@@ -21,6 +21,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
 
 interface OrganizationData {
   id: string;
@@ -31,6 +39,8 @@ interface OrganizationData {
 const formSchema = z.object({
   name: z.string().min(2, { message: "Project name must be at least 2 characters." }),
   description: z.string().optional(),
+  visibility: z.enum(["private", "public"]), // Make it non-optional here, with default in `useForm`
+  github_repo_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -100,6 +110,8 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
     defaultValues: {
       name: "",
       description: "",
+      visibility: "private", // Explicitly set default here
+      github_repo_url: "",
     },
   });
 
@@ -149,6 +161,8 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
       slug: newSlug,
       description: values.description,
       organization_id: organization.id,
+      visibility: values.visibility, // Insert new field
+      github_repo_url: values.github_repo_url || null, // Insert new field, handle empty string
     });
 
     if (error) {
@@ -178,8 +192,8 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-      <Card className="w-[350px]">
+    <div className="flex items-center justify-center pt-10">
+      <Card className="w-[550px]">
         <CardHeader>
           <CardTitle>Create New Project</CardTitle>
           <CardDescription>Create a new project for {organization?.name}.</CardDescription>
@@ -205,8 +219,34 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
                 {...form.register("description")}
               />
             </div>
-            <Button type="submit" disabled={loading || orgLoading}>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="visibility">Visibility</Label>
+              <Select onValueChange={(value) => form.setValue("visibility", value as "private" | "public")} defaultValue="private">
+                <SelectTrigger id="visibility" className="w-full">
+                  <SelectValue placeholder="Select a visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">Private</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="github_repo_url">GitHub Repository URL (Optional)</Label>
+              <Input
+                id="github_repo_url"
+                placeholder="https://github.com/your-repo"
+                {...form.register("github_repo_url")}
+              />
+              {form.formState.errors.github_repo_url && (
+                <p className="text-red-500 text-sm">{form.formState.errors.github_repo_url.message}</p>
+              )}
+            </div>
+            <Button type="submit" disabled={loading}>
               {loading ? "Creating..." : "Create Project"}
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href={`/dashboard/organizations/${orgSlug}/projects`}>Cancel</Link>
             </Button>
           </form>
         </CardContent>

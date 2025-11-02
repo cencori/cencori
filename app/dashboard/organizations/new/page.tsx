@@ -31,8 +31,8 @@ import {
 const formSchema = z.object({
   name: z.string().min(2, { message: "Organization name must be at least 2 characters." }),
   description: z.string().optional(),
-  type: z.enum(["personal", "agency", "startup", "company"]),
-  plan: z.enum(["free", "basic", "pro", "enterprise"]), // Update with your actual plans
+  type: z.enum(["Personal", "Agency", "Startup", "Company"]),
+  plan: z.enum(["Free Plan", "Basic Plan", "Pro Plan", "Enterprise Plan"]), // Update with your actual plans
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -50,8 +50,8 @@ export default function NewOrganizationPage() {
     defaultValues: {
       name: "",
       description: "",
-      type: "personal",
-      plan: "free",
+      type: "Personal",
+      plan: "Free Plan",
     },
   });
 
@@ -156,10 +156,10 @@ export default function NewOrganizationPage() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="personal">Personal</SelectItem>
-                  <SelectItem value="agency">Agency</SelectItem>
-                  <SelectItem value="startup">Startup</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
+                  <SelectItem value="Personal">Personal</SelectItem>
+                  <SelectItem value="Agency">Agency</SelectItem>
+                  <SelectItem value="Startup">Startup</SelectItem>
+                  <SelectItem value="Company">Company</SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.type && (
@@ -173,10 +173,10 @@ export default function NewOrganizationPage() {
                   <SelectValue placeholder="Select plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                  <SelectItem value="Free Plan">Free Plan</SelectItem>
+                  <SelectItem value="Basic Plan">Basic Plan</SelectItem>
+                  <SelectItem value="Pro Plan">Pro Plan</SelectItem>
+                  <SelectItem value="Enterprise Plan">Enterprise Plan</SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.plan && (

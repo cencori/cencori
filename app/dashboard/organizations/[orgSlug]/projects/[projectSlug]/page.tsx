@@ -98,7 +98,7 @@ export default function ProjectDetailsPage({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xl">Loading project details...</p>
+        <p className="text-sm text-muted-foreground">Loading project details...</p>
       </div>
     );
   }
@@ -106,7 +106,7 @@ export default function ProjectDetailsPage({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xl text-red-500">{error}</p>
+        <p className="text-sm text-red-500">{error}</p>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function ProjectDetailsPage({
     // Should theoretically be caught by notFound() above, but as a safeguard
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xl text-red-500">Project or Organization not found.</p>
+        <p className="text-sm text-red-500">Project or Organization not found.</p>
       </div>
     );
   }
@@ -133,7 +133,7 @@ export default function ProjectDetailsPage({
         </CardHeader>
         <CardContent>
           <p><strong>Organization:</strong> {organization.name}</p>
-          <p><strong>Slug:</strong> {project.slug}</p>
+          <p><strong>Project ID:</strong> {project.slug}</p>
           <p><strong>Description:</strong> {project.description || "No description provided."}</p>
           <p><strong>Created At:</strong> {new Date(project.created_at).toLocaleDateString()}</p>
           {/* Add more project details as needed */}
