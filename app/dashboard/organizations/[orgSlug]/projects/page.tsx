@@ -19,6 +19,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"; // Import DropdownMenu components
 import { MoreHorizontal as MoreHorizontalIcon } from "lucide-react"; // Import MoreHorizontalIcon
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"; // Import Dialog components
+import { toast } from "sonner";
 
 interface OrganizationData {
   id: string;
@@ -46,6 +57,8 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>(""); // New state for search term
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // State for delete dialog
+  const [projectToDelete, setProjectToDelete] = useState<ProjectData | null>(null); // Project to delete
 
   useEffect(() => {
     const fetchOrgAndProjects = async () => {
@@ -101,6 +114,27 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
 
     fetchOrgAndProjects();
   }, [orgSlug, setBreadcrumbs]);
+
+  const handleDeleteProject = async (projectId: string) => {
+    setLoading(true);
+    const { error: deleteError } = await browserSupabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+
+    if (deleteError) {
+      console.error("Error deleting project:", deleteError.message);
+      toast.error("Failed to delete project: " + deleteError.message);
+    } else {
+      toast.success("Project deleted successfully!");
+      // Remove the deleted project from the state
+      setProjects((prevProjects) =>
+        prevProjects ? prevProjects.filter((p) => p.id !== projectId) : null
+      );
+    }
+    setLoading(false);
+    setIsDeleteDialogOpen(false); // Close dialog after action
+  };
 
   if (loading) {
     return (
@@ -172,18 +206,14 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
                   <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={project.visibility === 'public' ? 'outline' : 'outline'}>
+                  <Badge variant={project.visibility === 'public' ? 'secondary' : 'default'}>
                     {project.visibility.charAt(0).toUpperCase() + project.visibility.slice(1)}
                   </Badge>
                 </TableCell>
                 <TableCell>{new Date(project.created_at).toLocaleDateString()}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
-                    <Badge variant={project.status === 'active' ? 'outline' : 'destructive'}>
-                    <span
-                      className={project.status === 'active' ? 'size-1.5 rounded-full bg-green-500' : 'size-1.5 rounded-full bg-destructive'}
-                      aria-hidden="true"
-                    />
+                    <Badge variant={project.status === 'active' ? 'default' : 'destructive'}>
                       {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                     </Badge>
                   </div>
@@ -197,10 +227,23 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); /* Handle Edit */ }}>
+                      <DropdownMenuItem 
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}/edit`);
+                        }}
+                      >
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); /* Handle Delete */ }}>
+                      <DropdownMenuItem
+                        className="cursor-pointer text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectToDelete(project);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -220,6 +263,31 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
           </Button>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the project "{projectToDelete?.name}"?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => projectToDelete && handleDeleteProject(projectToDelete.id)}
+              disabled={loading}
+            >
+              {loading ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
