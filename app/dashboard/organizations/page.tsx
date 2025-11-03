@@ -9,6 +9,7 @@ import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/plus";
 import { BoxesIcon } from "@/components/ui/boxes"; // Import BoxesIcon
+import { Input } from "@/components/ui/input";
 
 interface OrganizationData {
   id: string;
@@ -24,6 +25,7 @@ export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<OrganizationData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -97,13 +99,23 @@ export default function OrganizationsPage() {
     );
   }
 
+  const filteredOrganizations = organizations.filter(org =>
+    org.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center space-x-4 pb-4">
         <h1 className="text-lg font-bold">Your Organizations</h1>
       </div>
-      <div className="flex justify-end items-center mb-6">
-        
+      <div className="flex justify-between items-center mb-6">
+        <Input
+          type="text"
+          placeholder="Search organizations..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-xs mr-6"
+        />
         <Button asChild>
           <Link href="/dashboard/organizations/new">
             <PlusIcon size={16} className="mr-2" />
@@ -113,7 +125,7 @@ export default function OrganizationsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map((org) => (
+        {filteredOrganizations.map((org) => (
           <Card key={org.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}>
             <CardHeader>
               <div>
