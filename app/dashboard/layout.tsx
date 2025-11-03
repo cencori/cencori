@@ -193,12 +193,12 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
   return (
     <div className="min-h-screen bg-white-50 dark:bg-black transition-colors">
-      <header className="h-12 border-b border-zinc-100 dark:border-zinc-800 px-6 flex items-center justify-between">
+      <header className="h-12 border-b border-zinc-100 dark:border-zinc-800 px-4 md:px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/organizations" className="flex items-center gap-3">
             <Logo variant="mark" className="h-4"/>
           </Link>
-          <Breadcrumb className="hidden md:flex">
+          <Breadcrumb className="sm:flex md:flex">
             <BreadcrumbList>
               {orgSlug && (
                 <React.Fragment>
@@ -227,7 +227,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                             />
                           </SelectPrimitive.Icon>
                         </SelectPrimitive.Trigger>
-                        <SelectContent className="w-80 p-1">
+                        <SelectContent className="w-full sm:w-80 p-1">
                           <div className="px-2 py-1">
                             <div className="relative">
                               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -290,7 +290,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                             />
                           </SelectPrimitive.Icon>
                         </SelectPrimitive.Trigger>
-                        <SelectContent className="w-80 p-1">
+                        <SelectContent className="w-full sm:w-80 p-1">
                           <div className="px-2 py-1">
                             <div className="relative">
                               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -470,7 +470,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         </div>
       </header>
 
-      <main className="p-8">
+      <main className="p-4 md:p-8">
         {children}
       </main>
     </div>
