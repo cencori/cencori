@@ -182,7 +182,7 @@ export default function EditProjectPage({
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
+    <div className="flex items-center justify-center mt-12 h-full">
       <Card className="w-[550px]">
         <CardHeader>
           <CardTitle>Edit Project: {project.name}</CardTitle>
