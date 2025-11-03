@@ -10,7 +10,30 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLab
 import { Separator } from "@/components/ui/separator";
 import { LogOut, CircleUserRound, CreditCard, Settings, Home, Users, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { BreadcrumbProvider, useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
+// import { BreadcrumbProvider, useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
+} from "@/components/ui/breadcrumb";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectValue,
+  SelectPrimitive,
+} from "@/components/ui/select";
+import { ChevronsUpDown, PlusCircle, Search } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr"; // Import createBrowserClient
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -56,14 +79,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     null;
 
   return (
-    <BreadcrumbProvider>
-      <LayoutContent
-        user={typedUser}
-        avatar={avatar}
-        name={name}>
-        {children}
-      </LayoutContent>
-    </BreadcrumbProvider>
+    <LayoutContent
+      user={typedUser}
+      avatar={avatar}
+      name={name}>
+      {children}
+    </LayoutContent>
   );
 }
 
@@ -81,7 +102,80 @@ interface LayoutContentProps {
 
 function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const router = useRouter();
-  const { breadcrumbs } = useBreadcrumbs();
+  const pathname = usePathname();
+
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingOrgData, setLoadingOrgData] = useState(true);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+  );
+
+  useEffect(() => {
+    const fetchOrgAndProjects = async () => {
+      setLoadingOrgData(true);
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !currentUser) {
+        console.error("User not logged in:", userError?.message);
+        setLoadingOrgData(false);
+        return;
+      }
+
+      // Fetch organizations
+      const { data: orgsData, error: orgsError } = await supabase
+        .from("organizations")
+        .select("id, name, slug")
+        .eq("owner_id", currentUser.id);
+
+      if (orgsError) {
+        console.error("Error fetching organizations:", orgsError.message);
+      } else {
+        setOrganizations(orgsData || []);
+      }
+
+      // Fetch projects for all fetched organizations
+      if (orgsData && orgsData.length > 0) {
+        const orgIds = orgsData.map(org => org.id);
+        const { data: projectsData, error: projectsError } = await supabase
+          .from("projects")
+          .select("id, name, slug, organization_id")
+          .in("organization_id", orgIds);
+
+        if (projectsError) {
+          console.error("Error fetching projects:", projectsError.message);
+        } else {
+          // Map project data to include orgSlug for easier filtering in breadcrumbs
+          const projectsWithOrgSlug = projectsData?.map(proj => ({
+            ...proj,
+            orgSlug: orgsData.find(org => org.id === proj.organization_id)?.slug
+          })) || [];
+          setProjects(projectsWithOrgSlug);
+        }
+      }
+      setLoadingOrgData(false);
+    };
+
+    fetchOrgAndProjects();
+  }, [user]); // Re-fetch if the authenticated user changes
+
+  const getOrgSlug = () => {
+    const match = pathname.match(/organizations\/([^/]+)/);
+    return match ? match[1] : null;
+  };
+
+  const getProjectSlug = () => {
+    const match = pathname.match(/projects\/([^/]+)/);
+    return match ? match[1] : null;
+  };
+
+  const orgSlug = getOrgSlug();
+  const projectSlug = getProjectSlug();
+
+  const currentOrg = organizations.find((org) => org.slug === orgSlug);
+  const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
 
   return (
     <div className="min-h-screen bg-white-50 dark:bg-black transition-colors">
@@ -90,24 +184,169 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           <Link href="/dashboard/organizations" className="flex items-center gap-3">
             <Logo variant="mark" className="h-4"/>
           </Link>
-          {breadcrumbs.length > 0 && (
-            <nav className="flex items-center space-x-2 text-sm text-muted-foreground ml-4">
-              {breadcrumbs.map((item, index) => (
-                <React.Fragment key={index}>
-                  {index > 0 && <span>/</span>}
-                  {item.href ? (
-                    <Link href={item.href} className="hover:text-primary flex items-center gap-1">
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="text-primary flex items-center gap-1">
-                      {item.label}
-                    </span>
-                  )}
+          <Breadcrumb className="hidden md:flex">
+            <BreadcrumbList>
+              {orgSlug && (
+                <React.Fragment>
+                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  <BreadcrumbItem>
+                    <Select
+                      value={currentOrg?.slug || "all"}
+                      onValueChange={(slug) => {
+                        if (slug === "all") {
+                          router.push("/dashboard/organizations");
+                        } else {
+                          router.push(`/dashboard/organizations/${slug}`);
+                        }
+                      }}
+                    >
+                        <SelectPrimitive.Trigger
+                          className="flex h-8 cursor-pointer w-full items-center justify-between p-1.5 text-foreground focus-visible:bg-accent focus-visible:ring-0 [&>span]:line-clamp-none"
+                        >
+                          <SelectValue placeholder="Organizations">
+                            {currentOrg?.name || "Organizations"}
+                          </SelectValue>
+                          <SelectPrimitive.Icon asChild>
+                            <ChevronsUpDown
+                              size={14}
+                              className="ml-2 text-muted-foreground/80"
+                            />
+                          </SelectPrimitive.Icon>
+                        </SelectPrimitive.Trigger>
+                        <SelectContent className="w-80 p-1">
+                          <div className="px-2 py-1">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="search"
+                                placeholder="Search organizations..."
+                                className="w-full rounded-lg bg-background pl-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div className="h-auto w-full rounded-md overflow-y-auto">
+                            {organizations.map((org) => (
+                              <SelectItem key={org.id} value={org.slug} className="cursor-pointer">
+                                {org.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                          <SelectSeparator />
+                          <SelectGroup>
+                            <SelectItem value="all" className="cursor-pointer">
+                              All Organizations
+                            </SelectItem>
+                          </SelectGroup>
+                          <SelectSeparator />
+                          <Link href="/dashboard/organizations/new" className="flex items-center gap-2 cursor-pointer px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50">
+                            <PlusCircle className="h-4 w-4" />
+                            New Organization
+                          </Link>
+                        </SelectContent>
+                      </Select>
+                  </BreadcrumbItem>
                 </React.Fragment>
-              ))}
-            </nav>
-          )}
+              )}
+
+              {orgSlug && projectSlug && !pathname.includes("new") && !pathname.includes("edit") && (
+                <React.Fragment>
+                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  <BreadcrumbItem>
+                    {projectSlug || !pathname.includes("new") || !pathname.includes("edit") ? (
+                      <Select
+                        value={currentProject?.slug || "all"}
+                        onValueChange={(slug) => {
+                          if (slug === "all") {
+                            router.push(`/dashboard/organizations/${orgSlug}/projects`);
+                          } else {
+                            router.push(`/dashboard/organizations/${orgSlug}/projects/${slug}`);
+                          }
+                        }}
+                      >
+                        <SelectPrimitive.Trigger
+                          className="flex h-8 w-full cursor-pointer items-center justify-between p-1.5 text-foreground focus-visible:bg-accent focus-visible:ring-0 [&>span]:line-clamp-none"
+                        >
+                          <SelectValue placeholder="Projects">
+                            {currentProject?.name || "Projects"}
+                          </SelectValue>
+                          <SelectPrimitive.Icon asChild>
+                            <ChevronsUpDown
+                              size={14}
+                              className="ml-2 text-muted-foreground/80"
+                            />
+                          </SelectPrimitive.Icon>
+                        </SelectPrimitive.Trigger>
+                        <SelectContent className="w-80 p-1">
+                          <div className="px-2 py-1">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="search"
+                                placeholder="Search projects..."
+                                className="w-full rounded-lg bg-background pl-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div className="h-auto w-full rounded-md overflow-y-auto">
+                            {projects.filter(p => p.orgSlug === orgSlug).map((proj) => (
+                              <SelectItem key={proj.id} value={proj.slug} className="cursor-pointer">
+                                {proj.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                          <SelectSeparator />
+                          <SelectGroup>
+                            <SelectItem value="all" className="cursor-pointer">
+                              All Projects
+                            </SelectItem>
+                          </SelectGroup>
+                          <SelectSeparator />
+                          <Link href={`/dashboard/organizations/${orgSlug}/projects/new`} className="flex items-center gap-2 cursor-pointer px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50">
+                              <PlusCircle className="h-4 w-4" />
+                              Create New Project
+                            </Link>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={`/dashboard/organizations/${orgSlug}/projects`}>
+                          {currentProject?.name || projectSlug}
+                        </Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </React.Fragment>
+                
+              )}
+
+              {pathname.includes("/organizations/new") && (
+                <React.Fragment>
+                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>New Organization</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </React.Fragment>
+              )}
+
+              {orgSlug && pathname.includes("/projects/new") && (
+                <React.Fragment>
+                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>New Project</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </React.Fragment>
+              )}
+
+              {orgSlug && projectSlug && pathname.includes("/edit") && (
+                <React.Fragment>
+                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Edit Project</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </React.Fragment>
+              )}
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
         <div className="flex items-center gap-3">
         <button

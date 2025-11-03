@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { notFound, redirect, useRouter } from "next/navigation"; // Import useRouter
 import { Home as HomeIcon } from "lucide-react";
-import { useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
 import { useEffect, useState } from "react"; // Import useState
 import { PlusIcon } from '@/components/ui/plus';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -50,7 +49,6 @@ interface ProjectData {
 
 export default function OrgProjectsPage({ params }: { params: { orgSlug: string } }) {
   const { orgSlug } = params;
-  const { setBreadcrumbs } = useBreadcrumbs();
   const router = useRouter(); // Initialize useRouter
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [projects, setProjects] = useState<ProjectData[] | null>(null);
@@ -86,11 +84,11 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
         }
         setOrganization(orgData);
 
-        setBreadcrumbs([
-          { label: "Organizations", href: "/dashboard/organizations" },
-          { label: orgData.name, href: `/dashboard/organizations/${orgSlug}/projects` },
-          { label: "Projects" },
-        ]);
+        // setBreadcrumbs([
+        //   { label: "Organizations", href: "/dashboard/organizations" },
+        //   { label: orgData.name, href: `/dashboard/organizations/${orgSlug}/projects` },
+        //   { label: "Projects" },
+        // ]);
 
         const { data: projectsData, error: projectsError } = await browserSupabase
           .from("projects")
@@ -113,7 +111,7 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
     };
 
     fetchOrgAndProjects();
-  }, [orgSlug, setBreadcrumbs]);
+  }, [orgSlug]);
 
   const handleDeleteProject = async (projectId: string) => {
     setLoading(true);

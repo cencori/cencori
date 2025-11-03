@@ -8,7 +8,6 @@ import { siteConfig } from "@/config/site";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/plus";
-import { ChevronRightIcon } from "@/components/ui/chevron-right"; // Import ChevronRightIcon
 import { BoxesIcon } from "@/components/ui/boxes"; // Import BoxesIcon
 
 interface OrganizationData {

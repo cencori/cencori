@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
 import {
   Select,
   SelectContent,
@@ -58,8 +57,6 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
   );
 
-  const { setBreadcrumbs } = useBreadcrumbs();
-
   // Fetch organization details in useEffect
   useEffect(() => {
     const fetchOrg = async () => {
@@ -87,13 +84,6 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
         }
         setOrganization(orgData);
 
-        setBreadcrumbs([
-          { label: "Organizations", href: "/dashboard/organizations" },
-          { label: orgData.name, href: `/dashboard/organizations/${orgSlug}/projects` },
-          { label: "Projects", href: `/dashboard/organizations/${orgSlug}/projects` },
-          { label: "New" },
-        ]);
-
       } catch (err: unknown) { // Change any to unknown
         console.error("Unexpected error fetching organization:", (err as Error).message);
         setOrgError("An unexpected error occurred while loading organization details.");
@@ -103,7 +93,7 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
     };
 
     fetchOrg();
-  }, [orgSlug, setBreadcrumbs, router, supabase]);
+  }, [orgSlug, router, supabase]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

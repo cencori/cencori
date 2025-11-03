@@ -5,8 +5,8 @@ import { notFound, redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Home as HomeIcon } from "lucide-react";
-import { useBreadcrumbs } from "@/lib/contexts/BreadcrumbContext";
 import { useEffect, useState } from "react";
+import React from "react";
 
 interface OrganizationData {
   id: string;
@@ -28,7 +28,6 @@ export default function ProjectDetailsPage({
   params: { orgSlug: string; projectSlug: string };
 }) {
   const { orgSlug, projectSlug } = params;
-  const { setBreadcrumbs } = useBreadcrumbs();
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,12 +76,12 @@ export default function ProjectDetailsPage({
         setProject(projectData);
 
         // Set breadcrumbs
-        setBreadcrumbs([
-          { label: "Organizations", href: "/dashboard/organizations" },
-          { label: orgData.name, href: `/dashboard/organizations/${orgSlug}/projects` },
-          { label: "Projects", href: `/dashboard/organizations/${orgSlug}/projects` },
-          { label: projectData.name },
-        ]);
+        // setBreadcrumbs([
+        //   { label: "Organizations", href: "/dashboard/organizations" },
+        //   { label: orgData.name, href: `/dashboard/organizations/${orgSlug}/projects` },
+        //   { label: "Projects", href: `/dashboard/organizations/${orgSlug}/projects` },
+        //   { label: projectData.name },
+        // ]);
 
       } catch (err: unknown) { // Change any to unknown
         console.error("Unexpected error:", (err as Error).message);
@@ -93,7 +92,7 @@ export default function ProjectDetailsPage({
     };
 
     fetchProjectDetails();
-  }, [orgSlug, projectSlug, setBreadcrumbs]);
+  }, [orgSlug, projectSlug]);
 
   if (loading) {
     return (
