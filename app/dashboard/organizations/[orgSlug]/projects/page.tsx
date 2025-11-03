@@ -163,22 +163,23 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
         <div className="flex items-center space-x-4 pb-4">
         <h1 className="text-xl font-bold">Projects</h1>
         </div>
+      <div>
       <div className="flex justify-between items-center mb-6">
-      <Input
+          <Input
             type="text"
             placeholder="Search projects..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64 sm:w-20"
+            className="max-w-xs"
           />
           <Button asChild>
             <Link href={`/dashboard/organizations/${orgSlug}/projects/new`}>
               <PlusIcon size={16} className="mr-2" />
-              New Project
+                New Project
             </Link>
           </Button>
       </div>
-
+      </div>
       {/* Filter projects based on search term */}
       {projects && projects.length > 0 ? (
         <Table>
