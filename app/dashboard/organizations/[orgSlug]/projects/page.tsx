@@ -200,7 +200,7 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
               project.slug.toLowerCase().includes(searchTerm.toLowerCase())
             ).map((project) => (
               <TableRow key={project.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}`)}>
-                <TableCell className="font-light">
+                <TableCell className="font-medium">
                   {project.name}
                   <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
                 </TableCell>

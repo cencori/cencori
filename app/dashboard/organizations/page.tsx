@@ -132,8 +132,8 @@ export default function OrganizationsPage() {
               <BoxesIcon size={24} className="text-muted-foreground pb-4" />
               </div>
               <div className="flex-col">
-                <CardTitle>{org.name}</CardTitle>
-                  <p>{org.current_plan}</p>
+                <CardTitle className="font-bold">{org.name}</CardTitle>
+                  <p className="text-muted-foreground">{org.current_plan.charAt(0).toUpperCase() + org.current_plan.slice(1) + " Plan"}</p>
               </div>
             </CardHeader>
           </Card>
