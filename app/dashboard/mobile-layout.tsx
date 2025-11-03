@@ -424,7 +424,7 @@ export default function MobileLayout({ user, avatar, name, children }: MobileLay
         </Sidebar>
 
         {/* content: note pt-16 => header (h-12) + 4px gap; mobile trigger occupies top-12 */}
-        <main className="p-4 md:p-8 pt-28 max-w-5xl mx-auto">
+        <main className="p-4 md:p-8 pt-16 max-w-5xl mx-auto">
           {children}
         </main>
       </div>

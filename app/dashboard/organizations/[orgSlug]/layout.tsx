@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import { notFound, redirect, useRouter, useParams } from "next/navigation";
+import { notFound, redirect, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import {
@@ -12,13 +12,23 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuBadge,
   SidebarTrigger,
   SidebarRail,
   SidebarGroup,
   SidebarGroupLabel,
+  SidebarGroupAction,
+  SidebarInput,
+  SidebarSeparator,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Home, Settings, Package, Users, Handshake, CreditCard } from "lucide-react";
+import { SettingsIcon } from "@/components/animate-ui/icons/settings";
+import { Layers, LayersIcon } from "@/components/animate-ui/icons/layers";
+import { Unplug, UnplugIcon } from "@/components/animate-ui/icons/unplug";
+import { ActivityIcon } from "@/components/animate-ui/icons/activity";
+import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
+import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
 
 
 interface OrganizationData {
@@ -29,12 +39,13 @@ interface OrganizationData {
 
 export default function OrganizationLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: { orgSlug: string };
 }) {
+  const { orgSlug } = params;
   const router = useRouter();
-  const params = useParams();
-  const orgSlug = params.orgSlug as string;
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +121,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Projects">
                   <Link href={`/dashboard/organizations/${orgSlug}/projects`}>
-                    <Package />
+                    <LayersIcon animateOnHover/>
                     <span>Projects</span>
                   </Link>
                 </SidebarMenuButton>
@@ -119,7 +130,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Billing">
                   <Link href={`/dashboard/organizations/${orgSlug}/billing`}>
-                    <CreditCard />
+                    <PanelTopIcon animateOnHover/>
                     <span>Billing</span>
                   </Link>
                 </SidebarMenuButton>
@@ -127,7 +138,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Usage">
                   <Link href={`/dashboard/organizations/${orgSlug}/usage`}>
-                    <Handshake />
+                    <ActivityIcon animateOnHover/>
                     <span>Usage</span>
                   </Link>
                 </SidebarMenuButton>
@@ -135,7 +146,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Integrations">
                   <Link href={`/dashboard/organizations/${orgSlug}/integrations`}>
-                    <Users />
+                    <UnplugIcon animateOnHover/>
                     <span>Integrations</span>
                   </Link>
                 </SidebarMenuButton>
@@ -143,7 +154,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Teams">
                   <Link href={`/dashboard/organizations/${orgSlug}/teams`}>
-                    <Users />
+                    <UserRoundIcon animateOnHover/>
                     <span>Teams</span>
                   </Link>
                 </SidebarMenuButton>
@@ -151,7 +162,7 @@ export default function OrganizationLayout({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                   <Link href={`/dashboard/organizations/${orgSlug}/settings`}>
-                    <Settings />
+                    <SettingsIcon animateOnHover />
                     <span>Settings</span>
                   </Link>
                 </SidebarMenuButton>
