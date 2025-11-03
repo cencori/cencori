@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import { notFound, redirect, useRouter } from "next/navigation";
+import { notFound, redirect, useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import {
@@ -12,14 +12,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuBadge,
   SidebarTrigger,
   SidebarRail,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupAction,
-  SidebarInput,
-  SidebarSeparator,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Home, Settings, Package, Users, Handshake, CreditCard } from "lucide-react";
@@ -33,13 +29,12 @@ interface OrganizationData {
 
 export default function OrganizationLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: { orgSlug: string };
 }) {
-  const { orgSlug } = params;
   const router = useRouter();
+  const params = useParams();
+  const orgSlug = params.orgSlug as string;
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
