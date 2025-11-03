@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
 import React, { useEffect, useState } from "react";
+import type { LayoutProps } from "next";
 import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
-  SidebarHeader,
   SidebarProvider,
   SidebarMenu,
   SidebarMenuItem,
@@ -15,7 +15,6 @@ import {
   SidebarTrigger,
   SidebarRail,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
@@ -24,7 +23,6 @@ import { UnplugIcon } from "@/components/animate-ui/icons/unplug";
 import { ActivityIcon } from "@/components/animate-ui/icons/activity";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
-import { Home } from "lucide-react";
 
 interface OrganizationData {
   id: string;
@@ -32,31 +30,64 @@ interface OrganizationData {
   slug: string;
 }
 
+/**
+ * Stable reference to the browser supabase client.
+ * Hoisted to avoid react-hooks/exhaustive-deps complaints.
+ */
+const browserSupabase = supabase;
+
+function CenteredPanel({ children }: { children: React.ReactNode }) {
+  // We subtract 4rem (header ~3rem + trigger/gap ~1rem) from viewport height
+  // so vertical centering occurs in the visible area beneath fixed header elements.
+  return (
+    <div className="flex items-center justify-center px-4">
+      <div
+        className="w-full max-w-5xl mx-auto text-center"
+        style={{ minHeight: "calc(100vh - 4rem)" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Layout for /dashboard/organizations/[orgSlug]
+ *
+ * Typed using Next's LayoutProps to match Next.js expectations and avoid
+ * build-time TypeScript errors related to params typing.
+ */
 export default function OrganizationLayout({
   children,
   params,
-}: {
-  children: React.ReactNode;
-  params: { orgSlug: string };
-}) {
-  const { orgSlug } = params;
+}: LayoutProps<"/dashboard/organizations/[orgSlug]">) {
+  // params is typed by LayoutProps; assert the shape for local usage
+  const { orgSlug } = params as { orgSlug: string };
+
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchOrganization = async () => {
       setLoading(true);
       setError(null);
+
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await browserSupabase.auth.getUser();
 
         if (userError || !user) {
+          // If user isn't authenticated, redirect to login
           redirect("/login");
           return;
         }
 
-        const { data: orgData, error: orgError } = await supabase
+        const { data: orgData, error: orgError } = await browserSupabase
           .from("organizations")
           .select("id, name, slug")
           .eq("slug", orgSlug)
@@ -65,93 +96,110 @@ export default function OrganizationLayout({
 
         if (orgError || !orgData) {
           console.error("Error fetching organization:", orgError?.message);
+          // Let Next handle a 404
           notFound();
           return;
         }
-        setOrganization(orgData);
 
+        if (mounted) {
+          setOrganization(orgData);
+        }
       } catch (err: unknown) {
         console.error("Unexpected error:", (err as Error).message);
-        setError("An unexpected error occurred.");
+        if (mounted) {
+          setError("An unexpected error occurred.");
+        }
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     fetchOrganization();
-  }, [orgSlug]);
 
+    return () => {
+      mounted = false;
+    };
+  }, [orgSlug, browserSupabase]);
 
+  // Loading
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
+      <CenteredPanel>
         <p className="text-sm text-muted-foreground">Loading organization...</p>
-      </div>
+      </CenteredPanel>
     );
   }
 
+  // Error
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
+      <CenteredPanel>
         <p className="text-sm text-red-500">{error}</p>
-      </div>
+      </CenteredPanel>
     );
   }
 
+  // Not found (fallback guard)
   if (!organization) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
+      <CenteredPanel>
         <p className="text-sm text-red-500">Organization not found.</p>
-      </div>
+      </CenteredPanel>
     );
   }
 
+  // Main layout when organization is present
   return (
     <SidebarProvider defaultOpen={true}>
       <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)]">
         <SidebarContent>
-          <SidebarGroup>
+          <SidebarGroup className="pt-4">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Projects">
                   <Link href={`/dashboard/organizations/${orgSlug}/projects`}>
-                    <LayersIcon animateOnHover/>
+                    <LayersIcon animateOnHover />
                     <span>Projects</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Billing">
                   <Link href={`/dashboard/organizations/${orgSlug}/billing`}>
-                    <PanelTopIcon animateOnHover/>
+                    <PanelTopIcon animateOnHover />
                     <span>Billing</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Usage">
                   <Link href={`/dashboard/organizations/${orgSlug}/usage`}>
-                    <ActivityIcon animateOnHover/>
+                    <ActivityIcon animateOnHover />
                     <span>Usage</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Integrations">
                   <Link href={`/dashboard/organizations/${orgSlug}/integrations`}>
-                    <UnplugIcon animateOnHover/>
+                    <UnplugIcon animateOnHover />
                     <span>Integrations</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Teams">
                   <Link href={`/dashboard/organizations/${orgSlug}/teams`}>
-                    <UserRoundIcon animateOnHover/>
+                    <UserRoundIcon animateOnHover />
                     <span>Teams</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                   <Link href={`/dashboard/organizations/${orgSlug}/settings`}>
@@ -163,11 +211,13 @@ export default function OrganizationLayout({
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+
         <SidebarRail />
         <SidebarFooter>
           <SidebarTrigger />
         </SidebarFooter>
       </Sidebar>
+
       <main className="flex w-full flex-1 flex-col overflow-hidden">
         {children}
       </main>
