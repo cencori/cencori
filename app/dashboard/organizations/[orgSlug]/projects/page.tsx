@@ -163,29 +163,28 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
         <div className="flex items-center space-x-4 pb-4">
         <h1 className="text-xl font-bold">Projects</h1>
         </div>
-      <div>
       <div className="flex justify-between items-center mb-6">
-          <Input
+      <Input
             type="text"
             placeholder="Search projects..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs mr-6"
+            className="w-64"
           />
           <Button asChild>
             <Link href={`/dashboard/organizations/${orgSlug}/projects/new`}>
               <PlusIcon size={16} className="mr-2" />
-                New Project
+              New Project
             </Link>
           </Button>
       </div>
-      </div>
+
       {/* Filter projects based on search term */}
       {projects && projects.length > 0 ? (
         <Table>
           <TableCaption>A list of your projects within {organization.name}.</TableCaption>
-          <TableHeader className=" bg-muted/50">
-            <TableRow className=" bg-muted/50">
+          <TableHeader className="bg-muted/50">
+            <TableRow className="bg-muted/50">
               <TableHead>PROJECT</TableHead>
               <TableHead>VISIBILITY</TableHead>
               <TableHead>DATE CREATED</TableHead>
@@ -193,7 +192,7 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
               <TableHead className="text-right"></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="border">
+          <TableBody>
             {projects.filter(project =>
               project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
               project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -203,11 +202,6 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
                 <TableCell className="font-medium">
                   {project.name}
                   <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={project.visibility === 'public' ? 'secondary' : 'default'}>
-                    {project.visibility.charAt(0).toUpperCase() + project.visibility.slice(1)}
-                  </Badge>
                 </TableCell>
                 <TableCell>
                   {(() => {

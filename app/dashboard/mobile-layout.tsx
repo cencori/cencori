@@ -425,7 +425,7 @@ export default function MobileLayout({ user, avatar, name, children }: MobileLay
         </header>
 
         {/* Mobile Sidebar Trigger - visible only on mobile (below md breakpoint) */}
-        <div className="fixed top-12 z-40 w-full bg-background md:hidden border-b border-zinc-100 dark:border-zinc-800 px-4 py-2">
+        <div className="fixed top-12 z-40 w-full bg-background md:hidden border-b border-zinc-100 dark:border-zinc-800 px-3 py-2">
           <SidebarTrigger>
             <MenuIcon className="h-5 w-5" />
             <span className="sr-only">Toggle Sidebar</span>
@@ -497,7 +497,7 @@ export default function MobileLayout({ user, avatar, name, children }: MobileLay
           </SidebarContent>
         </Sidebar>
 
-        <main className="p-4 md:p-8 pt-28">
+        <main className="p-4 md:p-8 pt-28 overflow-x-hidden">
           {children}
         </main>
       </div>
