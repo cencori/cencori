@@ -1,23 +1,21 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import { notFound, redirect, useRouter } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
+  SidebarHeader,
   SidebarProvider,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuBadge,
   SidebarTrigger,
   SidebarRail,
   SidebarGroup,
-  SidebarGroupAction,
-  SidebarInput,
-  SidebarSeparator,
+  SidebarGroupLabel,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
@@ -111,6 +109,19 @@ export default function OrganizationLayout({
   return (
     <SidebarProvider defaultOpen={true}>
       <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] ">
+        <SidebarHeader className="relative min-h-12 border-b pl-4 pr-1 transition-[padding] duration-200 ease-linear group-data-[collapsible=icon]/sidebar:pl-[var(--sidebar-width-icon)]">
+          <Link
+            href={`/dashboard/organizations/${orgSlug}/projects`}
+            className="flex items-center gap-2"
+          >
+            <Home />
+            <span className="text-sm font-medium">Dashboard</span>
+          </Link>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <SidebarTrigger />
+          </div>
+        </SidebarHeader>
+
         <SidebarContent>
           <SidebarGroup className="pt-4">
             <SidebarMenu>

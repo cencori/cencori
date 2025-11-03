@@ -18,7 +18,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-  BreadcrumbEllipsis,
+  // BreadcrumbEllipsis, // Removed unused import
 } from "@/components/ui/breadcrumb";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,7 +26,7 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
+  // SelectLabel, // Removed unused import
   SelectSeparator,
   SelectValue,
   SelectPrimitive,
@@ -188,7 +188,7 @@ function DesktopLayoutContent({ user, avatar, name, children }: LayoutContentPro
     };
 
     fetchOrgAndProjects();
-  }, [user]); // Re-fetch if the authenticated user changes
+  }, [user, supabase]); // Add supabase to dependency array
 
   const getOrgSlug = () => {
     const match = pathname.match(/organizations\/([^/]+)/);
