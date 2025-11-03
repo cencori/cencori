@@ -210,7 +210,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                         if (slug === "all") {
                           router.push("/dashboard/organizations");
                         } else {
-                          router.push(`/dashboard/organizations/${slug}`);
+                          router.push(`/dashboard/organizations/${slug}/projects`);
                         }
                       }}
                     >
