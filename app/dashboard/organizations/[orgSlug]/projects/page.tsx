@@ -158,7 +158,7 @@ export default function OrgProjectsPage({ params }: { params: { orgSlug: string 
   }
 
   return (
-    <div className="mx-92 py-24">
+    <div className="mx-92 py-24 bg-background">
         <div className="flex items-center space-x-4 pb-12">
         <h1 className="text-xl font-bold">Projects</h1>
         </div>
