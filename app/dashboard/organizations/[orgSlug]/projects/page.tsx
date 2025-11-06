@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { notFound, useRouter } from "next/navigation";
-import { Home as HomeIcon } from "lucide-react";
+import { FolderCog, Home as HomeIcon } from "lucide-react";
 import { PlusIcon } from "@/components/ui/plus";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -286,7 +286,7 @@ export default function OrgProjectsPage({
         </Table>
       ) : (
         <div className="text-center p-32 flex flex-col items-center justify-center">
-          <Fan animate />
+          <FolderCog />
           <p className="text-xl mb-4 mt-4">No projects found for {organization.name}.</p>
           <Button asChild>
             <Link href={`/dashboard/organizations/${orgSlug}/projects/new`}>Create Project</Link>
