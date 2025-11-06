@@ -54,7 +54,8 @@ export default async function GitHubImportPage({ params }: GitHubImportPageProps
     console.error('Error fetching GitHub App installation:', installationError);
     // If no installation is found, redirect to the installation prompt
     const state = JSON.stringify({ orgSlug });
-    const githubAppInstallationUrl = `https://github.com/apps/${GITHUB_APP_ID}/installations/new?state=${encodeURIComponent(state)}`;
+    // Use the App slug 'cencori1' instead of the numeric App ID
+    const githubAppInstallationUrl = `https://github.com/apps/cencori/installations/new?state=${encodeURIComponent(state)}`;
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <h1 className="text-2xl font-bold mb-4">Import Project from GitHub</h1>
