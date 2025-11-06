@@ -15,11 +15,17 @@ interface ImportGitHubProjectProps {
 export async function importGitHubProject({ orgSlug, organizationId, repoId, repoFullName, repoHtmlUrl, repoDescription }: ImportGitHubProjectProps) {
   'use server';
 
-  const supabase = await createServerClient();
+  console.log('Server Action: importGitHubProject called.');
+  const supabase = createServerClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  console.log('User data:', user);
+  if (userError) {
+    console.error('Error fetching user:', userError);
+  }
 
   if (!user) {
+    console.log('User not authenticated. Redirecting to login.');
     redirect('/login'); // Redirect to login if not authenticated
   }
 
@@ -31,8 +37,13 @@ export async function importGitHubProject({ orgSlug, organizationId, repoId, rep
     .eq('user_id', user.id)
     .single();
 
+  console.log('Organization member data:', organizationMember);
+  if (memberError) {
+    console.error('Error fetching organization member status:', memberError);
+  }
+
   if (memberError || !organizationMember) {
-    console.error('User is not a member of this organization or error fetching member status:', memberError);
+    console.log('User is not a member of this organization or error fetching member status. Redirecting.');
     redirect(`/dashboard/organizations/${orgSlug}/projects`); // Redirect if not authorized
   }
 
@@ -52,6 +63,9 @@ export async function importGitHubProject({ orgSlug, organizationId, repoId, rep
     })
     .select()
     .single();
+
+  console.log('Supabase project insert result - data:', newProject);
+  console.log('Supabase project insert result - error:', error);
 
   if (error) {
     console.error('Error importing GitHub project:', error);

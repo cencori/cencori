@@ -138,6 +138,14 @@ export default async function GitHubImportPage({ params }: GitHubImportPageProps
               <button
                 className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors self-end"
                 onClick={async () => {
+                  console.log('Attempting to import project with data:', {
+                    orgSlug: orgSlug,
+                    organizationId: organizationId,
+                    repoId: repo.id,
+                    repoFullName: repo.full_name,
+                    repoHtmlUrl: repo.html_url,
+                    repoDescription: repo.description,
+                  });
                   await importGitHubProject({
                     orgSlug: orgSlug,
                     organizationId: organizationId,
