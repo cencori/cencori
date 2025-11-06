@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { notFound, useRouter } from "next/navigation";
+import { notFound, useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import {
@@ -38,9 +38,12 @@ export default function OrganizationLayout({
   params: LayoutParams;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isProjectRoute = pathname.includes(`/dashboard/organizations/${organization?.slug}/projects/`);
 
   useEffect(() => {
     const fetchOrganization = async () => {
@@ -107,66 +110,68 @@ export default function OrganizationLayout({
 
   return (
     <SidebarProvider defaultOpen>
-      <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)]">
-        <SidebarContent>
-          <SidebarGroup className="pt-4">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Projects">
-                  <Link href={`/dashboard/organizations/${organization.slug}/projects`}>
-                    <LayersIcon animateOnHover />
-                    <span>Projects</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Billing">
-                  <Link href={`/dashboard/organizations/${organization.slug}/billing`}>
-                    <PanelTopIcon animateOnHover />
-                    <span>Billing</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Usage">
-                  <Link href={`/dashboard/organizations/${organization.slug}/usage`}>
-                    <ActivityIcon animateOnHover />
-                    <span>Usage</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Integrations">
-                  <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
-                    <UnplugIcon animateOnHover />
-                    <span>Integrations</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Teams">
-                  <Link href={`/dashboard/organizations/${organization.slug}/teams`}>
-                    <UserRoundIcon animateOnHover />
-                    <span>Teams</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Settings">
-                  <Link href={`/dashboard/organizations/${organization.slug}/settings`}>
-                    <SettingsIcon animateOnHover />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarRail />
-        <div className="absolute bottom-0 left-0 w-full p-2">
-          <SidebarTrigger />
-        </div>
-      </Sidebar>
+      {!isProjectRoute && (
+        <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)]">
+          <SidebarContent>
+            <SidebarGroup className="pt-4">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Projects">
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects`}>
+                      <LayersIcon animateOnHover />
+                      <span>Projects</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Billing">
+                    <Link href={`/dashboard/organizations/${organization.slug}/billing`}>
+                      <PanelTopIcon animateOnHover />
+                      <span>Billing</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Usage">
+                    <Link href={`/dashboard/organizations/${organization.slug}/usage`}>
+                      <ActivityIcon animateOnHover />
+                      <span>Usage</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Integrations">
+                    <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
+                      <UnplugIcon animateOnHover />
+                      <span>Integrations</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Teams">
+                    <Link href={`/dashboard/organizations/${organization.slug}/teams`}>
+                      <UserRoundIcon animateOnHover />
+                      <span>Teams</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Settings">
+                    <Link href={`/dashboard/organizations/${organization.slug}/settings`}>
+                      <SettingsIcon animateOnHover />
+                      <span>Settings</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarRail />
+          <div className="absolute bottom-0 left-0 w-full p-2">
+            <SidebarTrigger />
+          </div>
+        </Sidebar>
+      )}
       <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
     </SidebarProvider>
   );

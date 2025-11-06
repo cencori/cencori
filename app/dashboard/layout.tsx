@@ -30,6 +30,7 @@ import {
 import { ChevronsUpDown, PlusCircle, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr"; // Import createBrowserClient
+import { Toaster } from "@/components/ui/sonner";
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -468,6 +469,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       <main className="p-4 md:p-8 pt-16">
         {children}
       </main>
+      <Toaster />
     </div>
   );
 }
