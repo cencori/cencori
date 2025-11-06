@@ -5,6 +5,13 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { getInstallationOctokit } from '@/lib/github';
 import { importGitHubProject } from './actions'; // Import the Server Action
 
+interface GitHubRepo {
+  id: number;
+  full_name: string;
+  html_url: string;
+  description: string | null;
+}
+
 interface GitHubImportPageProps {
   params: {
     orgSlug: string;
@@ -69,14 +76,20 @@ export default async function GitHubImportPage({ params }: GitHubImportPageProps
   }
 
   const installationId = installationData.installation_id;
-  let repositories: any[] = [];
+  let repositories: GitHubRepo[] = []; // Changed from any[] to GitHubRepo[]
 
   try {
     const installationOctokit = await getInstallationOctokit(installationId);
     const { data } = await installationOctokit.request('GET /installation/repositories', {
       per_page: 100, // Fetch up to 100 repositories
     });
-    repositories = data.repositories;
+    // Ensure the data.repositories array elements conform to GitHubRepo interface
+    repositories = data.repositories.map(repo => ({
+      id: repo.id,
+      full_name: repo.full_name,
+      html_url: repo.html_url,
+      description: repo.description,
+    }));
   } catch (error) {
     console.error('Error fetching repositories:', error);
     // Handle error, maybe show a message to the user
@@ -126,7 +139,7 @@ export default async function GitHubImportPage({ params }: GitHubImportPageProps
                 onClick={async () => {
                   await importGitHubProject({
                     orgSlug: orgSlug,
-                    organizationId: organizationId, // Pass organizationId
+                    organizationId: organizationId,
                     repoId: repo.id,
                     repoFullName: repo.full_name,
                     repoHtmlUrl: repo.html_url,
