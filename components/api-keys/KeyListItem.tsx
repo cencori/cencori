@@ -142,7 +142,7 @@ export function KeyListItem({ apiKey, projectId, onRevoked }: KeyListItemProps) 
                     <AlertDialogHeader>
                         <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to revoke "{apiKey.name}"? This action cannot be undone and any
+                            Are you sure you want to revoke &lsquo;{apiKey.name}&rsquo;? This action cannot be undone and any
                             applications using this key will stop working immediately.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

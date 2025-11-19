@@ -28,7 +28,7 @@ export default function UsagePage() {
                 <CardHeader>
                     <CardTitle>Usage Analytics & Monitoring</CardTitle>
                     <CardDescription>
-                        Track your organization's resource usage and activity metrics
+                        Track your organization&apos;s resource usage and activity metrics
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -38,7 +38,7 @@ export default function UsagePage() {
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Usage Dashboard Coming Soon</h3>
                         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                            Get comprehensive insights into your organization's resource consumption.
+                            Get comprehensive insights into your organization&apos;s resource consumption.
                             Track API calls, storage, bandwidth, and more with detailed analytics and reports.
                         </p>
 

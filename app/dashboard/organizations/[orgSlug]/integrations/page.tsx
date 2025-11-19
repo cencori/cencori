@@ -40,7 +40,7 @@ export default function IntegrationsPage() {
                         <h3 className="text-lg font-semibold mb-2">Integrations Hub Coming Soon</h3>
                         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                             Connect Cencori with your existing tools and workflows.
-                            We're building integrations with popular services to enhance your productivity.
+                            We&apos;re building integrations with popular services to enhance your productivity.
                         </p>
 
                         <div className="max-w-md mx-auto text-left">

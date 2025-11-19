@@ -37,8 +37,8 @@ export default function BillingPage() {
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Billing Dashboard Coming Soon</h3>
                         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                            We're integrating Stripe to bring you a complete billing experience.
-                            Soon you'll be able to manage subscriptions, update payment methods, and view your billing history.
+                            We&apos;re integrating Stripe to bring you a complete billing experience.
+                            Soon you&apos;ll be able to manage subscriptions, update payment methods, and view your billing history.
                         </p>
 
                         <div className="max-w-md mx-auto text-left">
