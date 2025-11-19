@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CopyIcon } from "lucide-react";
+import { CopyIcon, Settings, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -25,11 +25,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 
 interface ProjectData {
   id: string;
   name: string;
-  slug: string; // Project ID
+  slug: string;
+  description?: string;
   organization_id: string;
   visibility: 'public' | 'private';
   status: 'active' | 'inactive';
@@ -44,12 +49,16 @@ export default function ProjectSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [projectVisibility, setProjectVisibility] = useState<'public' | 'private'>('private');
   const [projectStatus, setProjectStatus] = useState<'active' | 'inactive'>('active');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const router = useRouter();
+
+  // Get context to update breadcrumbs
+  const { updateProject: updateProjectContext } = useOrganizationProject();
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -67,8 +76,6 @@ export default function ProjectSettingsPage() {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          // Handle unauthorized access, e.g., redirect to login
-          // router.push("/login");
           notFound();
           return;
         }
@@ -89,7 +96,7 @@ export default function ProjectSettingsPage() {
         // Then, get project details using projectSlug and organization ID
         const { data: projectData, error: projectError } = await supabase
           .from("projects")
-          .select("id, name, slug, organization_id, visibility, status")
+          .select("id, name, slug, description, organization_id, visibility, status")
           .eq("slug", projectSlug)
           .eq("organization_id", organization.id)
           .single();
@@ -102,6 +109,7 @@ export default function ProjectSettingsPage() {
 
         setProject(projectData);
         setProjectName(projectData.name);
+        setProjectDescription(projectData.description || "");
         setProjectVisibility(projectData.visibility || 'private');
         setProjectStatus(projectData.status || 'active');
       } catch (err: unknown) {
@@ -134,17 +142,31 @@ export default function ProjectSettingsPage() {
 
       const { error: updateError } = await supabase
         .from("projects")
-        .update({ name: projectName, visibility: projectVisibility, status: projectStatus })
+        .update({
+          name: projectName,
+          description: projectDescription,
+          visibility: projectVisibility,
+          status: projectStatus
+        })
         .eq("id", project.id);
 
       if (updateError) {
-        console.error("Error updating project name:", updateError.message);
-        toast.error("Failed to update project name.");
+        console.error("Error updating project:", updateError.message);
+        toast.error("Failed to update project.");
       } else {
         setProject((prevProject) =>
-          prevProject ? { ...prevProject, name: projectName } : null
+          prevProject ? {
+            ...prevProject,
+            name: projectName,
+            description: projectDescription,
+            visibility: projectVisibility,
+            status: projectStatus
+          } : null
         );
-        toast.success("Project name updated successfully!");
+        toast.success("Project updated successfully!");
+
+        // Update context for real-time breadcrumb updates
+        updateProjectContext(project.id, { name: projectName, description: projectDescription });
       }
     } catch (err) {
       console.error("Unexpected error during save:", err);
@@ -171,7 +193,7 @@ export default function ProjectSettingsPage() {
         toast.error("Failed to delete project.");
       } else {
         toast.success("Project deleted successfully!");
-        router.push(`/dashboard/organizations/${orgSlug}/projects`); // Redirect to projects list
+        router.push(`/dashboard/organizations/${orgSlug}/projects`);
       }
     } catch (err) {
       console.error("Unexpected error during deletion:", err);
@@ -181,6 +203,14 @@ export default function ProjectSettingsPage() {
       setDeleteConfirmName("");
     }
   };
+
+  // Check if any changes have been made
+  const hasChanges = project && (
+    projectName !== project.name ||
+    projectDescription !== (project.description || "") ||
+    projectVisibility !== project.visibility ||
+    projectStatus !== project.status
+  );
 
   if (loading) {
     return (
@@ -207,132 +237,190 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="mx-92 py-8 lg:py-16">
-      <h1 className="text-xl font-bold mb-6">General Settings</h1>
-
-      <Card >
-        <CardHeader>
-          <CardTitle>Project Details</CardTitle>
-          <CardDescription>View and manage your project&apos;s basic information.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2">
-            <Label htmlFor="projectName">Project name</Label>
-            <Input
-              id="projectName"
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="max-w-md"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="projectId">Project ID</Label>
-            <div className="flex max-w-md space-x-2">
-              <Input id="projectId" type="text" value={project.slug} readOnly />
-              <Button onClick={handleCopy} variant="secondary" className="cursor-pointer">
-                <CopyIcon className="mr-2 h-4 w-4" />
-                Copy
-              </Button>
-            </div>
-          </div>
-          <div className="flex justify-end space-x-2 mt-6">
-        <Button variant="outline" className="cursor-pointer">Cancel</Button>
-        <Button onClick={handleSave} disabled={isSaving || (projectName === project?.name && projectVisibility === project?.visibility && projectStatus === project?.status)} className="cursor-pointer">
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
+    <div className="mx-92 py-24">
+      <div className="flex items-center space-x-4 pb-12">
+        <Settings className="h-6 w-6" />
+        <h1 className="text-xl font-bold">Project Settings</h1>
       </div>
-        </CardContent>
-      </Card>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Project Visibility</CardTitle>
-          <CardDescription>Control who can view and access this project.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2">
-            <Label htmlFor="projectVisibility">Visibility</Label>
-            <Select
-              value={projectVisibility}
-              onValueChange={(value: 'public' | 'private') => setProjectVisibility(value)}
-            >
-              <SelectTrigger className="max-w-md">
-                <SelectValue placeholder="Select visibility" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public">Public</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="danger">Danger Zone</TabsTrigger>
+        </TabsList>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Project Status</CardTitle>
-          <CardDescription>Set the current operational status of the project.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2">
-            <Label htmlFor="projectStatus">Status</Label>
-            <Select
-              value={projectStatus}
-              onValueChange={(value: 'active' | 'inactive') => setProjectStatus(value)}
-            >
-              <SelectTrigger className="max-w-md">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mt-8 dark:border-red-900 border-red-500">
-        <CardHeader>
-          <CardTitle className="text-red-500">Delete Project</CardTitle>
-          <CardDescription>Permanently remove this project and all its associated data. This action cannot be undone.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <DialogTrigger asChild>
-              <Button variant="destructive" className="cursor-pointer">Delete Project</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Confirm Project Deletion</DialogTitle>
-                <DialogDescription>
-                  This action is irreversible. To confirm, please type the project name (<b>{project.name}</b>) below.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
+        {/* GENERAL TAB */}
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Project Information</CardTitle>
+              <CardDescription>
+                View and manage your project&apos;s basic information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-name">Project Name</Label>
                 <Input
-                  id="confirmDelete"
-                  placeholder={project.name}
-                  value={deleteConfirmName}
-                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  id="project-name"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Enter project name"
                 />
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="cursor-pointer">Cancel</Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteProject}
-                  disabled={deleteConfirmName !== project.name}
-                  className="cursor-pointer"
+
+              <div className="space-y-2">
+                <Label htmlFor="project-slug">Project ID</Label>
+                <div className="flex space-x-2">
+                  <Input
+                    id="project-slug"
+                    value={project.slug}
+                    readOnly
+                    className="bg-muted"
+                  />
+                  <Button onClick={handleCopy} variant="secondary" className="cursor-pointer shrink-0">
+                    <CopyIcon className="mr-2 h-4 w-4" />
+                    Copy
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The project ID cannot be changed after creation
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project-description">Description</Label>
+                <Input
+                  id="project-description"
+                  value={projectDescription}
+                  onChange={(e) => setProjectDescription(e.target.value)}
+                  placeholder="Enter project description"
+                />
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-2">
+                <Label htmlFor="project-visibility">Visibility</Label>
+                <Select
+                  value={projectVisibility}
+                  onValueChange={(value: 'public' | 'private') => setProjectVisibility(value)}
                 >
-                  Delete
+                  <SelectTrigger id="project-visibility">
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Control who can view and access this project
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project-status">Status</Label>
+                <Select
+                  value={projectStatus}
+                  onValueChange={(value: 'active' | 'inactive') => setProjectStatus(value)}
+                >
+                  <SelectTrigger id="project-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">
+                      <div className="flex items-center gap-2">
+                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        Active
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="inactive">
+                      <div className="flex items-center gap-2">
+                        <span className="size-1.5 rounded-full bg-red-500" />
+                        Inactive
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Set the current operational status of the project
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleSave} disabled={isSaving || !hasChanges}>
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </CardContent>
-      </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* DANGER ZONE TAB */}
+        <TabsContent value="danger" className="space-y-6">
+          <Card className="border-red-200 dark:border-red-900">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <CardTitle className="text-red-600">Danger Zone</CardTitle>
+              </div>
+              <CardDescription>
+                Irreversible and destructive actions for this project
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-6">
+                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+                  Delete Project
+                </h3>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                  Once you delete this project, there is no going back. This will permanently
+                  delete the project and all associated data and settings.
+                </p>
+                <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      className="cursor-pointer bg-red-600 hover:bg-red-700"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Confirm Project Deletion</DialogTitle>
+                      <DialogDescription>
+                        This action is irreversible. To confirm, please type the project name (<b>{project.name}</b>) below.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <Input
+                        id="confirmDelete"
+                        placeholder={project.name}
+                        value={deleteConfirmName}
+                        onChange={(e) => setDeleteConfirmName(e.target.value)}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="cursor-pointer">Cancel</Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteProject}
+                        disabled={deleteConfirmName !== project.name}
+                        className="cursor-pointer bg-red-600 hover:bg-red-700"
+                      >
+                        I understand, delete this project
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Fan } from "@/components/animate-ui/icons/fan";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
   id: string;
@@ -149,11 +150,45 @@ export default function OrgProjectsPage({
     setIsDeleteDialogOpen(false);
   };
 
-  // While resolving params, render same loading UI as before
   if (!orgSlug || loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-muted-foreground">Loading projects...</p>
+      <div className="mx-92 py-24 dark:bg-sidebar">
+        <div className="flex items-center space-x-4 pb-12">
+          <Skeleton className="h-7 w-32" />
+        </div>
+        <div className="flex justify-between items-center mb-6">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Card>
+          <Table className="border">
+            <TableHeader className="bg-muted/50">
+              <TableRow className="bg-muted/50">
+                <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+                <TableHead><Skeleton className="h-4 w-24" /></TableHead>
+                <TableHead className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableHead>
+                <TableHead className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  <TableCell>
+                    <Skeleton className="h-5 w-48 mb-1" />
+                    <Skeleton className="h-3 w-32" />
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-6 w-16 ml-auto" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-8 w-8 ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     );
   }

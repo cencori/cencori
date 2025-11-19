@@ -4,13 +4,15 @@ import { createBrowserClient } from "@supabase/ssr"; // Import browser client
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { siteConfig } from "@/config/site";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/plus";
-import { BoxesIcon } from "@/components/ui/boxes"; // Import BoxesIcon
+import { BoxesIcon } from "@/components/ui/boxes";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react"; // Import Search icon
+import { Search } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
   id: string;
@@ -73,8 +75,25 @@ export default function OrganizationsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm">Loading organizations...</p>
+      <div className="mx-92 py-16">
+        <div className="flex items-center space-x-4 pb-12">
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="flex justify-between items-center mb-6">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-6 mb-4" />
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-1/2" />
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -129,14 +148,24 @@ export default function OrganizationsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredOrganizations.map((org) => (
-          <Card key={org.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}>
+          <Card
+            key={org.id}
+            className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/50 group"
+            onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}
+          >
             <CardHeader>
-              <div>
-              <BoxesIcon size={24} className="text-muted-foreground pb-4" />
-              </div>
-              <div className="flex-col">
-                <CardTitle className="font-bold">{org.name}</CardTitle>
-                  <p className="text-muted-foreground">{org.organization_plans[0]?.name?.charAt(0).toUpperCase() + org.organization_plans[0]?.name?.slice(1) + " Plan"}</p>
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-muted group-hover:bg-primary/10 transition-colors shrink-0">
+                  <BoxesIcon size={24} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-lg mb-1">{org.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {org.organization_plans[0]?.name?.charAt(0).toUpperCase() + org.organization_plans[0]?.name?.slice(1) || "Free"} Plan
+                    <span className="mx-1.5">•</span>
+                    Projects
+                  </p>
+                </div>
               </div>
             </CardHeader>
           </Card>
