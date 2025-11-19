@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
+import { Key } from "lucide-react";
 
 interface ProjectData {
   id: string;
@@ -135,6 +136,14 @@ export default function ProjectLayout({
                   <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}`}>
                     <PanelTopIcon animateOnHover />
                     <span>Project Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="API Keys">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/api-keys`}>
+                    <Key className="h-4 w-4" />
+                    <span>API Keys</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

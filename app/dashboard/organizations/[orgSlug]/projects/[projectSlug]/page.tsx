@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, Rocket, Activity, Clock, Zap, TrendingUp } from "lucide-react";
+import { Settings, Rocket, Activity, Clock, Zap, TrendingUp, Key } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
@@ -424,6 +424,12 @@ export default function ProjectDetailsPage({
               <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`}>
                 <Settings size={16} className="mr-2" />
                 Project Settings
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}>
+                <Key size={16} className="mr-2" />
+                Manage API Keys
               </Link>
             </Button>
             <Button variant="outline" className="w-full justify-start" disabled>
