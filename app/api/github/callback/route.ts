@@ -103,20 +103,35 @@ export async function GET(req: NextRequest) {
       }
 
       // Store installation with GitHub account metadata
-      const { error } = await supabase
+      // 1. Upsert the installation record (independent of organization)
+      const { error: installationError } = await supabase
         .from('github_app_installations')
         .upsert({
-          organization_id: organizationId,
           installation_id: Number(installation_id),
           github_account_type: actualAccountType,
           github_account_login: accountLogin,
           github_account_id: account.id,
           github_account_name: 'name' in account ? account.name : accountLogin,
+          // We no longer strictly need organization_id here, but we can keep it null or update it if needed.
+          // For now, we'll omit it to rely on the link table.
         }, { onConflict: 'installation_id' });
 
-      if (error) {
-        console.error('Error saving GitHub App installation:', error);
+      if (installationError) {
+        console.error('Error saving GitHub App installation:', installationError);
         return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?error=installation_failed`, req.url));
+      }
+
+      // 2. Create the link between Organization and Installation
+      const { error: linkError } = await supabase
+        .from('organization_github_installations')
+        .upsert({
+          organization_id: organizationId,
+          installation_id: Number(installation_id),
+        }, { onConflict: 'organization_id, installation_id' });
+
+      if (linkError) {
+        console.error('Error linking GitHub App installation to organization:', linkError);
+        return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?error=installation_link_failed`, req.url));
       }
 
       console.log('GitHub App installation saved successfully with account metadata');
