@@ -86,6 +86,13 @@ export async function importGitHubProject({
   }
 
   // Insert the new project
+  console.log('[Import] Attempting to insert project:', {
+    slug,
+    name: repoFullName.split('/')[1],
+    organizationId,
+    githubRepoId: repoId,
+  });
+
   const { data: newProject, error: insertError } = await supabase
     .from('projects')
     .insert({
@@ -103,13 +110,16 @@ export async function importGitHubProject({
     .single();
 
   if (insertError) {
-    console.error('Error importing GitHub project:', insertError);
+    console.error('[Import] Error importing GitHub project:', insertError);
+    console.error('[Import] Error details:', JSON.stringify(insertError, null, 2));
     redirect(`/dashboard/organizations/${orgSlug}/projects/import/github?error=import_failed&message=${encodeURIComponent(insertError.message)}`);
   }
 
   // Revalidate paths
   revalidatePath(`/dashboard/organizations/${orgSlug}/projects`);
   revalidatePath(`/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`);
+
+  console.log('[Import] Project imported successfully, redirecting to:', `/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`);
 
   // Redirect to the new project with success message
   redirect(`/dashboard/organizations/${orgSlug}/projects/${newProject.slug}?success=imported`);
