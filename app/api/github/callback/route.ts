@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 
 export async function GET(req: NextRequest) {
@@ -104,7 +105,9 @@ export async function GET(req: NextRequest) {
 
       // Store installation with GitHub account metadata
       // 1. Upsert the installation record (independent of organization)
-      const { error: installationError } = await supabase
+      // Use admin client to bypass RLS for the installation record itself
+      const supabaseAdmin = createAdminClient();
+      const { error: installationError } = await supabaseAdmin
         .from('github_app_installations')
         .upsert({
           installation_id: Number(installation_id),
@@ -122,6 +125,7 @@ export async function GET(req: NextRequest) {
       }
 
       // 2. Create the link between Organization and Installation
+      // Use user client to enforce RLS for the link
       const { error: linkError } = await supabase
         .from('organization_github_installations')
         .upsert({
