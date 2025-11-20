@@ -171,7 +171,6 @@ export default function GitHubImportPage() {
         <Card className="max-w-2xl mx-auto">
           <CardHeader className="text-center">
             <div className="mx-auto w-fit rounded-full bg-muted p-6 mb-4">
-              <Github className="h-12 w-12" />
             </div>
             <CardTitle className="text-2xl">GitHub App Not Installed</CardTitle>
             <CardDescription className="text-base">
