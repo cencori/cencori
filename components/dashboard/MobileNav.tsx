@@ -26,10 +26,10 @@ export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
 
             {/* Environment Switcher - only show when in a project */}
             {projectSlug && (
-                <div className="flex items-center bg-muted/50 rounded-full p-0.5 border border-border ml-auto">
+                <div className="flex items-center justify-center bg-muted/50 rounded-full p-0.5 border border-border ml-auto mt-2">
                     <button
                         onClick={() => setEnvironment("production")}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${!isTestMode
+                        className={`px-3 py-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center ${!isTestMode
                             ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-sm"
                             : "text-muted-foreground"
                             }`}
@@ -38,7 +38,7 @@ export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
                     </button>
                     <button
                         onClick={() => setEnvironment("test")}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${isTestMode
+                        className={`px-3 py-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center ${isTestMode
                             ? "bg-orange-500/10 text-orange-600 border border-orange-500/20 shadow-sm"
                             : "text-muted-foreground"
                             }`}
