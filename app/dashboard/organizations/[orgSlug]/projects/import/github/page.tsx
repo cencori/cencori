@@ -187,7 +187,7 @@ export default function GitHubImportPage() {
               </a>
             </Button>
             <p className="text-sm text-muted-foreground">
-              You'll be redirected to GitHub to authorize the app
+              You&apos;ll be redirected to GitHub to authorize the app
             </p>
           </CardContent>
         </Card>
