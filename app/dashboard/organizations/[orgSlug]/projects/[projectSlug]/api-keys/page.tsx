@@ -142,7 +142,7 @@ export default function ApiKeysPage({
                             <Skeleton className="h-4 w-full max-w-md mt-2" />
                         </div>
                         <div className="overflow-x-auto">
-                            <Table>
+                            <Table className="min-w-[800px]">
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-[150px] sm:w-[200px]">Name</TableHead>
@@ -196,7 +196,7 @@ export default function ApiKeysPage({
                 <div className="border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
                     <div className="bg-card">
                         <div className="overflow-x-auto">
-                            <Table>
+                            <Table className="min-w-[800px]">
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-[150px] sm:w-[200px]">Name</TableHead>
