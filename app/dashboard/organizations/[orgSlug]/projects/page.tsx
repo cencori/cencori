@@ -235,90 +235,92 @@ export default function OrgProjectsPage({
       </div>
 
       {projects && projects.length > 0 ? (
-        <Table className="border">
-          <TableHeader className="bg-muted/50">
-            <TableRow className="bg-muted/50">
-              <TableHead>PROJECT</TableHead>
-              <TableHead>DATE CREATED</TableHead>
-              <TableHead className="text-right">STATUS</TableHead>
-              <TableHead className="text-right"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="border">
-            {projects
-              .filter(
-                (project) =>
-                  project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  project.slug.toLowerCase().includes(searchTerm.toLowerCase())
-              )
-              .map((project) => (
-                <TableRow
-                  key={project.id}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}`)}
-                >
-                  <TableCell className="font-medium">
-                    {project.name}
-                    <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const date = new Date(project.created_at);
-                      const day = date.getDate().toString().padStart(2, "0");
-                      const month = date.toLocaleString("en-US", { month: "short" });
-                      const hours = date.getHours().toString().padStart(2, "0");
-                      const minutes = date.getMinutes().toString().padStart(2, "0");
-                      const seconds = date.getSeconds().toString().padStart(2, "0");
-                      return `${day} ${month} ${hours}:${minutes}:${seconds}`;
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Badge variant={"outline"} className="gap-1.5 flex items-center">
-                        <span
-                          className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
-                          aria-hidden="true"
-                        ></span>
-                        {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontalIcon className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}/edit`);
-                          }}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProjectToDelete(project);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="bg-muted/50">
+                <TableHead>PROJECT</TableHead>
+                <TableHead>DATE CREATED</TableHead>
+                <TableHead className="text-right">STATUS</TableHead>
+                <TableHead className="text-right"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="border">
+              {projects
+                .filter(
+                  (project) =>
+                    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    project.slug.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((project) => (
+                  <TableRow
+                    key={project.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}`)}
+                  >
+                    <TableCell className="font-medium">
+                      {project.name}
+                      <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const date = new Date(project.created_at);
+                        const day = date.getDate().toString().padStart(2, "0");
+                        const month = date.toLocaleString("en-US", { month: "short" });
+                        const hours = date.getHours().toString().padStart(2, "0");
+                        const minutes = date.getMinutes().toString().padStart(2, "0");
+                        const seconds = date.getSeconds().toString().padStart(2, "0");
+                        return `${day} ${month} ${hours}:${minutes}:${seconds}`;
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Badge variant={"outline"} className="gap-1.5 flex items-center">
+                          <span
+                            className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
+                            aria-hidden="true"
+                          ></span>
+                          {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontalIcon className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}/edit`);
+                            }}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProjectToDelete(project);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <div className="text-center p-32 flex flex-col items-center justify-center">
           <FolderCog />
