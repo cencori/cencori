@@ -98,7 +98,6 @@ export async function importGitHubProject({
       github_repo_url: repoHtmlUrl,
       visibility: 'private',
       status: 'active',
-      created_by: user.id,
     })
     .select()
     .single();

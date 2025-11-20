@@ -231,7 +231,6 @@ export default function GitHubImportPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Github className="h-8 w-8" />
             Import from GitHub
           </h1>
           <p className="text-muted-foreground mt-2">
