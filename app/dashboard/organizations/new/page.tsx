@@ -197,20 +197,20 @@ export default function NewOrganizationPage() {
                 <p className="text-red-500 text-sm">{form.formState.errors.plan.message}</p>
               )}
             </div>
-            <div className="flex justify-between cursor-pointer items-center mt-4">
-              <Button type="button" variant="outline" onClick={() => router.push("/dashboard/organizations")}>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-4">
+              <Button type="button" variant="outline" onClick={() => router.push("/dashboard/organizations")} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                 {loading ? "Creating..." : "Create Organization"}
               </Button>
             </div>
-          </form>
-        </CardContent>
-        <CardFooter className="text-sm text-muted-foreground">
-          By creating an organization, you agree to our <a href="/terms-of-service" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer"> Terms of Service</a>.
-        </CardFooter>
-      </Card>
-    </div>
+          </form >
+        </CardContent >
+    <CardFooter className="text-sm text-muted-foreground">
+      By creating an organization, you agree to our <a href="/terms-of-service" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer"> Terms of Service</a>.
+    </CardFooter>
+      </Card >
+    </div >
   );
 }

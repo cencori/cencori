@@ -201,8 +201,8 @@ export default function NewProjectPage({ params }: { params: { orgSlug: string }
   }
 
   return (
-    <div className="flex items-center justify-center pt-24">
-      <Card className="w-[550px]">
+    <div className="flex items-center justify-center pt-12 sm:pt-24 px-4">
+      <Card className="w-full max-w-[550px]">
         <CardHeader>
           <CardTitle>Create New Project</CardTitle>
           <CardDescription>Create a new project for {organization?.name}.</CardDescription>
