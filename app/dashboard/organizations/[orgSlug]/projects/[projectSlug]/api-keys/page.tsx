@@ -124,7 +124,7 @@ export default function ApiKeysPage({
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
                 {/* Header Skeleton */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 space-y-2">
@@ -145,12 +145,12 @@ export default function ApiKeysPage({
                             <Table className="min-w-[800px]">
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-[150px] sm:w-[200px]">Name</TableHead>
-                                        <TableHead className="min-w-[250px] sm:min-w-[300px]">API Key</TableHead>
-                                        <TableHead className="w-[80px] sm:w-[100px]">Status</TableHead>
-                                        <TableHead className="hidden lg:table-cell w-[120px]">Created</TableHead>
-                                        <TableHead className="hidden lg:table-cell w-[120px]">Last Used</TableHead>
-                                        <TableHead className="w-[60px] sm:w-[80px] text-right">Actions</TableHead>
+                                        <TableHead className="w-[150px] sm:w-[200px]"></TableHead>
+                                        <TableHead className="min-w-[250px] sm:min-w-[300px]"></TableHead>
+                                        <TableHead className="w-[80px] sm:w-[100px]"></TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]"></TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]"></TableHead>
+                                        <TableHead className="w-[60px] sm:w-[80px] text-right"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
