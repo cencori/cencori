@@ -237,7 +237,7 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="mx-92 py-24">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="flex items-center space-x-4 pb-12">
         <Settings className="h-6 w-6" />
         <h1 className="text-xl font-bold">Project Settings</h1>
