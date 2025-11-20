@@ -203,7 +203,9 @@ export default function ProjectLayout({
         </SheetContent>
       </Sheet>
 
-      <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
+      <main className="flex w-full flex-1 flex-col overflow-hidden">
+        {children}
+      </main>
     </SidebarProvider>
   );
 }

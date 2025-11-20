@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
 interface GenerateKeyDialogProps {
     projectId: string;
@@ -28,6 +29,7 @@ export function GenerateKeyDialog({
     onOpenChange,
     onKeyGenerated,
 }: GenerateKeyDialogProps) {
+    const { environment, isTestMode } = useEnvironment();
     const [keyName, setKeyName] = useState("");
     const [generatedKey, setGeneratedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -47,7 +49,10 @@ export function GenerateKeyDialog({
             const response = await fetch(`/api/projects/${projectId}/api-keys`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: keyName }),
+                body: JSON.stringify({
+                    name: keyName,
+                    environment
+                }),
             });
 
             if (!response.ok) {
@@ -56,7 +61,7 @@ export function GenerateKeyDialog({
             }
 
             const data = await response.json();
-            setGeneratedKey(data.apiKey);
+            setGeneratedKey(data.apiKey.full_key);
             toast.success("API key generated successfully!");
         } catch (error) {
             console.error("Error generating API key:", error);
@@ -103,7 +108,7 @@ export function GenerateKeyDialog({
                                 <Label htmlFor="key-name">Key Name</Label>
                                 <Input
                                     id="key-name"
-                                    placeholder="e.g., Production API Key"
+                                    placeholder={isTestMode ? "e.g., Development API Key" : "e.g., Production API Key"}
                                     value={keyName}
                                     onChange={(e) => setKeyName(e.target.value)}
                                     onKeyDown={(e) => {

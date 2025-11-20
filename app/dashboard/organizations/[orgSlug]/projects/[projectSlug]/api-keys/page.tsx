@@ -9,6 +9,7 @@ import { Key, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { KeyListItem } from "@/components/api-keys/KeyListItem";
+import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
 interface ApiKey {
     id: string;
@@ -45,6 +46,7 @@ export default function ApiKeysPage({
     }, [params]);
 
     const router = useRouter();
+    const { environment } = useEnvironment();
     const [projectId, setProjectId] = useState<string | null>(null);
     const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
     const [loading, setLoading] = useState(true);
@@ -99,11 +101,11 @@ export default function ApiKeysPage({
         };
 
         fetchProjectAndKeys();
-    }, [orgSlug, projectSlug, router]);
+    }, [orgSlug, projectSlug, router, environment]); // Re-fetch when environment changes
 
     const fetchApiKeys = async (projId: string) => {
         try {
-            const response = await fetch(`/api/projects/${projId}/api-keys`);
+            const response = await fetch(`/api/projects/${projId}/api-keys?environment=${environment}`);
             if (response.ok) {
                 const data = await response.json();
                 setApiKeys(data.apiKeys || []);
