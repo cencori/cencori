@@ -152,7 +152,7 @@ export default function OrgProjectsPage({
 
   if (!orgSlug || loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center space-x-4 pb-12">
           <Skeleton className="h-7 w-32" />
         </div>
