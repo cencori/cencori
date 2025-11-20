@@ -291,9 +291,6 @@ export default function ProjectDetailsPage({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Deployments</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
-                <Rocket size={16} className="text-blue-600 dark:text-blue-400" />
-              </div>
             </div>
             <CardTitle className="text-3xl">{stats.deployments.value}</CardTitle>
           </CardHeader>
@@ -308,9 +305,6 @@ export default function ProjectDetailsPage({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>API Calls</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
-                <Zap size={16} className="text-purple-600 dark:text-purple-400" />
-              </div>
             </div>
             <CardTitle className="text-3xl">{stats.apiCalls.value}</CardTitle>
           </CardHeader>
@@ -325,9 +319,6 @@ export default function ProjectDetailsPage({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Uptime</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center">
-                <TrendingUp size={16} className="text-emerald-600 dark:text-emerald-400" />
-              </div>
             </div>
             <CardTitle className="text-3xl">{stats.uptime.value}</CardTitle>
           </CardHeader>
