@@ -39,11 +39,11 @@ export default function GitHubImportPage() {
 
   useEffect(() => {
     fetchRepositories();
-    
+
     // Check for validation errors from callback
     const urlParams = new URLSearchParams(window.location.search);
     const errorType = urlParams.get('error');
-    
+
     if (errorType === 'account_type_mismatch') {
       const expected = urlParams.get('expected');
       const actual = urlParams.get('actual');
@@ -102,23 +102,23 @@ export default function GitHubImportPage() {
 
       setOrganizationId(orgData.id);
 
-      // Check for GitHub App installation
-      const { data: installationData, error: installationError } = await supabase
-        .from('github_app_installations')
+      // Check for GitHub App installation via the link table
+      const { data: linkData, error: linkError } = await supabase
+        .from('organization_github_installations')
         .select('installation_id')
         .eq('organization_id', orgData.id)
         .single();
 
-      if (installationError || !installationData) {
+      if (linkError || !linkData) {
         // No installation found, show install prompt
         setError('not_installed');
         return;
       }
 
-      setInstallationId(installationData.installation_id);
+      setInstallationId(linkData.installation_id);
 
       // Fetch repositories from API route
-      const response = await fetch(`/api/github/repositories?installation_id=${installationData.installation_id}`);
+      const response = await fetch(`/api/github/repositories?installation_id=${linkData.installation_id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch repositories');
