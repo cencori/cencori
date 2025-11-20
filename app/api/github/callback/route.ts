@@ -76,15 +76,17 @@ export async function GET(req: NextRequest) {
         throw new Error('Installation account not found');
       }
 
-      const actualAccountType = account.type.toLowerCase(); // 'user' or 'organization'
-      const actualAccountLogin = account.login.toLowerCase();
+      // Fix: Handle account types that use 'slug' instead of 'login' (e.g. Enterprise organizations)
+      const accountLogin = 'login' in account ? account.login : ('slug' in account ? (account as any).slug : '');
+      const actualAccountType = 'type' in account ? (account.type as string).toLowerCase() : 'user';
+      const actualAccountLogin = accountLogin.toLowerCase();
 
       // Validate account type and login match (only if provided)
       if (expectedAccountType && expectedAccountType !== actualAccountType) {
         console.error(`Account type mismatch: expected ${expectedAccountType}, got ${actualAccountType}`);
         return NextResponse.redirect(
           new URL(
-            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_type_mismatch&expected=${expectedAccountType}&actual=${actualAccountType}&account=${account.login}`,
+            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_type_mismatch&expected=${expectedAccountType}&actual=${actualAccountType}&account=${accountLogin}`,
             req.url
           )
         );
@@ -94,7 +96,7 @@ export async function GET(req: NextRequest) {
         console.error(`Account login mismatch: expected ${expectedAccountLogin}, got ${actualAccountLogin}`);
         return NextResponse.redirect(
           new URL(
-            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_name_mismatch&expected=${expectedAccountLogin}&actual=${account.login}`,
+            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_name_mismatch&expected=${expectedAccountLogin}&actual=${accountLogin}`,
             req.url
           )
         );
@@ -107,9 +109,9 @@ export async function GET(req: NextRequest) {
           organization_id: organizationId,
           installation_id: Number(installation_id),
           github_account_type: actualAccountType,
-          github_account_login: account.login,
+          github_account_login: accountLogin,
           github_account_id: account.id,
-          github_account_name: account.name || account.login,
+          github_account_name: 'name' in account ? account.name : accountLogin,
         }, { onConflict: 'installation_id' });
 
       if (error) {
