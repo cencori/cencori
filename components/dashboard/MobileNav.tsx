@@ -10,7 +10,7 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
-    const { environment, setEnvironment, isTestMode } = useEnvironment();
+    const { setEnvironment, isTestMode } = useEnvironment();
 
     return (
         <div className="sticky top-12 z-40 lg:hidden border-b border-zinc-100 dark:border-zinc-800 bg-sidebar px-4 h-12 flex items-center gap-3">

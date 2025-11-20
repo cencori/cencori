@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { generateApiKey, hashApiKey, extractKeyPrefix, getKeyLastFour } from "@/lib/api-keys";
 import crypto from "crypto";
 
 /**
@@ -110,7 +109,6 @@ export async function POST(
         }
 
         // Check if user is the owner
-        // @ts-ignore - Supabase types for joined tables can be tricky
         const ownerId = (project.organizations as { owner_id?: string })?.owner_id;
 
         if (ownerId !== user.id) {
