@@ -122,17 +122,36 @@ export default function ApiKeysPage({
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Skeleton className="h-8 w-48 mb-2" />
-                        <Skeleton className="h-4 w-96" />
+                {/* Header Skeleton */}
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-4 w-full max-w-md" />
                     </div>
-                    <Skeleton className="h-10 w-32" />
+                    <Skeleton className="h-10 w-full sm:w-40" />
                 </div>
+
+                {/* API Keys List Skeleton */}
                 <div className="space-y-3">
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-24 w-full" />
+                    {[1, 2, 3].map((i) => (
+                        <Card key={i}>
+                            <CardContent className="p-4 sm:p-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-5 w-32" />
+                                            <Skeleton className="h-5 w-16 rounded-full" />
+                                        </div>
+                                        <Skeleton className="h-4 w-64" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Skeleton className="h-8 w-8" />
+                                        <Skeleton className="h-8 w-8" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
             </div>
         );
