@@ -128,7 +128,17 @@ export default function GitHubImportPage() {
       });
 
       // Success is handled by redirect in the action
-    } catch (error) {
+    } catch (error: unknown) {
+      if (
+        (error instanceof Error && error.message === 'NEXT_REDIRECT') ||
+        (typeof error === 'object' &&
+          error !== null &&
+          'digest' in error &&
+          typeof (error as { digest: unknown }).digest === 'string' &&
+          (error as { digest: string }).digest.startsWith('NEXT_REDIRECT'))
+      ) {
+        throw error;
+      }
       console.error('Import error:', error);
       toast.error('Failed to import repository. Please try again.');
       setImportingRepoId(null);
