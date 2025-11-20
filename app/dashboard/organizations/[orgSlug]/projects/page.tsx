@@ -152,7 +152,7 @@ export default function OrgProjectsPage({
 
   if (!orgSlug || loading) {
     return (
-      <div className="mx-92 py-24 dark:bg-sidebar">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
         <div className="flex items-center space-x-4 pb-12">
           <Skeleton className="h-7 w-32" />
         </div>
@@ -210,23 +210,23 @@ export default function OrgProjectsPage({
   }
 
   return (
-    <div className="mx-92 py-24 dark:bg-sidebar">
-      <div className="flex items-center space-x-4 pb-12">
-        <h1 className="text-xl font-bold">Projects</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
+      <div className="flex items-center space-x-4 pb-6 sm:pb-12">
+        <h1 className="text-lg sm:text-xl font-bold">Projects</h1>
       </div>
 
-      <div className="flex justify-between items-center mb-6">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search projects..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs pl-8"
+            className="w-full sm:max-w-xs pl-8"
           />
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href={`/dashboard/organizations/${orgSlug}/projects/new`}>
             <PlusIcon size={16} className="mr-0.5" />
             New Project

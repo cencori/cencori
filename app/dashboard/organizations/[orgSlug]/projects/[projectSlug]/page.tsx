@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, Rocket, Activity, Clock, Zap, TrendingUp } from "lucide-react";
+import { Settings, Rocket, Activity, Clock, Zap, TrendingUp, Key } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
@@ -234,11 +234,11 @@ export default function ProjectDetailsPage({
   }
 
   return (
-    <div className="mx-92 py-24 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Hero Section */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div className="space-y-3 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={project.status === "active" ? "default" : "secondary"} className="gap-1.5">
               <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
               {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
@@ -248,28 +248,28 @@ export default function ProjectDetailsPage({
             </Badge>
           </div>
           <div>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold break-words">{project.name}</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               {project.description || "No description provided"}
             </p>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <Clock size={14} />
               Created {new Date(project.created_at).toLocaleDateString()}
             </span>
-            <span>•</span>
-            <span>ID: {project.slug}</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="truncate">ID: {project.slug}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+          <Button variant="outline" asChild className="flex-1 sm:flex-none">
             <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`}>
               <Settings size={16} className="mr-2" />
               Settings
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="flex-1 sm:flex-none">
             <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/edit`}>
               <Rocket size={16} className="mr-2" />
               Edit Project
@@ -424,6 +424,12 @@ export default function ProjectDetailsPage({
               <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`}>
                 <Settings size={16} className="mr-2" />
                 Project Settings
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}>
+                <Key size={16} className="mr-2" />
+                Manage API Keys
               </Link>
             </Button>
             <Button variant="outline" className="w-full justify-start" disabled>

@@ -21,6 +21,8 @@ import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { ActivityIcon } from "@/components/animate-ui/icons/activity";
 import { UnplugIcon } from "@/components/animate-ui/icons/unplug";
 import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
+import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 interface OrganizationData {
   id: string;
@@ -42,6 +44,7 @@ export default function OrganizationLayout({
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isOpen, setIsOpen } = useMobileSheet();
 
   const isProjectRoute = pathname.includes(`/dashboard/organizations/${organization?.slug}/projects/`);
 
@@ -110,8 +113,9 @@ export default function OrganizationLayout({
 
   return (
     <SidebarProvider defaultOpen>
+      {/* Desktop Sidebar - hidden on mobile */}
       {!isProjectRoute && (
-        <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)]">
+        <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block">
           <SidebarContent>
             <SidebarGroup className="pt-4">
               <SidebarMenu>
@@ -172,6 +176,70 @@ export default function OrganizationLayout({
           </div>
         </Sidebar>
       )}
+
+      {/* Mobile Sheet - slides up from bottom, only visible on mobile */}
+      {!isProjectRoute && (
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetContent side="bottom" className="h-[75vh]">
+            <div className="py-4">
+              <h2 className="text-lg font-semibold mb-4">{organization.name}</h2>
+              <SidebarGroup>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/projects`} onClick={() => setIsOpen(false)}>
+                        <LayersIcon animateOnHover />
+                        <span>Projects</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/billing`} onClick={() => setIsOpen(false)}>
+                        <PanelTopIcon animateOnHover />
+                        <span>Billing</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/usage`} onClick={() => setIsOpen(false)}>
+                        <ActivityIcon animateOnHover />
+                        <span>Usage</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/integrations`} onClick={() => setIsOpen(false)}>
+                        <UnplugIcon animateOnHover />
+                        <span>Integrations</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/teams`} onClick={() => setIsOpen(false)}>
+                        <UserRoundIcon animateOnHover />
+                        <span>Teams</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/dashboard/organizations/${organization.slug}/settings`} onClick={() => setIsOpen(false)}>
+                        <SettingsIcon animateOnHover />
+                        <span>Settings</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroup>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
       <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
     </SidebarProvider>
   );
