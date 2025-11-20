@@ -127,7 +127,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   // Use context instead of local state
   const { organizations, projects, loading: loadingOrgData } = useOrganizationProject();
   const { toggle } = useMobileSheet();
-  const { environment, setEnvironment, isTestMode } = useEnvironment();
+  const { setEnvironment, isTestMode } = useEnvironment();
 
   const getOrgSlug = () => {
     const match = pathname.match(/organizations\/([^/]+)/);
