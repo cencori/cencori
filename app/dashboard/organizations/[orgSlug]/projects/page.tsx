@@ -152,7 +152,7 @@ export default function OrgProjectsPage({
 
   if (!orgSlug || loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center space-x-4 pb-12">
           <Skeleton className="h-7 w-32" />
         </div>
@@ -210,7 +210,7 @@ export default function OrgProjectsPage({
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="flex items-center space-x-4 pb-6 sm:pb-12">
         <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
       </div>
@@ -235,7 +235,7 @@ export default function OrgProjectsPage({
       </div>
 
       {projects && projects.length > 0 ? (
-        <div className="overflow-x-auto border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+        <div className="overflow-x-auto bg-card border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
