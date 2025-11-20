@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Key, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
@@ -134,26 +135,39 @@ export default function ApiKeysPage({
                 </div>
 
                 {/* API Keys List Skeleton */}
-                <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i}>
-                            <CardContent className="p-4 sm:p-6">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Skeleton className="h-5 w-32" />
-                                            <Skeleton className="h-5 w-16 rounded-full" />
-                                        </div>
-                                        <Skeleton className="h-4 w-64" />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Skeleton className="h-8 w-8" />
-                                        <Skeleton className="h-8 w-8" />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                <div className="border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+                    <div className="bg-card">
+                        <div className="p-6 border-b">
+                            <Skeleton className="h-6 w-48" />
+                            <Skeleton className="h-4 w-full max-w-md mt-2" />
+                        </div>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[150px] sm:w-[200px]">Name</TableHead>
+                                        <TableHead className="min-w-[250px] sm:min-w-[300px]">API Key</TableHead>
+                                        <TableHead className="w-[80px] sm:w-[100px]">Status</TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]">Created</TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]">Last Used</TableHead>
+                                        <TableHead className="w-[60px] sm:w-[80px] text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {[1, 2, 3].map((i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-24 sm:w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-48 sm:w-64" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-14 sm:w-16" /></TableCell>
+                                            <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -165,7 +179,6 @@ export default function ApiKeysPage({
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="flex-1 min-w-0">
                     <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                        <Key size={24} className="sm:w-7 sm:h-7" />
                         API Keys
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">
@@ -180,19 +193,37 @@ export default function ApiKeysPage({
 
             {/* API Keys List */}
             {apiKeys.length > 0 ? (
-                <div className="space-y-3">
-                    {apiKeys.map((key) => (
-                        <KeyListItem
-                            key={key.id}
-                            apiKey={key}
-                            projectId={projectId!}
-                            onRevoked={handleKeyGenerated}
-                        />
-                    ))}
+                <div className="border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+                    <div className="bg-card">
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[150px] sm:w-[200px]">Name</TableHead>
+                                        <TableHead className="min-w-[250px] sm:min-w-[300px]">API Key</TableHead>
+                                        <TableHead className="w-[80px] sm:w-[100px]">Status</TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]">Created</TableHead>
+                                        <TableHead className="hidden lg:table-cell w-[120px]">Last Used</TableHead>
+                                        <TableHead className="w-[60px] sm:w-[80px] text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {apiKeys.map((key) => (
+                                        <KeyListItem
+                                            key={key.id}
+                                            apiKey={key}
+                                            projectId={projectId!}
+                                            onRevoked={handleKeyGenerated}
+                                        />
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
                 </div>
             ) : (
                 <Card>
-                    <CardHeader className="text-center py-12">
+                    <CardContent className="text-center py-12">
                         <div className="mx-auto w-fit rounded-full bg-muted p-6 mb-4">
                             <Key className="h-12 w-12 text-muted-foreground" />
                         </div>
@@ -201,7 +232,7 @@ export default function ApiKeysPage({
                             Generate your first API key to start authenticating requests to your project. You can
                             create multiple keys for different environments or use cases.
                         </CardDescription>
-                    </CardHeader>
+                    </CardContent>
                     <CardContent className="text-center pb-12">
                         <Button onClick={() => setShowGenerateDialog(true)}>
                             <Plus size={16} className="mr-2" />

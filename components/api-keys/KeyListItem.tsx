@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -77,64 +77,70 @@ export function KeyListItem({ apiKey, projectId, onRevoked }: KeyListItemProps) 
 
     return (
         <>
-            <Card className="transition-colors hover:bg-muted/50">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                        {/* Key info */}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-medium">{apiKey.name}</h4>
-                                <Badge variant="outline" className="text-xs">
-                                    Active
-                                </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <code className="text-sm text-muted-foreground font-mono">
-                                    {maskedKey}
-                                </code>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={handleCopy}
-                                >
-                                    {copied ? (
-                                        <Check className="h-3 w-3 text-green-600" />
-                                    ) : (
-                                        <Copy className="h-3 w-3" />
-                                    )}
-                                </Button>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-2">
-                                Created {new Date(apiKey.created_at).toLocaleDateString()}
-                                {apiKey.last_used_at && (
-                                    <span className="ml-3">
-                                        Last used {new Date(apiKey.last_used_at).toLocaleDateString()}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
+            <TableRow>
+                {/* Name */}
+                <TableCell className="font-medium">{apiKey.name}</TableCell>
 
-                        {/* Actions */}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                    className="text-red-600 cursor-pointer"
-                                    onClick={() => setShowRevokeDialog(true)}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Revoke Key
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                {/* API Key */}
+                <TableCell>
+                    <div className="flex items-center gap-2">
+                        <code className="text-sm text-muted-foreground font-mono">
+                            {maskedKey}
+                        </code>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleCopy}
+                        >
+                            {copied ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                                <Copy className="h-3 w-3" />
+                            )}
+                        </Button>
                     </div>
-                </CardContent>
-            </Card>
+                </TableCell>
+
+                {/* Status */}
+                <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                        Active
+                    </Badge>
+                </TableCell>
+
+                {/* Created */}
+                <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {new Date(apiKey.created_at).toLocaleDateString()}
+                </TableCell>
+
+                {/* Last Used */}
+                <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {apiKey.last_used_at
+                        ? new Date(apiKey.last_used_at).toLocaleDateString()
+                        : "Never"}
+                </TableCell>
+
+                {/* Actions */}
+                <TableCell>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                className="text-red-600 cursor-pointer"
+                                onClick={() => setShowRevokeDialog(true)}
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Revoke Key
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </TableCell>
+            </TableRow>
 
             {/* Revoke confirmation dialog */}
             <AlertDialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
