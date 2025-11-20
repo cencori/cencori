@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Fix: Handle account types that use 'slug' instead of 'login' (e.g. Enterprise organizations)
-      const accountLogin = 'login' in account ? account.login : ('slug' in account ? (account as any).slug : '');
+      const accountLogin = 'login' in account ? account.login : ('slug' in account ? (account as { slug: string }).slug : '');
       const actualAccountType = 'type' in account ? (account.type as string).toLowerCase() : 'user';
       const actualAccountLogin = accountLogin.toLowerCase();
 
