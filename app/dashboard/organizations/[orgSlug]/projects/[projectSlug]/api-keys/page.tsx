@@ -121,7 +121,7 @@ export default function ApiKeysPage({
 
     if (loading) {
         return (
-            <div className="mx-92 py-24 space-y-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <Skeleton className="h-8 w-48 mb-2" />
@@ -139,19 +139,19 @@ export default function ApiKeysPage({
     }
 
     return (
-        <div className="mx-92 py-24 space-y-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
             {/* Header */}
-            <div className="flex items-start justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <Key size={28} />
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                        <Key size={24} className="sm:w-7 sm:h-7" />
                         API Keys
                     </h1>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                         Manage API keys for authenticating requests to your project
                     </p>
                 </div>
-                <Button onClick={() => setShowGenerateDialog(true)}>
+                <Button onClick={() => setShowGenerateDialog(true)} className="w-full sm:w-auto">
                     <Plus size={16} className="mr-2" />
                     Generate New Key
                 </Button>

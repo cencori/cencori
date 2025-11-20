@@ -31,6 +31,8 @@ import { ChevronsUpDown, PlusCircle, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
+import { MobileNav } from "@/components/dashboard/MobileNav";
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -76,14 +78,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     null;
 
   return (
-    <OrganizationProjectProvider>
-      <LayoutContent
-        user={typedUser}
-        avatar={avatar}
-        name={name}>
-        {children}
-      </LayoutContent>
-    </OrganizationProjectProvider>
+    <MobileSheetProvider>
+      <OrganizationProjectProvider>
+        <LayoutContent
+          user={typedUser}
+          avatar={avatar}
+          name={name}>
+          {children}
+        </LayoutContent>
+      </OrganizationProjectProvider>
+    </MobileSheetProvider>
   );
 }
 
@@ -119,6 +123,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
   // Use context instead of local state
   const { organizations, projects, loading: loadingOrgData } = useOrganizationProject();
+  const { toggle } = useMobileSheet();
 
   const getOrgSlug = () => {
     const match = pathname.match(/organizations\/([^/]+)/);
@@ -415,7 +420,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         </div>
       </header>
 
-      <main className="p-4 md:p-8 pt-16">
+      {/* Mobile Navigation Bar - only visible on mobile screens */}
+      <MobileNav onMenuClick={toggle} />
+
+      <main className="p-4 md:p-8 pt-24 lg:pt-16">
         {children}
       </main>
       <Toaster />

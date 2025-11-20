@@ -19,6 +19,8 @@ import {
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
 import { Key } from "lucide-react";
+import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 interface ProjectData {
   id: string;
@@ -47,6 +49,7 @@ export default function ProjectLayout({
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isOpen, setIsOpen } = useMobileSheet();
 
   useEffect(() => {
     const fetchProjectAndOrganization = async () => {
@@ -127,7 +130,8 @@ export default function ProjectLayout({
 
   return (
     <SidebarProvider defaultOpen>
-      <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)]">
+      {/* Desktop Sidebar - hidden on mobile */}
+      <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block">
         <SidebarContent>
           <SidebarGroup className="pt-4">
             <SidebarMenu>
@@ -163,6 +167,42 @@ export default function ProjectLayout({
           <SidebarTrigger />
         </div>
       </Sidebar>
+
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent side="bottom" className="h-[75vh]">
+          <div className="py-4">
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}`} onClick={() => setIsOpen(false)}>
+                      <PanelTopIcon animateOnHover />
+                      <span>Project Overview</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/api-keys`} onClick={() => setIsOpen(false)}>
+                      <Key className="h-4 w-4" />
+                      <span>API Keys</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/settings`} onClick={() => setIsOpen(false)}>
+                      <SettingsIcon animateOnHover />
+                      <span>Project Settings</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
     </SidebarProvider>
   );
