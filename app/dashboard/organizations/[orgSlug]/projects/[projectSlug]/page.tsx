@@ -136,24 +136,24 @@ export default function ProjectDetailsPage({
 
   if (loading) {
     return (
-      <div className="mx-92 py-24 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Hero Section Skeleton */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="space-y-3 flex-1">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-16" />
               <Skeleton className="h-5 w-16" />
             </div>
             <Skeleton className="h-9 w-64" />
-            <Skeleton className="h-4 w-96" />
+            <Skeleton className="h-4 w-full max-w-md" />
             <div className="flex items-center gap-4">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-4 w-24" />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-28" />
-            <Skeleton className="h-10 w-28" />
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Skeleton className="h-10 flex-1 sm:flex-none sm:w-28" />
+            <Skeleton className="h-10 flex-1 sm:flex-none sm:w-32" />
           </div>
         </div>
 
@@ -178,8 +178,13 @@ export default function ProjectDetailsPage({
         {/* Activity Skeleton */}
         <Card>
           <CardHeader>
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-4 w-56" />
+            <div className="flex items-center justify-between">
+              <div className="space-y-1.5">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+              <Skeleton className="h-9 w-24" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -204,11 +209,13 @@ export default function ProjectDetailsPage({
                 <Skeleton className="h-6 w-40" />
                 <Skeleton className="h-4 w-56" />
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
+              <CardContent className="space-y-4">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ))}
