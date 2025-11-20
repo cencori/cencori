@@ -142,8 +142,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
 
   return (
-    <div className="min-h-screen bg-white-50 dark:bg-sidebar transition-colors">
-      <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-zinc-100 dark:border-zinc-800 bg-sidebar px-4 md:px-6 flex items-center justify-between">
+    <div className="min-h-screen bg-background transition-colors">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background px-4 md:px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/organizations" className="flex items-center gap-3">
             <Logo variant="mark" className="h-4" />

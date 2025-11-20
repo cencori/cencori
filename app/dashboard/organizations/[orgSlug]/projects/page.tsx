@@ -210,9 +210,9 @@ export default function OrgProjectsPage({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 dark:bg-sidebar">
       <div className="flex items-center space-x-4 pb-6 sm:pb-12">
-        <h1 className="text-lg sm:text-xl font-bold">Projects</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -223,7 +223,7 @@ export default function OrgProjectsPage({
             placeholder="Search projects..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:max-w-xs pl-8"
+            className="w-full sm:max-w-xs pl-8 bg-background border-input"
           />
         </div>
         <Button asChild className="w-full sm:w-auto">
@@ -235,17 +235,17 @@ export default function OrgProjectsPage({
       </div>
 
       {projects && projects.length > 0 ? (
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto rounded-md border bg-card">
           <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow className="bg-muted/50">
-                <TableHead>PROJECT</TableHead>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[300px]">PROJECT</TableHead>
                 <TableHead>DATE CREATED</TableHead>
                 <TableHead className="text-right">STATUS</TableHead>
                 <TableHead className="text-right"></TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="border">
+            <TableBody>
               {projects
                 .filter(
                   (project) =>
@@ -276,7 +276,7 @@ export default function OrgProjectsPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <Badge variant={"outline"} className="gap-1.5 flex items-center">
+                        <Badge variant={"outline"} className="gap-1.5 flex items-center border-foreground/20 text-foreground">
                           <span
                             className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
                             aria-hidden="true"
