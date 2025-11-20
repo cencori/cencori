@@ -2,12 +2,16 @@
 
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
 interface MobileNavProps {
     onMenuClick: () => void;
+    projectSlug?: string | null;
 }
 
-export function MobileNav({ onMenuClick }: MobileNavProps) {
+export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
+    const { setEnvironment, isTestMode } = useEnvironment();
+
     return (
         <div className="sticky top-12 z-40 lg:hidden border-b border-zinc-100 dark:border-zinc-800 bg-sidebar px-4 h-12 flex items-center gap-3">
             <Button
@@ -20,10 +24,29 @@ export function MobileNav({ onMenuClick }: MobileNavProps) {
                 <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Future: Add feedback button, notifications, etc. */}
-            <div className="flex items-center gap-2 ml-auto">
-                {/* Extensible space for future features */}
-            </div>
+            {/* Environment Switcher - only show when in a project */}
+            {projectSlug && (
+                <div className="flex items-center bg-muted/50 rounded-full p-0.5 border border-border ml-auto">
+                    <button
+                        onClick={() => setEnvironment("production")}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${!isTestMode
+                            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-sm"
+                            : "text-muted-foreground"
+                            }`}
+                    >
+                        Prod
+                    </button>
+                    <button
+                        onClick={() => setEnvironment("test")}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${isTestMode
+                            ? "bg-orange-500/10 text-orange-600 border border-orange-500/20 shadow-sm"
+                            : "text-muted-foreground"
+                            }`}
+                    >
+                        Dev
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

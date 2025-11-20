@@ -33,6 +33,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { MobileNav } from "@/components/dashboard/MobileNav";
+import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -80,12 +81,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <MobileSheetProvider>
       <OrganizationProjectProvider>
-        <LayoutContent
-          user={typedUser}
-          avatar={avatar}
-          name={name}>
-          {children}
-        </LayoutContent>
+        <EnvironmentProvider>
+          <LayoutContent
+            user={typedUser}
+            avatar={avatar}
+            name={name}>
+            {children}
+          </LayoutContent>
+        </EnvironmentProvider>
       </OrganizationProjectProvider>
     </MobileSheetProvider>
   );
@@ -124,6 +127,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   // Use context instead of local state
   const { organizations, projects, loading: loadingOrgData } = useOrganizationProject();
   const { toggle } = useMobileSheet();
+  const { setEnvironment, isTestMode } = useEnvironment();
 
   const getOrgSlug = () => {
     const match = pathname.match(/organizations\/([^/]+)/);
@@ -311,6 +315,29 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
               )}
             </BreadcrumbList>
           </Breadcrumb>
+
+          {projectSlug && (
+            <div className="hidden md:flex items-center bg-muted/50 rounded-full p-1 border border-border ml-2">
+              <button
+                onClick={() => setEnvironment("production")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${!isTestMode
+                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                Production
+              </button>
+              <button
+                onClick={() => setEnvironment("test")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${isTestMode
+                  ? "bg-orange-500/10 text-orange-600 border border-orange-500/20 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                Development
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -421,7 +448,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       </header>
 
       {/* Mobile Navigation Bar - only visible on mobile screens */}
-      <MobileNav onMenuClick={toggle} />
+      <MobileNav onMenuClick={toggle} projectSlug={projectSlug} />
 
       <main className="p-4 md:p-8 pt-24 lg:pt-16">
         {children}

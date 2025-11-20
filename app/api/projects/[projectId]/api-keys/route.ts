@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { generateApiKey, hashApiKey, extractKeyPrefix, getKeyLastFour } from "@/lib/api-keys";
+import crypto from "crypto";
 
 /**
  * GET /api/projects/[projectId]/api-keys
@@ -41,11 +41,16 @@ export async function GET(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // Fetch all non-revoked API keys for the project
+        // Get environment from query params, default to production
+        const { searchParams } = new URL(request.url);
+        const environment = searchParams.get("environment") || "production";
+
+        // Fetch API keys for the project and environment
         const { data: apiKeys, error: keysError } = await supabase
             .from("api_keys")
             .select("*")
             .eq("project_id", projectId)
+            .eq("environment", environment)
             .is("revoked_at", null)
             .order("created_at", { ascending: false });
 
@@ -54,18 +59,9 @@ export async function GET(
             return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 });
         }
 
-        // Return keys without the hash
-        const sanitizedKeys = apiKeys.map(key => ({
-            id: key.id,
-            name: key.name,
-            key_prefix: key.key_prefix,
-            created_at: key.created_at,
-            last_used_at: key.last_used_at,
-        }));
-
-        return NextResponse.json({ apiKeys: sanitizedKeys });
+        return NextResponse.json({ apiKeys });
     } catch (error) {
-        console.error("Unexpected error:", error);
+        console.error("Error in GET /api/projects/[projectId]/api-keys:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
@@ -79,22 +75,25 @@ export async function POST(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        const supabase = await createServerClient();
         const { projectId } = await params;
+        const supabase = await createServerClient();
+
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Parse body
         const body = await request.json();
-        const { name } = body;
+        const { name, environment = "production" } = body;
 
         if (!name || typeof name !== "string" || name.trim().length === 0) {
             return NextResponse.json({ error: "Key name is required" }, { status: 400 });
         }
 
-        // Get the current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        // Verify user has access to this project
+        // Verify project ownership
         const { data: project, error: projectError } = await supabase
             .from("projects")
             .select(`
@@ -106,50 +105,54 @@ export async function POST(
             .single();
 
         if (projectError || !project) {
-            return NextResponse.json({ error: "Project not found" }, { status: 404 });
+            return NextResponse.json({ error: "Project not found or access denied" }, { status: 404 });
         }
 
-        // Check if user owns the organization
-        const orgOwner = (project.organizations as { owner_id?: string })?.owner_id;
-        if (!orgOwner || orgOwner !== user.id) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // Check if user is the owner
+        const ownerId = (project.organizations as { owner_id?: string })?.owner_id;
+
+        if (ownerId !== user.id) {
+            return NextResponse.json({ error: "Only organization owners can create API keys" }, { status: 403 });
         }
 
-        // Generate new API key
-        const apiKey = generateApiKey();
-        const keyHash = hashApiKey(apiKey);
-        const keyPrefix = extractKeyPrefix(apiKey);
+        // Generate API key
+        // Format: cen_[test_]randomString
+        const prefix = environment === "test" ? "cen_test_" : "cen_";
+        const randomBytes = crypto.randomBytes(24);
+        const keyString = randomBytes.toString("hex"); // 48 chars
+        const apiKey = `${prefix}${keyString}`;
 
-        // Store the hashed key in database
-        const { data: newKey, error: insertError } = await supabase
+        // Hash the key for storage
+        const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+
+        // Store in database
+        const { data: newKey, error: createError } = await supabase
             .from("api_keys")
             .insert({
                 project_id: projectId,
                 name: name.trim(),
-                key_prefix: keyPrefix,
+                key_prefix: apiKey.substring(0, environment === "test" ? 13 : 8) + "...",
                 key_hash: keyHash,
                 created_by: user.id,
+                environment
             })
             .select()
             .single();
 
-        if (insertError) {
-            console.error("Error creating API key:", insertError);
+        if (createError) {
+            console.error("Error creating API key:", createError);
             return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
         }
 
-        // Return the full key (only time it's shown) and metadata
+        // Return the full key only once
         return NextResponse.json({
-            apiKey: apiKey, // Full key - only shown once
-            metadata: {
-                id: newKey.id,
-                name: newKey.name,
-                key_prefix: newKey.key_prefix,
-                created_at: newKey.created_at,
-            },
+            apiKey: {
+                ...newKey,
+                full_key: apiKey // This is the only time the full key is returned
+            }
         }, { status: 201 });
     } catch (error) {
-        console.error("Unexpected error:", error);
+        console.error("Error in POST /api/projects/[projectId]/api-keys:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_used_at TIMESTAMPTZ,
-    revoked_at TIMESTAMPTZ
+    revoked_at TIMESTAMPTZ,
+    environment TEXT NOT NULL DEFAULT 'production' CHECK (environment IN ('production', 'test'))
 );
 
 -- Create indexes for better performance
