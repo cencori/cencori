@@ -115,7 +115,7 @@ export default function OrganizationLayout({
     <SidebarProvider defaultOpen>
       {/* Desktop Sidebar - hidden on mobile */}
       {!isProjectRoute && (
-        <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block">
+        <Sidebar collapsible="icon" className="top-14 h-[calc(100vh-3.5rem)] hidden lg:block border-r bg-sidebar">
           <SidebarContent>
             <SidebarGroup className="pt-4">
               <SidebarMenu>
