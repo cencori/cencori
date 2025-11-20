@@ -132,15 +132,13 @@ export function GenerateKeyDialog({
                     <>
                         <DialogHeader>
                             <DialogTitle>API Key Generated</DialogTitle>
-                            <DialogDescription>
-                                <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-                                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                                    <span className="text-sm text-amber-900 dark:text-amber-100">
-                                        Make sure to copy your API key now. You won&apos;t be able to see it again!
-                                    </span>
-                                </div>
-                            </DialogDescription>
                         </DialogHeader>
+                        <div className="flex items-start gap-2 mt-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                            <span className="text-sm text-amber-900 dark:text-amber-100">
+                                Make sure to copy your API key now. You won&apos;t be able to see it again!
+                            </span>
+                        </div>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Label>Your API Key</Label>

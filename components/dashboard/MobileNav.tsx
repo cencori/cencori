@@ -18,7 +18,7 @@ export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
                 variant="ghost"
                 size="icon"
                 onClick={onMenuClick}
-                className="h-8 w-8"
+                className="h-8 w-8 mt-1.75"
                 aria-label="Open navigation menu"
             >
                 <Menu className="h-5 w-5" />
