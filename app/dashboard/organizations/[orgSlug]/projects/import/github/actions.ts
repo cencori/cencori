@@ -1,78 +1,117 @@
+'use server';
+
 import { createServerClient } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { UUID } from 'crypto'; // Import UUID type
 
 interface ImportGitHubProjectProps {
   orgSlug: string;
-  organizationId: UUID; // Use UUID for organizationId
+  organizationId: string;
   repoId: number;
   repoFullName: string;
   repoHtmlUrl: string;
   repoDescription: string | null;
 }
 
-export async function importGitHubProject({ orgSlug, organizationId, repoId, repoFullName, repoHtmlUrl, repoDescription }: ImportGitHubProjectProps) {
-  'use server';
-
-  console.log('Server Action: importGitHubProject called.');
+export async function importGitHubProject({
+  orgSlug,
+  organizationId,
+  repoId,
+  repoFullName,
+  repoHtmlUrl,
+  repoDescription
+}: ImportGitHubProjectProps) {
   const supabase = await createServerClient();
 
+  // Authenticate user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  console.log('User data:', user);
-  if (userError) {
-    console.error('Error fetching user:', userError);
+
+  if (userError || !user) {
+    console.error('User not authenticated:', userError);
+    redirect('/login');
   }
 
-  if (!user) {
-    console.log('User not authenticated. Redirecting to login.');
-    redirect('/login'); // Redirect to login if not authenticated
-  }
-
-  // Check if the user is a member of the organization
+  // Verify organization membership
   const { data: organizationMember, error: memberError } = await supabase
     .from('organization_members')
-    .select('role') // Select role to check for admin/owner if needed in future
-    .eq('organization_id', organizationId) // Use organization_id here
+    .select('role')
+    .eq('organization_id', organizationId)
     .eq('user_id', user.id)
     .single();
 
-  console.log('Organization member data:', organizationMember);
-  if (memberError) {
-    console.error('Error fetching organization member status:', memberError);
-  }
-
   if (memberError || !organizationMember) {
-    console.log('User is not a member of this organization or error fetching member status. Redirecting.');
-    redirect(`/dashboard/organizations/${orgSlug}/projects`); // Redirect if not authorized
+    console.error('User is not a member of this organization:', memberError);
+    redirect(`/dashboard/organizations/${orgSlug}/projects?error=unauthorized`);
   }
 
-  // Insert the new project into the 'projects' table
-  const { data: newProject, error } = await supabase
+  // Check if repository is already imported
+  const { data: existingProject, error: existingError } = await supabase
+    .from('projects')
+    .select('slug')
+    .eq('github_repo_id', repoId)
+    .eq('organization_id', organizationId)
+    .single();
+
+  if (existingProject) {
+    // Repository already imported, redirect to existing project
+    redirect(`/dashboard/organizations/${orgSlug}/projects/${existingProject.slug}?info=already_imported`);
+  }
+
+  // Generate unique slug from repo name
+  const baseSlug = repoFullName
+    .split('/')[1]
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  // Check for slug uniqueness and append number if needed
+  let slug = baseSlug;
+  let counter = 1;
+  let slugExists = true;
+
+  while (slugExists) {
+    const { data: slugCheck } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('slug', slug)
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (!slugCheck) {
+      slugExists = false;
+    } else {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+  }
+
+  // Insert the new project
+  const { data: newProject, error: insertError } = await supabase
     .from('projects')
     .insert({
-      name: repoFullName.split('/')[1], // Use repo name as project name
-      slug: repoFullName.split('/')[1].toLowerCase().replace(/[^a-z0-9-]+/g, '').replace(/^-+|-+$/g, ''), // Generate a slug
+      name: repoFullName.split('/')[1],
+      slug: slug,
       description: repoDescription,
-      organization_id: organizationId, // Use organization_id here
+      organization_id: organizationId,
       github_repo_id: repoId,
       github_repo_full_name: repoFullName,
       github_repo_url: repoHtmlUrl,
-      visibility: 'private', // Set a default visibility
-      created_by: user.id, // Assuming created_by is part of your projects table and references auth.users.id
+      visibility: 'private',
+      status: 'active',
+      created_by: user.id,
     })
     .select()
     .single();
 
-  console.log('Supabase project insert result - data:', newProject);
-  console.log('Supabase project insert result - error:', error);
-
-  if (error) {
-    console.error('Error importing GitHub project:', error);
-    redirect(`/dashboard/organizations/${orgSlug}/projects?error=import_failed`); // Redirect with error
+  if (insertError) {
+    console.error('Error importing GitHub project:', insertError);
+    redirect(`/dashboard/organizations/${orgSlug}/projects/import/github?error=import_failed&message=${encodeURIComponent(insertError.message)}`);
   }
 
+  // Revalidate paths
   revalidatePath(`/dashboard/organizations/${orgSlug}/projects`);
   revalidatePath(`/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`);
-  redirect(`/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`);
+
+  // Redirect to the new project with success message
+  redirect(`/dashboard/organizations/${orgSlug}/projects/${newProject.slug}?success=imported`);
 }
