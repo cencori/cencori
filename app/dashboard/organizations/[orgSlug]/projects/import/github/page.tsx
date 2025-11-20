@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Github, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { GitHubInstallDialog } from '@/components/github/GitHubInstallDialog';
 
 interface GitHubRepo {
   id: number;
@@ -32,11 +33,33 @@ export default function GitHubImportPage() {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [installationId, setInstallationId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
 
   const GITHUB_APP_SLUG = "cencori"; // Your GitHub App slug
 
   useEffect(() => {
     fetchRepositories();
+    
+    // Check for validation errors from callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorType = urlParams.get('error');
+    
+    if (errorType === 'account_type_mismatch') {
+      const expected = urlParams.get('expected');
+      const actual = urlParams.get('actual');
+      const account = urlParams.get('account');
+      toast.error(
+        `Account type mismatch: You selected "${expected}" but installed on a ${actual} account (@${account}). Please try again with the correct account type.`,
+        { duration: 10000 }
+      );
+    } else if (errorType === 'account_name_mismatch') {
+      const expected = urlParams.get('expected');
+      const actual = urlParams.get('actual');
+      toast.error(
+        `Account name mismatch: You selected "@${expected}" but installed on "@${actual}". Please try again with the correct organization.`,
+        { duration: 10000 }
+      );
+    }
   }, [orgSlug]);
 
   useEffect(() => {
@@ -171,10 +194,19 @@ export default function GitHubImportPage() {
     );
   }
 
+  // Handler for installation dialog confirmation
+  const handleInstallConfirm = (accountType: 'user' | 'organization', accountLogin?: string) => {
+    const state = JSON.stringify({
+      orgSlug,
+      accountType,
+      accountLogin
+    });
+    const githubAppInstallationUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
+    window.location.href = githubAppInstallationUrl;
+  };
+
   // Error: GitHub App not installed
   if (error === 'not_installed') {
-    const state = JSON.stringify({ orgSlug });
-    const githubAppInstallationUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
 
     return (
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -195,21 +227,26 @@ export default function GitHubImportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <Button asChild size="lg" className="w-full sm:w-auto">
-              <a href={githubAppInstallationUrl}>
-                <svg className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
-                  <path
-                    d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-                    fill="currentColor"
-                  />
-                </svg>
-                Install GitHub App
-              </a>
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => setShowInstallDialog(true)}>
+              <svg className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
+                <path
+                  d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+                  fill="currentColor"
+                />
+              </svg>
+              Install GitHub App
             </Button>
             <p className="text-sm text-muted-foreground">
-              You&apos;ll be redirected to GitHub to authorize the app
+              You&apos;ll be guided through the installation process
             </p>
           </CardContent>
+
+          <GitHubInstallDialog
+            open={showInstallDialog}
+            onOpenChange={setShowInstallDialog}
+            orgSlug={orgSlug}
+            onConfirm={handleInstallConfirm}
+          />
         </Card>
       </div>
     );

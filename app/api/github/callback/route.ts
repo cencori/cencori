@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { getInstallationOctokit } from '@/lib/github';
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
@@ -12,7 +13,6 @@ export async function GET(req: NextRequest) {
   // Basic validation
   if (!installation_id || !setup_action || !state) {
     console.error('Missing required query parameters for GitHub App callback.');
-    // Try to extract orgSlug for better redirect
     let redirectUrl = '/dashboard';
     try {
       const parsedState = JSON.parse(decodeURIComponent(state || '{}'));
@@ -27,10 +27,14 @@ export async function GET(req: NextRequest) {
 
   let orgSlug: string | undefined;
   let organizationId: string | undefined;
+  let expectedAccountType: string | undefined;
+  let expectedAccountLogin: string | undefined;
 
   try {
     const parsedState = JSON.parse(decodeURIComponent(state));
     orgSlug = parsedState.orgSlug;
+    expectedAccountType = parsedState.accountType;
+    expectedAccountLogin = parsedState.accountLogin;
   } catch (error) {
     console.error('Failed to parse state parameter:', error);
     return NextResponse.redirect(new URL('/dashboard?error=invalid_state', req.url));
@@ -60,19 +64,67 @@ export async function GET(req: NextRequest) {
 
     console.log(`GitHub App installed for organization slug: ${orgSlug}, Installation ID: ${installation_id}`);
 
-    const { error } = await supabase
-      .from('github_app_installations')
-      .upsert({
-        organization_id: organizationId,
+    try {
+      // Fetch installation details from GitHub
+      const installationOctokit = await getInstallationOctokit(Number(installation_id));
+      const { data: installation } = await installationOctokit.request('GET /app/installations/{installation_id}', {
         installation_id: Number(installation_id),
-      }, { onConflict: 'installation_id' });
+      });
 
-    if (error) {
-      console.error('Error saving GitHub App installation:', error);
-      return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?error=installation_failed`, req.url));
+      const account = installation.account;
+      if (!account) {
+        throw new Error('Installation account not found');
+      }
+
+      // Fix: Handle account types that use 'slug' instead of 'login' (e.g. Enterprise organizations)
+      const accountLogin = 'login' in account ? account.login : ('slug' in account ? (account as { slug: string }).slug : '');
+      const actualAccountType = 'type' in account ? (account.type as string).toLowerCase() : 'user';
+      const actualAccountLogin = accountLogin.toLowerCase();
+
+      // Validate account type and login match (only if provided)
+      if (expectedAccountType && expectedAccountType !== actualAccountType) {
+        console.error(`Account type mismatch: expected ${expectedAccountType}, got ${actualAccountType}`);
+        return NextResponse.redirect(
+          new URL(
+            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_type_mismatch&expected=${expectedAccountType}&actual=${actualAccountType}&account=${accountLogin}`,
+            req.url
+          )
+        );
+      }
+
+      if (expectedAccountLogin && expectedAccountLogin.toLowerCase() !== actualAccountLogin) {
+        console.error(`Account login mismatch: expected ${expectedAccountLogin}, got ${actualAccountLogin}`);
+        return NextResponse.redirect(
+          new URL(
+            `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_name_mismatch&expected=${expectedAccountLogin}&actual=${accountLogin}`,
+            req.url
+          )
+        );
+      }
+
+      // Store installation with GitHub account metadata
+      const { error } = await supabase
+        .from('github_app_installations')
+        .upsert({
+          organization_id: organizationId,
+          installation_id: Number(installation_id),
+          github_account_type: actualAccountType,
+          github_account_login: accountLogin,
+          github_account_id: account.id,
+          github_account_name: 'name' in account ? account.name : accountLogin,
+        }, { onConflict: 'installation_id' });
+
+      if (error) {
+        console.error('Error saving GitHub App installation:', error);
+        return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?error=installation_failed`, req.url));
+      }
+
+      console.log('GitHub App installation saved successfully with account metadata');
+
+    } catch (error) {
+      console.error('Error fetching/validating installation:', error);
+      return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?error=installation_validation_failed`, req.url));
     }
-
-    console.log('GitHub App installation saved successfully');
 
   } else if (setup_action === 'update') {
     console.log(`GitHub App updated for organization slug: ${orgSlug}, Installation ID: ${installation_id}`);
