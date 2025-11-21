@@ -1,0 +1,13 @@
+{
+  "name": "cencori-example",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Example usage of Cencori SDK",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cencori": "^0.1.1",
+    "dotenv": "^16.0.0"
+  }
+}
