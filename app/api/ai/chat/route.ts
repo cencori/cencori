@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendChatRequest, ChatMessage } from '@/lib/gemini';
 import { checkContent } from '@/lib/safety/content-filter';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // Request message format from client
 interface RequestMessage {
@@ -44,6 +45,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 { error: 'API key is inactive' },
                 { status: 403 }
+            );
+        }
+
+        // RATE LIMIT CHECK
+        const rateLimit = await checkRateLimit(apiKeyData.project_id);
+        if (!rateLimit.success) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'X-RateLimit-Limit': rateLimit.limit.toString(),
+                        'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+                        'X-RateLimit-Reset': rateLimit.reset.toString(),
+                    }
+                }
             );
         }
 
