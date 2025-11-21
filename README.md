@@ -57,6 +57,44 @@ Future phases will transition this architecture into a service-oriented system p
 
 ---
 
+## AI Gateway
+
+Cencori includes a production-ready **AI Gateway** that provides a secure, monitored proxy for AI API requests. This gateway enables teams to build AI-powered features with enterprise-grade safety, logging, and cost tracking.
+
+### Key Capabilities
+
+- **Smart Proxy:**  
+  Routes AI requests with automatic logging and cost tracking.
+  
+- **Content Safety Layer:**  
+  - Detects and blocks PII (emails, phone numbers, SSNs, credit cards)
+  - Filters harmful keywords and prompt injection attempts
+  - Assigns safety scores to all requests
+  
+- **Rate Limiting:**  
+  Database-backed rate limiting (60 requests/min per project) to prevent abuse and control costs.
+  
+- **Real-time Analytics:**  
+  - Interactive dashboard with request counts, costs, and latency metrics
+  - Time-period filtering (1h, 24h, 7d, 30d, all-time)
+  - Mini bar charts for visual insights
+  
+- **Request Logging:**  
+  Complete audit trail of all AI requests with status tracking (success, error, filtered).
+
+### API Endpoint
+
+```typescript
+POST /api/ai/chat
+Headers: { "x-api-key": "your_project_api_key" }
+Body: {
+  "messages": [{ "role": "user", "content": "Hello!" }],
+  "model": "gemini-1.5-pro" // Optional
+}
+```
+
+---
+
 ## Contributing
 
 We welcome contributions to Cencori! To ensure a smooth collaboration process, please follow these guidelines:
