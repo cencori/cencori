@@ -50,9 +50,9 @@ export default function AIUsagePage() {
 
             const data = await statsResponse.json();
             setStats(data.stats);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('[AI Usage] Error:', err);
-            setError(err.message || 'Failed to load AI usage data');
+            setError(err instanceof Error ? err.message : 'Failed to load AI usage data');
         } finally {
             setLoading(false);
         }

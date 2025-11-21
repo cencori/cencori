@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
+// Aggregated data types
+interface DateAggregation {
+    date: string;
+    count: number;
+    cost: number;
+    tokens: number;
+}
+
+interface ModelAggregation {
+    model: string;
+    count: number;
+    cost: number;
+}
+
+type DateAggregationMap = Record<string, DateAggregation>;
+type ModelAggregationMap = Record<string, ModelAggregation>;
+
 export async function GET(
     req: NextRequest,
     { params }: { params: { projectId: string } }
@@ -19,7 +36,7 @@ export async function GET(
     try {
         const { projectId } = params;
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get('period') || '7d'; // 7d, 30d, 90d
+        const period = searchParams.get('period') || '7d'; // 1h, 24h, 7d, 30d, all
 
         // Verify user has access to project
         const { data: project, error: projectError } = await supabase
@@ -46,8 +63,20 @@ export async function GET(
 
         // Calculate date range
         const now = new Date();
-        const daysAgo = period === '30d' ? 30 : period === '90d' ? 90 : 7;
-        const startDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+        let startDate: Date;
+
+        if (period === '1h') {
+            startDate = new Date(now.getTime() - 60 * 60 * 1000);
+        } else if (period === '24h') {
+            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        } else if (period === '30d') {
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else if (period === 'all') {
+            startDate = new Date(0); // Beginning of time
+        } else {
+            // Default to 7d
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        }
 
         // Get aggregate stats using admin client
         const { data: requests, error: requestsError } = await supabaseAdmin
@@ -74,31 +103,31 @@ export async function GET(
             : 0;
 
         // Group by date for chart
-        const requestsByDate = requests?.reduce((acc: any, r) => {
+        const requestsByDate = requests?.reduce((acc: DateAggregationMap, r) => {
             const date = new Date(r.created_at).toISOString().split('T')[0];
             if (!acc[date]) {
                 acc[date] = { date, count: 0, cost: 0, tokens: 0 };
             }
-            acc[date].count++;
-            acc[date].cost += parseFloat(r.cost_usd) || 0;
+            acc[date].count += 1;
+            acc[date].cost += parseFloat(r.cost_usd || '0');
             acc[date].tokens += r.total_tokens || 0;
             return acc;
-        }, {});
+        }, {} as DateAggregationMap);
 
-        const chartData = Object.values(requestsByDate || {}).sort((a: any, b: any) =>
-            a.date.localeCompare(b.date)
+        const chartData = Object.values(requestsByDate || {}).sort((a: DateAggregation, b: DateAggregation) =>
+            new Date(a.date).getTime() - new Date(b.date).getTime()
         );
 
         // Group by model
-        const requestsByModel = requests?.reduce((acc: any, r) => {
+        const requestsByModel = requests?.reduce((acc: ModelAggregationMap, r) => {
             const model = r.model || 'unknown';
             if (!acc[model]) {
                 acc[model] = { model, count: 0, cost: 0 };
             }
-            acc[model].count++;
-            acc[model].cost += parseFloat(r.cost_usd) || 0;
+            acc[model].count += 1;
+            acc[model].cost += parseFloat(r.cost_usd || '0');
             return acc;
-        }, {});
+        }, {} as ModelAggregationMap);
 
         return NextResponse.json({
             stats: {

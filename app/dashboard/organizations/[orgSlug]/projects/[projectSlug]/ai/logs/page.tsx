@@ -88,12 +88,13 @@ export default function AILogsPage() {
     }
 
     function getStatusBadge(status: string) {
-        const variants: Record<string, any> = {
+        const variants: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
             success: 'default',
             error: 'destructive',
-            filtered: 'secondary',
+            filtered: 'outline',
         };
-        return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
+
+        return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
     }
 
     return (

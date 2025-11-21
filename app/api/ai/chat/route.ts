@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendChatRequest, ChatMessage } from '@/lib/gemini';
 
+// Request message format from client
+interface RequestMessage {
+    role: 'user' | 'assistant' | 'model';
+    content?: string;
+    text?: string;
+}
+
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabaseAdmin = createAdminClient();
@@ -51,7 +58,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Convert messages to Gemini format
-        const geminiMessages: ChatMessage[] = messages.map((msg: any) => ({
+        const geminiMessages: ChatMessage[] = messages.map((msg: RequestMessage) => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content || msg.text || '' }],
         }));
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
             latency_ms: response.latencyMs,
             status: 'success',
             request_payload: {
-                messages: messages.map((m: any) => ({
+                messages: messages.map((m: RequestMessage) => ({
                     role: m.role,
                     content: m.content?.substring(0, 1000), // Limit stored content
                 })),
@@ -109,7 +116,9 @@ export async function POST(req: NextRequest) {
             cost_usd: response.costUsd,
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorLatency = (error as { latencyMs?: number }).latencyMs;
         console.error('[AI Gateway] Error:', error);
 
         // Log failed request
@@ -132,9 +141,9 @@ export async function POST(req: NextRequest) {
                         completion_tokens: 0,
                         total_tokens: 0,
                         cost_usd: 0,
-                        latency_ms: error.latencyMs || (Date.now() - startTime),
+                        latency_ms: errorLatency || (Date.now() - startTime),
                         status: 'error',
-                        error_message: error.message || 'Unknown error',
+                        error_message: errorMessage,
                         request_payload: {},
                     });
                 }
@@ -145,7 +154,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(
             {
-                error: error.message || 'Failed to process AI request',
+                error: errorMessage,
                 details: process.env.NODE_ENV === 'development' ? error : undefined,
             },
             { status: 500 }
