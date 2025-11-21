@@ -24,7 +24,7 @@ export default function AIDocsPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="mb-4 text-sm text-muted-foreground">
-                            Authenticate requests using your project's API Key in the header.
+                            Authenticate requests using your project&apos;s API Key in the header.
                         </p>
                         <div className="bg-muted p-4 rounded-md font-mono text-sm">
                             x-api-key: your_api_key_here
