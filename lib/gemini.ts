@@ -62,7 +62,7 @@ function calculateCost(
  */
 export async function sendChatRequest(request: ChatRequest): Promise<ChatResponse> {
     const startTime = Date.now();
-    const modelName = request.model || 'gemini-1.5-pro';
+    const modelName = request.model || 'gemini-2.5-pro';
 
     try {
         const model = genAI.getGenerativeModel({ model: modelName });
