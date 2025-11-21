@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
@@ -17,7 +17,7 @@ export async function GET(
     }
 
     try {
-        const { projectId } = params;
+        const { projectId } = await params;
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '50');
