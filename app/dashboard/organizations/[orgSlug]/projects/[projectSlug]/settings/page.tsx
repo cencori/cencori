@@ -228,7 +228,7 @@ export default function ProjectSettingsPage() {
           </div>
 
           {/* Card skeleton */}
-          <Card>
+          <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
             <CardHeader>
               <Skeleton className="h-6 w-48 mb-2" />
               <Skeleton className="h-4 w-full max-w-md" />
@@ -301,7 +301,7 @@ export default function ProjectSettingsPage() {
 
         {/* GENERAL TAB */}
         <TabsContent value="general" className="space-y-6">
-          <Card>
+          <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
             <CardHeader>
               <CardTitle>Project Information</CardTitle>
               <CardDescription>

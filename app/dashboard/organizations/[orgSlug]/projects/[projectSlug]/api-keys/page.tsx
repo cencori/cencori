@@ -222,7 +222,7 @@ export default function ApiKeysPage({
                     </div>
                 </div>
             ) : (
-                <Card>
+                <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
                     <CardContent className="text-center py-12">
                         <div className="mx-auto w-fit rounded-full bg-muted p-6 mb-4">
                             <Key className="h-12 w-12 text-muted-foreground" />
