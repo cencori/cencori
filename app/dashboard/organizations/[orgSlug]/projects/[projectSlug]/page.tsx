@@ -5,8 +5,11 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Settings, Rocket, Activity, Clock, Zap, TrendingUp, Key } from "lucide-react";
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
@@ -33,6 +36,23 @@ interface ActivityItem {
   type: string;
   message: string;
   timestamp: string;
+}
+
+interface AIStats {
+  totalRequests: number;
+  successfulRequests: number;
+  errorRequests: number;
+  filteredRequests: number;
+  totalCost: string;
+  totalTokens: number;
+  avgLatency: number;
+}
+
+interface ChartDataPoint {
+  date: string;
+  count: number;
+  cost: number;
+  tokens: number;
 }
 
 export default function ProjectDetailsPage({
@@ -66,6 +86,9 @@ export default function ProjectDetailsPage({
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [aiStats, setAiStats] = useState<AIStats | null>(null);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [period, setPeriod] = useState<string>('7d');
 
   useEffect(() => {
     if (!orgSlug || !projectSlug) return;
@@ -108,6 +131,9 @@ export default function ProjectDetailsPage({
           return;
         }
         setProject(projectData);
+
+        // Fetch AI stats if project exists
+        fetchAIStats(projectData.id, period);
       } catch (err: unknown) {
         console.error("Unexpected error:", (err as Error).message);
         setError("An unexpected error occurred.");
@@ -116,22 +142,69 @@ export default function ProjectDetailsPage({
       }
     };
 
+    async function fetchAIStats(projectId: string, selectedPeriod: string) {
+      try {
+        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setAiStats(statsData.stats);
+          setChartData(statsData.chartData || []);
+        }
+      } catch (err) {
+        console.log('AI stats not available yet');
+      }
+    }
+
     fetchProjectDetails();
   }, [orgSlug, projectSlug, router]);
 
-  // Mock data for stats - replace with real data later
+  // Refetch stats when period changes
+  useEffect(() => {
+    if (project?.id) {
+      fetchAIStats(project.id, period);
+    }
+  }, [period, project]);
+
+  async function fetchAIStats(projectId: string, selectedPeriod: string) {
+    try {
+      const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}`);
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setAiStats(statsData.stats);
+        setChartData(statsData.chartData || []);
+      }
+    } catch (err) {
+      console.log('AI stats not available yet');
+    }
+  }
+
+  // Real AI stats
   const stats = {
-    deployments: { value: "24", change: "+12%", trend: "up" },
-    apiCalls: { value: "1.2M", change: "+23%", trend: "up" },
-    uptime: { value: "99.9%", change: "Last 30 days", trend: "stable" },
+    aiRequests: {
+      value: aiStats ? aiStats.totalRequests.toLocaleString() : "0",
+      change: aiStats ? `${aiStats.successfulRequests} successful` : "No data",
+      trend: "up"
+    },
+    aiCost: {
+      value: aiStats ? `$${aiStats.totalCost}` : "$0",
+      change: aiStats ? `${aiStats.totalTokens.toLocaleString()} tokens` : "No data",
+      trend: "stable"
+    },
+    avgLatency: {
+      value: aiStats ? `${aiStats.avgLatency}ms` : "0ms",
+      change: aiStats ? `${aiStats.errorRequests} errors` : "Last 7 days",
+      trend: "stable"
+    },
   };
 
-  // Mock activity data - replace with real data later
-  const recentActivity: ActivityItem[] = [
-    { id: "1", type: "deployment", message: "Deployed to production", timestamp: "2 hours ago" },
-    { id: "2", type: "update", message: "Updated environment variables", timestamp: "5 hours ago" },
-    { id: "3", type: "deployment", message: "Deployed to staging", timestamp: "1 day ago" },
-    { id: "4", type: "settings", message: "Changed visibility to public", timestamp: "2 days ago" },
+  // Recent AI activity
+  const recentActivity: ActivityItem[] = aiStats && aiStats.totalRequests > 0 ? [
+    { id: "1", type: "ai", message: `${aiStats.totalRequests} AI requests processed`, timestamp: "Last 7 days" },
+    { id: "2", type: "ai", message: `${aiStats.successfulRequests} successful responses`, timestamp: "Last 7 days" },
+    { id: "3", type: "cost", message: `$${aiStats.totalCost} total cost`, timestamp: "Last 7 days" },
+    { id: "4", type: "tokens", message: `${aiStats.totalTokens.toLocaleString()} tokens used`, timestamp: "Last 7 days" },
+  ] : [
+    { id: "1", type: "info", message: "No AI activity yet", timestamp: "Start using the AI API" },
   ];
 
   if (loading) {
@@ -285,46 +358,141 @@ export default function ProjectDetailsPage({
         </div>
       </div>
 
+      {/* Time Period Selector */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Analytics Overview</h2>
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Select period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1h">Last Hour</SelectItem>
+            <SelectItem value="24h">Last 24 Hours</SelectItem>
+            <SelectItem value="7d">Last 7 Days</SelectItem>
+            <SelectItem value="30d">Last 30 Days</SelectItem>
+            <SelectItem value="all">All Time</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* AI Requests Chart */}
         <Card className="transition-all hover:shadow-md">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Deployments</CardDescription>
-            </div>
-            <CardTitle className="text-3xl">{stats.deployments.value}</CardTitle>
+            <CardDescription>AI Requests</CardDescription>
+            <CardTitle className="text-3xl">{stats.aiRequests.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-emerald-600 dark:text-emerald-400">{stats.deployments.change}</span> from last month
+            <div className="h-20">
+              {chartData.length > 0 ? (
+                <ChartContainer
+                  config={{
+                    requests: {
+                      label: "Requests",
+                      color: "hsl(var(--primary))",
+                    },
+                  }}
+                  className="h-full w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <Bar
+                        dataKey="count"
+                        fill="var(--color-requests)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                  No data yet
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              <span className="text-emerald-600 dark:text-emerald-400">{stats.aiRequests.change}</span>
             </p>
           </CardContent>
         </Card>
 
+        {/* AI Cost Chart */}
         <Card className="transition-all hover:shadow-md">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>API Calls</CardDescription>
-            </div>
-            <CardTitle className="text-3xl">{stats.apiCalls.value}</CardTitle>
+            <CardDescription>AI Cost</CardDescription>
+            <CardTitle className="text-3xl">{stats.aiCost.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-emerald-600 dark:text-emerald-400">{stats.apiCalls.change}</span> from last month
+            <div className="h-20">
+              {chartData.length > 0 ? (
+                <ChartContainer
+                  config={{
+                    cost: {
+                      label: "Cost",
+                      color: "hsl(142.1 76.2% 36.3%)",
+                    },
+                  }}
+                  className="h-full w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <Bar
+                        dataKey="cost"
+                        fill="var(--color-cost)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                  No data yet
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              <span className="text-muted-foreground">{stats.aiCost.change}</span>
             </p>
           </CardContent>
         </Card>
 
+        {/* Avg Latency Chart */}
         <Card className="transition-all hover:shadow-md">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Uptime</CardDescription>
-            </div>
-            <CardTitle className="text-3xl">{stats.uptime.value}</CardTitle>
+            <CardDescription>Avg Latency</CardDescription>
+            <CardTitle className="text-3xl">{stats.avgLatency.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {stats.uptime.change}
+            <div className="h-20">
+              {chartData.length > 0 ? (
+                <ChartContainer
+                  config={{
+                    latency: {
+                      label: "Latency",
+                      color: "hsl(221.2 83.2% 53.3%)",
+                    },
+                  }}
+                  className="h-full w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <Bar
+                        dataKey="count"
+                        fill="var(--color-latency)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                  No data yet
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {stats.avgLatency.change}
             </p>
           </CardContent>
         </Card>
@@ -403,43 +571,6 @@ export default function ProjectDetailsPage({
                 {project.status}
               </Badge>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks for this project</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/edit`}>
-                <Settings size={16} className="mr-2" />
-                Edit Project Details
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`}>
-                <Settings size={16} className="mr-2" />
-                Project Settings
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}>
-                <Key size={16} className="mr-2" />
-                Manage API Keys
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" disabled>
-              <Activity size={16} className="mr-2" />
-              View Analytics
-              <Badge variant="secondary" className="ml-auto text-xs">Soon</Badge>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" disabled>
-              <Rocket size={16} className="mr-2" />
-              Deploy Project
-              <Badge variant="secondary" className="ml-auto text-xs">Soon</Badge>
-            </Button>
           </CardContent>
         </Card>
       </div>
