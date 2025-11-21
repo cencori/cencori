@@ -16,9 +16,8 @@ export default function BillingPage() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex items-center space-x-4 pb-12">
-                <CreditCard className="h-6 w-6" />
                 <h1 className="text-xl font-bold">Billing</h1>
                 <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
             </div>
