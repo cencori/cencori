@@ -21,7 +21,7 @@ type ModelAggregationMap = Record<string, ModelAggregation>;
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
@@ -34,7 +34,7 @@ export async function GET(
     }
 
     try {
-        const { projectId } = params;
+        const { projectId } = await params;
         const { searchParams } = new URL(req.url);
         const period = searchParams.get('period') || '7d'; // 1h, 24h, 7d, 30d, all
 
