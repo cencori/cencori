@@ -316,71 +316,48 @@ export default function ProjectDetailsPage({
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Hero Section */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div className="space-y-3 flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={project.status === "active" ? "default" : "secondary"} className="gap-1.5">
-              <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
-              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-            </Badge>
-            <Badge variant="outline">
-              {project.visibility.charAt(0).toUpperCase() + project.visibility.slice(1)}
-            </Badge>
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold break-words">{project.name}</h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              {project.description || "No description provided"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock size={14} />
-              Created {new Date(project.created_at).toLocaleDateString()}
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="truncate">ID: {project.slug}</span>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
+        <div className="space-y-4 flex-1 min-w-0">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 mt-4">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{project.name}</h1>
+                <Badge variant="outline" className="h-5 gap-1.5">
+                  <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  {project.status}
+                </Badge>
+              </div>
+              <Separator className="my-4 mt-12 w-full max-w-[1600px]" />
+            </div>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-          <Button variant="outline" asChild className="flex-1 sm:flex-none">
-            <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`}>
-              <Settings size={16} className="mr-2" />
-              Settings
-            </Link>
-          </Button>
-          <Button asChild className="flex-1 sm:flex-none">
-            <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/edit`}>
-              <Rocket size={16} className="mr-2" />
-              Edit Project
-            </Link>
-          </Button>
-        </div>
+
+
       </div>
 
       {/* Time Period Selector */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Analytics Overview</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold tracking-tight">Analytics Overview</h2>
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px] rounded-none border-2 focus:ring-0 focus:ring-offset-0">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1h">Last Hour</SelectItem>
-            <SelectItem value="24h">Last 24 Hours</SelectItem>
-            <SelectItem value="7d">Last 7 Days</SelectItem>
-            <SelectItem value="30d">Last 30 Days</SelectItem>
-            <SelectItem value="all">All Time</SelectItem>
+          <SelectContent className="rounded-none border-2">
+            <SelectItem value="1h" className="rounded-none cursor-pointer">Last Hour</SelectItem>
+            <SelectItem value="24h" className="rounded-none cursor-pointer">Last 24 Hours</SelectItem>
+            <SelectItem value="7d" className="rounded-none cursor-pointer">Last 7 Days</SelectItem>
+            <SelectItem value="30d" className="rounded-none cursor-pointer">Last 30 Days</SelectItem>
+            <SelectItem value="all" className="rounded-none cursor-pointer">All Time</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {/* AI Requests Chart */}
-        <Card className="transition-all hover:shadow-md">
+        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
           <CardHeader className="pb-2">
-            <CardDescription>AI Requests</CardDescription>
+            <CardDescription>Requests</CardDescription>
             <CardTitle className="text-3xl">{stats.aiRequests.value}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -400,7 +377,7 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="count"
                         fill="var(--color-requests)"
-                        radius={[4, 4, 0, 0]}
+                        radius={[0, 0, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -418,9 +395,9 @@ export default function ProjectDetailsPage({
         </Card>
 
         {/* AI Cost Chart */}
-        <Card className="transition-all hover:shadow-md">
+        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
           <CardHeader className="pb-2">
-            <CardDescription>AI Cost</CardDescription>
+            <CardDescription>Cost</CardDescription>
             <CardTitle className="text-3xl">{stats.aiCost.value}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -440,7 +417,7 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="cost"
                         fill="var(--color-cost)"
-                        radius={[4, 4, 0, 0]}
+                        radius={[0, 0, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -458,9 +435,9 @@ export default function ProjectDetailsPage({
         </Card>
 
         {/* Avg Latency Chart */}
-        <Card className="transition-all hover:shadow-md">
+        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
           <CardHeader className="pb-2">
-            <CardDescription>Avg Latency</CardDescription>
+            <CardDescription>Average Latency</CardDescription>
             <CardTitle className="text-3xl">{stats.avgLatency.value}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -470,7 +447,7 @@ export default function ProjectDetailsPage({
                   config={{
                     latency: {
                       label: "Latency",
-                      color: "hsl(221.2 83.2% 53.3%)",
+                      color: "hsla(135, 87%, 27%, 1.00)",
                     },
                   }}
                   className="h-full w-full"
@@ -480,7 +457,7 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="count"
                         fill="var(--color-latency)"
-                        radius={[4, 4, 0, 0]}
+                        radius={[0, 0, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -498,50 +475,49 @@ export default function ProjectDetailsPage({
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Activity size={20} />
-                Recent Activity
-              </CardTitle>
-              <CardDescription>Latest deployments and updates</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/activity`}>
-                View All
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
-              <div key={activity.id}>
-                <div className="flex gap-4">
-                  <div className="relative">
-                    <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                    {index !== recentActivity.length - 1 && (
-                      <div className="absolute top-4 left-[3px] w-[2px] h-full bg-border" />
-                    )}
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <p className="text-sm font-medium">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
-                  </div>
-                </div>
-                {index !== recentActivity.length - 1 && <div className="h-px" />}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        {/* Recent Activity */}
+        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Recent Activity
+                </CardTitle>
+                <CardDescription>Latest deployments and updates</CardDescription>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <Button variant="ghost" size="sm" asChild className="rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/activity`}>
+                  View All
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentActivity.map((activity, index) => (
+                <div key={activity.id}>
+                  <div className="flex gap-4">
+                    <div className="relative">
+                      <div className="h-2 w-2 rounded-full bg-primary mt-2" />
+                      {index !== recentActivity.length - 1 && (
+                        <div className="absolute top-4 left-[3px] w-[2px] h-full bg-border" />
+                      )}
+                    </div>
+                    <div className="flex-1 pb-4">
+                      <p className="text-sm font-medium">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
+                    </div>
+                  </div>
+                  {index !== recentActivity.length - 1 && <div className="h-px" />}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Project Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+        {/* Project Information */}
+        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
           <CardHeader>
             <CardTitle>Project Information</CardTitle>
             <CardDescription>Basic details about this project</CardDescription>

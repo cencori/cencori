@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendChatRequest, ChatMessage } from '@/lib/gemini';
+import { checkContent } from '@/lib/safety/content-filter';
 
 // Request message format from client
 interface RequestMessage {
@@ -62,6 +63,48 @@ export async function POST(req: NextRequest) {
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content || msg.text || '' }],
         }));
+
+        // SAFETY CHECK: Validate input content
+        const combinedInputText = messages
+            .map((m: RequestMessage) => m.content || m.text || '')
+            .join('\n');
+
+        const safetyResult = checkContent(combinedInputText);
+
+        if (!safetyResult.safe) {
+            // Log filtered request
+            await supabaseAdmin.from('ai_requests').insert({
+                project_id: apiKeyData.project_id,
+                api_key_id: apiKeyData.id,
+                model: model || 'gemini-1.5-pro',
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+                cost_usd: 0,
+                latency_ms: Date.now() - startTime,
+                status: 'filtered',
+                error_message: 'Content safety violation',
+                filtered_reasons: safetyResult.reasons,
+                safety_score: safetyResult.score,
+                request_payload: {
+                    messages: messages.map((m: RequestMessage) => ({
+                        role: m.role,
+                        content: m.content?.substring(0, 1000),
+                    })),
+                    model: model || 'gemini-1.5-pro',
+                    temperature,
+                },
+                response_payload: null
+            });
+
+            return NextResponse.json(
+                {
+                    error: 'Content safety violation',
+                    reasons: safetyResult.reasons
+                },
+                { status: 400 }
+            );
+        }
 
         // Call Gemini API
         const response = await sendChatRequest({
