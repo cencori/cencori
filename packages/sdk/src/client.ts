@@ -25,7 +25,7 @@ export class CencoriClient {
         }
 
         this.apiKey = config.apiKey;
-        this.baseUrl = config.baseUrl || 'https://cencori.com';
+        this.baseUrl = config.baseUrl || 'https://cencori.vercel.app';
 
         this.ai = new AIModule(this);
     }
@@ -51,7 +51,7 @@ export class CencoriClient {
             // Handle API errors
             if (!response.ok) {
                 const errorData = data as ErrorResponse;
-                
+
                 if (response.status === 401) {
                     throw new AuthenticationError(errorData.error || 'Invalid API key');
                 }
