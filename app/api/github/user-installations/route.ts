@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { createAdminClient } from '@/lib/supabaseAdmin';
 
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
@@ -20,55 +21,65 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Get all organizations owned by the user
-        const { data: ownedOrgs, error: orgsError } = await supabase
+        // Verify user owns the current organization
+        const { data: org, error: orgError } = await supabase
             .from('organizations')
-            .select('id')
-            .eq('owner_id', user.id);
+            .select('id, owner_id')
+            .eq('id', currentOrgId)
+            .single();
 
-        if (orgsError) {
-            console.error('[User Installations] Error fetching owned organizations:', orgsError);
-            return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 });
+        if (orgError || !org || org.owner_id !== user.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        if (!ownedOrgs || ownedOrgs.length === 0) {
-            return NextResponse.json({ installations: [] });
-        }
+        // Use admin client to read installation data (bypass RLS)
+        const supabaseAdmin = createAdminClient();
 
-        const orgIds = ownedOrgs.map(org => org.id);
-
-        // Get all installation IDs linked to ANY of user's organizations
-        const { data: allLinkedInstallations, error: linksError } = await supabase
-            .from('organization_github_installations')
-            .select('installation_id')
-            .in('organization_id', orgIds);
-
-        if (linksError) {
-            console.error('[User Installations] Error fetching linked installations:', linksError);
-            return NextResponse.json({ error: 'Failed to fetch installations' }, { status: 500 });
-        }
-
-        if (!allLinkedInstallations || allLinkedInstallations.length === 0) {
-            return NextResponse.json({ installations: [] });
-        }
-
-        // Get unique installation IDs
-        const uniqueInstallationIds = [...new Set(allLinkedInstallations.map(link => link.installation_id))];
-
-        // Get installations already linked to the CURRENT organization
-        const { data: currentOrgLinks, error: currentLinksError } = await supabase
+        // Get all installations already linked to the current organization
+        const { data: currentOrgLinks, error: currentLinksError } = await supabaseAdmin
             .from('organization_github_installations')
             .select('installation_id')
             .eq('organization_id', currentOrgId);
 
         if (currentLinksError) {
             console.error('[User Installations] Error fetching current org links:', currentLinksError);
+            return NextResponse.json({ error: 'Failed to fetch current installations' }, { status: 500 });
         }
 
         const currentOrgInstallationIds = currentOrgLinks?.map(link => link.installation_id) || [];
 
+        // Get all organizations owned by the user
+        const { data: userOrgs, error: userOrgsError } = await supabaseAdmin
+            .from('organizations')
+            .select('id')
+            .eq('owner_id', user.id);
+
+        if (userOrgsError || !userOrgs || userOrgs.length === 0) {
+            return NextResponse.json({ installations: [] });
+        }
+
+        const userOrgIds = userOrgs.map(o => o.id);
+
+        // Get all installations linked to any of the user's organizations
+        const { data: allUserLinks, error: allLinksError } = await supabaseAdmin
+            .from('organization_github_installations')
+            .select('installation_id')
+            .in('organization_id', userOrgIds);
+
+        if (allLinksError) {
+            console.error('[User Installations] Error fetching user installations:', allLinksError);
+            return NextResponse.json({ error: 'Failed to fetch installations' }, { status: 500 });
+        }
+
+        if (!allUserLinks || allUserLinks.length === 0) {
+            return NextResponse.json({ installations: [] });
+        }
+
+        // Get unique installation IDs across all user's orgs
+        const allUserInstallationIds = [...new Set(allUserLinks.map(link => link.installation_id))];
+
         // Filter out installations already linked to current org
-        const availableInstallationIds = uniqueInstallationIds.filter(
+        const availableInstallationIds = allUserInstallationIds.filter(
             id => !currentOrgInstallationIds.includes(id)
         );
 
@@ -77,7 +88,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Get installation details
-        const { data: installations, error: installationsError } = await supabase
+        const { data: installations, error: installationsError } = await supabaseAdmin
             .from('github_app_installations')
             .select('installation_id, github_account_type, github_account_login, github_account_name')
             .in('installation_id', availableInstallationIds);
