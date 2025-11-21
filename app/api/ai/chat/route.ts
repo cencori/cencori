@@ -16,16 +16,13 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = createAdminClient();
 
     try {
-        // Get API key from header
-        const authHeader = req.headers.get('authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const apiKey = req.headers.get('CENCORI_API_KEY');
+        if (!apiKey) {
             return NextResponse.json(
-                { error: 'Missing or invalid authorization header' },
+                { error: 'Missing CENCORI_API_KEY header' },
                 { status: 401 }
             );
         }
-
-        const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
 
         // Validate API key and get project info
         const { data: apiKeyData, error: apiKeyError } = await supabaseAdmin

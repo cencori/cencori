@@ -1,0 +1,33 @@
+{
+  "name": "cencori",
+  "version": "0.1.2",
+  "description": "Official SDK for Cencori",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "ai",
+    "gateway",
+    "cencori",
+    "sdk",
+    "typescript"
+  ],
+  "author": "FohnAI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bolaabanjo/cencori"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}
