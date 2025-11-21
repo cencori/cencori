@@ -62,7 +62,7 @@ function calculateCost(
  */
 export async function sendChatRequest(request: ChatRequest): Promise<ChatResponse> {
     const startTime = Date.now();
-    const modelName = request.model || 'gemini-2.5-pro';
+    const modelName = request.model || 'models/gemini-3.0-pro';
 
     try {
         const model = genAI.getGenerativeModel({ model: modelName });
@@ -115,7 +115,7 @@ export async function sendChatRequest(request: ChatRequest): Promise<ChatRespons
  */
 export async function testGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'models/gemini-3.0-pro' });
         const result = await model.generateContent('Hello');
         return !!result.response.text();
     } catch (error) {
