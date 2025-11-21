@@ -45,7 +45,6 @@ export default function GitHubImportPage() {
   const GITHUB_APP_SLUG = "cencori"; // Your GitHub App slug
 
   useEffect(() => {
-    fetchAvailableInstallations();
     fetchRepositories();
 
     // Check for validation errors from callback
@@ -71,6 +70,13 @@ export default function GitHubImportPage() {
   }, [orgSlug]);
 
   useEffect(() => {
+    // Fetch available installations when organizationId is set
+    if (organizationId) {
+      fetchAvailableInstallations();
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
     // Filter repositories based on search term
     if (searchTerm) {
       setFilteredRepos(
@@ -85,10 +91,13 @@ export default function GitHubImportPage() {
   }, [searchTerm, repositories]);
 
   const fetchAvailableInstallations = async () => {
+    if (!organizationId) return;
+
     try {
-      const response = await fetch('/api/github/user-installations');
+      const response = await fetch(`/api/github/user-installations?organizationId=${organizationId}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('[Import Page] Available installations:', data.installations);
         setAvailableInstallations(data.installations || []);
       }
     } catch (error) {
