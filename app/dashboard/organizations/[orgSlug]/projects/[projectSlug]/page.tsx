@@ -38,6 +38,23 @@ interface ActivityItem {
   timestamp: string;
 }
 
+interface AIStats {
+  totalRequests: number;
+  successfulRequests: number;
+  errorRequests: number;
+  filteredRequests: number;
+  totalCost: string;
+  totalTokens: number;
+  avgLatency: number;
+}
+
+interface ChartDataPoint {
+  date: string;
+  count: number;
+  cost: number;
+  tokens: number;
+}
+
 export default function ProjectDetailsPage({
   params,
 }: {
@@ -69,8 +86,8 @@ export default function ProjectDetailsPage({
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [aiStats, setAiStats] = useState<any>(null);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [aiStats, setAiStats] = useState<AIStats | null>(null);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [period, setPeriod] = useState<string>('7d');
 
   useEffect(() => {
