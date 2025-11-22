@@ -123,7 +123,7 @@ export default function OrganizationsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <div className="flex items-center space-x-4 pb-6 sm:pb-12">
         <h1 className="text-base sm:text-lg font-bold">Your Organizations</h1>
       </div>
