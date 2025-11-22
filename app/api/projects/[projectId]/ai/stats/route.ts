@@ -50,14 +50,16 @@ export async function GET(
         }
 
         // Verify user is member of organization
+        console.log(`[AI Stats] Checking membership for User: ${user.id}, Org: ${project.organization_id}`);
         const { data: member, error: memberError } = await supabase
             .from('organization_members')
-            .select('id')
+            .select('user_id')
             .eq('organization_id', project.organization_id)
             .eq('user_id', user.id)
             .single();
 
         if (memberError || !member) {
+            console.error('[AI Stats] Membership check failed:', memberError);
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 

@@ -71,7 +71,7 @@ export default function AIDocsPage() {
   "messages": [
     { "role": "user", "content": "Hello!" }
   ],
-  "model": "gemini-1.5-pro", // Optional
+  "model": "gemini-3-pro-preview", // Optional
   "temperature": 0.7 // Optional
 }`}
                                 </pre>

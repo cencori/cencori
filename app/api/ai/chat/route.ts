@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendChatRequest, ChatMessage } from '@/lib/gemini';
 import { checkContent } from '@/lib/safety/content-filter';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { hashApiKey } from '@/lib/api-keys';
 
 // Request message format from client
 interface RequestMessage {
@@ -15,6 +16,18 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabaseAdmin = createAdminClient();
 
+    // DEBUG: Check Supabase URL
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    console.log('🔗 Supabase URL:', sbUrl ? sbUrl.substring(0, 20) + '...' : 'UNDEFINED');
+
+    // DEBUG: Simple health check
+    try {
+        const { count, error: healthError } = await supabaseAdmin.from('api_keys').select('*', { count: 'exact', head: true });
+        console.log('💓 Supabase Health Check:', { count, error: healthError });
+    } catch (e) {
+        console.error('💓 Supabase Health Check FAILED:', e);
+    }
+
     try {
         const apiKey = req.headers.get('CENCORI_API_KEY');
         if (!apiKey) {
@@ -24,14 +37,21 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Hash the API key for lookup
+        const keyHash = hashApiKey(apiKey);
+        console.log('🔍 Checking API key hash:', keyHash.substring(0, 16) + '...');
+
         // Validate API key and get project info
         const { data: apiKeyData, error: apiKeyError } = await supabaseAdmin
             .from('api_keys')
             .select('id, project_id, environment, is_active')
-            .eq('key', apiKey)
+            .eq('key_hash', keyHash)
             .single();
 
+        console.log('📊 Supabase Response:', { apiKeyData, apiKeyError });
+
         if (apiKeyError || !apiKeyData) {
+            console.log('❌ API key validation failed!');
             return NextResponse.json(
                 { error: 'Invalid API key' },
                 { status: 401 }
@@ -90,7 +110,7 @@ export async function POST(req: NextRequest) {
             await supabaseAdmin.from('ai_requests').insert({
                 project_id: apiKeyData.project_id,
                 api_key_id: apiKeyData.id,
-                model: model || 'gemini-1.5-pro',
+                model: model || 'gemini-3-pro-preview',
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0,
@@ -105,7 +125,7 @@ export async function POST(req: NextRequest) {
                         role: m.role,
                         content: m.content?.substring(0, 1000),
                     })),
-                    model: model || 'gemini-1.5-pro',
+                    model: model || 'gemini-3-pro-preview',
                     temperature,
                 },
                 response_payload: null
@@ -123,7 +143,7 @@ export async function POST(req: NextRequest) {
         // Call Gemini API
         const response = await sendChatRequest({
             messages: geminiMessages,
-            model: model || 'gemini-1.5-pro',
+            model: model,
             temperature,
             maxOutputTokens,
         });
@@ -132,7 +152,7 @@ export async function POST(req: NextRequest) {
         const logData = {
             project_id: apiKeyData.project_id,
             api_key_id: apiKeyData.id,
-            model: model || 'gemini-1.5-pro',
+            model: model || 'gemini-3-pro-preview',
             prompt_tokens: response.promptTokens,
             completion_tokens: response.completionTokens,
             total_tokens: response.totalTokens,
@@ -144,7 +164,7 @@ export async function POST(req: NextRequest) {
                     role: m.role,
                     content: m.content?.substring(0, 1000), // Limit stored content
                 })),
-                model: model || 'gemini-1.5-pro',
+                model: model || 'gemini-3-pro-preview',
                 temperature,
             },
             response_payload: {
@@ -164,7 +184,7 @@ export async function POST(req: NextRequest) {
         // Return Gemini response
         return NextResponse.json({
             content: response.text,
-            model: model || 'gemini-1.5-pro',
+            model: model || 'gemini-3-pro-preview',
             usage: {
                 prompt_tokens: response.promptTokens,
                 completion_tokens: response.completionTokens,
