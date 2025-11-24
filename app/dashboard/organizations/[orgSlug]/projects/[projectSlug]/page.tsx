@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Settings, Rocket, Activity, Clock, Zap, TrendingUp, Key } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -54,6 +54,58 @@ interface ChartDataPoint {
   cost: number;
   tokens: number;
 }
+
+// Type for recharts dot props
+interface DotProps {
+  key?: string;
+  cx?: number;
+  cy?: number;
+  r?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  fill?: string;
+  index?: number;
+  value?: number;
+  dataKey?: string;
+  payload?: any;
+  [key: string]: any;
+}
+
+// Custom animated dot for line charts
+const CustomizedDot = (props: DotProps) => {
+  const { cx, cy, stroke } = props;
+
+  return (
+    <g>
+      {/* Main dot */}
+      <circle cx={cx} cy={cy} r={3} fill={stroke} />
+      {/* Ping animation circles */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={3}
+        stroke={stroke}
+        fill="none"
+        strokeWidth="1"
+        opacity="0.8"
+      >
+        <animate
+          attributeName="r"
+          values="3;10"
+          dur="1s"
+          repeatCount="indefinite"
+        />
+        <animate
+          attributeName="opacity"
+          values="0.8;0"
+          dur="1s"
+          repeatCount="indefinite"
+        />
+      </circle>
+    </g>
+  );
+};
+
 
 export default function ProjectDetailsPage({
   params,
@@ -361,26 +413,50 @@ export default function ProjectDetailsPage({
             <CardTitle className="text-3xl">{stats.aiRequests.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-20">
+            <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
                   config={{
                     requests: {
                       label: "Requests",
-                      color: "hsl(var(--primary))",
+                      color: "hsla(24, 76%, 36%, 1.00)",
                     },
                   }}
                   className="h-full w-full"
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <Bar
-                        dataKey="count"
-                        fill="var(--color-requests)"
-                        radius={[0, 0, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <LineChart
+                    data={chartData}
+                    margin={{
+                      left: 12,
+                      right: 12,
+                      top: 8,
+                      bottom: 8,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Line
+                      dataKey="count"
+                      type="monotone"
+                      stroke="var(--color-requests)"
+                      strokeWidth={2}
+                      dot={(props: DotProps) => {
+                        const { key, ...rest } = props;
+                        return <CustomizedDot key={key} {...rest} stroke="var(--color-requests)" />;
+                      }}
+                    />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
@@ -401,7 +477,7 @@ export default function ProjectDetailsPage({
             <CardTitle className="text-3xl">{stats.aiCost.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-20">
+            <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
                   config={{
@@ -412,15 +488,39 @@ export default function ProjectDetailsPage({
                   }}
                   className="h-full w-full"
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <Bar
-                        dataKey="cost"
-                        fill="var(--color-cost)"
-                        radius={[0, 0, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <LineChart
+                    data={chartData}
+                    margin={{
+                      left: 12,
+                      right: 12,
+                      top: 8,
+                      bottom: 8,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Line
+                      dataKey="cost"
+                      type="monotone"
+                      stroke="var(--color-cost)"
+                      strokeWidth={2}
+                      dot={(props: DotProps) => {
+                        const { key, ...rest } = props;
+                        return <CustomizedDot key={key} {...rest} stroke="var(--color-cost)" />;
+                      }}
+                    />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
@@ -441,26 +541,50 @@ export default function ProjectDetailsPage({
             <CardTitle className="text-3xl">{stats.avgLatency.value}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-20">
+            <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
                   config={{
                     latency: {
                       label: "Latency",
-                      color: "hsla(135, 87%, 27%, 1.00)",
+                      color: "hsla(244, 59%, 59%, 1.00)",
                     },
                   }}
                   className="h-full w-full"
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <Bar
-                        dataKey="count"
-                        fill="var(--color-latency)"
-                        radius={[0, 0, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <LineChart
+                    data={chartData}
+                    margin={{
+                      left: 12,
+                      right: 12,
+                      top: 8,
+                      bottom: 8,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Line
+                      dataKey="count"
+                      type="monotone"
+                      stroke="var(--color-latency)"
+                      strokeWidth={2}
+                      dot={(props: DotProps) => {
+                        const { key, ...rest } = props;
+                        return <CustomizedDot key={key} {...rest} stroke="var(--color-latency)" />;
+                      }}
+                    />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
