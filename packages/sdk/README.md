@@ -58,7 +58,7 @@ Send a chat message to the AI.
 
 **Parameters:**
 - `messages`: Array of message objects with `role` ('user' | 'assistant') and `content`
-- `model`: Optional AI model (defaults to 'gemini-3-pro-preview')
+- `model`: Optional AI model (defaults to 'gemini-1.5-flash')
 - `temperature`: Optional temperature (0-1)
 - `maxOutputTokens`: Optional max tokens for response
 

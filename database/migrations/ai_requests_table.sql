@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.ai_requests (
     api_key_id UUID NOT NULL REFERENCES public.api_keys(id) ON DELETE CASCADE,
     
     -- Model information
-    model TEXT NOT NULL DEFAULT 'gemini-3-pro-preview',
+    model TEXT NOT NULL DEFAULT 'gemini-1.5-flash',
     
     -- Token usage
     prompt_tokens INTEGER NOT NULL DEFAULT 0,

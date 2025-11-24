@@ -89,7 +89,7 @@ POST /api/ai/chat
 Headers: { "x-api-key": "your_project_api_key" }
 Body: {
   "messages": [{ "role": "user", "content": "Hello!" }],
-  "model": "gemini-3-pro-preview" // Optional
+  "model": "gemini-1.5-flash" // Optional
 }
 ```
 
