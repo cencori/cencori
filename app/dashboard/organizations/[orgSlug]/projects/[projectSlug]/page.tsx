@@ -603,8 +603,8 @@ export default function ProjectDetailsPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         {/* Recent Activity */}
-        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader>
+        <Card className="h-[280px] flex flex-col transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+          <CardHeader className="flex-none">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
@@ -612,14 +612,14 @@ export default function ProjectDetailsPage({
                 </CardTitle>
                 <CardDescription>Latest deployments and updates</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild className="rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <Button variant="ghost" size="sm" asChild className="rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
                 <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/activity`}>
                   View All
                 </Link>
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 overflow-y-auto">
             <div className="space-y-4">
               {recentActivity.map((activity, index) => (
                 <div key={activity.id}>
@@ -643,12 +643,12 @@ export default function ProjectDetailsPage({
         </Card>
 
         {/* Project Information */}
-        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader>
+        <Card className="h-[280px] flex flex-col transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
+          <CardHeader className="flex-none">
             <CardTitle>Project Information</CardTitle>
             <CardDescription>Basic details about this project</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex-1 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Organization</span>
               <span className="font-medium">{organization.name}</span>
