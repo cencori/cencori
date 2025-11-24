@@ -30,11 +30,7 @@ const PRICING = {
         inputPer1KTokens: 0.00025,
         outputPer1KTokens: 0.00075,
     },
-    'gemini-3-pro-preview': {
-        inputPer1KTokens: 0.00025,
-        outputPer1KTokens: 0.00075,
-    },
-    'gemini-1.5-flash': {
+    'gemini-1.5-flash-001': {
         inputPer1KTokens: 0.000075,
         outputPer1KTokens: 0.0003,
     },
@@ -66,7 +62,7 @@ function calculateCost(
  */
 export async function sendChatRequest(request: ChatRequest): Promise<ChatResponse> {
     const startTime = Date.now();
-    const modelName = request.model || 'gemini-1.5-flash';
+    const modelName = request.model || 'gemini-1.5-flash-001';
 
     try {
         const model = genAI.getGenerativeModel({ model: modelName });
@@ -119,7 +115,7 @@ export async function sendChatRequest(request: ChatRequest): Promise<ChatRespons
  */
 export async function testGeminiConnection(): Promise<boolean> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' });
         const result = await model.generateContent('Hello');
         return !!result.response.text();
     } catch (error) {

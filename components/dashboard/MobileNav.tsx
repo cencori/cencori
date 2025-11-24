@@ -13,7 +13,7 @@ export function MobileNav({ onMenuClick, projectSlug }: MobileNavProps) {
     const { setEnvironment, isTestMode } = useEnvironment();
 
     return (
-        <div className="sticky top-12 z-40 lg:hidden border-b border-zinc-100 dark:border-zinc-800 bg-sidebar px-4 h-14 flex items-center gap-3">
+        <div className="sticky top-12 z-40 lg:hidden border-b dark:border-zinc-800 bg-background px-4 h-14 flex items-center gap-3">
             <Button
                 variant="ghost"
                 size="icon"
