@@ -314,16 +314,26 @@ export default function ProjectDetailsPage({
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
+    <div className="w-full max-w-[1920px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
       {/* Hero Section */}
-      <div className="flex items-center gap-3 mt-4">
-        <h1 className="text-3xl sm:text-4xl mt-0 font-bold tracking-tight text-foreground">{project.name}</h1>
-        <Badge variant="outline" className="h-5 gap-1.5">
-          <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
-          {project.status}
-        </Badge>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
+        <div className="space-y-4 flex-1 min-w-0">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 mt-4 sm:mt-1">
+                <h1 className="text-3xl sm:text-4xl mt-0 font-bold tracking-tight text-foreground">{project.name}</h1>
+                <Badge variant="outline" className="h-5 gap-1.5">
+                  <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  {project.status}
+                </Badge>
+              </div>
+              <Separator className="my-4 mt-12 w-full max-w-[1920px]" />
+            </div>
+          </div>
+        </div>
+
+
       </div>
-      <Separator className="my-4 mt-12 w-full max-w-[1600px]" />
 
       {/* Time Period Selector */}
       <div className="flex items-center justify-between mb-6">
