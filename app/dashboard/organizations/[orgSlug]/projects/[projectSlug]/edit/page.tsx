@@ -49,9 +49,10 @@ interface ProjectData {
 export default function EditProjectPage({
   params,
 }: {
-  params: { orgSlug: string; projectSlug: string };
+  params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
-  const { orgSlug, projectSlug } = params;
+  const [orgSlug, setOrgSlug] = useState<string | null>(null);
+  const [projectSlug, setProjectSlug] = useState<string | null>(null);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +63,14 @@ export default function EditProjectPage({
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
   );
 
+  useEffect(() => {
+    (async () => {
+      const resolved = await params;
+      setOrgSlug(resolved.orgSlug);
+      setProjectSlug(resolved.projectSlug);
+    })();
+  }, [params]);
+
   // Get context to update breadcrumbs
   const { updateProject: updateProjectContext } = useOrganizationProject();
 
@@ -70,6 +79,8 @@ export default function EditProjectPage({
   });
 
   useEffect(() => {
+    if (!orgSlug || !projectSlug) return;
+
     const fetchProject = async () => {
       setLoading(true);
       setError(null);

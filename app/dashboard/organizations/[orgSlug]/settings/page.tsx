@@ -51,7 +51,7 @@ interface ProjectData {
 export default function OrganizationSettingsPage({
   params,
 }: {
-  params: { orgSlug: string } | Promise<{ orgSlug: string }>;
+  params: Promise<{ orgSlug: string }>;
 }) {
   const router = useRouter();
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
@@ -75,9 +75,9 @@ export default function OrganizationSettingsPage({
     let mounted = true;
     (async () => {
       try {
-        const resolved = await Promise.resolve(params);
-        if (mounted && resolved && typeof (resolved as { orgSlug: string }).orgSlug === "string") {
-          setOrgSlug((resolved as { orgSlug: string }).orgSlug);
+        const resolved = await params;
+        if (mounted && resolved && typeof resolved.orgSlug === "string") {
+          setOrgSlug(resolved.orgSlug);
         }
       } catch (e) {
         console.error("Failed to resolve params:", e);
@@ -232,7 +232,7 @@ export default function OrganizationSettingsPage({
 
         {/* GENERAL TAB */}
         <TabsContent value="general" className="space-y-6">
-          <Card>
+          <Card className="rounded-none">
             <CardHeader>
               <CardTitle>Organization Information</CardTitle>
               <CardDescription>
@@ -291,7 +291,7 @@ export default function OrganizationSettingsPage({
 
         {/* PROJECTS TAB */}
         <TabsContent value="projects" className="space-y-6">
-          <Card>
+          <Card className="rounded-none">
             <CardHeader>
               <CardTitle>Projects Management</CardTitle>
               <CardDescription>
@@ -357,7 +357,7 @@ export default function OrganizationSettingsPage({
 
         {/* MEMBERS TAB */}
         <TabsContent value="members" className="space-y-6">
-          <Card>
+          <Card className="rounded-none">
             <CardHeader>
               <CardTitle>Team Members</CardTitle>
               <CardDescription>Manage team members and their roles</CardDescription>
@@ -376,7 +376,7 @@ export default function OrganizationSettingsPage({
 
         {/* API KEYS TAB */}
         <TabsContent value="api-keys" className="space-y-6">
-          <Card>
+          <Card className="rounded-none">
             <CardHeader>
               <CardTitle>API Keys</CardTitle>
               <CardDescription>
@@ -397,7 +397,7 @@ export default function OrganizationSettingsPage({
 
         {/* DANGER ZONE TAB */}
         <TabsContent value="danger" className="space-y-6">
-          <Card className="border-red-200 dark:border-red-900">
+          <Card className="rounded-none border-red-200 dark:border-red-900">
             <CardHeader>
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -408,7 +408,7 @@ export default function OrganizationSettingsPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-6">
+              <div className="rounded-none border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-6">
                 <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
                   Delete Organization
                 </h3>

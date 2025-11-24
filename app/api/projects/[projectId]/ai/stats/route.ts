@@ -52,7 +52,7 @@ export async function GET(
         // Verify user is member of organization
         const { data: member, error: memberError } = await supabase
             .from('organization_members')
-            .select('id')
+            .select('user_id')
             .eq('organization_id', project.organization_id)
             .eq('user_id', user.id)
             .single();

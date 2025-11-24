@@ -35,7 +35,7 @@ interface OrganizationData {
   slug: string;
 }
 
-type LayoutParams = { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>;
+type LayoutParams = Promise<{ orgSlug: string; projectSlug: string }>;
 
 export default function ProjectLayout({
   children,
@@ -56,7 +56,7 @@ export default function ProjectLayout({
       setLoading(true);
       setError(null);
       try {
-        const resolvedParams = await Promise.resolve(params);
+        const resolvedParams = await params;
         const { orgSlug, projectSlug } = resolvedParams;
 
         const {

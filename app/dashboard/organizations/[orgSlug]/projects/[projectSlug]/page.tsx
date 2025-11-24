@@ -58,7 +58,7 @@ interface ChartDataPoint {
 export default function ProjectDetailsPage({
   params,
 }: {
-  params: { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>;
+  params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
   const [projectSlug, setProjectSlug] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export default function ProjectDetailsPage({
     let mounted = true;
     (async () => {
       try {
-        const resolved = await Promise.resolve(params as { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>);
+        const resolved = await params;
         if (mounted && resolved) {
           if (typeof resolved.orgSlug === "string") setOrgSlug(resolved.orgSlug);
           if (typeof resolved.projectSlug === "string") setProjectSlug(resolved.projectSlug);
@@ -233,7 +233,7 @@ export default function ProjectDetailsPage({
         {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-none">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-4 w-24" />
@@ -249,7 +249,7 @@ export default function ProjectDetailsPage({
         </div>
 
         {/* Activity Skeleton */}
-        <Card>
+        <Card className="rounded-none">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="space-y-1.5">
@@ -277,7 +277,7 @@ export default function ProjectDetailsPage({
         {/* Info Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-none">
               <CardHeader>
                 <Skeleton className="h-6 w-40" />
                 <Skeleton className="h-4 w-56" />
@@ -314,30 +314,20 @@ export default function ProjectDetailsPage({
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
       {/* Hero Section */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
-        <div className="space-y-4 flex-1 min-w-0">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 mt-4">
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{project.name}</h1>
-                <Badge variant="outline" className="h-5 gap-1.5">
-                  <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
-                  {project.status}
-                </Badge>
-              </div>
-              <Separator className="my-4 mt-12 w-full max-w-[1600px]" />
-            </div>
-          </div>
-        </div>
-
-
+      <div className="flex items-center gap-3 mt-4">
+        <h1 className="text-3xl sm:text-4xl mt-0 font-bold tracking-tight text-foreground">{project.name}</h1>
+        <Badge variant="outline" className="h-5 gap-1.5">
+          <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+          {project.status}
+        </Badge>
       </div>
+      <Separator className="my-4 mt-12 w-full max-w-[1600px]" />
 
       {/* Time Period Selector */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold tracking-tight">Analytics Overview</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-[140px] rounded-none border-2 focus:ring-0 focus:ring-offset-0">
             <SelectValue placeholder="Select period" />

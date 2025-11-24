@@ -182,7 +182,6 @@ export default function OrganizationLayout({
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetContent side="bottom" className="h-[75vh]">
             <div className="py-4">
-              <h2 className="text-lg font-semibold mb-4">{organization.name}</h2>
               <SidebarGroup>
                 <SidebarMenu>
                   <SidebarMenuItem>
