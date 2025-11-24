@@ -14,6 +14,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
 interface OrganizationData {
   id: string;
@@ -141,6 +142,7 @@ export default function ProjectDetailsPage({
   const [aiStats, setAiStats] = useState<AIStats | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [period, setPeriod] = useState<string>('7d');
+  const { environment } = useEnvironment();
 
   useEffect(() => {
     if (!orgSlug || !projectSlug) return;
@@ -196,7 +198,7 @@ export default function ProjectDetailsPage({
 
     async function fetchAIStats(projectId: string, selectedPeriod: string) {
       try {
-        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}`);
+        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}&environment=${environment}`);
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
           setAiStats(statsData.stats);
@@ -210,16 +212,16 @@ export default function ProjectDetailsPage({
     fetchProjectDetails();
   }, [orgSlug, projectSlug, router]);
 
-  // Refetch stats when period changes
+  // Refetch stats when period or environment changes
   useEffect(() => {
     if (project?.id) {
       fetchAIStats(project.id, period);
     }
-  }, [period, project]);
+  }, [period, project, environment]);
 
   async function fetchAIStats(projectId: string, selectedPeriod: string) {
     try {
-      const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}`);
+      const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}&environment=${environment}`);
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
         setAiStats(statsData.stats);
