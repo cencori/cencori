@@ -1,17 +1,15 @@
-// app/page.tsx
 "use client";
 
+import Navbar from "@/components/landing/Navbar";
+import { Hero } from "@/components/landing/Hero";
+import { Features } from "@/components/landing/Features";
+import { ValueProp } from "@/components/landing/ValueProp";
+import { CTA } from "@/components/landing/CTA";
+import { Footer } from "@/components/landing/Footer";
 import { Logo } from "@/components/logo";
-import FooterSection from "@/components/sections/footer/default";
-import Hero from "@/components/sections/hero/default";
-import Navbar from "@/components/sections/navbar/default";
 import { siteConfig } from "@/config/site";
-import { ArrowRightIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { CircleUserRound } from "lucide-react";
-import { useRouter } from "next/navigation"; // Import useRouter
 
 export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -72,13 +70,13 @@ export default function HomePage() {
       text: "Dashboard",
       href: "/dashboard/organizations",
       isButton: true,
-      variant: "default", // Use a string literal, TS will infer type when array is const
+      variant: "default",
     },
     {
       text: userProfile.name || "User",
-      href: "#", // Not clickable as per requirement, or could be profile page
+      href: "#",
       isButton: false,
-      isAvatar: true, // Custom prop for Navbar to render avatar
+      isAvatar: true,
       avatarSrc: userProfile.avatar,
       avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
     },
@@ -97,7 +95,7 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen lg:px-32 bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
       <Navbar
         logo={<Logo variant="mark" className="h-4" />}
         name="cencori"
@@ -107,56 +105,15 @@ export default function HomePage() {
         isAuthenticated={isAuthenticated}
         userProfile={isAuthenticated ? userProfile : undefined}
       />
+
       <main>
         <Hero />
+        <Features />
+        <ValueProp />
+        <CTA />
       </main>
-      <FooterSection
-        logo={<Logo variant="mark" className="h-4" />}
-        columns={[
-          {
-            title: "Product",
-            links: [
 
-              { text: "AI", href: siteConfig.links.products.ai },
-              { text: "Audit", href: siteConfig.links.products.audit },
-              { text: "Knight", href: siteConfig.links.products.knight },
-              { text: "Sandbox", href: siteConfig.links.products.sandbox },
-              { text: "Insights", href: siteConfig.links.products.insights },
-              { text: "Network", href: siteConfig.links.products.network },
-              { text: "Edge", href: siteConfig.links.products.edge },
-              { text: "Enterprise", href: siteConfig.links.products.enterprise },
-              { text: "Developer Tools", href: siteConfig.links.products.developerTools },
-            ],
-          },
-          {
-            title: "Company",
-            links: [
-              { text: "About", href: "/about" },
-              { text: "Careers", href: "/careers" },
-              { text: "Blog", href: "/blog" },
-              { text: "Changelog", href: "/changelog" },
-              { text: "Contact Us", href: "/contact" },
-              { text: "Customers", href: "/customers" },
-              { text: "Events", href: "/events" },
-              { text: "Partners", href: "/partners" },
-              { text: "Shipped", href: "/shipped" },
-            ],
-          },
-          {
-            title: "Socials",
-            links: [
-              { text: "GitHub", href: siteConfig.links.github },
-              { text: "X", href: siteConfig.links.x },
-            ],
-          },
-        ]}
-        copyright="© 2025 FohnAI. All rights reserved"
-        policies={[
-          { text: "Privacy Policy", href: siteConfig.links.company.privacyPolicy },
-          { text: "Terms of Service", href: "/terms-of-service" },
-        ]}
-        showModeToggle={true}
-      />
+      <Footer />
     </div>
   );
 }
