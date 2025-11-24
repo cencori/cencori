@@ -1,174 +1,250 @@
 ![Cencori by FohnAI](public/Bonus.png)
 
-# Cencori by FohnAI
+# Cencori
 
-Cencori is a multi-tenant AI infrastructure platform designed to help teams build, deploy, and scale AI-driven applications with consistency and reliability. It provides the foundational backend and system architecture required to manage AI products in production environments.
+**The Security Layer for AI Development**
 
----
+Build with AI. Deploy with confidence.
 
-## Overview
-
-Cencori is developed by **FohnAI** as part of a broader initiative to modernize AI infrastructure. The goal is to unify how developers create, protect, and scale AI systems across different use cases, ranging from experimental prototypes to enterprise-grade solutions.
-
-This project represents the **MVP** phase of the Cencori platform, focusing on the foundational backend layer and multi-tenant system design.
+Cencori is a developer-first AI infrastructure platform that wraps your AI integrations with security, compliance, and observability - so you can ship AI features without worrying about data leaks, compliance violations, or runaway costs.
 
 ---
 
-## Core Objectives
+## Why Cencori?
 
-1. Establish a secure and extensible multi-tenant architecture.  
-2. Implement a robust authentication and organization management system.  
-3. Enable developers to deploy and manage AI-powered applications seamlessly.  
-4. Lay the groundwork for FohnAI’s broader runtime and deployment ecosystem.
+If you're building with AI or building AI products, you need:
+
+- **Security** - Automatic PII detection and filtering
+- **Compliance** - Audit logs and safety scores for every request
+- **Cost Control** - Rate limiting and usage analytics
+- **Observability** - Real-time dashboards and request tracking
+- **Multi-tenancy** - Organization and project management built-in
+
+**Cencori gives you all of this in one platform.**
 
 ---
 
-## Technology Stack
+## Quick Start
+
+### 1. Install the SDK
+
+```bash
+npm install cencori
+```
+
+### 2. Get Your API Key
+
+1. Sign up at [cencori.vercel.app](https://cencori.vercel.app)
+2. Create a project
+3. Generate an API key
+
+### 3. Make Your First Request
+
+```typescript
+import { Cencori } from 'cencori';
+
+const ai = new Cencori('your-api-key');
+
+const response = await ai.chat({
+  messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+console.log(response.content);
+```
+
+**That's it!** Cencori handles security, logging, and cost tracking automatically.
+
+---
+
+## Key Features
+
+### **Built-in Security**
+
+Every request goes through automatic safety filters:
+- **PII Detection** - Blocks emails, phone numbers, SSNs, credit cards
+- **Content Safety** - Filters harmful keywords and prompt injection attempts
+- **Safety Scores** - Every request gets a safety score for compliance
+
+### **Real-time Analytics**
+
+Track everything in your dashboard:
+- Request counts by time period
+- Cost tracking per project
+- Latency monitoring
+- Error rates and filtering stats
+
+### **Flexible API Keys**
+
+- **Production Keys** - For live applications (`cen_...`)
+- **Test Keys** - For development (`cen_test_...`)
+- Environment-based data isolation
+- Easy key rotation
+
+### **Rate Limiting**
+
+Database-backed rate limiting (60 requests/min per project) prevents abuse and controls costs.
+
+### **Complete Audit Logs**
+
+Every request is logged with:
+- Timestamp and user
+- Request/response payloads
+- Token usage and cost
+- Safety scores and filter results
+
+---
+
+## Who Is Cencori For?
+
+### For Developers Using AI Tools
+Building with Cursor, Lovable, Bolt, v0, or Windsurf?
+
+**Cencori helps you:**
+- Ship AI features faster with security built-in
+- Catch issues AI-generated code might miss
+- Move from prototype to production safely
+
+### For AI Product Companies
+AI design tools, AI coding assistants, AI marketing platforms, AI customer support bots, AI legal research tools, AI medical diagnostic systems, AI financial advisors, AI content generation tools, AI language translation services, AI data analysis platforms, AI cybersecurity solutions, AI educational tutors, AI gaming, AI robotics control, AI fashion design tools?
+
+**Cencori provides:**
+- Enterprise-grade security your customers demand
+- Ready-made compliance story for B2B sales
+- Infrastructure so you can focus on product
+
+---
+
+## Architecture
+
+Cencori is built on a modern, scalable stack:
 
 | Layer | Technology | Purpose |
-|-------|-------------|----------|
-| **Framework** | Next.js (App Router) | Core web framework and API routing |
-| **Auth & Database** | Supabase | Authentication, data storage, and organization logic |
-| **Language** | TypeScript | Type-safe backend and frontend development |
-| **Deployment** | Vercel | Initial hosting and continuous deployment |
-| **ORM (Future)** | Drizzle ORM or Prisma | Database schema management and migration control |
-| **Backend Core (Future)** | NestJS | Dedicated service backend for scaling and modularity |
-
-## Project Status
-
-Cencori is currently in its **MVP (Minimum Viable Product)** phase. We are actively developing core features for multi-tenancy, authentication, and foundational API services. Future phases will expand on deployment infrastructure, developer dashboard, and billing systems.
+|-------|------------|---------|
+| **Framework** | Next.js 15 (App Router) | Full-stack platform |
+| **Auth & Database** | Supabase | Authentication & data |
+| **Language** | TypeScript | Type-safe development |
+| **Deployment** | Vercel | Hosting & CI/CD |
+| **AI Models** | Google | Primary AI provider (Until the official FohnAI model is ready) |
 
 ---
 
-## Architecture Overview
+## API Reference
 
-The MVP backend is composed of:
-
-- **Organizations & Projects:**  
-  Supports multi-tenancy by grouping users and their assets under organizations and projects.  
-- **Supabase Integration:**  
-  Handles authentication, authorization, and secure database operations.  
-- **Server Client Layer:**  
-  A secure abstraction layer for Supabase (`/lib/supabaseServer.ts`) to manage service-role operations safely.  
-- **API Routes:**  
-  Provides REST endpoints for creating, reading, and managing organizational data.  
-
-Future phases will transition this architecture into a service-oriented system powered by NestJS, with dedicated modules for runtime orchestration, metrics, and billing.
-
----
-
-## AI Gateway
-
-Cencori includes a production-ready **AI Gateway** that provides a secure, monitored proxy for AI API requests. This gateway enables teams to build AI-powered features with enterprise-grade safety, logging, and cost tracking.
-
-### Key Capabilities
-
-- **Smart Proxy:**  
-  Routes AI requests with automatic logging and cost tracking.
-  
-- **Content Safety Layer:**  
-  - Detects and blocks PII (emails, phone numbers, SSNs, credit cards)
-  - Filters harmful keywords and prompt injection attempts
-  - Assigns safety scores to all requests
-  
-- **Rate Limiting:**  
-  Database-backed rate limiting (60 requests/min per project) to prevent abuse and control costs.
-  
-- **Real-time Analytics:**  
-  - Interactive dashboard with request counts, costs, and latency metrics
-  - Time-period filtering (1h, 24h, 7d, 30d, all-time)
-  - Mini bar charts for visual insights
-  
-- **Request Logging:**  
-  Complete audit trail of all AI requests with status tracking (success, error, filtered).
-
-### API Endpoint
+### Chat Endpoint
 
 ```typescript
 POST /api/ai/chat
-Headers: { "x-api-key": "your_project_api_key" }
+Headers: { "CENCORI_API_KEY": "your-api-key" }
 Body: {
-  "messages": [{ "role": "user", "content": "Hello!" }],
-  "model": "gemini-1.5-flash" // Optional
+  "messages": [
+    { "role": "user", "content": "Hello!" }
+  ],
 }
 ```
 
----
+### Response
 
-## Contributing
+```json
+{
+  "content": "Hello! How can I help you?",
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 15,
+    "total_tokens": 25
+  },
+  "cost_usd": 0.000025
+}
+```
 
-We welcome contributions to Cencori! To ensure a smooth collaboration process, please follow these guidelines:
-
-1.  **Fork the repository:** Start by forking the [Cencori repository](https://github.com/bolaabanjo/cencori).
-2.  **Create a new branch:** For each new feature or bug fix, create a dedicated branch:
-    ```bash
-    git checkout -b feature/your-feature-name
-    # or
-    git checkout -b bugfix/issue-description
-    ```
-3.  **Code Standards:**
-    *   Write clean, readable, and well-commented TypeScript code.
-    *   Follow the existing code style and conventions.
-    *   Ensure your code passes linting checks.
-4.  **Testing:**
-    *   Add unit and integration tests for new features or bug fixes.
-    *   Ensure all existing tests pass before submitting a pull request.
-5.  **Commit Messages:** Use clear and descriptive commit messages following the Conventional Commits specification (e.g., `feat: add new feature`, `fix: resolve bug in auth flow`).
-6.  **Pull Requests:**
-    *   Open a pull request to the `main` branch of the original repository.
-    *   Provide a clear and concise description of your changes.
-    *   Reference any relevant issues.
+**[Full API Documentation](https://cencori.vercel.app/docs)**
 
 ---
 
 ## Development Setup
 
 ### Prerequisites
-- Node.js 18+  
-- A Supabase project (free tier acceptable)  
-- Basic knowledge of TypeScript and Next.js  
+
+- Node.js 18+
+- A Supabase project (free tier works)
+- Gemini API key
 
 ### Installation
 
-1.  Clone this repository:
-    ```bash
-    git clone https://github.com/bolaabanjo/cencori.git
-    cd cencori
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    # or yarn install
-    ```
-3.  Set up environment variables:
-    Create a `.env.local` file in the root of your project and add your Supabase credentials:
-    ```
-    NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-    SUPABASE_URL=YOUR_SUPABASE_URL
-    SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-    NEXTAUTH_SECRET=YOUR_NEXTAUTH_SECRET # If using NextAuth (optional, but good practice)
-    ```
-    You can find your Supabase URL and Anon Key in your Supabase project settings.
-    For `NEXTAUTH_SECRET`, you can generate a strong secret using `openssl rand -base64 32` or a similar method.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/bolaabanjo/cencori.git
+   cd cencori
+   ```
 
-### Running the Development Server
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-To run the project locally:
+3. Set up environment variables:
+   Create a `.env.local` file:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
 
-```bash
-npm run dev
-# or yarn dev
-```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the dashboard.
 
 ---
-Roadmap
-Phase	Focus	Description
-Phase 1	Foundation	Multi-tenant backend, authentication, and API endpoints
-Phase 2	Infrastructure	Deployment layer, runtime system, and metrics
-Phase 3	Platform	Developer dashboard, usage analytics, and billing systems
+
+## Roadmap
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| **Phase 1** | AI Gateway MVP | Complete |
+| **Phase 2** | Multi-model support | In Progress |
+| **Phase 3** | Advanced analytics | Planned |
+| **Phase 4** | Enterprise features | Planned |
+
+### Coming Soon
+
+- Support for OpenAI, Anthropic, and more AI providers
+- Custom safety rules and filter configuration
+- Team collaboration features
+- Webhook notifications
+- Advanced cost optimization
+
+---
+
+## Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes and add tests
+4. Submit a pull request
+
+Please follow our coding standards and include tests for new features.
+
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Support
+
+- **Email:** support@fohnai.com
+- **Docs:** [cencori.vercel.app/docs](https://cencori.vercel.app/docs)
+- **Issues:** [GitHub Issues](https://github.com/bolaabanjo/cencori/issues)
+
+---
+
+**Built by FohnAI**
+
+*Making AI development safe, compliant, and trustworthy.*
