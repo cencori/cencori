@@ -52,7 +52,7 @@ interface ProjectData {
 export default function OrgProjectsPage({
   params,
 }: {
-  params: { orgSlug: string } | Promise<{ orgSlug: string }>;
+  params: Promise<{ orgSlug: string }>;
 }) {
   // Resolve params (works whether params is a plain object or a Promise)
   const [orgSlug, setOrgSlug] = useState<string | null>(null);

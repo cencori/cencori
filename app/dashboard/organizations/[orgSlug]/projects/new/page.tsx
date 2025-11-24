@@ -44,16 +44,16 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function NewProjectPage({ params }: { params: { orgSlug: string } | Promise<{ orgSlug: string }> }) {
+export default function NewProjectPage({ params }: { params: Promise<{ orgSlug: string }> }) {
   // Resolve params safely (works whether params is an object or a Promise)
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const resolved = await Promise.resolve(params);
-        if (mounted && resolved && typeof (resolved as { orgSlug: string }).orgSlug === "string") {
-          setOrgSlug((resolved as { orgSlug: string }).orgSlug);
+        const resolved = await params;
+        if (mounted && resolved && typeof resolved.orgSlug === "string") {
+          setOrgSlug(resolved.orgSlug);
         }
       } catch (err) {
         console.error("Failed to resolve params:", err);

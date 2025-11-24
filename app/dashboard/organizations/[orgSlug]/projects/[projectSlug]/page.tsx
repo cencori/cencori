@@ -58,7 +58,7 @@ interface ChartDataPoint {
 export default function ProjectDetailsPage({
   params,
 }: {
-  params: { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>;
+  params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
   const [projectSlug, setProjectSlug] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export default function ProjectDetailsPage({
     let mounted = true;
     (async () => {
       try {
-        const resolved = await Promise.resolve(params as { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>);
+        const resolved = await params;
         if (mounted && resolved) {
           if (typeof resolved.orgSlug === "string") setOrgSlug(resolved.orgSlug);
           if (typeof resolved.projectSlug === "string") setProjectSlug(resolved.projectSlug);

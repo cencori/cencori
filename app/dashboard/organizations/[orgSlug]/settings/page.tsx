@@ -51,7 +51,7 @@ interface ProjectData {
 export default function OrganizationSettingsPage({
   params,
 }: {
-  params: { orgSlug: string } | Promise<{ orgSlug: string }>;
+  params: Promise<{ orgSlug: string }>;
 }) {
   const router = useRouter();
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
@@ -75,9 +75,9 @@ export default function OrganizationSettingsPage({
     let mounted = true;
     (async () => {
       try {
-        const resolved = await Promise.resolve(params);
-        if (mounted && resolved && typeof (resolved as { orgSlug: string }).orgSlug === "string") {
-          setOrgSlug((resolved as { orgSlug: string }).orgSlug);
+        const resolved = await params;
+        if (mounted && resolved && typeof resolved.orgSlug === "string") {
+          setOrgSlug(resolved.orgSlug);
         }
       } catch (e) {
         console.error("Failed to resolve params:", e);

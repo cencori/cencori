@@ -23,7 +23,7 @@ interface ApiKey {
 export default function ApiKeysPage({
     params,
 }: {
-    params: { orgSlug: string; projectSlug: string } | Promise<{ orgSlug: string; projectSlug: string }>;
+    params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
     const [orgSlug, setOrgSlug] = useState<string | null>(null);
     const [projectSlug, setProjectSlug] = useState<string | null>(null);
