@@ -67,8 +67,8 @@ interface DotProps {
   index?: number;
   value?: number;
   dataKey?: string;
-  payload?: any;
-  [key: string]: any;
+  payload?: ChartDataPoint;
+  [key: string]: unknown;
 }
 
 // Custom animated dot for line charts
