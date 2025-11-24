@@ -78,11 +78,18 @@ export async function GET(
             startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
-        // Get aggregate stats using admin client
+        // Get environment from query params (production or test)
+        const environment = searchParams.get('environment') || 'production';
+
+        // Get aggregate stats using admin client, filtered by environment
         const { data: requests, error: requestsError } = await supabaseAdmin
             .from('ai_requests')
-            .select('*')
+            .select(`
+                *,
+                api_keys!inner(environment)
+            `)
             .eq('project_id', projectId)
+            .eq('api_keys.environment', environment)
             .gte('created_at', startDate.toISOString());
 
         if (requestsError) {
