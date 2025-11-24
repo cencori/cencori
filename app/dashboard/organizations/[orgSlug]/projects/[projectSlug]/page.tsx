@@ -214,7 +214,7 @@ export default function ProjectDetailsPage({
 
   // Refetch stats when period or environment changes
   useEffect(() => {
-    if (project?.id) {
+    if (project?.id && environment) {
       fetchAIStats(project.id, period);
     }
   }, [period, project, environment]);
