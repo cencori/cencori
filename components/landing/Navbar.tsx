@@ -406,7 +406,7 @@ export default function Navbar({
                                 return (
                                     <Button
                                         key={index}
-                                        variant={action.variant as any || "default"}
+                                        variant={(action.variant as "default" | "destructive" | "outline" | "secondary" | "ghost" | "link") || "default"}
                                         className="rounded-none"
                                         asChild
                                     >

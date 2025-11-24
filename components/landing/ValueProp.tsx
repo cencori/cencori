@@ -17,7 +17,7 @@ export const ValueProp = () => {
                             <span className="text-muted-foreground">AI infrastructure</span>
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed">
-                            You wouldn't deploy a web app without a firewall. Why deploy AI without Cencori?
+                            You wouldn&apos;t deploy a web app without a firewall. Why deploy AI without Cencori?
                             We provide the essential security and compliance layer that sits between your users and your AI models.
                         </p>
 
