@@ -314,7 +314,7 @@ export default function ProjectDetailsPage({
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
+    <div className="w-full max-w-[1920px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
       {/* Hero Section */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
         <div className="space-y-4 flex-1 min-w-0">
@@ -327,7 +327,7 @@ export default function ProjectDetailsPage({
                   {project.status}
                 </Badge>
               </div>
-              <Separator className="my-4 mt-12 w-full max-w-[1600px]" />
+              <Separator className="my-4 mt-12 w-full max-w-[1920px]" />
             </div>
           </div>
         </div>
