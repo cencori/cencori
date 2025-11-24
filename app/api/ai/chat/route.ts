@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
             await supabaseAdmin.from('ai_requests').insert({
                 project_id: apiKeyData.project_id,
                 api_key_id: apiKeyData.id,
-                model: model || 'gemini-1.5-flash-001',
+                model: model || 'gemini-2.5-flash',
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0,
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
                         role: m.role,
                         content: m.content?.substring(0, 1000),
                     })),
-                    model: model || 'gemini-1.5-flash-001',
+                    model: model || 'gemini-2.5-flash',
                     temperature,
                 },
                 response_payload: null
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         const logData = {
             project_id: apiKeyData.project_id,
             api_key_id: apiKeyData.id,
-            model: model || 'gemini-1.5-flash',
+            model: model || 'gemini-2.5-flash',
             prompt_tokens: response.promptTokens,
             completion_tokens: response.completionTokens,
             total_tokens: response.totalTokens,
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
                     role: m.role,
                     content: m.content?.substring(0, 1000), // Limit stored content
                 })),
-                model: model || 'gemini-1.5-flash-001',
+                model: model || 'gemini-2.5-flash',
                 temperature,
             },
             response_payload: {
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         // Return Gemini response
         return NextResponse.json({
             content: response.text,
-            model: model || 'gemini-1.5-flash',
+            model: model || 'gemini-2.5-flash',
             usage: {
                 prompt_tokens: response.promptTokens,
                 completion_tokens: response.completionTokens,
