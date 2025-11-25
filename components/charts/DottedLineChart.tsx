@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, XAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import {
     Card,
     CardContent,
@@ -14,18 +14,22 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp } from "lucide-react";
 
-interface HatchedBarChartProps {
+interface DottedLineChartProps {
     data?: Array<{ label: string; value: number }>;
     title?: string;
     description?: string;
+    trend?: { value: number; direction: 'up' | 'down' };
 }
 
-export function HatchedBarChart({
+export function DottedLineChart({
     data,
-    title = "Cost Analysis",
-    description = "Total cost breakdown"
-}: HatchedBarChartProps) {
+    title = "Dotted Line Chart",
+    description = "Trend over time",
+    trend
+}: DottedLineChartProps) {
     const defaultData = [
         { label: "January", value: 186 },
         { label: "February", value: 305 },
@@ -40,74 +44,59 @@ export function HatchedBarChart({
     const chartConfig = {
         value: {
             label: "Value",
-            color: "var(--chart-1)",
+            color: "var(--chart-2)",
         },
     } satisfies ChartConfig;
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>{title}</CardTitle>
+                <CardTitle>
+                    {title}
+                    {trend && (
+                        <Badge
+                            variant="outline"
+                            className="text-green-500 bg-green-500/10 border-none ml-2"
+                        >
+                            <TrendingUp className="h-4 w-4" />
+                            <span>{trend.value}%</span>
+                        </Badge>
+                    )}
+                </CardTitle>
                 <CardDescription>{description}</CardDescription>
             </CardHeader>
             <CardContent>
                 <ChartContainer config={chartConfig}>
-                    <BarChart accessibilityLayer data={chartData}>
+                    <LineChart
+                        accessibilityLayer
+                        data={chartData}
+                        margin={{
+                            left: 12,
+                            right: 12,
+                        }}
+                    >
+                        <CartesianGrid vertical={false} />
                         <XAxis
                             dataKey="label"
                             tickLine={false}
-                            tickMargin={10}
                             axisLine={false}
+                            tickMargin={8}
                             tickFormatter={(value) => value.slice(0, 3)}
                         />
                         <ChartTooltip
                             cursor={false}
                             content={<ChartTooltipContent hideLabel />}
                         />
-                        <Bar
+                        <Line
                             dataKey="value"
-                            fill="var(--color-value)"
-                            radius={4}
-                            shape={<CustomPatternBar />}
+                            type="linear"
+                            stroke="var(--color-value)"
+                            dot={false}
+                            strokeDasharray="4 4"
                         />
-                    </BarChart>
+                    </LineChart>
                 </ChartContainer>
             </CardContent>
         </Card>
     );
 }
-
-const CustomPatternBar = (props: React.SVGProps<SVGRectElement>) => {
-    const { fill, x, y, width, height } = props;
-
-    return (
-        <>
-            <defs>
-                <pattern
-                    id="hatched-bar-pattern"
-                    patternUnits="userSpaceOnUse"
-                    width="8"
-                    height="8"
-                    patternTransform="rotate(45)"
-                >
-                    <line
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="8"
-                        stroke={fill}
-                        strokeWidth="4"
-                    />
-                </pattern>
-            </defs>
-            <rect
-                x={x}
-                y={y}
-                width={width}
-                height={height}
-                fill="url(#hatched-bar-pattern)"
-                stroke="none"
-            />
-        </>
-    );
-};

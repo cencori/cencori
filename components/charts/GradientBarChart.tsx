@@ -15,17 +15,17 @@ import {
     ChartTooltipContent,
 } from "@/components/ui/chart";
 
-interface HatchedBarChartProps {
+interface GradientBarChartProps {
     data?: Array<{ label: string; value: number }>;
     title?: string;
     description?: string;
 }
 
-export function HatchedBarChart({
+export function GradientBarChart({
     data,
-    title = "Cost Analysis",
-    description = "Total cost breakdown"
-}: HatchedBarChartProps) {
+    title = "Activity",
+    description = "Overview"
+}: GradientBarChartProps) {
     const defaultData = [
         { label: "January", value: 186 },
         { label: "February", value: 305 },
@@ -68,7 +68,7 @@ export function HatchedBarChart({
                             dataKey="value"
                             fill="var(--color-value)"
                             radius={4}
-                            shape={<CustomPatternBar />}
+                            shape={<CustomGradientBar />}
                         />
                     </BarChart>
                 </ChartContainer>
@@ -77,36 +77,25 @@ export function HatchedBarChart({
     );
 }
 
-const CustomPatternBar = (props: React.SVGProps<SVGRectElement>) => {
+const CustomGradientBar = (props: React.SVGProps<SVGRectElement>) => {
     const { fill, x, y, width, height } = props;
 
     return (
         <>
             <defs>
-                <pattern
-                    id="hatched-bar-pattern"
-                    patternUnits="userSpaceOnUse"
-                    width="8"
-                    height="8"
-                    patternTransform="rotate(45)"
-                >
-                    <line
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="8"
-                        stroke={fill}
-                        strokeWidth="4"
-                    />
-                </pattern>
+                <linearGradient id="gradient-bar-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={fill} stopOpacity={0.8} />
+                    <stop offset="100%" stopColor={fill} stopOpacity={0.2} />
+                </linearGradient>
             </defs>
             <rect
                 x={x}
                 y={y}
                 width={width}
                 height={height}
-                fill="url(#hatched-bar-pattern)"
+                fill="url(#gradient-bar-fill)"
                 stroke="none"
+                rx={4}
             />
         </>
     );
