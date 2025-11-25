@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendChatRequest, ChatMessage } from '@/lib/gemini';
-import { checkContent } from '@/lib/safety/content-filter';
+import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { hashApiKey } from '@/lib/api-keys';
 
@@ -82,15 +82,24 @@ export async function POST(req: NextRequest) {
             parts: [{ text: msg.content || msg.text || '' }],
         }));
 
-        // SAFETY CHECK: Validate input content
+        // PHASE 1 SECURITY CHECK: Validate input content + jailbreak detection
         const combinedInputText = messages
             .map((m: RequestMessage) => m.content || m.text || '')
             .join('\n');
 
-        const safetyResult = checkContent(combinedInputText);
+        // Build conversation history for context
+        const conversationHistory = messages.map((m: RequestMessage) => ({
+            role: m.role,
+            content: m.content || m.text || '',
+        }));
 
-        if (!safetyResult.safe) {
-            // Log filtered request
+        const inputSecurityResult = checkInputSecurity(
+            combinedInputText,
+            conversationHistory
+        );
+
+        if (!inputSecurityResult.safe) {
+            // Log filtered request with detailed security info
             await supabaseAdmin.from('ai_requests').insert({
                 project_id: apiKeyData.project_id,
                 api_key_id: apiKeyData.id,
@@ -101,9 +110,9 @@ export async function POST(req: NextRequest) {
                 cost_usd: 0,
                 latency_ms: Date.now() - startTime,
                 status: 'filtered',
-                error_message: 'Content safety violation',
-                filtered_reasons: safetyResult.reasons,
-                safety_score: safetyResult.score,
+                error_message: `Security violation: ${inputSecurityResult.layer}`,
+                filtered_reasons: inputSecurityResult.reasons,
+                safety_score: 1 - inputSecurityResult.riskScore, // Convert risk to safety score
                 request_payload: {
                     messages: messages.map((m: RequestMessage) => ({
                         role: m.role,
@@ -111,6 +120,8 @@ export async function POST(req: NextRequest) {
                     })),
                     model: model || 'gemini-2.5-flash',
                     temperature,
+                    security_layer: inputSecurityResult.layer,
+                    risk_score: inputSecurityResult.riskScore,
                 },
                 response_payload: null
             });
@@ -118,7 +129,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: 'Content safety violation',
-                    reasons: safetyResult.reasons
+                    reasons: inputSecurityResult.reasons,
+                    layer: inputSecurityResult.layer,
                 },
                 { status: 400 }
             );
@@ -132,7 +144,59 @@ export async function POST(req: NextRequest) {
             maxOutputTokens,
         });
 
-        // Log the request to database
+        // PHASE 2 SECURITY CHECK: Scan AI output for PII leakage and harmful content
+        const outputSecurityResult = checkOutputSecurity(
+            response.text,
+            {
+                inputText: combinedInputText,
+                inputSecurityResult,
+                conversationHistory,
+            }
+        );
+
+        if (!outputSecurityResult.safe) {
+            // Log the blocked output for security review
+            await supabaseAdmin.from('ai_requests').insert({
+                project_id: apiKeyData.project_id,
+                api_key_id: apiKeyData.id,
+                model: model || 'gemini-2.5-flash',
+                prompt_tokens: response.promptTokens,
+                completion_tokens: response.completionTokens,
+                total_tokens: response.totalTokens,
+                cost_usd: response.costUsd,
+                latency_ms: response.latencyMs,
+                status: 'blocked_output', // New status for output filtering
+                error_message: `Output security violation: ${outputSecurityResult.layer}`,
+                filtered_reasons: outputSecurityResult.reasons,
+                safety_score: 1 - outputSecurityResult.riskScore,
+                request_payload: {
+                    messages: messages.map((m: RequestMessage) => ({
+                        role: m.role,
+                        content: m.content?.substring(0, 1000),
+                    })),
+                    model: model || 'gemini-2.5-flash',
+                    temperature,
+                },
+                response_payload: {
+                    // Store blocked content for security review
+                    blocked: true,
+                    text: response.text.substring(0, 500), // Limited for security
+                    blocked_content: outputSecurityResult.blockedContent,
+                    risk_score: outputSecurityResult.riskScore,
+                }
+            });
+
+            // Return generic error - don't reveal what was blocked
+            return NextResponse.json(
+                {
+                    error: 'I cannot provide that information as it may contain sensitive data or violate security policies.',
+                    details: 'The AI response was blocked by our security layer.',
+                },
+                { status: 400 }
+            );
+        }
+
+        // Log the successful request to database
         const logData = {
             project_id: apiKeyData.project_id,
             api_key_id: apiKeyData.id,
@@ -143,6 +207,7 @@ export async function POST(req: NextRequest) {
             cost_usd: response.costUsd,
             latency_ms: response.latencyMs,
             status: 'success',
+            safety_score: 1.0, // Passed all security checks
             request_payload: {
                 messages: messages.map((m: RequestMessage) => ({
                     role: m.role,
