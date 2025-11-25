@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key } from "lucide-react";
+import { Key, ScrollText } from "lucide-react";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -152,6 +152,14 @@ export default function ProjectLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Request Logs">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/logs`}>
+                    <ScrollText className="h-4 w-4" />
+                    <span>Request Logs</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                   <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/settings`}>
                     <SettingsIcon animateOnHover />
@@ -186,6 +194,14 @@ export default function ProjectLayout({
                     <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/api-keys`} onClick={() => setIsOpen(false)}>
                       <Key className="h-4 w-4" />
                       <span>API Keys</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/logs`} onClick={() => setIsOpen(false)}>
+                      <ScrollText className="h-4 w-4" />
+                      <span>Request Logs</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
