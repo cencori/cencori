@@ -1,0 +1,122 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabaseAdmin';
+
+export async function GET(
+    req: NextRequest,
+    { params }: { params: Promise<{ projectId: string }> }
+) {
+    const supabaseAdmin = createAdminClient();
+    const { projectId } = await params;
+
+    try {
+        // Get query parameters
+        const searchParams = req.nextUrl.searchParams;
+        const page = parseInt(searchParams.get('page') || '1');
+        const perPage = parseInt(searchParams.get('per_page') || '50');
+        const severity = searchParams.get('severity'); // 'critical' | 'high' | 'medium' | 'low' | 'all'
+        const incidentType = searchParams.get('type');
+        const reviewed = searchParams.get('reviewed'); // 'true' | 'false' | 'all'
+        const timeRange = searchParams.get('time_range') || '7d';
+
+        // Calculate time filter
+        let startTime: Date | null = null;
+        const now = new Date();
+
+        switch (timeRange) {
+            case '1h':
+                startTime = new Date(now.getTime() - 60 * 60 * 1000);
+                break;
+            case '24h':
+                startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                break;
+            case '7d':
+                startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                break;
+            case '30d':
+                startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                break;
+            case 'all':
+                startTime = null;
+                break;
+        }
+
+        // Build query
+        let query = supabaseAdmin
+            .from('security_incidents')
+            .select('*', { count: 'exact' })
+            .eq('project_id', projectId);
+
+        // Apply filters
+        if (severity && severity !== 'all') {
+            query = query.eq('severity', severity);
+        }
+
+        if (incidentType && incidentType !== 'all') {
+            query = query.eq('incident_type', incidentType);
+        }
+
+        if (reviewed === 'true') {
+            query = query.eq('reviewed', true);
+        } else if (reviewed === 'false') {
+            query = query.eq('reviewed', false);
+        }
+
+        if (startTime) {
+            query = query.gte('created_at', startTime.toISOString());
+        }
+
+        // Get summary stats (always for the filtered time range, regardless of other filters)
+        let statsQuery = supabaseAdmin
+            .from('security_incidents')
+            .select('severity', { count: 'exact' })
+            .eq('project_id', projectId);
+
+        if (startTime) {
+            statsQuery = statsQuery.gte('created_at', startTime.toISOString());
+        }
+
+        const { data: statsData } = await statsQuery;
+
+        // Calculate counts by severity
+        const summary = {
+            critical: statsData?.filter(i => i.severity === 'critical').length || 0,
+            high: statsData?.filter(i => i.severity === 'high').length || 0,
+            medium: statsData?.filter(i => i.severity === 'medium').length || 0,
+            low: statsData?.filter(i => i.severity === 'low').length || 0,
+        };
+
+        // Apply pagination to main query
+        const offset = (page - 1) * perPage;
+        query = query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + perPage - 1);
+
+        const { data: incidents, error, count } = await query;
+
+        if (error) {
+            console.error('[Security Incidents API] Error:', error);
+            return NextResponse.json(
+                { error: 'Failed to fetch security incidents' },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({
+            incidents: incidents || [],
+            summary,
+            pagination: {
+                page,
+                per_page: perPage,
+                total: count || 0,
+                total_pages: Math.ceil((count || 0) / perPage),
+            },
+        });
+
+    } catch (error) {
+        console.error('[Security Incidents API] Unexpected error:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
