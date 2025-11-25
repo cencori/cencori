@@ -5,15 +5,23 @@ export interface SafetyResult {
     score: number; // 0-1, where 1 is safest
 }
 
-// Basic PII patterns
+export interface ContentFilterConfig {
+    threshold?: number; // Default 0.5
+    enableObfuscatedPII?: boolean; // Default true
+    enableIntentAnalysis?: boolean; // Default true
+}
+
+// Enhanced PII patterns including obfuscated formats
 const PII_PATTERNS = {
     email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/,
+    // Obfuscated email: "john dot smith at company dot org"
+    emailObfuscated: /\b[A-Za-z0-9._%-]+\s*(dot|at|\[at\]|\(at\))\s*[A-Za-z0-9.-]+\s*(dot|\[dot\]|\(dot\))\s*[A-Za-z]{2,}\b/gi,
     phone: /\b(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/,
     ssn: /\b\d{3}-\d{2}-\d{4}\b/,
     creditCard: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/,
 };
 
-// Basic harmful keywords (expand as needed)
+// Expanded harmful keywords
 const HARMFUL_KEYWORDS = [
     'ignore previous instructions',
     'system prompt',
@@ -44,7 +52,26 @@ const HARMFUL_KEYWORDS = [
     'give me the code for',
 ];
 
-export function checkContent(text: string): SafetyResult {
+// Intent analysis - patterns suggesting indirect malicious requests
+const INDIRECT_INTENT_PATTERNS = [
+    {
+        pattern: /how (to|would|could|can).*(share|mention|drop|weave|integrate).*(email|phone|contact|address)/i,
+        description: 'Indirect request for PII sharing techniques',
+        risk: 0.6,
+    },
+    {
+        pattern: /(subtle|natural|incidental).*(way|method).*(share|mention|provide).*(contact|email|information)/i,
+        description: 'Request for subtle information sharing',
+        risk: 0.5,
+    },
+    {
+        pattern: /without.*(obvious|explicit|direct).*(email|contact|phone)/i,
+        description: 'Request to hide PII sharing',
+        risk: 0.5,
+    },
+];
+
+export function checkContent(text: string, config?: ContentFilterConfig): SafetyResult {
     const reasons: string[] = [];
     let score = 1.0;
 
@@ -52,11 +79,22 @@ export function checkContent(text: string): SafetyResult {
         return { safe: true, reasons: [], score: 1.0 };
     }
 
+    const threshold = config?.threshold ?? 0.5;
+    const enableObfuscated = config?.enableObfuscatedPII ?? true;
+    const enableIntent = config?.enableIntentAnalysis ?? true;
+
     // Check for PII
     if (PII_PATTERNS.email.test(text)) {
         reasons.push('Potential email address detected');
         score -= 0.2;
     }
+
+    // Check for obfuscated PII
+    if (enableObfuscated && PII_PATTERNS.emailObfuscated.test(text)) {
+        reasons.push('Potential obfuscated email format detected (dot/at notation)');
+        score -= 0.3; // Higher risk - intentional obfuscation
+    }
+
     if (PII_PATTERNS.phone.test(text)) {
         reasons.push('Potential phone number detected');
         score -= 0.2;
@@ -79,9 +117,18 @@ export function checkContent(text: string): SafetyResult {
         }
     }
 
-    // Determine safety based on score
-    // Threshold can be adjusted. For now, < 0.5 is unsafe.
-    const safe = score >= 0.5;
+    // Intent analysis - detect indirect malicious requests
+    if (enableIntent) {
+        for (const intentPattern of INDIRECT_INTENT_PATTERNS) {
+            if (intentPattern.pattern.test(text)) {
+                reasons.push(intentPattern.description);
+                score -= intentPattern.risk;
+            }
+        }
+    }
+
+    // Determine safety based on score and threshold
+    const safe = score >= threshold;
 
     return {
         safe,
