@@ -3,6 +3,7 @@
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -409,12 +410,12 @@ export default function ProjectDetailsPage({
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {/* AI Requests Chart */}
-        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader className="pb-2">
-            <CardDescription>Requests</CardDescription>
-            <CardTitle className="text-3xl">{stats.aiRequests.value}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <TechnicalBorder className="h-full">
+          <div className="p-6">
+            <div className="pb-2">
+              <p className="text-sm text-muted-foreground">Requests</p>
+              <h3 className="text-3xl font-semibold leading-none tracking-tight">{stats.aiRequests.value}</h3>
+            </div>
             <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
@@ -469,16 +470,16 @@ export default function ProjectDetailsPage({
             <p className="text-xs text-muted-foreground mt-2">
               <span className="text-emerald-600 dark:text-emerald-400">{stats.aiRequests.change}</span>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </TechnicalBorder>
 
         {/* AI Cost Chart */}
-        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader className="pb-2">
-            <CardDescription>Cost</CardDescription>
-            <CardTitle className="text-3xl">{stats.aiCost.value}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <TechnicalBorder className="h-full">
+          <div className="p-6">
+            <div className="pb-2">
+              <p className="text-sm text-muted-foreground">Cost</p>
+              <h3 className="text-3xl font-semibold leading-none tracking-tight">{stats.aiCost.value}</h3>
+            </div>
             <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
@@ -533,16 +534,16 @@ export default function ProjectDetailsPage({
             <p className="text-xs text-muted-foreground mt-2">
               <span className="text-muted-foreground">{stats.aiCost.change}</span>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </TechnicalBorder>
 
         {/* Avg Latency Chart */}
-        <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader className="pb-2">
-            <CardDescription>Average Latency</CardDescription>
-            <CardTitle className="text-3xl">{stats.avgLatency.value}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <TechnicalBorder className="h-full">
+          <div className="p-6">
+            <div className="pb-2">
+              <p className="text-sm text-muted-foreground">Average Latency</p>
+              <h3 className="text-3xl font-semibold leading-none tracking-tight">{stats.avgLatency.value}</h3>
+            </div>
             <div className="h-32">
               {chartData.length > 0 ? (
                 <ChartContainer
@@ -597,84 +598,89 @@ export default function ProjectDetailsPage({
             <p className="text-xs text-muted-foreground mt-2">
               {stats.avgLatency.change}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </TechnicalBorder>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         {/* Recent Activity */}
-        <Card className="h-[280px] flex flex-col transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader className="flex-none">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Recent Activity
-                </CardTitle>
-                <CardDescription>Latest deployments and updates</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" asChild className="rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/activity`}>
-                  View All
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
-            <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
-                <div key={activity.id}>
-                  <div className="flex gap-4">
-                    <div className="relative">
-                      <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                      {index !== recentActivity.length - 1 && (
-                        <div className="absolute top-4 left-[3px] w-[2px] h-full bg-border" />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <p className="text-sm font-medium">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
-                    </div>
-                  </div>
-                  {index !== recentActivity.length - 1 && <div className="h-px" />}
+        <TechnicalBorder className="h-[280px] flex flex-col">
+          <div className="flex flex-col h-full">
+            <div className="flex-none p-6 pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2">
+                    Recent Activity
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">Latest deployments and updates</p>
                 </div>
-              ))}
+                <Button variant="ghost" size="sm" asChild className="rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                  <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/activity`}>
+                    View All
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex-1 overflow-y-auto p-6 pt-0">
+              <div className="space-y-4">
+                {recentActivity.map((activity, index) => (
+                  <div key={activity.id}>
+                    <div className="flex gap-4">
+                      <div className="relative">
+                        <div className="h-2 w-2 rounded-full bg-primary mt-2" />
+                        {index !== recentActivity.length - 1 && (
+                          <div className="absolute top-4 left-[3px] w-[2px] h-full bg-border" />
+                        )}
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <p className="text-sm font-medium">{activity.message}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
+                      </div>
+                    </div>
+                    {index !== recentActivity.length - 1 && <div className="h-px" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </TechnicalBorder>
 
         {/* Project Information */}
-        <Card className="h-[280px] flex flex-col transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-          <CardHeader className="flex-none">
-            <CardTitle>Project Information</CardTitle>
-            <CardDescription>Basic details about this project</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Organization</span>
-              <span className="font-medium">{organization.name}</span>
+        <TechnicalBorder className="h-[280px] flex flex-col">
+          <div className="flex flex-col h-full p-6">
+            <div className="flex-none pb-4">
+              <h3 className="text-lg font-semibold leading-none tracking-tight">Project Information</h3>
+              <p className="text-sm text-muted-foreground mt-1">Basic details about this project</p>
             </div>
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Project ID</span>
-              <span className="font-mono text-xs">{project.slug}</span>
+            <div className="flex-1 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Organization</span>
+                <span className="font-medium">{organization.name}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Project ID</span>
+                <span className="font-mono text-xs">{project.slug}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Visibility</span>
+                <Badge variant="outline" className="h-5">
+                  {project.visibility}
+                </Badge>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant="outline" className="h-5 gap-1.5">
+                  <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  {project.status}
+                </Badge>
+              </div>
             </div>
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Visibility</span>
-              <Badge variant="outline" className="h-5">
-                {project.visibility}
-              </Badge>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant="outline" className="h-5 gap-1.5">
-                <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
-                {project.status}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </TechnicalBorder>
+
       </div>
     </div>
   );
