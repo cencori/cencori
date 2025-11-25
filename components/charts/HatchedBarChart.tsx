@@ -1,6 +1,5 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
 import { Bar, BarChart, XAxis } from "recharts";
 import {
     Card,
@@ -15,61 +14,47 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Badge } from "@/components/ui/badge";
 
-const chartData = [
-    { month: "January", desktop: 342 },
-    { month: "February", desktop: 876 },
-    { month: "March", desktop: 512 },
-    { month: "April", desktop: 629 },
-    { month: "May", desktop: 458 },
-    { month: "June", desktop: 781 },
-    { month: "July", desktop: 394 },
-    { month: "August", desktop: 925 },
-    { month: "September", desktop: 647 },
-    { month: "October", desktop: 532 },
-    { month: "November", desktop: 803 },
-    { month: "December", desktop: 271 },
-];
+interface HatchedBarChartProps {
+    data?: Array<{ label: string; value: number }>;
+    title?: string;
+    description?: string;
+}
 
-const chartConfig = {
-    desktop: {
-        label: "Desktop",
-        color: "var(--chart-1)",
-    },
-} satisfies ChartConfig;
+export function HatchedBarChart({
+    data,
+    title = "Cost Analysis",
+    description = "Total cost breakdown"
+}: HatchedBarChartProps) {
+    const defaultData = [
+        { label: "January", value: 186 },
+        { label: "February", value: 305 },
+        { label: "March", value: 237 },
+        { label: "April", value: 73 },
+        { label: "May", value: 209 },
+        { label: "June", value: 214 },
+    ];
 
-export function HatchedBarChart() {
+    const chartData = data || defaultData;
+
+    const chartConfig = {
+        value: {
+            label: "Value",
+            color: "var(--chart-1)",
+        },
+    } satisfies ChartConfig;
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle>
-                    Bar Chart
-                    <Badge
-                        variant="outline"
-                        className="text-green-500 bg-green-500/10 border-none ml-2"
-                    >
-                        <TrendingUp className="h-4 w-4" />
-                        <span>5.2%</span>
-                    </Badge>
-                </CardTitle>
-                <CardDescription>January - June 2025</CardDescription>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
             </CardHeader>
             <CardContent>
                 <ChartContainer config={chartConfig}>
                     <BarChart accessibilityLayer data={chartData}>
-                        <rect
-                            x="0"
-                            y="0"
-                            width="100%"
-                            height="85%"
-                            fill="url(#default-pattern-dots)"
-                        />
-                        <defs>
-                            <DottedBackgroundPattern />
-                        </defs>
                         <XAxis
-                            dataKey="month"
+                            dataKey="label"
                             tickLine={false}
                             tickMargin={10}
                             axisLine={false}
@@ -80,10 +65,10 @@ export function HatchedBarChart() {
                             content={<ChartTooltipContent hideLabel />}
                         />
                         <Bar
-                            dataKey="desktop"
-                            fill="var(--color-desktop)"
-                            shape={<CustomHatchedBar />}
+                            dataKey="value"
+                            fill="var(--color-value)"
                             radius={4}
+                            shape={<CustomPatternBar />}
                         />
                     </BarChart>
                 </ChartContainer>
@@ -92,58 +77,37 @@ export function HatchedBarChart() {
     );
 }
 
-const CustomHatchedBar = (
-    props: React.SVGProps<SVGRectElement> & { dataKey?: string }
-) => {
-    const { fill, x, y, width, height, dataKey } = props;
+const CustomPatternBar = (props: React.SVGProps<SVGRectElement>) => {
+    const { fill, x, y, width, height } = props;
 
     return (
         <>
+            <defs>
+                <pattern
+                    id="hatched-bar-pattern"
+                    patternUnits="userSpaceOnUse"
+                    width="8"
+                    height="8"
+                    patternTransform="rotate(45)"
+                >
+                    <line
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="8"
+                        stroke={fill}
+                        strokeWidth="4"
+                    />
+                </pattern>
+            </defs>
             <rect
-                rx={4}
                 x={x}
                 y={y}
                 width={width}
                 height={height}
+                fill="url(#hatched-bar-pattern)"
                 stroke="none"
-                fill={`url(#hatched-bar-pattern-${dataKey})`}
             />
-            <defs>
-                <pattern
-                    key={dataKey}
-                    id={`hatched-bar-pattern-${dataKey}`}
-                    x="0"
-                    y="0"
-                    width="5"
-                    height="5"
-                    patternUnits="userSpaceOnUse"
-                    patternTransform="rotate(-45)"
-                >
-                    <rect width="10" height="10" opacity={0.5} fill={fill}></rect>
-                    <rect width="1" height="10" fill={fill}></rect>
-                </pattern>
-            </defs>
         </>
-    );
-};
-
-const DottedBackgroundPattern = () => {
-    return (
-        <pattern
-            id="default-pattern-dots"
-            x="0"
-            y="0"
-            width="10"
-            height="10"
-            patternUnits="userSpaceOnUse"
-        >
-            <circle
-                className="dark:text-muted/40 text-muted"
-                cx="2"
-                cy="2"
-                r="1"
-                fill="currentColor"
-            />
-        </pattern>
     );
 };

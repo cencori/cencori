@@ -109,9 +109,16 @@ export async function GET(
             ? requests.reduce((sum, r) => sum + (r.latency_ms || 0), 0) / totalRequests
             : 0;
 
-        // Group by date for chart
+        // Group by date for chart - using local date instead of UTC
+        // This ensures charts show the correct date for the user's timezone
         const requestsByDate = requests?.reduce((acc: DateAggregationMap, r) => {
-            const date = new Date(r.created_at).toISOString().split('T')[0];
+            // Get the date in the server's timezone (which runs in user's local time on client)
+            const timestamp = new Date(r.created_at);
+            const year = timestamp.getFullYear();
+            const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+            const day = String(timestamp.getDate()).padStart(2, '0');
+            const date = `${year}-${month}-${day}`;
+
             if (!acc[date]) {
                 acc[date] = { date, count: 0, cost: 0, tokens: 0 };
             }

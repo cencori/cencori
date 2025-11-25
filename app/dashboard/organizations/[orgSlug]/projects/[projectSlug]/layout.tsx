@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key } from "lucide-react";
+import { Key, FileText, ShieldAlert, BarChart3 } from "lucide-react";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -152,6 +152,30 @@ export default function ProjectLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Logs">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/logs`}>
+                    <FileText className="h-4 w-4" />
+                    <span>Request Logs</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Security">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/security`}>
+                    <ShieldAlert className="h-4 w-4" />
+                    <span>Security</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Analytics">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/analytics`}>
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Analytics</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                   <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/settings`}>
                     <SettingsIcon animateOnHover />
@@ -186,6 +210,30 @@ export default function ProjectLayout({
                     <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/api-keys`} onClick={() => setIsOpen(false)}>
                       <Key className="h-4 w-4" />
                       <span>API Keys</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/logs`} onClick={() => setIsOpen(false)}>
+                      <FileText className="h-4 w-4" />
+                      <span>Request Logs</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/security`} onClick={() => setIsOpen(false)}>
+                      <ShieldAlert className="h-4 w-4" />
+                      <span>Security</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/analytics`} onClick={() => setIsOpen(false)}>
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Analytics</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
