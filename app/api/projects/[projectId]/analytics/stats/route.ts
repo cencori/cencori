@@ -42,10 +42,10 @@ function calculatePercentile(values: number[], percentile: number): number {
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     const supabaseAdmin = createAdminClient();
-    const { projectId } = params;
+    const { projectId } = await params;
 
     try {
         // Get query parameters
