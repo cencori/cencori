@@ -9,6 +9,36 @@ import { SecurityBreakdownChart } from '@/components/audit/SecurityBreakdownChar
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { Activity, CheckCircle, DollarSign, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 
+interface TrendData {
+    timestamp: string;
+    total: number;
+    success: number;
+    filtered: number;
+    blocked_output: number;
+    error: number;
+}
+
+interface OverviewData {
+    overview: {
+        total_requests: number;
+        success_rate: number;
+        total_cost: number;
+        avg_latency: number;
+        total_tokens: number;
+        total_incidents: number;
+        critical_incidents: number;
+    };
+    breakdown: {
+        model_usage: Record<string, number>;
+        incidents_by_severity: {
+            critical: number;
+            high: number;
+            medium: number;
+            low: number;
+        };
+    };
+}
+
 interface PageProps {
     params: Promise<{
         orgSlug: string;
@@ -20,8 +50,8 @@ export default function AnalyticsPage({ params }: PageProps) {
     const [projectId, setProjectId] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('7d');
-    const [overview, setOverview] = useState<any>(null);
-    const [trends, setTrends] = useState<any[]>([]);
+    const [overview, setOverview] = useState<OverviewData | null>(null);
+    const [trends, setTrends] = useState<TrendData[]>([]);
     const [groupBy, setGroupBy] = useState<'hour' | 'day'>('day');
 
     // Fetch project ID
