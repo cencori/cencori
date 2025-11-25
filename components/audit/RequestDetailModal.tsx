@@ -19,10 +19,10 @@ import { toast } from 'sonner';
 interface RequestDetail {
     id: string;
     created_at: string;
-    status: string;
+    status: 'success' | 'filtered' | 'blocked_output' | 'error' | 'rate_limited';
     model: string;
-    request_payload: any;
-    response_payload: any;
+    request_payload: Record<string, unknown> | null;
+    response_payload: string | Record<string, unknown> | null;
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
@@ -113,7 +113,7 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         Request Details
-                        <StatusBadge status={request.status as any} />
+                        <StatusBadge status={request.status} />
                     </DialogTitle>
                     <DialogDescription>
                         {formatDate(request.created_at)} • {request.model}
