@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
 import { toast } from 'sonner';
 
 interface RequestLog {
@@ -165,7 +166,7 @@ export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) 
 
     return (
         <>
-            <div className="rounded-md border">
+            <TechnicalBorder>
                 {/* Desktop view */}
                 <div className="hidden md:block overflow-x-auto">
                     <Table>
@@ -245,7 +246,7 @@ export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) 
                         </div>
                     ))}
                 </div>
-            </div>
+            </TechnicalBorder>
 
             {/* Pagination */}
             <div className="flex items-center justify-between px-2 py-4">

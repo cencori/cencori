@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Search, X, ListFilter, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
 
 interface PageProps {
     params: Promise<{
@@ -124,12 +124,12 @@ export default function RequestLogsPage({ params }: PageProps) {
             </div>
 
             {/* Filters */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+            <TechnicalBorder>
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-2">
                             <ListFilter className="h-4 w-4" />
-                            <CardTitle className="text-base">Filters</CardTitle>
+                            <h3 className="text-base font-semibold">Filters</h3>
                         </div>
                         {hasActiveFilters && (
                             <Button
@@ -142,8 +142,6 @@ export default function RequestLogsPage({ params }: PageProps) {
                             </Button>
                         )}
                     </div>
-                </CardHeader>
-                <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {/* Status filter */}
                         <div className="space-y-2">
@@ -214,8 +212,8 @@ export default function RequestLogsPage({ params }: PageProps) {
                             </form>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </TechnicalBorder>
 
             {/* Export button */}
             <div className="flex justify-end">
