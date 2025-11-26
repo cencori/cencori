@@ -34,7 +34,7 @@ npm install cencori
 
 ### 2. Get Your API Key
 
-1. Sign up at [cencori.vercel.app](https://cencori.vercel.app)
+1. Sign up at [cencori.com](https://cencori.com)
 2. Create a project
 3. Generate an API key
 
@@ -156,7 +156,7 @@ Body: {
 }
 ```
 
-**[Full API Documentation](https://cencori.vercel.app/docs)**
+**[Full API Documentation](https://cencori.com/docs)**
 
 ---
 
@@ -239,8 +239,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Email:** support@fohnai.com
-- **Docs:** [cencori.vercel.app/docs](https://cencori.vercel.app/docs)
+- **Email:** support@cencori.com
+- **Docs:** [cencori.com/docs](https://cencori.com/docs)
 - **Issues:** [GitHub Issues](https://github.com/bolaabanjo/cencori/issues)
 
 ---

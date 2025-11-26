@@ -25,7 +25,7 @@ export class CencoriClient {
         }
 
         this.apiKey = config.apiKey;
-        this.baseUrl = config.baseUrl || 'https://cencori.vercel.app';
+        this.baseUrl = config.baseUrl || 'https://cencori.com';
 
         this.ai = new AIModule(this);
     }
