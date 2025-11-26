@@ -1,3 +1,5 @@
+"use client";
+
 import { type VariantProps } from "class-variance-authority";
 import { CreditCard, Menu, Settings, UserPlus, Users, Shield, Book, Rocket, Code, Laptop, Share2, Building2, Workflow, DollarSign, LifeBuoy, Rss, Layers, Search, BriefcaseBusiness, UsersRound, Factory, ScrollText, CalendarDays, Handshake, Ship, LockKeyhole, HardHat, FileText, Blocks, FlaskConical, Gauge, Terminal, Globe, User, BookOpen, FileWarning, Package2 } from "lucide-react";
 import { ReactNode } from "react";
@@ -317,15 +319,15 @@ export default function Navbar({
                                     } else { // item is NavLink
                                         return (
                                             <NavigationMenuItem key={index}>
-                                                <Link href={item.href} legacyBehavior passHref>
-                                                    <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "rounded-none bg-transparent hover:bg-transparent focus:bg-transparent p-0")} asChild>
+                                                <NavigationMenuLink asChild>
+                                                    <Link href={item.href} className={cn(navigationMenuTriggerStyle(), "rounded-none bg-transparent hover:bg-transparent focus:bg-transparent p-0")}>
                                                         <TechnicalBorder cornerSize={8} borderWidth={1} className="p-0">
                                                             <div className="h-9 px-4 py-2 flex items-center justify-center text-sm font-medium">
                                                                 {item.title}
                                                             </div>
                                                         </TechnicalBorder>
-                                                    </NavigationMenuLink>
-                                                </Link>
+                                                    </Link>
+                                                </NavigationMenuLink>
                                             </NavigationMenuItem>
                                         );
                                     }
