@@ -70,16 +70,16 @@ pnpm add cencori`}
                     <h3 className="text-base font-semibold">Create a Project</h3>
                     <ol className="space-y-2 text-sm ml-6 list-decimal">
                         <li>Log in to your <a href="/dashboard" className="text-primary hover:underline">Cencori dashboard</a></li>
-                        <li>Click <strong>"Create Project"</strong> and give it a name</li>
-                        <li>Navigate to <strong>"API Keys"</strong> in the project settings</li>
-                        <li>Click <strong>"Generate New Key"</strong> and copy it immediately (it won't be shown again)</li>
+                        <li>Click <strong>&quot;Create Project&quot;</strong> and give it a name</li>
+                        <li>Navigate to <strong>&quot;API Keys&quot;</strong> in the project settings</li>
+                        <li>Click <strong>&quot;Generate New Key&quot;</strong> and copy it immediately (it won&apos;t be shown again)</li>
                     </ol>
                 </div>
 
                 <div className="space-y-3 mt-6">
                     <h3 className="text-base font-semibold">Add Your AI Provider Key</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                        In your project settings, add your AI provider's API key under <strong>"Provider Keys"</strong>. Cencori will use this to make requests on your behalf.
+                        In your project settings, add your AI provider&apos;s API key under <strong>&quot;Provider Keys&quot;</strong>. Cencori will use this to make requests on your behalf.
                     </p>
                 </div>
             </div>
@@ -120,7 +120,7 @@ export const cencori = new Cencori({
                     Step 4: Make Your First Request
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Replace your existing AI provider calls with Cencori's unified API:
+                    Replace your existing AI provider calls with Cencori&apos;s unified API:
                 </p>
 
                 <div className="space-y-3">
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
                     Switching Between AI Providers
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    One of Cencori's key features is multi-provider support. Change the model parameter to switch providers without changing your code:
+                    One of Cencori&apos;s key features is multi-provider support. Change the model parameter to switch providers without changing your code:
                 </p>
 
                 <CodeBlock
@@ -220,7 +220,7 @@ const geminiResponse = await cencori.chat.completions.create({
             {/* Next Steps */}
             <div className="space-y-4">
                 <h2 id="next-steps" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    What's Next?
+                    What&apos;s Next?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                     Now that you have Cencori set up, explore these topics to unlock its full potential:

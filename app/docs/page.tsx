@@ -41,7 +41,7 @@ export default function DocsPage() {
                         <strong>Model Lock-In:</strong> Switching between OpenAI, Anthropic, or Google requires rewriting integration code and losing observability continuity.
                     </li>
                     <li className="list-disc">
-                        <strong>Blind Spots:</strong> You can't debug what you can't see. When AI responses are wrong, you need to inspect the exact prompt and model parameters.
+                        <strong>Blind Spots:</strong> You can&apos;t debug what you can&apos;t see. When AI responses are wrong, you need to inspect the exact prompt and model parameters.
                     </li>
                 </ul>
             </div>
@@ -118,7 +118,7 @@ export default function DocsPage() {
                 </div>
 
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Every AI request flows through Cencori's policy engine, which checks for:
+                    Every AI request flows through Cencori&apos;s policy engine, which checks for:
                 </p>
                 <ul className="space-y-1.5 text-sm ml-6 mt-2">
                     <li className="list-disc">Security threats (prompt injection, jailbreaks)</li>

@@ -1,57 +1,65 @@
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/docs/CodeBlock";
 
 export default function VibeCodersPage() {
     return (
-        <div className="space-y-10">
-            <div>
-                <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">
-                    For Vibe Coders
+        <div className="max-w-4xl space-y-12 px-4 py-12 lg:py-20">
+            {/* Header */}
+            <div className="space-y-3">
+                <h1 className="scroll-m-20 text-3xl font-bold tracking-tight">
+                    For Context Engineers
                 </h1>
-                <p className="text-xl text-muted-foreground leading-relaxed">
-                    You're building fast with tools like Cursor, v0, and Lovable. Cencori ensures your speed doesn't compromise security.
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                    You&apos;re building fast with tools like Cursor, v0, Antigravity and Lovable. Cencori ensures your speed doesn&apos;t compromise security.
                 </p>
             </div>
 
-            <div className="space-y-6">
-                <h2 id="the-problem" className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                    The "Vibe Coding" Security Gap
+            {/* The Problem */}
+            <div className="space-y-4">
+                <h2 id="the-problem" className="scroll-m-20 text-xl font-semibold tracking-tight">
+                    The &quot;Vibe Coding&quot; Security Gap
                 </h2>
-                <p className="leading-7 [&:not(:first-child)]:mt-6">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                     AI coding assistants are incredible at generating functional code, but they often miss security best practices. They might:
                 </p>
-                <ul className="my-6 ml-6 list-disc [&>li]:mt-2">
-                    <li>Hardcode sensitive API keys or credentials.</li>
-                    <li>Forget input validation, leading to SQL injection or XSS.</li>
-                    <li>Fail to implement rate limiting on expensive API routes.</li>
-                    <li>Hallucinate insecure dependencies.</li>
+                <ul className="space-y-2 text-sm ml-6">
+                    <li className="list-disc">Hardcode sensitive API keys or credentials.</li>
+                    <li className="list-disc">Forget input validation, leading to SQL injection or XSS.</li>
+                    <li className="list-disc">Fail to implement rate limiting on expensive API routes.</li>
+                    <li className="list-disc">Hallucinate insecure dependencies.</li>
                 </ul>
-                <p className="leading-7">
-                    When you're "vibe coding" — iterating rapidly and letting the AI handle the implementation — you need a safety net that catches these issues automatically.
+                <p className="text-sm text-muted-foreground leading-relaxed mt-4">
+                    When you&apos;re &quot;vibe coding&quot; (iterating rapidly and letting the AI handle the implementation) you need a safety net that catches these issues automatically.
                 </p>
             </div>
 
-            <div className="space-y-6">
-                <h2 id="how-cencori-helps" className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight">
+            {/* How Cencori Helps */}
+            <div className="space-y-4">
+                <h2 id="how-cencori-helps" className="scroll-m-20 text-xl font-semibold tracking-tight">
                     How Cencori Helps
                 </h2>
-                <p className="leading-7">
-                    Cencori acts as a wrapper around your AI-generated endpoints. It doesn't get in your way; it just observes and protects.
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Cencori acts as a wrapper around your AI-generated endpoints. It doesn&apos;t get in your way; it just observes and protects.
                 </p>
 
-                <h3 id="example-nextjs" className="text-xl font-semibold mt-8 mb-4">Example: Securing a Next.js Route</h3>
-                <p className="leading-7 mb-4">
-                    Let's say Cursor generated this API route for you:
-                </p>
-                <CodeBlock
-                    filename="app/api/generate/route.ts (Before)"
-                    code={`import { openai } from "@/lib/openai";
+                <div className="space-y-4 mt-6">
+                    <h3 className="text-base font-semibold">Example: Securing a Next.js Route</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Let&apos;s say Cursor generated this API route for you:
+                    </p>
+                    <CodeBlock
+                        filename="app/api/generate/route.ts (Before)"
+                        language="typescript"
+                        code={`import { openai } from "@/lib/openai";
 
 export async function POST(req: Request) {
   const { prompt } = await req.json();
   
-  // ⚠️ No rate limiting
-  // ⚠️ No input validation
-  // ⚠️ No logging
+  // No rate limiting
+  // No input validation
+  // No logging
   
   const response = await openai.chat.completions.create({
     model: "gpt-4",
@@ -60,14 +68,15 @@ export async function POST(req: Request) {
 
   return Response.json(response);
 }`}
-                />
+                    />
 
-                <p className="leading-7 mb-4">
-                    With Cencori, you just wrap it. You can even ask Cursor to "wrap this with Cencori":
-                </p>
-                <CodeBlock
-                    filename="app/api/generate/route.ts (After)"
-                    code={`import { cencori } from "@/lib/cencori"; // Your Cencori instance
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        With Cencori, you just wrap it. You can even ask Cursor to &quot;wrap this with Cencori&quot;:
+                    </p>
+                    <CodeBlock
+                        filename="app/api/generate/route.ts (After)"
+                        language="typescript"
+                        code={`import { cencori } from "@/lib/cencori"; // Your Cencori instance
 
 export async function POST(req: Request) {
   // Cencori middleware handles logging, rate limiting, and threat detection automatically.
@@ -82,23 +91,78 @@ export async function POST(req: Request) {
     return Response.json(response);
   }, req);
 }`}
-                />
+                    />
+                </div>
             </div>
 
-            <div className="space-y-6">
-                <h2 id="getting-started" className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight">
+            {/* What You Get */}
+            <div className="space-y-4">
+                <h2 id="benefits" className="scroll-m-20 text-xl font-semibold tracking-tight">
+                    What You Get
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    By wrapping your AI routes with Cencori, you automatically get:
+                </p>
+                <ul className="space-y-2 text-sm ml-6">
+                    <li className="list-disc">
+                        <strong>Real-time threat detection:</strong> Prompt injection attempts are blocked before reaching your AI provider
+                    </li>
+                    <li className="list-disc">
+                        <strong>Automatic rate limiting:</strong> Per-user, per-endpoint limits prevent abuse and cost overruns
+                    </li>
+                    <li className="list-disc">
+                        <strong>Complete audit logs:</strong> Every request and response logged for compliance and debugging
+                    </li>
+                    <li className="list-disc">
+                        <strong>Cost tracking:</strong> Token usage and costs attributed to users and features
+                    </li>
+                    <li className="list-disc">
+                        <strong>PII filtering:</strong> Sensitive data detection before it leaves your system
+                    </li>
+                </ul>
+            </div>
+
+            {/* Getting Started */}
+            <div className="space-y-4">
+                <h2 id="getting-started" className="scroll-m-20 text-xl font-semibold tracking-tight">
                     Start Vibe Coding Safely
                 </h2>
-                <p className="leading-7">
-                    1. <strong>Install the SDK:</strong> <code>npm install @cencori/sdk</code>
-                    <br />
-                    2. <strong>Initialize:</strong> Set up your Cencori client.
-                    <br />
-                    3. <strong>Guard:</strong> Wrap your critical AI routes.
-                </p>
-                <p className="leading-7 mt-4">
+                <ol className="space-y-2 text-sm ml-6 list-decimal">
+                    <li>
+                        <strong>Install the SDK:</strong> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">npm install cencori</code>
+                    </li>
+                    <li>
+                        <strong>Initialize:</strong> Set up your Cencori client with your API key
+                    </li>
+                    <li>
+                        <strong>Guard:</strong> Wrap your critical AI routes with <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cencori.guard()</code>
+                    </li>
+                </ol>
+                <p className="text-sm text-muted-foreground leading-relaxed mt-4">
                     Now you can let the AI write the code, knowing Cencori has your back on security.
                 </p>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex justify-between items-center pt-8 mt-12 border-t border-border/40">
+                <Link href="/docs/quick-start">
+                    <Button variant="ghost" className="gap-2">
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="flex flex-col items-start">
+                            <span className="text-xs text-muted-foreground">Previous</span>
+                            <span className="text-sm font-medium">Quick Start</span>
+                        </span>
+                    </Button>
+                </Link>
+                <Link href="/docs/use-cases/ai-companies">
+                    <Button variant="ghost" className="gap-2">
+                        <span className="flex flex-col items-end">
+                            <span className="text-xs text-muted-foreground">Next</span>
+                            <span className="text-sm font-medium">For AI Companies</span>
+                        </span>
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </Link>
             </div>
         </div>
     );
