@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
         );
 
         if (!inputSecurityResult.safe) {
-            // Log filtered request with detailed security info
+            // Log filtered request with detailed security info (server-side only)
             await supabaseAdmin.from('ai_requests').insert({
                 project_id: apiKeyData.project_id,
                 api_key_id: apiKeyData.id,
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
                 status: 'filtered',
                 error_message: `Security violation: ${inputSecurityResult.layer}`,
                 filtered_reasons: inputSecurityResult.reasons,
-                safety_score: 1 - inputSecurityResult.riskScore, // Convert risk to safety score
+                safety_score: 1 - inputSecurityResult.riskScore,
                 request_payload: {
                     messages: messages.map((m: RequestMessage) => ({
                         role: m.role,
@@ -126,13 +126,14 @@ export async function POST(req: NextRequest) {
                 response_payload: null
             });
 
+            // Return generic error to user (don't reveal detection details)
             return NextResponse.json(
                 {
-                    error: 'Content safety violation',
-                    reasons: inputSecurityResult.reasons,
-                    layer: inputSecurityResult.layer,
+                    error: 'Request blocked by security policy',
+                    message: 'Your request was flagged by our security system. Please rephrase and try again.',
+                    code: 'SECURITY_VIOLATION'
                 },
-                { status: 400 }
+                { status: 403 }
             );
         }
 
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
         );
 
         if (!outputSecurityResult.safe) {
-            // Log the blocked output for security review
+            // Log the blocked output for security review (server-side only)
             await supabaseAdmin.from('ai_requests').insert({
                 project_id: apiKeyData.project_id,
                 api_key_id: apiKeyData.id,
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
                 total_tokens: response.totalTokens,
                 cost_usd: response.costUsd,
                 latency_ms: response.latencyMs,
-                status: 'blocked_output', // New status for output filtering
+                status: 'blocked_output',
                 error_message: `Output security violation: ${outputSecurityResult.layer}`,
                 filtered_reasons: outputSecurityResult.reasons,
                 safety_score: 1 - outputSecurityResult.riskScore,
@@ -178,21 +179,21 @@ export async function POST(req: NextRequest) {
                     temperature,
                 },
                 response_payload: {
-                    // Store blocked content for security review
                     blocked: true,
-                    text: response.text.substring(0, 500), // Limited for security
+                    text: response.text.substring(0, 500),
                     blocked_content: outputSecurityResult.blockedContent,
                     risk_score: outputSecurityResult.riskScore,
                 }
             });
 
-            // Return generic error - don't reveal what was blocked
+            // Return generic error to user (don't reveal what was detected)
             return NextResponse.json(
                 {
-                    error: 'I cannot provide that information as it may contain sensitive data or violate security policies.',
-                    details: 'The AI response was blocked by our security layer.',
+                    error: 'Response blocked by cencori security policy',
+                    message: 'The AI response contained content that violates our security policies.',
+                    code: 'CONTENT_FILTERED'
                 },
-                { status: 400 }
+                { status: 403 }
             );
         }
 
