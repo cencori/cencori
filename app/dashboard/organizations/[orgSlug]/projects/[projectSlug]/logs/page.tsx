@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Search, X, ListFilter, Loader2 } from 'lucide-react';
 import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
+import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 
 interface PageProps {
     params: Promise<{
@@ -26,6 +27,7 @@ interface PageProps {
 }
 
 export default function RequestLogsPage({ params }: PageProps) {
+    const { environment } = useEnvironment();
     const [projectId, setProjectId] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -221,7 +223,7 @@ export default function RequestLogsPage({ params }: PageProps) {
             </div>
 
             {/* Request logs table */}
-            <RequestLogsTable projectId={projectId} filters={filters} />
+            <RequestLogsTable projectId={projectId} filters={filters} environment={environment} />
         </div>
     );
 }

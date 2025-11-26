@@ -360,34 +360,43 @@ async function handleChatRequest(messages: any[]) {
     
     return response;
   } catch (error: any) {
-    // Security violation (blocked by Cencori policy)
-    if (error.code === "SECURITY_VIOLATION") {
-      console.error("Request blocked:", error.message);
+    // Security violation (blocked by Cencori - 403)
+    if (error.status === 403 && error.code === "SECURITY_VIOLATION") {
+      console.error("Request blocked by security");
       return {
-        error: "Your request was blocked by our security policy.",
-        reason: error.violationType,
+        error: "Request blocked",
+        message: error.message, // Generic message from Cencori
       };
     }
     
-    // Rate limit exceeded
-    if (error.code === "RATE_LIMIT_EXCEEDED") {
-      console.error("Rate limit hit:", error.retryAfter);
+    // Content filtering (response blocked - 403)
+    if (error.status === 403 && error.code === "CONTENT_FILTERED") {
+      console.error("Response filtered");
+      return {
+        error: "Response filtered",
+        message: error.message,
+      };
+    }
+    
+    // Rate limit exceeded (429)
+    if (error.status === 429) {
+      console.error("Rate limit hit");
       return {
         error: "Too many requests. Please try again later.",
         retryAfter: error.retryAfter,
       };
     }
     
-    // Invalid model or provider error
-    if (error.code === "INVALID_MODEL") {
-      console.error("Invalid model:", error.message);
+    // Invalid model or provider error (400)
+    if (error.status === 400) {
+      console.error("Bad request:", error.message);
       return {
-        error: "The requested model is not available.",
+        error: "Invalid request parameters.",
       };
     }
     
-    // Provider API error (e.g., OpenAI is down)
-    if (error.code === "PROVIDER_ERROR") {
+    // Provider API error (e.g., OpenAI is down - 503)
+    if (error.status === 503) {
       console.error("Provider error:", error.message);
       return {
         error: "The AI service is temporarily unavailable.",
@@ -402,6 +411,12 @@ async function handleChatRequest(messages: any[]) {
   }
 }`}
                 />
+
+                <div className="mt-4 p-4 bg-muted/20 border border-border/40">
+                    <p className="text-xs text-muted-foreground">
+                        <strong>Security Note:</strong> For security reasons, detailed detection patterns are not included in error responses. See the <Link href="/docs/concepts/security#security-incidents" className="text-primary hover:underline">Security documentation</Link> for comprehensive error handling guide with UI examples.
+                    </p>
+                </div>
             </div>
 
             {/* Advanced Features */}
