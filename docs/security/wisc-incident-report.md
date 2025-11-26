@@ -265,9 +265,9 @@ Output Risk Score: 0.85 → BLOCKED
 
 If you experience any issues or have questions:
 
-**Contact:** support@fohnai.com  
+**Contact:** support@cencori.com  
 **Incident ID:** WISC-001  
-**Documentation:** [cencori.vercel.app/docs/security](https://cencori.vercel.app/docs/security)
+**Documentation:** [cencori.com/docs/security](https://cencori.com/docs/security)
 
 ---
 
@@ -275,7 +275,7 @@ If you experience any issues or have questions:
 
 Thank you for reporting this critical security issue. Your vigilance helps us make Cencori more secure for all customers. We take security seriously and appreciate your partnership in making AI development safer.
 
-**Status:** ✅ **RESOLVED - System Hardened**
+**Status:** **RESOLVED - System Hardened**
 
 ---
 

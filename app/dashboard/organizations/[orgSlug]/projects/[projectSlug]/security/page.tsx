@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { X, ListFilter, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 
 interface PageProps {
     params: Promise<{
@@ -23,6 +24,7 @@ interface PageProps {
 }
 
 export default function SecurityIncidentsPage({ params }: PageProps) {
+    const { environment } = useEnvironment();
     const [projectId, setProjectId] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -217,7 +219,7 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
             </Card>
 
             {/* Security incidents table */}
-            <SecurityIncidentsTable projectId={projectId} filters={filters} />
+            <SecurityIncidentsTable projectId={projectId} filters={filters} environment={environment} />
         </div>
     );
 }
