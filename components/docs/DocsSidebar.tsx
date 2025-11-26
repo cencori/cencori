@@ -20,7 +20,7 @@ const sidebarItems = [
     {
         title: "Use Cases",
         items: [
-            { title: "For Vibe Coders", href: "/docs/use-cases/vibe-coders" },
+            { title: "For Context Engineers", href: "/docs/use-cases/vibe-coders" },
             { title: "For AI Companies", href: "/docs/use-cases/ai-companies" },
         ],
     },
