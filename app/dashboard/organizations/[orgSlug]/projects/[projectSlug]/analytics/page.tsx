@@ -8,6 +8,7 @@ import { ModelUsageChart } from '@/components/audit/ModelUsageChart';
 import { SecurityBreakdownChart } from '@/components/audit/SecurityBreakdownChart';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { Activity, CheckCircle, DollarSign, Clock, ShieldAlert, Loader2 } from 'lucide-react';
+import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 
 interface TrendData {
     timestamp: string;
@@ -47,6 +48,7 @@ interface PageProps {
 }
 
 export default function AnalyticsPage({ params }: PageProps) {
+    const { environment } = useEnvironment();
     const [projectId, setProjectId] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('7d');
@@ -96,12 +98,12 @@ export default function AnalyticsPage({ params }: PageProps) {
         const fetchAnalytics = async () => {
             try {
                 // Fetch overview
-                const overviewRes = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}`);
+                const overviewRes = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}&environment=${environment}`);
                 const overviewData = await overviewRes.json();
                 setOverview(overviewData);
 
                 // Fetch trends
-                const trendsRes = await fetch(`/api/projects/${projectId}/analytics/trends?time_range=${timeRange}`);
+                const trendsRes = await fetch(`/api/projects/${projectId}/analytics/trends?time_range=${timeRange}&environment=${environment}`);
                 const trendsData = await trendsRes.json();
                 setTrends(trendsData.trends || []);
                 setGroupBy(trendsData.group_by);
@@ -111,7 +113,7 @@ export default function AnalyticsPage({ params }: PageProps) {
         };
 
         fetchAnalytics();
-    }, [projectId, timeRange]);
+    }, [projectId, environment, timeRange]);
 
     if (loading) {
         return (

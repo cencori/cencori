@@ -28,6 +28,7 @@ interface RequestLog {
 
 interface RequestLogsTableProps {
     projectId: string;
+    environment: 'production' | 'test';
     filters: {
         status?: string;
         model?: string;
@@ -36,7 +37,7 @@ interface RequestLogsTableProps {
     };
 }
 
-export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) {
+export function RequestLogsTable({ projectId, environment, filters }: RequestLogsTableProps) {
     const [requests, setRequests] = useState<RequestLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -51,6 +52,7 @@ export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) 
             const params = new URLSearchParams({
                 page: page.toString(),
                 per_page: '50',
+                environment,
                 ...(filters.status && { status: filters.status }),
                 ...(filters.model && { model: filters.model }),
                 ...(filters.time_range && { time_range: filters.time_range }),
@@ -69,7 +71,7 @@ export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) 
         } finally {
             setLoading(false);
         }
-    }, [projectId, page, filters]);
+    }, [projectId, environment, page, filters]);
 
     // Initial fetch and refetch on filter change
     useEffect(() => {

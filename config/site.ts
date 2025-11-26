@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "cencori",
-  url: "https://cencori.vercel.app", // Replace with your actual site URL
+  url: "https://cencori.com",
   description:
     "Cencori is a multi-tenant AI infrastructure platform designed to help teams build, deploy, and scale AI-driven applications with consistency and reliability.",
   links: {

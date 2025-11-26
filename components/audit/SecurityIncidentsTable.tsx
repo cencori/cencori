@@ -24,6 +24,7 @@ interface SecurityIncident {
 
 interface SecurityIncidentsTableProps {
     projectId: string;
+    environment: 'production' | 'test';
     filters: {
         severity?: string;
         type?: string;
@@ -32,7 +33,7 @@ interface SecurityIncidentsTableProps {
     };
 }
 
-export function SecurityIncidentsTable({ projectId, filters }: SecurityIncidentsTableProps) {
+export function SecurityIncidentsTable({ projectId, environment, filters }: SecurityIncidentsTableProps) {
     const [incidents, setIncidents] = useState<SecurityIncident[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -47,6 +48,7 @@ export function SecurityIncidentsTable({ projectId, filters }: SecurityIncidents
             const params = new URLSearchParams({
                 page: page.toString(),
                 per_page: '50',
+                environment,
                 ...(filters.severity && { severity: filters.severity }),
                 ...(filters.type && { type: filters.type }),
                 ...(filters.reviewed && { reviewed: filters.reviewed }),
@@ -66,7 +68,7 @@ export function SecurityIncidentsTable({ projectId, filters }: SecurityIncidents
         } finally {
             setLoading(false);
         }
-    }, [projectId, page, filters]);
+    }, [projectId, environment, page, filters]);
 
     useEffect(() => {
         setPage(1);
