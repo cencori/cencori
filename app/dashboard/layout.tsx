@@ -150,9 +150,11 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background px-4 md:px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/organizations" className="flex items-center gap-3">
-            <Logo variant="mark" className="h-4" />
+            <Logo variant="mark" className="h-4 pr-2" /> {/* ensure space so separator can't overlap */}
           </Link>
-          <BreadcrumbSeparator className="text-muted-foreground"> / </BreadcrumbSeparator>
+          <span className="text-muted-foreground ml-0 mr-0 select-none" aria-hidden>
+            /
+          </span>
           <Breadcrumb className="sm:flex md:flex">
             <BreadcrumbList>
               {orgSlug && (
