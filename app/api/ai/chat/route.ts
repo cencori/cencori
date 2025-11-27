@@ -49,6 +49,45 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Get project and organization info for usage tracking
+        const { data: projectData, error: projectError } = await supabaseAdmin
+            .from('projects')
+            .select('id, organization_id, organizations!inner(id, monthly_requests_used, monthly_request_limit, subscription_tier)')
+            .eq('id', apiKeyData.project_id)
+            .single();
+
+        if (projectError || !projectData) {
+            return NextResponse.json(
+                { error: 'Project not found' },
+                { status: 404 }
+            );
+        }
+
+        const organization = Array.isArray(projectData.organizations)
+            ? projectData.organizations[0]
+            : projectData.organizations;
+
+        // CHECK USAGE LIMIT (before processing request)
+        if (organization.monthly_requests_used >= organization.monthly_request_limit) {
+            return NextResponse.json(
+                {
+                    error: 'Monthly limit reached',
+                    message: `You've used all ${organization.monthly_request_limit.toLocaleString()} requests this month. Upgrade to continue.`,
+                    code: 'USAGE_LIMIT_EXCEEDED',
+                    tier: organization.subscription_tier,
+                    used: organization.monthly_requests_used,
+                    limit: organization.monthly_request_limit,
+                },
+                {
+                    status: 429,
+                    headers: {
+                        'X-Usage-Limit': organization.monthly_request_limit.toString(),
+                        'X-Usage-Used': organization.monthly_requests_used.toString(),
+                    }
+                }
+            );
+        }
+
         // RATE LIMIT CHECK
         const rateLimit = await checkRateLimit(apiKeyData.project_id);
         if (!rateLimit.success) {
@@ -229,6 +268,19 @@ export async function POST(req: NextRequest) {
         if (logError) {
             console.error('[AI Gateway] Failed to log request:', logError);
             // Don't fail the request if logging fails
+        }
+
+        // INCREMENT USAGE COUNTER (atomic operation)
+        const { error: usageError } = await supabaseAdmin
+            .from('organizations')
+            .update({ 
+                monthly_requests_used: organization.monthly_requests_used + 1 
+            })
+            .eq('id', projectData.organization_id);
+
+        if (usageError) {
+            console.error('[AI Gateway] Failed to increment usage:', usageError);
+            // Don't fail the request if usage tracking fails
         }
 
         // Return Gemini response
