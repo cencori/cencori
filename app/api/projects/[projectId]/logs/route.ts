@@ -17,6 +17,7 @@ export async function GET(
         const model = searchParams.get('model');
         const timeRange = searchParams.get('time_range') || '24h'; // '1h' | '24h' | '7d' | '30d' | 'all'
         const search = searchParams.get('search');
+        const environment = searchParams.get('environment') || 'production'; // 'production' | 'test'
 
         // Calculate time filter
         let startTime: Date | null = null;
@@ -40,11 +41,35 @@ export async function GET(
                 break;
         }
 
+        // Get API keys for this environment
+        const { data: apiKeys } = await supabaseAdmin
+            .from('api_keys')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('environment', environment)
+            .eq('is_active', true);
+
+        const apiKeyIds = apiKeys?.map(k => k.id) || [];
+
+        // If no API keys found for environment, return empty results
+        if (apiKeyIds.length === 0) {
+            return NextResponse.json({
+                requests: [],
+                pagination: {
+                    page,
+                    per_page: perPage,
+                    total: 0,
+                    total_pages: 0,
+                },
+            });
+        }
+
         // Build query
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*', { count: 'exact' })
-            .eq('project_id', projectId);
+            .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds);
 
         // Apply filters
         if (status && status !== 'all') {
