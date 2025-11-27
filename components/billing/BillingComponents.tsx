@@ -41,13 +41,13 @@ export function UsageCard({ used, limit, tier, orgSlug }: UsageCardProps) {
                         <Alert>
                             <AlertTriangle className="h-4 w-4" />
                             <AlertDescription>
-                                You've reached your monthly limit. Upgrade to continue making requests.
+                                You&apos;ve reached your monthly limit. Upgrade to continue making requests.
                             </AlertDescription>
                         </Alert>
                     ) : isNearLimit ? (
                         <Alert>
                             <AlertDescription>
-                                You're approaching your monthly limit ({Math.round(100 - percentage)}% remaining).
+                                You&apos;re approaching your monthly limit ({Math.round(100 - percentage)}% remaining).
                             </AlertDescription>
                         </Alert>
                     ) : (
