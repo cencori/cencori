@@ -1,59 +1,108 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, CheckCircle2 } from "lucide-react";
+import { UsageCard, UpgradeCard } from '@/components/billing/BillingComponents';
+import { supabase } from '@/lib/supabaseClient';
+import { useParams } from 'next/navigation';
+
+interface Organization {
+    id: string;
+    name: string;
+    subscription_tier: 'free' | 'pro' | 'team' | 'enterprise';
+    subscription_status: string;
+    monthly_requests_used: number;
+    monthly_request_limit: number;
+    subscription_current_period_end: string | null;
+}
 
 export default function BillingPage() {
-    const upcomingFeatures = [
-        "Subscription management",
-        "Payment method updates",
-        "Billing history and invoices",
-        "Usage-based pricing tiers",
-        "Team member billing allocation",
-        "Automatic invoice generation",
-    ];
+    const params = useParams();
+    const orgSlug = params.orgSlug as string;
+    const [org, setOrg] = useState<Organization | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchOrg() {
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, monthly_request_limit, subscription_current_period_end')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (!error && data) {
+                setOrg(data);
+            }
+            setLoading(false);
+        }
+        fetchOrg();
+    }, [orgSlug]);
+
+    if (loading) {
+        return (
+            <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <Skeleton className="h-8 w-48 mb-6" />
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Skeleton className="h-64" />
+                    <Skeleton className="h-64" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!org) {
+        return <div>Organization not found</div>;
+    }
 
     return (
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center space-x-4 pb-12">
-                <h1 className="text-xl font-bold">Billing</h1>
-                <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
+            <div className="flex items-center justify-between pb-6">
+                <div>
+                    <h1 className="text-2xl font-bold">Billing & Usage</h1>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Manage your subscription and monitor usage
+                    </p>
+                </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Billing & Subscription Management</CardTitle>
-                    <CardDescription>
-                        Manage your subscription, payment methods, and billing history
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="text-center py-12">
-                        <div className="mx-auto w-fit rounded-full bg-muted p-6 mb-6">
-                            <CreditCard className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-semibold mb-2">Billing Dashboard Coming Soon</h3>
-                        <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                            We&apos;re integrating Stripe to bring you a complete billing experience.
-                            Soon you&apos;ll be able to manage subscriptions, update payment methods, and view your billing history.
-                        </p>
+            <div className="grid gap-6 md:grid-cols-2 mb-6">
+                <UsageCard
+                    used={org.monthly_requests_used}
+                    limit={org.monthly_request_limit}
+                    tier={org.subscription_tier}
+                    orgSlug={orgSlug}
+                />
 
-                        <div className="max-w-md mx-auto text-left">
-                            <p className="text-sm font-medium mb-3">Planned Features:</p>
-                            <ul className="space-y-2">
-                                {upcomingFeatures.map((feature, index) => (
-                                    <li key={index} className="flex items-start text-sm text-muted-foreground">
-                                        <CheckCircle2 className="h-4 w-4 mr-2 mt-0.5 text-primary shrink-0" />
-                                        {feature}
-                                    </li>
-                                ))}
-                            </ul>
+                {org.subscription_tier !== 'enterprise' && (
+                    <UpgradeCard
+                        currentTier={org.subscription_tier as 'free' | 'pro' | 'team'}
+                        nextTier={org.subscription_tier === 'free' ? 'pro' : org.subscription_tier === 'pro' ? 'team' : 'enterprise'}
+                        orgId={org.id}
+                    />
+                )}
+            </div>
+
+            {org.subscription_tier !== 'free' && org.subscription_current_period_end && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Subscription Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Status</span>
+                            <Badge variant={org.subscription_status === 'active' ? 'default' : 'secondary'}>
+                                {org.subscription_status}
+                            </Badge>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Renews on</span>
+                            <span>{new Date(org.subscription_current_period_end).toLocaleDateString()}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }
