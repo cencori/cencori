@@ -65,12 +65,15 @@ export async function GET(
             });
         }
 
-        // Build query
+        // Build query - join with ai_requests to filter by api_key_id
         let query = supabaseAdmin
             .from('security_incidents')
-            .select('*', { count: 'exact' })
+            .select(`
+                *,
+                ai_requests!inner(api_key_id)
+            `, { count: 'exact' })
             .eq('project_id', projectId)
-            .in('api_key_id', apiKeyIds);
+            .in('ai_requests.api_key_id', apiKeyIds);
 
         // Apply filters
         if (severity && severity !== 'all') {
@@ -94,9 +97,12 @@ export async function GET(
         // Get summary stats (always for the filtered time range, regardless of other filters)
         let statsQuery = supabaseAdmin
             .from('security_incidents')
-            .select('severity', { count: 'exact' })
+            .select(`
+                severity,
+                ai_requests!inner(api_key_id)
+            `, { count: 'exact' })
             .eq('project_id', projectId)
-            .in('api_key_id', apiKeyIds);
+            .in('ai_requests.api_key_id', apiKeyIds);
 
         if (startTime) {
             statsQuery = statsQuery.gte('created_at', startTime.toISOString());

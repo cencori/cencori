@@ -47,13 +47,11 @@ export default function ProjectLayout({
   const router = useRouter();
   const [project, setProject] = useState<ProjectData | null>(null);
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isOpen, setIsOpen } = useMobileSheet();
 
   useEffect(() => {
     const fetchProjectAndOrganization = async () => {
-      setLoading(true);
       setError(null);
       try {
         const resolvedParams = await params;
@@ -99,20 +97,12 @@ export default function ProjectLayout({
       } catch (err: unknown) {
         console.error("Unexpected error:", (err as Error).message);
         setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchProjectAndOrganization();
   }, [params, router]);
 
-  if (loading)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-muted-foreground">Loading project...</p>
-      </div>
-    );
 
   if (error)
     return (
@@ -121,12 +111,8 @@ export default function ProjectLayout({
       </div>
     );
 
-  if (!project || !organization)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">Project or organization not found.</p>
-      </div>
-    );
+  // Don't render until we have project and organization data
+  if (!project || !organization) return null;
 
   return (
     <SidebarProvider defaultOpen>
