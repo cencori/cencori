@@ -17,6 +17,7 @@ export async function GET(
         const incidentType = searchParams.get('type');
         const reviewed = searchParams.get('reviewed'); // 'true' | 'false' | 'all'
         const timeRange = searchParams.get('time_range') || '7d';
+        const environment = searchParams.get('environment') || 'production'; // 'production' | 'test'
 
         // Calculate time filter
         let startTime: Date | null = null;
@@ -40,11 +41,36 @@ export async function GET(
                 break;
         }
 
+        // Get API keys for this environment
+        const { data: apiKeys } = await supabaseAdmin
+            .from('api_keys')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('environment', environment)
+            .eq('is_active', true);
+
+        const apiKeyIds = apiKeys?.map(k => k.id) || [];
+
+        // If no API keys found for environment, return empty results
+        if (apiKeyIds.length === 0) {
+            return NextResponse.json({
+                incidents: [],
+                summary: { critical: 0, high: 0, medium: 0, low: 0 },
+                pagination: {
+                    page,
+                    per_page: perPage,
+                    total: 0,
+                    total_pages: 0,
+                },
+            });
+        }
+
         // Build query
         let query = supabaseAdmin
             .from('security_incidents')
             .select('*', { count: 'exact' })
-            .eq('project_id', projectId);
+            .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds);
 
         // Apply filters
         if (severity && severity !== 'all') {
@@ -69,7 +95,8 @@ export async function GET(
         let statsQuery = supabaseAdmin
             .from('security_incidents')
             .select('severity', { count: 'exact' })
-            .eq('project_id', projectId);
+            .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds);
 
         if (startTime) {
             statsQuery = statsQuery.gte('created_at', startTime.toISOString());

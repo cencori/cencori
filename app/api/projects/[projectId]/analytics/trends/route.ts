@@ -11,6 +11,7 @@ export async function GET(
     try {
         const searchParams = req.nextUrl.searchParams;
         const timeRange = searchParams.get('time_range') || '7d';
+        const environment = searchParams.get('environment') || 'production';
 
         // Calculate time filter
         const now = new Date();
@@ -39,11 +40,22 @@ export async function GET(
                 groupBy = 'day';
         }
 
+        // Get API keys for this environment
+        const { data: apiKeys } = await supabaseAdmin
+            .from('api_keys')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('environment', environment)
+            .eq('is_active', true);
+
+        const apiKeyIds = apiKeys?.map(k => k.id) || [];
+
         // Fetch requests
         const { data: requests, error } = await supabaseAdmin
             .from('ai_requests')
             .select('created_at, status, cost_usd, latency_ms')
             .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds)
             .gte('created_at', startTime.toISOString())
             .order('created_at', { ascending: true });
 
