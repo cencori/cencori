@@ -11,6 +11,7 @@ export async function GET(
     try {
         const searchParams = req.nextUrl.searchParams;
         const timeRange = searchParams.get('time_range') || '7d';
+        const environment = searchParams.get('environment') || 'production';
 
         // Calculate time filter
         const now = new Date();
@@ -33,11 +34,22 @@ export async function GET(
                 startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
+        // Get API keys for this environment
+        const { data: apiKeys } = await supabaseAdmin
+            .from('api_keys')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('environment', environment)
+            .eq('is_active', true);
+
+        const apiKeyIds = apiKeys?.map(k => k.id) || [];
+
         // Fetch all requests in time range
         const { data: requests, error: reqError } = await supabaseAdmin
             .from('ai_requests')
             .select('*')
             .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds)
             .gte('created_at', startTime.toISOString());
 
         if (reqError) {
@@ -50,6 +62,7 @@ export async function GET(
             .from('security_incidents')
             .select('*')
             .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds)
             .gte('created_at', startTime.toISOString());
 
         if (incError) {
