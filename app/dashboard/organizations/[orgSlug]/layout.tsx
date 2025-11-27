@@ -42,7 +42,6 @@ export default function OrganizationLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isOpen, setIsOpen } = useMobileSheet();
 
@@ -50,7 +49,6 @@ export default function OrganizationLayout({
 
   useEffect(() => {
     const fetchOrganization = async () => {
-      setLoading(true);
       setError(null);
       try {
         const resolvedParams = await Promise.resolve(params);
@@ -82,20 +80,12 @@ export default function OrganizationLayout({
       } catch (err: unknown) {
         console.error("Unexpected error:", (err as Error).message);
         setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchOrganization();
   }, [params, router]);
 
-  if (loading)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-muted-foreground">Loading organization...</p>
-      </div>
-    );
 
   if (error)
     return (
@@ -104,12 +94,8 @@ export default function OrganizationLayout({
       </div>
     );
 
-  if (!organization)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">Organization not found.</p>
-      </div>
-    );
+  // Don't render until we have organization data
+  if (!organization) return null;
 
   return (
     <SidebarProvider defaultOpen>
