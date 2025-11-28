@@ -69,11 +69,25 @@ export default function BillingPage() {
                 body: JSON.stringify({ tier, cycle, orgId: org.id }),
             });
 
-            const { checkoutUrl } = await response.json();
-            window.location.href = checkoutUrl;
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('Checkout API error:', data);
+                alert(`Failed to start checkout: ${data.error || 'Unknown error'}`);
+                return;
+            }
+
+            if (!data.checkoutUrl) {
+                console.error('No checkout URL returned:', data);
+                alert('Failed to get checkout URL. Please try again.');
+                return;
+            }
+
+            console.log('Redirecting to checkout:', data.checkoutUrl);
+            window.location.href = data.checkoutUrl;
         } catch (error) {
             console.error('Checkout error:', error);
-            alert('Failed to start checkout. Please try again.');
+            alert('Failed to start checkout. Please check your internet connection and try again.');
         }
     };
 

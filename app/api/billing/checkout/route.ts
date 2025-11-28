@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
 
     // Get product ID for this tier/cycle
     const productId = getProductId(tier, cycle);
+    console.log('[Checkout API] Product ID:', productId);
 
     // Get organization details
     const supabaseAdmin = createAdminClient();
@@ -40,11 +41,14 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orgError || !org) {
+      console.error('[Checkout API] Org fetch error:', orgError);
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
       );
     }
+
+    console.log('[Checkout API] Creating checkout for org:', org.slug);
 
     // Create Polar checkout session
     const checkout = await polarClient.checkouts.create({
@@ -56,15 +60,36 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    console.log('[Checkout API] Checkout created:', checkout.id);
+    console.log('[Checkout API] Checkout URL:', checkout.url);
+
+    if (!checkout.url) {
+      throw new Error('Polar did not return a checkout URL');
+    }
+
     return NextResponse.json({
       checkoutUrl: checkout.url,
       checkoutId: checkout.id,
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Checkout API] Error creating checkout:', error);
+    
+    let errorMessage = 'Unknown error';
+    let errorStack = undefined;
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorStack = error.stack;
+    }
+
+    console.error('[Checkout API] Error details:', errorMessage, errorStack);
+
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      {
+        error: 'Failed to create checkout session',
+        details: errorMessage
+      },
       { status: 500 }
     );
   }
