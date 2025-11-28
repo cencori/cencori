@@ -337,15 +337,6 @@ export default function Navbar({
                     </NavbarCenter>
 
                     <NavbarRight>
-                        <TechnicalBorder cornerSize={8} borderWidth={1} className="p-0 mr-4 hidden md:block">
-                            <GitHubStarsButton
-                                username="bolaabanjo"
-                                repo="cencori"
-                                variant="ghost"
-                                className="h-9 rounded-none hover:bg-transparent"
-                            />
-                        </TechnicalBorder>
-
                         {actions.map((action, index) => {
                             if (action.isAvatar && isAuthenticated) {
                                 return (
