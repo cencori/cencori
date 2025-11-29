@@ -281,7 +281,7 @@ export default function GitHubImportPage() {
             <CardTitle className="text-2xl">GitHub App Not Installed</CardTitle>
             <CardDescription className="text-base">
               To import projects from GitHub, you need to install the Cencori GitHub App.
-              This allows Cencori to access your repositories securely.
+              This allows Cencori to access your repositories.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
