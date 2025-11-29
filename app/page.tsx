@@ -2,6 +2,7 @@
 
 import Navbar from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
+import { SocialProof } from "@/components/landing/SocialProof";
 import { Features } from "@/components/landing/Features";
 import { ValueProp } from "@/components/landing/ValueProp";
 import { Pricing } from "@/components/landing/Pricing";
@@ -96,7 +97,7 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
+    <div className="min-h-screen px-50 bg-background text-foreground selection:bg-foreground selection:text-background">
       <Navbar
         logo={<Logo variant="mark" className="h-4" />}
         name="cencori"
@@ -109,6 +110,7 @@ export default function HomePage() {
 
       <main>
         <Hero />
+        <SocialProof />
         <Features />
         <ValueProp />
         <Pricing />
