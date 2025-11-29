@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { MetricCard } from '@/components/audit/MetricCard';
-import { RequestsChart } from '@/components/audit/RequestsChart';
-import { ModelUsageChart } from '@/components/audit/ModelUsageChart';
-import { SecurityBreakdownChart } from '@/components/audit/SecurityBreakdownChart';
+import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
+import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
+import { ModelUsageBarChart } from '@/components/audit/ModelUsageBarChart';
+import { SecurityBreakdownDonutChart } from '@/components/audit/SecurityBreakdownDonutChart';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { Activity, CheckCircle, DollarSign, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
@@ -147,9 +148,25 @@ export default function AnalyticsPage({ params }: PageProps) {
             {/* Metric Cards */}
             {overview && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <MetricCard
+                    <MetricCardWithChart
                         title="Total Requests"
                         value={overview.overview.total_requests}
+                        chartData={trends.map(t => ({
+                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            value: t.total
+                        }))}
+                        trend={(() => {
+                            if (!trends || trends.length < 2) return 0;
+                            const mid = Math.floor(trends.length / 2);
+                            const firstHalf = trends.slice(0, mid);
+                            const secondHalf = trends.slice(mid);
+
+                            const avgFirst = firstHalf.reduce((acc, curr) => acc + curr.total, 0) / firstHalf.length;
+                            const avgSecond = secondHalf.reduce((acc, curr) => acc + curr.total, 0) / secondHalf.length;
+
+                            if (avgFirst === 0) return 0;
+                            return ((avgSecond - avgFirst) / avgFirst) * 100;
+                        })()}
                     />
                     <MetricCard
                         title="Success Rate"
@@ -195,18 +212,18 @@ export default function AnalyticsPage({ params }: PageProps) {
                 {/* Requests over time */}
                 {trends.length > 0 && (
                     <div className="lg:col-span-2">
-                        <RequestsChart data={trends} groupBy={groupBy} />
+                        <RequestsAreaChart data={trends} groupBy={groupBy} />
                     </div>
                 )}
 
                 {/* Model usage */}
                 {overview?.breakdown?.model_usage && Object.keys(overview.breakdown.model_usage).length > 0 && (
-                    <ModelUsageChart data={overview.breakdown.model_usage} />
+                    <ModelUsageBarChart data={overview.breakdown.model_usage} />
                 )}
 
                 {/* Security breakdown */}
                 {overview?.breakdown?.incidents_by_severity && (
-                    <SecurityBreakdownChart data={overview.breakdown.incidents_by_severity} />
+                    <SecurityBreakdownDonutChart data={overview.breakdown.incidents_by_severity} />
                 )}
             </div>
 
