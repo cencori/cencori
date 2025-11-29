@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { MetricCard } from '@/components/audit/MetricCard';
 import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
+import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
 import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
 import { ModelUsageBarChart } from '@/components/audit/ModelUsageBarChart';
 import { SecurityBreakdownDonutChart } from '@/components/audit/SecurityBreakdownDonutChart';
@@ -168,11 +169,28 @@ export default function AnalyticsPage({ params }: PageProps) {
                             return ((avgSecond - avgFirst) / avgFirst) * 100;
                         })()}
                     />
-                    <MetricCard
+                    <MetricCardWithLineChart
                         title="Success Rate"
                         value={overview.overview.success_rate}
                         format="percentage"
-                        icon={<CheckCircle className="h-4 w-4 text-green-500" />}
+                        chartData={trends.map(t => ({
+                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            value: t.total > 0 ? Math.round((t.success / t.total) * 100) : 0
+                        }))}
+                        trend={(() => {
+                            if (!trends || trends.length < 2) return 0;
+                            const mid = Math.floor(trends.length / 2);
+                            const firstHalf = trends.slice(0, mid);
+                            const secondHalf = trends.slice(mid);
+                            
+                            const getRate = (t: TrendData) => t.total > 0 ? (t.success / t.total) * 100 : 0;
+                            
+                            const avgFirst = firstHalf.reduce((acc, curr) => acc + getRate(curr), 0) / firstHalf.length;
+                            const avgSecond = secondHalf.reduce((acc, curr) => acc + getRate(curr), 0) / secondHalf.length;
+                            
+                            if (avgFirst === 0) return 0;
+                            return ((avgSecond - avgFirst) / avgFirst) * 100;
+                        })()}
                     />
                     <MetricCard
                         title="Total Cost"
