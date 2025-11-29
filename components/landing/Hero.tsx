@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const Hero = () => {
     return (
-        <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background pt-50 pb-32">
+        <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-32">
             {/* Background Effects */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
@@ -17,7 +17,7 @@ export const Hero = () => {
                 <div className="mb-8 animate-appear">
                     <Link href="/changelog" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                        <span className="mr-2">v2.0 is now live</span>
+                        <span className="mr-2">Coming Soon.</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
                 </div>
