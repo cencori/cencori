@@ -12,7 +12,7 @@ const logos = [
 export const SocialProof = () => {
     return (
         <section className="py-24 border-b border-border/40 bg-background">
-            <div className="container px-4 md:px-6">
+            <div className="container mx-auto px-4 md:px-6">
                 <p className="text-center text-sm font-medium text-muted-foreground mb-12 uppercase tracking-widest">
                     Potentially Trusted by Intelligent Teams
                 </p>
