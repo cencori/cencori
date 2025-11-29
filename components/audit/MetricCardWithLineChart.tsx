@@ -18,11 +18,12 @@ interface MetricCardWithLineChartProps {
     trend?: number;
     format?: 'number' | 'currency' | 'percentage' | 'ms';
     lineColor?: string;
+    yAxisDomain?: [number, number];
 }
 
 const chartConfig = {
     value: {
-        label: 'Success Rate',
+        label: 'Value',
         color: 'hsl(var(--chart-2))',
     },
 } satisfies ChartConfig;
@@ -34,6 +35,7 @@ export function MetricCardWithLineChart({
     trend,
     format = 'number',
     lineColor = 'hsl(142, 71%, 45%)', // Default to green
+    yAxisDomain,
 }: MetricCardWithLineChartProps) {
     const formatValue = (val: string | number) => {
         if (typeof val === 'string') return val;
@@ -105,7 +107,7 @@ export function MetricCardWithLineChart({
                                     tickFormatter={(value) => value.slice(0, 3)}
                                     hide
                                 />
-                                <YAxis domain={[0, 100]} hide />
+                                <YAxis domain={yAxisDomain || ['auto', 'auto']} hide />
                                 <ChartTooltip
                                     cursor={false}
                                     content={<ChartTooltipContent hideLabel />}
