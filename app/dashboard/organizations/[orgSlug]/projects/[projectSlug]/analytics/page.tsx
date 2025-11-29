@@ -192,7 +192,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                             if (avgFirst === 0) return 0;
                             return ((avgSecond - avgFirst) / avgFirst) * 100;
                         })()}
-                        yAxisDomain={[0, 100]}
                     />
                     <MetricCardWithLineChart
                         title="Total Cost"
