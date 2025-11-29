@@ -20,6 +20,7 @@ interface TrendData {
     blocked_output: number;
     error: number;
     cost: number;
+    avg_latency: number;
 }
 
 interface OverviewData {
@@ -215,10 +216,27 @@ export default function AnalyticsPage({ params }: PageProps) {
                         })()}
                         lineColor="hsl(217, 91%, 60%)" // Blue
                     />
-                    <MetricCard
+                    <MetricCardWithLineChart
                         title="Avg Latency"
                         value={overview.overview.avg_latency}
                         format="ms"
+                        chartData={trends.map(t => ({
+                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            value: t.avg_latency
+                        }))}
+                        trend={(() => {
+                            if (!trends || trends.length < 2) return 0;
+                            const mid = Math.floor(trends.length / 2);
+                            const firstHalf = trends.slice(0, mid);
+                            const secondHalf = trends.slice(mid);
+
+                            const avgFirst = firstHalf.reduce((acc, curr) => acc + curr.avg_latency, 0) / firstHalf.length;
+                            const avgSecond = secondHalf.reduce((acc, curr) => acc + curr.avg_latency, 0) / secondHalf.length;
+
+                            if (avgFirst === 0) return 0;
+                            return ((avgSecond - avgFirst) / avgFirst) * 100;
+                        })()}
+                        lineColor="hsl(24, 96%, 53%)" // Orange
                     />
                 </div>
             )}
@@ -250,16 +268,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                     <div className="lg:col-span-2">
                         <RequestsAreaChart data={trends} groupBy={groupBy} />
                     </div>
-                )}
-
-                {/* Model usage */}
-                {overview?.breakdown?.model_usage && Object.keys(overview.breakdown.model_usage).length > 0 && (
-                    <ModelUsageBarChart data={overview.breakdown.model_usage} />
-                )}
-
-                {/* Security breakdown */}
-                {overview?.breakdown?.incidents_by_severity && (
-                    <SecurityBreakdownDonutChart data={overview.breakdown.incidents_by_severity} />
                 )}
             </div>
 
