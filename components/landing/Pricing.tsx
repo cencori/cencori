@@ -23,7 +23,7 @@ const tiers: Array<{
         {
             name: 'free',
             displayName: 'Free',
-            description: 'For hobbyists and side projects.',
+            description: 'For side projects.',
             price: { monthly: 0, annual: 0 },
             limit: '1,000',
             features: [
