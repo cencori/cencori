@@ -1,11 +1,27 @@
 "use client";
 
-import React from "react";
-import { motion } from "motion/react";
-import { cn } from "@/lib/utils";
-import { Cpu } from "lucide-react";
+import React from 'react';
+import { motion } from 'motion/react';
+import { cn } from '@/lib/utils';
+import { Cpu } from 'lucide-react';
 
+interface ProviderItemProps {
+    name: string;
+    icon: string | React.ComponentType<{ className?: string }>;
+    color: string;
+    borderColor: string;
+    bg: string;
+    isIconComponent?: boolean;
+}
 
+interface ConnectionPathProps {
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    color: string;
+    delay: number;
+}
 
 export const Integrations = () => {
     return (
@@ -135,45 +151,45 @@ export const Integrations = () => {
     );
 };
 
-const ProviderItem = ({ name, icon, color, borderColor, bg, isIconComponent = false }: any) => (
+const ProviderItem = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
     <div className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border bg-background/50 backdrop-blur-sm transition-all hover:scale-105 w-48", borderColor, bg)}>
         {isIconComponent ? (
             <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon, { className: "w-5 h-5" })}
+                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-5 h-5" })}
             </div>
         ) : (
-            <img src={icon} alt={name} className="w-6 h-6" />
+            <img src={icon as string} alt={name} className="w-6 h-6" />
         )}
         <span className={cn("font-medium text-sm", color)}>{name}</span>
     </div>
 );
 
-const ProviderItemMobile = ({ name, icon, color, borderColor, bg, isIconComponent = false }: any) => (
+const ProviderItemMobile = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
     <div className={cn("flex items-center gap-3 p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full", borderColor, bg)}>
         {isIconComponent ? (
             <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon, { className: "w-5 h-5" })}
+                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-5 h-5" })}
             </div>
         ) : (
-            <img src={icon} alt={name} className="w-6 h-6" />
+            <img src={icon as string} alt={name} className="w-6 h-6" />
         )}
         <span className={cn("font-medium text-sm", color)}>{name}</span>
     </div>
 );
 
-const ProviderItemMobileIconOnly = ({ name, icon, color, borderColor, bg, isIconComponent = false }: any) => (
+const ProviderItemMobileIconOnly = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
     <div className={cn("flex items-center justify-center p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full aspect-square", borderColor, bg)}>
         {isIconComponent ? (
             <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon, { className: "w-6 h-6" })}
+                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-6 h-6" })}
             </div>
         ) : (
-            <img src={icon} alt={name} className="w-8 h-8" />
+            <img src={icon as string} alt={name} className="w-8 h-8" />
         )}
     </div>
 );
 
-const ConnectionPath = ({ startX, startY, endX, endY, color, delay }: any) => {
+const ConnectionPath = ({ startX, startY, endX, endY, color, delay }: ConnectionPathProps) => {
     // Bezier curve for smooth flow
     const midX = (startX + endX) / 2;
     const path = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
@@ -200,7 +216,7 @@ const ConnectionPath = ({ startX, startY, endX, endY, color, delay }: any) => {
     );
 };
 
-const ConnectionPathVerticalMobile = ({ startX, startY, endX, endY, color, delay }: any) => {
+const ConnectionPathVerticalMobile = ({ startX, startY, endX, endY, color, delay }: ConnectionPathProps) => {
     // Vertical Bezier curve for mobile
     const midY = (startY + endY) / 2;
     // Curve out then down
@@ -226,4 +242,4 @@ const ConnectionPathVerticalMobile = ({ startX, startY, endX, endY, color, delay
             </circle>
         </>
     );
-}; 
+};
