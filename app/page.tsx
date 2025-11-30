@@ -4,7 +4,7 @@ import Navbar from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { SocialProof } from "@/components/landing/SocialProof";
 import { Features } from "@/components/landing/Features";
-import { ValueProp } from "@/components/landing/ValueProp";
+import { Integrations } from "@/components/landing/Integrations";
 import { Pricing } from "@/components/landing/Pricing";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
@@ -110,9 +110,8 @@ export default function HomePage() {
 
       <main>
         <Hero />
-        <SocialProof />
         <Features />
-        <ValueProp />
+        <Integrations />
         <Pricing />
         <CTA />
       </main>
