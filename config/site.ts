@@ -4,7 +4,7 @@ export const siteConfig = {
   description:
     "Cencori is a multi-tenant AI infrastructure platform designed to help teams build, deploy, and scale AI-driven applications with consistency and reliability.",
   links: {
-    github: "https://github.com/bolaabanjo/cencori", 
+    github: "https://github.com/cencori/cencori", 
     docs: "https://cencori.com/docs", 
     getStartedUrl: "/signup", 
     signInUrl: "/login",
