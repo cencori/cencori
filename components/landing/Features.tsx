@@ -1,47 +1,43 @@
 import React from "react";
-import { Shield, Lock, Activity, BarChart3, Zap, Globe, Fingerprint, FileCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const features = [
     {
         title: "PII Detection",
         description: "Automatically detect and redact sensitive information like emails and credit cards.",
-        icon: Fingerprint,
         className: "md:col-span-2 md:row-span-2",
         visual: "bg-red-500/10",
-    },
-    {
-        title: "Enterprise Compliance",
-        description: "SOC2 and HIPAA ready infrastructure with full audit trails.",
-        icon: FileCheck,
-        className: "md:col-span-1 md:row-span-1",
-        visual: "bg-blue-500/10",
+        image: "/feature-screenshot.png",
     },
     {
         title: "Real-time Analytics",
-        description: "Monitor usage, costs, and latency in real-time.",
-        icon: BarChart3,
-        className: "md:col-span-1 md:row-span-1",
+        description: "Monitor latency in real-time.",
+        className: "md:col-span-2 md:row-span-1",
         visual: "bg-green-500/10",
+        image: "/analytics.png",
     },
     {
         title: "Rate Limiting",
         description: "Granular, database-backed rate limiting per project or user.",
-        icon: Shield,
         className: "md:col-span-1 md:row-span-2",
         visual: "bg-orange-500/10",
+        images: ["/development.png", "/production.png"],
+    },
+    {
+        title: "Enterprise Compliance",
+        description: "SOC2 and HIPAA ready infrastructure with full audit trails.",
+        className: "md:col-span-1 md:row-span-1",
+        visual: "bg-blue-500/10",
     },
     {
         title: "Low Latency",
         description: "<50ms added latency to your requests.",
-        icon: Zap,
         className: "md:col-span-2 md:row-span-1",
         visual: "bg-yellow-500/10",
     },
     {
         title: "Global Edge Network",
         description: "Deploy close to your users for maximum performance.",
-        icon: Globe,
         className: "md:col-span-1 md:row-span-1",
         visual: "bg-purple-500/10",
     },
@@ -74,22 +70,60 @@ export const Features = () => {
                                 "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
                                 "bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-transparent to-transparent"
                             )} />
-                            
+
                             <div className="relative z-10">
-                                <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-foreground/5 text-foreground">
-                                    <feature.icon className="h-5 w-5" />
-                                </div>
                                 <h3 className="text-xl font-semibold tracking-tight mb-2">{feature.title}</h3>
-                                <p className="text-muted-foreground text-sm leading-relaxed">
+                                <p className="text-muted-foreground text-sm leading-relaxed max-w-[80%]">
                                     {feature.description}
                                 </p>
                             </div>
 
-                            {/* Placeholder for visual element */}
-                            <div className={cn(
-                                "absolute bottom-0 right-0 w-1/2 h-1/2 rounded-tl-3xl opacity-20 group-hover:opacity-30 transition-opacity",
-                                feature.visual
-                            )} />
+                            {/* Image with blur effect */}
+                            {feature.image && (
+                                <div className="absolute inset-0 z-0">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-transparent z-10" />
+                                    <img
+                                        src={feature.image}
+                                        alt={feature.title}
+                                        className="absolute right-0 bottom-0 w-[80%] h-auto object-cover rounded-tl-xl opacity-80 group-hover:scale-105 transition-transform duration-500"
+                                        style={{
+                                            maskImage: "linear-gradient(to top left, black 30%, transparent 100%)",
+                                            WebkitMaskImage: "linear-gradient(to top left, black 30%, transparent 100%)"
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Multiple Images (Stacked) */}
+                            {feature.images && (
+                                <div className="absolute inset-0 z-0 flex flex-col items-end justify-end p-6 gap-4">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10" />
+                                    {feature.images.map((img, idx) => (
+                                        <img
+                                            key={idx}
+                                            src={img}
+                                            alt={`${feature.title} ${idx}`}
+                                            className={cn(
+                                                "w-[70%] h-auto object-contain rounded-lg opacity-80 group-hover:scale-105 transition-transform duration-500 relative z-0",
+                                                idx === 0 ? "translate-x-4" : "translate-x-0"
+                                            )}
+                                            style={{
+                                                maskImage: "linear-gradient(to left, black 50%, transparent 100%)",
+                                                WebkitMaskImage: "linear-gradient(to left, black 50%, transparent 100%)"
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Placeholder for visual element (fallback) */}
+                            {!feature.image && !feature.images && (
+                                <div className={cn(
+                                    "absolute bottom-0 right-0 w-1/2 h-1/2 rounded-tl-3xl opacity-20 group-hover:opacity-30 transition-opacity",
+                                    feature.visual
+                                )} />
+                            )}
                         </div>
                     ))}
                 </div>
