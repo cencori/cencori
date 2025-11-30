@@ -1,0 +1,134 @@
+/**
+ * OpenAI Provider
+ * 
+ * Implements the AIProvider interface for OpenAI's GPT models
+ */
+
+import OpenAI from 'openai';
+import {
+    AIProvider,
+    UnifiedChatRequest,
+    UnifiedChatResponse,
+    StreamChunk,
+    ModelPricing,
+} from './base';
+import { getPricingFromDB } from './pricing';
+import { toOpenAIMessages, estimateTokenCount } from './utils';
+import { normalizeProviderError } from './errors';
+
+export class OpenAIProvider extends AIProvider {
+    readonly providerName = 'openai';
+    private client: OpenAI;
+
+    constructor() {
+        super();
+
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error('OPENAI_API_KEY is not configured');
+        }
+
+        this.client = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+    }
+
+    async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const startTime = Date.now();
+
+        try {
+            const completion = await this.client.chat.completions.create({
+                model: request.model,
+                messages: toOpenAIMessages(request.messages),
+                temperature: request.temperature ?? 0.7,
+                max_tokens: request.maxTokens,
+                stream: false,
+                user: request.userId,
+            });
+
+            const usage = completion.usage!;
+            const pricing = await this.getPricing(request.model);
+
+            const providerCost = this.calculateCost(
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                pricing
+            );
+
+            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
+
+            return {
+                content: completion.choices[0].message.content || '',
+                model: completion.model,
+                provider: this.providerName,
+                usage: {
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                },
+                cost: {
+                    providerCostUsd: providerCost,
+                    cencoriChargeUsd: cencoriCharge,
+                    markupPercentage: pricing.cencoriMarkupPercentage,
+                },
+                latencyMs: Date.now() - startTime,
+                finishReason: completion.choices[0].finish_reason as any,
+            };
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        try {
+            const stream = await this.client.chat.completions.create({
+                model: request.model,
+                messages: toOpenAIMessages(request.messages),
+                temperature: request.temperature ?? 0.7,
+                max_tokens: request.maxTokens,
+                stream: true,
+                user: request.userId,
+            });
+
+            for await (const chunk of stream) {
+                const delta = chunk.choices[0]?.delta?.content || '';
+                const finishReason = chunk.choices[0]?.finish_reason;
+
+                yield {
+                    delta,
+                    finishReason: finishReason as any,
+                };
+            }
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async countTokens(text: string, model?: string): Promise<number> {
+        // OpenAI doesn't have a direct token counting API
+        // Using tiktoken for accurate estimation
+        try {
+            const { encoding_for_model } = await import('tiktoken');
+            const encoding = encoding_for_model((model || 'gpt-3.5-turbo') as any);
+            const tokens = encoding.encode(text);
+            encoding.free();
+            return tokens.length;
+        } catch (error) {
+            // Fallback to rough estimation if tiktoken fails
+            console.warn('[OpenAI] Tiktoken failed, using estimation:', error);
+            return estimateTokenCount(text);
+        }
+    }
+
+    async getPricing(model: string): Promise<ModelPricing> {
+        return getPricingFromDB('openai', model);
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            await this.client.models.list();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+}

@@ -18,3 +18,8 @@ export * from './router';
 
 // Utility functions
 export * from './utils';
+
+// Provider implementations
+export * from './gemini';
+export * from './openai';
+
