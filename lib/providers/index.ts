@@ -22,4 +22,5 @@ export * from './utils';
 // Provider implementations
 export * from './gemini';
 export * from './openai';
+export * from './anthropic';
 

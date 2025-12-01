@@ -1,0 +1,138 @@
+/**
+ * Anthropic Provider
+ * 
+ * Implements the AIProvider interface for Anthropic's Claude models
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+import {
+    AIProvider,
+    UnifiedChatRequest,
+    UnifiedChatResponse,
+    StreamChunk,
+    ModelPricing,
+} from './base';
+import { getPricingFromDB } from './pricing';
+import { toAnthropicMessages } from './utils';
+import { normalizeProviderError } from './errors';
+
+export class AnthropicProvider extends AIProvider {
+    readonly providerName = 'anthropic';
+    private client: Anthropic;
+
+    constructor() {
+        super();
+
+        if (!process.env.ANTHROPIC_API_KEY) {
+            throw new Error('ANTHROPIC_API_KEY is not configured');
+        }
+
+        this.client = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY
+        });
+    }
+
+    async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const startTime = Date.now();
+
+        try {
+            // Anthropic handles system messages separately
+            const { system, messages } = toAnthropicMessages(request.messages);
+
+            const response = await this.client.messages.create({
+                model: request.model,
+                max_tokens: request.maxTokens ?? 4096,
+                temperature: request.temperature,
+                system,
+                messages,
+            });
+
+            const pricing = await this.getPricing(request.model);
+            const providerCost = this.calculateCost(
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+                pricing
+            );
+            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
+
+            return {
+                content: response.content[0].type === 'text' ? response.content[0].text : '',
+                model: response.model,
+                provider: this.providerName,
+                usage: {
+                    promptTokens: response.usage.input_tokens,
+                    completionTokens: response.usage.output_tokens,
+                    totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+                },
+                cost: {
+                    providerCostUsd: providerCost,
+                    cencoriChargeUsd: cencoriCharge,
+                    markupPercentage: pricing.cencoriMarkupPercentage,
+                },
+                latencyMs: Date.now() - startTime,
+                finishReason: response.stop_reason as any,
+            };
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        try {
+            const { system, messages } = toAnthropicMessages(request.messages);
+
+            const stream = await this.client.messages.create({
+                model: request.model,
+                max_tokens: request.maxTokens ?? 4096,
+                temperature: request.temperature,
+                system,
+                messages,
+                stream: true,
+            });
+
+            for await (const event of stream) {
+                if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                    yield {
+                        delta: event.delta.text,
+                    };
+                }
+                if (event.type === 'message_delta') {
+                    yield {
+                        delta: '',
+                        finishReason: event.delta.stop_reason as any,
+                    };
+                }
+            }
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async countTokens(text: string, model?: string): Promise<number> {
+        try {
+            // Anthropic has a count_tokens beta API
+            const response = await this.client.messages.countTokens({
+                model: model || 'claude-3-haiku-20240307',
+                messages: [{ role: 'user', content: text }],
+            });
+            return response.input_tokens;
+        } catch (error) {
+            // Fallback to estimation if API fails
+            console.warn('[Anthropic] Token counting failed, using estimation:', error);
+            return Math.ceil(text.length / 4);
+        }
+    }
+
+    async getPricing(model: string): Promise<ModelPricing> {
+        return getPricingFromDB('anthropic', model);
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            await this.countTokens('test', 'claude-3-haiku-20240307');
+            return true;
+        } catch {
+            return false;
+        }
+    }
+}
