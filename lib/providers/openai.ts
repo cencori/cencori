@@ -56,6 +56,9 @@ export class OpenAIProvider extends AIProvider {
 
             const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
 
+            // Normalize finish_reason to our type
+            const finishReason = completion.choices[0].finish_reason;
+
             return {
                 content: completion.choices[0].message.content || '',
                 model: completion.model,
@@ -71,7 +74,9 @@ export class OpenAIProvider extends AIProvider {
                     markupPercentage: pricing.cencoriMarkupPercentage,
                 },
                 latencyMs: Date.now() - startTime,
-                finishReason: completion.choices[0].finish_reason as any,
+                finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                    ? finishReason
+                    : undefined,
             };
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
@@ -95,7 +100,9 @@ export class OpenAIProvider extends AIProvider {
 
                 yield {
                     delta,
-                    finishReason: finishReason as any,
+                    finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                        ? finishReason
+                        : undefined,
                 };
             }
         } catch (error) {
@@ -108,7 +115,9 @@ export class OpenAIProvider extends AIProvider {
         // Using tiktoken for accurate estimation
         try {
             const { encoding_for_model } = await import('tiktoken');
-            const encoding = encoding_for_model((model || 'gpt-3.5-turbo') as any);
+            const modelName = model || 'gpt-3.5-turbo';
+            // Type assertion for tiktoken model names
+            const encoding = encoding_for_model(modelName as Parameters<typeof encoding_for_model>[0]);
             const tokens = encoding.encode(text);
             encoding.free();
             return tokens.length;

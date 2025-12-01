@@ -55,6 +55,11 @@ export class AnthropicProvider extends AIProvider {
             );
             const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
 
+            // Normalize Anthropic's stop_reason to our type
+            const stopReason = response.stop_reason;
+            const finishReason = stopReason === 'end_turn' ? 'stop' :
+                stopReason === 'max_tokens' ? 'length' : undefined;
+
             return {
                 content: response.content[0].type === 'text' ? response.content[0].text : '',
                 model: response.model,
@@ -70,7 +75,7 @@ export class AnthropicProvider extends AIProvider {
                     markupPercentage: pricing.cencoriMarkupPercentage,
                 },
                 latencyMs: Date.now() - startTime,
-                finishReason: response.stop_reason as any,
+                finishReason,
             };
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
@@ -97,9 +102,12 @@ export class AnthropicProvider extends AIProvider {
                     };
                 }
                 if (event.type === 'message_delta') {
+                    const stopReason = event.delta.stop_reason;
+                    const finishReason = stopReason === 'end_turn' ? 'stop' :
+                        stopReason === 'max_tokens' ? 'length' : undefined;
                     yield {
                         delta: '',
-                        finishReason: event.delta.stop_reason as any,
+                        finishReason,
                     };
                 }
             }
