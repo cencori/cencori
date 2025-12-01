@@ -1,4 +1,4 @@
-import type { CencoriClient } from '../client';
+import type { CencoriClient, ErrorResponse } from '../client';
 
 export interface Message {
     role: 'system' | 'user' | 'assistant';
@@ -52,11 +52,11 @@ export class AIModule {
      * Returns an async generator that yields chunks as they arrive
      */
     async *chatStream(params: ChatParams): AsyncGenerator<StreamChunk, void, unknown> {
-        const url = `${this.client['baseUrl']}/api/ai/chat`;
+        const url = `${this.client.getBaseUrl()}/api/ai/chat`;
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            'CENCORI_API_KEY': this.client['apiKey'],
+            'CENCORI_API_KEY': this.client.getApiKey(),
         };
 
         const response = await fetch(url, {
@@ -66,7 +66,7 @@ export class AIModule {
         });
 
         if (!response.ok) {
-            const error = await response.json();
+            const error = await response.json() as ErrorResponse;
             throw new Error(error.error || 'Stream request failed');
         }
 
