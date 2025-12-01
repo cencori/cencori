@@ -98,11 +98,14 @@ export class CustomProvider extends AIProvider {
                         try {
                             const parsed = JSON.parse(json);
                             const delta = parsed.choices?.[0]?.delta?.content || '';
-                            const finishReason = parsed.choices?.[0]?.finish_reason;
+                            const finishReasonRaw = parsed.choices?.[0]?.finish_reason;
+                            const finishReason = finishReasonRaw === 'stop' || finishReasonRaw === 'length' || finishReasonRaw === 'content_filter'
+                                ? finishReasonRaw
+                                : undefined;
 
                             yield {
                                 delta,
-                                finishReason: finishReason as any,
+                                finishReason,
                             };
                         } catch {
                             continue;
@@ -143,7 +146,7 @@ export class CustomProvider extends AIProvider {
     /**
      * Format request based on API format
      */
-    private formatRequest(request: UnifiedChatRequest, stream = false): any {
+    private formatRequest(request: UnifiedChatRequest, stream = false): Record<string, unknown> {
         if (this.config.format === 'openai') {
             return {
                 model: request.model,
@@ -178,9 +181,10 @@ export class CustomProvider extends AIProvider {
     /**
      * Parse response based on format
      */
-    private parseResponse(data: any, model: string, startTime: number): UnifiedChatResponse {
+    private parseResponse(data: unknown, model: string, startTime: number): UnifiedChatResponse {
         // Parse OpenAI-compatible response (most common)
-        const usage = data.usage || {
+        const responseData = data as Record<string, unknown>;
+        const usage = (responseData.usage as Record<string, unknown>) || {
             prompt_tokens: 0,
             completion_tokens: 0,
             total_tokens: 0
@@ -192,20 +196,31 @@ export class CustomProvider extends AIProvider {
             cencoriMarkupPercentage: 0
         };
 
+        const promptTokens = (usage.prompt_tokens as number) || 0;
+        const completionTokens = (usage.completion_tokens as number) || 0;
+
         const providerCost = this.calculateCost(
-            usage.prompt_tokens,
-            usage.completion_tokens,
+            promptTokens,
+            completionTokens,
             pricing
         );
 
+        const choices = (responseData.choices as Array<Record<string, unknown>>) || [];
+        const firstChoice = choices[0] || {};
+        const message = (firstChoice.message as Record<string, unknown>) || {};
+        const finishReasonRaw = firstChoice.finish_reason || '';
+        const finishReason = finishReasonRaw === 'stop' || finishReasonRaw === 'length' || finishReasonRaw === 'content_filter'
+            ? finishReasonRaw
+            : undefined;
+
         return {
-            content: data.choices?.[0]?.message?.content || '',
+            content: (message.content as string) || '',
             model,
             provider: this.providerName,
             usage: {
-                promptTokens: usage.prompt_tokens,
-                completionTokens: usage.completion_tokens,
-                totalTokens: usage.total_tokens,
+                promptTokens,
+                completionTokens,
+                totalTokens: (usage.total_tokens as number) || 0,
             },
             cost: {
                 providerCostUsd: providerCost,
@@ -213,7 +228,7 @@ export class CustomProvider extends AIProvider {
                 markupPercentage: pricing.cencoriMarkupPercentage,
             },
             latencyMs: Date.now() - startTime,
-            finishReason: data.choices?.[0]?.finish_reason as any,
+            finishReason,
         };
     }
 }
