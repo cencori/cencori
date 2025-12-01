@@ -16,28 +16,35 @@ import {
     SheetContent,
     SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const sidebarItems = [
     {
         title: "Getting Started",
         items: [
-            { title: "Introduction", href: "/docs" },
+            { title: "Introduction", href: "/docs/introduction" },
             { title: "Quick Start", href: "/docs/quick-start" },
             { title: "Installation", href: "/docs/installation" },
-        ],
-    },
-    {
-        title: "Use Cases",
-        items: [
-            { title: "For Context Engineers", href: "/docs/use-cases/vibe-coders" },
-            { title: "For AI Companies", href: "/docs/use-cases/ai-companies" },
+            { title: "Making Your First Request", href: "/docs/getting-started/first-request" },
         ],
     },
     {
         title: "Core Concepts",
         items: [
-            { title: "Security", href: "/docs/concepts/security" },
             { title: "Projects", href: "/docs/concepts/projects" },
+            { title: "Organizations", href: "/docs/concepts/organizations" },
+            { title: "API Keys", href: "/docs/concepts/api-keys" },
+            { title: "Multi-Provider", href: "/docs/concepts/multi-provider" },
+            { title: "Models", href: "/docs/concepts/models" },
+            { title: "Streaming", href: "/docs/concepts/streaming" },
+            { title: "Credits System", href: "/docs/concepts/credits" },
+            { title: "Rate Limiting", href: "/docs/concepts/rate-limiting" },
+            { title: "Security", href: "/docs/concepts/security" },
         ],
     },
     {
@@ -45,6 +52,31 @@ const sidebarItems = [
         items: [
             { title: "Authentication", href: "/docs/api/auth" },
             { title: "Chat", href: "/docs/api/chat" },
+            { title: "Projects API", href: "/docs/api/projects" },
+            { title: "API Keys API", href: "/docs/api/keys" },
+            { title: "Errors", href: "/docs/api/errors" },
+        ],
+    },
+    {
+        title: "Guides",
+        items: [
+            { title: "Migrating from OpenAI", href: "/docs/guides/migrate-openai" },
+            { title: "Migrating from Anthropic", href: "/docs/guides/migrate-anthropic" },
+            { title: "Custom Providers", href: "/docs/guides/custom-providers" },
+            { title: "Cost Optimization", href: "/docs/guides/cost-optimization" },
+        ],
+    },
+    {
+        title: "Security",
+        items: [
+            { title: "PII Detection", href: "/docs/security/pii-detection" },
+        ],
+    },
+    {
+        title: "Use Cases",
+        items: [
+            { title: "For Context Engineers", href: "/docs/use-cases/vibe-coders" },
+            { title: "For AI Companies", href: "/docs/use-cases/ai-companies" },
         ],
     },
 ];
@@ -122,43 +154,47 @@ export function DocsNavbar() {
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="left" className="w-full p-6">
+                            <SheetContent side="left" className="w-full p-0">
                                 <div className="flex flex-col h-full">
-                                    <div className="mb-6">
+                                    <div className="px-6 py-6 border-b border-border/40">
                                         <Link href="/docs" className="flex items-center gap-3" onClick={() => setOpen(false)}>
                                             <Logo variant="mark" className="h-6" />
                                             <span className="font-semibold">Docs</span>
                                         </Link>
                                     </div>
-                                    <nav className="flex-1 overflow-y-auto">
-                                        <div className="space-y-6">
+                                    <nav className="flex-1 overflow-y-auto px-6 py-4">
+                                        <Accordion type="multiple" defaultValue={sidebarItems.map(g => g.title)} className="w-full space-y-4">
                                             {sidebarItems.map((group, index) => (
-                                                <div key={index}>
-                                                    <h4 className="font-medium text-sm mb-2 text-foreground/90">{group.title}</h4>
-                                                    <ul className="space-y-1">
-                                                        {group.items.map((item, itemIndex) => {
-                                                            const isActive = pathname === item.href;
-                                                            return (
-                                                                <li key={itemIndex}>
-                                                                    <Link
-                                                                        href={item.href}
-                                                                        onClick={() => setOpen(false)}
-                                                                        className={cn(
-                                                                            "block text-sm py-2 px-3 rounded-md transition-colors",
-                                                                            isActive
-                                                                                ? "text-foreground font-medium bg-accent"
-                                                                                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                                                                        )}
-                                                                    >
-                                                                        {item.title}
-                                                                    </Link>
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </div>
+                                                <AccordionItem key={index} value={group.title} className="border-none">
+                                                    <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline hover:text-primary transition-colors text-foreground/90">
+                                                        {group.title}
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="pb-2">
+                                                        <ul className="space-y-1 border-l border-border/40 ml-2 pl-4 mt-1">
+                                                            {group.items.map((item, itemIndex) => {
+                                                                const isActive = pathname === item.href;
+                                                                return (
+                                                                    <li key={itemIndex}>
+                                                                        <Link
+                                                                            href={item.href}
+                                                                            onClick={() => setOpen(false)}
+                                                                            className={cn(
+                                                                                "block text-sm py-1.5 transition-colors hover:text-foreground",
+                                                                                isActive
+                                                                                    ? "text-primary font-medium"
+                                                                                    : "text-muted-foreground"
+                                                                            )}
+                                                                        >
+                                                                            {item.title}
+                                                                        </Link>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </AccordionContent>
+                                                </AccordionItem>
                                             ))}
-                                        </div>
+                                        </Accordion>
                                     </nav>
                                 </div>
                             </SheetContent>
