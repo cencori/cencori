@@ -1,23 +1,55 @@
+/**
+ * AI Chat API Route - Multi-Provider Support
+ * 
+ * Handles AI chat requests with support for OpenAI, Anthropic, Google Gemini, and custom providers
+ * Includes tier-based access control, credits management, and streaming support
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { sendChatRequest, ChatMessage } from '@/lib/gemini';
-import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
-import { checkRateLimit } from '@/lib/rate-limit';
-import { hashApiKey } from '@/lib/api-keys';
+import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/providers';
+import { ProviderRouter } from '@/lib/providers/router';
+import { UnifiedMessage } from '@/lib/providers/base';
+import { deductCredits, hasInsufficientCredits } from '@/lib/credits';
 
-// Request message format from client
-interface RequestMessage {
-    role: 'user' | 'assistant' | 'model';
-    content?: string;
-    text?: string;
+// Initialize providers
+const router = new ProviderRouter();
+
+// Lazy initialization of providers
+function initializeProviders() {
+    if (!router.hasProvider('google')) {
+        try {
+            router.registerProvider('google', new GeminiProvider());
+        } catch (error) {
+            console.warn('[API] Gemini provider not available:', error);
+        }
+    }
+
+    if (!router.hasProvider('openai') && process.env.OPENAI_API_KEY) {
+        try {
+            router.registerProvider('openai', new OpenAIProvider());
+        } catch (error) {
+            console.warn('[API] OpenAI provider not available:', error);
+        }
+    }
+
+    if (!router.hasProvider('anthropic') && process.env.ANTHROPIC_API_KEY) {
+        try {
+            router.registerProvider('anthropic', new AnthropicProvider());
+        } catch (error) {
+            console.warn('[API] Anthropic provider not available:', error);
+        }
+    }
 }
 
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
-    const supabaseAdmin = createAdminClient();
+    const supabase = createAdminClient();
 
     try {
-        const apiKey = req.headers.get('CENCORI_API_KEY');
+        // 1. Validate API key
+        const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
+
         if (!apiKey) {
             return NextResponse.json(
                 { error: 'Missing CENCORI_API_KEY header' },
@@ -25,317 +57,221 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Hash the API key for lookup
-        const keyHash = hashApiKey(apiKey);
-
-        // Validate API key and get project info
-        const { data: apiKeyData, error: apiKeyError } = await supabaseAdmin
+        // 2. Look up API key and get project/organization info
+        const { data: keyData, error: keyError } = await supabase
             .from('api_keys')
-            .select('id, project_id, environment, is_active')
-            .eq('key_hash', keyHash)
+            .select(`
+        id,
+        project_id,
+        projects!inner(
+          id,
+          organization_id,
+          organizations!inner(
+            id,
+            subscription_tier,
+            credits_balance
+          )
+        )
+      `)
+            .eq('key', apiKey)
+            .eq('is_active', true)
             .single();
 
-        if (apiKeyError || !apiKeyData) {
+        if (keyError || !keyData) {
             return NextResponse.json(
                 { error: 'Invalid API key' },
                 { status: 401 }
             );
         }
 
-        if (!apiKeyData.is_active) {
-            return NextResponse.json(
-                { error: 'API key is inactive' },
-                { status: 403 }
-            );
-        }
+        const project = keyData.projects as unknown as {
+            id: string;
+            organization_id: string;
+            organizations: {
+                id: string;
+                subscription_tier: string;
+                credits_balance: number;
+            };
+        };
 
-        // Get project and organization info for usage tracking
-        const { data: projectData, error: projectError } = await supabaseAdmin
-            .from('projects')
-            .select('id, organization_id, organizations!inner(id, monthly_requests_used, monthly_request_limit, subscription_tier)')
-            .eq('id', apiKeyData.project_id)
-            .single();
+        const organization = project.organizations;
+        const organizationId = organization.id;
+        const tier = organization.subscription_tier || 'free';
 
-        if (projectError || !projectData) {
-            return NextResponse.json(
-                { error: 'Project not found' },
-                { status: 404 }
-            );
-        }
-
-        const organization = Array.isArray(projectData.organizations)
-            ? projectData.organizations[0]
-            : projectData.organizations;
-
-        // CHECK USAGE LIMIT (before processing request)
-        if (organization.monthly_requests_used >= organization.monthly_request_limit) {
-            return NextResponse.json(
-                {
-                    error: 'Monthly limit reached',
-                    message: `You've used all ${organization.monthly_request_limit.toLocaleString()} requests this month. Upgrade to continue.`,
-                    code: 'USAGE_LIMIT_EXCEEDED',
-                    tier: organization.subscription_tier,
-                    used: organization.monthly_requests_used,
-                    limit: organization.monthly_request_limit,
-                },
-                {
-                    status: 429,
-                    headers: {
-                        'X-Usage-Limit': organization.monthly_request_limit.toString(),
-                        'X-Usage-Used': organization.monthly_requests_used.toString(),
-                    }
-                }
-            );
-        }
-
-        // RATE LIMIT CHECK
-        const rateLimit = await checkRateLimit(apiKeyData.project_id);
-        if (!rateLimit.success) {
-            return NextResponse.json(
-                { error: 'Rate limit exceeded. Please try again later.' },
-                {
-                    status: 429,
-                    headers: {
-                        'X-RateLimit-Limit': rateLimit.limit.toString(),
-                        'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-                        'X-RateLimit-Reset': rateLimit.reset.toString(),
-                    }
-                }
-            );
-        }
-
-        // Parse request body
+        // 3. Parse request body
         const body = await req.json();
-        const { messages, model, temperature, maxOutputTokens } = body;
+        const { messages, model, temperature, maxTokens, max_tokens, stream, userId } = body;
 
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        if (!messages || !Array.isArray(messages)) {
             return NextResponse.json(
                 { error: 'Invalid request: messages array is required' },
                 { status: 400 }
             );
         }
 
-        // Convert messages to Gemini format
-        const geminiMessages: ChatMessage[] = messages.map((msg: RequestMessage) => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.content || msg.text || '' }],
+        // Normalize messages to unified format
+        const unifiedMessages: UnifiedMessage[] = messages.map((msg: { role: string; content: string }) => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content,
         }));
 
-        // PHASE 1 SECURITY CHECK: Validate input content + jailbreak detection
-        const combinedInputText = messages
-            .map((m: RequestMessage) => m.content || m.text || '')
-            .join('\n');
+        // 4. Determine model and provider
+        const requestedModel = model || 'gemini-2.5-flash';
+        initializeProviders();
 
-        // Build conversation history for context
-        const conversationHistory = messages.map((m: RequestMessage) => ({
-            role: m.role,
-            content: m.content || m.text || '',
-        }));
+        const providerName = router.detectProvider(requestedModel);
+        const normalizedModel = router.normalizeModelName(requestedModel);
 
-        const inputSecurityResult = checkInputSecurity(
-            combinedInputText,
-            conversationHistory
-        );
+        // 5. Check tier-based access control
+        const isPaidTier = tier !== 'free';
+        const isMultiModelRequest = providerName !== 'google';
 
-        if (!inputSecurityResult.safe) {
-            // Log filtered request with detailed security info (server-side only)
-            await supabaseAdmin.from('ai_requests').insert({
-                project_id: apiKeyData.project_id,
-                api_key_id: apiKeyData.id,
-                model: model || 'gemini-2.5-flash',
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                total_tokens: 0,
-                cost_usd: 0,
-                latency_ms: Date.now() - startTime,
-                status: 'filtered',
-                error_message: `Security violation: ${inputSecurityResult.layer}`,
-                filtered_reasons: inputSecurityResult.reasons,
-                safety_score: 1 - inputSecurityResult.riskScore,
-                request_payload: {
-                    messages: messages.map((m: RequestMessage) => ({
-                        role: m.role,
-                        content: m.content?.substring(0, 1000),
-                    })),
-                    model: model || 'gemini-2.5-flash',
-                    temperature,
-                    security_layer: inputSecurityResult.layer,
-                    risk_score: inputSecurityResult.riskScore,
-                },
-                response_payload: null
-            });
-
-            // Return generic error to user (don't reveal detection details)
+        if (isMultiModelRequest && !isPaidTier) {
             return NextResponse.json(
                 {
-                    error: 'Request blocked by security policy',
-                    message: 'Your request was flagged by our security system. Please rephrase and try again.',
-                    code: 'SECURITY_VIOLATION'
+                    error: 'Multi-model access requires a paid subscription',
+                    message: 'OpenAI, Anthropic, and custom providers are only available on paid plans. Upgrade to access these models.',
+                    upgradeUrl: '/billing'
                 },
                 { status: 403 }
             );
         }
 
-        // Call Gemini API
-        const response = await sendChatRequest({
-            messages: geminiMessages,
-            model: model,
-            temperature,
-            maxOutputTokens,
-        });
+        // 6. Check credits balance
+        if (isMultiModelRequest && isPaidTier) {
+            const estimatedCost = 0.01;
+            const insufficient = await hasInsufficientCredits(organizationId, estimatedCost);
 
-        // PHASE 2 SECURITY CHECK: Scan AI output for PII leakage and harmful content
-        const outputSecurityResult = checkOutputSecurity(
-            response.text,
-            {
-                inputText: combinedInputText,
-                inputSecurityResult,
-                conversationHistory,
+            if (insufficient) {
+                return NextResponse.json(
+                    {
+                        error: 'Insufficient credits',
+                        message: 'Your credits balance is too low. Please top up to continue.',
+                        balance: organization.credits_balance,
+                        topUpUrl: '/billing/credits'
+                    },
+                    { status: 402 }
+                );
             }
-        );
-
-        if (!outputSecurityResult.safe) {
-            // Log the blocked output for security review (server-side only)
-            await supabaseAdmin.from('ai_requests').insert({
-                project_id: apiKeyData.project_id,
-                api_key_id: apiKeyData.id,
-                model: model || 'gemini-2.5-flash',
-                prompt_tokens: response.promptTokens,
-                completion_tokens: response.completionTokens,
-                total_tokens: response.totalTokens,
-                cost_usd: response.costUsd,
-                latency_ms: response.latencyMs,
-                status: 'blocked_output',
-                error_message: `Output security violation: ${outputSecurityResult.layer}`,
-                filtered_reasons: outputSecurityResult.reasons,
-                safety_score: 1 - outputSecurityResult.riskScore,
-                request_payload: {
-                    messages: messages.map((m: RequestMessage) => ({
-                        role: m.role,
-                        content: m.content?.substring(0, 1000),
-                    })),
-                    model: model || 'gemini-2.5-flash',
-                    temperature,
-                },
-                response_payload: {
-                    blocked: true,
-                    text: response.text.substring(0, 500),
-                    blocked_content: outputSecurityResult.blockedContent,
-                    risk_score: outputSecurityResult.riskScore,
-                }
-            });
-
-            // Return generic error to user (don't reveal what was detected)
-            return NextResponse.json(
-                {
-                    error: 'Response blocked by cencori security policy',
-                    message: 'The AI response contained content that violates our security policies.',
-                    code: 'CONTENT_FILTERED'
-                },
-                { status: 403 }
-            );
         }
 
-        // Log the successful request to database
-        const logData = {
-            project_id: apiKeyData.project_id,
-            api_key_id: apiKeyData.id,
-            model: model || 'gemini-2.5-flash',
-            prompt_tokens: response.promptTokens,
-            completion_tokens: response.completionTokens,
-            total_tokens: response.totalTokens,
-            cost_usd: response.costUsd,
-            latency_ms: response.latencyMs,
-            status: 'success',
-            safety_score: 1.0, // Passed all security checks
-            request_payload: {
-                messages: messages.map((m: RequestMessage) => ({
-                    role: m.role,
-                    content: m.content?.substring(0, 1000), // Limit stored content
-                })),
-                model: model || 'gemini-2.5-flash',
-                temperature,
-            },
-            response_payload: {
-                text: response.text.substring(0, 1000), // Limit stored content
-            },
+        // 7. Get provider
+        const provider = router.getProviderForModel(requestedModel);
+
+        const chatRequest = {
+            messages: unifiedMessages,
+            model: normalizedModel,
+            temperature,
+            maxTokens: maxTokens || max_tokens,
+            userId,
         };
 
-        const { error: logError } = await supabaseAdmin
-            .from('ai_requests')
-            .insert(logData);
+        // 8. Handle streaming
+        if (stream === true) {
+            const encoder = new TextEncoder();
 
-        if (logError) {
-            console.error('[AI Gateway] Failed to log request:', logError);
-            // Don't fail the request if logging fails
+            const customReadable = new ReadableStream({
+                async start(controller) {
+                    try {
+                        const streamGen = provider.stream(chatRequest);
+                        let fullContent = '';
+
+                        for await (const chunk of streamGen) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: chunk.delta, finish_reason: chunk.finishReason })}\n\n`));
+                            fullContent += chunk.delta;
+
+                            if (chunk.finishReason) {
+                                const promptTokens = await provider.countTokens(unifiedMessages.map(m => m.content).join(' '), normalizedModel);
+                                const completionTokens = await provider.countTokens(fullContent, normalizedModel);
+                                const pricing = await provider.getPricing(normalizedModel);
+                                const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
+                                const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
+
+                                if (isMultiModelRequest && isPaidTier) {
+                                    await deductCredits(organizationId, charge, `AI stream - ${providerName}/${normalizedModel}`, undefined);
+                                }
+
+                                await supabase.from('ai_requests').insert({
+                                    project_id: project.id,
+                                    api_key_id: keyData.id,
+                                    provider: providerName,
+                                    model: normalizedModel,
+                                    prompt_tokens: promptTokens,
+                                    completion_tokens: completionTokens,
+                                    total_tokens: promptTokens + completionTokens,
+                                    cost_usd: cost,
+                                    provider_cost_usd: cost,
+                                    cencori_charge_usd: charge,
+                                    markup_percentage: pricing.cencoriMarkupPercentage,
+                                    latency_ms: Date.now() - startTime,
+                                    status: 'success',
+                                    end_user_id: userId,
+                                });
+
+                                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                            }
+                        }
+                        controller.close();
+                    } catch (error) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Stream error' })}\n\n`));
+                        controller.close();
+                    }
+                },
+            });
+
+            return new Response(customReadable, {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                },
+            });
         }
 
-        // INCREMENT USAGE COUNTER (atomic operation)
-        const { error: usageError } = await supabaseAdmin
-            .from('organizations')
-            .update({ 
-                monthly_requests_used: organization.monthly_requests_used + 1 
-            })
-            .eq('id', projectData.organization_id);
+        // 9. Non-streaming
+        const response = await provider.chat(chatRequest);
 
-        if (usageError) {
-            console.error('[AI Gateway] Failed to increment usage:', usageError);
-            // Don't fail the request if usage tracking fails
+        // 10. Deduct credits
+        if (isMultiModelRequest && isPaidTier) {
+            await deductCredits(organizationId, response.cost.cencoriChargeUsd, `AI request - ${providerName}/${normalizedModel}`, undefined);
         }
 
-        // Return Gemini response
+        // 11. Log request
+        await supabase.from('ai_requests').insert({
+            project_id: project.id,
+            api_key_id: keyData.id,
+            provider: providerName,
+            model: normalizedModel,
+            prompt_tokens: response.usage.promptTokens,
+            completion_tokens: response.usage.completionTokens,
+            total_tokens: response.usage.totalTokens,
+            cost_usd: response.cost.providerCostUsd,
+            provider_cost_usd: response.cost.providerCostUsd,
+            cencori_charge_usd: response.cost.cencoriChargeUsd,
+            markup_percentage: response.cost.markupPercentage,
+            latency_ms: response.latencyMs,
+            status: 'success',
+            end_user_id: userId,
+        });
+
+        // 12. Return
         return NextResponse.json({
-            content: response.text,
-            model: model || 'gemini-2.5-flash',
+            content: response.content,
+            model: response.model,
+            provider: response.provider,
             usage: {
-                prompt_tokens: response.promptTokens,
-                completion_tokens: response.completionTokens,
-                total_tokens: response.totalTokens,
+                prompt_tokens: response.usage.promptTokens,
+                completion_tokens: response.usage.completionTokens,
+                total_tokens: response.usage.totalTokens,
             },
-            cost_usd: response.costUsd,
+            cost_usd: response.cost.cencoriChargeUsd,
+            finish_reason: response.finishReason,
         });
 
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorLatency = (error as { latencyMs?: number }).latencyMs;
-        console.error('[AI Gateway] Error:', error);
-
-        // Log failed request
-        try {
-            const authHeader = req.headers.get('authorization');
-            if (authHeader) {
-                const apiKey = authHeader.substring(7);
-                const { data: apiKeyData } = await supabaseAdmin
-                    .from('api_keys')
-                    .select('id, project_id')
-                    .eq('key', apiKey)
-                    .single();
-
-                if (apiKeyData) {
-                    await supabaseAdmin.from('ai_requests').insert({
-                        project_id: apiKeyData.project_id,
-                        api_key_id: apiKeyData.id,
-                        model: 'unknown',
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                        cost_usd: 0,
-                        latency_ms: errorLatency || (Date.now() - startTime),
-                        status: 'error',
-                        error_message: errorMessage,
-                        request_payload: {},
-                    });
-                }
-            }
-        } catch (logError) {
-            console.error('[AI Gateway] Failed to log error:', logError);
-        }
-
+        console.error('[API] Error:', error);
         return NextResponse.json(
-            {
-                error: errorMessage,
-                details: process.env.NODE_ENV === 'development' ? error : undefined,
-            },
+            { error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }
