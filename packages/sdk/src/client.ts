@@ -8,7 +8,7 @@ import {
     SafetyError
 } from './errors';
 
-interface ErrorResponse {
+export interface ErrorResponse {
     error?: string;
     reasons?: string[];
 }
@@ -28,6 +28,15 @@ export class CencoriClient {
         this.baseUrl = config.baseUrl || 'https://cencori.com';
 
         this.ai = new AIModule(this);
+    }
+
+    // Public getters for internal use by modules
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+
+    getApiKey(): string {
+        return this.apiKey;
     }
 
     async request<T>(endpoint: string, options: RequestOptions): Promise<T> {
