@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
         }));
 
         // 4. Determine model and provider
-        const requestedModel = model || 'gemini-2.5-flash'; // Default to Gemini for backwards compatibility
+        const requestedModel = model || 'gemini-2.5-flash';
         initializeProviders();
 
         const providerName = router.detectProvider(requestedModel);
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
         // 5. Check tier-based access control
         const isPaidTier = tier !== 'free';
-        const isMultiModelRequest = providerName !== 'google'; // Gemini is free for all tiers
+        const isMultiModelRequest = providerName !== 'google';
 
         if (isMultiModelRequest && !isPaidTier) {
             return NextResponse.json(
@@ -137,16 +137,16 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 6. Check credits balance for paid features
+        // 6. Check credits balance
         if (isMultiModelRequest && isPaidTier) {
-            const estimatedCost = 0.01; // Rough estimate for balance check
+            const estimatedCost = 0.01;
             const insufficient = await hasInsufficientCredits(organizationId, estimatedCost);
 
             if (insufficient) {
                 return NextResponse.json(
                     {
                         error: 'Insufficient credits',
-                        message: 'Your credits balance is too low. Please top up to continue using multi-model features.',
+                        message: 'Your credits balance is too low. Please top up to continue.',
                         balance: organization.credits_balance,
                         topUpUrl: '/billing/credits'
                     },
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 7. Get provider and make request
+        // 7. Get provider
         const provider = router.getProviderForModel(requestedModel);
 
         const chatRequest = {
@@ -163,61 +163,98 @@ export async function POST(req: NextRequest) {
             model: normalizedModel,
             temperature,
             maxTokens: maxTokens || max_tokens,
-            stream: stream === true,
             userId,
         };
 
-        // 8. Handle streaming vs non-streaming
+        // 8. Handle streaming
         if (stream === true) {
-            // TODO: Implement Server-Sent Events streaming
-            return NextResponse.json(
-                { error: 'Streaming not yet implemented' },
-                { status: 501 }
-            );
-        }
+            const encoder = new TextEncoder();
 
-        // 9. Make non-streaming request
-        const response = await provider.chat(chatRequest);
+            const customReadable = new ReadableStream({
+                async start(controller) {
+                    try {
+                        const streamGen = provider.stream(chatRequest);
+                        let fullContent = '';
 
-        // 10. Deduct credits for paid features
-        if (isMultiModelRequest && isPaidTier) {
-            const deducted = await deductCredits(
-                organizationId,
-                response.cost.cencoriChargeUsd,
-                `AI request - ${providerName}/${normalizedModel}`,
-                undefined // Will be linked to ai_requests ID after logging
-            );
+                        for await (const chunk of streamGen) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: chunk.delta, finish_reason: chunk.finishReason })}\n\n`));
+                            fullContent += chunk.delta;
 
-            if (!deducted) {
-                console.warn(`[API] Failed to deduct credits for org ${organizationId}`);
-            }
-        }
+                            if (chunk.finishReason) {
+                                const promptTokens = await provider.countTokens(unifiedMessages.map(m => m.content).join(' '), normalizedModel);
+                                const completionTokens = await provider.countTokens(fullContent, normalizedModel);
+                                const pricing = await provider.getPricing(normalizedModel);
+                                const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
+                                const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-        // 11. Log request (simplified - full logging would include security checks)
-        const { error: logError } = await supabase
-            .from('ai_requests')
-            .insert({
-                project_id: project.id,
-                api_key_id: keyData.id,
-                provider: providerName,
-                model: normalizedModel,
-                prompt_tokens: response.usage.promptTokens,
-                completion_tokens: response.usage.completionTokens,
-                total_tokens: response.usage.totalTokens,
-                cost_usd: response.cost.providerCostUsd,
-                provider_cost_usd: response.cost.providerCostUsd,
-                cencori_charge_usd: response.cost.cencoriChargeUsd,
-                markup_percentage: response.cost.markupPercentage,
-                latency_ms: response.latencyMs,
-                status: 'success',
-                end_user_id: userId,
+                                if (isMultiModelRequest && isPaidTier) {
+                                    await deductCredits(organizationId, charge, `AI stream - ${providerName}/${normalizedModel}`, undefined);
+                                }
+
+                                await supabase.from('ai_requests').insert({
+                                    project_id: project.id,
+                                    api_key_id: keyData.id,
+                                    provider: providerName,
+                                    model: normalizedModel,
+                                    prompt_tokens: promptTokens,
+                                    completion_tokens: completionTokens,
+                                    total_tokens: promptTokens + completionTokens,
+                                    cost_usd: cost,
+                                    provider_cost_usd: cost,
+                                    cencori_charge_usd: charge,
+                                    markup_percentage: pricing.cencoriMarkupPercentage,
+                                    latency_ms: Date.now() - startTime,
+                                    status: 'success',
+                                    end_user_id: userId,
+                                });
+
+                                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                            }
+                        }
+                        controller.close();
+                    } catch (error) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Stream error' })}\n\n`));
+                        controller.close();
+                    }
+                },
             });
 
-        if (logError) {
-            console.error('[API] Error logging request:', logError);
+            return new Response(customReadable, {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                },
+            });
         }
 
-        // 12. Return response
+        // 9. Non-streaming
+        const response = await provider.chat(chatRequest);
+
+        // 10. Deduct credits
+        if (isMultiModelRequest && isPaidTier) {
+            await deductCredits(organizationId, response.cost.cencoriChargeUsd, `AI request - ${providerName}/${normalizedModel}`, undefined);
+        }
+
+        // 11. Log request
+        await supabase.from('ai_requests').insert({
+            project_id: project.id,
+            api_key_id: keyData.id,
+            provider: providerName,
+            model: normalizedModel,
+            prompt_tokens: response.usage.promptTokens,
+            completion_tokens: response.usage.completionTokens,
+            total_tokens: response.usage.totalTokens,
+            cost_usd: response.cost.providerCostUsd,
+            provider_cost_usd: response.cost.providerCostUsd,
+            cencori_charge_usd: response.cost.cencoriChargeUsd,
+            markup_percentage: response.cost.markupPercentage,
+            latency_ms: response.latencyMs,
+            status: 'success',
+            end_user_id: userId,
+        });
+
+        // 12. Return
         return NextResponse.json({
             content: response.content,
             model: response.model,
@@ -232,11 +269,9 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[API] Error processing request:', error);
-
+        console.error('[API] Error:', error);
         return NextResponse.json(
-            { error: 'Internal server error', message: errorMessage },
+            { error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }
