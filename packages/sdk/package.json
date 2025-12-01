@@ -1,25 +1,34 @@
 {
   "name": "cencori",
-  "version": "0.2.3",
-  "description": "Official SDK for Cencori",
+  "version": "0.3.0",
+  "description": "Official TypeScript SDK for Cencori - The Security Layer for AI Development",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "keywords": [
     "ai",
     "gateway",
     "cencori",
     "sdk",
-    "typescript"
+    "typescript",
+    "openai",
+    "anthropic",
+    "streaming",
+    "security"
   ],
   "author": "FohnAI",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/bolaabanjo/cencori"
+  },
+  "homepage": "https://cencori.com",
+  "bugs": {
+    "url": "https://github.com/bolaabanjo/cencori/issues"
   },
   "scripts": {
     "build": "tsup",
