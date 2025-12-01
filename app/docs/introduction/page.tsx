@@ -11,7 +11,7 @@ export default function IntroductionPage() {
                     Introduction to Cencori
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Learn what Cencori is, how it works, and why it's the best choice for building production AI applications.
+                    Learn what Cencori is, how it works, and why it&apos;s the best choice for building production AI applications.
                 </p>
             </div>
 
