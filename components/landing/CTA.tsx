@@ -22,7 +22,7 @@ export const CTA = () => {
                             Ready to secure your AI?
                         </h2>
                         <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl leading-relaxed">
-                            Join engineers building safe, compliant, and production-ready AI applications with Cencori.
+                            Join engineers building production-ready AI applications with Cencori.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">

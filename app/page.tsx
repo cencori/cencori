@@ -84,17 +84,7 @@ export default function HomePage() {
     },
   ];
 
-  const unauthenticatedMobileLinks = [
-    { title: "Dashboard", href: "/dashboard/organizations" },
-    { title: "Documentation", href: siteConfig.links.docs },
-    { title: "GitHub", href: siteConfig.links.github },
-  ];
 
-  const authenticatedMobileLinks = [
-    { title: "Dashboard", href: "/dashboard/organizations" },
-    { title: "Documentation", href: siteConfig.links.docs },
-    { title: "GitHub", href: siteConfig.links.github },
-  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
@@ -102,7 +92,6 @@ export default function HomePage() {
         logo={<Logo variant="mark" className="h-4" />}
         name="cencori"
         homeUrl="/"
-        mobileNavItems={isAuthenticated ? authenticatedMobileLinks : unauthenticatedMobileLinks}
         actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
         isAuthenticated={isAuthenticated}
         userProfile={isAuthenticated ? userProfile : undefined}

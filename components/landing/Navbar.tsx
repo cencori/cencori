@@ -26,6 +26,7 @@ import {
     NavigationMenuTrigger,
     navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabaseClient";
@@ -123,7 +124,7 @@ export default function Navbar({
                 { title: "Developer Teams", href: "/solutions/devtools" },
                 { title: "Protect Generated Apps", href: "/solutions/vibe-coded" },
                 { title: "Data-science Sandboxes", href: "/solutions/model-ops" },
-                { title: "Code Execution & Automation Safety", href: "/solutions/sandboxing" },
+                { title: "Automation Safety", href: "/solutions/sandboxing" },
             ]
         },
         {
@@ -375,36 +376,49 @@ export default function Navbar({
                                     <span className="sr-only">Toggle navigation menu</span>
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="right" className="rounded-l-2xl border-l border-border/40">
-                                <nav className="grid gap-6 text-lg font-medium pt-10">
-                                    {mobileNavItems.map((item, index) => (
-                                        "sublinks" in item && item.sublinks ? (
-                                            <details key={index} className="group">
-                                                <summary className="flex w-full items-center justify-between text-muted-foreground hover:text-foreground cursor-pointer">
-                                                    {item.title}
-                                                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-                                                </summary>
-                                                <ul className="ml-4 mt-2 space-y-2 border-l border-border/40 pl-4">
-                                                    {item.sublinks.map((sublink, sublinkIndex) => (
-                                                        <li key={sublinkIndex}>
-                                                            <Link href={sublink.href || "#"} className="text-muted-foreground hover:text-foreground block py-1">
-                                                                {sublink.title}
-                                                            </Link>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </details>
-                                        ) : (
-                                            <Link
-                                                key={index}
-                                                href={item.href || "#"}
-                                                className="text-muted-foreground hover:text-foreground"
-                                            >
-                                                {item.title}
-                                            </Link>
-                                        )
-                                    ))}
-                                </nav>
+                            <SheetContent side="right" className="w-full border-none bg-background/95 backdrop-blur-xl p-6">
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center gap-2 mb-8">
+                                        <Logo variant="mark" className="h-6 w-6" />
+                                        <span className="font-bold text-xl tracking-tight">cencori</span>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto -mx-6 px-6">
+                                        <Accordion type="single" collapsible className="w-full">
+                                            {mobileNavItems.map((item, index) => (
+                                                "sublinks" in item && item.sublinks ? (
+                                                    <AccordionItem key={index} value={`item-${index}`} className="border-border/40">
+                                                        <AccordionTrigger className="text-base font-medium hover:no-underline hover:text-foreground text-muted-foreground">
+                                                            {item.title}
+                                                        </AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <div className="flex flex-col space-y-2 pl-4 pb-2">
+                                                                {item.sublinks.map((sublink, sublinkIndex) => (
+                                                                    <Link
+                                                                        key={sublinkIndex}
+                                                                        href={sublink.href || "#"}
+                                                                        className="text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
+                                                                    >
+                                                                        {sublink.title}
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                ) : (
+                                                    <div key={index} className="border-b border-border/40 py-4">
+                                                        <Link
+                                                            href={item.href || "#"}
+                                                            className="flex w-full items-center text-base font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                                        >
+                                                            {item.title}
+                                                        </Link>
+                                                    </div>
+                                                )
+                                            ))}
+                                        </Accordion>
+                                    </div>
+                                </div>
                             </SheetContent>
                         </Sheet>
                     </NavbarRight>
