@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/docs/CodeBlock";
 
 export default function VibeCodersPage() {
     return (
-        <div className="max-w-4xl space-y-12 px-4 py-12 lg:py-20">
+        <div className="max-w-4xl space-y-12 px-4 py-12 lg:py-0">
             {/* Header */}
             <div className="space-y-3">
                 <h1 className="scroll-m-20 text-3xl font-bold tracking-tight">

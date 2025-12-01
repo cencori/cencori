@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/docs/CodeBlock";
 
 export default function QuickStartPage() {
     return (
-        <div className="max-w-4xl space-y-12 px-4 py-12 lg:py-20">
+        <div className="max-w-4xl space-y-12 px-4 py-12 lg:py-0">
             {/* Header */}
             <div className="space-y-3">
                 <h1 className="scroll-m-20 text-3xl font-bold tracking-tight">
@@ -98,11 +98,10 @@ pnpm add cencori`}
                     <CodeBlock
                         filename="lib/cencori.ts"
                         language="typescript"
-                        code={`import { Cencori } from "cencori";
+                        code={`import { CencoriClient } from "cencori";
 
-export const cencori = new Cencori({
+export const cencori = new CencoriClient({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
 });`}
                     />
                 </div>
@@ -131,14 +130,14 @@ export const cencori = new Cencori({
                         code={`import { cencori } from "@/lib/cencori";
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, model } = await req.json();
 
   try {
-    const response = await cencori.chat.completions.create({
-      model: "gpt-4",
+    const response = await cencori.ai.chat({
+      model: model || "gpt-4o", // or "claude-3-opus", "gemini-2.5-flash"
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000,
+      maxTokens: 1000,
     });
 
     return Response.json(response);
@@ -194,20 +193,20 @@ export async function POST(req: Request) {
                     filename="example.ts"
                     language="typescript"
                     code={`// OpenAI GPT-4
-const gpt4Response = await cencori.chat.completions.create({
-  model: "gpt-4",
+const gpt4Response = await cencori.ai.chat({
+  model: "gpt-4o",
   messages: messages,
 });
 
 // Anthropic Claude
-const claudeResponse = await cencori.chat.completions.create({
-  model: "claude-3-opus-20240229",
+const claudeResponse = await cencori.ai.chat({
+  model: "claude-3-opus",
   messages: messages,
 });
 
 // Google Gemini
-const geminiResponse = await cencori.chat.completions.create({
-  model: "gemini-pro",
+const geminiResponse = await cencori.ai.chat({
+  model: "gemini-2.5-flash",
   messages: messages,
 });`}
                 />
