@@ -10,16 +10,18 @@ import { encryptApiKey } from '@/lib/encryption';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { orgSlug: string } }
+    { params }: { params: Promise<{ orgSlug: string }> }
 ) {
     const supabase = createAdminClient();
 
     try {
+        const { orgSlug } = await params;
+
         // Get organization by slug
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id')
-            .eq('slug', params.orgSlug)
+            .eq('slug', orgSlug)
             .single();
 
         if (orgError || !org) {
@@ -54,16 +56,18 @@ export async function GET(
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { orgSlug: string } }
+    { params }: { params: Promise<{ orgSlug: string }> }
 ) {
     const supabase = createAdminClient();
 
     try {
+        const { orgSlug } = await params;
+
         // Get organization
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id')
-            .eq('slug', params.orgSlug)
+            .eq('slug', orgSlug)
             .single();
 
         if (orgError || !org) {

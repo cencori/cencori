@@ -2,6 +2,10 @@
  * Credits API Routes
  * GET - Get credits balance and transaction history
  */
+/**
+ * Credits API Routes
+ * GET - Get credits balance and transaction history
+ */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -9,16 +13,19 @@ import { getCreditsBalance, getCreditTransactions } from '@/lib/credits';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { orgSlug: string } }
+    { params }: { params: Promise<{ orgSlug: string }> }
 ) {
     const supabase = createAdminClient();
 
     try {
+        // Await params in Next.js 14+
+        const { orgSlug } = await params;
+
         // Get organization
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id, credits_balance, credits_updated_at')
-            .eq('slug', params.orgSlug)
+            .eq('slug', orgSlug)
             .single();
 
         if (orgError || !org) {

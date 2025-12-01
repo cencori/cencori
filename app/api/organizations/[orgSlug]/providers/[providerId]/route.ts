@@ -1,6 +1,5 @@
 /**
  * Individual Custom Provider API Routes
- * GET - Get provider details
  * PATCH - Update provider
  * DELETE - Delete provider
  */
@@ -10,88 +9,91 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
 
 export async function PATCH(
-    req: NextRequest,
-    { params }: { params: { orgSlug: string; providerId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ orgSlug: string; providerId: string }> }
 ) {
-    const supabase = createAdminClient();
-
-    try {
-        const body = await req.json();
-        const { name, baseUrl, apiKey, format, isActive } = body;
-
-        // Get organization
-        const { data: org } = await supabase
-            .from('organizations')
-            .select('id')
-            .eq('slug', params.orgSlug)
-            .single();
-
-        if (!org) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-        }
-
-        // Prepare update data
-        const updateData: Record<string, unknown> = {};
-        if (name !== undefined) updateData.name = name;
-        if (baseUrl !== undefined) updateData.base_url = baseUrl;
-        if (format !== undefined) updateData.format = format;
-        if (isActive !== undefined) updateData.is_active = isActive;
-        if (apiKey !== undefined) {
-            updateData.api_key_encrypted = apiKey ? encryptApiKey(apiKey, org.id) : null;
-        }
-
-        // Update provider
-        const { data: provider, error } = await supabase
-            .from('custom_providers')
-            .update(updateData)
-            .eq('id', params.providerId)
-            .eq('organization_id', org.id)
-            .select()
-            .single();
-
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ provider });
-    } catch (error) {
-        console.error('[API] Error updating provider:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  const supabase = createAdminClient();
+  
+  try {
+    const { orgSlug, providerId } = await params;
+    const body = await req.json();
+    const { name, baseUrl, apiKey, format, isActive } = body;
+    
+    // Get organization
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', orgSlug)
+      .single();
+    
+    if (!org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
+    
+    // Prepare update data
+    const updateData: Record<string, unknown> = {};
+    if (name !== undefined) updateData.name = name;
+    if (baseUrl !== undefined) updateData.base_url = baseUrl;
+    if (format !== undefined) updateData.format = format;
+    if (isActive !== undefined) updateData.is_active = isActive;
+    if (apiKey !== undefined) {
+      updateData.api_key_encrypted = apiKey ? encryptApiKey(apiKey, org.id) : null;
+    }
+    
+    // Update provider
+    const { data: provider, error } = await supabase
+      .from('custom_providers')
+      .update(updateData)
+      .eq('id', providerId)
+      .eq('organization_id', org.id)
+      .select()
+      .single();
+    
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    
+    return NextResponse.json({ provider });
+  } catch (error) {
+    console.error('[API] Error updating provider:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 export async function DELETE(
-    req: NextRequest,
-    { params }: { params: { orgSlug: string; providerId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ orgSlug: string; providerId: string }> }
 ) {
-    const supabase = createAdminClient();
-
-    try {
-        // Get organization
-        const { data: org } = await supabase
-            .from('organizations')
-            .select('id')
-            .eq('slug', params.orgSlug)
-            .single();
-
-        if (!org) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-        }
-
-        // Delete provider (cascade will delete models)
-        const { error } = await supabase
-            .from('custom_providers')
-            .delete()
-            .eq('id', params.providerId)
-            .eq('organization_id', org.id);
-
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error('[API] Error deleting provider:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  const supabase = createAdminClient();
+  
+  try {
+    const { orgSlug, providerId } = await params;
+    
+    // Get organization
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', orgSlug)
+      .single();
+    
+    if (!org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
+    
+    // Delete provider (cascade will delete models)
+    const { error } = await supabase
+      .from('custom_providers')
+      .delete()
+      .eq('id', providerId)
+      .eq('organization_id', org.id);
+    
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[API] Error deleting provider:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
