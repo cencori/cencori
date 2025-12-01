@@ -14,9 +14,11 @@ Cencori is a developer-first AI infrastructure platform that wraps your AI integ
 
 If you're building with AI or building AI products, you need:
 
+- **Multi-Provider Support** - Switch between OpenAI, Anthropic, and Google Gemini seamlessly
 - **Security** - Automatic PII detection and filtering
 - **Compliance** - Audit logs and safety scores for every request
-- **Cost Control** - Rate limiting and usage analytics
+- **Cost Control** - Credits-based billing with transparent pricing
+- **Streaming** - Real-time AI responses with Server-Sent Events
 - **Observability** - Real-time dashboards and request tracking
 - **Multi-tenancy** - Organization and project management built-in
 
@@ -41,15 +43,32 @@ npm install cencori
 ### 3. Make Your First Request
 
 ```typescript
-import { Cencori } from 'cencori';
+import { CencoriClient } from 'cencori';
 
-const ai = new Cencori('your-api-key');
+const cencori = new CencoriClient({
+  apiKey: 'your-api-key'
+});
 
-const response = await ai.chat({
-  messages: [{ role: 'user', content: 'Hello!' }]
+const response = await cencori.ai.chat({
+  messages: [{ role: 'user', content: 'Hello!' }],
+  model: 'gpt-4o' // or 'claude-3-opus', 'gemini-2.5-flash'
 });
 
 console.log(response.content);
+```
+
+### 4. Stream Responses in Real-Time
+
+```typescript
+const stream = cencori.ai.chatStream({
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+  model: 'gpt-4o',
+  stream: true
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
 ```
 
 **That's it!** Cencori handles security, logging, and cost tracking automatically.
@@ -57,6 +76,33 @@ console.log(response.content);
 ---
 
 ## Key Features
+
+### **Multi-Provider AI Support**
+
+Access multiple AI providers with one API:
+- **OpenAI** - GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
+- **Anthropic** - Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku
+- **Google Gemini** - Gemini 2.5 Flash, Gemini 2.0 Flash
+- **Custom Providers** - Bring your own OpenAI/Anthropic-compatible endpoints
+
+Switch models with a single parameter - no code changes needed.
+
+### **Real-Time Streaming**
+
+Get AI responses as they're generated:
+- Server-Sent Events (SSE) support
+- Works with all providers (OpenAI, Anthropic, Gemini)
+- Async generator pattern for easy integration
+- Automatic token counting and cost tracking
+
+### **Credits-Based Billing**
+
+Transparent, prepaid pricing model:
+- Track costs in real-time
+- Set spending limits
+- Get alerts for low balances
+- Transparent markup on provider costs
+- Detailed cost breakdown by provider
 
 ### **Built-in Security**
 
@@ -69,9 +115,10 @@ Every request goes through automatic safety filters:
 
 Track everything in your dashboard:
 - Request counts by time period
-- Cost tracking per project
-- Latency monitoring
+- Cost tracking per project and provider
+- Latency monitoring across providers
 - Error rates and filtering stats
+- Model usage breakdown
 
 ### **Flexible API Keys**
 
@@ -82,14 +129,15 @@ Track everything in your dashboard:
 
 ### **Rate Limiting**
 
-Database-backed rate limiting (60 requests/min per project) prevents abuse and controls costs.
+Database-backed rate limiting prevents abuse and controls costs.
 
 ### **Complete Audit Logs**
 
 Every request is logged with:
 - Timestamp and user
 - Request/response payloads
-- Token usage and cost
+- Token usage and cost breakdown
+- Provider and model used
 - Safety scores and filter results
 
 ---
@@ -103,14 +151,27 @@ Building with Cursor, Lovable, Bolt, v0, or Windsurf?
 - Ship AI features faster with security built-in
 - Catch issues AI-generated code might miss
 - Move from prototype to production safely
+- Avoid vendor lock-in with multi-provider support
 
 ### For AI Product Companies
-AI design tools, AI coding assistants, AI marketing platforms, AI customer support bots, AI legal research tools, AI medical diagnostic systems, AI financial advisors, AI content generation tools, AI language translation services, AI data analysis platforms, AI cybersecurity solutions, AI educational tutors, AI gaming, AI robotics control, AI fashion design tools?
+AI design tools, coding assistants, chatbots, content generators?
 
 **Cencori provides:**
 - Enterprise-grade security your customers demand
 - Ready-made compliance story for B2B sales
 - Infrastructure so you can focus on product
+- Cost optimization across multiple providers
+
+---
+
+## Supported Models
+
+| Provider | Models | Streaming |
+|----------|--------|-----------|
+| **OpenAI** | GPT-4, GPT-4 Turbo, GPT-4o, GPT-3.5 Turbo | ✅ |
+| **Anthropic** | Claude 3 Opus, Sonnet, Haiku | ✅ |
+| **Google** | Gemini 2.5 Flash, Gemini 2.0 Flash | ✅ |
+| **Custom** | Any OpenAI/Anthropic compatible | ✅ |
 
 ---
 
@@ -124,39 +185,122 @@ Cencori is built on a modern, scalable stack:
 | **Auth & Database** | Supabase | Authentication & data |
 | **Language** | TypeScript | Type-safe development |
 | **Deployment** | Vercel | Hosting & CI/CD |
-| **AI Models** | Google | Primary AI provider (Until the official FohnAI model is ready) |
+| **AI Providers** | OpenAI, Anthropic, Google | Multi-provider support |
 
 ---
 
 ## API Reference
 
-### Chat Endpoint
+### Non-Streaming Request
 
 ```typescript
 POST /api/ai/chat
 Headers: { "CENCORI_API_KEY": "your-api-key" }
 Body: {
+  "model": "gpt-4o",
   "messages": [
     { "role": "user", "content": "Hello!" }
   ],
+  "temperature": 0.7,
+  "maxTokens": 1000
 }
 ```
 
-### Response
+### Streaming Request
+
+```typescript
+POST /api/ai/chat
+Headers: { "CENCORI_API_KEY": "your-api-key" }
+Body: {
+  "model": "claude-3-opus",
+  "messages": [
+    { "role": "user", "content": "Tell me a story" }
+  ],
+  "stream": true
+}
+```
+
+### Response (Non-Streaming)
 
 ```json
 {
   "content": "Hello! How can I help you?",
+  "model": "gpt-4o",
+  "provider": "openai",
   "usage": {
     "prompt_tokens": 10,
     "completion_tokens": 15,
     "total_tokens": 25
   },
-  "cost_usd": 0.000025
+  "cost_usd": 0.000025,
+  "finish_reason": "stop"
 }
 ```
 
 **[Full API Documentation](https://cencori.com/docs)**
+
+---
+
+## SDK Examples
+
+### Basic Chat
+
+```typescript
+import { CencoriClient } from 'cencori';
+
+const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  messages: [{ role: 'user', content: 'Explain quantum computing' }],
+  model: 'gpt-4o',
+  temperature: 0.7
+});
+
+console.log(response.content);
+```
+
+### Streaming with Async Generator
+
+```typescript
+const stream = cencori.ai.chatStream({
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant' },
+    { role: 'user', content: 'Write a poem about AI' }
+  ],
+  model: 'claude-3-opus'
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+  
+  if (chunk.finish_reason) {
+    console.log('\\nDone!', chunk.finish_reason);
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+import { 
+  CencoriClient, 
+  AuthenticationError, 
+  RateLimitError,
+  SafetyError 
+} from 'cencori';
+
+try {
+  const response = await cencori.ai.chat({...});
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Invalid API key');
+  } else if (error instanceof RateLimitError) {
+    console.error('Rate limit exceeded');
+  } else if (error instanceof SafetyError) {
+    console.error('Content blocked:', error.reasons);
+  }
+}
+```
 
 ---
 
@@ -166,7 +310,7 @@ Body: {
 
 - Node.js 18+
 - A Supabase project (free tier works)
-- Gemini API key
+- API keys for providers (OpenAI, Anthropic, Google)
 
 ### Installation
 
@@ -184,13 +328,26 @@ Body: {
 3. Set up environment variables:
    Create a `.env.local` file:
    ```env
+   # Supabase
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-   GEMINI_API_KEY=your_gemini_api_key
+   
+   # AI Providers
+   OPENAI_API_KEY=sk-...
+   ANTHROPIC_API_KEY=sk-ant-...
+   GOOGLE_AI_API_KEY=your_gemini_key
+   
+   # Security
+   ENCRYPTION_SECRET=your_32_byte_base64_key
    ```
 
-4. Run the development server:
+4. Run database migrations:
+   ```bash
+   # Apply migrations in database/migrations/ to your Supabase project
+   ```
+
+5. Run the development server:
    ```bash
    npm run dev
    ```
@@ -199,52 +356,64 @@ Open [http://localhost:3000](http://localhost:3000) to see the dashboard.
 
 ---
 
+## Pricing
+
+Cencori uses a prepaid credits system with transparent markup on provider costs:
+
+- **Free Tier**: Gemini access only
+- **Paid Tiers**: Access to OpenAI, Anthropic, and custom providers
+- **Credits**: Pay-as-you-go with no monthly fees
+- **Transparent Pricing**: See exact provider cost + markup
+
+View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)
+
+---
+
 ## Roadmap
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| **Phase 1** | AI Gateway MVP | Complete |
-| **Phase 2** | Multi-model support | In Progress |
-| **Phase 3** | Advanced analytics | Planned |
-| **Phase 4** | Enterprise features | Planned |
+**Phase 1 ✅ (Complete)**
+- Basic AI gateway with Gemini
+- Security monitoring
+- Dashboard and analytics
 
-### Coming Soon
+**Phase 2 ✅ (Complete)**
+- Multi-provider support (OpenAI, Anthropic)
+- Streaming responses
+- Credits system
+- Custom providers
 
-- Support for OpenAI, Anthropic, and more AI providers
-- Custom safety rules and filter configuration
-- Team collaboration features
-- Webhook notifications
+**Phase 3 🚧 (In Progress)**
+- Enhanced analytics with provider breakdowns
 - Advanced cost optimization
+- Payment integration for credit top-ups
+
+**Future**
+- Additional providers (Cohere, Together.ai, Groq)
+- Model fallback/retry logic
+- A/B testing infrastructure
+- Bring Your Own Keys (BYOK)
 
 ---
 
 ## Contributing
 
-We welcome contributions! Here's how to get started:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Make your changes and add tests
-4. Submit a pull request
-
-Please follow our coding standards and include tests for new features.
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ---
 
 ## Support
 
-- **Email:** support@cencori.com
-- **Docs:** [cencori.com/docs](https://cencori.com/docs)
-- **Issues:** [GitHub Issues](https://github.com/bolaabanjo/cencori/issues)
+- **Documentation**: [docs.cencori.com](https://docs.cencori.com)
+- **Dashboard**: [cencori.com/dashboard](https://cencori.com/dashboard)
+- **GitHub**: [github.com/bolaabanjo/cencori](https://github.com/bolaabanjo/cencori)
+- **Issues**: [Report a bug](https://github.com/bolaabanjo/cencori/issues)
 
 ---
 
-**Built by FohnAI**
+## License
 
-*Making AI development safe, compliant, and trustworthy.*
+MIT © FohnAI
+
+---
+
+**Built by developers, for developers. Ship AI features with confidence.**
