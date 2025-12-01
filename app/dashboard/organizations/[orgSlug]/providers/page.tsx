@@ -135,7 +135,7 @@ export default function ProvidersPage() {
             {providers.length === 0 && !loading && (
                 <div className="text-center py-12">
                     <p className="text-muted-foreground">No custom providers configured yet.</p>
-                    <p className="text-sm text-muted-foreground mt-1">Click "Add Provider" to get started.</p>
+                    <p className="text-sm text-muted-foreground mt-1">Click &quot;Add Provider&quot; to get started.</p>
                 </div>
             )}
         </div>
