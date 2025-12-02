@@ -2,7 +2,7 @@
  * AI Chat API Route - Multi-Provider Support
  * 
  * Handles AI chat requests with support for OpenAI, Anthropic, Google Gemini, and custom providers
- * Includes tier-based access control, credits management, and streaming support
+ * Includes tier-based access control, request limit enforcement, and streaming support
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,7 +10,6 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
-import { deductCredits, hasInsufficientCredits } from '@/lib/credits';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -69,7 +68,8 @@ export async function POST(req: NextRequest) {
           organizations!inner(
             id,
             subscription_tier,
-            credits_balance
+            monthly_requests_used,
+            monthly_request_limit
           )
         )
       `)
@@ -90,13 +90,38 @@ export async function POST(req: NextRequest) {
             organizations: {
                 id: string;
                 subscription_tier: string;
-                credits_balance: number;
+                monthly_requests_used: number;
+                monthly_request_limit: number;
             };
         };
 
         const organization = project.organizations;
         const organizationId = organization.id;
         const tier = organization.subscription_tier || 'free';
+
+        // 3. Check monthly request limit
+        const currentUsage = organization.monthly_requests_used || 0;
+        const limit = organization.monthly_request_limit || 1000;
+
+        if (currentUsage >= limit) {
+            return NextResponse.json(
+                {
+                    error: 'Monthly request limit reached',
+                    message: `You've used ${currentUsage.toLocaleString()} of ${limit.toLocaleString()} requests this month.`,
+                    current_tier: tier,
+                    usage: {
+                        used: currentUsage,
+                        limit: limit,
+                        percentage: Math.round((currentUsage / limit) * 100)
+                    },
+                    upgrade_message: tier === 'free'
+                        ? 'Upgrade to Pro for 50,000 requests/month'
+                        : 'Upgrade your plan to get more requests',
+                    upgrade_url: '/billing'
+                },
+                { status: 429 }
+            );
+        }
 
         // 3. Parse request body
         const body = await req.json();
@@ -137,25 +162,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 6. Check credits balance
-        if (isMultiModelRequest && isPaidTier) {
-            const estimatedCost = 0.01;
-            const insufficient = await hasInsufficientCredits(organizationId, estimatedCost);
-
-            if (insufficient) {
-                return NextResponse.json(
-                    {
-                        error: 'Insufficient credits',
-                        message: 'Your credits balance is too low. Please top up to continue.',
-                        balance: organization.credits_balance,
-                        topUpUrl: '/billing/credits'
-                    },
-                    { status: 402 }
-                );
-            }
-        }
-
-        // 7. Get provider
+        // 6. Get provider (removed credits check - using subscription limits instead)
         const provider = router.getProviderForModel(requestedModel);
 
         const chatRequest = {
@@ -187,9 +194,11 @@ export async function POST(req: NextRequest) {
                                 const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
                                 const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-                                if (isMultiModelRequest && isPaidTier) {
-                                    await deductCredits(organizationId, charge, `AI stream - ${providerName}/${normalizedModel}`, undefined);
-                                }
+                                // Increment usage counter
+                                await supabase
+                                    .from('organizations')
+                                    .update({ monthly_requests_used: currentUsage + 1 })
+                                    .eq('id', organizationId);
 
                                 await supabase.from('ai_requests').insert({
                                     project_id: project.id,
@@ -231,10 +240,11 @@ export async function POST(req: NextRequest) {
         // 9. Non-streaming
         const response = await provider.chat(chatRequest);
 
-        // 10. Deduct credits
-        if (isMultiModelRequest && isPaidTier) {
-            await deductCredits(organizationId, response.cost.cencoriChargeUsd, `AI request - ${providerName}/${normalizedModel}`, undefined);
-        }
+        // 10. Increment usage counter
+        await supabase
+            .from('organizations')
+            .update({ monthly_requests_used: currentUsage + 1 })
+            .eq('id', organizationId);
 
         // 11. Log request
         await supabase.from('ai_requests').insert({
