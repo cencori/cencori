@@ -33,10 +33,21 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Organization name must be at least 2 characters." }),
   description: z.string().optional(),
   type: z.enum(["personal", "agency", "startup", "company"]),
-  plan: z.enum(["free", "basic", "pro", "enterprise"]), // Update with your actual plans
+  plan: z.enum(["free", "pro", "team", "enterprise"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+// Helper to get monthly request limit based on tier
+function getRequestLimit(tier: string): number {
+  switch (tier) {
+    case 'free': return 1000;
+    case 'pro': return 50000;
+    case 'team': return 250000;
+    case 'enterprise': return 999999999; // Unlimited
+    default: return 1000;
+  }
+}
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -90,48 +101,61 @@ export default function NewOrganizationPage() {
       return;
     }
 
-    // Fetch the plan_id based on the selected plan name
-    const { data: planData, error: planError } = await supabase
-      .from("organization_plans")
-      .select("id")
-      .eq("name", values.plan)
-      .single();
+    const requestLimit = getRequestLimit(values.plan);
 
-    if (planError || !planData) {
-      console.error("Error fetching plan ID:", planError?.message);
-      toast.error("Failed to determine organization plan. Please try again.");
-      setLoading(false);
-      return;
-    }
-
+    // Create organization with subscription tier
     const { data: orgData, error } = await supabase.from("organizations").insert({
       name: values.name,
       slug: newSlug,
       description: values.description,
-      plan_id: planData.id,
+      organization_type: values.type,
+      subscription_tier: values.plan,
+      subscription_status: values.plan === 'free' ? 'active' : 'incomplete',
+      monthly_request_limit: requestLimit,
+      monthly_requests_used: 0,
       owner_id: user.id,
-    }).select('id').single(); // Select the id of the newly created organization
+    }).select('id, slug').single();
 
     if (error) {
       console.error("Error creating organization:", error.message);
       toast.error("Failed to create organization. " + error.message);
-    } else if (orgData) {
-      // Add the creating user as an owner in the organization_members table
-      const { error: memberError } = await supabase.from("organization_members").insert({
-        organization_id: orgData.id,
-        user_id: user.id,
-        role: "owner",
-      });
-
-      if (memberError) {
-        console.error("Error adding organization owner:", memberError.message);
-        toast.error("Organization created but failed to add owner. Please contact support.");
-        // Optionally, you might want to delete the organization here if adding owner fails critically
-      } else {
-        toast.success("Organization created successfully!");
-        router.push(`/dashboard/organizations/${newSlug}/projects`);
-      }
+      setLoading(false);
+      return;
     }
+
+    if (!orgData) {
+      toast.error("Failed to create organization. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Add the creating user as an owner in the organization_members table
+    const { error: memberError } = await supabase.from("organization_members").insert({
+      organization_id: orgData.id,
+      user_id: user.id,
+      role: "owner",
+    });
+
+    if (memberError) {
+      console.error("Error adding organization owner:", memberError.message);
+      toast.error("Organization created but failed to add owner. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
+    toast.success("Organization created successfully!");
+
+    // If user selected a paid plan, redirect to billing for Polar checkout
+    if (values.plan === 'pro' || values.plan === 'team') {
+      router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
+    } else if (values.plan === 'enterprise') {
+      // Redirect to contact page for enterprise
+      router.push(`/contact?plan=enterprise&org=${orgData.slug}`);
+    } else {
+      // Free tier - go to projects
+      router.push(`/dashboard/organizations/${orgData.slug}/projects`);
+    }
+
     setLoading(false);
   };
 
@@ -165,7 +189,7 @@ export default function NewOrganizationPage() {
             </div>
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="type">Organization Type</Label>
-              <Select onValueChange={(value: string) => form.setValue("type", value as FormValues["type"]) } defaultValue={form.getValues("type")}>
+              <Select onValueChange={(value: string) => form.setValue("type", value as FormValues["type"])} defaultValue={form.getValues("type")}>
                 <SelectTrigger id="type" className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -182,19 +206,49 @@ export default function NewOrganizationPage() {
             </div>
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="plan">Select Plan</Label>
-              <Select onValueChange={(value: string) => form.setValue("plan", value as FormValues["plan"]) } defaultValue={form.getValues("plan")}>
+              <Select onValueChange={(value: string) => form.setValue("plan", value as FormValues["plan"])} defaultValue={form.getValues("plan")}>
                 <SelectTrigger id="plan" className="w-full">
                   <SelectValue placeholder="Select plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                  <SelectItem value="free">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Free</span>
+                      <span className="text-xs text-muted-foreground">1,000 requests/month • $0</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pro">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Pro</span>
+                      <span className="text-xs text-muted-foreground">50,000 requests/month • $49/mo</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="team">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Team</span>
+                      <span className="text-xs text-muted-foreground">250,000 requests/month • $149/mo</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="enterprise">
+                    <div className="flex-col">
+                      <span className="font-medium">Enterprise</span>
+                      <span className="text-xs text-muted-foreground">Unlimited requests • Custom pricing</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.plan && (
                 <p className="text-red-500 text-sm">{form.formState.errors.plan.message}</p>
+              )}
+              {(form.watch("plan") === "pro" || form.watch("plan") === "team") && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  You'll be redirected to checkout after creating the organization.
+                </p>
+              )}
+              {form.watch("plan") === "enterprise" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  You'll be redirected to contact sales for custom pricing.
+                </p>
               )}
             </div>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-4">
@@ -207,9 +261,9 @@ export default function NewOrganizationPage() {
             </div>
           </form >
         </CardContent >
-    <CardFooter className="text-sm text-muted-foreground">
-      By creating an organization, you agree to our <a href="/terms-of-service" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer"> Terms of Service</a>.
-    </CardFooter>
+        <CardFooter className="text-sm text-muted-foreground">
+          By creating an organization, you agree to our <a href="/terms-of-service" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer"> Terms of Service</a>.
+        </CardFooter>
       </Card >
     </div >
   );
