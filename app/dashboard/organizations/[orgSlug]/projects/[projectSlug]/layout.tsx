@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key, ScrollText, ShieldAlert, Activity } from "lucide-react";
+import { Key, ScrollText, ShieldAlert, Activity, Zap } from "lucide-react";
+import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -162,6 +163,14 @@ export default function ProjectLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Playground">
+                  <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/playground`}>
+                    <CubeTransparentIcon className="h-4 w-4" />
+                    <span>Playground</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                   <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/settings`}>
                     <SettingsIcon animateOnHover />
@@ -220,6 +229,14 @@ export default function ProjectLayout({
                     <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/analytics`} onClick={() => setIsOpen(false)}>
                       <Activity className="h-4 w-4" />
                       <span>Analytics</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/playground`} onClick={() => setIsOpen(false)}>
+                      <CubeTransparentIcon className="h-4 w-4" />
+                      <span>Playground</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
