@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import crypto from 'crypto';
 import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
@@ -56,12 +57,16 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 2. Look up API key and get project/organization info
+        // 2. Hash the provided API key to compare with stored hash
+        const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+
+        // 3. Look up API key by hash and get project/organization info
         const { data: keyData, error: keyError } = await supabase
             .from('api_keys')
             .select(`
         id,
         project_id,
+        environment,
         projects!inner(
           id,
           organization_id,
@@ -73,8 +78,8 @@ export async function POST(req: NextRequest) {
           )
         )
       `)
-            .eq('key', apiKey)
-            .eq('is_active', true)
+            .eq('key_hash', keyHash)
+            .is('revoked_at', null)
             .single();
 
         if (keyError || !keyData) {
