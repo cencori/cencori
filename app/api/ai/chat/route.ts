@@ -220,6 +220,8 @@ export async function POST(req: NextRequest) {
                                     latency_ms: Date.now() - startTime,
                                     status: 'success',
                                     end_user_id: userId,
+                                    request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
+                                    response_payload: { content: fullContent },
                                 });
 
                                 if (streamLogError) {
@@ -271,6 +273,8 @@ export async function POST(req: NextRequest) {
             latency_ms: response.latencyMs,
             status: 'success',
             end_user_id: userId,
+            request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
+            response_payload: { content: response.content, finishReason: response.finishReason },
         });
 
         if (logError) {
