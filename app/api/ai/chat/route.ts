@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
                                     .update({ monthly_requests_used: currentUsage + 1 })
                                     .eq('id', organizationId);
 
-                                await supabase.from('ai_requests').insert({
+                                const { error: streamLogError } = await supabase.from('ai_requests').insert({
                                     project_id: project.id,
                                     api_key_id: keyData.id,
                                     provider: providerName,
@@ -221,6 +221,10 @@ export async function POST(req: NextRequest) {
                                     status: 'success',
                                     end_user_id: userId,
                                 });
+
+                                if (streamLogError) {
+                                    console.error('[API] Failed to log streaming request:', streamLogError);
+                                }
 
                                 controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                             }
@@ -252,7 +256,7 @@ export async function POST(req: NextRequest) {
             .eq('id', organizationId);
 
         // 11. Log request
-        await supabase.from('ai_requests').insert({
+        const { error: logError } = await supabase.from('ai_requests').insert({
             project_id: project.id,
             api_key_id: keyData.id,
             provider: providerName,
@@ -268,6 +272,16 @@ export async function POST(req: NextRequest) {
             status: 'success',
             end_user_id: userId,
         });
+
+        if (logError) {
+            console.error('[API] Failed to log request:', logError);
+            console.error('[API] Request data:', {
+                project_id: project.id,
+                api_key_id: keyData.id,
+                provider: providerName,
+                model: normalizedModel,
+            });
+        }
 
         // 12. Return
         return NextResponse.json({
