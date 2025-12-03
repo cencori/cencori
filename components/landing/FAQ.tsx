@@ -27,7 +27,7 @@ export function FAQ() {
                             How does Cencori actually work?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
-                            Cencori acts as a secure gateway between your application and AI providers. You make one simple change - replace your AI API endpoint with Cencori's. We route your requests, apply security checks, log everything for compliance, and return the AI response. Your existing code stays the same - just point it to <code className="text-sm bg-muted px-1.5 py-0.5 rounded">https://cencori.com/api/ai/chat</code> instead of OpenAI or Anthropic directly.
+                            Cencori acts as a secure gateway between your application and AI providers. You make one simple change - replace your AI API endpoint with Cencori&apos;s. We route your requests, apply security checks, log everything for compliance, and return the AI response. Your existing code stays the same - just point it to cencori&apos;s API instead of OpenAI or Anthropic directly.
                         </AccordionContent>
                     </AccordionItem>
 
@@ -52,10 +52,10 @@ export function FAQ() {
 
                     <AccordionItem value="latency" className="border rounded-lg px-6 bg-card">
                         <AccordionTrigger className="text-left hover:no-underline">
-                            What's the latency overhead?
+                            What&apos;s the latency overhead?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
-                            Typically 10-50ms added latency for security checks. Our servers are globally distributed on Vercel's edge network, so requests are routed from the nearest location. For most use cases, this is imperceptible - the AI model generation time (often 1-5 seconds) dominates total latency.
+                            Typically 10-50ms added latency for security checks. Our servers are globally distributed on Vercel&apos;s edge network, so requests are routed from the nearest location. For most use cases, this is imperceptible - the AI model generation time (often 1-5 seconds) dominates total latency.
                         </AccordionContent>
                     </AccordionItem>
 
@@ -71,13 +71,13 @@ export function FAQ() {
                     {/* Business Questions */}
                     <AccordionItem value="environments" className="border rounded-lg px-6 bg-card">
                         <AccordionTrigger className="text-left hover:no-underline">
-                            What's the difference between Production and Development environments?
+                            What&apos;s the difference between Production and Development environments?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
                             <p className="mb-2">Each project has separate Production and Development environments with isolated API keys:</p>
                             <ul className="list-disc list-inside space-y-1 ml-2">
                                 <li><strong className="text-foreground">Production</strong> keys (start with <code className="bg-muted px-1 rounded">cen_</code>): Count toward your tier limits, logged for compliance</li>
-                                <li><strong className="text-foreground">Development</strong> keys (start with <code className="bg-muted px-1 rounded">cen_test_</code>): Don't count toward limits, perfect for testing</li>
+                                <li><strong className="text-foreground">Development</strong> keys (start with <code className="bg-muted px-1 rounded">cen_test_</code>): Don&apos;t count toward limits, perfect for testing</li>
                             </ul>
                             <p className="mt-2">This lets you iterate safely without affecting production quotas or compliance logs.</p>
                         </AccordionContent>
@@ -112,7 +112,7 @@ export function FAQ() {
 
                     <AccordionItem value="pricing" className="border rounded-lg px-6 bg-card">
                         <AccordionTrigger className="text-left hover:no-underline">
-                            What's the pricing model?
+                            What&apos;s the pricing model?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
                             <p className="mb-2">Simple, transparent pricing:</p>
@@ -144,7 +144,7 @@ export function FAQ() {
 
                     <AccordionItem value="fohnai-cencori" className="border rounded-lg px-6 bg-card">
                         <AccordionTrigger className="text-left hover:no-underline">
-                            What's the difference between FohnAI and Cencori?
+                            What&apos;s the difference between FohnAI and Cencori?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
                             <strong className="text-foreground">FohnAI</strong> is the AI R&D company building infrastructure to protect AI systems and the people who use them. <strong className="text-foreground">Cencori</strong> is our flagship product - the security layer for AI applications.
