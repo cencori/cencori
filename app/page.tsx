@@ -8,6 +8,7 @@ import { Integrations } from "@/components/landing/Integrations";
 import { Pricing } from "@/components/landing/Pricing";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
+import { FAQ } from "@/components/landing/FAQ";
 import { Logo } from "@/components/logo";
 import { siteConfig } from "@/config/site";
 import { useState, useEffect } from "react";
@@ -102,6 +103,7 @@ export default function HomePage() {
         <Features />
         <Integrations />
         <Pricing />
+        <FAQ />
         <CTA />
       </main>
 
