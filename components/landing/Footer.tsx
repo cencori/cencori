@@ -13,7 +13,6 @@ export const Footer = () => {
                     <div className="col-span-1 md:col-span-1">
                         <Link href="/" className="flex items-center gap-2 mb-6">
                             <Logo variant="mark" className="h-6 w-6" />
-                            <span className="font-bold text-xl tracking-tight">cencori</span>
                         </Link>
                         <p className="text-muted-foreground text-sm leading-relaxed mb-6">
                             The security layer for AI development. Build with confidence, deploy with peace of mind.
