@@ -94,7 +94,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
                     </div>
                     <h3 className="text-xl font-semibold mb-2">No articles found</h3>
                     <p className="text-muted-foreground max-w-sm">
-                        We couldn't find any articles matching your search. Try adjusting your filters or search terms.
+                        We couldn&apos;t find any articles matching your search. Try adjusting your filters or search terms.
                     </p>
                     <button
                         onClick={() => { setSearchQuery(""); setSelectedTag(null); }}
