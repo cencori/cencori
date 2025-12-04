@@ -140,7 +140,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                     {/* Hero Image - Hidden */}
 
                     {/* Content */}
-                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-xl prose-headings:font-bold prose-headings:tracking-tight prose-a:text-purple-200 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-strong:text-foreground prose-strong:font-semibold">
+                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-base prose-headings:font-bold prose-headings:tracking-tight prose-a:text-purple-400 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-strong:text-foreground prose-strong:font-semibold">
                         {content}
                     </div>
                 </article>
