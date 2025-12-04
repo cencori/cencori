@@ -8,6 +8,10 @@ import { Calendar, Clock, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import Navbar from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
+import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
+import { CodeBlock } from "@/components/ai-elements/code-block";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -72,81 +76,77 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const content = await parseMDX(post.content);
 
     return (
-        <div className="min-h-screen bg-background">
-            {/* Back Button */}
-            <div className="border-b border-border/40">
-                <div className="container mx-auto py-6 px-4 max-w-4xl">
-                    <Link
-                        href="/blog"
-                        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Blog
-                    </Link>
-                </div>
-            </div>
+        <div className="min-h-screen bg-background flex flex-col">
+            <Navbar />
 
-            {/* Cover Image */}
-            {post.coverImage && (
-                <div className="relative w-full h-[400px] bg-muted">
-                    <Image
-                        src={post.coverImage}
-                        alt={post.title}
-                        fill
-                        className="object-cover"
-                        priority
-                    />
-                </div>
-            )}
+            <main className="flex-1 pt-20">
+                {/* Background Elements */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
 
-            {/* Article */}
-            <article className="container mx-auto px-4 max-w-4xl">
-                {/* Header */}
-                <header className="py-12 border-b border-border/40">
-                    {/* Tags */}
-                    {post.tags && post.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            {post.tags.map((tag) => (
-                                <TagChip key={tag} tag={tag} href={`/blog?tag=${tag}`} />
+                <article className="container mx-auto px-4 max-w-4xl py-12">
+                    {/* Back Link */}
+                    <div className="mb-8">
+                        <Link
+                            href="/blog"
+                            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+                        >
+                            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                            Blog
+                        </Link>
+                    </div>
+
+                    {/* Header */}
+                    <header className="mb-10 text-center max-w-2xl mx-auto">
+                        {/* Title */}
+                        <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight leading-tight">
+                            {post.title}
+                        </h1>
+
+                        {/* Meta & Author */}
+                        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+                            {/* Author */}
+                            {post.authorDetails.map((author) => (
+                                <div key={author.slug} className="flex items-center gap-2">
+                                    {author.avatar && (
+                                        <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
+                                            <Image
+                                                src={author.avatar}
+                                                alt={author.name}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                        </div>
+                                    )}
+                                    <span className="font-medium text-foreground">{author.name}</span>
+                                </div>
                             ))}
-                        </div>
-                    )}
 
-                    {/* Title */}
-                    <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                        {post.title}
-                    </h1>
+                            <span className="text-muted-foreground/30">•</span>
 
-                    {/* Meta */}
-                    <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mb-8">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            {format(new Date(post.date), "MMMM d, yyyy")}
+                            {/* Date */}
+                            <div>
+                                {format(new Date(post.date), "MMMM d, yyyy")}
+                            </div>
+
+                            <span className="text-muted-foreground/30">•</span>
+
+                            {/* Read Time */}
+                            <div>
+                                {post.readTime}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            {post.readTime}
-                        </div>
+                    </header>
+
+                    {/* Hero Image - Hidden */}
+
+                    {/* Content */}
+                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border/50 prose-pre:rounded-xl">
+                        {content}
                     </div>
+                </article>
+            </main>
 
-                    {/* Authors */}
-                    <div className="flex flex-col gap-4">
-                        {post.authorDetails.map((author) => (
-                            <AuthorBadge
-                                key={author.slug}
-                                author={author}
-                                size="lg"
-                                showBio
-                            />
-                        ))}
-                    </div>
-                </header>
-
-                {/* Content */}
-                <div className="prose prose-neutral dark:prose-invert max-w-none py-12">
-                    {content}
-                </div>
-            </article>
+            <Footer />
         </div>
     );
 }

@@ -135,6 +135,8 @@ export function getAllTags(): string[] {
     return Array.from(tags).sort();
 }
 
+import { MDXComponents } from '@/components/blog/MDXComponents';
+
 /**
  * Parse and render MDX content
  */
@@ -144,6 +146,7 @@ export async function parseMDX(content: string) {
         options: {
             parseFrontmatter: false,
         },
+        components: MDXComponents,
     });
 
     return mdxContent;
