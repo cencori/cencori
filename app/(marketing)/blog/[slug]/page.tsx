@@ -85,7 +85,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
                 <article className="container mx-auto px-4 max-w-4xl py-12">
                     {/* Back Link */}
-                    <div className="mb-8">
+                    <div className="mb-8 flex justify-center">
                         <Link
                             href="/blog"
                             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
@@ -96,7 +96,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                     </div>
 
                     {/* Header */}
-                    <header className="mb-10 text-center max-w-2xl mx-auto">
+                    <header className="mb-32 text-center max-w-2xl mx-auto">
                         {/* Title */}
                         <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight leading-tight">
                             {post.title}
