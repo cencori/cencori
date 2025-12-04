@@ -83,7 +83,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 {/* Background Elements */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
 
-                <article className="container mx-auto px-4 max-w-4xl py-12">
+                <article className="container mx-auto px-4 max-w-5xl py-16">
                     {/* Back Link */}
                     <div className="mb-8 flex justify-center">
                         <Link
@@ -140,7 +140,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                     {/* Hero Image - Hidden */}
 
                     {/* Content */}
-                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-lg prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border/50 prose-pre:rounded-xl">
+                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-xl prose-headings:font-bold prose-headings:tracking-tight prose-a:text-purple-200 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-strong:text-foreground prose-strong:font-semibold">
                         {content}
                     </div>
                 </article>
