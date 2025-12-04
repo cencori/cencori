@@ -69,38 +69,38 @@ export const MDXComponents = {
     a: ({ className, href, children, ...props }: HTMLAttributes<HTMLAnchorElement> & { href?: string }) => {
         // Check if link is external
         const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
-        
+
         if (isExternal) {
             return (
                 <a
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={cn("font-medium text-purple-200 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
                     {...props}
                 >
                     {children}
                 </a>
             );
         }
-        
+
         // Internal link using Next.js Link
         if (href) {
             return (
                 <Link
                     href={href}
-                    className={cn("font-medium text-purple-200 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
                     {...props}
                 >
                     {children}
                 </Link>
             );
         }
-        
+
         // Fallback for links without href
         return (
             <a
-                className={cn("font-medium text-purple-200 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
                 {...props}
             >
                 {children}
