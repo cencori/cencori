@@ -1,8 +1,8 @@
 ---
-title: "Introducing Cencori."
+title: "Introducing Cencori"
 slug: "introducing-cencori"
 date: "2024-11-03"
-excerpt: "Today we're launching Cencori - the security layer for AI applications. Learn why we built it and how it helps developers ship AI products faster while staying secure."
+excerpt: "Today, we're excited to introduce Cencori."
 coverImage: "/blog/images/covers/placeholder.jpg"
 authors:
   - bola
@@ -10,103 +10,333 @@ tags: ["Announcement", "Product", "AI Security"]
 published: true
 ---
 
-## Why We Built Cencori
+Today marks an important milestone for Cencori. After months of development and feedback from early users, we're officially launching our platform to help developers and companies build secure, reliable AI applications.
 
-One month ago, we dropped a simple demo showing how to create organizations and projects. Today, we're launching something much bigger: **a complete security layer for AI applications**.
+## Who We Are
 
-### The Problem
+Cencori is a security and monitoring platform purpose-built for AI applications. We provide the infrastructure layer that sits between your application and AI providers, offering real-time threat detection, multi-provider routing, and comprehensive observability.
 
-As AI applications move from prototypes to production, developers face three critical challenges:
+Our mission is simple: **make AI applications production-ready from day one**.
 
-1. **Security Threats**: Prompt injections, PII leakage, jailbreaks
-2. **Multi-Model Complexity**: Managing OpenAI, Anthropic, and Google APIs separately
-3. **Compliance Requirements**: Audit logs, data retention, SOC 2
+<Callout type="info" title="Our Vision">
+We believe every AI application deserves enterprise-grade security, monitoring, and compliance capabilities - regardless of company size or development stage.
+</Callout>
 
-Building all of this from scratch takes months. We know - we've done it multiple times.
+## The Challenge We're Solving
 
-### The Solution
+As AI applications transition from prototypes to production systems, development teams encounter critical infrastructure challenges that can delay launches, increase costs, and create security vulnerabilities.
 
-**Cencori** sits between your application and AI providers, giving you:
+### Security Vulnerabilities
 
-- ✅ **Prompt Injection Detection** - Block malicious inputs before they reach your models
-- ✅ **Multi-Provider Gateway** - Switch between GPT-4, Claude, and Gemini seamlessly  
-- ✅ **Audit Logs** - Track every request for compliance and debugging
-- ✅ **Cost Optimization** - Monitor spend per user, feature, or model
+AI applications face unique security threats that traditional security tools weren't designed to handle:
 
-## How It Works
+- **Prompt Injection Attacks** - Malicious users manipulating AI behavior through crafted inputs
+- **Data Leakage** - Sensitive information inadvertently exposed in prompts or responses  
+- **Jailbreak Attempts** - Users bypassing content policies and safety guardrails
+- **Model Abuse** - Unauthorized access patterns and usage anomalies
+
+<Callout type="warn" title="The Reality">
+A single prompt injection can compromise your entire AI application. Traditional WAFs and security tools cannot detect or prevent these AI-specific attacks.
+</Callout>
+
+### Infrastructure Complexity  
+
+Managing multiple AI providers creates operational overhead:
+
+- Different APIs, authentication methods, and request formats
+- Complex failover logic when primary providers experience downtime
+- Rate limiting across multiple provider quotas
+- Cost tracking scattered across multiple billing systems
+
+### Compliance Requirements
+
+Production AI applications must meet strict compliance standards:
+
+- Audit logs for every AI request and response
+- Data retention policies for regulatory compliance
+- Security incident tracking and reporting
+- Usage attribution for cost allocation
+
+Building this infrastructure in-house typically requires months of engineering time - time better spent on your core product.
+
+## Our Solution
+
+Cencori provides a complete infrastructure platform for AI applications, handling security, routing, and observability so your team can focus on building features.
+
+### Security First
+
+Our security layer analyzes every request in real-time before it reaches your AI models:
+
+<Cards>
+  <Card title="Prompt Injection Detection">
+    Machine learning models trained on thousands of attack patterns to identify and block malicious prompts
+  </Card>
+  <Card title="PII Detection & Redaction">
+    Automatically detect and optionally redact sensitive information like emails, phone numbers, and credit cards
+  </Card>
+  <Card title="Content Filtering">
+    Customizable filters to enforce your content policies across all AI interactions
+  </Card>
+  <Card title="Anomaly Detection">
+    Real-time monitoring of usage patterns to identify potential abuse or security incidents
+  </Card>
+</Cards>
+
+<Callout type="success" title="Real-Time Protection">
+Security checks run in milliseconds, adding negligible latency while providing comprehensive protection against AI-specific threats.
+</Callout>
+
+### Unified AI Gateway
+
+A single API endpoint that connects to all major AI providers:
 
 ```typescript
-// Before: Direct OpenAI call
-const response = await openai.chat.completions.create({
-  model: "gpt-4",
-  messages: [{ role: "user", content: userInput }]
-});
-
-// After: Cencori gateway
+// One simple API call
 const response = await fetch('https://cencori.com/api/ai/chat', {
   method: 'POST',
   headers: {
-    'CENCORI_API_KEY': 'cen_...',
+    'CENCORI_API_KEY': process.env.CENCORI_API_KEY,
   },
   body: JSON.stringify({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: userInput }]
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: userPrompt }]
   })
 });
 ```
 
-That's it. One endpoint change, and you get enterprise-grade security + multi-provider support.
+Switch between providers by simply changing the model parameter:
 
-## What We've Shipped
+```typescript
+// OpenAI GPT-4
+{ model: 'gpt-4o' }
 
-In just 30 days, we built:
+// Anthropic Claude
+{ model: 'claude-3-opus' }
 
-### AI Gateway
-A unified routing layer that connects to OpenAI, Anthropic, and Google. Switch models without changing code.
+// Google Gemini
+{ model: 'gemini-2.5-flash' }
+```
 
-### Multi-Model Support  
-Run the same prompt across GPT-4, Claude, and Gemini to compare outputs, latency, and cost.
+No need to maintain separate SDKs, authentication logic, or error handling for each provider.
 
-### Security Layer
-Real-time detection of:
-- Prompt injections
-- PII in requests/responses
-- Unusual access patterns
+### Complete Observability
 
-### Analytics Dashboard
-Track:
-- Total requests and cost
-- Success rate and latency
-- Model usage breakdown
-- Security incidents
+Every request flows through Cencori, giving you complete visibility into your AI operations:
 
-## Who It's For
+- **Request Logs** - Full request and response data with metadata
+- **Analytics Dashboard** - Usage trends, costs, and performance metrics
+- **Security Incidents** - Real-time alerts when threats are detected
+- **Cost Attribution** - Track spending by user, feature, or team
 
-**AI Companies**: Secure your product without building infrastructure  
-**Indie Hackers**: Enterprise features at indie-friendly pricing  
-**Dev Teams**: Ship faster with built-in compliance
+<Callout type="idea" title="debugging Made Easy">
+When something goes wrong in production, having detailed logs of every AI interaction is invaluable. Cencori makes debugging AI applications as straightforward as debugging traditional APIs.
+</Callout>
 
-## Get Started
+## Who We Serve
 
-**Free tier**: 1,000 requests/month  
-**Pro**: $49/month for 50,000 requests  
-**Enterprise**: Custom limits and SLA
+Cencori is designed for development teams building AI-powered applications across various industries and use cases.
 
-[Create your account →](https://cencori.com/signup)
+### AI-First Companies
 
----
+For companies building products around AI capabilities:
+
+<Cards cols={2}>
+  <Card title="Rapid Development">
+    Ship features faster without building security and monitoring from scratch
+  </Card>
+  <Card title="Enterprise Ready">
+    Meet customer security and compliance requirements from day one
+  </Card>
+  <Card title="Cost Control">
+    Monitor and optimize AI spending across your entire application
+  </Card>
+  <Card title="Provider Flexibility">
+    Easily test and switch between AI providers as new models launch
+  </Card>
+</Cards>
+
+### Development Teams
+
+For engineering teams integrating AI into existing products:
+
+- **Startups** - Get enterprise features without enterprise complexity
+- **Scale-ups** - Handle growing AI usage with confidence
+- **Enterprises** - Meet compliance requirements and maintain audit trails
+
+### Use Cases We Enable
+
+Our platform supports a wide range of AI applications:
+
+<Cards cols={3}>
+  <Card title="Chatbots & Assistants">
+    Customer service, internal tools, productivity assistants
+  </Card>
+  <Card title="Content Generation">
+    Marketing copy, documentation, creative writing
+  </Card>
+  <Card title="Data Analysis">
+    Business intelligence, report generation, insights extraction
+  </Card>
+  <Card title="Code Generation">
+    Developer tools, automation, code review
+  </Card>
+  <Card title="Search & Recommendations">
+    Semantic search, personalized recommendations
+  </Card>
+  <Card title="Multi-Modal Applications">
+    Image generation, audio transcription, vision tasks
+  </Card>
+</Cards>
+
+## Core Features
+
+### AI Gateway & Routing
+
+- **Multi-Provider Support** - OpenAI, Anthropic, Google, with more coming
+- **Automatic Failover** - Seamless switching when providers experience downtime
+- **Load Balancing** - Distribute requests across providers for reliability
+- **Rate Limit Management** - Intelligent queuing when approaching quotas
+
+### Security & Compliance
+
+- **Real-Time Threat Detection** - Block attacks before they reach your models
+- **Audit Logging** - Comprehensive logs for compliance and debugging
+- **Data Retention Policies** - Configurable retention to meet regulatory requirements
+- **Security Incident Tracking** - Monitor and respond to threats
+
+### Monitoring & Analytics
+
+- **Usage Dashboard** - Track requests, costs, and performance in real-time
+- **Model Comparison** - Compare outputs, latency, and costs across providers
+- **Custom Alerts** - Get notified of unusual patterns or budget thresholds
+- **Cost Attribution** - Understand spending by user, feature, or endpoint
+
+<Callout type="info" title="See the Docs">
+Want to dive deeper into our features? Check out our comprehensive documentation at [cencori.com/docs](/docs) for detailed guides and API references.
+</Callout>
+
+## Getting Started
+
+Integrating Cencori into your application takes minutes:
+
+### Step 1: Create Your Account
+
+[Sign up for free](/signup) and create your first project. The free tier includes 1,000 requests per month - perfect for development and testing.
+
+### Step 2: Add Your Provider Keys
+
+In your project settings, add API keys for the AI providers you want to use. Cencori securely stores these credentials and uses them to make requests on your behalf.
+
+### Step 3: Make Your First Request
+
+Replace your existing AI provider calls with a simple fetch to our unified endpoint:
+
+```typescript
+const response = await fetch('https://cencori.com/api/ai/chat', {
+  method: 'POST', 
+  headers: {
+    'CENCORI_API_KEY': process.env.CENCORI_API_KEY,
+  },
+  body: JSON.stringify({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: userInput }
+    ]
+  })
+});
+
+const data = await response.json();
+console.log(data.choices[0].message.content);
+```
+
+That's it. You now have security, monitoring, and multi-provider support built in.
+
+<Cards>
+  <Card href="/docs/quick-start" title="Quick Start Guide">
+    Get up and running in under 5 minutes
+  </Card>
+  <Card href="/docs/api/chat" title="API Reference">
+    Complete documentation of our API endpoints
+  </Card>
+  <Card href="/signup" title="Create Free Account">
+    Start building with 1,000 free requests per month
+  </Card>
+</Cards>
+
+## Pricing
+
+We offer flexible pricing designed to scale with your needs:
+
+### Free Tier
+Perfect for development, side projects, and testing
+- 1,000 requests/month
+- All security features
+- 7-day log retention
+- Community support
+
+### Pro - $49/month  
+For growing applications and small teams
+- 50,000 requests/month
+- 30-day log retention
+- Priority support
+- Custom security rules
+
+### Enterprise - Custom
+For large-scale applications with specific requirements
+- Custom request volumes
+- Extended log retention
+- Dedicated support
+- SLA guarantees
+- Self-hosted option
+
+<Callout type="success" title="No Hidden Fees">
+All plans include full access to security features, analytics, and multi-provider support. You only pay for the requests you use.
+</Callout>
 
 ## What's Next
 
-We're just getting started. Coming soon:
+We're committed to continuous improvement and bringing new features to the platform. Here's what's coming:
 
-- Custom security rules (define your own policies)
-- Streaming support for real-time responses  
-- More providers (Cohere, AI21, Mistral)
-- Self-hosted deployment option
+### Near Term
 
-Follow along as we build in public. Questions? Hit me up on [Twitter](https://twitter.com/bolaabanjo) or email [support@cencori.com](mailto:support@cencori.com).
+- **Streaming Support** - Real-time streaming responses for better user experience
+- **Additional Providers** - Cohere, AI21, Mistral, and other emerging models
+- **Advanced Analytics** - Deeper insights into usage patterns and performance
+- **Custom Security Rules** - Define your own threat detection logic
 
-Let's make AI apps more secure, together.
+### Future Roadmap
 
-— Bola
+- **Fine-Tuned Models** - Support for custom and fine-tuned model deployment  
+- **Edge Deployment** - Reduced latency with regional endpoints
+- **Enterprise SSO** - SAML and OAuth integration for enterprise customers
+- **White-Label Option** - Custom domains and branding
+
+<Callout type="idea" title="Shape Our Roadmap">
+We build based on customer needs. Have a feature request? Let us know what would make Cencori more useful for your team.
+</Callout>
+
+## Join Us
+
+Whether you're building your first AI feature or scaling to millions of users, Cencori provides the infrastructure you need to move faster and worry less.
+
+<Cards cols={2}>
+  <Card href="/signup" title="Start Building">
+    Create your free account and make your first request in minutes
+  </Card>
+  <Card href="https://x.com/cencori" title="Follow Our Journey" external>
+    Follow us on Twitter for updates, tips, and AI security insights
+  </Card>
+  <Card href="/docs" title="Read the Docs">
+    Explore our comprehensive documentation and API guides
+  </Card>
+  <Card href="mailto:support@cencori.com" title="Get in Touch">
+    Questions? Our team is here to help
+  </Card>
+</Cards>
+
+---
+
+We're excited to have you join us on this journey. Let's build the next generation of AI applications - secure, reliable, and production-ready from day one.
+
+**The Cencori Team**
