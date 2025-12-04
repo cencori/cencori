@@ -1,0 +1,112 @@
+---
+title: "Introducing Cencori: AI Security for Production"
+slug: "introducing-cencori"
+date: "2024-11-03"
+excerpt: "Today we're launching Cencori - the security layer for AI applications. Learn why we built it and how it helps developers ship AI products faster while staying secure."
+coverImage: "/blog/images/covers/placeholder.svg"
+authors:
+  - bola
+tags: ["Announcement", "Product", "AI Security"]
+published: true
+---
+
+## Why We Built Cencori
+
+One month ago, we dropped a simple demo showing how to create organizations and projects. Today, we're launching something much bigger: **a complete security layer for AI applications**.
+
+### The Problem
+
+As AI applications move from prototypes to production, developers face three critical challenges:
+
+1. **Security Threats**: Prompt injections, PII leakage, jailbreaks
+2. **Multi-Model Complexity**: Managing OpenAI, Anthropic, and Google APIs separately
+3. **Compliance Requirements**: Audit logs, data retention, SOC 2
+
+Building all of this from scratch takes months. We know - we've done it multiple times.
+
+### The Solution
+
+**Cencori** sits between your application and AI providers, giving you:
+
+- ✅ **Prompt Injection Detection** - Block malicious inputs before they reach your models
+- ✅ **Multi-Provider Gateway** - Switch between GPT-4, Claude, and Gemini seamlessly  
+- ✅ **Audit Logs** - Track every request for compliance and debugging
+- ✅ **Cost Optimization** - Monitor spend per user, feature, or model
+
+## How It Works
+
+```typescript
+// Before: Direct OpenAI call
+const response = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [{ role: "user", content: userInput }]
+});
+
+// After: Cencori gateway
+const response = await fetch('https://cencori.com/api/ai/chat', {
+  method: 'POST',
+  headers: {
+    'CENCORI_API_KEY': 'cen_...',
+  },
+  body: JSON.stringify({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: userInput }]
+  })
+});
+```
+
+That's it. One endpoint change, and you get enterprise-grade security + multi-provider support.
+
+## What We've Shipped
+
+In just 30 days, we built:
+
+### AI Gateway
+A unified routing layer that connects to OpenAI, Anthropic, and Google. Switch models without changing code.
+
+### Multi-Model Support  
+Run the same prompt across GPT-4, Claude, and Gemini to compare outputs, latency, and cost.
+
+### Security Layer
+Real-time detection of:
+- Prompt injections
+- PII in requests/responses
+- Unusual access patterns
+
+### Analytics Dashboard
+Track:
+- Total requests and cost
+- Success rate and latency
+- Model usage breakdown
+- Security incidents
+
+## Who It's For
+
+**AI Companies**: Secure your product without building infrastructure  
+**Indie Hackers**: Enterprise features at indie-friendly pricing  
+**Dev Teams**: Ship faster with built-in compliance
+
+## Get Started
+
+**Free tier**: 1,000 requests/month  
+**Pro**: $49/month for 50,000 requests  
+**Enterprise**: Custom limits and SLA
+
+[Create your account →](https://cencori.com/signup)
+
+---
+
+## What's Next
+
+We're just getting started. Coming soon:
+
+- Custom security rules (define your own policies)
+- Streaming support for real-time responses  
+- More providers (Cohere, AI21, Mistral)
+- Self-hosted deployment option
+
+Follow along as we build in public. Questions? Hit me up on [Twitter](https://twitter.com/bolaabanjo) or email [support@cencori.com](mailto:support@cencori.com).
+
+Let's make AI apps more secure, together.
+
+— Bola
