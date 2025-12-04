@@ -136,6 +136,7 @@ export function getAllTags(): string[] {
 }
 
 import { MDXComponents } from '@/components/blog/MDXComponents';
+import rehypePrettyCode from 'rehype-pretty-code';
 
 /**
  * Parse and render MDX content
@@ -145,6 +146,16 @@ export async function parseMDX(content: string) {
         source: content,
         options: {
             parseFrontmatter: false,
+            mdxOptions: {
+                rehypePlugins: [
+                    [
+                        rehypePrettyCode,
+                        {
+                            theme: 'github-dark',
+                        },
+                    ],
+                ],
+            },
         },
         components: MDXComponents,
     });
