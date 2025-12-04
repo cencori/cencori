@@ -2,7 +2,7 @@
 
 import { type VariantProps } from "class-variance-authority";
 import { Menu, ChevronDown } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CircleUserRound } from "lucide-react";
 
@@ -75,8 +75,6 @@ interface NavbarProps {
     mobileNavItems?: MobileNavLink[];
     actions?: NavbarActionProps[];
     className?: string;
-    isAuthenticated?: boolean;
-    userProfile?: { name: string | null; avatar: string | null };
 }
 
 function isNavDropdown(item: NavItem): item is NavDropdown {
@@ -153,10 +151,46 @@ export default function Navbar({
         },
     ],
     className,
-    isAuthenticated = false,
-    userProfile,
 }: NavbarProps) {
     const router = useRouter();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null } | null>(null);
+
+    // Check authentication state on mount and auth changes
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session?.user) {
+                setIsAuthenticated(true);
+                setUserProfile({
+                    name: session.user.user_metadata?.full_name || session.user.email || null,
+                    avatar: session.user.user_metadata?.avatar_url || null,
+                });
+            } else {
+                setIsAuthenticated(false);
+                setUserProfile(null);
+            }
+        };
+
+        checkAuth();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setIsAuthenticated(true);
+                setUserProfile({
+                    name: session.user.user_metadata?.full_name || session.user.email || null,
+                    avatar: session.user.user_metadata?.avatar_url || null,
+                });
+            } else {
+                setIsAuthenticated(false);
+                setUserProfile(null);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     const productsDropdown: NavDropdown = {
         title: "Products",
