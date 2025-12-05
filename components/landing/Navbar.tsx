@@ -46,8 +46,8 @@ interface NavLink {
 interface NavDropdown {
     title: string;
     type: "mega" | "dropdown";
-    columns?: NavLink[][]; 
-    items?: NavLink[]; 
+    columns?: NavLink[][];
+    items?: NavLink[];
     footerCtaPrimary?: NavLink;
     footerCtaSecondary?: NavLink;
 }
