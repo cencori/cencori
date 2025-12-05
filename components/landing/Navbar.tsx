@@ -204,9 +204,9 @@ export default function Navbar({
 
     return (
         <header className={cn("fixed top-0 cursor-pointer left-0 right-0 z-50 bg-background/80 mb-16 backdrop-blur-xl border-b border-border/40", className)}>
-            <div className="container mx-auto px-4 md:px-6">
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
                 <NavbarComponent className="py-3">
-                    <NavbarLeft>
+                    <NavbarLeft className="gap-6">
                         <Link
                             href={homeUrl}
                             className="flex items-center gap-2 text-lg font-bold tracking-tight"
@@ -214,16 +214,14 @@ export default function Navbar({
                             {logo}
                             {name}
                         </Link>
-                    </NavbarLeft>
 
-                    <NavbarCenter className="hidden md:flex justify-center">
-                        <NavigationMenu>
+                        <NavigationMenu className="hidden md:flex">
                             <NavigationMenuList className="gap-1">
                                 {navItems.map((item, index) => {
                                     if (isNavDropdown(item)) {
                                         return (
                                             <NavigationMenuItem key={index}>
-                                                <NavigationMenuTrigger className="h-8 px-3 text-sm font-medium rounded-full bg-transparent hover:bg-foreground/5 focus:bg-foreground/5 data-[state=open]:bg-foreground/5 border-none">
+                                                <NavigationMenuTrigger className="h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5 data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground border-none">
                                                     {item.title}
                                                 </NavigationMenuTrigger>
                                                 <NavigationMenuContent className="rounded-xl border-border/40 shadow-none bg-background/95 backdrop-blur-xl">
@@ -275,7 +273,7 @@ export default function Navbar({
                                         return (
                                             <NavigationMenuItem key={index}>
                                                 <Link href={item.href} legacyBehavior passHref>
-                                                    <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "h-8 px-3 text-sm font-medium rounded-full bg-transparent hover:bg-foreground/5 focus:bg-foreground/5")}>
+                                                    <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5")}>
                                                         {item.title}
                                                     </NavigationMenuLink>
                                                 </Link>
@@ -285,7 +283,7 @@ export default function Navbar({
                                 })}
                             </NavigationMenuList>
                         </NavigationMenu>
-                    </NavbarCenter>
+                    </NavbarLeft>
 
                     <NavbarRight>
                         <div className="hidden md:block mr-4">
