@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Cencori | The AI Infrastructure Platform.",
+  title: "Cencori",
   description: "A multi-tenant AI infrastructure platform designed to help teams build, deploy, and scale AI-engineered applications.",
 };
 
