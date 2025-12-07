@@ -13,7 +13,7 @@ export default function ContactPage() {
       <section>
         <h2 className="text-2xl font-semibold mb-4">Get in Touch</h2>
         <p className="text-zinc-300 leading-relaxed">
-          For general inquiries, please email us at <Link href="mailto:info@fohnai.com" className="text-blue-400 hover:underline">info@fohnai.com</Link>.
+          For general inquiries, please email us at <Link href="mailto:info@fohnai.com" className="text-blue-400 hover:underline">support@cencori.com</Link>.
         </p>
       </section>
     </div>
