@@ -24,11 +24,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bolaabanjo/cencori"
+    "url": "https://github.com/cencori/cencori"
   },
   "homepage": "https://cencori.com",
   "bugs": {
-    "url": "https://github.com/bolaabanjo/cencori/issues"
+    "url": "https://github.com/cencori/cencori/issues"
   },
   "scripts": {
     "build": "tsup",
