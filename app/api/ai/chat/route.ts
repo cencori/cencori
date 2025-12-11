@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
+import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -145,6 +146,37 @@ export async function POST(req: NextRequest) {
             content: msg.content,
         }));
 
+        // SEMANTIC ANALYSIS & SECURITY CHECK (INPUT)
+        const lastUserMessage = unifiedMessages.slice().reverse().find(m => m.role === 'user');
+        const inputText = lastUserMessage?.content || '';
+
+        const inputSecurity = checkInputSecurity(inputText, unifiedMessages);
+
+        if (!inputSecurity.safe) {
+            // Log security incident
+            await supabase.from('security_incidents').insert({
+                project_id: project.id,
+                api_key_id: keyData.id,
+                incident_type: inputSecurity.layer,
+                severity: inputSecurity.riskScore > 0.8 ? 'critical' : 'high',
+                description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
+                input_text: inputText,
+                risk_score: inputSecurity.riskScore,
+                details: inputSecurity.details,
+                action_taken: 'blocked',
+                end_user_id: userId
+            });
+
+            return NextResponse.json(
+                {
+                    error: 'Security violation detected',
+                    message: 'I cannot provide that information as it may contain sensitive data or violates our safety policies.',
+                    reasons: inputSecurity.reasons
+                },
+                { status: 403 }
+            );
+        }
+
         // 4. Determine model and provider
         const requestedModel = model || 'gemini-2.5-flash';
         initializeProviders();
@@ -189,8 +221,41 @@ export async function POST(req: NextRequest) {
                         let fullContent = '';
 
                         for await (const chunk of streamGen) {
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: chunk.delta, finish_reason: chunk.finishReason })}\n\n`));
+                            // Accumulate content for security scanning
                             fullContent += chunk.delta;
+
+                            // Real-time Output Security Scan
+                            // We check the accumulating content to catch PII leakage as it happens
+                            const outputSecurity = checkOutputSecurity(fullContent, {
+                                inputText,
+                                inputSecurityResult: inputSecurity,
+                                conversationHistory: unifiedMessages
+                            });
+
+                            if (!outputSecurity.safe) {
+                                // Close stream with error
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Response blocked due to security content policy' })}\n\n`));
+
+                                // Log security incident
+                                await supabase.from('security_incidents').insert({
+                                    project_id: project.id,
+                                    api_key_id: keyData.id,
+                                    incident_type: 'output_leakage',
+                                    severity: 'critical',
+                                    description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
+                                    input_text: inputText,
+                                    output_text: fullContent,
+                                    risk_score: outputSecurity.riskScore,
+                                    details: outputSecurity.details,
+                                    action_taken: 'blocked_stream',
+                                    end_user_id: userId
+                                });
+
+                                controller.close();
+                                return; // Stop processing
+                            }
+
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: chunk.delta, finish_reason: chunk.finishReason })}\n\n`));
 
                             if (chunk.finishReason) {
                                 const promptTokens = await provider.countTokens(unifiedMessages.map(m => m.content).join(' '), normalizedModel);
@@ -250,6 +315,39 @@ export async function POST(req: NextRequest) {
 
         // 9. Non-streaming
         const response = await provider.chat(chatRequest);
+
+        // Output Security Check
+        const outputSecurity = checkOutputSecurity(response.content, {
+            inputText,
+            inputSecurityResult: inputSecurity,
+            conversationHistory: unifiedMessages
+        });
+
+        if (!outputSecurity.safe) {
+            // Log security incident
+            await supabase.from('security_incidents').insert({
+                project_id: project.id,
+                api_key_id: keyData.id,
+                incident_type: 'output_leakage',
+                severity: 'critical',
+                description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
+                input_text: inputText,
+                output_text: response.content,
+                risk_score: outputSecurity.riskScore,
+                details: outputSecurity.details,
+                action_taken: 'blocked',
+                end_user_id: userId
+            });
+
+            return NextResponse.json(
+                {
+                    error: 'Security violation detected',
+                    message: 'Response blocked as it contains sensitive data.',
+                    reasons: outputSecurity.reasons
+                },
+                { status: 403 }
+            );
+        }
 
         // 10. Increment usage counter
         await supabase
