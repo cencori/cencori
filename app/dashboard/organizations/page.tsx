@@ -20,7 +20,7 @@ interface OrganizationData {
   slug: string;
   description?: string;
   plan_id: string;
-  organization_plans: { name: string }[]; // Corrected to array type
+  organization_plans: { name: string }[] | null; // Allow null
 }
 
 export default function OrganizationsPage() {
@@ -161,7 +161,7 @@ export default function OrganizationsPage() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-lg mb-1">{org.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {org.organization_plans[0]?.name?.charAt(0).toUpperCase() + org.organization_plans[0]?.name?.slice(1) || "Free"} Plan
+                    {org.organization_plans?.[0]?.name ? (org.organization_plans[0]?.name.charAt(0).toUpperCase() + org.organization_plans[0]?.name.slice(1)) : "Free"} Plan
                     <span className="mx-1.5">•</span>
                     Projects
                   </p>
