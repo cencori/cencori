@@ -89,6 +89,8 @@ export function PingingDotChart() {
 const CustomizedDot = (props: React.SVGProps<SVGCircleElement>) => {
   const { cx, cy, stroke } = props;
 
+  if (typeof cx !== 'number' || typeof cy !== 'number') return null;
+
   return (
     <g>
       {/* Main dot */}
