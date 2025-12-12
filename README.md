@@ -2,27 +2,29 @@
 
 # Cencori
 
-**The Security Layer for AI Development**
+**AI Infrastructure for Production**
 
-Build with AI. Deploy with confidence.
-
-Cencori is a developer-first AI infrastructure platform that wraps your AI integrations with security, compliance, and observability - so you can ship AI features without worrying about data leaks, compliance violations, or runaway costs.
+The unified API for AI providers. Connect your app once, use OpenAI, Anthropic, or Google — with built-in security, observability, and cost control.
 
 ---
 
 ## Why Cencori?
 
-If you're building with AI or building AI products, you need:
+Building AI features is easy. Building them for production is hard:
 
-- **Multi-Provider Support** - Switch between OpenAI, Anthropic, and Google Gemini seamlessly
-- **Security** - Automatic PII detection and filtering
-- **Compliance** - Audit logs and safety scores for every request
-- **Cost Control** - Credits-based billing with transparent pricing
+- **Provider lock-in** — Switching from OpenAI to Anthropic means rewriting code
+- **Security gaps** — PII leaks, prompt injection, no audit trail
+- **Cost surprises** — No visibility until the bill arrives
+- **Compliance burden** — SOC2, GDPR, HIPAA require months of work
+
+**Cencori solves all of this with one integration.**
+
+- **One API** - Switch between OpenAI, Anthropic, and Google Gemini with a parameter change
+- **Security** - Automatic PII detection, prompt injection protection, content filtering
+- **Compliance** - Complete audit logs and safety scores for every request
+- **Cost Control** - Real-time cost tracking with per-project budgets
 - **Streaming** - Real-time AI responses with Server-Sent Events
-- **Observability** - Real-time dashboards and request tracking
-- **Multi-tenancy** - Organization and project management built-in
-
-**Cencori gives you all of this in one platform.**
+- **Observability** - Analytics dashboard with usage patterns and security incidents
 
 ---
 

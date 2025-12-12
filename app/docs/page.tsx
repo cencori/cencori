@@ -11,8 +11,7 @@ export default function DocsPage() {
                     Cencori Documentation
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Cencori is the essential security and compliance layer for AI-integrated applications.
-                    It sits between your users and your AI models, ensuring safety, observability, and control.
+                    Cencori is the unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.
                 </p>
             </div>
 
@@ -52,7 +51,7 @@ export default function DocsPage() {
                     Why Cencori?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Cencori is purpose-built infrastructure for AI-powered applications. It provides the security, observability, and control layer that traditional web infrastructure (like firewalls, load balancers, and logging services) provides for standard HTTP traffic—but for AI.
+                    Cencori gives you everything you need to ship AI to production: a unified API, automatic security, complete logging, and real-time cost tracking. Instead of integrating with each provider separately, you integrate once with Cencori.
                 </p>
 
                 <div className="space-y-3 mt-4">

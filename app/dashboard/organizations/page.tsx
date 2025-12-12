@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/plus";
 import { BoxesIcon } from "@/components/ui/boxes";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
@@ -138,7 +138,7 @@ export default function OrganizationsPage() {
             className="w-full sm:max-w-xs pl-8"
           />
         </div>
-        <Button asChild className="w-full rounded-none sm:w-auto">
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/dashboard/organizations/new">
             <PlusIcon size={16} className="mr-2" />
             New Organization
@@ -150,22 +150,25 @@ export default function OrganizationsPage() {
         {filteredOrganizations.map((org) => (
           <Card
             key={org.id}
-            className="overflow-x-auto rounded-none cursor-pointer border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary hover:scale-102 transition-all"
+            className="group cursor-pointer border hover:border-primary/50 hover:shadow-md transition-all duration-200"
             onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}
           >
             <CardHeader>
               <div className="flex items-start gap-4">
-                <div className="p-3 rounded-xl bg-muted group-hover:bg-primary/10 transition-colors shrink-0">
-                  <BoxesIcon size={24} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="p-3 rounded-lg bg-primary/5 group-hover:bg-primary/10 transition-colors shrink-0">
+                  <BoxesIcon size={24} className="text-primary/70 group-hover:text-primary transition-colors" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-lg mb-1">{org.name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {org.organization_plans?.[0]?.name ? (org.organization_plans[0]?.name.charAt(0).toUpperCase() + org.organization_plans[0]?.name.slice(1)) : "Free"} Plan
-                    <span className="mx-1.5">•</span>
-                    Projects
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {org.organization_plans?.[0]?.name
+                        ? org.organization_plans[0].name.charAt(0).toUpperCase() + org.organization_plans[0].name.slice(1)
+                        : "Free"}
+                    </Badge>
+                  </div>
                 </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </div>
             </CardHeader>
           </Card>

@@ -14,12 +14,12 @@ export const Features = () => {
             <div className="container mx-auto px-4 md:px-6">
                 <div className="flex flex-col items-center text-center mb-20">
                     <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-white">
-                        Infrastructure for{" "}
-                        <span className="text-white/60">modern AI apps</span>
+                        Everything you need to{" "}
+                        <span className="text-white/60">ship AI</span>
                     </h2>
                     <p className="text-lg text-white/50 max-w-2xl">
-                        Everything you need to build, monitor, and scale your AI
-                        applications. One SDK, every provider.
+                        A complete platform to build, secure, and scale AI features.
+                        Connect once, use any provider.
                     </p>
                 </div>
 
