@@ -261,10 +261,10 @@ export default function OrgProjectsPage({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[300px]">PROJECT</TableHead>
-                  <TableHead>DATE CREATED</TableHead>
-                  <TableHead className="text-right">STATUS</TableHead>
+                <TableRow className="hover:bg-transparent bg-muted/50">
+                  <TableHead className="w-[300px]">Project</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -279,22 +279,19 @@ export default function OrgProjectsPage({
                   .map((project) => (
                     <TableRow
                       key={project.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}`)}
                     >
                       <TableCell className="font-medium">
                         {project.name}
-                        <p className="text-muted-foreground text-xs">ID: {project.slug}</p>
+                        <p className="text-muted-foreground text-xs">{project.slug}</p>
                       </TableCell>
                       <TableCell>
                         {(() => {
                           const date = new Date(project.created_at);
-                          const day = date.getDate().toString().padStart(2, "0");
+                          const day = date.getDate();
                           const month = date.toLocaleString("en-US", { month: "short" });
-                          const hours = date.getHours().toString().padStart(2, "0");
-                          const minutes = date.getMinutes().toString().padStart(2, "0");
-                          const seconds = date.getSeconds().toString().padStart(2, "0");
-                          return `${day} ${month} ${hours}:${minutes}:${seconds}`;
+                          return `${month} ${day}, ${date.getFullYear()}`;
                         })()}
                       </TableCell>
                       <TableCell className="text-right">

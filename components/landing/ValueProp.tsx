@@ -13,22 +13,21 @@ export const ValueProp = () => {
                     {/* Left: Content */}
                     <div className="flex flex-col gap-8">
                         <h2 className="text-3xl md:text-5xl font-bold tracking-tighter">
-                            The missing piece in your <br />
-                            <span className="text-muted-foreground">AI infrastructure</span>
+                            One API for <br />
+                            <span className="text-muted-foreground">every AI provider</span>
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed">
-                            You wouldn&apos;t deploy a web app without a firewall. Why deploy AI without Cencori?
-                            We provide the essential security and compliance layer that sits between your users and your AI models.
+                            Stop rewriting integrations for every provider. Cencori gives you a unified API that works with OpenAI, Anthropic, and Google — with security, logging, and cost tracking built-in.
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             {[
-                                "SOC2 Ready Logs",
-                                "PII Redaction",
-                                "Prompt Injection Defense",
-                                "Cost Attribution",
-                                "Latency Monitoring",
-                                "Multi-tenant Auth"
+                                "Audit Logs",
+                                "PII Protection",
+                                "Security Scanning",
+                                "Cost Tracking",
+                                "Performance Metrics",
+                                "Multi-tenancy"
                             ].map((item, i) => (
                                 <div key={i} className="flex items-center gap-3">
                                     <div className="w-5 h-5 border border-foreground flex items-center justify-center bg-foreground text-background">
