@@ -289,8 +289,10 @@ export default function OrganizationSettingsPage({
                 <Label>Current Plan</Label>
                 <div className="flex items-center space-x-2">
                   <Badge variant="outline" className="text-sm">
-                    {organization.organization_plans[0]?.name?.charAt(0).toUpperCase() +
-                      organization.organization_plans[0]?.name?.slice(1) || "Free"}
+                    {organization.organization_plans?.[0]?.name
+                      ? organization.organization_plans[0].name.charAt(0).toUpperCase() +
+                      organization.organization_plans[0].name.slice(1)
+                      : "Free"}
                   </Badge>
                 </div>
               </div>
