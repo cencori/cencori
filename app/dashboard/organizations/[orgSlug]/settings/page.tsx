@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Settings, Trash2, Users, Key, AlertTriangle } from "lucide-react";
+import { Settings, Trash2, Users, Key, AlertTriangle, Copy, Check } from "lucide-react";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 
 interface OrganizationData {
@@ -78,6 +78,7 @@ export default function OrganizationSettingsPage({
   const [orgName, setOrgName] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [slugCopied, setSlugCopied] = useState(false);
 
   // Get context to update breadcrumbs
   const { updateOrganization: updateOrgContext } = useOrganizationProject();
@@ -267,7 +268,26 @@ export default function OrganizationSettingsPage({
 
               <div className="space-y-2">
                 <Label htmlFor="org-slug">Organization Slug</Label>
-                <Input id="org-slug" value={organization.slug} disabled className="bg-muted" />
+                <div className="flex gap-2">
+                  <Input id="org-slug" value={organization.slug} disabled className="bg-muted" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(organization.slug);
+                      setSlugCopied(true);
+                      toast.success("Slug copied to clipboard");
+                      setTimeout(() => setSlugCopied(false), 2000);
+                    }}
+                    title="Copy slug"
+                  >
+                    {slugCopied ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   The slug cannot be changed after creation
                 </p>
