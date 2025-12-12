@@ -26,6 +26,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Settings, Trash2, Users, Key, AlertTriangle } from "lucide-react";
@@ -62,6 +72,7 @@ export default function OrganizationSettingsPage({
   const [isDeleteOrgDialogOpen, setIsDeleteOrgDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<ProjectData | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Editable fields
   const [orgName, setOrgName] = useState("");
@@ -185,16 +196,20 @@ export default function OrganizationSettingsPage({
   };
 
   const handleDeleteOrganization = async () => {
-    if (!organization || confirmDeleteText !== organization.slug) return;
+    if (!organization || confirmDeleteText !== organization.name) return;
 
+    setIsDeleting(true);
     // Delete organization - this should cascade delete projects if set up in DB
     const { error } = await supabase.from("organizations").delete().eq("id", organization.id);
 
     if (error) {
       console.error("Error deleting organization:", error.message);
       toast.error("Failed to delete organization");
+      setIsDeleting(false);
     } else {
       toast.success("Organization deleted successfully!");
+      setIsDeleteOrgDialogOpen(false);
+      setConfirmDeleteText("");
       router.push("/dashboard/organizations");
     }
   };
@@ -418,7 +433,10 @@ export default function OrganizationSettingsPage({
                 </p>
                 <Button
                   variant="destructive"
-                  onClick={() => setIsDeleteOrgDialogOpen(true)}
+                  onClick={() => {
+                    setConfirmDeleteText("");
+                    setIsDeleteOrgDialogOpen(true);
+                  }}
                   className="bg-red-600 hover:bg-red-700"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -452,45 +470,46 @@ export default function OrganizationSettingsPage({
       </Dialog>
 
       {/* Delete Organization Dialog */}
-      <Dialog open={isDeleteOrgDialogOpen} onOpenChange={setIsDeleteOrgDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Organization</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isDeleteOrgDialogOpen} onOpenChange={(open) => {
+        setIsDeleteOrgDialogOpen(open);
+        if (!open) setConfirmDeleteText("");
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Organization</AlertDialogTitle>
+            <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the organization, all
               projects, and remove all data.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="confirm-delete">
-                Type <span className="font-mono font-bold">{organization.slug}</span> to confirm
+                Type <span className="font-mono font-bold">{organization.name}</span> to confirm
               </Label>
               <Input
                 id="confirm-delete"
                 value={confirmDeleteText}
                 onChange={(e) => setConfirmDeleteText(e.target.value)}
-                placeholder="Enter organization slug"
+                placeholder="Enter organization name"
+                disabled={isDeleting}
               />
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" onClick={() => setConfirmDeleteText("")}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button
-              variant="destructive"
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleDeleteOrganization}
-              disabled={confirmDeleteText !== organization.slug}
+              disabled={confirmDeleteText !== organization.name || isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              I understand, delete this organization
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {isDeleting ? "Deleting..." : "I understand, delete this organization"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
