@@ -151,9 +151,9 @@ export async function GET(req: NextRequest) {
     console.log(`GitHub App installation requested for organization slug: ${orgSlug}`);
   }
 
-  // Redirect back to projects page with success message
+  // Redirect back to GitHub import page with success message
   if (orgSlug) {
-    return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects?success=github_connected`, req.url));
+    return NextResponse.redirect(new URL(`/dashboard/organizations/${orgSlug}/projects/import/github?success=github_connected`, req.url));
   } else {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }

@@ -64,7 +64,7 @@ export async function importGitHubProject({
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-  // Check for slug uniqueness and append number if needed
+  // Check for slug uniqueness GLOBALLY (not just within org) to match database constraint
   let slug = baseSlug;
   let counter = 1;
   let slugExists = true;
@@ -74,7 +74,6 @@ export async function importGitHubProject({
       .from('projects')
       .select('id')
       .eq('slug', slug)
-      .eq('organization_id', organizationId)
       .single();
 
     if (!slugCheck) {
