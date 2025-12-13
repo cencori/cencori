@@ -33,7 +33,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import * as React from "react";
-import { GitHubStarsButton } from "@/components/animate-ui/components/buttons/github-stars";
 
 type NavItem = NavDropdown | NavLink;
 
@@ -286,11 +285,6 @@ export default function Navbar({
                     </NavbarLeft>
 
                     <NavbarRight>
-                        <div className="hidden md:block mr-4">
-                            <Link href="https://github.com/cencori/cencori" target="_blank" rel="noopener noreferrer">
-                                <GitHubStarsButton username="cencori" repo="cencori" variant="ghost" />
-                            </Link>
-                        </div>
                         {actions.map((action, index) => {
                             if (action.isAvatar && isAuthenticated) {
                                 return (
