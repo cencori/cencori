@@ -25,7 +25,7 @@ export default function APIKeysPage() {
                     API keys are secret tokens that authenticate your application when making requests to Cencori. Each key is tied to a specific project and environment.
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Think of API keys like passwords - they prove your application has permission to use Cencori&apos;s services.
+                    Think of API keys like passwords, they prove your application has permission to use Cencori&apos;s services.
                 </p>
             </div>
 
