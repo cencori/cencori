@@ -1,6 +1,11 @@
+import { Metadata } from "next";
 import { DocsLayout } from "@/components/docs/DocsLayout";
 import { DocsNavbar } from "@/components/docs/DocsNavbar";
 import { Footer } from "@/components/landing/Footer";
+
+export const metadata: Metadata = {
+    title: "Documentation",
+};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     return (
