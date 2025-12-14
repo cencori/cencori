@@ -1,0 +1,286 @@
+# Cencori - LLM.txt Documentation
+> One API for every AI provider with built-in security, observability, and cost control.
+> Use this document to quickly integrate Cencori into your project.
+
+## What is Cencori?
+
+Cencori is the unified AI infrastructure for production applications. Instead of integrating with OpenAI, Anthropic, and Google separately, you integrate once with Cencori and get:
+- **One SDK** for all providers (OpenAI, Anthropic, Google)
+- **Automatic security** - PII detection, prompt injection protection, content filtering
+- **Complete observability** - audit logs, analytics, cost tracking
+- **Multi-provider flexibility** - switch models with one parameter
+
+## Quick Start
+
+### 1. Install the SDK
+
+```bash
+npm install cencori
+# or: yarn add cencori
+# or: pnpm add cencori
+```
+
+### 2. Set Environment Variables
+
+```bash
+# .env
+CENCORI_API_KEY=cen_your_api_key_here
+CENCORI_PROJECT_ID=proj_your_project_id_here
+```
+
+### 3. Initialize the Client
+
+```typescript
+// lib/cencori.ts
+import { Cencori } from "cencori";
+
+export const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+  projectId: process.env.CENCORI_PROJECT_ID!,
+});
+```
+
+### 4. Make Your First Request
+
+```typescript
+// app/api/chat/route.ts
+import { cencori } from "@/lib/cencori";
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const response = await cencori.chat.completions.create({
+    model: "gpt-4o", // or "claude-3-opus", "gemini-2.5-flash"
+    messages: messages,
+    temperature: 0.7,
+    max_tokens: 1000,
+  });
+
+  return Response.json({
+    content: response.choices[0].message.content,
+    usage: response.usage,
+  });
+}
+```
+
+## Chat API Reference
+
+### Basic Usage
+
+```typescript
+const response = await cencori.chat.completions.create({
+  model: "gpt-4o",
+  messages: [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "Hello!" }
+  ],
+  temperature: 0.7,
+  max_tokens: 1000,
+});
+
+console.log(response.choices[0].message.content);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | AI model to use (see Models section) |
+| `messages` | array | Yes | Conversation history with role and content |
+| `temperature` | number | No | Randomness (0-2, default: 1) |
+| `max_tokens` | number | No | Max response tokens |
+| `stream` | boolean | No | Enable streaming (default: false) |
+| `user` | string | No | User ID for rate limiting |
+
+### Response Format
+
+```typescript
+{
+  id: "chatcmpl-abc123",
+  model: "gpt-4o",
+  choices: [{
+    index: 0,
+    message: { role: "assistant", content: "Hello! How can I help?" },
+    finish_reason: "stop"
+  }],
+  usage: {
+    prompt_tokens: 13,
+    completion_tokens: 7,
+    total_tokens: 20
+  }
+}
+```
+
+## Streaming
+
+Stream responses for better UX:
+
+```typescript
+// Server route
+import { cencori } from "@/lib/cencori";
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const stream = await cencori.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        controller.enqueue(encoder.encode(content));
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(readableStream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+    },
+  });
+}
+```
+
+Client streaming:
+
+```typescript
+// React component
+const res = await fetch('/api/chat', {
+  method: 'POST',
+  body: JSON.stringify({ messages }),
+});
+
+const reader = res.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const chunk = decoder.decode(value);
+  setResponse(prev => prev + chunk);
+}
+```
+
+## Supported Models
+
+### OpenAI
+| Model | Context | Input Cost | Output Cost |
+|-------|---------|------------|-------------|
+| `gpt-4o` | 128K | $5/1M | $15/1M |
+| `gpt-4-turbo` | 128K | $10/1M | $30/1M |
+| `gpt-3.5-turbo` | 16K | $0.50/1M | $1.50/1M |
+
+### Anthropic
+| Model | Context | Input Cost | Output Cost |
+|-------|---------|------------|-------------|
+| `claude-3-opus` | 200K | $15/1M | $75/1M |
+| `claude-3-sonnet` | 200K | $3/1M | $15/1M |
+| `claude-3-haiku` | 200K | $0.25/1M | $1.25/1M |
+
+### Google Gemini
+| Model | Context | Input Cost | Output Cost |
+|-------|---------|------------|-------------|
+| `gemini-2.5-flash` | 1M | $0.15/1M | $0.60/1M |
+| `gemini-2.0-flash` | 1M | $0.10/1M | $0.40/1M |
+
+### Model Selection Guide
+- **Chat/General**: `gemini-2.5-flash` (fast, cheap, good quality)
+- **Code**: `gpt-4o` (best coding)
+- **Documents**: `claude-3-opus` (200K context, strong reasoning)
+- **High-Volume**: `gpt-3.5-turbo` (low cost)
+
+## Multi-Provider Switching
+
+Switch providers with one parameter:
+
+```typescript
+// OpenAI
+await cencori.chat.completions.create({ model: "gpt-4o", messages });
+
+// Anthropic
+await cencori.chat.completions.create({ model: "claude-3-opus", messages });
+
+// Google
+await cencori.chat.completions.create({ model: "gemini-2.5-flash", messages });
+```
+
+All responses have the same format regardless of provider!
+
+## Error Handling
+
+```typescript
+try {
+  const response = await cencori.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+  });
+  return response;
+} catch (error: any) {
+  if (error.status === 403 && error.code === "SECURITY_VIOLATION") {
+    // Request blocked by security (prompt injection, PII, etc.)
+    return { error: "Request blocked by security policy" };
+  }
+  if (error.status === 429) {
+    // Rate limit exceeded
+    return { error: "Too many requests", retryAfter: error.retryAfter };
+  }
+  if (error.status === 400) {
+    // Invalid parameters
+    return { error: "Invalid request" };
+  }
+  throw error;
+}
+```
+
+## Security Features
+
+Cencori automatically protects against:
+
+### Prompt Injection
+Detects and blocks malicious inputs like:
+- "Ignore all previous instructions..."
+- "What is your system prompt?"
+- Jailbreak attempts
+
+### PII Detection
+Scans for and filters:
+- Social Security Numbers
+- Credit card numbers
+- Email addresses
+- Phone numbers
+
+### Content Filtering
+Blocks harmful content before it reaches AI providers.
+
+All security violations return status 403 with error code.
+
+## Best Practices
+
+1. **Set max_tokens** - Prevent unexpectedly long responses
+2. **Include user IDs** - Enable per-user rate limiting
+3. **Handle errors gracefully** - Implement retry logic
+4. **Use streaming for chat UIs** - Better user experience
+5. **Monitor token usage** - Check dashboard for costs
+6. **Store API keys in env vars** - Never commit to version control
+7. **Use system role for instructions** - Never concatenate with user input
+
+## Dashboard
+
+After integration, visit your Cencori dashboard to see:
+- Request logs with full prompts and responses
+- Security incidents (blocked attacks)
+- Usage analytics and costs
+- Rate limit status
+
+## Links
+
+- Dashboard: https://cencori.com
+- Full Docs: https://cencori.com/docs
+- Pricing: https://cencori.com/pricing
