@@ -7,9 +7,79 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 
+const faqData = [
+    {
+        question: "How does Cencori actually work?",
+        answer: "Cencori acts as a secure gateway between your application and AI providers. You make one simple change - replace your AI API endpoint with Cencori's. We route your requests, apply security checks, log everything for compliance, and return the AI response. Your existing code stays the same - just point it to Cencori's API instead of OpenAI or Anthropic directly."
+    },
+    {
+        question: "What AI models and providers do you support?",
+        answer: "We support all major AI providers: OpenAI (GPT-4, GPT-4 Turbo, GPT-4 Mini), Anthropic (Claude 3 Opus, Sonnet, Haiku), and Google (Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro). You can switch between models dynamically in a single request - no code changes needed."
+    },
+    {
+        question: "Do you provide the API keys or do I bring my own?",
+        answer: "Currently, we provide the AI provider access. You use your Cencori API key (starts with cen_), and we handle routing to OpenAI, Anthropic, or Google on your behalf. You pay a Cencori subscription plus a small markup on AI usage (10-20%). We handle all provider billing, consolidate it into one invoice, and save you the hassle of managing multiple accounts."
+    },
+    {
+        question: "What's the latency overhead?",
+        answer: "Typically 10-50ms added latency for security checks. Our servers are globally distributed on Vercel's edge network, so requests are routed from the nearest location. For most use cases, this is imperceptible - the AI model generation time (often 1-5 seconds) dominates total latency."
+    },
+    {
+        question: "How do you detect prompt injections?",
+        answer: "We use a combination of pattern matching, behavioral analysis, and ML-based detection. Our system looks for common injection techniques like instruction overrides, delimiter manipulation, and role confusion. We maintain a constantly updated database of attack patterns and measure a risk score for each request. False positive rate is typically under 1% for production traffic."
+    },
+    {
+        question: "What's the difference between Production and Development environments?",
+        answer: "Each project has separate Production and Development environments with isolated API keys. Production keys (start with cen_) count toward your tier limits and are logged for compliance. Development keys (start with cen_test_) don't count toward limits, perfect for testing. This lets you iterate safely without affecting production quotas or compliance logs."
+    },
+    {
+        question: "What happens when I hit my request limit?",
+        answer: "We return a 429 error with details about your usage and upgrade options. Your app can handle this gracefully by showing users a message or queuing requests. You can upgrade your plan mid-month instantly - higher limits apply immediately, and we prorate the difference."
+    },
+    {
+        question: "Is my data secure? Where do you store requests and responses?",
+        answer: "Yes. All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We store request/response logs in Supabase (SOC 2 compliant) for audit and analytics purposes. Logs are retained for 90 days by default (customizable for enterprise). We never train models on your data or share it with third parties."
+    },
+    {
+        question: "Can I use this for just one project or do I need to migrate everything?",
+        answer: "Cencori is project-scoped, so you can start with just one app or feature. Each project gets its own API keys, quotas, and analytics. No need for an all-or-nothing migration - add projects as you need them. Many customers start with their highest-risk or highest-value feature first."
+    },
+    {
+        question: "What's the pricing model?",
+        answer: "Simple, transparent pricing: Free Tier with 1,000 requests/month and all providers. Pro at $49/month for 50,000 requests. Enterprise with custom limits, SLA, and dedicated support. Plus AI usage cost (our cost + 10-20% markup). No hidden fees."
+    },
+    {
+        question: "How is Cencori different from using OpenAI directly?",
+        answer: "OpenAI gives you the model. Cencori gives you production-ready AI infrastructure including security (prompt injection, PII detection, content filtering), multi-provider support (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost optimization (track spend per user/feature), and a unified API (one integration, all providers). Think of it as the difference between using Stripe vs. building your own payment processor."
+    },
+    {
+        question: "What is Cencori?",
+        answer: "Cencori is the unified AI infrastructure for production applications. One API for every AI provider with built-in security, observability, and cost control. It's the security layer for AI applications built by FohnAI."
+    },
+];
+
+const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqData.map(item => ({
+        "@type": "Question",
+        "name": item.question,
+        "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.answer
+        }
+    }))
+};
+
 export function FAQ() {
     return (
         <section className="py-24 bg-background">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(faqSchema),
+                }}
+            />
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
                 <div className="text-center mb-16">
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">
