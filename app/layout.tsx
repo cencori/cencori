@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cencori",
+  title: "Cencori | The AI Infrastucture Platform",
   description: "The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
 };
 
