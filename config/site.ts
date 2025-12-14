@@ -4,7 +4,7 @@ export const siteConfig = {
   description:
     "Cencori is the unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
   links: {
-    github: "https://github.com/cencori/cencori",
+    github: "https://github.com/cencori",
     docs: "https://cencori.com/docs",
     getStartedUrl: "/signup",
     signInUrl: "/login",
