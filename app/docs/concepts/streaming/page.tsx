@@ -89,9 +89,9 @@ Done    ← Done    ← Complete`}
                 <CodeBlock
                     filename="stream-example.ts"
                     language="typescript"
-                    code={`import { CencoriClient } from 'cencori';
+                    code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
 
 const stream = cencori.ai.chatStream({
   model: 'gpt-4o',
@@ -124,12 +124,12 @@ for await (const chunk of stream) {
                         <CodeBlock
                             filename="app/api/chat/route.ts"
                             language="typescript"
-                            code={`import { CencoriClient } from 'cencori';
+                            code={`import { Cencori } from 'cencori';
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
   
-  const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+  const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
   
   const stream = cencori.ai.chatStream({
     model: 'gpt-4o',
@@ -218,11 +218,11 @@ export function Chat() {
                 <CodeBlock
                     filename="server.ts"
                     language="typescript"
-                    code={`import { CencoriClient } from 'cencori';
+                    code={`import { Cencori } from 'cencori';
 import express from 'express';
 
 const app = express();
-const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
 
 app.post('/chat', async (req, res) => {
   const { messages } = req.body;

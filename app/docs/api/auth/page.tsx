@@ -61,7 +61,6 @@ export default function AuthenticationPage() {
 
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
 });`}
                     />
                 </div>
@@ -74,15 +73,14 @@ export const cencori = new Cencori({
                     <CodeBlock
                         filename="example-request.ts"
                         language="typescript"
-                        code={`const response = await fetch("https://api.cencori.com/v1/chat/completions", {
+                        code={`const response = await fetch("https://cencori.com/api/ai/chat", {
   method: "POST",
   headers: {
-    "Authorization": \`Bearer \${process.env.CENCORI_API_KEY}\`,
+    "CENCORI_API_KEY": process.env.CENCORI_API_KEY!,
     "Content-Type": "application/json",
-    "X-Project-ID": process.env.CENCORI_PROJECT_ID!,
   },
   body: JSON.stringify({
-    model: "gpt-4",
+    model: "gpt-4o",
     messages: [
       { role: "user", content: "Hello!" }
     ],
@@ -106,9 +104,8 @@ export const cencori = new Cencori({
                     <CodeBlock
                         filename=".env"
                         language="bash"
-                        code={`# Cencori API Credentials
-CENCORI_API_KEY=cen_prod_your_api_key_here
-CENCORI_PROJECT_ID=proj_your_project_id_here`}
+                        code={`# Cencori API Key
+CENCORI_API_KEY=cen_your_api_key_here`}
                     />
                     <p className="text-sm text-muted-foreground leading-relaxed">
                         Make sure to add <code className="text-xs bg-muted px-1.5 py-0.5 rounded">.env</code> to your <code className="text-xs bg-muted px-1.5 py-0.5 rounded">.gitignore</code> file.
@@ -151,9 +148,6 @@ CENCORI_PROJECT_ID=proj_your_project_id_here`}
                         <strong>Authorization:</strong> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">Bearer YOUR_API_KEY</code> (required)
                     </li>
                     <li className="list-disc">
-                        <strong>X-Project-ID:</strong> Your project ID (required)
-                    </li>
-                    <li className="list-disc">
                         <strong>Content-Type:</strong> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">application/json</code> (required for POST requests)
                     </li>
                     <li className="list-disc">
@@ -165,10 +159,8 @@ CENCORI_PROJECT_ID=proj_your_project_id_here`}
                     filename="headers-example.ts"
                     language="typescript"
                     code={`const headers = {
-  "Authorization": "Bearer cen_prod_abc123xyz456",
-  "X-Project-ID": "proj_789def012ghi",
+  "CENCORI_API_KEY": "cen_your_api_key_here",
   "Content-Type": "application/json",
-  "X-Environment": "production",
 };`}
                 />
             </div>
@@ -334,23 +326,20 @@ async function makeRequest() {
 async function testAuthentication() {
   const cencori = new Cencori({
     apiKey: process.env.CENCORI_API_KEY!,
-    projectId: process.env.CENCORI_PROJECT_ID!,
   });
 
   try {
     // Make a minimal request to test auth
-    const response = await cencori.chat.completions.create({
+    const response = await cencori.ai.chat({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: "Test" }],
-      max_tokens: 5,
     });
 
     console.log("✓ Authentication successful!");
-    console.log("Response:", response.choices[0].message.content);
+    console.log("Response:", response.content);
     return true;
   } catch (error: any) {
     console.error("✗ Authentication failed:", error.message);
-    console.error("Error code:", error.code);
     return false;
   }
 }

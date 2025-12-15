@@ -1,6 +1,6 @@
 # Cencori
 
-Official SDK for the Cencori.
+Official SDK for Cencori - The Security Layer for AI Development.
 
 ## Installation
 
@@ -8,14 +8,16 @@ Official SDK for the Cencori.
 npm install cencori
 # or
 yarn add cencori
+# or
+pnpm add cencori
 ```
 
 ## Quick Start
 
 ```typescript
-import { CencoriClient } from 'cencori';
+import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!
 });
 
@@ -39,12 +41,14 @@ Get your API key from the [Cencori Dashboard](https://cencori.com/dashboard):
 
 ## API Reference
 
-### CencoriClient
+### Cencori
 
 Initialize the SDK client.
 
 ```typescript
-const cencori = new CencoriClient({
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
   apiKey: 'your_api_key_here',
   baseUrl: 'https://cencori.com' // Optional, defaults to production
 });
@@ -54,13 +58,14 @@ const cencori = new CencoriClient({
 
 #### `ai.chat(params)`
 
-Send a chat message to the AI.
+Send a chat message to the AI (non-streaming).
 
 **Parameters:**
-- `messages`: Array of message objects with `role` ('user' | 'assistant') and `content`
-- `model`: Optional AI model (defaults to 'gemini-1.5-flash')
+- `messages`: Array of message objects with `role` ('system' | 'user' | 'assistant') and `content`
+- `model`: Optional AI model (defaults to 'gemini-2.5-flash')
 - `temperature`: Optional temperature (0-1)
-- `maxOutputTokens`: Optional max tokens for response
+- `maxTokens`: Optional max tokens for response
+- `userId`: Optional user ID for rate limiting
 
 **Example:**
 
@@ -69,11 +74,32 @@ const response = await cencori.ai.chat({
   messages: [
     { role: 'user', content: 'Explain quantum computing' }
   ],
+  model: 'gpt-4o',
   temperature: 0.7
 });
 
 console.log(response.content);
 console.log(response.usage); // Token usage stats
+console.log(response.cost_usd); // Cost in USD
+```
+
+#### `ai.chatStream(params)`
+
+Stream a chat response token-by-token.
+
+**Example:**
+
+```typescript
+const stream = cencori.ai.chatStream({
+  messages: [
+    { role: 'user', content: 'Tell me a story' }
+  ],
+  model: 'gpt-4o'
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
 ```
 
 ## Error Handling
@@ -82,7 +108,7 @@ The SDK includes custom error classes for common scenarios:
 
 ```typescript
 import {
-  CencoriClient,
+  Cencori,
   AuthenticationError,
   RateLimitError,
   SafetyError
@@ -106,24 +132,33 @@ try {
 The SDK is written in TypeScript and includes full type definitions.
 
 ```typescript
-import type { ChatParams, ChatResponse, Message } from 'cencori';
+import type { ChatParams, ChatResponse, Message, StreamChunk } from 'cencori';
 ```
 
 ## Features
 
-- Full TypeScript support with type definitions
-- Built-in authentication
-- Automatic retry logic with exponential backoff
-- Custom error classes
-- Content safety filtering
-- Rate limiting protection
+- ✅ Full TypeScript support with type definitions
+- ✅ Built-in authentication
+- ✅ Automatic retry logic with exponential backoff
+- ✅ Custom error classes
+- ✅ Content safety filtering (PII, prompt injection, harmful content)
+- ✅ Rate limiting protection
+- ✅ Streaming support with `chatStream()`
+
+## Supported Models
+
+| Provider | Models |
+|----------|--------|
+| OpenAI | `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo` |
+| Anthropic | `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` |
+| Google | `gemini-2.5-flash`, `gemini-2.0-flash` |
 
 ## Local Development
 
 For local development or testing:
 
 ```typescript
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: 'cen_test_...',
   baseUrl: 'http://localhost:3000'
 });
@@ -131,9 +166,9 @@ const cencori = new CencoriClient({
 
 ## Support
 
-- **Documentation**: [docs.cencori.com](https://docs.cencori.com)
+- **Documentation**: [cencori.com/docs](https://cencori.com/docs)
 - **Dashboard**: [cencori.com/dashboard](https://cencori.com/dashboard)
-- **GitHub**: [github.com/bolaabanjo/cencori](https://github.com/bolaabanjo/cencori)
+- **GitHub**: [github.com/cencori](https://github.com/cencori)
 
 ## License
 

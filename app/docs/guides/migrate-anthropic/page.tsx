@@ -64,9 +64,9 @@ const response = await anthropic.messages.create({
                         <CodeBlock
                             filename="after.ts"
                             language="typescript"
-                            code={`import { CencoriClient } from 'cencori';
+                            code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
 });
 
@@ -145,9 +145,9 @@ const anthropic = new Anthropic({
                                 <CodeBlock
                                     filename="new.ts"
                                     language="typescript"
-                                    code={`import { CencoriClient } from 'cencori';
+                                    code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
 });`}
                                 />

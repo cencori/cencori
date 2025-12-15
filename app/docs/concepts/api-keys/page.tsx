@@ -99,9 +99,9 @@ export default function APIKeysPage() {
                         <CodeBlock
                             filename="app.ts"
                             language="typescript"
-                            code={`import { CencoriClient } from 'cencori';
+                            code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY, // Store in environment variable
 });
 

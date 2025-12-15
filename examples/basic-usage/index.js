@@ -1,8 +1,8 @@
-import { CencoriClient, AuthenticationError, RateLimitError, SafetyError } from 'cencori';
+import { Cencori, AuthenticationError, RateLimitError, SafetyError } from 'cencori';
 import 'dotenv/config';
 
 // Initialize the Cencori client
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY
 });
 

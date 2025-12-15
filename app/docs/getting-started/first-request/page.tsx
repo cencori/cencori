@@ -98,10 +98,10 @@ pnpm add cencori`}
                 <CodeBlock
                     filename="index.ts"
                     language="typescript"
-                    code={`import { CencoriClient } from 'cencori';
+                    code={`import { Cencori } from 'cencori';
 
 // Initialize the client
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
 });
 
