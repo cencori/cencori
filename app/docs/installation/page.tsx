@@ -96,11 +96,7 @@ export default function InstallationPage() {
                     filename=".env"
                     language="bash"
                     code={`# Cencori API Credentials
-CENCORI_API_KEY=cen_your_api_key_here
-CENCORI_PROJECT_ID=proj_your_project_id_here
-
-# Optional: Set environment (production or test)
-CENCORI_ENVIRONMENT=production`}
+CENCORI_API_KEY=cen_your_api_key_here`}
                 />
 
                 <div className="mt-4 p-4 bg-muted/20 border border-border/40">
@@ -128,7 +124,6 @@ CENCORI_ENVIRONMENT=production`}
 
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
 });`}
                     />
                 </div>
@@ -142,21 +137,9 @@ export const cencori = new Cencori({
 
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
   
-  // Optional: Set base URL (default: https://api.cencori.com)
-  baseURL: "https://api.cencori.com",
-  
-  // Optional: Set timeout in milliseconds (default: 60000)
-  timeout: 60000,
-  
-  // Optional: Enable debug logging
-  debug: process.env.NODE_ENV === "development",
-  
-  // Optional: Set custom headers
-  headers: {
-    "X-Custom-Header": "value",
-  },
+  // Optional: Set base URL (default: https://cencori.com)
+  baseUrl: "https://cencori.com",
 });`}
                     />
                 </div>

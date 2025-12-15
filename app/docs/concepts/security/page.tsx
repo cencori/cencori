@@ -113,17 +113,10 @@ Pattern: Instruction override`}
 
 const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
-  
-  // Enable PII filtering
-  security: {
-    piiFiltering: {
-      enabled: true,
-      redactMode: "hash", // Options: "hash", "mask", "remove"
-      detectionLevel: "strict", // Options: "strict", "moderate", "lenient"
-    },
-  },
-});`}
+});
+
+// PII filtering is automatically enabled
+// Configure in your Cencori dashboard for custom settings`}
                     />
                 </div>
 
@@ -275,45 +268,32 @@ const competitorBlockPolicy = {
                         filename="app/api/chat/route.ts"
                         language="typescript"
                         code={`import { cencori } from "@/lib/cencori";
+import { SafetyError } from "cencori";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
   
   try {
-    const response = await cencori.chat.completions.create({
-      model: "gpt-4",
+    const response = await cencori.ai.chat({
+      model: "gpt-4o",
       messages: messages,
     });
     
     return Response.json(response);
-  } catch (error: any) {
+  } catch (error) {
     // Check for security violations
-    if (error.status === 403 && error.code === "SECURITY_VIOLATION") {
-      // Log incident on your side (optional)
-      console.error("Security incident triggered");
+    if (error instanceof SafetyError) {
+      console.error("Security incident:", error.reasons);
       
-      // Return user-friendly error
       return Response.json(
         { 
           error: "Request blocked",
-          message: error.message // Generic message from Cencori
+          message: "Your request was flagged by our security system."
         },
         { status: 403 }
       );
     }
     
-    // Check for content filtering
-    if (error.status === 403 && error.code === "CONTENT_FILTERED") {
-      return Response.json(
-        { 
-          error: "Response filtered",
-          message: error.message
-        },
-        { status: 403 }
-      );
-    }
-    
-    // Handle other errors
     throw error;
   }
 }`}

@@ -93,9 +93,9 @@ export default function MultiProviderPage() {
                 <CodeBlock
                     filename="switching-providers.ts"
                     language="typescript"
-                    code={`import { CencoriClient } from 'cencori';
+                    code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
 
 // Use OpenAI
 const gptResponse = await cencori.ai.chat({

@@ -91,8 +91,7 @@ export default function ProjectsPage() {
                             filename=".env"
                             language="bash"
                             code={`# Store your API key securely
-CENCORI_API_KEY=cen_prod_abc123xyz456
-CENCORI_PROJECT_ID=proj_789def012ghi`}
+CENCORI_API_KEY=cen_prod_abc123xyz456`}
                         />
                     </div>
 
@@ -163,15 +162,13 @@ Message: The provided API key has been revoked or does not exist.`}
                         filename=".env.development"
                         language="bash"
                         code={`# Development environment
-CENCORI_API_KEY=cen_test_abc123xyz456
-CENCORI_PROJECT_ID=proj_789def012ghi`}
+CENCORI_API_KEY=cen_test_abc123xyz456`}
                     />
                     <CodeBlock
                         filename=".env.production"
                         language="bash"
                         code={`# Production environment
-CENCORI_API_KEY=cen_xyz789abc123
-CENCORI_PROJECT_ID=proj_789def012ghi`}
+CENCORI_API_KEY=cen_xyz789abc123`}
                     />
                 </div>
 

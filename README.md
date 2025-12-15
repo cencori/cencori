@@ -45,9 +45,9 @@ npm install cencori
 ### 3. Make Your First Request
 
 ```typescript
-import { CencoriClient } from 'cencori';
+import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({
+const cencori = new Cencori({
   apiKey: 'your-api-key'
 });
 
@@ -248,9 +248,9 @@ Body: {
 ### Basic Chat
 
 ```typescript
-import { CencoriClient } from 'cencori';
+import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
 
 const response = await cencori.ai.chat({
   messages: [{ role: 'user', content: 'Explain quantum computing' }],
@@ -285,7 +285,7 @@ for await (const chunk of stream) {
 
 ```typescript
 import { 
-  CencoriClient, 
+  Cencori, 
   AuthenticationError, 
   RateLimitError,
   SafetyError 

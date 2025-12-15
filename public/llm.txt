@@ -25,7 +25,6 @@ npm install cencori
 ```bash
 # .env
 CENCORI_API_KEY=cen_your_api_key_here
-CENCORI_PROJECT_ID=proj_your_project_id_here
 ```
 
 ### 3. Initialize the Client
@@ -36,7 +35,6 @@ import { Cencori } from "cencori";
 
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-  projectId: process.env.CENCORI_PROJECT_ID!,
 });
 ```
 
@@ -49,15 +47,15 @@ import { cencori } from "@/lib/cencori";
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  const response = await cencori.chat.completions.create({
+  const response = await cencori.ai.chat({
     model: "gpt-4o", // or "claude-3-opus", "gemini-2.5-flash"
     messages: messages,
     temperature: 0.7,
-    max_tokens: 1000,
+    maxTokens: 1000,
   });
 
   return Response.json({
-    content: response.choices[0].message.content,
+    content: response.content,
     usage: response.usage,
   });
 }
@@ -68,72 +66,72 @@ export async function POST(req: Request) {
 ### Basic Usage
 
 ```typescript
-const response = await cencori.chat.completions.create({
+const response = await cencori.ai.chat({
   model: "gpt-4o",
   messages: [
     { role: "system", content: "You are a helpful assistant." },
     { role: "user", content: "Hello!" }
   ],
   temperature: 0.7,
-  max_tokens: 1000,
+  maxTokens: 1000,
 });
 
-console.log(response.choices[0].message.content);
+console.log(response.content);
 ```
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `model` | string | Yes | AI model to use (see Models section) |
+| `model` | string | No | AI model (default: gemini-2.5-flash) |
 | `messages` | array | Yes | Conversation history with role and content |
-| `temperature` | number | No | Randomness (0-2, default: 1) |
-| `max_tokens` | number | No | Max response tokens |
-| `stream` | boolean | No | Enable streaming (default: false) |
-| `user` | string | No | User ID for rate limiting |
+| `temperature` | number | No | Randomness (0-1) |
+| `maxTokens` | number | No | Max response tokens |
+| `userId` | string | No | User ID for rate limiting |
 
 ### Response Format
 
 ```typescript
 {
-  id: "chatcmpl-abc123",
+  content: "Hello! How can I help?",
   model: "gpt-4o",
-  choices: [{
-    index: 0,
-    message: { role: "assistant", content: "Hello! How can I help?" },
-    finish_reason: "stop"
-  }],
+  provider: "openai",
   usage: {
     prompt_tokens: 13,
     completion_tokens: 7,
     total_tokens: 20
-  }
+  },
+  cost_usd: 0.0003,
+  finish_reason: "stop"
 }
 ```
 
 ## Streaming
 
-Stream responses for better UX:
+Stream responses for better UX using `chatStream()`:
 
 ```typescript
 // Server route
-import { cencori } from "@/lib/cencori";
+import { Cencori } from "cencori";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
+  
+  const cencori = new Cencori({
+    apiKey: process.env.CENCORI_API_KEY!,
+  });
 
-  const stream = await cencori.chat.completions.create({
+  const stream = cencori.ai.chatStream({
     model: "gpt-4o",
     messages,
-    stream: true,
   });
 
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
     async start(controller) {
       for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        controller.enqueue(encoder.encode(content));
+        // chunk.delta contains the streamed text
+        controller.enqueue(encoder.encode(chunk.delta));
       }
       controller.close();
     },
@@ -148,10 +146,18 @@ export async function POST(req: Request) {
 }
 ```
 
-Client streaming:
+### Stream Chunk Format
 
 ```typescript
-// React component
+{
+  delta: "Hello",           // The text chunk
+  finish_reason?: "stop"    // Only on last chunk
+}
+```
+
+Client-side streaming:
+
+```typescript
 const res = await fetch('/api/chat', {
   method: 'POST',
   body: JSON.stringify({ messages }),
@@ -202,13 +208,13 @@ Switch providers with one parameter:
 
 ```typescript
 // OpenAI
-await cencori.chat.completions.create({ model: "gpt-4o", messages });
+await cencori.ai.chat({ model: "gpt-4o", messages });
 
 // Anthropic
-await cencori.chat.completions.create({ model: "claude-3-opus", messages });
+await cencori.ai.chat({ model: "claude-3-opus", messages });
 
 // Google
-await cencori.chat.completions.create({ model: "gemini-2.5-flash", messages });
+await cencori.ai.chat({ model: "gemini-2.5-flash", messages });
 ```
 
 All responses have the same format regardless of provider!
@@ -216,24 +222,24 @@ All responses have the same format regardless of provider!
 ## Error Handling
 
 ```typescript
+import { Cencori, SafetyError, RateLimitError, AuthenticationError } from "cencori";
+
 try {
-  const response = await cencori.chat.completions.create({
+  const response = await cencori.ai.chat({
     model: "gpt-4o",
     messages,
   });
   return response;
-} catch (error: any) {
-  if (error.status === 403 && error.code === "SECURITY_VIOLATION") {
-    // Request blocked by security (prompt injection, PII, etc.)
-    return { error: "Request blocked by security policy" };
+} catch (error) {
+  if (error instanceof SafetyError) {
+    // Request blocked (prompt injection, PII, harmful content)
+    return { error: "Content blocked", reasons: error.reasons };
   }
-  if (error.status === 429) {
-    // Rate limit exceeded
-    return { error: "Too many requests", retryAfter: error.retryAfter };
+  if (error instanceof RateLimitError) {
+    return { error: "Too many requests" };
   }
-  if (error.status === 400) {
-    // Invalid parameters
-    return { error: "Invalid request" };
+  if (error instanceof AuthenticationError) {
+    return { error: "Invalid API key" };
   }
   throw error;
 }
@@ -259,14 +265,14 @@ Scans for and filters:
 ### Content Filtering
 Blocks harmful content before it reaches AI providers.
 
-All security violations return status 403 with error code.
+All security violations throw `SafetyError` with `reasons` array.
 
 ## Best Practices
 
-1. **Set max_tokens** - Prevent unexpectedly long responses
-2. **Include user IDs** - Enable per-user rate limiting
-3. **Handle errors gracefully** - Implement retry logic
-4. **Use streaming for chat UIs** - Better user experience
+1. **Set maxTokens** - Prevent unexpectedly long responses
+2. **Include userId** - Enable per-user rate limiting
+3. **Handle errors gracefully** - Use typed error classes
+4. **Use chatStream() for chat UIs** - Better user experience
 5. **Monitor token usage** - Check dashboard for costs
 6. **Store API keys in env vars** - Never commit to version control
 7. **Use system role for instructions** - Never concatenate with user input

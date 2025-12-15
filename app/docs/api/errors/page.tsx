@@ -255,9 +255,9 @@ export default function ErrorsReferencePage() {
                 <CodeBlock
                     filename="error-handling.ts"
                     language="typescript"
-                    code={`import { CencoriClient } from 'cencori';
+                    code={`import { Cencori } from 'cencori';
 
-const cencori = new CencoriClient({ apiKey: process.env.CENCORI_API_KEY });
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
 
 async function makeRequest(messages: any[]) {
   try {
