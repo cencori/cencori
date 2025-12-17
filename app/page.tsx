@@ -100,6 +100,7 @@ export default function HomePage() {
 
       <main>
         <Hero />
+        <SocialProof />
         <Features />
         <Integrations />
         <Pricing />
