@@ -104,7 +104,7 @@ export const metadata: Metadata = {
     description: "The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
     images: [
       {
-        url: "https://cencori.com/og-image.png",
+        url: "https://cencori.com/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Cencori - The AI Infrastructure Platform",
@@ -119,7 +119,7 @@ export const metadata: Metadata = {
     creator: "@cencori",
     title: "Cencori | The AI Infrastructure Platform",
     description: "The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
-    images: ["https://cencori.com/og-image.png"],
+    images: ["https://cencori.com/og-image.jpg"],
   },
 
   // Canonical and alternates
