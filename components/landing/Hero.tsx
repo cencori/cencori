@@ -23,26 +23,25 @@ export const Hero = () => {
                 </div>
 
                 {/* Headline */}
-                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter mb-8 max-w-5xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-                    AI Infrastructure <span className="italic">for</span> <br className="hidden md:block" />
-                    Production
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
+                    AI Infrastructure <span className="italic">for</span> Production
                 </h1>
 
                 {/* Subheadline */}
-                <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mb-12 animate-appear [animation-delay:200ms] leading-relaxed">
+                <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
                     The unified API for every AI provider. Security, observability, and cost control, all built-in.
                 </p>
 
                 {/* CTAs */}
-                <div className="flex flex-col sm:flex-row gap-4 animate-appear [animation-delay:300ms]">
+                <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
                     <Link href="/login">
-                        <Button size="lg" className="h-12 px-8 text-base rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
+                        <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
                             Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                     </Link>
                     <Link href="/docs">
-                        <Button variant="outline" size="lg" className="h-12 px-8 text-base rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                            Read Docs
+                        <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
+                            Documentation
                         </Button>
                     </Link>
                 </div>
