@@ -228,14 +228,20 @@
 
 @keyframes marquee {
   0% {
-    transform: translateX(-10%);
+    transform: translateX(0);
   }
 
   100% {
-    transform: translateX(-43.333%);
+    transform: translateX(-25%);
   }
 }
 
 .animate-marquee {
-  animation: marquee 20s linear infinite;
+  animation: marquee 5s linear infinite;
+}
+
+@media (min-width: 768px) {
+  .animate-marquee {
+    animation: marquee 10s linear infinite;
+  }
 }

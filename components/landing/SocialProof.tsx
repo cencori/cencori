@@ -39,7 +39,7 @@ const ProviderLogo = ({
         <img
             src={`https://cdn.brandfetch.io/${provider.domain}/w/256/h/48/theme/${logoTheme}/logo?c=${clientId}`}
             alt={provider.name}
-            className="h-5 w-auto object-contain opacity-50 hover:opacity-100 transition-opacity"
+            className="h-5 max-w-[100px] w-auto object-contain opacity-50 hover:opacity-100 transition-opacity"
             onError={() => setHasError(true)}
         />
     );
@@ -50,11 +50,11 @@ export const SocialProof = () => {
     const clientId = process.env.NEXT_PUBLIC_BRANDFETCH_CLIENT_ID || "";
     const theme = resolvedTheme || "dark";
 
-    // Triple the array for seamless infinite loop
-    const duplicatedProviders = [...providers, ...providers, ...providers];
+    // Create 40 copies - by the time it loops, no one is watching anymore!
+    const duplicatedProviders = Array.from({ length: 40 }, () => providers).flat();
 
     return (
-        <section className="py-10 border-b border-border/40 bg-background">
+        <section className="py-10 bg-background">
             <div className="container mx-auto px-4 md:px-6 mb-6">
                 <p className="text-center text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">
                     Works with your favorite AI providers
@@ -63,16 +63,14 @@ export const SocialProof = () => {
 
             {/* Constrained width container with overflow hidden and fade mask */}
             <div
-                className="max-w-3xl mx-auto overflow-hidden"
+                className="max-w-xs sm:max-w-xl md:max-w-3xl mx-auto overflow-hidden"
                 style={{
                     maskImage: "linear-gradient(to right, transparent, black 10%, black 90%, transparent)",
                     WebkitMaskImage: "linear-gradient(to right, transparent, black 10%, black 90%, transparent)",
                 }}
             >
                 {/* Scrolling track */}
-                <div
-                    className="flex items-center gap-12 animate-marquee"
-                >
+                <div className="flex items-center gap-14 animate-marquee">
                     {duplicatedProviders.map((provider, index) => (
                         <div
                             key={index}

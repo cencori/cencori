@@ -334,7 +334,7 @@ export default function Navbar({
                                     <Button
                                         key={index}
                                         variant="default"
-                                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 h-9 px-4 text-sm font-medium"
+                                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 h-8 px-3 text-xs font-medium"
                                         asChild
                                     >
                                         <Link href={action.href}>
@@ -347,7 +347,7 @@ export default function Navbar({
                                     <Button
                                         key={index}
                                         variant="ghost"
-                                        className="hidden md:inline-flex h-9 px-4 text-sm font-medium rounded-full hover:bg-foreground/5 mr-2"
+                                        className="hidden md:inline-flex h-8 px-3 text-xs font-medium rounded-full hover:bg-foreground/5 mr-2"
                                         asChild
                                     >
                                         <Link href={action.href}>
