@@ -34,7 +34,7 @@ export const Hero = () => {
                 </p>
 
                 {/* CTAs */}
-                <div className="flex flex-col sm:flex-row gap-4 animate-appear [animation-delay:300ms] mb-20">
+                <div className="flex flex-col sm:flex-row gap-4 animate-appear [animation-delay:300ms]">
                     <Link href="/login">
                         <Button size="lg" className="h-12 px-8 text-base rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
                             Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
@@ -45,19 +45,6 @@ export const Hero = () => {
                             Read Docs
                         </Button>
                     </Link>
-                </div>
-
-                {/* Hero Image */}
-                <div className="w-full max-w-6xl animate-appear [animation-delay:500ms] relative flex justify-center mt-12">
-                    <img
-                        src="/shot.png"
-                        alt="Application Dashboard"
-                        className="w-full h-auto object-contain opacity-90"
-                        style={{
-                            maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)",
-                            WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)"
-                        }}
-                    />
                 </div>
             </div>
         </section>

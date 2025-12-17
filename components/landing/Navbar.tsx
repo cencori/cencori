@@ -271,11 +271,11 @@ export default function Navbar({
                                     } else {
                                         return (
                                             <NavigationMenuItem key={index}>
-                                                <Link href={item.href} legacyBehavior passHref>
-                                                    <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5")}>
+                                                <NavigationMenuLink asChild className={cn(navigationMenuTriggerStyle(), "h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5")}>
+                                                    <Link href={item.href}>
                                                         {item.title}
-                                                    </NavigationMenuLink>
-                                                </Link>
+                                                    </Link>
+                                                </NavigationMenuLink>
                                             </NavigationMenuItem>
                                         );
                                     }
