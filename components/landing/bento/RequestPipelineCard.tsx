@@ -55,7 +55,7 @@ export const RequestPipelineCard = () => {
                     {/* Pipeline track */}
                     <div className="relative">
                         {/* Track line */}
-                        <div className="absolute top-4 left-4 right-4 h-0.5 bg-white/[0.08] rounded-full" />
+                        <div className="absolute top-4 left-4 right-4 h-0.5 bg-muted rounded-full" />
 
                         {/* Animated progress line */}
                         <div
@@ -87,13 +87,13 @@ export const RequestPipelineCard = () => {
                                     <div
                                         className={cn(
                                             "w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 text-lg",
-                                            "bg-white/[0.05] border border-white/[0.08]",
+                                            "bg-muted/50 border border-border",
                                             activeStage >= i && "bg-orange-500/20 border-orange-500/40 shadow-[0_0_15px_-3px_rgba(249,115,22,0.4)]"
                                         )}
                                     >
                                         <span className={cn(
                                             "transition-colors duration-300",
-                                            activeStage >= i ? "text-orange-400" : "text-white/40"
+                                            activeStage >= i ? "text-orange-400" : "text-muted-foreground"
                                         )}>
                                             {stage.icon}
                                         </span>
@@ -101,7 +101,7 @@ export const RequestPipelineCard = () => {
                                     <span
                                         className={cn(
                                             "text-[10px] transition-colors duration-300",
-                                            activeStage >= i ? "text-orange-400" : "text-white/40"
+                                            activeStage >= i ? "text-orange-400" : "text-muted-foreground"
                                         )}
                                     >
                                         {stage.name}

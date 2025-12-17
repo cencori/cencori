@@ -9,6 +9,7 @@ import { Pricing } from "@/components/landing/Pricing";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 import { FAQ } from "@/components/landing/FAQ";
+import { HowToSetup } from "@/components/landing/HowToSetup";
 import { Logo } from "@/components/logo";
 import { siteConfig } from "@/config/site";
 import { useState, useEffect } from "react";
@@ -102,6 +103,7 @@ export default function HomePage() {
         <Hero />
         <SocialProof />
         <Features />
+        <HowToSetup />
         <Integrations />
         <Pricing />
         <FAQ />

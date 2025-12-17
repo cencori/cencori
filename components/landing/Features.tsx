@@ -13,11 +13,11 @@ export const Features = () => {
         <section className="py-32 bg-background">
             <div className="container mx-auto px-4 md:px-6">
                 <div className="flex flex-col items-center text-center mb-20">
-                    <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-white">
+                    <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-foreground">
                         Everything you need to{" "}
-                        <span className="text-white/60">ship AI</span>
+                        <span className="text-muted-foreground">ship AI</span>
                     </h2>
-                    <p className="text-lg text-white/50 max-w-2xl">
+                    <p className="text-lg text-muted-foreground max-w-2xl">
                         A complete platform to build, secure, and scale AI features.
                         Connect once, use any provider.
                     </p>

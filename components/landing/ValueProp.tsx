@@ -62,7 +62,7 @@ export const ValueProp = () => {
                                     </div>
 
                                     {/* Middle Layer: Cencori (Highlighted) */}
-                                    <div className="w-full h-24 mt-8 bg-zinc-950 text-white flex items-center justify-center">
+                                    <div className="w-full h-24 mt-8 bg-zinc-950 text-foreground flex items-center justify-center">
                                         <div className="flex flex-col items-center">
                                             <img src="/cdark.png" alt="Cencori logo" className="h-20 w-auto" />
                                         </div>

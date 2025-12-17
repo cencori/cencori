@@ -42,11 +42,11 @@ export const ModelRouterCard = () => {
                     <div className="relative z-10">
                         <div
                             className={cn(
-                                "w-20 h-8 rounded-md bg-white/[0.08] border border-white/[0.12] flex items-center justify-center transition-all duration-300",
+                                "w-20 h-8 rounded-md bg-muted border border-border flex items-center justify-center transition-all duration-300",
                                 isHovered && "border-emerald-500/40 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]"
                             )}
                         >
-                            <span className="text-xs text-white/80">Request</span>
+                            <span className="text-xs text-foreground/80">Request</span>
                         </div>
                         {/* Pulse animation */}
                         {isHovered && (
@@ -57,7 +57,7 @@ export const ModelRouterCard = () => {
                     {/* Connection lines */}
                     <div className="relative flex-1 w-full flex flex-col items-center justify-center">
                         {/* Main vertical line */}
-                        <div className="w-px h-full bg-gradient-to-b from-white/20 to-transparent" />
+                        <div className="w-px h-full bg-gradient-to-b from-foreground/20 to-transparent" />
 
                         {/* Animated dot moving down */}
                         {isHovered && (
@@ -88,16 +88,16 @@ export const ModelRouterCard = () => {
                         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
                             <defs>
                                 <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
-                                    <stop offset="100%" stopColor="rgba(255,255,255,0.05)" />
+                                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.3" />
+                                    <stop offset="100%" stopColor="currentColor" stopOpacity="0.05" />
                                 </linearGradient>
                             </defs>
                             {/* Left line */}
-                            <line x1="50%" y1="0" x2="15%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" />
+                            <line x1="50%" y1="0" x2="15%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" className="text-foreground" />
                             {/* Center line */}
-                            <line x1="50%" y1="0" x2="50%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" />
+                            <line x1="50%" y1="0" x2="50%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" className="text-foreground" />
                             {/* Right line */}
-                            <line x1="50%" y1="0" x2="85%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" />
+                            <line x1="50%" y1="0" x2="85%" y2="100%" stroke="url(#lineGradient)" strokeWidth="1" className="text-foreground" />
                         </svg>
                     </div>
 
@@ -121,7 +121,7 @@ export const ModelRouterCard = () => {
                                 <span
                                     className={cn(
                                         "text-[10px] transition-all duration-300",
-                                        isHovered && activeIndex === i ? provider.textColor : "text-white/40"
+                                        isHovered && activeIndex === i ? provider.textColor : "text-muted-foreground"
                                     )}
                                 >
                                     {provider.name}
