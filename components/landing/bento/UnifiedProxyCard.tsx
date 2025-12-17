@@ -6,54 +6,54 @@ import { cn } from "@/lib/utils";
 
 const codeLines = [
     { text: 'import', className: 'text-purple-400' },
-    { text: ' { Cencori }', className: 'text-white' },
+    { text: ' { Cencori }', className: 'text-foreground' },
     { text: ' from', className: 'text-purple-400' },
     { text: " 'cencori'", className: 'text-emerald-400' },
-    { text: ';', className: 'text-white' },
+    { text: ';', className: 'text-foreground' },
     { text: '\n\n', className: '' },
     { text: 'const', className: 'text-purple-400' },
-    { text: ' client', className: 'text-white' },
-    { text: ' = ', className: 'text-white' },
+    { text: ' client', className: 'text-foreground' },
+    { text: ' = ', className: 'text-foreground' },
     { text: 'new', className: 'text-purple-400' },
     { text: ' Cencori', className: 'text-amber-300' },
-    { text: '({ ', className: 'text-white' },
-    { text: 'apiKey', className: 'text-white' },
-    { text: ': ', className: 'text-white' },
+    { text: '({ ', className: 'text-foreground' },
+    { text: 'apiKey', className: 'text-foreground' },
+    { text: ': ', className: 'text-foreground' },
     { text: "'your-key'", className: 'text-emerald-400' },
-    { text: ' });', className: 'text-white' },
+    { text: ' });', className: 'text-foreground' },
     { text: '\n\n', className: '' },
-    { text: '// Works with any provider', className: 'text-white/40' },
+    { text: '// Works with any provider', className: 'text-muted-foreground' },
     { text: '\n', className: '' },
     { text: 'const', className: 'text-purple-400' },
-    { text: ' response', className: 'text-white' },
-    { text: ' = ', className: 'text-white' },
+    { text: ' response', className: 'text-foreground' },
+    { text: ' = ', className: 'text-foreground' },
     { text: 'await', className: 'text-purple-400' },
-    { text: ' client.chat.', className: 'text-white' },
+    { text: ' client.chat.', className: 'text-foreground' },
     { text: 'completions', className: 'text-amber-300' },
-    { text: '({', className: 'text-white' },
+    { text: '({', className: 'text-foreground' },
     { text: '\n  ', className: '' },
-    { text: 'provider', className: 'text-white' },
-    { text: ': ', className: 'text-white' },
+    { text: 'provider', className: 'text-foreground' },
+    { text: ': ', className: 'text-foreground' },
     { text: "'openai'", className: 'text-emerald-400' },
-    { text: ',', className: 'text-white' },
+    { text: ',', className: 'text-foreground' },
     { text: '\n  ', className: '' },
-    { text: 'model', className: 'text-white' },
-    { text: ': ', className: 'text-white' },
+    { text: 'model', className: 'text-foreground' },
+    { text: ': ', className: 'text-foreground' },
     { text: "'gpt-4o'", className: 'text-emerald-400' },
-    { text: ',', className: 'text-white' },
+    { text: ',', className: 'text-foreground' },
     { text: '\n  ', className: '' },
-    { text: 'messages', className: 'text-white' },
-    { text: ': [{ ', className: 'text-white' },
-    { text: 'role', className: 'text-white' },
-    { text: ': ', className: 'text-white' },
+    { text: 'messages', className: 'text-foreground' },
+    { text: ': [{ ', className: 'text-foreground' },
+    { text: 'role', className: 'text-foreground' },
+    { text: ': ', className: 'text-foreground' },
     { text: "'user'", className: 'text-emerald-400' },
-    { text: ', ', className: 'text-white' },
-    { text: 'content', className: 'text-white' },
-    { text: ': ', className: 'text-white' },
+    { text: ', ', className: 'text-foreground' },
+    { text: 'content', className: 'text-foreground' },
+    { text: ': ', className: 'text-foreground' },
     { text: "'Hello!'", className: 'text-emerald-400' },
-    { text: ' }]', className: 'text-white' },
+    { text: ' }]', className: 'text-foreground' },
     { text: '\n', className: '' },
-    { text: '});', className: 'text-white' },
+    { text: '});', className: 'text-foreground' },
 ];
 
 const TypewriterCode = ({ isHovered }: { isHovered: boolean }) => {
@@ -116,18 +116,18 @@ export const UnifiedProxyCard = () => {
             >
                 <div
                     className={cn(
-                        "relative rounded-lg border border-white/[0.08] bg-black/50 p-4 overflow-hidden transition-all duration-300",
+                        "relative rounded-lg border border-border bg-muted/50 p-4 overflow-hidden transition-all duration-300",
                         "group-hover:border-emerald-500/20"
                     )}
                 >
                     {/* Window header */}
-                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/[0.08]">
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-border">
                         <div className="flex gap-1.5">
                             <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
                             <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
                             <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
                         </div>
-                        <span className="text-xs text-white/40 ml-2">app.ts</span>
+                        <span className="text-xs text-muted-foreground ml-2">app.ts</span>
                     </div>
 
                     {/* Code content */}

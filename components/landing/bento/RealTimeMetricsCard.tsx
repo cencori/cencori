@@ -56,7 +56,7 @@ const MetricBar = ({ label, value, maxValue, color, isHovered }: MetricBarProps)
 
     return (
         <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40 w-16 shrink-0">{label}</span>
+            <span className="text-xs text-muted-foreground w-16 shrink-0">{label}</span>
             <div className="flex-1 h-2 bg-white/[0.05] rounded-full overflow-hidden">
                 <div
                     className={cn(
@@ -67,7 +67,7 @@ const MetricBar = ({ label, value, maxValue, color, isHovered }: MetricBarProps)
                     style={{ width: `${percentage}%` }}
                 />
             </div>
-            <span className="text-xs text-white/60 w-12 text-right tabular-nums">{value}%</span>
+            <span className="text-xs text-muted-foreground w-12 text-right tabular-nums">{value}%</span>
         </div>
     );
 };
@@ -90,24 +90,24 @@ export const RealTimeMetricsCard = () => {
                 <div className="grid grid-cols-3 gap-4">
                     {/* Metric counters */}
                     <div className="flex flex-col gap-1">
-                        <span className="text-xs text-white/40 uppercase tracking-wider">Requests</span>
-                        <span className="text-2xl font-bold text-white">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider">Requests</span>
+                        <span className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={12847} isHovered={isHovered} />
                         </span>
                         <span className="text-xs text-emerald-400">+12.4%</span>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <span className="text-xs text-white/40 uppercase tracking-wider">Avg Latency</span>
-                        <span className="text-2xl font-bold text-white">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider">Avg Latency</span>
+                        <span className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={42} suffix="ms" isHovered={isHovered} />
                         </span>
                         <span className="text-xs text-emerald-400">-8.2%</span>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <span className="text-xs text-white/40 uppercase tracking-wider">Cost Today</span>
-                        <span className="text-2xl font-bold text-white">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider">Cost Today</span>
+                        <span className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={847} prefix="$" isHovered={isHovered} />
                         </span>
                         <span className="text-xs text-orange-400">+3.1%</span>

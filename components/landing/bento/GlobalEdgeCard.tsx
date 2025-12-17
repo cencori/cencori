@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { BentoCard } from "./BentoCard";
 import createGlobe from "cobe";
+import { useTheme } from "next-themes";
 
 // Edge node locations (lat, lng)
 const edgeNodes = [
@@ -26,6 +27,9 @@ export const GlobalEdgeCard = () => {
     const [activeNodeIndex, setActiveNodeIndex] = useState(0);
     const globeRef = useRef<ReturnType<typeof createGlobe> | null>(null);
     const phiRef = useRef(0);
+    const { resolvedTheme } = useTheme();
+
+    const isDark = resolvedTheme === "dark";
 
     useEffect(() => {
         let width = 0;
@@ -46,19 +50,23 @@ export const GlobalEdgeCard = () => {
             size: index === activeNodeIndex && isHovered ? 0.1 : 0.05,
         }));
 
+        // Theme-aware colors
+        const baseColor: [number, number, number] = isDark ? [0.1, 0.1, 0.1] : [0.9, 0.9, 0.9];
+        const glowColor: [number, number, number] = isDark ? [0.02, 0.15, 0.1] : [0.8, 0.95, 0.9];
+
         globeRef.current = createGlobe(canvas, {
             devicePixelRatio: 2,
             width: width * 2,
             height: width * 2,
             phi: 0,
             theta: 0.3,
-            dark: 1,
+            dark: isDark ? 1 : 0,
             diffuse: 1.2,
             mapSamples: 21000,
-            mapBrightness: 12.0,
-            baseColor: [0.1, 0.1, 0.1],
+            mapBrightness: isDark ? 12.0 : 6.0,
+            baseColor,
             markerColor: [0.063, 0.725, 0.506], // Emerald green
-            glowColor: [0.02, 0.15, 0.1], // Subtle emerald glow
+            glowColor,
             markers,
             onRender: (state) => {
                 // Rotate faster when hovered
@@ -73,7 +81,7 @@ export const GlobalEdgeCard = () => {
             globeRef.current?.destroy();
             window.removeEventListener("resize", onResize);
         };
-    }, [isHovered, activeNodeIndex]);
+    }, [isHovered, activeNodeIndex, isDark]);
 
     // Cycle through active nodes when hovered
     useEffect(() => {
@@ -111,8 +119,8 @@ export const GlobalEdgeCard = () => {
                     />
 
                     {/* Gradient overlays for seamless blending */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/50 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-card/50 via-transparent to-transparent pointer-events-none" />
 
                     {/* Active location label */}
                     {isHovered && (
@@ -123,7 +131,7 @@ export const GlobalEdgeCard = () => {
                                     {edgeNodes[activeNodeIndex].name}
                                 </span>
                             </div>
-                            <span className="text-[10px] text-white/40">
+                            <span className="text-[10px] text-muted-foreground">
                                 {edgeNodes.length} regions
                             </span>
                         </div>

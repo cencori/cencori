@@ -62,12 +62,12 @@ export const LatencyOverheadCard = () => {
                         <span
                             className={cn(
                                 "text-5xl font-bold tabular-nums transition-all duration-150",
-                                isHovered ? "text-emerald-400" : "text-white"
+                                isHovered ? "text-emerald-400" : "text-foreground"
                             )}
                         >
                             &lt;{latencyValue}
                         </span>
-                        <span className="text-2xl text-white/60">ms</span>
+                        <span className="text-2xl text-muted-foreground">ms</span>
 
                         {/* Pulse rings */}
                         {isHovered && (
@@ -92,7 +92,7 @@ export const LatencyOverheadCard = () => {
                     </div>
 
                     {/* Latency wave visualization */}
-                    <div className="flex-1 h-16 relative overflow-hidden rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <div className="flex-1 h-16 relative overflow-hidden rounded-lg bg-muted/30 border border-border/50">
                         <svg
                             className="absolute inset-0 w-full h-full"
                             preserveAspectRatio="none"
@@ -140,21 +140,21 @@ export const LatencyOverheadCard = () => {
                 </div>
 
                 {/* Bottom stats */}
-                <div className="flex gap-6 mt-4 pt-4 border-t border-white/[0.05]">
+                <div className="flex gap-6 mt-4 pt-4 border-t border-border/50">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-xs text-white/40">p50:</span>
-                        <span className="text-xs text-white/80 tabular-nums">32ms</span>
+                        <span className="text-xs text-muted-foreground">p50:</span>
+                        <span className="text-xs text-foreground/80 tabular-nums">32ms</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500/60" />
-                        <span className="text-xs text-white/40">p95:</span>
-                        <span className="text-xs text-white/80 tabular-nums">48ms</span>
+                        <span className="text-xs text-muted-foreground">p95:</span>
+                        <span className="text-xs text-foreground/80 tabular-nums">48ms</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500/30" />
-                        <span className="text-xs text-white/40">p99:</span>
-                        <span className="text-xs text-white/80 tabular-nums">67ms</span>
+                        <span className="text-xs text-muted-foreground">p99:</span>
+                        <span className="text-xs text-foreground/80 tabular-nums">67ms</span>
                     </div>
                 </div>
 

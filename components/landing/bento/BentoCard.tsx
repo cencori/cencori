@@ -38,7 +38,7 @@ export const BentoCard = ({
     return (
         <div
             className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0A] p-6 transition-all duration-500 h-full",
+                "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all duration-500 h-full",
                 "hover:-translate-y-1",
                 styles.glow,
                 styles.border,
@@ -57,10 +57,10 @@ export const BentoCard = ({
 
             {/* Content header */}
             <div className="relative z-10 flex flex-col gap-2">
-                <h3 className="text-xl font-semibold tracking-tight text-white">
+                <h3 className="text-xl font-semibold tracking-tight text-foreground">
                     {title}
                 </h3>
-                <p className="text-sm text-white/60 leading-relaxed max-w-[90%]">
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-[90%]">
                     {description}
                 </p>
             </div>
