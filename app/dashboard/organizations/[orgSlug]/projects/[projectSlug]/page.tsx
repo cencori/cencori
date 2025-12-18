@@ -407,6 +407,7 @@ export default function ProjectDetailsPage({
   const [aiStats, setAiStats] = useState<AIStats | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [period, setPeriod] = useState<string>('7d');
+  const [hasAnyRequests, setHasAnyRequests] = useState<boolean>(false); // Track if ANY requests exist across all environments
   const { environment } = useEnvironment();
 
   useEffect(() => {
@@ -453,6 +454,9 @@ export default function ProjectDetailsPage({
 
         // Fetch AI stats if project exists
         fetchAIStats(projectData.id, period);
+
+        // Also check if there are ANY requests across all environments (for hiding Getting Started)
+        checkAnyRequests(projectData.id);
       } catch (err: unknown) {
         console.error("Unexpected error:", (err as Error).message);
         setError("An unexpected error occurred.");
@@ -471,6 +475,21 @@ export default function ProjectDetailsPage({
         }
       } catch (err) {
         console.log('AI stats not available yet');
+      }
+    }
+
+    // Check if ANY requests exist across all environments (without environment filter)
+    async function checkAnyRequests(projectId: string) {
+      try {
+        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=all`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          if (statsData.stats && statsData.stats.totalRequests > 0) {
+            setHasAnyRequests(true);
+          }
+        }
+      } catch (err) {
+        // Ignore errors
       }
     }
 
@@ -634,8 +653,8 @@ export default function ProjectDetailsPage({
 
   return (
     <div className="w-full max-w-[1920px] mx-auto px-6 sm:px-4 lg:px-8 py-6 sm:py-4">
-      {/* Hero Section - Only show when user has data */}
-      {(aiStats !== null && aiStats.totalRequests > 0) && (
+      {/* Hero Section - Only show when user has ANY data (across all environments) */}
+      {hasAnyRequests && (
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
           <div className="space-y-4 flex-1 min-w-0">
             <div className="space-y-6">
@@ -654,16 +673,16 @@ export default function ProjectDetailsPage({
         </div>
       )}
 
-      {/* Getting Started Section */}
+      {/* Getting Started Section - Only show if NO requests exist in ANY environment */}
       <GettingStartedSection
         orgSlug={orgSlug!}
         projectSlug={projectSlug!}
-        hasData={aiStats !== null && aiStats.totalRequests > 0}
+        hasData={hasAnyRequests}
         loading={loading}
       />
 
-      {/* Time Period Selector and Analytics - Only show when user has data */}
-      {(aiStats !== null && aiStats.totalRequests > 0) && (
+      {/* Time Period Selector and Analytics - Only show when user has ANY data (across all environments) */}
+      {hasAnyRequests && (
         <>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
