@@ -98,7 +98,7 @@ export default function ProductAIPage() {
     };
     checkUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
       if (session) {
         setIsAuthenticated(true);
         const { user } = session;
