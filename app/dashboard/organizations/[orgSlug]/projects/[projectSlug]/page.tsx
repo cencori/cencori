@@ -198,9 +198,9 @@ function GettingStartedSection({
       </div>
 
       {/* LLM Prompt Bar */}
-      <div className="flex items-center justify-between gap-4 px-8 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4 text-emerald-500" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 sm:px-8 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg max-w-3xl mx-auto">
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Info className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
           <span>Copy this quickstart guide as a prompt for LLMs to integrate Cencori</span>
         </div>
         <Button
