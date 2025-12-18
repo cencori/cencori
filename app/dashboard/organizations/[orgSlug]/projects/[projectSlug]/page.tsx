@@ -117,7 +117,7 @@ function GettingStartedSection({
 }: {
   orgSlug: string;
   projectSlug: string;
-  hasData: boolean;
+  hasData: boolean | null; // null = still checking
   loading: boolean;
 }) {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
@@ -125,8 +125,9 @@ function GettingStartedSection({
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
 
-  // Don't show if user has data
-  if (hasData || loading) {
+  // Don't show while loading, while still checking (null), or if user has data (true)
+  // Only show when hasData === false (confirmed no requests)
+  if (loading || hasData === null || hasData === true) {
     return null;
   }
 
@@ -407,7 +408,7 @@ export default function ProjectDetailsPage({
   const [aiStats, setAiStats] = useState<AIStats | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [period, setPeriod] = useState<string>('7d');
-  const [hasAnyRequests, setHasAnyRequests] = useState<boolean>(false); // Track if ANY requests exist across all environments
+  const [hasAnyRequests, setHasAnyRequests] = useState<boolean | null>(null); // null = still checking, false = no requests, true = has requests
   const { environment } = useEnvironment();
 
   useEffect(() => {
@@ -484,12 +485,13 @@ export default function ProjectDetailsPage({
         const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=all`);
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
-          if (statsData.stats && statsData.stats.totalRequests > 0) {
-            setHasAnyRequests(true);
-          }
+          // Set true if requests exist, false if none
+          setHasAnyRequests(statsData.stats && statsData.stats.totalRequests > 0);
+        } else {
+          setHasAnyRequests(false); // No data means no requests
         }
       } catch (err) {
-        // Ignore errors
+        setHasAnyRequests(false); // Error means treat as no requests
       }
     }
 
