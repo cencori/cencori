@@ -128,9 +128,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Refresh session if expired - this should be in your middleware
-  // A simple example for session refreshing:
-  await supabase.auth.getSession();
+  // IMPORTANT: Use getUser() instead of getSession() for secure session validation
+  // getSession() reads from local storage without validation - getUser() validates with Supabase Auth server
+  // This properly refreshes tokens and prevents logout during hot reload
+  const { data: { user }, error } = await supabase.auth.getUser();
 
   return supabaseResponse;
 }
