@@ -246,13 +246,13 @@ function GettingStartedSection({
               </p>
             </div>
             <div className="relative">
-              <div className="bg-zinc-950 dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-                  <span className="text-xs text-zinc-400 font-mono">terminal</span>
+              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                  <span className="text-xs text-muted-foreground font-mono">terminal</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-zinc-400 hover:text-zinc-200"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
                     onClick={copyInstall}
                   >
                     {copiedInstall ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -288,13 +288,13 @@ function GettingStartedSection({
               </p>
             </div>
             <div className="relative">
-              <div className="bg-zinc-950 dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-                  <span className="text-xs text-zinc-400 font-mono">.env</span>
+              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                  <span className="text-xs text-muted-foreground font-mono">.env</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-zinc-400 hover:text-zinc-200"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
                     onClick={copyEnv}
                   >
                     {copiedEnv ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -324,13 +324,13 @@ function GettingStartedSection({
               </p>
             </div>
             <div className="relative">
-              <div className="bg-zinc-950 dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-                  <span className="text-xs text-zinc-400 font-mono">lib/cencori.ts</span>
+              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                  <span className="text-xs text-muted-foreground font-mono">lib/cencori.ts</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-zinc-400 hover:text-zinc-200"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
                     onClick={() => {
                       navigator.clipboard.writeText(`import { Cencori } from "cencori";
 
@@ -343,7 +343,7 @@ export const cencori = new Cencori({
                   </Button>
                 </div>
                 <div className="p-4 space-y-1">
-                  <code className="text-sm font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">"cencori"</span><span className="text-zinc-300">;</span></code>
+                  <code className="text-sm font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori&quot;</span><span className="text-zinc-300">;</span></code>
                   <code className="text-sm font-mono block text-zinc-600">&nbsp;</code>
                   <code className="text-sm font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencori</span> <span className="text-zinc-300">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
                   <code className="text-sm font-mono block">  <span className="text-zinc-300">apiKey:</span> <span className="text-blue-400">process.env</span><span className="text-zinc-300">.</span><span className="text-zinc-100">CENCORI_API_KEY</span><span className="text-zinc-300">!,</span></code>
