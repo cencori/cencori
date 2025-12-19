@@ -479,10 +479,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Theme Toggle - hidden on mobile */}
+          {/* Theme Toggle */}
           <button
             type="button"
-            className="hidden lg:inline-flex w-7 h-7 cursor-pointer items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black/40 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
+            className="w-7 h-7 cursor-pointer inline-flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black/40 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
             aria-label="Toggle theme"
             onClick={() => {
               if (typeof document !== "undefined") {
