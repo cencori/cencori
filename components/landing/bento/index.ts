@@ -5,3 +5,4 @@ export { ModelRouterCard } from "./ModelRouterCard";
 export { RequestPipelineCard } from "./RequestPipelineCard";
 export { LatencyOverheadCard } from "./LatencyOverheadCard";
 export { GlobalEdgeCard } from "./GlobalEdgeCard";
+export { UnifiedBillingCard } from "./UnifiedBillingCard";
