@@ -8,6 +8,7 @@ interface Organization {
     name: string;
     slug: string;
     description?: string;
+    plan?: string;
 }
 
 interface Project {
@@ -59,7 +60,7 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
             // Fetch organizations
             const { data: orgsData, error: orgsError } = await supabase
                 .from("organizations")
-                .select("id, name, slug");
+                .select("id, name, slug, plan");
 
             if (orgsError) {
                 console.error("Error fetching organizations:", orgsError.message);
