@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Logo } from "@/components/logo";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { CircleUserRound, CreditCard, Settings, Users, UserPlus, HelpCircle, MessageSquarePlus, Book, Wrench, Activity, Mail, Command } from "lucide-react";
+import { CircleUserRound, CreditCard, Settings, Users, UserPlus, HelpCircle, MessageSquarePlus, Book, Wrench, Activity, Mail, Command, Menu } from "lucide-react";
 import Link from "next/link";
 import {
   Breadcrumb,
@@ -168,10 +168,11 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           <Link href="/dashboard/organizations" className="flex items-center">
             <Logo variant="mark" className="h-4" />
           </Link>
-          <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm" aria-hidden>
+          {/* Breadcrumbs - hidden on mobile */}
+          <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm hidden lg:block" aria-hidden>
             /
           </span>
-          <Breadcrumb className="sm:flex md:flex">
+          <Breadcrumb className="hidden lg:flex">
             <BreadcrumbList>
               {orgSlug && (
                 <React.Fragment>
@@ -363,12 +364,35 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Feedback Button */}
+          {/* Search Button (icon only on mobile) */}
+          <button
+            type="button"
+            className="w-8 h-8 lg:w-auto lg:h-6 lg:px-2.5 flex items-center justify-center lg:justify-start gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
+            onClick={() => setCommandPaletteOpen(true)}
+          >
+            <Search className="h-4 w-4 lg:h-3 lg:w-3" />
+            <span className="hidden lg:inline">Search...</span>
+            <span className="hidden lg:flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+              <Command className="h-2.5 w-2.5" />K
+            </span>
+          </button>
+
+          {/* Hamburger Menu - visible on mobile only */}
+          <button
+            type="button"
+            onClick={toggle}
+            className="w-8 h-8 flex lg:hidden items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="h-4 w-4 text-muted-foreground" />
+          </button>
+
+          {/* Feedback Button - hidden on mobile */}
           <DropdownMenu open={feedbackOpen} onOpenChange={setFeedbackOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-6 px-2.5 text-[11px] font-medium rounded-full bg-secondary/60 hover:bg-secondary text-foreground transition-colors cursor-pointer"
+                className="hidden lg:block h-6 px-2.5 text-[11px] font-medium rounded-full bg-secondary/60 hover:bg-secondary text-foreground transition-colors cursor-pointer"
               >
                 Feedback
               </button>
@@ -399,25 +423,12 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Search Button */}
-          <button
-            type="button"
-            className="h-6 px-2.5 flex items-center gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
-            onClick={() => setCommandPaletteOpen(true)}
-          >
-            <Search className="h-3 w-3" />
-            <span>Search...</span>
-            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
-              <Command className="h-2.5 w-2.5" />K
-            </span>
-          </button>
-
-          {/* Help Button */}
+          {/* Help Button - hidden on mobile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="w-6 h-6 inline-flex items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors cursor-pointer"
+                className="hidden lg:inline-flex w-6 h-6 items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors cursor-pointer"
                 aria-label="Help"
               >
                 <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -468,10 +479,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Theme Toggle */}
+          {/* Theme Toggle - hidden on mobile */}
           <button
             type="button"
-            className="w-7 h-7 cursor-pointer inline-flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black/40 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
+            className="hidden lg:inline-flex w-7 h-7 cursor-pointer items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black/40 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
             aria-label="Toggle theme"
             onClick={() => {
               if (typeof document !== "undefined") {
@@ -514,7 +525,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             </svg>
           </button>
 
-          {/* Add other header buttons as needed */}
+          {/* User Avatar Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="h-7 w-7 cursor-pointer">
