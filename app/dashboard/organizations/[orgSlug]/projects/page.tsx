@@ -43,8 +43,26 @@ interface ProjectData {
   visibility: "private" | "public";
   github_repo_url?: string;
   status: "active" | "inactive";
+  region?: string;
   created_at: string;
 }
+
+// Region display labels
+const REGION_LABELS: Record<string, string> = {
+  auto: "Auto",
+  "us-east-1": "US East",
+  "us-west-1": "US West",
+  "us-west-2": "US West",
+  "eu-west-1": "EU West",
+  "eu-central-1": "EU Central",
+  "ap-southeast-1": "AP Southeast",
+  "ap-northeast-1": "AP Northeast",
+  "ap-south-1": "AP South",
+  "sa-east-1": "SA East",
+  "ca-central-1": "CA Central",
+  "me-south-1": "ME South",
+  "af-south-1": "AF South",
+};
 
 export default function OrgProjectsPage({
   params,
@@ -111,7 +129,7 @@ export default function OrgProjectsPage({
 
         const { data: projectsData, error: projectsError } = await browserSupabase
           .from("projects")
-          .select("id, name, slug, description, visibility, github_repo_url, status, created_at")
+          .select("id, name, slug, description, visibility, github_repo_url, status, region, created_at")
           .eq("organization_id", orgData.id);
 
         if (projectsError) {
@@ -262,6 +280,7 @@ export default function OrgProjectsPage({
             <TableHeader>
               <TableRow className="hover:bg-transparent border-b border-border/40">
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Project</TableHead>
+                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Region</TableHead>
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Created</TableHead>
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Status</TableHead>
                 <TableHead className="h-8 w-10"></TableHead>
@@ -277,6 +296,9 @@ export default function OrgProjectsPage({
                   <TableCell className="py-3 px-4">
                     <div className="text-[13px] font-medium">{project.name}</div>
                     <div className="text-[11px] text-muted-foreground">ID: {project.slug}</div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground py-3">
+                    {REGION_LABELS[project.region || "auto"] || project.region || "Auto"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-3">
                     {(() => {
