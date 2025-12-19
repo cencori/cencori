@@ -297,8 +297,8 @@ export default function OrgProjectsPage({
                     <div className="text-[13px] font-medium">{project.name}</div>
                     <div className="text-[11px] text-muted-foreground">ID: {project.slug}</div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground py-3">
-                    {REGION_LABELS[project.region || "auto"] || project.region || "Auto"}
+                  <TableCell className="text-xs text-muted-foreground py-3 font-mono">
+                    {project.region || "americas"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-3">
                     {(() => {
