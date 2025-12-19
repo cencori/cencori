@@ -6,6 +6,7 @@ import {
     RequestPipelineCard,
     LatencyOverheadCard,
     GlobalEdgeCard,
+    UnifiedBillingCard,
 } from "./bento";
 
 export const Features = () => {
@@ -24,25 +25,28 @@ export const Features = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-5 max-w-6xl mx-auto">
-                    {/* Row 1: Unified Proxy (2x2) + Real-time Metrics (2x1) + Model Router start */}
+                    {/* Row 1-2: Unified Proxy (2x2) spans both rows */}
                     <div className="md:col-span-2 md:row-span-2 min-h-[420px]">
                         <UnifiedProxyCard />
                     </div>
+
+                    {/* Row 1 right side: Real-time Metrics (2x1) */}
                     <div className="md:col-span-2 min-h-[200px]">
                         <RealTimeMetricsCard />
                     </div>
 
-                    {/* Row 2: Model Router (spanning into row 2) */}
-                    <div className="md:col-span-1 md:row-span-2 min-h-[420px]">
+                    {/* Row 2 right side: Model Router + Unified Billing */}
+                    <div className="md:col-span-1 min-h-[200px]">
                         <ModelRouterCard />
                     </div>
+                    <div className="md:col-span-1 min-h-[200px]">
+                        <UnifiedBillingCard />
+                    </div>
 
-                    {/* Request Pipeline next to Model Router */}
+                    {/* Row 3: Request Pipeline + Latency Overhead + Global Edge */}
                     <div className="md:col-span-1 min-h-[200px]">
                         <RequestPipelineCard />
                     </div>
-
-                    {/* Row 3: Latency Overhead + Global Edge */}
                     <div className="md:col-span-2 min-h-[200px]">
                         <LatencyOverheadCard />
                     </div>
@@ -54,4 +58,3 @@ export const Features = () => {
         </section>
     );
 };
-
