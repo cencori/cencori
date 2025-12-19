@@ -171,11 +171,16 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                       }}
                     >
                       <SelectPrimitive.Trigger
-                        className="flex h-7 cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+                        className="flex h-7 cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors"
                       >
                         <SelectValue placeholder="Organizations">
                           {currentOrg?.name || "Organizations"}
                         </SelectValue>
+                        {currentOrg?.plan && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20">
+                            {currentOrg.plan}
+                          </span>
+                        )}
                         <SelectPrimitive.Icon asChild>
                           <ChevronsUpDown
                             size={12}
@@ -319,11 +324,11 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           </Breadcrumb>
 
           {projectSlug && (
-            <div className="hidden md:flex items-center bg-muted/50 rounded-full p-1 border border-border ml-2">
+            <div className="hidden md:flex items-center bg-muted/30 rounded-full p-0.5 border border-border/40 ml-2">
               <button
                 onClick={() => setEnvironment("production")}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${!isTestMode
-                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-sm"
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${!isTestMode
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
               >
@@ -331,8 +336,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
               </button>
               <button
                 onClick={() => setEnvironment("test")}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${isTestMode
-                  ? "bg-orange-500/10 text-orange-600 border border-orange-500/20 shadow-sm"
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${isTestMode
+                  ? "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
               >
