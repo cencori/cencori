@@ -34,6 +34,7 @@ import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/conte
 import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
+import { CommandPalette } from "@/components/dashboard/CommandPalette";
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -130,6 +131,19 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const { setEnvironment, isTestMode } = useEnvironment();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ⌘K keyboard shortcut for command palette
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const getOrgSlug = () => {
     const match = pathname.match(/organizations\/([^/]+)/);
@@ -354,7 +368,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-6 px-2.5 text-[11px] font-medium rounded-full bg-secondary/80 hover:bg-secondary text-foreground transition-colors"
+                className="h-6 px-2.5 text-[11px] font-medium rounded-full bg-secondary/60 hover:bg-secondary text-foreground transition-colors cursor-pointer"
               >
                 Feedback
               </button>
@@ -388,10 +402,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           {/* Search Button */}
           <button
             type="button"
-            className="h-6 px-2.5 flex items-center gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/80 hover:bg-secondary transition-colors"
-            onClick={() => {
-              // TODO: Open command palette/search modal
-            }}
+            className="h-6 px-2.5 flex items-center gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
+            onClick={() => setCommandPaletteOpen(true)}
           >
             <Search className="h-3 w-3" />
             <span>Search...</span>
@@ -405,7 +417,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="w-6 h-6 inline-flex items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors"
+                className="w-6 h-6 inline-flex items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors cursor-pointer"
                 aria-label="Help"
               >
                 <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -571,6 +583,12 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         {children}
       </main>
       <Toaster />
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        orgSlug={orgSlug}
+        projectSlug={projectSlug}
+      />
     </div>
   );
 }
