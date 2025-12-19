@@ -8,16 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { generateSlug } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -31,7 +22,6 @@ import Link from "next/link";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Organization name must be at least 2 characters." }),
-  description: z.string().optional(),
   type: z.enum(["personal", "agency", "startup", "company"]),
   plan: z.enum(["free", "pro", "team", "enterprise"]),
 });
@@ -44,7 +34,7 @@ function getRequestLimit(tier: string): number {
     case 'free': return 1000;
     case 'pro': return 50000;
     case 'team': return 250000;
-    case 'enterprise': return 999999999; // Unlimited
+    case 'enterprise': return 999999999;
     default: return 1000;
   }
 }
@@ -61,7 +51,6 @@ export default function NewOrganizationPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      description: "",
       type: "personal",
       plan: "free",
     },
@@ -80,9 +69,8 @@ export default function NewOrganizationPage() {
     let newSlug = generateSlug();
     let slugExists = true;
 
-    // Ensure slug is unique (simple retry logic)
-    for (let i = 0; i < 5; i++) { // Max 5 retries
-      const { data, error } = await supabase
+    for (let i = 0; i < 5; i++) {
+      const { data } = await supabase
         .from("organizations")
         .select("slug")
         .eq("slug", newSlug)
@@ -103,11 +91,9 @@ export default function NewOrganizationPage() {
 
     const requestLimit = getRequestLimit(values.plan);
 
-    // Create organization with subscription tier
     const { data: orgData, error } = await supabase.from("organizations").insert({
       name: values.name,
       slug: newSlug,
-      description: values.description,
       subscription_tier: values.plan,
       subscription_status: values.plan === 'free' ? 'active' : 'incomplete',
       monthly_request_limit: requestLimit,
@@ -128,7 +114,6 @@ export default function NewOrganizationPage() {
       return;
     }
 
-    // Add the creating user as an owner in the organization_members table
     const { error: memberError } = await supabase.from("organization_members").insert({
       organization_id: orgData.id,
       user_id: user.id,
@@ -144,14 +129,11 @@ export default function NewOrganizationPage() {
 
     toast.success("Organization created successfully!");
 
-    // If user selected a paid plan, redirect to billing for Polar checkout
     if (values.plan === 'pro' || values.plan === 'team') {
       router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
     } else if (values.plan === 'enterprise') {
-      // Redirect to contact page for enterprise
       router.push(`/contact?plan=enterprise&org=${orgData.slug}`);
     } else {
-      // Free tier - go to projects
       router.push(`/dashboard/organizations/${orgData.slug}/projects`);
     }
 
@@ -159,111 +141,122 @@ export default function NewOrganizationPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-      <Card className="w-[550px]">
-        <CardHeader>
-          <CardTitle>Create New Organization</CardTitle>
-          <CardDescription>Start managing your projects by creating an organization.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid w-full items-center gap-4">
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="name">Organization Name</Label>
+    <div className="w-full max-w-2xl mx-auto px-6 py-10">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-base font-medium mb-1">Create a new organization</h1>
+        <p className="text-xs text-muted-foreground">
+          Organizations are a way to group your projects. Each organization can be configured with different team members and billing settings.
+        </p>
+      </div>
+
+      {/* Form Card */}
+      <div className="bg-card border border-border/40 rounded-md">
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          {/* Name Field */}
+          <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-2 md:gap-6 p-4 border-b border-border/40">
+            <label htmlFor="name" className="text-xs font-medium pt-2">
+              Name
+            </label>
+            <div className="space-y-1.5">
               <Input
                 id="name"
-                placeholder="My Awesome Org"
+                placeholder="Organization name"
+                className="h-8 text-xs bg-secondary/50 border-border/50"
                 {...form.register("name")}
               />
+              <p className="text-[11px] text-muted-foreground">
+                What's the name of your company or team? You can change this later.
+              </p>
               {form.formState.errors.name && (
-                <p className="text-red-500 text-sm">{form.formState.errors.name.message}</p>
+                <p className="text-[11px] text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Input
-                id="description"
-                placeholder="A brief description of my organization"
-                {...form.register("description")}
-              />
-            </div>
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="type">Organization Type</Label>
-              <Select onValueChange={(value: string) => form.setValue("type", value as FormValues["type"])} defaultValue={form.getValues("type")}>
-                <SelectTrigger id="type" className="w-full">
+          </div>
+
+          {/* Type Field */}
+          <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-2 md:gap-6 p-4 border-b border-border/40">
+            <label htmlFor="type" className="text-xs font-medium pt-2">
+              Type
+            </label>
+            <div className="space-y-1.5">
+              <Select
+                onValueChange={(value: string) => form.setValue("type", value as FormValues["type"])}
+                defaultValue={form.getValues("type")}
+              >
+                <SelectTrigger id="type" className="h-8 text-xs bg-secondary/50 border-border/50">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="personal">Personal</SelectItem>
-                  <SelectItem value="agency">Agency</SelectItem>
-                  <SelectItem value="startup">Startup</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
+                  <SelectItem value="personal" className="text-xs">Personal</SelectItem>
+                  <SelectItem value="agency" className="text-xs">Agency</SelectItem>
+                  <SelectItem value="startup" className="text-xs">Startup</SelectItem>
+                  <SelectItem value="company" className="text-xs">Company</SelectItem>
                 </SelectContent>
               </Select>
-              {form.formState.errors.type && (
-                <p className="text-red-500 text-sm">{form.formState.errors.type.message}</p>
-              )}
+              <p className="text-[11px] text-muted-foreground">
+                What best describes your organization?
+              </p>
             </div>
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="plan">Select Plan</Label>
-              <Select onValueChange={(value: string) => form.setValue("plan", value as FormValues["plan"])} defaultValue={form.getValues("plan")}>
-                <SelectTrigger id="plan" className="w-full">
+          </div>
+
+          {/* Plan Field */}
+          <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-2 md:gap-6 p-4">
+            <label htmlFor="plan" className="text-xs font-medium pt-2">
+              Plan
+            </label>
+            <div className="space-y-1.5">
+              <Select
+                onValueChange={(value: string) => form.setValue("plan", value as FormValues["plan"])}
+                defaultValue={form.getValues("plan")}
+              >
+                <SelectTrigger id="plan" className="h-8 text-xs bg-secondary/50 border-border/50">
                   <SelectValue placeholder="Select plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="free">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Free</span>
-                      <span className="text-xs text-muted-foreground">1,000 requests/month • $0</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="pro">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Pro</span>
-                      <span className="text-xs text-muted-foreground">50,000 requests/month • $49/mo</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="team">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Team</span>
-                      <span className="text-xs text-muted-foreground">250,000 requests/month • $149/mo</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="enterprise">
-                    <div className="flex-col">
-                      <span className="font-medium">Enterprise</span>
-                      <span className="text-xs text-muted-foreground">Unlimited requests • Custom pricing</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="free" className="text-xs">Free - $0/month</SelectItem>
+                  <SelectItem value="pro" className="text-xs">Pro - $49/month</SelectItem>
+                  <SelectItem value="team" className="text-xs">Team - $149/month</SelectItem>
+                  <SelectItem value="enterprise" className="text-xs">Enterprise - Custom</SelectItem>
                 </SelectContent>
               </Select>
-              {form.formState.errors.plan && (
-                <p className="text-red-500 text-sm">{form.formState.errors.plan.message}</p>
-              )}
+              <p className="text-[11px] text-muted-foreground">
+                Which plan fits your organization's needs best?{" "}
+                <Link href="/pricing" className="text-primary hover:underline">
+                  Learn more
+                </Link>
+              </p>
               {(form.watch("plan") === "pro" || form.watch("plan") === "team") && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  You'll be redirected to checkout after creating the organization.
-                </p>
-              )}
-              {form.watch("plan") === "enterprise" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  You'll be redirected to contact sales for custom pricing.
+                <p className="text-[11px] text-muted-foreground">
+                  You'll be redirected to checkout after creating.
                 </p>
               )}
             </div>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-4">
-              <Button type="button" variant="outline" onClick={() => router.push("/dashboard/organizations")} className="w-full sm:w-auto">
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Creating..." : "Create Organization"}
-              </Button>
-            </div>
-          </form >
-        </CardContent >
-        <CardFooter className="text-sm text-muted-foreground">
-          By creating an organization, you agree to our <a href="/terms-of-service" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer"> Terms of Service</a>.
-        </CardFooter>
-      </Card >
-    </div >
+          </div>
+        </form>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs px-3"
+          onClick={() => router.push("/dashboard/organizations")}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-7 text-xs px-4"
+          disabled={loading}
+          onClick={form.handleSubmit(onSubmit)}
+        >
+          {loading ? "Creating..." : "Create organization"}
+        </Button>
+      </div>
+    </div>
   );
 }
