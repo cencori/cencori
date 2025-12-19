@@ -79,37 +79,37 @@
 }
 
 .dark {
-  --background: oklch(0 0 0);
-  --foreground: oklch(1 0 0);
-  --card: oklch(0 0 0);
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0 0 0);
-  --popover-foreground: oklch(1 0 0);
-  --primary: oklch(1 0 0);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.15 0 0);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.15 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.15 0 0);
-  --accent-foreground: oklch(1 0 0);
+  --background: oklch(0.145 0.005 285);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.18 0.005 285);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.16 0.005 285);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.95 0 0);
+  --primary-foreground: oklch(0.145 0.005 285);
+  --secondary: oklch(0.22 0.005 285);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.22 0.005 285);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.22 0.005 285);
+  --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.2 0 0);
-  --input: oklch(0.2 0 0);
-  --ring: oklch(1 0 0);
+  --border: oklch(0.26 0.005 285);
+  --input: oklch(0.22 0.005 285);
+  --ring: oklch(0.95 0 0);
   --chart-1: oklch(0.9 0 0);
   --chart-2: oklch(0.7 0 0);
   --chart-3: oklch(0.5 0 0);
   --chart-4: oklch(0.3 0 0);
   --chart-5: oklch(0.1 0 0);
-  --sidebar: oklch(0 0 0);
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(1 0 0);
-  --sidebar-primary-foreground: oklch(0 0 0);
-  --sidebar-accent: oklch(0.15 0 0);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.2 0 0);
-  --sidebar-ring: oklch(1 0 0);
+  --sidebar: oklch(0.13 0.005 285);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.95 0 0);
+  --sidebar-primary-foreground: oklch(0.145 0.005 285);
+  --sidebar-accent: oklch(0.2 0.005 285);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.26 0.005 285);
+  --sidebar-ring: oklch(0.95 0 0);
 }
 
 @layer base {
