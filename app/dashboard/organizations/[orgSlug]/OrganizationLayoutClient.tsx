@@ -102,9 +102,9 @@ export default function OrganizationLayoutClient({
         <SidebarProvider defaultOpen>
             {/* Desktop Sidebar - hidden on mobile */}
             {!isProjectRoute && (
-                <Sidebar collapsible="icon" className="top-14 h-[calc(100vh-3.5rem)] hidden lg:block border-r bg-sidebar">
+                <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40 bg-sidebar">
                     <SidebarContent>
-                        <SidebarGroup className="pt-4">
+                        <SidebarGroup className="pt-3">
                             <SidebarMenu>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Projects">
@@ -166,7 +166,7 @@ export default function OrganizationLayoutClient({
                         </SidebarGroup>
                     </SidebarContent>
                     <SidebarRail />
-                    <div className="absolute bottom-0 left-0 w-full p-2">
+                    <div className="absolute bottom-0 left-0 w-full p-1.5">
                         <SidebarTrigger />
                     </div>
                 </Sidebar>

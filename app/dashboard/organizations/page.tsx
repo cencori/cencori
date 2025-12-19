@@ -212,7 +212,7 @@ export default function OrganizationsPage() {
       {filteredOrganizations.length === 0 && searchTerm && (
         <div className="text-center py-10">
           <p className="text-xs text-muted-foreground">
-            No organizations found matching "{searchTerm}"
+            No organizations found matching &quot;{searchTerm}&quot;
           </p>
         </div>
       )}

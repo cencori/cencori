@@ -118,9 +118,9 @@ export default function ProjectLayoutClient({
     return (
         <SidebarProvider defaultOpen>
             {/* Desktop Sidebar - hidden on mobile */}
-            <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block">
+            <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40">
                 <SidebarContent>
-                    <SidebarGroup className="pt-4">
+                    <SidebarGroup className="pt-3">
                         <SidebarMenu>
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild tooltip="Overview">
@@ -188,8 +188,8 @@ export default function ProjectLayoutClient({
             </Sidebar>
 
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetContent side="bottom" className="h-[75vh]">
-                    <div className="py-4">
+                <SheetContent side="bottom" className="h-[70vh]">
+                    <div className="py-3">
                         <SidebarGroup>
                             <SidebarMenu>
                                 <SidebarMenuItem>

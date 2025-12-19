@@ -452,7 +452,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       {/* Mobile Navigation Bar - only visible on mobile screens */}
       <MobileNav onMenuClick={toggle} projectSlug={projectSlug} />
 
-      <main className="p-4 md:p-8 pt-24 lg:pt-16">
+      <main className="p-4 md:p-6 pt-20 lg:pt-14">
         {children}
       </main>
       <Toaster />
