@@ -282,8 +282,7 @@ export default function OrgProjectsPage({
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Project</TableHead>
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Region</TableHead>
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Created</TableHead>
-                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Status</TableHead>
-                <TableHead className="h-8 w-10"></TableHead>
+                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -308,7 +307,7 @@ export default function OrgProjectsPage({
                       return `${month} ${day}, ${date.getFullYear()}`;
                     })()}
                   </TableCell>
-                  <TableCell className="text-right py-3">
+                  <TableCell className="py-3 pr-4 text-right">
                     <Badge variant="outline" className="gap-1.5 text-[11px] px-2 py-0.5 border-foreground/20 text-foreground">
                       <span
                         className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
@@ -316,37 +315,6 @@ export default function OrgProjectsPage({
                       ></span>
                       {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 pr-4">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-6 w-6 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontalIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="text-xs cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/organizations/${orgSlug}/projects/${project.slug}/edit`);
-                          }}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-xs cursor-pointer text-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProjectToDelete(project);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
