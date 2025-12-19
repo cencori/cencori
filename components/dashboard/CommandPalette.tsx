@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import ReactMarkdown from "react-markdown";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +29,6 @@ import {
     Lightbulb,
     Wand2,
     ArrowLeft,
-    Loader2,
 } from "lucide-react";
 
 // Official GitHub Logo SVG
@@ -536,6 +536,7 @@ export function CommandPalette({
         });
 
         return groups;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, onOpenChange, orgSlug, projectSlug]);
 
     // Smart search: filter items based on label and keywords
@@ -637,7 +638,7 @@ export function CommandPalette({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+            <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
                 <VisuallyHidden>
                     <DialogTitle>Command Palette</DialogTitle>
                 </VisuallyHidden>
@@ -659,22 +660,41 @@ export function CommandPalette({
                                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                             </button>
                             <span className="text-sm font-medium">Ask Cencori AI</span>
-                            {aiLoading && <Loader2 className="h-4 w-4 animate-spin text-primary ml-auto" />}
                         </div>
 
                         {/* AI Content */}
                         <div className="flex-1 overflow-y-auto">
                             {aiAnswer ? (
-                                // Show answer
-                                <div className="p-4">
-                                    <div className="text-xs text-muted-foreground mb-2">Answer:</div>
-                                    <div className="text-sm leading-relaxed whitespace-pre-wrap">{aiAnswer}</div>
+                                // Show question and answer with avatars
+                                <div className="p-4 space-y-4">
+                                    {/* User question */}
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                                            <svg className="h-3.5 w-3.5 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                                            </svg>
+                                        </div>
+                                        <div className="text-sm text-foreground pt-0.5">{aiQuestion}</div>
+                                    </div>
+                                    {/* AI answer */}
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <Wand2 className="h-3.5 w-3.5 text-primary" />
+                                        </div>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none pt-0.5 text-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-secondary [&_pre]:p-3 [&_pre]:rounded-md [&_pre]:overflow-x-auto">
+                                            <ReactMarkdown>{aiAnswer}</ReactMarkdown>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : aiLoading ? (
-                                // Loading state
+                                // Loading state with animated dots
                                 <div className="flex items-center justify-center h-full">
                                     <div className="text-center">
-                                        <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
+                                        <div className="flex items-center justify-center gap-1 mb-2">
+                                            <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
                                         <p className="text-xs text-muted-foreground">Thinking...</p>
                                     </div>
                                 </div>
@@ -744,7 +764,7 @@ export function CommandPalette({
                                 <div className="px-4 py-8 text-center">
                                     <p className="text-xs text-muted-foreground">No results found</p>
                                     <p className="text-[10px] text-muted-foreground/60 mt-1">
-                                        Try searching for "settings", "api", or "docs"
+                                        Try searching for &quot;settings&quot;, &quot;api&quot;, or &quot;docs&quot;
                                     </p>
                                 </div>
                             ) : (
