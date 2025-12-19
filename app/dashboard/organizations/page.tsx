@@ -1,17 +1,15 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr"; // Import browser client
+import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { siteConfig } from "@/config/site";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/plus";
-import { BoxesIcon } from "@/components/ui/boxes";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowRight } from "lucide-react";
+import { Search, Building2, FolderKanban } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
@@ -20,7 +18,8 @@ interface OrganizationData {
   slug: string;
   description?: string;
   plan_id: string;
-  organization_plans: { name: string }[] | null; // Allow null
+  organization_plans: { name: string }[] | null;
+  projects?: { count: number }[];
 }
 
 export default function OrganizationsPage() {
@@ -43,14 +42,13 @@ export default function OrganizationsPage() {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          // If no user, redirect to login
           router.push(siteConfig.links.signInUrl);
           return;
         }
 
         const { data: orgsData, error: fetchError } = await supabase
           .from("organizations")
-          .select("id, name, slug, description, plan_id, organization_plans(name)");
+          .select("id, name, slug, description, plan_id, organization_plans(name), projects(count)");
 
         if (fetchError) {
           console.error("Error fetching organizations:", fetchError.message);
@@ -58,7 +56,6 @@ export default function OrganizationsPage() {
         } else {
           setOrganizations(orgsData);
           if (orgsData && orgsData.length === 0) {
-            // If no organizations, redirect to new organization page
             router.push("/dashboard/organizations/new");
           }
         }
@@ -71,27 +68,37 @@ export default function OrganizationsPage() {
     };
 
     fetchOrganizations();
-  }, [router]); // Depend on router to ensure it's ready
+  }, [router]);
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex items-center space-x-4 pb-12">
-          <Skeleton className="h-6 w-48" />
+      <div className="w-full max-w-4xl mx-auto px-6 py-8">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <Skeleton className="h-6 w-36" />
         </div>
-        <div className="flex justify-between items-center mb-6">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-40" />
+
+        {/* Search and Button Skeleton */}
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-7 w-28" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-6 mb-4" />
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-            </Card>
+
+        {/* Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="p-3 rounded-md bg-zinc-100 dark:bg-zinc-800/60"
+            >
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-7 w-7 rounded" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton className="h-2.5 w-16" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -101,18 +108,26 @@ export default function OrganizationsPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xl text-red-500">{error}</p>
+        <p className="text-sm text-red-500">{error}</p>
       </div>
     );
   }
 
-  // This block should ideally not be reached if organizations.length is 0 due to redirect in useEffect
   if (!organizations || organizations.length === 0) {
     return (
-      <div className="text-center p-10 ">
-        <p className="text-sm mb-4 mt-32">You don&apos;t have any organizations yet.</p>
-        <Button asChild>
-          <Link href="/dashboard/organizations/new">Create Your First Organization</Link>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
+        <div className="w-10 h-10 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+          <Building2 className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <h2 className="text-sm font-medium mb-1">No organizations yet</h2>
+        <p className="text-xs text-muted-foreground mb-3 max-w-[200px]">
+          Create your first organization to start managing projects.
+        </p>
+        <Button asChild size="sm" className="h-7 text-xs px-3">
+          <Link href="/dashboard/organizations/new">
+            <PlusIcon size={12} className="mr-1" />
+            Create Organization
+          </Link>
         </Button>
       </div>
     );
@@ -122,58 +137,85 @@ export default function OrganizationsPage() {
     org.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getProjectCount = (org: OrganizationData): number => {
+    if (org.projects && org.projects.length > 0) {
+      return org.projects[0]?.count ?? 0;
+    }
+    return 0;
+  };
+
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex items-center space-x-4 pb-6 sm:pb-12">
-        <h1 className="text-base sm:text-lg font-bold">Your Organizations</h1>
+    <div className="w-full max-w-4xl mx-auto px-6 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-base font-medium">
+          Your Organizations
+        </h1>
       </div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div className="relative w-full sm:w-auto">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+
+      {/* Search and Actions - Small with breathing room */}
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search organizations..."
+            placeholder="Search for an organization..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:max-w-xs pl-8"
+            className="w-48 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
           />
         </div>
-        <Button asChild className="w-full sm:w-auto">
+        <Button asChild size="sm" className="h-7 text-xs px-3">
           <Link href="/dashboard/organizations/new">
-            <PlusIcon size={16} className="mr-2" />
-            New Organization
+            <PlusIcon size={12} className="mr-1" />
+            New organization
           </Link>
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredOrganizations.map((org) => (
-          <Card
-            key={org.id}
-            className="group cursor-pointer border hover:border-primary/50 hover:shadow-md transition-all duration-200"
-            onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}
-          >
-            <CardHeader>
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-lg bg-primary/5 group-hover:bg-primary/10 transition-colors shrink-0">
-                  <BoxesIcon size={24} className="text-primary/70 group-hover:text-primary transition-colors" />
+      {/* Organizations Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {filteredOrganizations.map((org) => {
+          const projectCount = getProjectCount(org);
+          const planName = org.organization_plans?.[0]?.name
+            ? org.organization_plans[0].name.charAt(0).toUpperCase() + org.organization_plans[0].name.slice(1)
+            : "Free";
+
+          return (
+            <div
+              key={org.id}
+              onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}
+              className="group p-3 rounded-md bg-card border border-border/40 hover:border-border cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                {/* Icon */}
+                <div className="flex-shrink-0 w-7 h-7 rounded bg-secondary flex items-center justify-center">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
+
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg mb-1">{org.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      {org.organization_plans?.[0]?.name
-                        ? org.organization_plans[0].name.charAt(0).toUpperCase() + org.organization_plans[0].name.slice(1)
-                        : "Free"}
-                    </Badge>
-                  </div>
+                  <h3 className="text-[13px] font-medium truncate leading-tight">
+                    {org.name}
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    {planName} Plan • {projectCount} project{projectCount !== 1 ? 's' : ''}
+                  </p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </div>
-            </CardHeader>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Empty search state */}
+      {filteredOrganizations.length === 0 && searchTerm && (
+        <div className="text-center py-10">
+          <p className="text-xs text-muted-foreground">
+            No organizations found matching "{searchTerm}"
+          </p>
+        </div>
+      )}
     </div>
   );
 }
