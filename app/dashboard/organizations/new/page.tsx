@@ -162,6 +162,7 @@ export default function NewOrganizationPage() {
               <Input
                 id="name"
                 placeholder="Organization name"
+                autoComplete="off"
                 className="h-8 text-xs bg-secondary/50 border-border/50"
                 {...form.register("name")}
               />

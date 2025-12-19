@@ -147,12 +147,12 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
   return (
     <div className="min-h-screen bg-background transition-colors">
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background px-4 md:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/organizations" className="flex items-center gap-3">
-            <Logo variant="mark" className="h-4" /> 
+      <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/organizations" className="flex items-center">
+            <Logo variant="mark" className="h-4" />
           </Link>
-          <span className="text-muted-foreground ml-0 mr-0 select-none" aria-hidden>
+          <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm" aria-hidden>
             /
           </span>
           <Breadcrumb className="sm:flex md:flex">
@@ -171,15 +171,15 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                       }}
                     >
                       <SelectPrimitive.Trigger
-                        className="flex h-8 cursor-pointer w-full items-center justify-between p-1.5 text-foreground"
+                        className="flex h-7 cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors"
                       >
                         <SelectValue placeholder="Organizations">
                           {currentOrg?.name || "Organizations"}
                         </SelectValue>
                         <SelectPrimitive.Icon asChild>
                           <ChevronsUpDown
-                            size={14}
-                            className="ml-2 text-muted-foreground/80"
+                            size={12}
+                            className="text-muted-foreground/60"
                           />
                         </SelectPrimitive.Icon>
                       </SelectPrimitive.Trigger>
@@ -220,7 +220,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
               {orgSlug && projectSlug && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground"> / </BreadcrumbSeparator>
+                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
                     {projectSlug ? (
                       <Select
@@ -234,15 +234,15 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                         }}
                       >
                         <SelectPrimitive.Trigger
-                          className="flex h-8 w-full cursor-pointer items-center justify-between p-1.5 text-foreground focus-visible:bg-accent focus-visible:ring-0 [&>span]:line-clamp-none"
+                          className="flex h-7 cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors"
                         >
                           <SelectValue placeholder="Projects">
                             {currentProject?.name || "Projects"}
                           </SelectValue>
                           <SelectPrimitive.Icon asChild>
                             <ChevronsUpDown
-                              size={14}
-                              className="ml-2 text-muted-foreground/80"
+                              size={12}
+                              className="text-muted-foreground/60"
                             />
                           </SelectPrimitive.Icon>
                         </SelectPrimitive.Trigger>
@@ -291,27 +291,27 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
               {pathname.includes("/organizations/new") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground"> / </BreadcrumbSeparator>
+                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
-                    <BreadcrumbPage>New Organization</BreadcrumbPage>
+                    <BreadcrumbPage className="text-xs font-medium">New organization</BreadcrumbPage>
                   </BreadcrumbItem>
                 </React.Fragment>
               )}
 
               {orgSlug && pathname.includes("/projects/new") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground"> / </BreadcrumbSeparator>
+                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
-                    <BreadcrumbPage>New Project</BreadcrumbPage>
+                    <BreadcrumbPage className="text-xs font-medium">New project</BreadcrumbPage>
                   </BreadcrumbItem>
                 </React.Fragment>
               )}
 
               {orgSlug && projectSlug && pathname.includes("/edit") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground"> / </BreadcrumbSeparator>
+                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
-                    <BreadcrumbPage>Edit Project</BreadcrumbPage>
+                    <BreadcrumbPage className="text-xs font-medium">Edit project</BreadcrumbPage>
                   </BreadcrumbItem>
                 </React.Fragment>
               )}
