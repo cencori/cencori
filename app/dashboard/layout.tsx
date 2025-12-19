@@ -188,33 +188,33 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                           />
                         </SelectPrimitive.Icon>
                       </SelectPrimitive.Trigger>
-                      <SelectContent className="w-full sm:w-80 p-1">
-                        <div className="px-2 py-1">
+                      <SelectContent className="w-56 p-1">
+                        <div className="px-1.5 py-1">
                           <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
                             <Input
                               type="search"
                               placeholder="Search organizations..."
-                              className="w-full rounded-lg bg-background pl-8 text-xs"
+                              className="h-6 w-full rounded bg-background pl-6 text-[11px] border-border/40"
                             />
                           </div>
                         </div>
-                        <div className="h-auto w-full rounded-md overflow-y-auto">
+                        <div className="h-auto w-full rounded-md overflow-y-auto max-h-40">
                           {organizations.map((org) => (
-                            <SelectItem key={org.id} value={org.slug} className="cursor-pointer">
+                            <SelectItem key={org.id} value={org.slug} className="cursor-pointer text-xs py-1.5">
                               {org.name}
                             </SelectItem>
                           ))}
                         </div>
-                        <SelectSeparator />
+                        <SelectSeparator className="my-1" />
                         <SelectGroup>
-                          <SelectItem value="all" className="cursor-pointer">
+                          <SelectItem value="all" className="cursor-pointer text-xs py-1.5">
                             All Organizations
                           </SelectItem>
                         </SelectGroup>
-                        <SelectSeparator />
-                        <Link href="/dashboard/organizations/new" className="flex items-center gap-2 cursor-pointer px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50">
-                          <PlusCircle className="h-4 w-4" />
+                        <SelectSeparator className="my-1" />
+                        <Link href="/dashboard/organizations/new" className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5 text-xs outline-hidden select-none hover:bg-accent rounded-sm transition-colors">
+                          <PlusCircle className="h-3 w-3" />
                           New Organization
                         </Link>
                       </SelectContent>
@@ -251,33 +251,33 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                             />
                           </SelectPrimitive.Icon>
                         </SelectPrimitive.Trigger>
-                        <SelectContent className="w-full sm:w-80 p-1">
-                          <div className="px-2 py-1">
+                        <SelectContent className="w-56 p-1">
+                          <div className="px-1.5 py-1">
                             <div className="relative">
-                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
                               <Input
                                 type="search"
                                 placeholder="Search projects..."
-                                className="w-full rounded-lg bg-background pl-8 text-xs"
+                                className="h-6 w-full rounded bg-background pl-6 text-[11px] border-border/40"
                               />
                             </div>
                           </div>
-                          <div className="h-auto w-full rounded-md overflow-y-auto">
+                          <div className="h-auto w-full rounded-md overflow-y-auto max-h-40">
                             {projects.filter(p => p.orgSlug === orgSlug).map((proj) => (
-                              <SelectItem key={proj.id} value={proj.slug} className="cursor-pointer">
+                              <SelectItem key={proj.id} value={proj.slug} className="cursor-pointer text-xs py-1.5">
                                 {proj.name}
                               </SelectItem>
                             ))}
                           </div>
-                          <SelectSeparator />
+                          <SelectSeparator className="my-1" />
                           <SelectGroup>
-                            <SelectItem value="all" className="cursor-pointer">
+                            <SelectItem value="all" className="cursor-pointer text-xs py-1.5">
                               All Projects
                             </SelectItem>
                           </SelectGroup>
-                          <SelectSeparator />
-                          <Link href={`/dashboard/organizations/${orgSlug}/projects/new`} className="flex items-center gap-2 cursor-pointer px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50">
-                            <PlusCircle className="h-4 w-4" />
+                          <SelectSeparator className="my-1" />
+                          <Link href={`/dashboard/organizations/${orgSlug}/projects/new`} className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5 text-xs outline-hidden select-none hover:bg-accent rounded-sm transition-colors">
+                            <PlusCircle className="h-3 w-3" />
                             New Project
                           </Link>
                         </SelectContent>
