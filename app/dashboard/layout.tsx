@@ -176,9 +176,9 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                         <SelectValue placeholder="Organizations">
                           {currentOrg?.name || "Organizations"}
                         </SelectValue>
-                        {currentOrg?.plan && (
+                        {currentOrg?.subscription_tier && (
                           <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20">
-                            {currentOrg.plan}
+                            {currentOrg.subscription_tier}
                           </span>
                         )}
                         <SelectPrimitive.Icon asChild>
