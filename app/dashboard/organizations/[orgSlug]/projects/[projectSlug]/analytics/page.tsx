@@ -6,11 +6,10 @@ import { MetricCard } from '@/components/audit/MetricCard';
 import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
 import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
 import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
-import { ModelUsageBarChart } from '@/components/audit/ModelUsageBarChart';
-import { SecurityBreakdownDonutChart } from '@/components/audit/SecurityBreakdownDonutChart';
-import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
-import { Activity, CheckCircle, DollarSign, Clock, ShieldAlert, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ShieldAlert, Loader2, BarChart3 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TrendData {
     timestamp: string;
@@ -60,7 +59,6 @@ export default function AnalyticsPage({ params }: PageProps) {
     const [trends, setTrends] = useState<TrendData[]>([]);
     const [groupBy, setGroupBy] = useState<'hour' | 'day'>('day');
 
-    // Fetch project ID
     useEffect(() => {
         const fetchProjectId = async () => {
             setLoading(true);
@@ -95,18 +93,15 @@ export default function AnalyticsPage({ params }: PageProps) {
         fetchProjectId();
     }, [params]);
 
-    // Fetch analytics data
     useEffect(() => {
         if (!projectId) return;
 
         const fetchAnalytics = async () => {
             try {
-                // Fetch overview
                 const overviewRes = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}&environment=${environment}`);
                 const overviewData = await overviewRes.json();
                 setOverview(overviewData);
 
-                // Fetch trends
                 const trendsRes = await fetch(`/api/projects/${projectId}/analytics/trends?time_range=${timeRange}&environment=${environment}`);
                 const trendsData = await trendsRes.json();
                 setTrends(trendsData.trends || []);
@@ -119,38 +114,72 @@ export default function AnalyticsPage({ params }: PageProps) {
         fetchAnalytics();
     }, [projectId, environment, timeRange]);
 
+    const calculateTrend = (dataPoints: TrendData[], getValue: (t: TrendData) => number) => {
+        if (!dataPoints || dataPoints.length < 2) return 0;
+        const mid = Math.floor(dataPoints.length / 2);
+        const firstHalf = dataPoints.slice(0, mid);
+        const secondHalf = dataPoints.slice(mid);
+
+        const avgFirst = firstHalf.reduce((acc, curr) => acc + getValue(curr), 0) / firstHalf.length;
+        const avgSecond = secondHalf.reduce((acc, curr) => acc + getValue(curr), 0) / secondHalf.length;
+
+        if (avgFirst === 0) return 0;
+        return ((avgSecond - avgFirst) / avgFirst) * 100;
+    };
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="mb-6">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-3 w-48 mt-1" />
+                </div>
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28" />)}
+                </div>
+                <Skeleton className="h-[200px]" />
             </div>
         );
     }
 
     if (!projectId) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                <p className="text-lg font-medium text-muted-foreground">Project not found</p>
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="text-center py-16 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">Project not found</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-            {/* Header with time range selector */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Analytics</h2>
-                    <p className="text-muted-foreground">
-                        Insights and metrics for your AI requests
-                    </p>
+                    <h1 className="text-base font-medium">Analytics</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Insights and metrics for your AI requests</p>
                 </div>
-                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                    <SelectTrigger className="w-[120px] h-7 text-xs">
+                        <SelectValue placeholder="Period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
+                        <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
+                        <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
+                        <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                        <SelectItem value="all" className="text-xs">All Time</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
-            {/* Metric Cards */}
+            {/* Primary Metrics */}
             {overview && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <MetricCardWithChart
                         title="Total Requests"
                         value={overview.overview.total_requests}
@@ -158,18 +187,7 @@ export default function AnalyticsPage({ params }: PageProps) {
                             label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                             value: t.total
                         }))}
-                        trend={(() => {
-                            if (!trends || trends.length < 2) return 0;
-                            const mid = Math.floor(trends.length / 2);
-                            const firstHalf = trends.slice(0, mid);
-                            const secondHalf = trends.slice(mid);
-
-                            const avgFirst = firstHalf.reduce((acc, curr) => acc + curr.total, 0) / firstHalf.length;
-                            const avgSecond = secondHalf.reduce((acc, curr) => acc + curr.total, 0) / secondHalf.length;
-
-                            if (avgFirst === 0) return 0;
-                            return ((avgSecond - avgFirst) / avgFirst) * 100;
-                        })()}
+                        trend={calculateTrend(trends, t => t.total)}
                     />
                     <MetricCardWithLineChart
                         title="Success Rate"
@@ -179,20 +197,7 @@ export default function AnalyticsPage({ params }: PageProps) {
                             label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                             value: t.total > 0 ? Math.round((t.success / t.total) * 100) : 0
                         }))}
-                        trend={(() => {
-                            if (!trends || trends.length < 2) return 0;
-                            const mid = Math.floor(trends.length / 2);
-                            const firstHalf = trends.slice(0, mid);
-                            const secondHalf = trends.slice(mid);
-
-                            const getRate = (t: TrendData) => t.total > 0 ? (t.success / t.total) * 100 : 0;
-
-                            const avgFirst = firstHalf.reduce((acc, curr) => acc + getRate(curr), 0) / firstHalf.length;
-                            const avgSecond = secondHalf.reduce((acc, curr) => acc + getRate(curr), 0) / secondHalf.length;
-
-                            if (avgFirst === 0) return 0;
-                            return ((avgSecond - avgFirst) / avgFirst) * 100;
-                        })()}
+                        trend={calculateTrend(trends, t => t.total > 0 ? (t.success / t.total) * 100 : 0)}
                     />
                     <MetricCardWithLineChart
                         title="Total Cost"
@@ -202,19 +207,8 @@ export default function AnalyticsPage({ params }: PageProps) {
                             label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                             value: t.cost
                         }))}
-                        trend={(() => {
-                            if (!trends || trends.length < 2) return 0;
-                            const mid = Math.floor(trends.length / 2);
-                            const firstHalf = trends.slice(0, mid);
-                            const secondHalf = trends.slice(mid);
-
-                            const avgFirst = firstHalf.reduce((acc, curr) => acc + curr.cost, 0) / firstHalf.length;
-                            const avgSecond = secondHalf.reduce((acc, curr) => acc + curr.cost, 0) / secondHalf.length;
-
-                            if (avgFirst === 0) return 0;
-                            return ((avgSecond - avgFirst) / avgFirst) * 100;
-                        })()}
-                        lineColor="hsl(217, 91%, 60%)" // Blue
+                        trend={calculateTrend(trends, t => t.cost)}
+                        lineColor="hsl(217, 91%, 60%)"
                     />
                     <MetricCardWithLineChart
                         title="Avg Latency"
@@ -224,26 +218,15 @@ export default function AnalyticsPage({ params }: PageProps) {
                             label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                             value: t.avg_latency
                         }))}
-                        trend={(() => {
-                            if (!trends || trends.length < 2) return 0;
-                            const mid = Math.floor(trends.length / 2);
-                            const firstHalf = trends.slice(0, mid);
-                            const secondHalf = trends.slice(mid);
-
-                            const avgFirst = firstHalf.reduce((acc, curr) => acc + curr.avg_latency, 0) / firstHalf.length;
-                            const avgSecond = secondHalf.reduce((acc, curr) => acc + curr.avg_latency, 0) / secondHalf.length;
-
-                            if (avgFirst === 0) return 0;
-                            return ((avgSecond - avgFirst) / avgFirst) * 100;
-                        })()}
-                        lineColor="hsl(24, 96%, 53%)" // Orange
+                        trend={calculateTrend(trends, t => t.avg_latency)}
+                        lineColor="hsl(24, 96%, 53%)"
                     />
                 </div>
             )}
 
             {/* Secondary Metrics */}
             {overview && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4 mb-6">
                     <MetricCard
                         title="Total Tokens"
                         value={overview.overview.total_tokens}
@@ -251,33 +234,29 @@ export default function AnalyticsPage({ params }: PageProps) {
                     <MetricCard
                         title="Security Incidents"
                         value={overview.overview.total_incidents}
-                        icon={<ShieldAlert className="h-4 w-4" />}
+                        icon={<ShieldAlert className="h-3 w-3" />}
                     />
                     <MetricCard
                         title="Critical Incidents"
                         value={overview.overview.critical_incidents}
-                        icon={<ShieldAlert className="h-4 w-4 text-red-600" />}
+                        icon={<ShieldAlert className="h-3 w-3 text-red-500" />}
                     />
                 </div>
             )}
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Requests over time */}
-                {trends.length > 0 && (
-                    <div className="lg:col-span-2">
-                        <RequestsAreaChart data={trends} groupBy={groupBy} />
-                    </div>
-                )}
-            </div>
+            {/* Area Chart */}
+            {trends.length > 0 && (
+                <RequestsAreaChart data={trends} groupBy={groupBy} />
+            )}
 
-            {/* Empty state */}
+            {/* Empty State */}
             {overview && overview.overview.total_requests === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 border rounded-lg">
-                    <p className="text-lg font-medium text-muted-foreground">No data yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Make some AI requests to see analytics
-                    </p>
+                <div className="text-center py-16 flex flex-col items-center rounded-md border border-border/40 bg-card">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium mb-1">No data yet</p>
+                    <p className="text-xs text-muted-foreground">Make some AI requests to see analytics</p>
                 </div>
             )}
         </div>

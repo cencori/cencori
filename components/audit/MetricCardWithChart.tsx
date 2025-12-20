@@ -1,9 +1,8 @@
 'use client';
 
-import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Bar, BarChart, XAxis } from 'recharts';
+import { Bar, BarChart } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -15,37 +14,16 @@ interface MetricCardWithChartProps {
     title: string;
     value: string | number;
     chartData: Array<{ label: string; value: number }>;
-    trend?: number; // Percentage change (e.g., 5.2 for 5.2% increase)
+    trend?: number;
     format?: 'number' | 'currency' | 'percentage' | 'ms';
 }
 
 const chartConfig = {
     value: {
         label: 'Requests',
-        color: 'hsl(var(--chart-1))',
+        color: 'hsl(142 76% 36%)',
     },
 } satisfies ChartConfig;
-
-const DottedBackgroundPattern = () => {
-    return (
-        <pattern
-            id="metric-card-pattern-dots"
-            x="0"
-            y="0"
-            width="10"
-            height="10"
-            patternUnits="userSpaceOnUse"
-        >
-            <circle
-                className="dark:text-muted/40 text-muted"
-                cx="2"
-                cy="2"
-                r="1"
-                fill="currentColor"
-            />
-        </pattern>
-    );
-};
 
 export function MetricCardWithChart({
     title,
@@ -73,75 +51,48 @@ export function MetricCardWithChart({
     const isNegativeTrend = trend && trend < 0;
 
     return (
-        <TechnicalBorder className="h-full">
-            <div className="p-6">
-                {/* Header with Title and Value */}
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                        <p className="text-sm text-muted-foreground mb-2">{title}</p>
-                        <div className="flex items-center gap-2">
-                            <p className="text-3xl font-bold">{formatValue(value)}</p>
-                            {trend !== undefined && trend !== 0 && (
-                                <div
-                                    className={cn(
-                                        'flex items-center gap-1 px-2 py-1 rounded-md border-none text-xs font-medium',
-                                        isPositiveTrend && 'text-green-500 bg-green-500/10',
-                                        isNegativeTrend && 'text-red-500 bg-red-500/10'
-                                    )}
-                                >
-                                    {isPositiveTrend ? (
-                                        <TrendingUp className="h-3 w-3" />
-                                    ) : (
-                                        <TrendingDown className="h-3 w-3" />
-                                    )}
-                                    <span>{Math.abs(trend).toFixed(1)}%</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Mini Bar Chart */}
-                {chartData.length > 0 && (
-                    <div className="h-24 -mx-2">
-                        <ChartContainer config={chartConfig} className="h-full w-full">
-                            <BarChart
-                                accessibilityLayer
-                                data={chartData}
-                                margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-                            >
-                                <rect
-                                    x="0"
-                                    y="0"
-                                    width="100%"
-                                    height="100%"
-                                    fill="url(#metric-card-pattern-dots)"
-                                />
-                                <defs>
-                                    <DottedBackgroundPattern />
-                                </defs>
-                                <XAxis
-                                    dataKey="label"
-                                    tickLine={false}
-                                    tickMargin={8}
-                                    axisLine={false}
-                                    tickFormatter={(value) => value.slice(0, 3)}
-                                    className="text-xs"
-                                />
-                                <ChartTooltip
-                                    cursor={false}
-                                    content={<ChartTooltipContent hideLabel />}
-                                />
-                                <Bar
-                                    dataKey="value"
-                                    fill="hsl(142.1 76.2% 36.3"
-                                    radius={4}
-                                />
-                            </BarChart>
-                        </ChartContainer>
+        <div className="rounded-md border border-border/40 bg-card p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
+            <div className="flex items-center gap-2 mb-2">
+                <p className="text-xl font-semibold font-mono">{formatValue(value)}</p>
+                {trend !== undefined && trend !== 0 && (
+                    <div
+                        className={cn(
+                            'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium',
+                            isPositiveTrend && 'text-emerald-500 bg-emerald-500/10',
+                            isNegativeTrend && 'text-red-500 bg-red-500/10'
+                        )}
+                    >
+                        {isPositiveTrend ? (
+                            <TrendingUp className="h-2.5 w-2.5" />
+                        ) : (
+                            <TrendingDown className="h-2.5 w-2.5" />
+                        )}
+                        <span>{Math.abs(trend).toFixed(1)}%</span>
                     </div>
                 )}
             </div>
-        </TechnicalBorder>
+
+            {chartData.length > 0 && (
+                <div className="h-12">
+                    <ChartContainer config={chartConfig} className="h-full w-full">
+                        <BarChart
+                            data={chartData}
+                            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                        >
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent hideLabel />}
+                            />
+                            <Bar
+                                dataKey="value"
+                                fill="var(--color-value)"
+                                radius={2}
+                            />
+                        </BarChart>
+                    </ChartContainer>
+                </div>
+            )}
+        </div>
     );
 }
