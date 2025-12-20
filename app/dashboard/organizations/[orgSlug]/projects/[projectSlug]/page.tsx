@@ -108,7 +108,7 @@ const CustomizedDot = (props: DotProps) => {
   );
 };
 
-// Getting Started Section Component - Only shows when no AI requests yet
+// Getting Started Section Component - Compact redesign
 function GettingStartedSection({
   orgSlug,
   projectSlug,
@@ -117,16 +117,15 @@ function GettingStartedSection({
 }: {
   orgSlug: string;
   projectSlug: string;
-  hasData: boolean | null; // null = still checking
+  hasData: boolean | null;
   loading: boolean;
 }) {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copyingPrompt, setCopyingPrompt] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
-  // Don't show while loading, while still checking (null), or if user has data (true)
-  // Only show when hasData === false (confirmed no requests)
   if (loading || hasData === null || hasData === true) {
     return null;
   }
@@ -134,7 +133,6 @@ function GettingStartedSection({
   const copyPrompt = async () => {
     try {
       setCopyingPrompt(true);
-      // Fetch the full llm.txt content
       const response = await fetch('/llm.txt');
       const llmContent = await response.text();
       await navigator.clipboard.writeText(llmContent);
@@ -148,226 +146,133 @@ function GettingStartedSection({
   };
 
   const copyInstall = async () => {
-    try {
-      await navigator.clipboard.writeText("npm install cencori");
-      setCopiedInstall(true);
-      setTimeout(() => setCopiedInstall(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
+    await navigator.clipboard.writeText("npm install cencori");
+    setCopiedInstall(true);
+    setTimeout(() => setCopiedInstall(false), 2000);
   };
 
   const copyEnv = async () => {
-    try {
-      await navigator.clipboard.writeText("CENCORI_API_KEY=cen_your_api_key_here");
-      setCopiedEnv(true);
-      setTimeout(() => setCopiedEnv(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
+    await navigator.clipboard.writeText("CENCORI_API_KEY=cen_your_api_key_here");
+    setCopiedEnv(true);
+    setTimeout(() => setCopiedEnv(false), 2000);
   };
 
-  return (
-    <div className="mb-8 space-y-6">
-      {/* Header - constrained to same width as steps */}
-      <div className="max-w-3xl mx-auto space-y-4">
-        {/* Spinner at top */}
-        <div className="flex items-center gap-2">
-          <LoaderIcon className="h-4 w-4 animate-spin text-amber-500" />
-          <p className="text-sm text-muted-foreground">Waiting for your first request</p>
-        </div>
-
-        {/* Title */}
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Getting started</p>
-          <h2 className="text-2xl font-semibold tracking-tight">Integrate Cencori in your app</h2>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Install the SDK, set your API key, and make your first AI request.
-            The moment we detect activity, setup is complete.
-          </p>
-        </div>
-
-        {/* SDK Icon - Single option */}
-        <div className="flex">
-          <div className="flex items-center gap-2 px-4 py-2 border rounded-lg bg-muted/30">
-            <div className="w-8 h-8 rounded bg-amber-500/10 flex items-center justify-center">
-              <span className="text-amber-500 font-bold text-sm">JS</span>
-            </div>
-            <span className="text-sm font-medium">JavaScript / TypeScript</span>
-          </div>
-        </div>
-      </div>
-
-      {/* LLM Prompt Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 sm:px-8 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg max-w-3xl mx-auto">
-        <div className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-          <span>Copy this quickstart guide as a prompt for LLMs to integrate Cencori</span>
-        </div>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={copyPrompt}
-          disabled={copyingPrompt}
-          className="gap-2"
-        >
-          {copiedPrompt ? (
-            <>
-              <Check className="h-3.5 w-3.5" />
-              Copied
-            </>
-          ) : copyingPrompt ? (
-            <>
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Copying...
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Copy prompt
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Steps */}
-      <div className="space-y-8 max-w-3xl mx-auto mt-8">
-        {/* Step 1: Install */}
-        <div className="flex gap-6">
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-              1
-            </div>
-          </div>
-          <div className="flex-1 space-y-3">
-            <div>
-              <h3 className="font-medium">Install the Cencori SDK</h3>
-              <p className="text-sm text-muted-foreground">
-                Run the following command to install the SDK.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                  <span className="text-xs text-muted-foreground font-mono">terminal</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={copyInstall}
-                  >
-                    {copiedInstall ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-                <div className="p-4">
-                  <code className="text-sm text-emerald-400 font-mono">npm install cencori</code>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2: API Key */}
-        <div className="flex gap-6">
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-              2
-            </div>
-          </div>
-          <div className="flex-1 space-y-3">
-            <div>
-              <h3 className="font-medium">Set your Cencori API key</h3>
-              <p className="text-sm text-muted-foreground">
-                Add this key to your <code className="text-xs bg-muted px-1 py-0.5 rounded">.env</code> file.
-                Get your key from the{" "}
-                <Link
-                  href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}
-                  className="text-primary hover:underline"
-                >
-                  API keys page
-                </Link>.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                  <span className="text-xs text-muted-foreground font-mono">.env</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={copyEnv}
-                  >
-                    {copiedEnv ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-                <div className="p-4">
-                  <code className="text-sm text-blue-400 font-mono">CENCORI_API_KEY=<span className="text-zinc-500">cen_your_api_key_here</span></code>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3: Make Request */}
-        <div className="flex gap-6">
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/30 text-muted-foreground flex items-center justify-center text-sm font-semibold">
-              3
-            </div>
-          </div>
-          <div className="flex-1 space-y-3">
-            <div>
-              <h3 className="font-medium text-muted-foreground">Make your first AI request</h3>
-              <p className="text-sm text-muted-foreground">
-                Create a client file or use the playground. Once we detect your first request,
-                this setup will complete automatically.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="bg-muted dark:bg-zinc-900 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                  <span className="text-xs text-muted-foreground font-mono">lib/cencori.ts</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`import { Cencori } from "cencori";
+  const copyCode = async () => {
+    await navigator.clipboard.writeText(`import { Cencori } from "cencori";
 
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
 });`);
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="p-4 space-y-1">
-                  <code className="text-sm font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori&quot;</span><span className="text-zinc-300">;</span></code>
-                  <code className="text-sm font-mono block text-zinc-600">&nbsp;</code>
-                  <code className="text-sm font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencori</span> <span className="text-zinc-300">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
-                  <code className="text-sm font-mono block">  <span className="text-zinc-300">apiKey:</span> <span className="text-blue-400">process.env</span><span className="text-zinc-300">.</span><span className="text-zinc-100">CENCORI_API_KEY</span><span className="text-zinc-300">!,</span></code>
-                  <code className="text-sm font-mono block"><span className="text-zinc-300">{"})"}</span><span className="text-zinc-300">;</span></code>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`}>
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Try Playground
-                </Link>
-              </Button>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="https://cencori.com/docs" target="_blank">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Docs
-                </Link>
-              </Button>
-            </div>
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Waiting for first request</span>
           </div>
         </div>
+        <h2 className="text-lg font-semibold">Get started</h2>
+        <p className="text-xs text-muted-foreground">
+          Install the SDK, add your API key, and make a request.
+        </p>
+      </div>
+
+      {/* LLM Prompt Bar - Compact */}
+      <div className="flex items-center justify-between gap-3 px-3 py-2 bg-emerald-500/5 border border-emerald-500/20 rounded-md">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="h-3 w-3 text-emerald-500" />
+          <span>Copy as LLM prompt</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={copyPrompt}
+          disabled={copyingPrompt}
+          className="h-6 px-2 text-xs gap-1"
+        >
+          {copiedPrompt ? <Check className="h-3 w-3" /> : copyingPrompt ? <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Copy className="h-3 w-3" />}
+          {copiedPrompt ? "Copied" : "Copy"}
+        </Button>
+      </div>
+
+      {/* Steps Grid - Compact */}
+      <div className="grid gap-3">
+        {/* Step 1: Install */}
+        <div className="border border-border/40 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-medium">1</span>
+              <span className="text-xs font-medium">Install SDK</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyInstall}>
+              {copiedInstall ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+            </Button>
+          </div>
+          <div className="px-3 py-2 bg-zinc-950">
+            <code className="text-xs text-emerald-400 font-mono">npm install cencori</code>
+          </div>
+        </div>
+
+        {/* Step 2: API Key */}
+        <div className="border border-border/40 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-medium">2</span>
+              <span className="text-xs font-medium">Add to .env</span>
+              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`} className="text-[10px] text-primary hover:underline">
+                Get key →
+              </Link>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyEnv}>
+              {copiedEnv ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+            </Button>
+          </div>
+          <div className="px-3 py-2 bg-zinc-950">
+            <code className="text-xs font-mono"><span className="text-blue-400">CENCORI_API_KEY</span><span className="text-zinc-500">=cen_your_api_key_here</span></code>
+          </div>
+        </div>
+
+        {/* Step 3: Make Request */}
+        <div className="border border-border/40 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full border border-muted-foreground/30 text-muted-foreground flex items-center justify-center text-[10px] font-medium">3</span>
+              <span className="text-xs font-medium text-muted-foreground">Create client</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyCode}>
+              {copiedCode ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+            </Button>
+          </div>
+          <div className="px-3 py-2.5 bg-zinc-950 space-y-0.5">
+            <code className="text-xs font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori&quot;</span><span className="text-zinc-400">;</span></code>
+            <code className="text-xs font-mono block text-zinc-600">&nbsp;</code>
+            <code className="text-xs font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencori</span> <span className="text-zinc-400">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
+            <code className="text-xs font-mono block">  <span className="text-zinc-300">apiKey:</span> <span className="text-blue-400">process.env</span><span className="text-zinc-400">.</span><span className="text-zinc-100">CENCORI_API_KEY</span><span className="text-zinc-400">!,</span></code>
+            <code className="text-xs font-mono block"><span className="text-zinc-300">{"})"}</span><span className="text-zinc-400">;</span></code>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons - Compact */}
+      <div className="flex gap-2 pt-1">
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" asChild>
+          <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`}>
+            <Terminal className="h-3 w-3" />
+            Playground
+          </Link>
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" asChild>
+          <Link href="https://cencori.com/docs" target="_blank">
+            <ExternalLink className="h-3 w-3" />
+            Docs
+          </Link>
+        </Button>
       </div>
     </div>
   );
