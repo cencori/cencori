@@ -41,9 +41,6 @@ export function GenerateKeyDialog({
             return;
         }
 
-        console.log("🔑 Generating API key with projectId:", projectId);
-        console.log("🔑 API URL:", `/api/projects/${projectId}/api-keys`);
-
         setLoading(true);
         try {
             const response = await fetch(`/api/projects/${projectId}/api-keys`, {
@@ -93,22 +90,21 @@ export function GenerateKeyDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-[525px]">
+            <DialogContent className="sm:max-w-[400px] p-0">
                 {!generatedKey ? (
                     <>
-                        <DialogHeader>
-                            <DialogTitle>Generate API Key</DialogTitle>
-                            <DialogDescription>
-                                Create a new API key for this project. Give it a descriptive name to help you
-                                remember what it&apos;s used for.
+                        <DialogHeader className="px-4 pt-4 pb-0">
+                            <DialogTitle className="text-sm font-medium">Generate API key</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Create a new API key for this project. Give it a descriptive name.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="key-name">Key Name</Label>
+                        <div className="px-4 py-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="key-name" className="text-xs">Key name</Label>
                                 <Input
                                     id="key-name"
-                                    placeholder={isTestMode ? "e.g., Development API Key" : "e.g., Production API Key"}
+                                    placeholder={isTestMode ? "e.g., Development key" : "e.g., Production key"}
                                     value={keyName}
                                     onChange={(e) => setKeyName(e.target.value)}
                                     onKeyDown={(e) => {
@@ -116,55 +112,58 @@ export function GenerateKeyDialog({
                                             handleGenerate();
                                         }
                                     }}
+                                    className="h-8 text-xs"
                                 />
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        <DialogFooter className="px-4 pb-4 pt-0 gap-2">
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onOpenChange(false)}>
                                 Cancel
                             </Button>
-                            <Button onClick={handleGenerate} disabled={loading || !keyName.trim()}>
-                                {loading ? "Generating..." : "Generate Key"}
+                            <Button size="sm" className="h-7 text-xs" onClick={handleGenerate} disabled={loading || !keyName.trim()}>
+                                {loading ? "Generating..." : "Generate"}
                             </Button>
                         </DialogFooter>
                     </>
                 ) : (
                     <>
-                        <DialogHeader>
-                            <DialogTitle>API Key Generated</DialogTitle>
+                        <DialogHeader className="px-4 pt-4 pb-0">
+                            <DialogTitle className="text-sm font-medium">API key generated</DialogTitle>
                         </DialogHeader>
-                        <div className="flex items-start gap-2 mt-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                            <span className="text-sm text-amber-900 dark:text-amber-100">
-                                Make sure to copy your API key now. You won&apos;t be able to see it again!
-                            </span>
+                        <div className="px-4 py-3">
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                                    Copy your API key now. You won&apos;t be able to see it again.
+                                </span>
+                            </div>
                         </div>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Your API Key</Label>
+                        <div className="px-4 pb-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Your API key</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         value={generatedKey}
                                         readOnly
-                                        className="font-mono text-sm"
+                                        className="h-8 text-xs font-mono bg-secondary/50"
                                     />
                                     <Button
                                         variant="outline"
                                         size="icon"
                                         onClick={handleCopy}
-                                        className="shrink-0"
+                                        className="h-8 w-8 shrink-0"
                                     >
                                         {copied ? (
-                                            <Check className="h-4 w-4 text-green-600" />
+                                            <Check className="h-3.5 w-3.5 text-emerald-500" />
                                         ) : (
-                                            <Copy className="h-4 w-4" />
+                                            <Copy className="h-3.5 w-3.5" />
                                         )}
                                     </Button>
                                 </div>
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button onClick={handleClose}>Done</Button>
+                        <DialogFooter className="px-4 pb-4 pt-0">
+                            <Button size="sm" className="h-7 text-xs" onClick={handleClose}>Done</Button>
                         </DialogFooter>
                     </>
                 )}
