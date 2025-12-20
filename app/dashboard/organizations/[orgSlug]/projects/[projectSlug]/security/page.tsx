@@ -174,10 +174,10 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
                         <SelectValue placeholder="Time" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
-                        <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
-                        <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
-                        <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                        <SelectItem value="1h" className="text-xs">1 Hour</SelectItem>
+                        <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
+                        <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
+                        <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
                         <SelectItem value="all" className="text-xs">All Time</SelectItem>
                     </SelectContent>
                 </Select>
