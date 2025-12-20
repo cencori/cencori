@@ -220,6 +220,7 @@ export default function ApiKeysPage({
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-base font-medium">API Keys</h1>
+                <p className="text-xs text-muted-foreground mt-1">Manage API keys for authenticating requests to your project.</p>
             </div>
 
             {/* Actions */}
