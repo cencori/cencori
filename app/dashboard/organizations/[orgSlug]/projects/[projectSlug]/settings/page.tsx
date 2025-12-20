@@ -3,17 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CopyIcon, Settings, AlertTriangle, Trash2 } from "lucide-react";
+import { Copy, Check, Trash2, BarChart3, Power, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,9 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import Link from "next/link";
 
 interface ProjectData {
   id: string;
@@ -56,9 +47,9 @@ export default function ProjectSettingsPage() {
   const [projectStatus, setProjectStatus] = useState<'active' | 'inactive'>('active');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [copiedSlug, setCopiedSlug] = useState(false);
   const router = useRouter();
 
-  // Get context to update breadcrumbs
   const { updateProject: updateProjectContext } = useOrganizationProject();
 
   useEffect(() => {
@@ -71,17 +62,12 @@ export default function ProjectSettingsPage() {
           return;
         }
 
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
           notFound();
           return;
         }
 
-        // First, get the organization ID using orgSlug
         const { data: organization, error: orgError } = await supabase
           .from("organizations")
           .select("id")
@@ -89,12 +75,10 @@ export default function ProjectSettingsPage() {
           .single();
 
         if (orgError || !organization) {
-          console.error("Error fetching organization:", orgError?.message);
           notFound();
           return;
         }
 
-        // Then, get project details using projectSlug and organization ID
         const { data: projectData, error: projectError } = await supabase
           .from("projects")
           .select("id, name, slug, description, organization_id, visibility, status")
@@ -103,7 +87,6 @@ export default function ProjectSettingsPage() {
           .single();
 
         if (projectError || !projectData) {
-          console.error("Error fetching project:", projectError?.message);
           notFound();
           return;
         }
@@ -113,8 +96,7 @@ export default function ProjectSettingsPage() {
         setProjectDescription(projectData.description || "");
         setProjectVisibility(projectData.visibility || 'private');
         setProjectStatus(projectData.status || 'active');
-      } catch (err: unknown) {
-        console.error("Unexpected error:", (err as Error).message);
+      } catch {
         setError("An unexpected error occurred.");
       } finally {
         setLoading(false);
@@ -127,19 +109,16 @@ export default function ProjectSettingsPage() {
   const handleCopy = () => {
     if (project?.slug) {
       navigator.clipboard.writeText(project.slug);
-      toast.success("Project ID copied to clipboard!");
+      setCopiedSlug(true);
+      setTimeout(() => setCopiedSlug(false), 2000);
+      toast.success("Copied!");
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    setError(null);
     try {
-      if (!project) {
-        toast.error("Project data not available.");
-        setIsSaving(false);
-        return;
-      }
+      if (!project) return;
 
       const { error: updateError } = await supabase
         .from("projects")
@@ -152,26 +131,14 @@ export default function ProjectSettingsPage() {
         .eq("id", project.id);
 
       if (updateError) {
-        console.error("Error updating project:", updateError.message);
-        toast.error("Failed to update project.");
+        toast.error("Failed to save.");
       } else {
-        setProject((prevProject) =>
-          prevProject ? {
-            ...prevProject,
-            name: projectName,
-            description: projectDescription,
-            visibility: projectVisibility,
-            status: projectStatus
-          } : null
-        );
-        toast.success("Project updated successfully!");
-
-        // Update context for real-time breadcrumb updates
+        setProject(prev => prev ? { ...prev, name: projectName, description: projectDescription, visibility: projectVisibility, status: projectStatus } : null);
+        toast.success("Saved!");
         updateProjectContext(project.id, { name: projectName, description: projectDescription });
       }
-    } catch (err) {
-      console.error("Unexpected error during save:", err);
-      toast.error("An unexpected error occurred while saving.");
+    } catch {
+      toast.error("An error occurred.");
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +146,7 @@ export default function ProjectSettingsPage() {
 
   const handleDeleteProject = async () => {
     if (deleteConfirmName !== project?.name) {
-      toast.error("Project name does not match for deletion.");
+      toast.error("Name doesn't match.");
       return;
     }
 
@@ -190,22 +157,19 @@ export default function ProjectSettingsPage() {
         .eq("id", project.id);
 
       if (deleteError) {
-        console.error("Error deleting project:", deleteError.message);
-        toast.error("Failed to delete project.");
+        toast.error("Failed to delete.");
       } else {
-        toast.success("Project deleted successfully!");
+        toast.success("Project deleted!");
         router.push(`/dashboard/organizations/${orgSlug}/projects`);
       }
-    } catch (err) {
-      console.error("Unexpected error during deletion:", err);
-      toast.error("An unexpected error occurred during deletion.");
+    } catch {
+      toast.error("An error occurred.");
     } finally {
       setShowDeleteDialog(false);
       setDeleteConfirmName("");
     }
   };
 
-  // Check if any changes have been made
   const hasChanges = project && (
     projectName !== project.name ||
     projectDescription !== (project.description || "") ||
@@ -215,82 +179,30 @@ export default function ProjectSettingsPage() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex items-center space-x-4 pb-12">
-          <Skeleton className="h-7 w-48" />
-        </div>
-
-        <div className="space-y-6">
-          {/* Tabs skeleton */}
-          <div className="flex space-x-2">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-
-          {/* Card skeleton */}
-          <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-            <CardHeader>
-              <Skeleton className="h-6 w-48 mb-2" />
-              <Skeleton className="h-4 w-full max-w-md" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <div className="flex space-x-2">
-                  <Skeleton className="h-10 flex-1" />
-                  <Skeleton className="h-10 w-20" />
-                </div>
-                <Skeleton className="h-3 w-64" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <Skeleton className="h-px w-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-3 w-56" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-3 w-72" />
-              </div>
-              <div className="flex justify-end pt-4">
-                <Skeleton className="h-10 w-32" />
-              </div>
-            </CardContent>
-          </Card>
+      <div className="max-w-3xl mx-auto py-8 space-y-8">
+        <Skeleton className="h-6 w-48" />
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !project) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">{error}</p>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">Project not found.</p>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <p className="text-sm text-red-500">{error || "Project not found."}</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="flex items-center space-x-4 pb-12">
-        <h1 className="text-xl font-bold">Project Settings</h1>
+    <div className="max-w-5xl py-6 space-y-6">
+      {/* Header */}
+      <div className="space-y-0.5">
+        <h1 className="text-lg font-semibold">Settings</h1>
+        <p className="text-xs text-muted-foreground">Configure general options and project lifecycle.</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
@@ -301,174 +213,240 @@ export default function ProjectSettingsPage() {
 
         {/* GENERAL TAB */}
         <TabsContent value="general" className="space-y-6">
-          <Card className="transition-all hover:shadow-md rounded-none border-2 border-border relative before:absolute before:top-0 before:left-0 before:w-3 before:h-3 before:border-t-4 before:border-l-4 before:border-primary after:absolute after:bottom-0 after:right-0 after:w-3 after:h-3 after:border-b-4 after:border-r-4 after:border-primary">
-            <CardHeader>
-              <CardTitle>Project Information</CardTitle>
-              <CardDescription>
-                View and manage your project&apos;s basic information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="project-name">Project Name</Label>
+          {/* General Settings */}
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium">General settings</h2>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              {/* Project Name */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Project name</p>
+                  <p className="text-[10px] text-muted-foreground">Displayed throughout the dashboard.</p>
+                </div>
                 <Input
-                  id="project-name"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="Enter project name"
+                  className="w-64 h-8 text-sm"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="project-slug">Project ID</Label>
-                <div className="flex space-x-2">
+              {/* Project ID */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Project ID</p>
+                  <p className="text-[10px] text-muted-foreground">Reference used in APIs and URLs.</p>
+                </div>
+                <div className="flex items-center gap-2">
                   <Input
-                    id="project-slug"
                     value={project.slug}
                     readOnly
-                    className="bg-muted"
+                    className="w-52 h-8 bg-muted/50 font-mono text-xs"
                   />
-                  <Button onClick={handleCopy} variant="secondary" className="cursor-pointer shrink-0">
-                    <CopyIcon className="mr-2 h-4 w-4" />
-                    Copy
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
+                    {copiedSlug ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The project ID cannot be changed after creation
-                </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="project-description">Description</Label>
-                <Input
-                  id="project-description"
-                  value={projectDescription}
-                  onChange={(e) => setProjectDescription(e.target.value)}
-                  placeholder="Enter project description"
-                />
+              {/* Save Button Row */}
+              <div className="flex justify-end px-4 py-2 bg-muted/20">
+                <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={isSaving || !hasChanges}>
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
               </div>
+            </div>
+          </section>
 
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <Label htmlFor="project-visibility">Visibility</Label>
-                <Select
-                  value={projectVisibility}
-                  onValueChange={(value: 'public' | 'private') => setProjectVisibility(value)}
-                >
-                  <SelectTrigger id="project-visibility">
-                    <SelectValue placeholder="Select visibility" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Control who can view and access this project
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="project-status">Status</Label>
-                <Select
-                  value={projectStatus}
-                  onValueChange={(value: 'active' | 'inactive') => setProjectStatus(value)}
-                >
-                  <SelectTrigger id="project-status">
-                    <SelectValue placeholder="Select status" />
+          {/* Project Status */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Project status</h2>
+              <p className="text-[10px] text-muted-foreground">Pause or activate your project.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              {/* Status Toggle */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Status</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {projectStatus === 'active' ? 'Your project is currently active.' : 'Your project is paused.'}
+                  </p>
+                </div>
+                <Select value={projectStatus} onValueChange={(v: 'active' | 'inactive') => setProjectStatus(v)}>
+                  <SelectTrigger className="w-28 h-8 text-xs">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">
                       <div className="flex items-center gap-2">
-                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Active
                       </div>
                     </SelectItem>
                     <SelectItem value="inactive">
                       <div className="flex items-center gap-2">
-                        <span className="size-1.5 rounded-full bg-red-500" />
-                        Inactive
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        Paused
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Set the current operational status of the project
-                </p>
               </div>
+              {/* Visibility */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Visibility</p>
+                  <p className="text-[10px] text-muted-foreground">Control who can view this project.</p>
+                </div>
+                <Select value={projectVisibility} onValueChange={(v: 'public' | 'private') => setProjectVisibility(v)}>
+                  <SelectTrigger className="w-28 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private</SelectItem>
+                    <SelectItem value="public">Public</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </section>
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleSave} disabled={isSaving || !hasChanges}>
-                  {isSaving ? "Saving..." : "Save Changes"}
+          {/* Project Analytics */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Project analytics</h2>
+              <p className="text-[10px] text-muted-foreground">View usage and request statistics.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Analytics</p>
+                  <p className="text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                  <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`}>
+                    View
+                  </Link>
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
+
+          {/* Delete Project */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Delete Project</h2>
+              <p className="text-[10px] text-muted-foreground">Permanently remove your project and its data.</p>
+            </div>
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 overflow-hidden">
+              <div className="px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
+                  <div className="space-y-2 flex-1">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Deleting this project will remove all data.</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        This includes API keys, logs, and analytics. This action cannot be undone.
+                      </p>
+                    </div>
+                    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="h-7 text-xs gap-1.5">
+                          <Trash2 className="h-3 w-3" />
+                          Delete project
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Delete Project</DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Type <span className="font-mono font-medium text-foreground">{project.name}</span> to confirm.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Input
+                          placeholder={project.name}
+                          value={deleteConfirmName}
+                          onChange={(e) => setDeleteConfirmName(e.target.value)}
+                          className="h-9"
+                        />
+                        <DialogFooter>
+                          <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(false)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleDeleteProject}
+                            disabled={deleteConfirmName !== project.name}
+                          >
+                            Delete
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </TabsContent>
 
         {/* DANGER ZONE TAB */}
-        <TabsContent value="danger" className="space-y-6">
-          <Card className="border-red-200 dark:border-red-900">
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <CardTitle className="text-red-600">Danger Zone</CardTitle>
-              </div>
-              <CardDescription>
-                Irreversible and destructive actions for this project
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-6">
-                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
-                  Delete Project
-                </h3>
-                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-                  Once you delete this project, there is no going back. This will permanently
-                  delete the project and all associated data and settings.
-                </p>
-                <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      className="cursor-pointer bg-red-600 hover:bg-red-700"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Project
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Confirm Project Deletion</DialogTitle>
-                      <DialogDescription>
-                        This action is irreversible. To confirm, please type the project name (<b>{project.name}</b>) below.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <Input
-                        id="confirmDelete"
-                        placeholder={project.name}
-                        value={deleteConfirmName}
-                        onChange={(e) => setDeleteConfirmName(e.target.value)}
-                      />
+        <TabsContent value="danger" className="space-y-10">
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-lg font-medium">Delete Project</h2>
+              <p className="text-sm text-muted-foreground">Permanently remove your project and its data.</p>
+            </div>
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 overflow-hidden">
+              <div className="px-6 py-5">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                  <div className="space-y-3 flex-1">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Deleting this project will remove all data.</p>
+                      <p className="text-xs text-muted-foreground">
+                        This includes API keys, logs, and analytics. This action cannot be undone.
+                      </p>
                     </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="cursor-pointer">Cancel</Button>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDeleteProject}
-                        disabled={deleteConfirmName !== project.name}
-                        className="cursor-pointer bg-red-600 hover:bg-red-700"
-                      >
-                        I understand, delete this project
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="h-8 gap-1.5">
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete project
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Delete Project</DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Type <span className="font-mono font-medium text-foreground">{project.name}</span> to confirm.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Input
+                          placeholder={project.name}
+                          value={deleteConfirmName}
+                          onChange={(e) => setDeleteConfirmName(e.target.value)}
+                          className="h-9"
+                        />
+                        <DialogFooter>
+                          <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(false)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleDeleteProject}
+                            disabled={deleteConfirmName !== project.name}
+                          >
+                            Delete
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </TabsContent>
       </Tabs>
     </div>
