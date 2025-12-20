@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
-import { ChevronsUpDown, HelpCircle } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronsUpDown, HelpCircle, ExternalLink } from "lucide-react";
 
 interface MobileNavProps {
     onMenuClick: () => void;
@@ -13,8 +20,11 @@ interface MobileNavProps {
 
 export function MobileNav({ projectSlug }: MobileNavProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { organizations, projects } = useOrganizationProject();
     const { setEnvironment, isTestMode } = useEnvironment();
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackText, setFeedbackText] = useState("");
 
     const getOrgSlug = () => {
         const match = pathname.match(/organizations\/([^/]+)/);
@@ -25,20 +35,41 @@ export function MobileNav({ projectSlug }: MobileNavProps) {
     const currentOrg = organizations.find((org) => org.slug === orgSlug);
     const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
 
+    // Get available orgs and projects for dropdowns
+    const availableOrgs = organizations;
+    const availableProjects = projects.filter((proj) => proj.orgSlug === orgSlug);
+
     return (
-        <div className="sticky top-12 z-40 lg:hidden border-b border-border/40 bg-background">
-            {/* Scrollable breadcrumb row */}
+        <div className="sticky top-12 z-50 lg:hidden border-b border-border/40 bg-background">
             <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
-                {/* Organization selector */}
+                {/* Organization selector dropdown */}
                 {orgSlug && (
                     <>
-                        <Link
-                            href={`/dashboard/organizations/${orgSlug}/projects`}
-                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0"
-                        >
-                            {currentOrg?.name || "Organization"}
-                            <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
-                        </Link>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0">
+                                    {currentOrg?.name || "Organization"}
+                                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                                {availableOrgs.map((org) => (
+                                    <DropdownMenuItem
+                                        key={org.id}
+                                        className="text-xs cursor-pointer"
+                                        onClick={() => router.push(`/dashboard/organizations/${org.slug}/projects`)}
+                                    >
+                                        {org.name}
+                                    </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuItem
+                                    className="text-xs cursor-pointer text-primary"
+                                    onClick={() => router.push("/dashboard/organizations/new")}
+                                >
+                                    + New organization
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {currentOrg?.subscription_tier && (
                             <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
                                 {currentOrg.subscription_tier}
@@ -47,17 +78,41 @@ export function MobileNav({ projectSlug }: MobileNavProps) {
                     </>
                 )}
 
-                {/* Project selector */}
+                {/* Project selector dropdown */}
                 {projectSlug && (
                     <>
                         <span className="text-muted-foreground/50 text-xs shrink-0">/</span>
-                        <Link
-                            href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}`}
-                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0"
-                        >
-                            {currentProject?.name || projectSlug}
-                            <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
-                        </Link>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0">
+                                    {currentProject?.name || projectSlug}
+                                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                                <DropdownMenuItem
+                                    className="text-xs cursor-pointer"
+                                    onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects`)}
+                                >
+                                    All projects
+                                </DropdownMenuItem>
+                                {availableProjects.map((proj) => (
+                                    <DropdownMenuItem
+                                        key={proj.id}
+                                        className="text-xs cursor-pointer"
+                                        onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/${proj.slug}`)}
+                                    >
+                                        {proj.name}
+                                    </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuItem
+                                    className="text-xs cursor-pointer text-primary"
+                                    onClick={() => router.push(`/dashboard/organizations/${orgSlug}/projects/new`)}
+                                >
+                                    + New project
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </>
                 )}
 
@@ -88,21 +143,78 @@ export function MobileNav({ projectSlug }: MobileNavProps) {
                 {/* Spacer */}
                 <div className="flex-1 min-w-4" />
 
-                {/* Action buttons */}
-                <button
-                    type="button"
-                    className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                >
-                    Feedback
-                </button>
+                {/* Feedback dropdown */}
+                <DropdownMenu open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                        >
+                            Feedback
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72 p-3">
+                        <div className="space-y-3">
+                            <textarea
+                                placeholder="My idea for improving Cencori is..."
+                                value={feedbackText}
+                                onChange={(e) => setFeedbackText(e.target.value)}
+                                className="w-full h-20 text-xs bg-secondary/50 border border-border/40 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring/20"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    className="h-7 px-3 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                    disabled={!feedbackText.trim()}
+                                    onClick={() => {
+                                        // TODO: Submit feedback
+                                        setFeedbackText("");
+                                        setFeedbackOpen(false);
+                                    }}
+                                >
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-                <button
-                    type="button"
-                    className="w-6 h-6 flex items-center justify-center rounded-full border border-border/40 hover:bg-secondary transition-colors shrink-0"
-                    aria-label="Help"
-                >
-                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+                {/* Help dropdown */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            className="w-6 h-6 flex items-center justify-center rounded-full border border-border/40 hover:bg-secondary transition-colors shrink-0"
+                            aria-label="Help"
+                        >
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 p-2">
+                        <div className="px-2 py-1.5 mb-1">
+                            <p className="text-xs font-medium">Need help?</p>
+                            <p className="text-[10px] text-muted-foreground">Start with our docs or community.</p>
+                        </div>
+                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                            <Link href="/docs" target="_blank">
+                                <ExternalLink className="h-3 w-3 mr-2" />
+                                Documentation
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                            <Link href="https://discord.gg/cencori" target="_blank">
+                                <ExternalLink className="h-3 w-3 mr-2" />
+                                Discord Community
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                            <Link href="mailto:support@cencori.com">
+                                <ExternalLink className="h-3 w-3 mr-2" />
+                                Email Support
+                            </Link>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
     );
