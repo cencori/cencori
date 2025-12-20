@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Zap, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw } from "lucide-react";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,6 +40,9 @@ interface ProjectData {
   visibility: 'public' | 'private';
   status: 'active' | 'inactive';
   region?: string;
+  request_timeout_seconds?: number;
+  max_retries?: number;
+  fallback_provider?: string | null;
 }
 
 interface WebhookData {
@@ -162,7 +166,7 @@ export default function ProjectSettingsPage() {
 
         const { data: projectData, error: projectError } = await supabase
           .from("projects")
-          .select("id, name, slug, description, organization_id, visibility, status, region")
+          .select("id, name, slug, description, organization_id, visibility, status, region, request_timeout_seconds, max_retries, fallback_provider")
           .eq("slug", projectSlug)
           .eq("organization_id", organization.id)
           .single();
@@ -822,21 +826,21 @@ export default function ProjectSettingsPage() {
                     <Clock className="h-3 w-3 text-muted-foreground" />
                     <span className="text-[10px]">Request timeout</span>
                   </div>
-                  <span className="text-[10px] font-mono">30s</span>
+                  <span className="text-[10px] font-mono">{project?.request_timeout_seconds || 30}s</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-3 w-3 text-muted-foreground" />
+                    <ArrowPathIcon className="h-3 w-3 text-muted-foreground" />
                     <span className="text-[10px]">Max retries</span>
                   </div>
-                  <span className="text-[10px] font-mono">3</span>
+                  <span className="text-[10px] font-mono">{project?.max_retries ?? 3}</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <Server className="h-3 w-3 text-muted-foreground" />
                     <span className="text-[10px]">Fallback provider</span>
                   </div>
-                  <span className="text-[10px] font-mono">Anthropic</span>
+                  <span className="text-[10px] font-mono">{project?.fallback_provider || 'None'}</span>
                 </div>
               </div>
             </div>
