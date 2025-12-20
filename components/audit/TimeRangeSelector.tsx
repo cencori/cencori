@@ -7,7 +7,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Clock } from 'lucide-react';
 
 interface TimeRangeSelectorProps {
     value: string;
@@ -25,7 +24,6 @@ const timeRanges = [
 export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     return (
         <div className="flex items-center gap-1.5">
-            <Clock className="h-3 w-3 text-muted-foreground" />
             <Select value={value} onValueChange={onChange}>
                 <SelectTrigger className="w-[100px] h-7 text-xs">
                     <SelectValue placeholder="Time range" />
