@@ -90,7 +90,7 @@ export function GenerateKeyDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-[400px] p-0">
+            <DialogContent className="sm:max-w-[400px] p-0 top-[20%] translate-y-0">
                 {!generatedKey ? (
                     <>
                         <DialogHeader className="px-4 pt-4 pb-0">
