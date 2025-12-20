@@ -6,8 +6,7 @@ import { IncidentDetailModal } from './IncidentDetailModal';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ChevronRight, CheckCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Loader2, CheckCircle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SecurityIncident {
@@ -86,7 +85,10 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
         if (diff < 60000) return 'Just now';
         if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const day = date.getDate();
+        const month = date.toLocaleString("en-US", { month: "short" });
+        return `${month} ${day}`;
     };
 
     const formatIncidentType = (type: string) => {
@@ -101,14 +103,13 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
     };
 
     const handleIncidentReviewed = () => {
-        // Refresh the list after marking as reviewed
         fetchIncidents();
     };
 
     if (loading && incidents.length === 0) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
         );
     }
@@ -116,29 +117,32 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
     return (
         <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Critical</p>
-                    <p className="text-2xl font-bold text-red-600">{summary.critical}</p>
+            <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="rounded-md border border-border/40 bg-card p-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Critical</p>
+                    <p className="text-lg font-semibold font-mono text-red-500">{summary.critical}</p>
                 </div>
-                <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground mb-1">High</p>
-                    <p className="text-2xl font-bold text-yellow-600">{summary.high}</p>
+                <div className="rounded-md border border-border/40 bg-card p-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">High</p>
+                    <p className="text-lg font-semibold font-mono text-amber-500">{summary.high}</p>
                 </div>
-                <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Medium</p>
-                    <p className="text-2xl font-bold text-yellow-600">{summary.medium}</p>
+                <div className="rounded-md border border-border/40 bg-card p-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Medium</p>
+                    <p className="text-lg font-semibold font-mono text-yellow-500">{summary.medium}</p>
                 </div>
-                <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Low</p>
-                    <p className="text-2xl font-bold text-zinc-600 dark:text-zinc-400">{summary.low}</p>
+                <div className="rounded-md border border-border/40 bg-card p-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Low</p>
+                    <p className="text-lg font-semibold font-mono text-muted-foreground">{summary.low}</p>
                 </div>
             </div>
 
             {incidents.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-                    <p className="text-lg font-medium text-muted-foreground">No incidents found</p>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <div className="text-center py-16 flex flex-col items-center rounded-md border border-border/40 bg-card">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium mb-1">No incidents found</p>
+                    <p className="text-xs text-muted-foreground">
                         {filters.severity !== 'all' || filters.type !== 'all'
                             ? 'Try adjusting your filters'
                             : 'Your project is secure! 🎉'
@@ -147,59 +151,55 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                 </div>
             ) : (
                 <>
-                    <div className="rounded-md border">
+                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                         {/* Desktop view */}
                         <div className="hidden md:block overflow-x-auto">
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Severity</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Blocked At</TableHead>
-                                        <TableHead className="text-right">Risk Score</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead></TableHead>
+                                    <TableRow className="hover:bg-transparent border-b border-border/40">
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Severity</TableHead>
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Type</TableHead>
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Time</TableHead>
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Blocked At</TableHead>
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Risk</TableHead>
+                                        <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {incidents.map((incident) => (
                                         <TableRow
                                             key={incident.id}
-                                            className="cursor-pointer hover:bg-muted/50"
+                                            className="cursor-pointer hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
                                             onClick={() => handleRowClick(incident.id)}
                                         >
-                                            <TableCell>
+                                            <TableCell className="py-2.5 px-4">
                                                 <SeverityBadge severity={incident.severity} />
                                             </TableCell>
-                                            <TableCell className="font-medium">
+                                            <TableCell className="py-2.5 text-xs">
                                                 {formatIncidentType(incident.incident_type)}
                                             </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                            <TableCell className="py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                                                 {formatDate(incident.created_at)}
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs">
+                                            <TableCell className="py-2.5">
+                                                <Badge variant="outline" className="text-[10px] h-5">
                                                     {incident.blocked_at}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right text-sm font-mono">
+                                            <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
                                                 {(incident.risk_score * 100).toFixed(0)}%
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="py-2.5 text-right pr-4">
                                                 {incident.reviewed ? (
-                                                    <Badge variant="outline" className="text-green-600 border-green-500/20">
-                                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                                    <Badge variant="outline" className="text-[10px] h-5 text-emerald-500 border-emerald-500/20 gap-1">
+                                                        <CheckCircle className="h-2.5 w-2.5" />
                                                         Reviewed
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-muted-foreground">
+                                                    <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground">
                                                         Pending
                                                     </Badge>
                                                 )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -208,30 +208,26 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                         </div>
 
                         {/* Mobile view */}
-                        <div className="md:hidden divide-y">
+                        <div className="md:hidden divide-y divide-border/40">
                             {incidents.map((incident) => (
                                 <div
                                     key={incident.id}
-                                    className="p-4 cursor-pointer hover:bg-muted/50"
+                                    className="p-3 cursor-pointer hover:bg-secondary/30 transition-colors"
                                     onClick={() => handleRowClick(incident.id)}
                                 >
-                                    <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-start justify-between mb-1.5">
                                         <div className="flex items-center gap-2">
                                             <SeverityBadge severity={incident.severity} />
                                             {incident.reviewed && (
-                                                <Badge variant="outline" className="text-xs text-green-600">
-                                                    ✓
-                                                </Badge>
+                                                <Badge variant="outline" className="text-[9px] h-4 text-emerald-500">✓</Badge>
                                             )}
                                         </div>
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className="text-[10px] text-muted-foreground">
                                             {formatDate(incident.created_at)}
                                         </span>
                                     </div>
-                                    <p className="text-sm font-medium mb-2">
-                                        {formatIncidentType(incident.incident_type)}
-                                    </p>
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <p className="text-xs mb-1.5">{formatIncidentType(incident.incident_type)}</p>
+                                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                         <span>{incident.blocked_at} block</span>
                                         <span className="font-mono">Risk: {(incident.risk_score * 100).toFixed(0)}%</span>
                                     </div>
@@ -241,14 +237,15 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                     </div>
 
                     {/* Pagination */}
-                    <div className="flex items-center justify-between px-2 py-4">
-                        <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between py-3">
+                        <p className="text-xs text-muted-foreground">
                             Page {page} of {totalPages}
                         </p>
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-7 text-xs"
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1 || loading}
                             >
@@ -257,6 +254,7 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                             <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-7 text-xs"
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages || loading}
                             >

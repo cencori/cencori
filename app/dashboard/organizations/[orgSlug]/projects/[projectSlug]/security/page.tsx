@@ -3,18 +3,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { SecurityIncidentsTable } from '@/components/audit/SecurityIncidentsTable';
-import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { X, ListFilter, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { X, ShieldAlert, Loader2 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PageProps {
     params: Promise<{
@@ -34,7 +27,6 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
         time_range: '7d',
     });
 
-    // Fetch project ID from slug
     useEffect(() => {
         const fetchProjectId = async () => {
             setLoading(true);
@@ -47,10 +39,7 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
                     .eq('slug', orgSlug)
                     .single();
 
-                if (!orgData) {
-                    console.error('Organization not found');
-                    return;
-                }
+                if (!orgData) return;
 
                 const { data: projectData } = await supabase
                     .from('projects')
@@ -87,136 +76,125 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
         filters.reviewed !== 'all' ||
         filters.time_range !== '7d';
 
-    // Show loading while fetching project ID
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="mb-6">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-64 mt-1" />
+                </div>
+                <div className="flex gap-3 mb-4">
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-7 w-28" />)}
+                </div>
+                <Skeleton className="h-[300px]" />
             </div>
         );
     }
 
-    // Show error if project ID not found
     if (!projectId) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                <p className="text-lg font-medium text-muted-foreground">Project not found</p>
-                <p className="text-sm text-muted-foreground mt-1">Unable to load security incidents</p>
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="text-center py-16 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">Project not found</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Unable to load security incidents</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Security Incidents</h2>
-                    <p className="text-muted-foreground">
-                        Monitor and review security threats detected in your AI requests
-                    </p>
-                </div>
+        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-base font-medium">Security</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">Monitor and review security threats in your AI requests</p>
             </div>
 
-            {/* Filters */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <ListFilter className="h-4 w-4" />
-                            <CardTitle className="text-base">Filters</CardTitle>
-                        </div>
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                Clear filters
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Severity filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Severity</label>
-                            <Select
-                                value={filters.severity}
-                                onValueChange={(value) =>
-                                    setFilters(prev => ({ ...prev, severity: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All severities" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Severities</SelectItem>
-                                    <SelectItem value="critical">Critical</SelectItem>
-                                    <SelectItem value="high">High</SelectItem>
-                                    <SelectItem value="medium">Medium</SelectItem>
-                                    <SelectItem value="low">Low</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+                {/* Severity */}
+                <Select
+                    value={filters.severity}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, severity: value }))}
+                >
+                    <SelectTrigger className="w-[120px] h-7 text-xs">
+                        <SelectValue placeholder="Severity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">All severities</SelectItem>
+                        <SelectItem value="critical" className="text-xs">Critical</SelectItem>
+                        <SelectItem value="high" className="text-xs">High</SelectItem>
+                        <SelectItem value="medium" className="text-xs">Medium</SelectItem>
+                        <SelectItem value="low" className="text-xs">Low</SelectItem>
+                    </SelectContent>
+                </Select>
 
-                        {/* Type filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Incident Type</label>
-                            <Select
-                                value={filters.type}
-                                onValueChange={(value) =>
-                                    setFilters(prev => ({ ...prev, type: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    <SelectItem value="jailbreak_attempt">Jailbreak Attempt</SelectItem>
-                                    <SelectItem value="pii_detection">PII Detection</SelectItem>
-                                    <SelectItem value="prompt_injection">Prompt Injection</SelectItem>
-                                    <SelectItem value="harmful_content">Harmful Content</SelectItem>
-                                    <SelectItem value="data_exfiltration">Data Exfiltration</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                {/* Type */}
+                <Select
+                    value={filters.type}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
+                >
+                    <SelectTrigger className="w-[140px] h-7 text-xs">
+                        <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">All types</SelectItem>
+                        <SelectItem value="jailbreak_attempt" className="text-xs">Jailbreak</SelectItem>
+                        <SelectItem value="pii_detection" className="text-xs">PII Detection</SelectItem>
+                        <SelectItem value="prompt_injection" className="text-xs">Prompt Injection</SelectItem>
+                        <SelectItem value="harmful_content" className="text-xs">Harmful Content</SelectItem>
+                        <SelectItem value="data_exfiltration" className="text-xs">Data Exfiltration</SelectItem>
+                    </SelectContent>
+                </Select>
 
-                        {/* Review status */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Review Status</label>
-                            <Select
-                                value={filters.reviewed}
-                                onValueChange={(value) =>
-                                    setFilters(prev => ({ ...prev, reviewed: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="false">Pending Review</SelectItem>
-                                    <SelectItem value="true">Reviewed</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                {/* Review Status */}
+                <Select
+                    value={filters.reviewed}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, reviewed: value }))}
+                >
+                    <SelectTrigger className="w-[110px] h-7 text-xs">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                        <SelectItem value="false" className="text-xs">Pending</SelectItem>
+                        <SelectItem value="true" className="text-xs">Reviewed</SelectItem>
+                    </SelectContent>
+                </Select>
 
-                        {/* Time range */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Time Range</label>
-                            <TimeRangeSelector
-                                value={filters.time_range}
-                                onChange={(value) =>
-                                    setFilters(prev => ({ ...prev, time_range: value }))
-                                }
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                {/* Time Range */}
+                <Select
+                    value={filters.time_range}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
+                >
+                    <SelectTrigger className="w-[100px] h-7 text-xs">
+                        <SelectValue placeholder="Time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
+                        <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
+                        <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
+                        <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                        <SelectItem value="all" className="text-xs">All Time</SelectItem>
+                    </SelectContent>
+                </Select>
+
+                {/* Clear Filters */}
+                {hasActiveFilters && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        onClick={handleClearFilters}
+                    >
+                        <X className="h-3 w-3 mr-1" />
+                        Clear
+                    </Button>
+                )}
+            </div>
 
             {/* Security incidents table */}
             <SecurityIncidentsTable projectId={projectId} filters={filters} environment={environment} />
