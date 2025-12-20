@@ -59,6 +59,15 @@ interface ProviderHealth {
   error?: string;
 }
 
+interface RateLimitsData {
+  tier: string;
+  usage: {
+    requestsPerMinute: { used: number; limit: number; percentage: number };
+    tokensPerDay: { used: number; limit: number; percentage: number };
+    concurrentRequests: { used: number; limit: number; percentage: number };
+  };
+}
+
 const WEBHOOK_EVENTS = [
   { value: 'request.completed', label: 'Request Completed' },
   { value: 'request.failed', label: 'Request Failed' },
@@ -115,6 +124,7 @@ export default function ProjectSettingsPage() {
   const [providers, setProviders] = useState<ProviderHealth[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [versions, setVersions] = useState<{ sdk: string; api: string; proxy: string } | null>(null);
+  const [rateLimits, setRateLimits] = useState<RateLimitsData | null>(null);
 
   // Webhook dialog state
   const [showWebhookDialog, setShowWebhookDialog] = useState(false);
@@ -174,6 +184,8 @@ export default function ProjectSettingsPage() {
         fetchProviders();
         // Fetch service versions
         fetchVersions();
+        // Fetch rate limits
+        fetchRateLimits(projectData.id);
       } catch {
         setError("An unexpected error occurred.");
       } finally {
@@ -223,6 +235,19 @@ export default function ProjectSettingsPage() {
       }
     } catch (err) {
       console.error('Failed to fetch versions:', err);
+    }
+  };
+
+  // Fetch rate limits for the project
+  const fetchRateLimits = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/rate-limits`);
+      if (response.ok) {
+        const data = await response.json();
+        setRateLimits(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch rate limits:', err);
     }
   };
 
@@ -740,35 +765,44 @@ export default function ProjectSettingsPage() {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Rate limits</h2>
-              <p className="text-[10px] text-muted-foreground">Current usage against your plan limits.</p>
+              <p className="text-[10px] text-muted-foreground">Current usage against your plan limits{rateLimits?.tier ? ` (${rateLimits.tier} tier)` : ''}.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               <div className="divide-y divide-border/40">
                 <div className="px-4 py-3">
                   <div className="flex justify-between text-[10px] mb-1.5">
                     <span className="text-muted-foreground">Requests / min</span>
-                    <span>450 / 1,000</span>
+                    <span>{rateLimits?.usage.requestsPerMinute.used.toLocaleString() || '—'} / {rateLimits?.usage.requestsPerMinute.limit.toLocaleString() || '—'}</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '45%' }} />
+                    <div
+                      className={`h-full rounded-full ${(rateLimits?.usage.requestsPerMinute.percentage || 0) > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${rateLimits?.usage.requestsPerMinute.percentage || 0}%` }}
+                    />
                   </div>
                 </div>
                 <div className="px-4 py-3">
                   <div className="flex justify-between text-[10px] mb-1.5">
                     <span className="text-muted-foreground">Tokens / day</span>
-                    <span>1.2M / 5M</span>
+                    <span>{rateLimits?.usage.tokensPerDay.used.toLocaleString() || '—'} / {rateLimits?.usage.tokensPerDay.limit.toLocaleString() || '—'}</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '24%' }} />
+                    <div
+                      className={`h-full rounded-full ${(rateLimits?.usage.tokensPerDay.percentage || 0) > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${rateLimits?.usage.tokensPerDay.percentage || 0}%` }}
+                    />
                   </div>
                 </div>
                 <div className="px-4 py-3">
                   <div className="flex justify-between text-[10px] mb-1.5">
                     <span className="text-muted-foreground">Concurrent requests</span>
-                    <span>8 / 50</span>
+                    <span>{rateLimits?.usage.concurrentRequests.used || '—'} / {rateLimits?.usage.concurrentRequests.limit || '—'}</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '16%' }} />
+                    <div
+                      className={`h-full rounded-full ${(rateLimits?.usage.concurrentRequests.percentage || 0) > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${rateLimits?.usage.concurrentRequests.percentage || 0}%` }}
+                    />
                   </div>
                 </div>
               </div>
