@@ -5,7 +5,7 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, BarChart3, Power, AlertTriangle } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Zap, Clock, Webhook, Server, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -208,7 +208,7 @@ export default function ProjectSettingsPage() {
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="danger">Danger Zone</TabsTrigger>
+          <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
@@ -389,61 +389,174 @@ export default function ProjectSettingsPage() {
           </section>
         </TabsContent>
 
-        {/* DANGER ZONE TAB */}
-        <TabsContent value="danger" className="space-y-10">
-          <section className="space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-lg font-medium">Delete Project</h2>
-              <p className="text-sm text-muted-foreground">Permanently remove your project and its data.</p>
+        {/* INFRASTRUCTURE TAB */}
+        <TabsContent value="infrastructure" className="space-y-6">
+          {/* Proxy Instance */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Proxy instance</h2>
+              <p className="text-[10px] text-muted-foreground">Your primary proxy endpoint and region.</p>
             </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 overflow-hidden">
-              <div className="px-6 py-5">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
-                  <div className="space-y-3 flex-1">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Deleting this project will remove all data.</p>
-                      <p className="text-xs text-muted-foreground">
-                        This includes API keys, logs, and analytics. This action cannot be undone.
-                      </p>
-                    </div>
-                    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                      <DialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="h-8 gap-1.5">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete project
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-sm">
-                        <DialogHeader>
-                          <DialogTitle>Delete Project</DialogTitle>
-                          <DialogDescription className="text-xs">
-                            Type <span className="font-mono font-medium text-foreground">{project.name}</span> to confirm.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Input
-                          placeholder={project.name}
-                          value={deleteConfirmName}
-                          onChange={(e) => setDeleteConfirmName(e.target.value)}
-                          className="h-9"
-                        />
-                        <DialogFooter>
-                          <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(false)}>
-                            Cancel
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={handleDeleteProject}
-                            disabled={deleteConfirmName !== project.name}
-                          >
-                            Delete
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Globe className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium">Primary Proxy</p>
+                    <p className="text-[10px] text-muted-foreground">US East (Virginia) • Edge</p>
                   </div>
                 </div>
+                <span className="text-lg">🇺🇸</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Service Versions + Provider Connections Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Service Versions */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium">Service versions</h2>
+              <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                <div className="divide-y divide-border/40">
+                  <div className="flex justify-between px-4 py-2">
+                    <span className="text-[10px] text-muted-foreground">SDK Version</span>
+                    <span className="text-[10px] font-mono">1.2.0</span>
+                  </div>
+                  <div className="flex justify-between px-4 py-2">
+                    <span className="text-[10px] text-muted-foreground">API Version</span>
+                    <span className="text-[10px] font-mono">v1</span>
+                  </div>
+                  <div className="flex justify-between px-4 py-2">
+                    <span className="text-[10px] text-muted-foreground">Proxy Version</span>
+                    <span className="text-[10px] font-mono">2.1.4</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Provider Connections */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium">Provider connections</h2>
+              <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                <div className="divide-y divide-border/40">
+                  <div className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px]">OpenAI</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">45ms</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px]">Anthropic</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">52ms</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span className="text-[10px]">Google AI</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">120ms</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* Rate Limits */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Rate limits</h2>
+              <p className="text-[10px] text-muted-foreground">Current usage against your plan limits.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="divide-y divide-border/40">
+                <div className="px-4 py-3">
+                  <div className="flex justify-between text-[10px] mb-1.5">
+                    <span className="text-muted-foreground">Requests / min</span>
+                    <span>450 / 1,000</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '45%' }} />
+                  </div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="flex justify-between text-[10px] mb-1.5">
+                    <span className="text-muted-foreground">Tokens / day</span>
+                    <span>1.2M / 5M</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '24%' }} />
+                  </div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="flex justify-between text-[10px] mb-1.5">
+                    <span className="text-muted-foreground">Concurrent requests</span>
+                    <span>8 / 50</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '16%' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Request Configuration */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Request configuration</h2>
+              <p className="text-[10px] text-muted-foreground">Default settings for request handling.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="divide-y divide-border/40">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px]">Request timeout</span>
+                  </div>
+                  <span className="text-[10px] font-mono">30s</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px]">Max retries</span>
+                  </div>
+                  <span className="text-[10px] font-mono">3</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px]">Fallback provider</span>
+                  </div>
+                  <span className="text-[10px] font-mono">Anthropic</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Webhooks */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Webhooks</h2>
+              <p className="text-[10px] text-muted-foreground">HTTP callbacks for request events.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Webhook className="h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium">No webhooks configured</p>
+                    <p className="text-[10px] text-muted-foreground">Add webhooks to receive real-time events.</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  Add webhook
+                </Button>
               </div>
             </div>
           </section>
