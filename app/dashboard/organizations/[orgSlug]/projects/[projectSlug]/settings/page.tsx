@@ -69,11 +69,25 @@ const WEBHOOK_EVENTS = [
 ];
 
 const REGION_MAP: Record<string, { name: string; flag: string }> = {
-  'us-east-1': { name: 'US East (Virginia)', flag: '🇺🇸' },
+  // General regions (auto-routing)
+  'americas': { name: 'Americas (Auto)', flag: '🌎' },
+  'europe': { name: 'Europe (Auto)', flag: '🌍' },
+  'asia-pacific': { name: 'Asia-Pacific (Auto)', flag: '🌏' },
+  // Specific regions
+  'us-east-1': { name: 'US East (N. Virginia)', flag: '🇺🇸' },
+  'us-west-1': { name: 'US West (N. California)', flag: '🇺🇸' },
   'us-west-2': { name: 'US West (Oregon)', flag: '🇺🇸' },
+  'ca-central-1': { name: 'Canada (Central)', flag: '🇨🇦' },
   'eu-west-1': { name: 'EU West (Ireland)', flag: '🇮🇪' },
-  'ap-southeast-1': { name: 'Asia (Singapore)', flag: '🇸🇬' },
-  'default': { name: 'US East (Virginia)', flag: '🇺🇸' },
+  'eu-central-1': { name: 'EU Central (Frankfurt)', flag: '🇩🇪' },
+  'ap-southeast-1': { name: 'Asia Pacific (Singapore)', flag: '🇸🇬' },
+  'ap-northeast-1': { name: 'Asia Pacific (Tokyo)', flag: '🇯🇵' },
+  'ap-south-1': { name: 'Asia Pacific (Mumbai)', flag: '🇮🇳' },
+  'sa-east-1': { name: 'South America (São Paulo)', flag: '🇧🇷' },
+  'me-south-1': { name: 'Middle East (Bahrain)', flag: '🇧🇭' },
+  'af-south-1': { name: 'Africa (Cape Town)', flag: '🇿🇦' },
+  // Default fallback
+  'default': { name: 'Americas (Auto)', flag: '🌎' },
 };
 
 export default function ProjectSettingsPage() {
@@ -100,6 +114,7 @@ export default function ProjectSettingsPage() {
   const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
   const [providers, setProviders] = useState<ProviderHealth[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
+  const [versions, setVersions] = useState<{ sdk: string; api: string; proxy: string } | null>(null);
 
   // Webhook dialog state
   const [showWebhookDialog, setShowWebhookDialog] = useState(false);
@@ -157,6 +172,8 @@ export default function ProjectSettingsPage() {
         fetchWebhooks(projectData.id);
         // Fetch provider health
         fetchProviders();
+        // Fetch service versions
+        fetchVersions();
       } catch {
         setError("An unexpected error occurred.");
       } finally {
@@ -193,6 +210,19 @@ export default function ProjectSettingsPage() {
       console.error('Failed to fetch provider health:', err);
     } finally {
       setProvidersLoading(false);
+    }
+  };
+
+  // Fetch service versions
+  const fetchVersions = async () => {
+    try {
+      const response = await fetch('/api/versions');
+      if (response.ok) {
+        const data = await response.json();
+        setVersions(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch versions:', err);
     }
   };
 
@@ -637,15 +667,15 @@ export default function ProjectSettingsPage() {
                 <div className="divide-y divide-border/40">
                   <div className="flex justify-between px-4 py-2">
                     <span className="text-[10px] text-muted-foreground">SDK Version</span>
-                    <span className="text-[10px] font-mono">1.2.0</span>
+                    <span className="text-[10px] font-mono">{versions?.sdk || '—'}</span>
                   </div>
                   <div className="flex justify-between px-4 py-2">
                     <span className="text-[10px] text-muted-foreground">API Version</span>
-                    <span className="text-[10px] font-mono">v1</span>
+                    <span className="text-[10px] font-mono">{versions?.api || '—'}</span>
                   </div>
                   <div className="flex justify-between px-4 py-2">
                     <span className="text-[10px] text-muted-foreground">Proxy Version</span>
-                    <span className="text-[10px] font-mono">2.1.4</span>
+                    <span className="text-[10px] font-mono">{versions?.proxy || '—'}</span>
                   </div>
                 </div>
               </div>
