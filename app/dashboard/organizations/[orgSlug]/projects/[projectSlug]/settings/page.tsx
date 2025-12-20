@@ -394,7 +394,7 @@ export default function ProjectSettingsPage() {
 
   if (loading) {
     return (
-      <div className="w-full px-8 py-6 space-y-6">
+      <div className="w-full px-32 py-6 space-y-6">
         {/* Header */}
         <div className="space-y-0.5">
           <Skeleton className="h-5 w-24" />
