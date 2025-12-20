@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Zap, Clock, Webhook, Server, AlertTriangle } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Zap, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,6 +22,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ProjectData {
   id: string;
@@ -30,7 +38,43 @@ interface ProjectData {
   organization_id: string;
   visibility: 'public' | 'private';
   status: 'active' | 'inactive';
+  region?: string;
 }
+
+interface WebhookData {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  is_active: boolean;
+  created_at: string;
+  last_triggered_at?: string;
+  failure_count: number;
+}
+
+interface ProviderHealth {
+  name: string;
+  status: 'healthy' | 'degraded' | 'down';
+  latency: number | null;
+  error?: string;
+}
+
+const WEBHOOK_EVENTS = [
+  { value: 'request.completed', label: 'Request Completed' },
+  { value: 'request.failed', label: 'Request Failed' },
+  { value: 'security.violation', label: 'Security Violation' },
+  { value: 'rate_limit.exceeded', label: 'Rate Limit Exceeded' },
+  { value: 'cost.threshold', label: 'Cost Threshold Reached' },
+  { value: 'model.fallback', label: 'Model Fallback Triggered' },
+];
+
+const REGION_MAP: Record<string, { name: string; flag: string }> = {
+  'us-east-1': { name: 'US East (Virginia)', flag: '🇺🇸' },
+  'us-west-2': { name: 'US West (Oregon)', flag: '🇺🇸' },
+  'eu-west-1': { name: 'EU West (Ireland)', flag: '🇮🇪' },
+  'ap-southeast-1': { name: 'Asia (Singapore)', flag: '🇸🇬' },
+  'default': { name: 'US East (Virginia)', flag: '🇺🇸' },
+};
 
 export default function ProjectSettingsPage() {
   const params = useParams();
@@ -51,6 +95,18 @@ export default function ProjectSettingsPage() {
   const router = useRouter();
 
   const { updateProject: updateProjectContext } = useOrganizationProject();
+
+  // Infrastructure state
+  const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
+  const [providers, setProviders] = useState<ProviderHealth[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+
+  // Webhook dialog state
+  const [showWebhookDialog, setShowWebhookDialog] = useState(false);
+  const [webhookName, setWebhookName] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookEvents, setWebhookEvents] = useState<string[]>(['request.completed']);
+  const [creatingWebhook, setCreatingWebhook] = useState(false);
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -81,7 +137,7 @@ export default function ProjectSettingsPage() {
 
         const { data: projectData, error: projectError } = await supabase
           .from("projects")
-          .select("id, name, slug, description, organization_id, visibility, status")
+          .select("id, name, slug, description, organization_id, visibility, status, region")
           .eq("slug", projectSlug)
           .eq("organization_id", organization.id)
           .single();
@@ -96,6 +152,11 @@ export default function ProjectSettingsPage() {
         setProjectDescription(projectData.description || "");
         setProjectVisibility(projectData.visibility || 'private');
         setProjectStatus(projectData.status || 'active');
+
+        // Fetch webhooks for this project
+        fetchWebhooks(projectData.id);
+        // Fetch provider health
+        fetchProviders();
       } catch {
         setError("An unexpected error occurred.");
       } finally {
@@ -105,6 +166,101 @@ export default function ProjectSettingsPage() {
 
     fetchProjectDetails();
   }, [orgSlug, projectSlug]);
+
+  // Fetch webhooks for the project
+  const fetchWebhooks = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/webhooks`);
+      if (response.ok) {
+        const data = await response.json();
+        setWebhooks(data.webhooks || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch webhooks:', err);
+    }
+  };
+
+  // Fetch provider health status
+  const fetchProviders = async () => {
+    setProvidersLoading(true);
+    try {
+      const response = await fetch('/api/providers/health');
+      if (response.ok) {
+        const data = await response.json();
+        setProviders(data.providers || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch provider health:', err);
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
+  // Create a new webhook
+  const handleCreateWebhook = async () => {
+    if (!project || !webhookName || !webhookUrl) {
+      toast.error('Name and URL are required');
+      return;
+    }
+
+    setCreatingWebhook(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/webhooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: webhookName,
+          url: webhookUrl,
+          events: webhookEvents,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Webhook created!');
+        setShowWebhookDialog(false);
+        setWebhookName('');
+        setWebhookUrl('');
+        setWebhookEvents(['request.completed']);
+        fetchWebhooks(project.id);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to create webhook');
+      }
+    } catch {
+      toast.error('Failed to create webhook');
+    } finally {
+      setCreatingWebhook(false);
+    }
+  };
+
+  // Delete a webhook
+  const handleDeleteWebhook = async (webhookId: string) => {
+    if (!project) return;
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/webhooks/${webhookId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Webhook deleted!');
+        setWebhooks(prev => prev.filter(w => w.id !== webhookId));
+      } else {
+        toast.error('Failed to delete webhook');
+      }
+    } catch {
+      toast.error('Failed to delete webhook');
+    }
+  };
+
+  // Toggle webhook event selection
+  const toggleWebhookEvent = (event: string) => {
+    setWebhookEvents(prev =>
+      prev.includes(event)
+        ? prev.filter(e => e !== event)
+        : [...prev, event]
+    );
+  };
 
   const handleCopy = () => {
     if (project?.slug) {
@@ -179,11 +335,68 @@ export default function ProjectSettingsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto py-8 space-y-8">
-        <Skeleton className="h-6 w-48" />
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
+      <div className="w-full px-8 py-6 space-y-6">
+        {/* Header */}
+        <div className="space-y-0.5">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-3 w-48" />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-4 border-b border-border/40 pb-2">
+          <Skeleton className="h-6 w-16" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+
+        {/* General Settings Section */}
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-28" />
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="space-y-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-2 w-32" />
+              </div>
+              <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="space-y-1">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-2 w-28" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-40" />
+                <Skeleton className="h-8 w-8" />
+              </div>
+            </div>
+            <div className="flex justify-end px-4 py-2 bg-muted/20">
+              <Skeleton className="h-7 w-14" />
+            </div>
+          </div>
+        </div>
+
+        {/* Project Status Section */}
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-2 w-36" />
+          </div>
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="space-y-1">
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-2 w-40" />
+              </div>
+              <Skeleton className="h-8 w-28" />
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="space-y-1">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-2 w-36" />
+              </div>
+              <Skeleton className="h-8 w-28" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -198,7 +411,7 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-6 space-y-6">
+    <div className="w-full px-8 py-6 space-y-6">
       {/* Header */}
       <div className="space-y-0.5">
         <h1 className="text-lg font-semibold">Settings</h1>
@@ -405,10 +618,12 @@ export default function ProjectSettingsPage() {
                   </div>
                   <div className="space-y-0.5">
                     <p className="text-xs font-medium">Primary Proxy</p>
-                    <p className="text-[10px] text-muted-foreground">US East (Virginia) • Edge</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {REGION_MAP[project.region || 'default']?.name || 'US East (Virginia)'} • Edge
+                    </p>
                   </div>
                 </div>
-                <span className="text-lg">🇺🇸</span>
+                <span className="text-lg">{REGION_MAP[project.region || 'default']?.flag || '🇺🇸'}</span>
               </div>
             </div>
           </section>
@@ -438,30 +653,54 @@ export default function ProjectSettingsPage() {
 
             {/* Provider Connections */}
             <section className="space-y-3">
-              <h2 className="text-sm font-medium">Provider connections</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium">Provider connections</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={fetchProviders}
+                  disabled={providersLoading}
+                >
+                  <RefreshCw className={`h-3 w-3 ${providersLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
               <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
                 <div className="divide-y divide-border/40">
-                  <div className="flex items-center justify-between px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[10px]">OpenAI</span>
+                  {providersLoading && providers.length === 0 ? (
+                    <>
+                      <div className="flex items-center justify-between px-4 py-2">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-10" />
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-10" />
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2">
+                        <Skeleton className="h-3 w-18" />
+                        <Skeleton className="h-3 w-10" />
+                      </div>
+                    </>
+                  ) : providers.length > 0 ? (
+                    providers.map((provider) => (
+                      <div key={provider.name} className="flex items-center justify-between px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${provider.status === 'healthy' ? 'bg-emerald-500' :
+                            provider.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
+                            }`} />
+                          <span className="text-[10px]">{provider.name}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          {provider.latency ? `${provider.latency}ms` : provider.error || 'N/A'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-center">
+                      <p className="text-[10px] text-muted-foreground">Click refresh to check providers</p>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">45ms</span>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[10px]">Anthropic</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">52ms</span>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      <span className="text-[10px]">Google AI</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">120ms</span>
-                  </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -541,23 +780,127 @@ export default function ProjectSettingsPage() {
 
           {/* Webhooks */}
           <section className="space-y-3">
-            <div className="space-y-0.5">
-              <h2 className="text-sm font-medium">Webhooks</h2>
-              <p className="text-[10px] text-muted-foreground">HTTP callbacks for request events.</p>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h2 className="text-sm font-medium">Webhooks</h2>
+                <p className="text-[10px] text-muted-foreground">HTTP callbacks for request events.</p>
+              </div>
+              <Dialog open={showWebhookDialog} onOpenChange={setShowWebhookDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                    <Plus className="h-3 w-3" />
+                    Add webhook
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create Webhook</DialogTitle>
+                    <DialogDescription className="text-xs">
+                      Add a webhook to receive real-time event notifications.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="webhook-name" className="text-xs">Name</Label>
+                      <Input
+                        id="webhook-name"
+                        placeholder="My Webhook"
+                        value={webhookName}
+                        onChange={(e) => setWebhookName(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="webhook-url" className="text-xs">Endpoint URL</Label>
+                      <Input
+                        id="webhook-url"
+                        placeholder="https://your-server.com/webhook"
+                        value={webhookUrl}
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Events</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {WEBHOOK_EVENTS.map((event) => (
+                          <div key={event.value} className="flex items-center gap-2">
+                            <Checkbox
+                              id={event.value}
+                              checked={webhookEvents.includes(event.value)}
+                              onCheckedChange={() => toggleWebhookEvent(event.value)}
+                            />
+                            <label htmlFor={event.value} className="text-[10px] cursor-pointer">
+                              {event.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" size="sm" onClick={() => setShowWebhookDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreateWebhook}
+                      disabled={creatingWebhook || !webhookName || !webhookUrl}
+                    >
+                      {creatingWebhook ? 'Creating...' : 'Create'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Webhook className="h-4 w-4 text-muted-foreground" />
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-medium">No webhooks configured</p>
-                    <p className="text-[10px] text-muted-foreground">Add webhooks to receive real-time events.</p>
+              {webhooks.length === 0 ? (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Webhook className="h-4 w-4 text-muted-foreground" />
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">No webhooks configured</p>
+                      <p className="text-[10px] text-muted-foreground">Add webhooks to receive real-time events.</p>
+                    </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs">
-                  Add webhook
-                </Button>
-              </div>
+              ) : (
+                <div className="divide-y divide-border/40">
+                  {webhooks.map((webhook) => (
+                    <div key={webhook.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${webhook.is_active ? 'bg-emerald-500' : 'bg-muted-foreground'
+                          }`} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{webhook.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{webhook.url}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">
+                          {webhook.events.length} event{webhook.events.length !== 1 ? 's' : ''}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="text-red-500 text-xs"
+                              onClick={() => handleDeleteWebhook(webhook.id)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         </TabsContent>
