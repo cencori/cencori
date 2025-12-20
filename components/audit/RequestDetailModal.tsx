@@ -4,15 +4,13 @@ import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { StatusBadge } from './StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Check, Loader2, ExternalLink } from 'lucide-react';
+import { Copy, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -89,18 +87,22 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString();
+        const date = new Date(dateString);
+        const day = date.getDate();
+        const month = date.toLocaleString("en-US", { month: "short" });
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `${month} ${day}, ${date.getFullYear()} ${time}`;
     };
 
     if (loading || !request) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Loading Request Details</DialogTitle>
+                <DialogContent className="sm:max-w-[500px] p-0 top-[15%] translate-y-0">
+                    <DialogHeader className="px-4 pt-4 pb-3">
+                        <DialogTitle className="text-sm font-medium">Loading...</DialogTitle>
                     </DialogHeader>
-                    <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                 </DialogContent>
             </Dialog>
@@ -109,48 +111,38 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
+            <DialogContent className="sm:max-w-[540px] p-0 top-[10%] translate-y-0 max-h-[80vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <DialogHeader className="px-4 pt-4 pb-3 border-b border-border/40 shrink-0">
+                    <DialogTitle className="flex items-center gap-2 text-sm font-medium">
                         Request Details
                         <StatusBadge status={request.status} />
                     </DialogTitle>
-                    <DialogDescription>
+                    <p className="text-[11px] text-muted-foreground">
                         {formatDate(request.created_at)} • {request.model}
-                    </DialogDescription>
+                    </p>
                 </DialogHeader>
 
-                <div className="space-y-6">
-                    {/* Security Checks */}
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                    {/* Security Summary */}
                     <div>
-                        <h3 className="text-sm font-semibold mb-3">Security Checks</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="rounded-lg border p-3">
-                                <p className="text-xs text-muted-foreground mb-1">Overall Safety</p>
-                                <p className="text-2xl font-bold">
+                        <h3 className="text-xs font-medium mb-2">Security Checks</h3>
+                        <div className="rounded-md border border-border/40 p-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-muted-foreground">Overall Safety</span>
+                                <span className="text-sm font-medium font-mono">
                                     {request.safety_score ? (request.safety_score * 100).toFixed(0) + '%' : 'N/A'}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border p-3">
-                                <p className="text-xs text-muted-foreground mb-1">Security Incidents</p>
-                                <p className="text-2xl font-bold">
-                                    {request.security_incidents?.length || 0}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border p-3">
-                                <p className="text-xs text-muted-foreground mb-1">Filtered Reasons</p>
-                                <p className="text-2xl font-bold">
-                                    {request.filtered_reasons?.length || 0}
-                                </p>
+                                </span>
                             </div>
                         </div>
 
                         {request.filtered_reasons && request.filtered_reasons.length > 0 && (
-                            <div className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-                                <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mb-2">
+                            <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-2.5">
+                                <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mb-1">
                                     Blocked Reasons:
                                 </p>
-                                <ul className="text-xs text-yellow-600/80 dark:text-yellow-500/80 space-y-1">
+                                <ul className="text-[11px] text-amber-600/80 dark:text-amber-400/80 space-y-0.5">
                                     {request.filtered_reasons.map((reason, i) => (
                                         <li key={i}>• {reason}</li>
                                     ))}
@@ -159,42 +151,42 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
                         )}
                     </div>
 
-                    <Separator />
-
-                    {/* Request & Response */}
+                    {/* Tabs */}
                     <Tabs defaultValue="request" className="w-full">
-                        <TabsList>
-                            <TabsTrigger value="request">Request</TabsTrigger>
-                            <TabsTrigger value="response">Response</TabsTrigger>
-                            <TabsTrigger value="metrics">Metrics</TabsTrigger>
+                        <TabsList className="h-8 p-0.5">
+                            <TabsTrigger value="request" className="text-xs h-7 px-3">Request</TabsTrigger>
+                            <TabsTrigger value="response" className="text-xs h-7 px-3">Response</TabsTrigger>
+                            <TabsTrigger value="metrics" className="text-xs h-7 px-3">Metrics</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="request" className="space-y-3">
+                        <TabsContent value="request" className="mt-3 space-y-2">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold">Request Payload</h4>
+                                <h4 className="text-xs font-medium">Request Payload</h4>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
+                                    size="icon"
+                                    className="h-6 w-6"
                                     onClick={() => handleCopy(JSON.stringify(request.request_payload, null, 2), 'request')}
                                 >
                                     {copiedField === 'request' ? (
-                                        <Check className="h-4 w-4" />
+                                        <Check className="h-3 w-3 text-emerald-500" />
                                     ) : (
-                                        <Copy className="h-4 w-4" />
+                                        <Copy className="h-3 w-3" />
                                     )}
                                 </Button>
                             </div>
-                            <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
+                            <pre className="rounded-md bg-secondary/50 p-3 text-[11px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">
                                 {JSON.stringify(request.request_payload, null, 2)}
                             </pre>
                         </TabsContent>
 
-                        <TabsContent value="response" className="space-y-3">
+                        <TabsContent value="response" className="mt-3 space-y-2">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold">Response Payload</h4>
+                                <h4 className="text-xs font-medium">Response Payload</h4>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
+                                    size="icon"
+                                    className="h-6 w-6"
                                     onClick={() => handleCopy(
                                         typeof request.response_payload === 'string'
                                             ? request.response_payload
@@ -203,59 +195,59 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
                                     )}
                                 >
                                     {copiedField === 'response' ? (
-                                        <Check className="h-4 w-4" />
+                                        <Check className="h-3 w-3 text-emerald-500" />
                                     ) : (
-                                        <Copy className="h-4 w-4" />
+                                        <Copy className="h-3 w-3" />
                                     )}
                                 </Button>
                             </div>
                             {request.response_payload ? (
-                                <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto whitespace-pre-wrap">
+                                <pre className="rounded-md bg-secondary/50 p-3 text-[11px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">
                                     {typeof request.response_payload === 'string'
                                         ? request.response_payload
                                         : JSON.stringify(request.response_payload, null, 2)}
                                 </pre>
                             ) : (
-                                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
                                     No response data (request was filtered)
                                 </div>
                             )}
                         </TabsContent>
 
-                        <TabsContent value="metrics" className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Prompt Tokens</p>
-                                    <p className="text-lg font-bold font-mono">{request.prompt_tokens.toLocaleString()}</p>
+                        <TabsContent value="metrics" className="mt-3">
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Prompt Tokens</p>
+                                    <p className="text-sm font-medium font-mono">{request.prompt_tokens.toLocaleString()}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Completion Tokens</p>
-                                    <p className="text-lg font-bold font-mono">{request.completion_tokens.toLocaleString()}</p>
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Completion</p>
+                                    <p className="text-sm font-medium font-mono">{request.completion_tokens.toLocaleString()}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Total Tokens</p>
-                                    <p className="text-lg font-bold font-mono">{request.total_tokens.toLocaleString()}</p>
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Total Tokens</p>
+                                    <p className="text-sm font-medium font-mono">{request.total_tokens.toLocaleString()}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Cost</p>
-                                    <p className="text-lg font-bold font-mono">${request.cost_usd.toFixed(6)}</p>
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Cost</p>
+                                    <p className="text-sm font-medium font-mono">${request.cost_usd.toFixed(6)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Latency</p>
-                                    <p className="text-lg font-bold font-mono">{request.latency_ms}ms</p>
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Latency</p>
+                                    <p className="text-sm font-medium font-mono">{request.latency_ms}ms</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Environment</p>
-                                    <p className="text-lg font-bold">{request.api_key?.environment || 'Unknown'}</p>
+                                <div className="rounded-md border border-border/40 p-2.5">
+                                    <p className="text-[10px] text-muted-foreground mb-0.5">Environment</p>
+                                    <p className="text-sm font-medium">{request.api_key?.environment || 'Unknown'}</p>
                                 </div>
                             </div>
 
                             {request.error_message && (
-                                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                                    <p className="text-xs font-semibold text-red-600 dark:text-red-500 mb-2">
+                                <div className="mt-3 rounded-md border border-red-500/20 bg-red-500/5 p-2.5">
+                                    <p className="text-[11px] font-medium text-red-600 dark:text-red-400 mb-1">
                                         Error Message:
                                     </p>
-                                    <p className="text-sm text-red-600/80 dark:text-red-500/80">
+                                    <p className="text-[11px] text-red-600/80 dark:text-red-400/80">
                                         {request.error_message}
                                     </p>
                                 </div>
@@ -265,36 +257,33 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
 
                     {/* Security Incidents */}
                     {request.security_incidents && request.security_incidents.length > 0 && (
-                        <>
-                            <Separator />
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3">Related Security Incidents</h3>
-                                <div className="space-y-2">
-                                    {request.security_incidents.map((incident) => (
-                                        <div
-                                            key={incident.id}
-                                            className="flex items-center justify-between rounded-lg border p-3"
-                                        >
-                                            <div>
-                                                <p className="text-sm font-medium">{incident.incident_type}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Risk Score: {(incident.risk_score * 100).toFixed(0)}%
-                                                </p>
-                                            </div>
-                                            <span className={cn(
-                                                'text-xs font-semibold px-2 py-1 rounded',
-                                                incident.severity === 'critical' && 'bg-red-500/10 text-red-600',
-                                                incident.severity === 'high' && 'bg-yellow-500/10 text-yellow-600',
-                                                incident.severity === 'medium' && 'bg-blue-500/10 text-blue-600',
-                                                incident.severity === 'low' && 'bg-zinc-500/10 text-zinc-600'
-                                            )}>
-                                                {incident.severity.toUpperCase()}
-                                            </span>
+                        <div>
+                            <h3 className="text-xs font-medium mb-2">Security Incidents</h3>
+                            <div className="space-y-1.5">
+                                {request.security_incidents.map((incident) => (
+                                    <div
+                                        key={incident.id}
+                                        className="flex items-center justify-between rounded-md border border-border/40 p-2.5"
+                                    >
+                                        <div>
+                                            <p className="text-xs font-medium">{incident.incident_type}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Risk: {(incident.risk_score * 100).toFixed(0)}%
+                                            </p>
                                         </div>
-                                    ))}
-                                </div>
+                                        <span className={cn(
+                                            'text-[10px] font-medium px-1.5 py-0.5 rounded',
+                                            incident.severity === 'critical' && 'bg-red-500/10 text-red-500',
+                                            incident.severity === 'high' && 'bg-amber-500/10 text-amber-500',
+                                            incident.severity === 'medium' && 'bg-blue-500/10 text-blue-500',
+                                            incident.severity === 'low' && 'bg-zinc-500/10 text-zinc-400'
+                                        )}>
+                                            {incident.severity.toUpperCase()}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
             </DialogContent>
