@@ -39,13 +39,11 @@ export function ExportButton({ projectId, filters }: ExportButtonProps) {
                 throw new Error('Export failed');
             }
 
-            // Download the file
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
 
-            // Get filename from Content-Disposition header
             const contentDisposition = response.headers.get('Content-Disposition');
             const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
             a.download = filenameMatch ? filenameMatch[1] : `cencori-logs.${format}`;
@@ -67,27 +65,27 @@ export function ExportButton({ projectId, filters }: ExportButtonProps) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={isExporting}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={isExporting}>
                     {isExporting ? (
                         <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                             Exporting...
                         </>
                     ) : (
                         <>
-                            <Download className="mr-2 h-4 w-4" />
+                            <Download className="mr-1.5 h-3 w-3" />
                             Export
                         </>
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExport('csv')}>
-                    <FileText className="mr-2 h-4 w-4" />
+            <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => handleExport('csv')} className="text-xs cursor-pointer">
+                    <FileText className="mr-2 h-3 w-3" />
                     Export as CSV
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('json')}>
-                    <FileJson className="mr-2 h-4 w-4" />
+                <DropdownMenuItem onClick={() => handleExport('json')} className="text-xs cursor-pointer">
+                    <FileJson className="mr-2 h-3 w-3" />
                     Export as JSON
                 </DropdownMenuItem>
             </DropdownMenuContent>
