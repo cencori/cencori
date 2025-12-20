@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
-import { StatusBadge } from '@/components/audit/StatusBadge';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { ExportButton } from '@/components/audit/ExportButton';
 import { Button } from '@/components/ui/button';
@@ -15,9 +14,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, X, ListFilter, Loader2 } from 'lucide-react';
-import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
+import { Search, X, Loader2 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PageProps {
     params: Promise<{
@@ -33,7 +32,7 @@ export default function RequestLogsPage({ params }: PageProps) {
     const [filters, setFilters] = useState({
         status: 'all',
         model: 'all',
-        time_range: '24h',
+        time_range: '30d',
         search: '',
     });
     const [searchInput, setSearchInput] = useState('');
@@ -45,7 +44,6 @@ export default function RequestLogsPage({ params }: PageProps) {
             try {
                 const { projectSlug, orgSlug } = await params;
 
-                // First get organization ID
                 const { data: orgData } = await supabase
                     .from('organizations')
                     .select('id')
@@ -57,7 +55,6 @@ export default function RequestLogsPage({ params }: PageProps) {
                     return;
                 }
 
-                // Then get project ID
                 const { data: projectData } = await supabase
                     .from('projects')
                     .select('id')
@@ -87,139 +84,140 @@ export default function RequestLogsPage({ params }: PageProps) {
         setFilters({
             status: 'all',
             model: 'all',
-            time_range: '24h',
+            time_range: '30d',
             search: '',
         });
         setSearchInput('');
     };
 
-    const hasActiveFilters = filters.status !== 'all' || filters.model !== 'all' || filters.search || filters.time_range !== '24h';
+    const hasActiveFilters = filters.status !== 'all' || filters.model !== 'all' || filters.search || filters.time_range !== '30d';
 
-    // Show loading while fetching project ID
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="w-full max-w-6xl mx-auto px-6 py-8">
+                <div className="mb-8">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-3 w-48 mt-1" />
+                </div>
+                <div className="flex items-center gap-3 mb-6">
+                    <Skeleton className="h-7 w-28" />
+                    <Skeleton className="h-7 w-28" />
+                    <Skeleton className="h-7 w-28" />
+                    <Skeleton className="h-7 w-40" />
+                </div>
+                <div className="bg-card border border-border/40 rounded-md">
+                    <div className="border-b border-border/40 px-4 py-2">
+                        <div className="grid grid-cols-7 gap-4">
+                            {[1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-3 w-12" />)}
+                        </div>
+                    </div>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="border-b border-border/40 px-4 py-3 last:border-b-0">
+                            <div className="grid grid-cols-7 gap-4 items-center">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-3 w-20" />
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-3 w-full" />
+                                <Skeleton className="h-3 w-12" />
+                                <Skeleton className="h-3 w-16" />
+                                <Skeleton className="h-3 w-14" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
 
-    // Show error if project ID not found
     if (!projectId) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                <p className="text-lg font-medium text-muted-foreground">Project not found</p>
-                <p className="text-sm text-muted-foreground mt-1">Unable to load request logs</p>
+            <div className="w-full max-w-6xl mx-auto px-6 py-8">
+                <div className="text-center py-16">
+                    <p className="text-sm font-medium">Project not found</p>
+                    <p className="text-xs text-muted-foreground mt-1">Unable to load request logs</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Request Logs</h2>
-                    <p className="text-muted-foreground">
-                        View and monitor all AI requests for this project
-                    </p>
-                </div>
+        <div className="w-full max-w-6xl mx-auto px-6 py-8">
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-base font-medium">Logs</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">View and monitor all AI requests for this project.</p>
             </div>
 
-            {/* Filters */}
-            <TechnicalBorder>
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-2">
-                            <ListFilter className="h-4 w-4" />
-                            <h3 className="text-base font-semibold">Filters</h3>
-                        </div>
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                Clear filters
-                            </Button>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Status filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Status</label>
-                            <Select
-                                value={filters.status}
-                                onValueChange={(value) =>
-                                    setFilters(prev => ({ ...prev, status: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All statuses</SelectItem>
-                                    <SelectItem value="success">Success</SelectItem>
-                                    <SelectItem value="filtered">Filtered</SelectItem>
-                                    <SelectItem value="blocked_output">Blocked Output</SelectItem>
-                                    <SelectItem value="error">Error</SelectItem>
-                                    <SelectItem value="rate_limited">Rate Limited</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+                {/* Status filter */}
+                <Select
+                    value={filters.status}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                >
+                    <SelectTrigger className="w-[130px] h-7 text-xs">
+                        <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                        <SelectItem value="success" className="text-xs">Success</SelectItem>
+                        <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
+                        <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
+                        <SelectItem value="error" className="text-xs">Error</SelectItem>
+                        <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
+                    </SelectContent>
+                </Select>
 
-                        {/* Model filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Model</label>
-                            <Select
-                                value={filters.model}
-                                onValueChange={(value) =>
-                                    setFilters(prev => ({ ...prev, model: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All models" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All models</SelectItem>
-                                    <SelectItem value="gemini-2.5-flash">gemini-2.5-flash</SelectItem>
-                                    <SelectItem value="gemini-1.5-pro">gemini-1.5-pro</SelectItem>
-                                    <SelectItem value="gemini-1.5-flash">gemini-1.5-flash</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                {/* Model filter */}
+                <Select
+                    value={filters.model}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, model: value }))}
+                >
+                    <SelectTrigger className="w-[150px] h-7 text-xs">
+                        <SelectValue placeholder="All models" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">All models</SelectItem>
+                        <SelectItem value="gemini-2.5-flash" className="text-xs">gemini-2.5-flash</SelectItem>
+                        <SelectItem value="gemini-1.5-pro" className="text-xs">gemini-1.5-pro</SelectItem>
+                        <SelectItem value="gemini-1.5-flash" className="text-xs">gemini-1.5-flash</SelectItem>
+                    </SelectContent>
+                </Select>
 
-                        {/* Time range */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Time Range</label>
-                            <TimeRangeSelector
-                                value={filters.time_range}
-                                onChange={(value) =>
-                                    setFilters(prev => ({ ...prev, time_range: value }))
-                                }
-                            />
-                        </div>
+                {/* Time range */}
+                <TimeRangeSelector
+                    value={filters.time_range}
+                    onChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
+                />
 
-                        {/* Search */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Search</label>
-                            <form onSubmit={handleSearchSubmit} className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search requests..."
-                                    value={searchInput}
-                                    onChange={(e) => setSearchInput(e.target.value)}
-                                    className="pl-8"
-                                />
-                            </form>
-                        </div>
-                    </div>
+                {/* Search */}
+                <form onSubmit={handleSearchSubmit} className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <Input
+                        placeholder="Search requests..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        className="w-40 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
+                    />
+                </form>
+
+                {/* Clear filters */}
+                {hasActiveFilters && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        onClick={handleClearFilters}
+                    >
+                        <X className="h-3 w-3 mr-1" />
+                        Clear
+                    </Button>
+                )}
+
+                {/* Export button - pushed to right */}
+                <div className="ml-auto">
+                    <ExportButton projectId={projectId} filters={filters} />
                 </div>
-            </TechnicalBorder>
-
-            {/* Export button */}
-            <div className="flex justify-end">
-                <ExportButton projectId={projectId} filters={filters} />
             </div>
 
             {/* Request logs table */}

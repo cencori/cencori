@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -26,15 +24,15 @@ const timeRanges = [
 
 export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     return (
-        <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-1.5">
+            <Clock className="h-3 w-3 text-muted-foreground" />
             <Select value={value} onValueChange={onChange}>
-                <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Select time range" />
+                <SelectTrigger className="w-[100px] h-7 text-xs">
+                    <SelectValue placeholder="Time range" />
                 </SelectTrigger>
                 <SelectContent>
                     {timeRanges.map((range) => (
-                        <SelectItem key={range.value} value={range.value}>
+                        <SelectItem key={range.value} value={range.value} className="text-xs">
                             {range.label}
                         </SelectItem>
                     ))}

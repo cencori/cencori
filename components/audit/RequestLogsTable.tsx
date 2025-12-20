@@ -5,9 +5,7 @@ import { StatusBadge } from './StatusBadge';
 import { RequestDetailModal } from './RequestDetailModal';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
+import { Loader2, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface RequestLog {
@@ -45,7 +43,6 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
     const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Fetch logs
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
@@ -73,16 +70,14 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         }
     }, [projectId, environment, page, filters]);
 
-    // Initial fetch and refetch on filter change
     useEffect(() => {
-        setPage(1); // Reset to page 1 when filters change
+        setPage(1);
     }, [filters]);
 
     useEffect(() => {
         fetchLogs();
     }, [fetchLogs]);
 
-    // Real-time updates via SSE
     useEffect(() => {
         const eventSource = new EventSource(`/api/projects/${projectId}/logs/stream`);
 
@@ -91,13 +86,8 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'new_request') {
-                    // Add new request to the beginning if on page 1
                     if (page === 1) {
                         setRequests(prev => [data.request, ...prev].slice(0, 50));
-                        toast.success('New request logged', {
-                            description: `Status: ${data.request.status}`,
-                            duration: 3000,
-                        });
                     }
                 }
             } catch (error) {
@@ -106,7 +96,6 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         });
 
         eventSource.addEventListener('error', () => {
-            console.error('SSE connection error');
             eventSource.close();
         });
 
@@ -120,27 +109,17 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         const now = new Date();
         const diff = now.getTime() - date.getTime();
 
-        // Less than 1 minute
-        if (diff < 60000) {
-            return 'Just now';
-        }
-        // Less than 1 hour
-        if (diff < 3600000) {
-            const minutes = Math.floor(diff / 60000);
-            return `${minutes}m ago`;
-        }
-        // Less than 1 day
-        if (diff < 86400000) {
-            const hours = Math.floor(diff / 3600000);
-            return `${hours}h ago`;
-        }
-        // More than 1 day
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+
+        const day = date.getDate();
+        const month = date.toLocaleString("en-US", { month: "short" });
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `${month} ${day}, ${date.getFullYear()} ${time}`;
     };
 
-    const formatCost = (cost: number) => {
-        return `$${cost.toFixed(6)}`;
-    };
+    const formatCost = (cost: number) => `$${cost.toFixed(6)}`;
 
     const handleRowClick = (requestId: string) => {
         setSelectedRequest(requestId);
@@ -150,16 +129,19 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
     if (loading && requests.length === 0) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
     if (requests.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-lg font-medium text-muted-foreground">No requests found</p>
-                <p className="text-sm text-muted-foreground mt-1">
+            <div className="text-center py-16 flex flex-col items-center justify-center">
+                <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium mb-1">No requests found</p>
+                <p className="text-xs text-muted-foreground">
                     Try adjusting your filters or make some AI requests
                 </p>
             </div>
@@ -168,52 +150,48 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
 
     return (
         <>
-            <TechnicalBorder>
-                {/* Desktop view */}
+            {/* Desktop Table */}
+            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                 <div className="hidden md:block overflow-x-auto">
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Model</TableHead>
-                                <TableHead>Request</TableHead>
-                                <TableHead className="text-right">Tokens</TableHead>
-                                <TableHead className="text-right">Cost</TableHead>
-                                <TableHead className="text-right">Latency</TableHead>
-                                <TableHead></TableHead>
+                            <TableRow className="hover:bg-transparent border-b border-border/40">
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Status</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Time</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Model</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Request</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Tokens</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Cost</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Latency</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {requests.map((request) => (
                                 <TableRow
                                     key={request.id}
-                                    className="cursor-pointer hover:bg-muted/50"
+                                    className="cursor-pointer hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
                                     onClick={() => handleRowClick(request.id)}
                                 >
-                                    <TableCell>
+                                    <TableCell className="py-2.5 px-4">
                                         <StatusBadge status={request.status} />
                                     </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                    <TableCell className="py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                                         {formatDate(request.created_at)}
                                     </TableCell>
-                                    <TableCell className="text-sm font-mono">
+                                    <TableCell className="py-2.5 text-xs font-mono text-muted-foreground">
                                         {request.model}
                                     </TableCell>
-                                    <TableCell className="max-w-md truncate text-sm">
+                                    <TableCell className="py-2.5 max-w-[300px] truncate text-xs">
                                         {request.request_preview || 'No preview'}
                                     </TableCell>
-                                    <TableCell className="text-right text-sm font-mono">
+                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
                                         {request.total_tokens.toLocaleString()}
                                     </TableCell>
-                                    <TableCell className="text-right text-sm font-mono">
+                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
                                         {formatCost(request.cost_usd)}
                                     </TableCell>
-                                    <TableCell className="text-right text-sm font-mono">
+                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground pr-4">
                                         {request.latency_ms}ms
-                                    </TableCell>
-                                    <TableCell>
-                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -222,43 +200,44 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                 </div>
 
                 {/* Mobile view */}
-                <div className="md:hidden divide-y">
+                <div className="md:hidden divide-y divide-border/40">
                     {requests.map((request) => (
                         <div
                             key={request.id}
-                            className="p-4 cursor-pointer hover:bg-muted/50 active:bg-muted"
+                            className="p-3 cursor-pointer hover:bg-secondary/30 active:bg-secondary/50 transition-colors"
                             onClick={() => handleRowClick(request.id)}
                         >
-                            <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-start justify-between mb-1.5">
                                 <StatusBadge status={request.status} />
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-[10px] text-muted-foreground">
                                     {formatDate(request.created_at)}
                                 </span>
                             </div>
-                            <p className="text-sm truncate mb-2">
+                            <p className="text-xs truncate mb-1.5">
                                 {request.request_preview || 'No preview'}
                             </p>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                 <span className="font-mono">{request.model}</span>
-                                <div className="flex items-center gap-3">
-                                    <span>{request.total_tokens.toLocaleString()} tokens</span>
+                                <div className="flex items-center gap-2">
+                                    <span>{request.total_tokens.toLocaleString()} tok</span>
                                     <span className="font-mono">{formatCost(request.cost_usd)}</span>
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
-            </TechnicalBorder>
+            </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-2 py-4">
-                <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between py-3">
+                <p className="text-xs text-muted-foreground">
                     Page {page} of {totalPages}
                 </p>
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
+                        className="h-7 text-xs"
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page === 1 || loading}
                     >
@@ -267,6 +246,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                     <Button
                         variant="outline"
                         size="sm"
+                        className="h-7 text-xs"
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                         disabled={page === totalPages || loading}
                     >
