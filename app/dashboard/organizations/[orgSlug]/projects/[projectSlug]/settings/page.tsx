@@ -198,7 +198,7 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="max-w-5xl py-6 space-y-6">
+    <div className="max-w-5xl mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="space-y-0.5">
         <h1 className="text-lg font-semibold">Settings</h1>
