@@ -1,9 +1,8 @@
 'use client';
 
-import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
+import { Line, LineChart } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -24,7 +23,7 @@ interface MetricCardWithLineChartProps {
 const chartConfig = {
     value: {
         label: 'Value',
-        color: 'hsl(var(--chart-2))',
+        color: 'hsl(142 76% 36%)',
     },
 } satisfies ChartConfig;
 
@@ -34,8 +33,7 @@ export function MetricCardWithLineChart({
     chartData,
     trend,
     format = 'number',
-    lineColor = 'hsl(142, 71%, 45%)', // Default to green
-    yAxisDomain,
+    lineColor = 'hsl(142, 71%, 45%)',
 }: MetricCardWithLineChartProps) {
     const formatValue = (val: string | number) => {
         if (typeof val === 'string') return val;
@@ -56,81 +54,56 @@ export function MetricCardWithLineChart({
     const isNegativeTrend = trend && trend < 0;
 
     return (
-        <TechnicalBorder className="h-full">
-            <div className="p-6">
-                {/* Header with Title and Value */}
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                        <p className="text-sm text-muted-foreground mb-2">{title}</p>
-                        <div className="flex items-center gap-2">
-                            <p className="text-3xl font-bold">{formatValue(value)}</p>
-                            {trend !== undefined && trend !== 0 && (
-                                <div
-                                    className={cn(
-                                        'flex items-center gap-1 px-2 py-1 rounded-md border-none text-xs font-medium',
-                                        isPositiveTrend && 'text-green-500 bg-green-500/10',
-                                        isNegativeTrend && 'text-red-500 bg-red-500/10'
-                                    )}
-                                >
-                                    {isPositiveTrend ? (
-                                        <TrendingUp className="h-3 w-3" />
-                                    ) : (
-                                        <TrendingDown className="h-3 w-3" />
-                                    )}
-                                    <span>{Math.abs(trend).toFixed(1)}%</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Mini Line Chart */}
-                {chartData.length > 0 && (
-                    <div className="h-24 -mx-2">
-                        <ChartContainer config={chartConfig} className="h-full w-full">
-                            <LineChart
-                                accessibilityLayer
-                                data={chartData}
-                                margin={{
-                                    left: 12,
-                                    right: 12,
-                                    top: 5,
-                                    bottom: 5,
-                                }}
-                            >
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.5} />
-                                <XAxis
-                                    dataKey="label"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={8}
-                                    tickFormatter={(value) => value.slice(0, 3)}
-                                    hide
-                                />
-                                <YAxis domain={yAxisDomain || ['auto', 'auto']} hide />
-                                <ChartTooltip
-                                    cursor={false}
-                                    content={<ChartTooltipContent hideLabel />}
-                                />
-                                <Line
-                                    dataKey="value"
-                                    type="linear"
-                                    stroke={lineColor}
-                                    strokeWidth={2}
-                                    dot={false}
-                                    strokeDasharray="4 4"
-                                    activeDot={{
-                                        r: 4,
-                                        fill: lineColor,
-                                        stroke: 'var(--background)',
-                                        strokeWidth: 2,
-                                    }}
-                                />
-                            </LineChart>
-                        </ChartContainer>
+        <div className="rounded-md border border-border/40 bg-card p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
+            <div className="flex items-center gap-2 mb-2">
+                <p className="text-xl font-semibold font-mono">{formatValue(value)}</p>
+                {trend !== undefined && trend !== 0 && (
+                    <div
+                        className={cn(
+                            'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium',
+                            isPositiveTrend && 'text-emerald-500 bg-emerald-500/10',
+                            isNegativeTrend && 'text-red-500 bg-red-500/10'
+                        )}
+                    >
+                        {isPositiveTrend ? (
+                            <TrendingUp className="h-2.5 w-2.5" />
+                        ) : (
+                            <TrendingDown className="h-2.5 w-2.5" />
+                        )}
+                        <span>{Math.abs(trend).toFixed(1)}%</span>
                     </div>
                 )}
             </div>
-        </TechnicalBorder>
+
+            {chartData.length > 0 && (
+                <div className="h-12">
+                    <ChartContainer config={chartConfig} className="h-full w-full">
+                        <LineChart
+                            data={chartData}
+                            margin={{ left: 0, right: 0, top: 4, bottom: 0 }}
+                        >
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent hideLabel />}
+                            />
+                            <Line
+                                dataKey="value"
+                                type="monotone"
+                                stroke={lineColor}
+                                strokeWidth={1.5}
+                                dot={false}
+                                activeDot={{
+                                    r: 3,
+                                    fill: lineColor,
+                                    stroke: 'var(--background)',
+                                    strokeWidth: 2,
+                                }}
+                            />
+                        </LineChart>
+                    </ChartContainer>
+                </div>
+            )}
+        </div>
     );
 }

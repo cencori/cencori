@@ -1,6 +1,5 @@
 'use client';
 
-import { TechnicalBorder } from '@/components/landing/TechnicalBorder';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
     ChartConfig,
@@ -26,17 +25,13 @@ interface RequestsAreaChartProps {
 }
 
 const chartConfig = {
-    total: {
-        label: 'Total Requests',
-        color: 'hsl(var(--primary))',
-    },
     success: {
         label: 'Successful',
-        color: 'hsl(142, 71%, 45%)', // Green
+        color: 'hsl(142, 71%, 45%)',
     },
     filtered: {
-        label: 'Filtered/Blocked',
-        color: 'hsl(0, 84%, 60%)', // Red
+        label: 'Filtered',
+        color: 'hsl(0, 84%, 60%)',
     },
 } satisfies ChartConfig;
 
@@ -52,72 +47,61 @@ export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
     };
 
     return (
-        <TechnicalBorder className="h-full">
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-lg font-semibold leading-none tracking-tight">
-                            Requests Over Time
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Traffic analysis for the selected period
-                        </p>
-                    </div>
-                </div>
-
-                <div className="h-[350px] w-full">
-                    <ChartContainer config={chartConfig} className="h-full w-full">
-                        <AreaChart
-                            accessibilityLayer
-                            data={data}
-                            margin={{
-                                left: 12,
-                                right: 12,
-                            }}
-                        >
-                            <CartesianGrid vertical={false} />
-                            <XAxis
-                                dataKey="timestamp"
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                tickFormatter={formatXAxis}
-                            />
-                            <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                tickCount={5}
-                            />
-                            <ChartTooltip
-                                cursor={false}
-                                content={<ChartTooltipContent indicator="dot" />}
-                            />
-                            <Area
-                                dataKey="filtered"
-                                type="natural"
-                                fill="var(--color-filtered)"
-                                fillOpacity={0.4}
-                                stroke="var(--color-filtered)"
-                                stackId="a"
-                            />
-                            <Area
-                                dataKey="success"
-                                type="natural"
-                                fill="var(--color-success)"
-                                fillOpacity={0.4}
-                                stroke="var(--color-success)"
-                                stackId="a"
-                            />
-                            {/* We don't stack 'total' because it's the sum, but we might want to show it as a line or just rely on the stacked components. 
-                                Actually, usually 'total' = success + filtered + error. 
-                                Let's stack success and filtered (and maybe error if we had it mapped) to show the composition.
-                            */}
-                            <ChartLegend content={<ChartLegendContent />} />
-                        </AreaChart>
-                    </ChartContainer>
-                </div>
+        <div className="rounded-md border border-border/40 bg-card p-4">
+            <div className="mb-3">
+                <h3 className="text-xs font-medium">Requests Over Time</h3>
+                <p className="text-[10px] text-muted-foreground">Traffic analysis</p>
             </div>
-        </TechnicalBorder>
+
+            <div className="h-[200px] w-full">
+                <ChartContainer config={chartConfig} className="h-full w-full">
+                    <AreaChart
+                        data={data}
+                        margin={{ left: 0, right: 0, top: 4, bottom: 0 }}
+                    >
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
+                        <XAxis
+                            dataKey="timestamp"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                            tickFormatter={formatXAxis}
+                            tick={{ fontSize: 10 }}
+                        />
+                        <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={4}
+                            tickCount={4}
+                            tick={{ fontSize: 10 }}
+                            width={30}
+                        />
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent indicator="dot" />}
+                        />
+                        <Area
+                            dataKey="filtered"
+                            type="monotone"
+                            fill="var(--color-filtered)"
+                            fillOpacity={0.3}
+                            stroke="var(--color-filtered)"
+                            strokeWidth={1.5}
+                            stackId="a"
+                        />
+                        <Area
+                            dataKey="success"
+                            type="monotone"
+                            fill="var(--color-success)"
+                            fillOpacity={0.3}
+                            stroke="var(--color-success)"
+                            strokeWidth={1.5}
+                            stackId="a"
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                    </AreaChart>
+                </ChartContainer>
+            </div>
+        </div>
     );
 }
