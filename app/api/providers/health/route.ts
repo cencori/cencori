@@ -23,7 +23,7 @@ const PROVIDERS = [
     {
         name: 'Google AI',
         url: 'https://generativelanguage.googleapis.com/v1beta/models',
-        envKey: 'GOOGLE_AI_API_KEY',
+        envKey: 'GEMINI_API_KEY',
         useQueryParam: true,
     },
 ];
