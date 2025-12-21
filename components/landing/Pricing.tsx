@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles } from 'lucide-react';
+import { Check, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from "@/lib/utils";
 
@@ -19,11 +19,12 @@ const tiers: Array<{
     highlighted?: boolean;
     cta: string;
     ctaVariant?: 'default' | 'outline' | 'ghost';
+    icon?: React.ReactNode;
 }> = [
         {
             name: 'free',
             displayName: 'Free',
-            description: 'For side projects.',
+            description: 'Perfect for side projects and experimentation.',
             price: { monthly: 0, annual: 0 },
             limit: '1,000',
             features: [
@@ -32,7 +33,7 @@ const tiers: Array<{
                 'Basic security features',
                 'Community support',
             ],
-            cta: 'Get Started',
+            cta: 'Start Free',
             ctaVariant: 'outline',
         },
         {
@@ -47,7 +48,7 @@ const tiers: Array<{
                 'All security features',
                 'Priority support (24hr)',
                 'Advanced analytics',
-                'Webhooks',
+                'Webhooks & integrations',
             ],
             highlighted: true,
             cta: 'Get Started',
@@ -84,12 +85,13 @@ const tiers: Array<{
                 'Custom integrations',
             ],
             cta: 'Contact Sales',
-            ctaVariant: 'ghost',
+            ctaVariant: 'outline',
         },
     ];
 
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -111,96 +113,145 @@ export function Pricing() {
         if (tier === 'enterprise') {
             window.location.href = '/contact';
         } else if (isAuthenticated) {
-            // Authenticated users: go to dashboard to pick org
             window.location.href = '/dashboard/organizations';
         } else {
-            // Unauthenticated users: go to signup
             window.location.href = '/signup';
         }
     };
 
     return (
-        <section className="py-24 px-4 relative overflow-hidden">
-            {/* Background Gradients */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-foreground/5 blur-[100px] rounded-full pointer-events-none" />
-
-            <div className="container mx-auto relative z-10">
+        <section className="py-24 bg-background relative overflow-hidden">
+            <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
                 {/* Header */}
-                <div className="text-center mb-20">
-                    <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
-                        Simple, Transparent Pricing
+                <div className="text-center mb-12">
+                    <Badge variant="outline" className="rounded-full px-4 py-1 mb-4 text-xs font-medium border-border/50">
+                        Pricing
+                    </Badge>
+                    <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+                        Simple, transparent pricing
                     </h2>
-                    <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                        Start free, scale as you grow. No hidden fees.
+                    <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                        Start free, scale as you grow. No hidden fees, no surprises.
                     </p>
+
+                    {/* Billing Toggle */}
+                    <div className="inline-flex items-center gap-1 p-1 rounded-full bg-muted/50 border border-border/50">
+                        <button
+                            onClick={() => setBillingPeriod('monthly')}
+                            className={cn(
+                                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
+                                billingPeriod === 'monthly'
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Monthly
+                        </button>
+                        <button
+                            onClick={() => setBillingPeriod('annual')}
+                            className={cn(
+                                "px-4 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5",
+                                billingPeriod === 'annual'
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Annual
+                            <span className="text-[10px] text-emerald-500 font-semibold">-17%</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid gap-6 lg:grid-cols-4 md:grid-cols-2 max-w-7xl mx-auto">
+                <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
                     {tiers.map((tier) => (
                         <div
                             key={tier.name}
                             className={cn(
-                                "relative flex flex-col p-6 rounded-3xl border transition-all duration-300",
+                                "relative flex flex-col p-5 rounded-2xl border transition-all duration-300",
                                 tier.highlighted
-                                    ? "bg-background/80 border-foreground/20 shadow-2xl shadow-foreground/5 scale-105 z-10"
-                                    : "bg-background/40 border-border/50 hover:border-foreground/10 hover:bg-background/60"
+                                    ? "bg-card border-border shadow-lg"
+                                    : "bg-card border-border/50 hover:border-border hover:shadow-lg"
                             )}
                         >
                             {tier.highlighted && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                                    <Badge className="rounded-full px-4 py-1 bg-foreground text-background hover:bg-foreground/90 border-0 shadow-lg shadow-foreground/20">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                    <Badge className="rounded-full px-3 py-0.5 text-[10px] font-medium bg-emerald-500 text-white border-0 shadow-sm">
                                         Most Popular
                                     </Badge>
                                 </div>
                             )}
 
-                            <div className="mb-8">
-                                <h3 className="text-lg font-semibold mb-2">{tier.displayName}</h3>
-                                <p className="text-sm text-muted-foreground mb-6 h-10">{tier.description}</p>
-                                <div className="flex items-baseline gap-1">
-                                    {typeof tier.price.monthly === 'number' ? (
-                                        <>
-                                            <span className="text-4xl font-bold tracking-tight">${tier.price.monthly}</span>
-                                            <span className="text-muted-foreground">/mo</span>
-                                        </>
-                                    ) : (
-                                        <span className="text-4xl font-bold tracking-tight">{tier.price.monthly}</span>
-                                    )}
-                                </div>
+                            {/* Tier Name */}
+                            <div className="flex items-center gap-2 mb-2">
+                                {tier.icon && (
+                                    <span className="text-emerald-500">
+                                        {tier.icon}
+                                    </span>
+                                )}
+                                <h3 className="text-sm font-semibold">{tier.displayName}</h3>
                             </div>
 
-                            <div className="flex-1 mb-8">
-                                <ul className="space-y-3">
+                            {/* Description */}
+                            <p className="text-xs text-muted-foreground mb-4 h-8">
+                                {tier.description}
+                            </p>
+
+                            {/* Price */}
+                            <div className="flex items-baseline gap-1 mb-5 pb-5 border-b border-border/50">
+                                {typeof tier.price.monthly === 'number' ? (
+                                    <>
+                                        <span className="text-3xl font-bold tracking-tight">
+                                            ${billingPeriod === 'annual'
+                                                ? Math.round(Number(tier.price.annual) / 12)
+                                                : tier.price.monthly
+                                            }
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">/mo</span>
+                                        {billingPeriod === 'annual' && tier.price.monthly > 0 && (
+                                            <span className="text-[10px] text-muted-foreground ml-1">billed annually</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <span className="text-3xl font-bold tracking-tight">{tier.price.monthly}</span>
+                                )}
+                            </div>
+
+                            {/* Features */}
+                            <div className="flex-1 mb-5">
+                                <ul className="space-y-2">
                                     {tier.features.map((feature, i) => (
-                                        <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                                            <Check className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                                            <span>{feature}</span>
+                                        <li key={i} className="flex items-start gap-2 text-xs">
+                                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-500" />
+                                            <span className="text-muted-foreground">
+                                                {feature}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
 
+                            {/* CTA Button */}
                             <Button
-                                className={cn(
-                                    "w-full rounded-full h-12 font-medium cursor-pointer transition-all duration-300",
-                                    tier.highlighted
-                                        ? "bg-foreground text-background cursor-pointer hover:bg-foreground/90 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
-                                        : ""
-                                )}
+                                className="w-full rounded-full h-9 text-xs font-medium cursor-pointer transition-all duration-300 group"
                                 variant={tier.ctaVariant || 'default'}
                                 onClick={() => handleCTA(tier.name)}
                             >
                                 {tier.cta}
+                                <ArrowRight className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-0.5" />
                             </Button>
                         </div>
                     ))}
                 </div>
 
-                {/* FAQ Link */}
-                <div className="text-center mt-16">
-                    <p className="text-muted-foreground">
-                        Need help choosing? <a href="/contact" className="text-foreground font-medium hover:underline underline-offset-4">Contact our team</a>
+                {/* Bottom Note */}
+                <div className="text-center mt-12">
+                    <p className="text-xs text-muted-foreground">
+                        All plans include SSL encryption, 99.9% uptime SLA, and GDPR compliance.{' '}
+                        <a href="/contact" className="text-foreground font-medium hover:underline underline-offset-2">
+                            Contact sales
+                        </a>{' '}
+                        for volume discounts.
                     </p>
                 </div>
             </div>

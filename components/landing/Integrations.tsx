@@ -4,14 +4,14 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { Cpu } from 'lucide-react';
+import { OpenAI, Claude, Gemini } from '@lobehub/icons';
 
 interface ProviderItemProps {
     name: string;
-    icon: string | React.ComponentType<{ className?: string }>;
+    Icon: React.ComponentType<{ size?: number; className?: string }>;
     color: string;
     borderColor: string;
     bg: string;
-    isIconComponent?: boolean;
 }
 
 interface ConnectionPathProps {
@@ -56,10 +56,10 @@ export const Integrations = () => {
 
                     {/* Right Points (Providers) */}
                     <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-between py-4 z-20 w-40">
-                        <ProviderItem name="OpenAI" icon="/providers/openai.svg" color="text-red-500" borderColor="border-red-500/20" bg="bg-red-500/10" />
-                        <ProviderItem name="Anthropic" icon="/providers/anthropic.svg" color="text-green-500" borderColor="border-green-500/20" bg="bg-green-500/10" />
-                        <ProviderItem name="Gemini" icon="/providers/google.svg" color="text-blue-500" borderColor="border-blue-500/20" bg="bg-blue-500/10" />
-                        <ProviderItem name="Custom" icon={Cpu} color="text-yellow-500" borderColor="border-yellow-500/20" bg="bg-yellow-500/10" isIconComponent />
+                        <ProviderItem name="OpenAI" Icon={OpenAI} color="text-emerald-500" borderColor="border-emerald-500/20" bg="bg-emerald-500/10" />
+                        <ProviderItem name="Anthropic" Icon={Claude} color="text-orange-500" borderColor="border-orange-500/20" bg="bg-orange-500/10" />
+                        <ProviderItem name="Gemini" Icon={Gemini} color="text-blue-500" borderColor="border-blue-500/20" bg="bg-blue-500/10" />
+                        <ProviderItem name="Custom" Icon={Cpu} color="text-yellow-500" borderColor="border-yellow-500/20" bg="bg-yellow-500/10" />
                     </div>
 
                     {/* SVG Connections */}
@@ -78,10 +78,10 @@ export const Integrations = () => {
 
                         {/* Lines: Cencori -> Providers */}
                         {/* OpenAI (Top) */}
-                        <ConnectionPath startX={550} startY={200} endX={850} endY={40} color="#ef4444" delay={0} />
+                        <ConnectionPath startX={550} startY={200} endX={850} endY={40} color="#10b981" delay={0} />
 
                         {/* Anthropic */}
-                        <ConnectionPath startX={550} startY={200} endX={850} endY={146} color="#22c55e" delay={0.5} />
+                        <ConnectionPath startX={550} startY={200} endX={850} endY={146} color="#f97316" delay={0.5} />
 
                         {/* Gemini */}
                         <ConnectionPath startX={550} startY={200} endX={850} endY={253} color="#3b82f6" delay={1} />
@@ -111,10 +111,10 @@ export const Integrations = () => {
 
                     {/* Bottom Points (Providers) - Horizontal Stack */}
                     <div className="absolute bottom-0 left-0 right-0 flex justify-between gap-2 z-20 px-2">
-                        <ProviderItemMobileIconOnly name="OpenAI" icon="/providers/openai.svg" color="text-red-500" borderColor="border-red-500/20" bg="bg-red-500/10" />
-                        <ProviderItemMobileIconOnly name="Anthropic" icon="/providers/anthropic.svg" color="text-green-500" borderColor="border-green-500/20" bg="bg-green-500/10" />
-                        <ProviderItemMobileIconOnly name="Gemini" icon="/providers/google.svg" color="text-blue-500" borderColor="border-blue-500/20" bg="bg-blue-500/10" />
-                        <ProviderItemMobileIconOnly name="Custom" icon={Cpu} color="text-yellow-500" borderColor="border-yellow-500/20" bg="bg-yellow-500/10" isIconComponent />
+                        <ProviderItemMobileIconOnly name="OpenAI" Icon={OpenAI} color="text-emerald-500" borderColor="border-emerald-500/20" bg="bg-emerald-500/10" />
+                        <ProviderItemMobileIconOnly name="Anthropic" Icon={Claude} color="text-orange-500" borderColor="border-orange-500/20" bg="bg-orange-500/10" />
+                        <ProviderItemMobileIconOnly name="Gemini" Icon={Gemini} color="text-blue-500" borderColor="border-blue-500/20" bg="bg-blue-500/10" />
+                        <ProviderItemMobileIconOnly name="Custom" Icon={Cpu} color="text-yellow-500" borderColor="border-yellow-500/20" bg="bg-yellow-500/10" />
                     </div>
 
                     {/* SVG Connections (Vertical) */}
@@ -133,10 +133,10 @@ export const Integrations = () => {
 
                         {/* Lines: Cencori -> Providers */}
                         {/* OpenAI */}
-                        <ConnectionPathVerticalMobile startX={192} startY={230} endX={45} endY={440} color="#ef4444" delay={0} />
+                        <ConnectionPathVerticalMobile startX={192} startY={230} endX={45} endY={440} color="#10b981" delay={0} />
 
                         {/* Anthropic */}
-                        <ConnectionPathVerticalMobile startX={192} startY={230} endX={135} endY={440} color="#22c55e" delay={0.5} />
+                        <ConnectionPathVerticalMobile startX={192} startY={230} endX={135} endY={440} color="#f97316" delay={0.5} />
 
                         {/* Gemini */}
                         <ConnectionPathVerticalMobile startX={192} startY={230} endX={225} endY={440} color="#3b82f6" delay={1} />
@@ -151,41 +151,16 @@ export const Integrations = () => {
     );
 };
 
-const ProviderItem = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
+const ProviderItem = ({ name, Icon, color, borderColor, bg }: ProviderItemProps) => (
     <div className={cn("flex items-center gap-3 p-3 pl-4 rounded-xl border bg-background/50 backdrop-blur-sm transition-all hover:scale-105 w-48", borderColor, bg)}>
-        {isIconComponent ? (
-            <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-5 h-5" })}
-            </div>
-        ) : (
-            <img src={icon as string} alt={name} className="w-6 h-6" />
-        )}
+        <Icon size={24} className={color} />
         <span className={cn("font-medium text-sm", color)}>{name}</span>
     </div>
 );
 
-const ProviderItemMobile = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
-    <div className={cn("flex items-center gap-3 p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full", borderColor, bg)}>
-        {isIconComponent ? (
-            <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-5 h-5" })}
-            </div>
-        ) : (
-            <img src={icon as string} alt={name} className="w-6 h-6" />
-        )}
-        <span className={cn("font-medium text-sm", color)}>{name}</span>
-    </div>
-);
-
-const ProviderItemMobileIconOnly = ({ name, icon, color, borderColor, bg, isIconComponent = false }: ProviderItemProps) => (
+const ProviderItemMobileIconOnly = ({ name, Icon, color, borderColor, bg }: ProviderItemProps) => (
     <div className={cn("flex items-center justify-center p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full aspect-square", borderColor, bg)}>
-        {isIconComponent ? (
-            <div className={cn("w-6 h-6 flex items-center justify-center", color)}>
-                {React.createElement(icon as React.ComponentType<{ className?: string }>, { className: "w-6 h-6" })}
-            </div>
-        ) : (
-            <img src={icon as string} alt={name} className="w-8 h-8" />
-        )}
+        <Icon size={28} className={color} />
     </div>
 );
 
