@@ -364,7 +364,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   }
 
   return (
-    <div className="w-full px-8 py-6 space-y-6">
+    <div className="w-full max-w-5xl mx-auto px-6 py-8 space-y-6">
       {/* Header */}
       <div className="space-y-0.5">
         <h1 className="text-lg font-semibold">Settings</h1>
