@@ -198,7 +198,7 @@ export default function ProductEdgePage() {
               Ready to integrate?
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Start protecting your platform's AI requests in minutes.
+              Start protecting your platform&apos;s AI requests in minutes.
             </p>
             <div className="flex items-center justify-center gap-3">
               <Button asChild className="h-9 px-4 text-sm rounded-full">
