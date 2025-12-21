@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, use } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -47,124 +47,73 @@ interface ProjectData {
   created_at: string;
 }
 
-// Region display labels
-const REGION_LABELS: Record<string, string> = {
-  auto: "Auto",
-  "us-east-1": "US East",
-  "us-west-1": "US West",
-  "us-west-2": "US West",
-  "eu-west-1": "EU West",
-  "eu-central-1": "EU Central",
-  "ap-southeast-1": "AP Southeast",
-  "ap-northeast-1": "AP Northeast",
-  "ap-south-1": "AP South",
-  "sa-east-1": "SA East",
-  "ca-central-1": "CA Central",
-  "me-south-1": "ME South",
-  "af-south-1": "AF South",
-};
+// Hook to fetch org and projects with caching
+function useOrgAndProjects(orgSlug: string) {
+  return useQuery({
+    queryKey: ["orgProjects", orgSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
+
+      const { data: orgData, error: orgError } = await browserSupabase
+        .from("organizations")
+        .select("id, name, slug")
+        .eq("slug", orgSlug)
+        .single();
+
+      if (orgError || !orgData) throw new Error("Organization not found");
+
+      const { data: projectsData, error: projectsError } = await browserSupabase
+        .from("projects")
+        .select("id, name, slug, description, visibility, github_repo_url, status, region, created_at")
+        .eq("organization_id", orgData.id);
+
+      if (projectsError) throw new Error("Failed to load projects");
+
+      return {
+        organization: orgData as OrganizationData,
+        projects: (projectsData || []) as ProjectData[],
+      };
+    },
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
 
 export default function OrgProjectsPage({
   params,
 }: {
   params: Promise<{ orgSlug: string }>;
 }) {
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resolved = await Promise.resolve(params);
-        if (mounted && resolved && typeof (resolved as { orgSlug: string }).orgSlug === "string") {
-          setOrgSlug((resolved as { orgSlug: string }).orgSlug);
-        }
-      } catch (e) {
-        console.error("Failed to resolve params:", e);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [params]);
-
+  const { orgSlug } = use(params);
   const router = useRouter();
-  const [organization, setOrganization] = useState<OrganizationData | null>(null);
-  const [projects, setProjects] = useState<ProjectData[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<ProjectData | null>(null);
 
-  useEffect(() => {
-    if (!orgSlug) return;
+  // Fetch org and projects with caching - INSTANT ON REVISIT!
+  const { data, isLoading, error } = useOrgAndProjects(orgSlug);
+  const organization = data?.organization;
+  const projects = data?.projects || [];
 
-    const fetchOrgAndProjects = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await browserSupabase.auth.getUser();
-
-        if (userError || !user) {
-          router.push("/login");
-          return;
-        }
-
-        const { data: orgData, error: orgError } = await browserSupabase
-          .from("organizations")
-          .select("id, name, slug")
-          .eq("slug", orgSlug)
-          .single();
-
-        if (orgError || !orgData) {
-          console.error("Error fetching organization:", orgError?.message);
-          notFound();
-          return;
-        }
-        setOrganization(orgData);
-
-        const { data: projectsData, error: projectsError } = await browserSupabase
-          .from("projects")
-          .select("id, name, slug, description, visibility, github_repo_url, status, region, created_at")
-          .eq("organization_id", orgData.id);
-
-        if (projectsError) {
-          console.error("Error fetching projects:", projectsError.message);
-          setError("Error loading projects.");
-          return;
-        }
-        setProjects(projectsData);
-      } catch (err: unknown) {
-        console.error("Unexpected error:", (err as Error).message);
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrgAndProjects();
-  }, [orgSlug, router]);
-
-  const handleDeleteProject = async (projectId: string) => {
-    setLoading(true);
-    const { error: deleteError } = await browserSupabase.from("projects").delete().eq("id", projectId);
-
-    if (deleteError) {
-      console.error("Error deleting project:", deleteError.message);
-      toast.error("Failed to delete project: " + deleteError.message);
-    } else {
+  // Delete project mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await browserSupabase.from("projects").delete().eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgProjects", orgSlug] });
       toast.success("Project deleted successfully!");
-      setProjects((prevProjects) => (prevProjects ? prevProjects.filter((p) => p.id !== projectId) : null));
-    }
-    setLoading(false);
-    setIsDeleteDialogOpen(false);
-  };
+      setIsDeleteDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error("Failed to delete project: " + error.message);
+    },
+  });
 
-  if (!orgSlug || loading) {
+  if (isLoading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="mb-8">
@@ -204,7 +153,7 @@ export default function OrgProjectsPage({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xs text-red-500">{error}</p>
+        <p className="text-xs text-red-500">{error.message}</p>
       </div>
     );
   }
@@ -217,12 +166,12 @@ export default function OrgProjectsPage({
     );
   }
 
-  const filteredProjects = projects?.filter(
+  const filteredProjects = projects.filter(
     (project) =>
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-8">
@@ -356,8 +305,14 @@ export default function OrgProjectsPage({
             <DialogClose asChild>
               <Button variant="outline" size="sm" className="h-7 text-xs">Cancel</Button>
             </DialogClose>
-            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => projectToDelete && handleDeleteProject(projectToDelete.id)} disabled={loading}>
-              {loading ? "Deleting..." : "Delete"}
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => projectToDelete && deleteMutation.mutate(projectToDelete.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

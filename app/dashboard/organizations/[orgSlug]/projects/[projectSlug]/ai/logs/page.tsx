@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useState, use } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,58 +22,55 @@ interface AIRequest {
     error_message?: string;
 }
 
-export default function AILogsPage() {
-    const params = useParams();
-    const projectSlug = params.projectSlug as string;
+interface PageProps {
+    params: Promise<{ orgSlug: string; projectSlug: string }>;
+}
 
-    const [loading, setLoading] = useState(true);
-    const [logs, setLogs] = useState<AIRequest[]>([]);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [projectId, setProjectId] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetchProjectId();
-    }, [projectSlug]);
-
-    useEffect(() => {
-        if (projectId) {
-            fetchLogs();
-        }
-    }, [projectId, page]);
-
-    async function fetchProjectId() {
-        try {
+// Hook to get project ID from slug
+function useProjectId(projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectIdForLogs", projectSlug],
+        queryFn: async () => {
             const response = await fetch(`/api/projects?slug=${projectSlug}`);
             if (!response.ok) throw new Error('Failed to fetch project');
-
             const { projects } = await response.json();
             const project = projects?.[0];
-            if (project) {
-                setProjectId(project.id);
-            }
-        } catch (err) {
-            console.error('[AI Logs] Error fetching project:', err);
-        }
-    }
+            if (!project) throw new Error('Project not found');
+            return project.id as string;
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes - IDs don't change
+    });
+}
 
-    async function fetchLogs() {
-        if (!projectId) return;
-
-        try {
-            setLoading(true);
+// Hook to fetch logs with pagination
+function useAILogs(projectId: string | undefined, page: number) {
+    return useQuery({
+        queryKey: ["aiLogs", projectId, page],
+        queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/ai/logs?page=${page}&limit=20`);
             if (!response.ok) throw new Error('Failed to fetch logs');
-
             const data = await response.json();
-            setLogs(data.logs || []);
-            setTotalPages(data.pagination.totalPages || 1);
-        } catch (err) {
-            console.error('[AI Logs] Error:', err);
-        } finally {
-            setLoading(false);
-        }
-    }
+            return {
+                logs: (data.logs || []) as AIRequest[],
+                totalPages: data.pagination?.totalPages || 1,
+            };
+        },
+        enabled: !!projectId,
+        staleTime: 15 * 1000, // 15 seconds - logs change frequently
+    });
+}
+
+export default function AILogsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
+    const [page, setPage] = useState(1);
+
+    // Fetch project ID with caching
+    const { data: projectId } = useProjectId(projectSlug);
+
+    // Fetch logs with pagination
+    const { data: logsData, isLoading } = useAILogs(projectId, page);
+    const logs = logsData?.logs || [];
+    const totalPages = logsData?.totalPages || 1;
 
     function getStatusIcon(status: string) {
         switch (status) {
@@ -105,12 +103,12 @@ export default function AILogsPage() {
                     <h1 className="text-2xl font-bold">AI Request Logs</h1>
                     <p className="text-muted-foreground">Detailed history of all AI API requests</p>
                 </div>
-                <a
-                    href={`/dashboard/organizations/${params.orgSlug}/projects/${projectSlug}/ai`}
+                <Link
+                    href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/ai`}
                     className="text-sm text-primary hover:underline"
                 >
                     ← Back to dashboard
-                </a>
+                </Link>
             </div>
 
             {/* Logs Table */}
@@ -120,7 +118,7 @@ export default function AILogsPage() {
                     <CardDescription>Last 20 AI requests</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {loading ? (
+                    {isLoading ? (
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                         </div>

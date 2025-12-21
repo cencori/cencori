@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/lib/supabaseClient';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Check, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react';
 
 interface Organization {
@@ -21,14 +22,34 @@ interface Organization {
 
 type Tier = 'free' | 'pro' | 'team' | 'enterprise';
 
-export default function BillingPage() {
-    const params = useParams();
+interface PageProps {
+    params: Promise<{ orgSlug: string }>;
+}
+
+// Hook to fetch org billing data with caching
+function useOrgBilling(orgSlug: string) {
+    return useQuery({
+        queryKey: ["orgBilling", orgSlug],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, monthly_request_limit, subscription_current_period_end')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (error || !data) throw new Error("Organization not found");
+            return data as Organization;
+        },
+        staleTime: 30 * 1000, // 30 seconds
+    });
+}
+
+export default function BillingPage({ params }: PageProps) {
+    const { orgSlug } = use(params);
     const searchParams = useSearchParams();
-    const orgSlug = params.orgSlug as string;
-    const [org, setOrg] = useState<Organization | null>(null);
-    const [loading, setLoading] = useState(true);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
+    // Check for success param from Stripe
     useEffect(() => {
         if (searchParams.get('success') === 'true') {
             setShowSuccessMessage(true);
@@ -38,21 +59,8 @@ export default function BillingPage() {
         }
     }, [searchParams]);
 
-    useEffect(() => {
-        async function fetchOrg() {
-            const { data, error } = await supabase
-                .from('organizations')
-                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, monthly_request_limit, subscription_current_period_end')
-                .eq('slug', orgSlug)
-                .single();
-
-            if (!error && data) {
-                setOrg(data);
-            }
-            setLoading(false);
-        }
-        fetchOrg();
-    }, [orgSlug]);
+    // Fetch org billing with caching - INSTANT ON REVISIT!
+    const { data: org, isLoading, error } = useOrgBilling(orgSlug);
 
     const handleUpgrade = async (tier: 'pro' | 'team', cycle: 'monthly' | 'annual') => {
         if (!org) return;
@@ -77,7 +85,7 @@ export default function BillingPage() {
         }
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <Skeleton className="h-5 w-24 mb-6" />
@@ -89,7 +97,7 @@ export default function BillingPage() {
         );
     }
 
-    if (!org) {
+    if (error || !org) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <div className="text-center py-16 flex flex-col items-center">
