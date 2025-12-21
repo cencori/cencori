@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key, ScrollText, ShieldAlert, Activity, Zap } from "lucide-react";
+import { Key, ScrollText, ShieldAlert, Activity, Zap, Server } from "lucide-react";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -155,6 +155,14 @@ export default function ProjectLayoutClient({
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
+                                <SidebarMenuButton asChild tooltip="Providers">
+                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/providers`}>
+                                        <Server className="h-4 w-4" />
+                                        <span>Providers</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
                                 <SidebarMenuButton asChild tooltip="Analytics">
                                     <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/analytics`}>
                                         <Activity className="h-4 w-4" />
@@ -221,6 +229,14 @@ export default function ProjectLayoutClient({
                                         <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/security`} onClick={() => setIsOpen(false)}>
                                             <ShieldAlert className="h-4 w-4" />
                                             <span>Security Incidents</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/providers`} onClick={() => setIsOpen(false)}>
+                                            <Server className="h-4 w-4" />
+                                            <span>Providers</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
