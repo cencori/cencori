@@ -131,14 +131,6 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Providers">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/providers`}>
-                                            <Cpu className="h-4 w-4" />
-                                            <span>Providers</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Integrations">
                                         <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
                                             <UnplugIcon animateOnHover />
@@ -200,14 +192,6 @@ export default function OrganizationLayoutClient({
                                             <Link href={`/dashboard/organizations/${organization.slug}/usage`} onClick={() => setIsOpen(false)}>
                                                 <ActivityIcon animateOnHover />
                                                 <span>Usage</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
-                                            <Link href={`/dashboard/organizations/${organization.slug}/providers`} onClick={() => setIsOpen(false)}>
-                                                <Cpu className="h-4 w-4" />
-                                                <span>Providers</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
