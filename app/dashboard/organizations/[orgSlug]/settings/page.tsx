@@ -237,7 +237,7 @@ export default function OrganizationSettingsPage({
           <div className="rounded-md border border-border/40 bg-card p-4 space-y-4">
             <div>
               <h3 className="text-xs font-medium mb-0.5">Organization Information</h3>
-              <p className="text-[10px] text-muted-foreground">Update your organization's name and description</p>
+              <p className="text-[10px] text-muted-foreground">Update your organization&apos;s name and description</p>
             </div>
 
             <div className="space-y-3">
