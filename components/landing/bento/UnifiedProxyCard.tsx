@@ -142,6 +142,32 @@ export const UnifiedProxyCard = () => {
                         )}
                     />
                 </div>
+
+                {/* Supported providers section */}
+                <div className="mt-4 pt-4 border-t border-border/50">
+                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2">Supported Providers</p>
+                    <div className="flex flex-wrap gap-2">
+                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] rounded-full border border-emerald-500/20">OpenAI</span>
+                        <span className="px-2 py-1 bg-orange-500/10 text-orange-400 text-[10px] rounded-full border border-orange-500/20">Anthropic</span>
+                        <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-[10px] rounded-full border border-blue-500/20">Google</span>
+                        <span className="px-2 py-1 bg-purple-500/10 text-purple-400 text-[10px] rounded-full border border-purple-500/20">Cohere</span>
+                        <span className="px-2 py-1 bg-pink-500/10 text-pink-400 text-[10px] rounded-full border border-pink-500/20">Mistral</span>
+                        <span className="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] rounded-full border border-cyan-500/20">AWS Bedrock</span>
+                    </div>
+                </div>
+
+                {/* Feature highlights */}
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-400">✓</span> Zero vendor lock-in
+                    </span>
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-400">✓</span> Auto-retry & failover
+                    </span>
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-emerald-400">✓</span> OpenAI-compatible API
+                    </span>
+                </div>
             </BentoCard>
         </div>
     );

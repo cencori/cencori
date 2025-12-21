@@ -111,6 +111,19 @@ export const RequestPipelineCard = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Feature highlights */}
+                <div className="mt-4 pt-3 border-t border-border/50 space-y-1">
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-orange-400">•</span> No code changes required
+                    </span>
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-orange-400">•</span> Automatic retry logic
+                    </span>
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-orange-400">•</span> Circuit breaker built-in
+                    </span>
+                </div>
             </BentoCard>
         </div>
     );

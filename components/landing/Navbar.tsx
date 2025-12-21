@@ -113,6 +113,7 @@ export default function Navbar({
         {
             title: "Products", sublinks: [
                 { title: "AI Gateway", href: siteConfig.links.products.ai },
+                { title: "Edge", href: "/edge" },
             ]
         },
         {
@@ -163,6 +164,7 @@ export default function Navbar({
         columns: [
             [
                 { title: "AI Gateway", href: siteConfig.links.products.ai, description: "Real-time request/response protection." },
+                { title: "Edge", href: "/edge", description: "Platform integrations & edge middleware." },
             ],
         ],
     };
