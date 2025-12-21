@@ -111,7 +111,7 @@ function SidebarProvider({
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
-  const state = open ? "collapsed" : "expanded"
+  const state = open ? "expanded" : "collapsed"
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
@@ -155,6 +155,7 @@ function Sidebar({
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
+  expandOnHover = false,
   className,
   children,
   ...props
@@ -162,8 +163,9 @@ function Sidebar({
   side?: "left" | "right" | "bottom"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  expandOnHover?: boolean
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -208,6 +210,18 @@ function Sidebar({
     )
   }
 
+  const handleMouseEnter = () => {
+    if (expandOnHover && collapsible === "icon") {
+      setOpen(true)
+    }
+  }
+
+  const handleMouseLeave = () => {
+    if (expandOnHover && collapsible === "icon") {
+      setOpen(false)
+    }
+  }
+
   return (
     <div
       className="group peer text-sidebar-foreground hidden md:block"
@@ -216,6 +230,8 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
@@ -255,6 +271,7 @@ function Sidebar({
     </div>
   )
 }
+
 
 function SidebarTrigger({
   className,

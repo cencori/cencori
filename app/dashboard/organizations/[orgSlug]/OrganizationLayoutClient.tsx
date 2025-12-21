@@ -98,63 +98,75 @@ export default function OrganizationLayoutClient({
     // Don't render until we have organization data
     if (!organization) return null;
 
+    const basePath = `/dashboard/organizations/${organization.slug}`;
+
+    // Helper to check if a route is active
+    const isActive = (path: string) => {
+        if (path === basePath + '/projects') {
+            // Projects page - match exact or ends with /projects
+            return pathname === path || pathname.endsWith('/projects');
+        }
+        return pathname.startsWith(path);
+    };
+
     return (
-        <SidebarProvider defaultOpen>
+        <SidebarProvider defaultOpen={false}>
             {/* Desktop Sidebar - hidden on mobile */}
             {!isProjectRoute && (
-                <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40 bg-sidebar">
+                <Sidebar collapsible="icon" expandOnHover className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40 bg-sidebar">
                     <SidebarContent>
                         <SidebarGroup className="pt-3">
                             <SidebarMenu>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Projects">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/projects`}>
+                                    <SidebarMenuButton asChild tooltip="Projects" isActive={isActive(`${basePath}/projects`)}>
+                                        <Link href={`${basePath}/projects`}>
                                             <LayersIcon animateOnHover />
                                             <span>Projects</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Billing">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/billing`}>
+                                    <SidebarMenuButton asChild tooltip="Billing" isActive={isActive(`${basePath}/billing`)}>
+                                        <Link href={`${basePath}/billing`}>
                                             <PanelTopIcon animateOnHover />
                                             <span>Billing</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Usage">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/usage`}>
+                                    <SidebarMenuButton asChild tooltip="Usage" isActive={isActive(`${basePath}/usage`)}>
+                                        <Link href={`${basePath}/usage`}>
                                             <ActivityIcon animateOnHover />
                                             <span>Usage</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Integrations">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
+                                    <SidebarMenuButton asChild tooltip="Integrations" isActive={isActive(`${basePath}/integrations`)}>
+                                        <Link href={`${basePath}/integrations`}>
                                             <UnplugIcon animateOnHover />
                                             <span>Integrations</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Teams">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/teams`}>
+                                    <SidebarMenuButton asChild tooltip="Teams" isActive={isActive(`${basePath}/teams`)}>
+                                        <Link href={`${basePath}/teams`}>
                                             <UserRoundIcon animateOnHover />
                                             <span>Teams</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Settings">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/settings`}>
+                                    <SidebarMenuButton asChild tooltip="Settings" isActive={isActive(`${basePath}/settings`)}>
+                                        <Link href={`${basePath}/settings`}>
                                             <SettingsIcon animateOnHover />
                                             <span>Settings</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             </SidebarMenu>
+
                         </SidebarGroup>
                     </SidebarContent>
                     <SidebarRail />
