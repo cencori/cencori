@@ -4,10 +4,8 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -38,8 +36,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Settings, Trash2, Users, Key, AlertTriangle, Copy, Check } from "lucide-react";
+import { Trash2, Users, Key, AlertTriangle, Copy, Check, Settings } from "lucide-react";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
   id: string;
@@ -74,13 +73,11 @@ export default function OrganizationSettingsPage({
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Editable fields
   const [orgName, setOrgName] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [slugCopied, setSlugCopied] = useState(false);
 
-  // Get context to update breadcrumbs
   const { updateOrganization: updateOrgContext } = useOrganizationProject();
 
   useEffect(() => {
@@ -95,9 +92,7 @@ export default function OrganizationSettingsPage({
         console.error("Failed to resolve params:", e);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [params]);
 
   useEffect(() => {
@@ -106,17 +101,13 @@ export default function OrganizationSettingsPage({
     const fetchOrganizationData = async () => {
       setLoading(true);
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
           router.push("/login");
           return;
         }
 
-        // Fetch organization details
         const { data: orgData, error: orgError } = await supabase
           .from("organizations")
           .select("id, name, slug, description, plan_id, organization_plans(name)")
@@ -124,7 +115,6 @@ export default function OrganizationSettingsPage({
           .single();
 
         if (orgError || !orgData) {
-          console.error("Error fetching organization:", orgError?.message);
           toast.error("Failed to load organization");
           return;
         }
@@ -133,19 +123,15 @@ export default function OrganizationSettingsPage({
         setOrgName(orgData.name);
         setOrgDescription(orgData.description || "");
 
-        // Fetch projects
         const { data: projectsData, error: projectsError } = await supabase
           .from("projects")
           .select("id, name, slug, status, created_at")
           .eq("organization_id", orgData.id);
 
-        if (projectsError) {
-          console.error("Error fetching projects:", projectsError.message);
-        } else {
+        if (!projectsError) {
           setProjects(projectsData || []);
         }
       } catch (err: unknown) {
-        console.error("Unexpected error:", (err as Error).message);
         toast.error("An unexpected error occurred");
       } finally {
         setLoading(false);
@@ -161,20 +147,14 @@ export default function OrganizationSettingsPage({
     setIsSaving(true);
     const { error } = await supabase
       .from("organizations")
-      .update({
-        name: orgName,
-        description: orgDescription,
-      })
+      .update({ name: orgName, description: orgDescription })
       .eq("id", organization.id);
 
     if (error) {
-      console.error("Error updating organization:", error.message);
       toast.error("Failed to update organization");
     } else {
-      toast.success("Organization updated successfully!");
+      toast.success("Organization updated");
       setOrganization({ ...organization, name: orgName, description: orgDescription });
-
-      // Update context for real-time breadcrumb updates
       updateOrgContext(organization.id, { name: orgName, description: orgDescription });
     }
     setIsSaving(false);
@@ -186,10 +166,9 @@ export default function OrganizationSettingsPage({
     const { error } = await supabase.from("projects").delete().eq("id", projectToDelete.id);
 
     if (error) {
-      console.error("Error deleting project:", error.message);
       toast.error("Failed to delete project");
     } else {
-      toast.success("Project deleted successfully!");
+      toast.success("Project deleted");
       setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
     }
     setIsDeleteProjectDialogOpen(false);
@@ -200,15 +179,13 @@ export default function OrganizationSettingsPage({
     if (!organization || confirmDeleteText !== organization.name) return;
 
     setIsDeleting(true);
-    // Delete organization - this should cascade delete projects if set up in DB
     const { error } = await supabase.from("organizations").delete().eq("id", organization.id);
 
     if (error) {
-      console.error("Error deleting organization:", error.message);
       toast.error("Failed to delete organization");
       setIsDeleting(false);
     } else {
-      toast.success("Organization deleted successfully!");
+      toast.success("Organization deleted");
       setIsDeleteOrgDialogOpen(false);
       setConfirmDeleteText("");
       router.push("/dashboard/organizations");
@@ -217,98 +194,100 @@ export default function OrganizationSettingsPage({
 
   if (!orgSlug || loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-muted-foreground">Loading settings...</p>
+      <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <Skeleton className="h-5 w-40 mb-6" />
+        <Skeleton className="h-8 w-64 mb-4" />
+        <Skeleton className="h-[300px]" />
       </div>
     );
   }
 
   if (!organization) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">Organization not found.</p>
+      <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="text-center py-16 flex flex-col items-center">
+          <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+            <Settings className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">Organization not found</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="flex items-center space-x-4 pb-12">
-        <h1 className="text-xl font-bold">Organization Settings</h1>
+    <div className="w-full max-w-5xl mx-auto px-6 py-8">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-base font-medium">Organization Settings</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Manage your organization</p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-          <TabsTrigger value="danger">Danger Zone</TabsTrigger>
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList className="h-8">
+          <TabsTrigger value="general" className="text-xs h-7 px-3">General</TabsTrigger>
+          <TabsTrigger value="projects" className="text-xs h-7 px-3">Projects</TabsTrigger>
+          <TabsTrigger value="members" className="text-xs h-7 px-3">Members</TabsTrigger>
+          <TabsTrigger value="api-keys" className="text-xs h-7 px-3">API Keys</TabsTrigger>
+          <TabsTrigger value="danger" className="text-xs h-7 px-3 text-red-500 data-[state=active]:text-red-500">Danger</TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
-        <TabsContent value="general" className="space-y-6">
-          <Card className="rounded-none">
-            <CardHeader>
-              <CardTitle>Organization Information</CardTitle>
-              <CardDescription>
-                Update your organization&apos;s name and description
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="org-name">Organization Name</Label>
+        <TabsContent value="general">
+          <div className="rounded-md border border-border/40 bg-card p-4 space-y-4">
+            <div>
+              <h3 className="text-xs font-medium mb-0.5">Organization Information</h3>
+              <p className="text-[10px] text-muted-foreground">Update your organization's name and description</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="org-name" className="text-xs">Name</Label>
                 <Input
                   id="org-name"
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Enter organization name"
+                  placeholder="Organization name"
+                  className="h-8 text-xs"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="org-slug">Organization Slug</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-slug" className="text-xs">Slug</Label>
                 <div className="flex gap-2">
-                  <Input id="org-slug" value={organization.slug} disabled className="bg-muted" />
+                  <Input id="org-slug" value={organization.slug} disabled className="h-8 text-xs bg-muted font-mono" />
                   <Button
                     variant="outline"
                     size="icon"
+                    className="h-8 w-8 shrink-0"
                     onClick={() => {
                       navigator.clipboard.writeText(organization.slug);
                       setSlugCopied(true);
-                      toast.success("Slug copied to clipboard");
+                      toast.success("Slug copied");
                       setTimeout(() => setSlugCopied(false), 2000);
                     }}
-                    title="Copy slug"
                   >
-                    {slugCopied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
+                    {slugCopied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The slug cannot be changed after creation
-                </p>
+                <p className="text-[10px] text-muted-foreground">Cannot be changed after creation</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="org-description">Description</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-description" className="text-xs">Description</Label>
                 <Input
                   id="org-description"
                   value={orgDescription}
                   onChange={(e) => setOrgDescription(e.target.value)}
-                  placeholder="Enter organization description"
+                  placeholder="Organization description"
+                  className="h-8 text-xs"
                 />
               </div>
 
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <Label>Current Plan</Label>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="text-sm">
+              <div className="space-y-1.5 pt-2">
+                <Label className="text-xs">Plan</Label>
+                <div>
+                  <Badge variant="outline" className="text-[10px] h-5">
                     {organization.organization_plans?.[0]?.name
                       ? organization.organization_plans[0].name.charAt(0).toUpperCase() +
                       organization.organization_plans[0].name.slice(1)
@@ -316,176 +295,152 @@ export default function OrganizationSettingsPage({
                   </Badge>
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleSaveOrganization} disabled={isSaving}>
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSaveOrganization} disabled={isSaving} size="sm" className="h-7 text-xs">
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         {/* PROJECTS TAB */}
-        <TabsContent value="projects" className="space-y-6">
-          <Card className="rounded-none">
-            <CardHeader>
-              <CardTitle>Projects Management</CardTitle>
-              <CardDescription>
-                View and manage all projects under this organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {projects.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Project Name</TableHead>
-                      <TableHead>Slug</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+        <TabsContent value="projects">
+          <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+            <div className="p-4 border-b border-border/40">
+              <h3 className="text-xs font-medium mb-0.5">Projects</h3>
+              <p className="text-[10px] text-muted-foreground">Manage projects in this organization</p>
+            </div>
+            {projects.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-b border-border/40">
+                    <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Name</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Slug</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Status</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Created</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((project) => (
+                    <TableRow key={project.id} className="border-b border-border/40 last:border-0 hover:bg-secondary/30">
+                      <TableCell className="py-2.5 px-4 text-xs font-medium">{project.name}</TableCell>
+                      <TableCell className="py-2.5 text-xs text-muted-foreground font-mono">{project.slug}</TableCell>
+                      <TableCell className="py-2.5">
+                        <Badge variant="outline" className="text-[10px] h-5 gap-1">
+                          <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                          {project.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2.5 text-xs text-muted-foreground">
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="py-2.5 text-right pr-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                          onClick={() => {
+                            setProjectToDelete(project);
+                            setIsDeleteProjectDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {projects.map((project) => (
-                      <TableRow key={project.id}>
-                        <TableCell className="font-medium">{project.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{project.slug}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="gap-1.5 flex items-center w-fit">
-                            <span
-                              className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"
-                                }`}
-                              aria-hidden="true"
-                            />
-                            {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(project.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              setProjectToDelete(project);
-                              setIsDeleteProjectDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No projects found in this organization</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-xs">No projects found</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* MEMBERS TAB */}
-        <TabsContent value="members" className="space-y-6">
-          <Card className="rounded-none">
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>Manage team members and their roles</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">Team Management Coming Soon</p>
-                <p className="text-sm">
-                  Invite team members and assign roles to collaborate on your projects
-                </p>
+        <TabsContent value="members">
+          <div className="rounded-md border border-border/40 bg-card p-4">
+            <div className="text-center py-12 flex flex-col items-center">
+              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                <Users className="h-5 w-5 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
+              <p className="text-sm font-medium mb-1">Team Management Coming Soon</p>
+              <p className="text-xs text-muted-foreground">
+                Invite team members and assign roles
+              </p>
+            </div>
+          </div>
         </TabsContent>
 
         {/* API KEYS TAB */}
-        <TabsContent value="api-keys" className="space-y-6">
-          <Card className="rounded-none">
-            <CardHeader>
-              <CardTitle>API Keys</CardTitle>
-              <CardDescription>
-                Manage API keys for programmatic access to your organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">API Key Management Coming Soon</p>
-                <p className="text-sm">
-                  Generate and manage API keys to integrate with your applications
-                </p>
+        <TabsContent value="api-keys">
+          <div className="rounded-md border border-border/40 bg-card p-4">
+            <div className="text-center py-12 flex flex-col items-center">
+              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                <Key className="h-5 w-5 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
+              <p className="text-sm font-medium mb-1">API Key Management Coming Soon</p>
+              <p className="text-xs text-muted-foreground">
+                Generate and manage API keys
+              </p>
+            </div>
+          </div>
         </TabsContent>
 
         {/* DANGER ZONE TAB */}
-        <TabsContent value="danger" className="space-y-6">
-          <Card className="rounded-none border-red-200 dark:border-red-900">
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <CardTitle className="text-red-600">Danger Zone</CardTitle>
-              </div>
-              <CardDescription>
-                Irreversible and destructive actions for this organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-none border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-6">
-                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
-                  Delete Organization
-                </h3>
-                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-                  Once you delete this organization, there is no going back. This will permanently
-                  delete the organization and all associated projects, data, and settings.
-                </p>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setConfirmDeleteText("");
-                    setIsDeleteOrgDialogOpen(true);
-                  }}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Organization
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="danger">
+          <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <h3 className="text-xs font-medium text-red-500">Danger Zone</h3>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-4">
+              Irreversible and destructive actions
+            </p>
+
+            <div className="rounded-md border border-red-500/20 bg-red-500/5 p-4">
+              <h4 className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Delete Organization</h4>
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Permanently delete this organization and all associated projects.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setConfirmDeleteText("");
+                  setIsDeleteOrgDialogOpen(true);
+                }}
+              >
+                <Trash2 className="h-3 w-3 mr-1.5" />
+                Delete Organization
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
       {/* Delete Project Dialog */}
       <Dialog open={isDeleteProjectDialogOpen} onOpenChange={setIsDeleteProjectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Project</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{projectToDelete?.name}&quot;? This action
-              cannot be undone.
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-sm">Delete Project</DialogTitle>
+            <DialogDescription className="text-xs">
+              Are you sure you want to delete &quot;{projectToDelete?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs">Cancel</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={handleDeleteProject}>
-              Delete Project
+            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleDeleteProject}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -496,38 +451,34 @@ export default function OrganizationSettingsPage({
         setIsDeleteOrgDialogOpen(open);
         if (!open) setConfirmDeleteText("");
       }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-[400px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Organization</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the organization, all
-              projects, and remove all data.
+            <AlertDialogTitle className="text-sm">Delete Organization</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              This will permanently delete the organization and all projects.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="confirm-delete">
-                Type <span className="font-mono font-bold">{organization.name}</span> to confirm
-              </Label>
-              <Input
-                id="confirm-delete"
-                value={confirmDeleteText}
-                onChange={(e) => setConfirmDeleteText(e.target.value)}
-                placeholder="Enter organization name"
-                disabled={isDeleting}
-              />
-            </div>
+          <div className="space-y-2 py-3">
+            <Label htmlFor="confirm-delete" className="text-xs">
+              Type <span className="font-mono font-medium">{organization.name}</span> to confirm
+            </Label>
+            <Input
+              id="confirm-delete"
+              value={confirmDeleteText}
+              onChange={(e) => setConfirmDeleteText(e.target.value)}
+              placeholder="Organization name"
+              disabled={isDeleting}
+              className="h-8 text-xs"
+            />
           </div>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel disabled={isDeleting} className="h-7 text-xs">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteOrganization}
               disabled={confirmDeleteText !== organization.name || isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="h-7 text-xs bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? "Deleting..." : "I understand, delete this organization"}
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

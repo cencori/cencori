@@ -1,16 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Check, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Check, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react';
 
 interface Organization {
     id: string;
@@ -33,10 +30,8 @@ export default function BillingPage() {
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
     useEffect(() => {
-        // Check if returning from successful checkout
         if (searchParams.get('success') === 'true') {
             setShowSuccessMessage(true);
-            // Clear the success param from URL after a moment
             setTimeout(() => {
                 window.history.replaceState({}, '', window.location.pathname);
             }, 100);
@@ -71,42 +66,40 @@ export default function BillingPage() {
 
             const data = await response.json();
 
-            if (!response.ok) {
-                console.error('Checkout API error:', data);
+            if (!response.ok || !data.checkoutUrl) {
                 alert(`Failed to start checkout: ${data.error || 'Unknown error'}`);
                 return;
             }
 
-            if (!data.checkoutUrl) {
-                console.error('No checkout URL returned:', data);
-                alert('Failed to get checkout URL. Please try again.');
-                return;
-            }
-
-            console.log('Redirecting to checkout:', data.checkoutUrl);
             window.location.href = data.checkoutUrl;
         } catch (error) {
-            console.error('Checkout error:', error);
-            alert('Failed to start checkout. Please check your internet connection and try again.');
+            alert('Failed to start checkout. Please try again.');
         }
     };
 
     if (loading) {
         return (
-            <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <Skeleton className="h-8 w-48 mb-6" />
-                <div className="grid gap-6 lg:grid-cols-4">
-                    <Skeleton className="h-96" />
-                    <Skeleton className="h-96" />
-                    <Skeleton className="h-96" />
-                    <Skeleton className="h-96" />
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <Skeleton className="h-5 w-24 mb-6" />
+                <Skeleton className="h-24 mb-6" />
+                <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-72" />)}
                 </div>
             </div>
         );
     }
 
     if (!org) {
-        return <div>Organization not found</div>;
+        return (
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="text-center py-16 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <CreditCard className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">Organization not found</p>
+                </div>
+            </div>
+        );
     }
 
     const percentage = Math.min((org.monthly_requests_used / org.monthly_request_limit) * 100, 100);
@@ -126,26 +119,14 @@ export default function BillingPage() {
                 displayName: 'Free',
                 price: { monthly: 0, annual: 0 },
                 limit: '1,000',
-                features: [
-                    '1,000 requests/month',
-                    '1 project',
-                    'Basic security features',
-                    'Community support',
-                ],
+                features: ['1,000 requests/month', '1 project', 'Basic security', 'Community support'],
             },
             {
                 name: 'pro',
                 displayName: 'Pro',
                 price: { monthly: 49, annual: 490 },
                 limit: '50,000',
-                features: [
-                    '50,000 requests/month',
-                    'Unlimited projects',
-                    'All security features',
-                    'Priority support (24hr)',
-                    'Advanced analytics',
-                    'Webhooks',
-                ],
+                features: ['50,000 requests/month', 'Unlimited projects', 'All security features', 'Priority support', 'Analytics', 'Webhooks'],
                 highlighted: true,
             },
             {
@@ -153,202 +134,153 @@ export default function BillingPage() {
                 displayName: 'Team',
                 price: { monthly: 149, annual: 1490 },
                 limit: '250,000',
-                features: [
-                    '250,000 requests/month',
-                    'Everything in Pro',
-                    'Team collaboration (10 members)',
-                    'Priority support (4hr)',
-                    'API access',
-                    '90-day log retention',
-                ],
+                features: ['250,000 requests/month', 'Everything in Pro', '10 team members', '4hr support', 'API access', '90-day logs'],
             },
             {
                 name: 'enterprise',
                 displayName: 'Enterprise',
                 price: { monthly: 'Custom', annual: 'Custom' },
                 limit: 'Unlimited',
-                features: [
-                    'Unlimited requests',
-                    'Everything in Team',
-                    'Unlimited members',
-                    'Dedicated support',
-                    'SLA guarantees',
-                    'Custom integrations',
-                ],
+                features: ['Unlimited requests', 'Everything in Team', 'Unlimited members', 'Dedicated support', 'SLA', 'Custom integrations'],
             },
         ];
 
     return (
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Header */}
-            <div className="pb-8">
-                <h1 className="text-3xl font-bold">Billing</h1>
-                <p className="text-muted-foreground mt-2">
-                    Manage your subscription and monitor usage
-                </p>
+            <div className="mb-6">
+                <h1 className="text-base font-medium">Billing</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">Manage your subscription and monitor usage</p>
             </div>
 
             {/* Success Message */}
             {showSuccessMessage && (
-                <Alert className="mb-6 border-green-500/50 bg-green-500/10">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    <AlertDescription className="text-green-700 dark:text-green-300">
-                        <strong className="font-semibold">Subscription updated successfully!</strong> Your new plan is now active. It may take a few moments for changes to reflect.
-                    </AlertDescription>
-                </Alert>
+                <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                        <span className="font-medium">Subscription updated!</span> Your new plan is now active.
+                    </p>
+                </div>
             )}
 
             {/* Usage Overview */}
-            <Card className="mb-8 rounded-none border-2">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Current Usage</CardTitle>
-                        <Badge variant={isAtLimit ? 'destructive' : isNearLimit ? 'secondary' : 'default'}>
-                            {org.subscription_tier.toUpperCase()}
-                        </Badge>
+            <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h3 className="text-xs font-medium">Current Usage</h3>
+                        <p className="text-[10px] text-muted-foreground">
+                            {org.monthly_requests_used.toLocaleString()} / {org.monthly_request_limit.toLocaleString()} requests
+                        </p>
                     </div>
-                    <CardDescription>
-                        {org.monthly_requests_used.toLocaleString()} / {org.monthly_request_limit.toLocaleString()} requests this month
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Progress value={percentage} className="h-3" />
-                    <div className="text-sm text-muted-foreground">
-                        {isAtLimit ? (
-                            <Alert>
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertDescription>
-                                    You&apos;ve reached your monthly limit. Upgrade to continue making requests.
-                                </AlertDescription>
-                            </Alert>
-                        ) : isNearLimit ? (
-                            <Alert>
-                                <AlertDescription>
-                                    You&apos;re approaching your monthly limit ({Math.round(100 - percentage)}% remaining).
-                                </AlertDescription>
-                            </Alert>
-                        ) : (
-                            <p>{Math.round(percentage)}% used • Resets on the 1st of each month</p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                    <Badge variant={isAtLimit ? 'destructive' : 'outline'} className="text-[10px] h-5 uppercase">
+                        {org.subscription_tier}
+                    </Badge>
+                </div>
+                <Progress value={percentage} className="h-2 mb-2" />
+                <div className="text-[10px] text-muted-foreground">
+                    {isAtLimit ? (
+                        <span className="flex items-center gap-1 text-red-500">
+                            <AlertTriangle className="h-3 w-3" />
+                            Limit reached. Upgrade to continue.
+                        </span>
+                    ) : isNearLimit ? (
+                        <span className="text-amber-500">{Math.round(100 - percentage)}% remaining</span>
+                    ) : (
+                        <span>{Math.round(percentage)}% used • Resets monthly</span>
+                    )}
+                </div>
+            </div>
 
-            {/* Subscription Details (if applicable) */}
+            {/* Subscription Details */}
             {org.subscription_tier !== 'free' && org.subscription_current_period_end && (
-                <Card className="mb-8 rounded-none border-2">
-                    <CardHeader>
-                        <CardTitle>Subscription Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        <div className="flex justify-between text-sm">
+                <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
+                    <h3 className="text-xs font-medium mb-2">Subscription</h3>
+                    <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Status</span>
-                            <Badge variant={org.subscription_status === 'active' ? 'default' : 'secondary'}>
+                            <Badge variant={org.subscription_status === 'active' ? 'outline' : 'secondary'} className="text-[10px] h-5 gap-1">
+                                <span className={`size-1.5 rounded-full ${org.subscription_status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
                                 {org.subscription_status}
                             </Badge>
                         </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Renews on</span>
+                        <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Renews</span>
                             <span>{new Date(org.subscription_current_period_end).toLocaleDateString()}</span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             )}
 
             {/* Pricing Tiers */}
             <div>
-                <h2 className="text-2xl font-bold mb-6">Available Plans</h2>
-                <div className="grid gap-6 lg:grid-cols-4 md:grid-cols-2">
+                <h2 className="text-sm font-medium mb-4">Available Plans</h2>
+                <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
                     {tiers.map((tier) => {
                         const isCurrent = org.subscription_tier === tier.name;
                         const canUpgrade = !isCurrent && org.subscription_tier !== 'enterprise';
 
                         return (
-                            <TechnicalBorder
+                            <div
                                 key={tier.name}
-                                cornerSize={16}
-                                borderWidth={2}
-                                active={isCurrent}
-                                hoverEffect={!isCurrent}
-                                className={`${isCurrent ? 'bg-primary/5' : ''}`}
+                                className={`rounded-md border bg-card p-4 relative ${isCurrent ? 'border-primary bg-primary/5' : 'border-border/40'
+                                    } ${tier.highlighted && !isCurrent ? 'border-primary/50' : ''}`}
                             >
-                                <Card className={`relative border-0 shadow-none ${tier.highlighted && !isCurrent ? 'bg-background' : ''
-                                    } ${isCurrent ? 'bg-primary/5' : ''}`}>
-                                    {isCurrent && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                            <Badge className="rounded-none">Current Plan</Badge>
-                                        </div>
+                                {isCurrent && (
+                                    <Badge className="absolute -top-2 left-3 text-[9px] h-4 px-1.5">Current</Badge>
+                                )}
+                                {tier.highlighted && !isCurrent && (
+                                    <Badge variant="secondary" className="absolute -top-2 left-3 text-[9px] h-4 px-1.5">Popular</Badge>
+                                )}
+
+                                <div className="mb-3 pt-1">
+                                    <h3 className="text-sm font-medium">{tier.displayName}</h3>
+                                    <p className="text-[10px] text-muted-foreground">{tier.limit} requests/month</p>
+                                </div>
+
+                                <div className="mb-4">
+                                    {typeof tier.price.monthly === 'number' ? (
+                                        <>
+                                            <span className="text-2xl font-semibold font-mono">${tier.price.monthly}</span>
+                                            <span className="text-xs text-muted-foreground">/mo</span>
+                                        </>
+                                    ) : (
+                                        <span className="text-lg font-semibold">{tier.price.monthly}</span>
                                     )}
-                                    {tier.highlighted && !isCurrent && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                            <Badge variant="default" className="rounded-none">Most Popular</Badge>
+                                </div>
+
+                                <div className="space-y-1.5 mb-4">
+                                    {tier.features.map((feature, i) => (
+                                        <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                                            <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
+                                            <span>{feature}</span>
                                         </div>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-2">
+                                    {isCurrent ? (
+                                        <Button className="w-full h-7 text-xs" disabled>Current Plan</Button>
+                                    ) : tier.name === 'enterprise' ? (
+                                        <Button className="w-full h-7 text-xs" variant="outline" onClick={() => window.location.href = '/contact'}>
+                                            Contact Sales
+                                        </Button>
+                                    ) : canUpgrade && tier.name !== 'free' ? (
+                                        <>
+                                            <Button className="w-full h-7 text-xs" onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'monthly')}>
+                                                ${tier.price.monthly}/mo
+                                            </Button>
+                                            <Button className="w-full h-7 text-xs" variant="outline" onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'annual')}>
+                                                ${tier.price.annual}/yr
+                                                <Badge variant="secondary" className="ml-1.5 text-[9px] h-4 px-1">-17%</Badge>
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button className="w-full h-7 text-xs" variant="outline" disabled>
+                                            {tier.name === 'free' ? 'Free Forever' : 'N/A'}
+                                        </Button>
                                     )}
-
-                                    <CardHeader>
-                                        <CardTitle className="text-2xl">{tier.displayName}</CardTitle>
-                                        <CardDescription>{tier.limit} requests/month</CardDescription>
-                                        <div className="pt-4">
-                                            {typeof tier.price.monthly === 'number' ? (
-                                                <>
-                                                    <span className="text-4xl font-bold">${tier.price.monthly}</span>
-                                                    <span className="text-muted-foreground">/month</span>
-                                                </>
-                                            ) : (
-                                                <span className="text-4xl font-bold">{tier.price.monthly}</span>
-                                            )}
-                                        </div>
-                                    </CardHeader>
-
-                                    <CardContent className="space-y-4">
-                                        <div className="space-y-2">
-                                            {tier.features.map((feature, i) => (
-                                                <div key={i} className="flex items-start gap-2 text-sm">
-                                                    <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                                                    <span>{feature}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="pt-4 space-y-2">
-                                            {isCurrent ? (
-                                                <Button className="w-full rounded-none" disabled>
-                                                    Current Plan
-                                                </Button>
-                                            ) : tier.name === 'enterprise' ? (
-                                                <Button
-                                                    className="w-full rounded-none"
-                                                    variant="outline"
-                                                    onClick={() => window.location.href = '/contact'}
-                                                >
-                                                    Contact Sales
-                                                </Button>
-                                            ) : canUpgrade && tier.name !== 'free' ? (
-                                                <>
-                                                    <Button
-                                                        className="w-full rounded-none"
-                                                        onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'monthly')}
-                                                    >
-                                                        Upgrade - ${tier.price.monthly}/mo
-                                                    </Button>
-                                                    <Button
-                                                        className="w-full rounded-none"
-                                                        variant="outline"
-                                                        onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'annual')}
-                                                    >
-                                                        ${tier.price.annual}/year
-                                                        <Badge className="ml-2 rounded-none" variant="secondary">Save 17%</Badge>
-                                                    </Button>
-                                                </>
-                                            ) : (
-                                                <Button className="w-full rounded-none" variant="outline" disabled>
-                                                    {tier.name === 'free' ? 'Free Forever' : 'Not Available'}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TechnicalBorder>
+                                </div>
+                            </div>
                         );
                     })}
                 </div>
