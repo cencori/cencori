@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { notFound, useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 import {
@@ -46,10 +46,20 @@ export default function ProjectLayoutClient({
     params: LayoutParams;
 }) {
     const router = useRouter();
+    const pathname = usePathname();
     const [project, setProject] = useState<ProjectData | null>(null);
     const [organization, setOrganization] = useState<OrganizationData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { isOpen, setIsOpen } = useMobileSheet();
+
+    // Helper to check if a route is active
+    const isActive = (path: string) => {
+        if (path.endsWith(project?.slug || '')) {
+            // For the overview page, match exact path
+            return pathname === path;
+        }
+        return pathname.startsWith(path);
+    };
 
     useEffect(() => {
         const fetchProjectAndOrganization = async () => {
@@ -115,77 +125,80 @@ export default function ProjectLayoutClient({
     // Don't render until we have project and organization data
     if (!project || !organization) return null;
 
+    const basePath = `/dashboard/organizations/${organization.slug}/projects/${project.slug}`;
+
     return (
-        <SidebarProvider defaultOpen>
+        <SidebarProvider defaultOpen={false}>
             {/* Desktop Sidebar - hidden on mobile */}
-            <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40">
+            <Sidebar collapsible="icon" expandOnHover className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40">
                 <SidebarContent>
                     <SidebarGroup className="pt-3">
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Overview">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}`}>
+                                <SidebarMenuButton asChild tooltip="Overview" isActive={isActive(basePath)}>
+                                    <Link href={basePath}>
                                         <PanelTopIcon animateOnHover />
                                         <span>Project Overview</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="API Keys">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/api-keys`}>
+                                <SidebarMenuButton asChild tooltip="API Keys" isActive={isActive(`${basePath}/api-keys`)}>
+                                    <Link href={`${basePath}/api-keys`}>
                                         <Key className="h-4 w-4" />
                                         <span>API Keys</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Request Logs">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/logs`}>
+                                <SidebarMenuButton asChild tooltip="Request Logs" isActive={isActive(`${basePath}/logs`)}>
+                                    <Link href={`${basePath}/logs`}>
                                         <ScrollText className="h-4 w-4" />
                                         <span>Logs</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Security">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/security`}>
+                                <SidebarMenuButton asChild tooltip="Security" isActive={isActive(`${basePath}/security`)}>
+                                    <Link href={`${basePath}/security`}>
                                         <ShieldAlert className="h-4 w-4" />
                                         <span>Security</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Providers">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/providers`}>
+                                <SidebarMenuButton asChild tooltip="Providers" isActive={isActive(`${basePath}/providers`)}>
+                                    <Link href={`${basePath}/providers`}>
                                         <Server className="h-4 w-4" />
                                         <span>Providers</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Analytics">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/analytics`}>
+                                <SidebarMenuButton asChild tooltip="Analytics" isActive={isActive(`${basePath}/analytics`)}>
+                                    <Link href={`${basePath}/analytics`}>
                                         <Activity className="h-4 w-4" />
                                         <span>Analytics</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Playground">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/playground`}>
+                                <SidebarMenuButton asChild tooltip="Playground" isActive={isActive(`${basePath}/playground`)}>
+                                    <Link href={`${basePath}/playground`}>
                                         <CubeTransparentIcon className="h-4 w-4" />
                                         <span>Playground</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton asChild tooltip="Settings">
-                                    <Link href={`/dashboard/organizations/${organization.slug}/projects/${project.slug}/settings`}>
+                                <SidebarMenuButton asChild tooltip="Settings" isActive={isActive(`${basePath}/settings`)}>
+                                    <Link href={`${basePath}/settings`}>
                                         <SettingsIcon animateOnHover />
                                         <span>Project Settings</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
+
                         </SidebarMenu>
                     </SidebarGroup>
                 </SidebarContent>
