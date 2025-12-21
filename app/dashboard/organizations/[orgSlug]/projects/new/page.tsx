@@ -1,16 +1,17 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useState, use } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { generateSlug } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Select,
   SelectContent,
@@ -58,73 +59,39 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function NewProjectPage({ params }: { params: Promise<{ orgSlug: string }> }) {
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resolved = await params;
-        if (mounted && resolved && typeof resolved.orgSlug === "string") {
-          setOrgSlug(resolved.orgSlug);
-        }
-      } catch (err) {
-        console.error("Failed to resolve params:", err);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [params]);
+interface PageProps {
+  params: Promise<{ orgSlug: string }>;
+}
 
+// Hook to fetch org with caching
+function useOrganization(orgSlug: string) {
+  return useQuery({
+    queryKey: ["organization", orgSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
+
+      const { data: orgData, error: fetchError } = await supabase
+        .from("organizations")
+        .select("id, name, slug")
+        .eq("slug", orgSlug)
+        .eq("owner_id", user.id)
+        .single();
+
+      if (fetchError || !orgData) throw new Error("Organization not found or you don't have permission.");
+      return orgData as OrganizationData;
+    },
+    staleTime: 60 * 1000, // 1 minute
+  });
+}
+
+export default function NewProjectPage({ params }: PageProps) {
+  const { orgSlug } = use(params);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [orgLoading, setOrgLoading] = useState(true);
-  const [orgError, setOrgError] = useState<string | null>(null);
-  const [organization, setOrganization] = useState<OrganizationData | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-  );
-
-  useEffect(() => {
-    if (!orgSlug) return;
-
-    const fetchOrg = async () => {
-      setOrgLoading(true);
-      setOrgError(null);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.push("/login");
-          return;
-        }
-
-        const { data: orgData, error: fetchError } = await supabase
-          .from("organizations")
-          .select("id, name, slug")
-          .eq("slug", orgSlug)
-          .eq("owner_id", user.id)
-          .single();
-
-        if (fetchError || !orgData) {
-          console.error("Error fetching organization:", fetchError?.message);
-          setOrgError("Organization not found or you don't have permission.");
-          return;
-        }
-        setOrganization(orgData);
-      } catch (err: unknown) {
-        console.error("Unexpected error fetching organization:", (err as Error).message);
-        setOrgError("An unexpected error occurred while loading organization details.");
-      } finally {
-        setOrgLoading(false);
-      }
-    };
-
-    fetchOrg();
-  }, [orgSlug, router, supabase]);
+  // Fetch org with caching - INSTANT ON REVISIT!
+  const { data: organization, isLoading: orgLoading, error: orgError } = useOrganization(orgSlug);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -195,7 +162,7 @@ export default function NewProjectPage({ params }: { params: Promise<{ orgSlug: 
     setLoading(false);
   };
 
-  if (!orgSlug || orgLoading) {
+  if (orgLoading) {
     return (
       <div className="w-full max-w-2xl mx-auto px-6 py-10">
         <div className="mb-8">
@@ -220,7 +187,7 @@ export default function NewProjectPage({ params }: { params: Promise<{ orgSlug: 
   if (orgError) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xs text-red-500">{orgError}</p>
+        <p className="text-xs text-red-500">{orgError.message}</p>
       </div>
     );
   }

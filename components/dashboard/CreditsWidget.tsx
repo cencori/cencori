@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
-import { DollarSign, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { DollarSign, TrendingDown, AlertCircle } from 'lucide-react';
 
 interface CreditsWidgetProps {
     orgSlug: string;
@@ -24,27 +24,24 @@ interface CreditsData {
     }>;
 }
 
-export function CreditsWidget({ orgSlug }: CreditsWidgetProps) {
-    const [data, setData] = useState<CreditsData | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchCredits();
-    }, [orgSlug]);
-
-    const fetchCredits = async () => {
-        try {
+// Hook to fetch credits with caching
+function useCredits(orgSlug: string) {
+    return useQuery({
+        queryKey: ["orgCredits", orgSlug],
+        queryFn: async () => {
             const res = await fetch(`/api/organizations/${orgSlug}/credits`);
-            const credits = await res.json();
-            setData(credits);
-        } catch (error) {
-            console.error('Failed to fetch credits:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+            if (!res.ok) throw new Error("Failed to fetch credits");
+            return res.json() as Promise<CreditsData>;
+        },
+        staleTime: 30 * 1000, // 30 seconds
+    });
+}
 
-    if (loading) {
+export function CreditsWidget({ orgSlug }: CreditsWidgetProps) {
+    // Fetch credits with caching - INSTANT ON REVISIT!
+    const { data, isLoading } = useCredits(orgSlug);
+
+    if (isLoading) {
         return (
             <TechnicalBorder cornerSize={16} borderWidth={2}>
                 <Card className="border-0 shadow-none">

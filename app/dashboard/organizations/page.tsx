@@ -1,15 +1,15 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { siteConfig } from "@/config/site";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabaseClient";
 import { PlusIcon } from "@/components/ui/plus";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, FolderKanban } from "lucide-react";
+import { Search, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrganizationData {
@@ -22,55 +22,45 @@ interface OrganizationData {
   projects?: { count: number }[];
 }
 
+// Hook to fetch all organizations with caching
+function useOrganizations() {
+  const router = useRouter();
+
+  return useQuery({
+    queryKey: ["organizations"],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.push(siteConfig.links.signInUrl);
+        throw new Error("Not authenticated");
+      }
+
+      const { data: orgsData, error: fetchError } = await supabase
+        .from("organizations")
+        .select("id, name, slug, description, plan_id, organization_plans(name), projects(count)");
+
+      if (fetchError) throw new Error("Error loading organizations.");
+
+      // Redirect to new org page if no orgs
+      if (orgsData && orgsData.length === 0) {
+        router.push("/dashboard/organizations/new");
+      }
+
+      return orgsData as OrganizationData[];
+    },
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
 export default function OrganizationsPage() {
   const router = useRouter();
-  const [organizations, setOrganizations] = useState<OrganizationData[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-  );
+  // Fetch orgs with caching - INSTANT ON REVISIT!
+  const { data: organizations, isLoading, error } = useOrganizations();
 
-  useEffect(() => {
-    const fetchOrganizations = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.push(siteConfig.links.signInUrl);
-          return;
-        }
-
-        const { data: orgsData, error: fetchError } = await supabase
-          .from("organizations")
-          .select("id, name, slug, description, plan_id, organization_plans(name), projects(count)");
-
-        if (fetchError) {
-          console.error("Error fetching organizations:", fetchError.message);
-          setError("Error loading organizations.");
-        } else {
-          setOrganizations(orgsData);
-          if (orgsData && orgsData.length === 0) {
-            router.push("/dashboard/organizations/new");
-          }
-        }
-      } catch (err: unknown) {
-        console.error("Unexpected error:", (err as Error).message);
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrganizations();
-  }, [router]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="w-full max-w-4xl mx-auto px-6 py-8">
         {/* Header Skeleton */}
@@ -108,7 +98,7 @@ export default function OrganizationsPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-sm text-red-500">{error}</p>
+        <p className="text-sm text-red-500">{error.message}</p>
       </div>
     );
   }

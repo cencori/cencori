@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { importGitHubProject } from './actions';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, AlertCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { GitHubInstallDialog } from '@/components/github/GitHubInstallDialog';
 
 // Official GitHub logo SVG
 const GitHubLogo = ({ className }: { className?: string }) => (
@@ -20,8 +23,6 @@ const GitHubLogo = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-import { toast } from 'sonner';
-import { GitHubInstallDialog } from '@/components/github/GitHubInstallDialog';
 
 interface GitHubRepo {
   id: number;
@@ -30,98 +31,24 @@ interface GitHubRepo {
   description: string | null;
 }
 
-export default function GitHubImportPage() {
-  const params = useParams();
-  const router = useRouter();
-  const orgSlug = params.orgSlug as string;
+interface GitHubInstallation {
+  installation_id: number;
+  github_account_type: string;
+  github_account_login: string;
+  github_account_name: string | null;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
-  const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [installationId, setInstallationId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [availableInstallations, setAvailableInstallations] = useState<Array<{
-    installation_id: number;
-    github_account_type: string;
-    github_account_login: string;
-    github_account_name: string | null;
-  }>>([]);
-  const [linkingInstallation, setLinkingInstallation] = useState(false);
+interface PageProps {
+  params: Promise<{ orgSlug: string }>;
+}
 
-  const GITHUB_APP_SLUG = "cencori";
-
-  useEffect(() => {
-    fetchRepositories();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const errorType = urlParams.get('error');
-
-    if (errorType === 'account_type_mismatch') {
-      const expected = urlParams.get('expected');
-      const actual = urlParams.get('actual');
-      const account = urlParams.get('account');
-      toast.error(
-        `Account type mismatch: You selected "${expected}" but installed on a ${actual} account (@${account}). Please try again with the correct account type.`,
-        { duration: 10000 }
-      );
-    } else if (errorType === 'account_name_mismatch') {
-      const expected = urlParams.get('expected');
-      const actual = urlParams.get('actual');
-      toast.error(
-        `Account name mismatch: You selected "@${expected}" but installed on "@${actual}". Please try again with the correct organization.`,
-        { duration: 10000 }
-      );
-    }
-  }, [orgSlug]);
-
-  useEffect(() => {
-    if (organizationId) {
-      fetchAvailableInstallations();
-    }
-  }, [organizationId]);
-
-  useEffect(() => {
-    if (searchTerm) {
-      setFilteredRepos(
-        repositories.filter(repo =>
-          repo.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          repo.description?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    } else {
-      setFilteredRepos(repositories);
-    }
-  }, [searchTerm, repositories]);
-
-  const fetchAvailableInstallations = async () => {
-    if (!organizationId) return;
-
-    try {
-      const response = await fetch(`/api/github/user-installations?organizationId=${organizationId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableInstallations(data.installations || []);
-      }
-    } catch (error) {
-      console.error('Error fetching available installations:', error);
-    }
-  };
-
-  const fetchRepositories = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
+// Hook to fetch GitHub repositories and installation status
+function useGitHubData(orgSlug: string) {
+  return useQuery({
+    queryKey: ["githubRepos", orgSlug],
+    queryFn: async () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        router.push('/login');
-        return;
-      }
+      if (userError || !user) throw new Error("Not authenticated");
 
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
@@ -129,52 +56,111 @@ export default function GitHubImportPage() {
         .eq('slug', orgSlug)
         .single();
 
-      if (orgError || !orgData) {
-        setError('Organization not found');
-        return;
-      }
+      if (orgError || !orgData) throw new Error('Organization not found');
 
-      setOrganizationId(orgData.id);
-
-      const { data: linkData, error: linkError } = await supabase
+      const { data: linkData } = await supabase
         .from('organization_github_installations')
         .select('installation_id')
         .eq('organization_id', orgData.id)
         .single();
 
-      if (linkError || !linkData) {
-        setError('not_installed');
-        return;
+      if (!linkData) {
+        return {
+          organizationId: orgData.id,
+          installationId: null,
+          repositories: [] as GitHubRepo[],
+          status: 'not_installed' as const,
+        };
       }
-
-      setInstallationId(linkData.installation_id);
 
       const response = await fetch(`/api/github/repositories?installation_id=${linkData.installation_id}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch repositories');
-      }
+      if (!response.ok) throw new Error('Failed to fetch repositories');
 
       const data = await response.json();
-      setRepositories(data.repositories || []);
-      setFilteredRepos(data.repositories || []);
-    } catch (err) {
-      console.error('Error fetching repositories:', err);
-      setError('fetch_error');
-    } finally {
-      setLoading(false);
+      return {
+        organizationId: orgData.id,
+        installationId: linkData.installation_id,
+        repositories: (data.repositories || []) as GitHubRepo[],
+        status: 'installed' as const,
+      };
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+// Hook to fetch available installations for the user
+function useAvailableInstallations(organizationId: string | null) {
+  return useQuery({
+    queryKey: ["availableInstallations", organizationId],
+    queryFn: async () => {
+      const response = await fetch(`/api/github/user-installations?organizationId=${organizationId}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.installations || []) as GitHubInstallation[];
+    },
+    enabled: !!organizationId,
+    staleTime: 30 * 1000,
+  });
+}
+
+export default function GitHubImportPage({ params }: PageProps) {
+  const { orgSlug } = use(params);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [linkingInstallation, setLinkingInstallation] = useState(false);
+
+  const GITHUB_APP_SLUG = "cencori";
+
+  // Fetch GitHub data with caching
+  const { data: githubData, isLoading, error, refetch } = useGitHubData(orgSlug);
+
+  // Fetch available installations
+  const { data: availableInstallations = [] } = useAvailableInstallations(
+    githubData?.status === 'not_installed' ? githubData.organizationId : null
+  );
+
+  // Handle error params from GitHub OAuth flow
+  useEffect(() => {
+    const errorType = searchParams.get('error');
+    if (errorType === 'account_type_mismatch') {
+      const expected = searchParams.get('expected');
+      const actual = searchParams.get('actual');
+      const account = searchParams.get('account');
+      toast.error(
+        `Account type mismatch: You selected "${expected}" but installed on a ${actual} account (@${account}). Please try again with the correct account type.`,
+        { duration: 10000 }
+      );
+    } else if (errorType === 'account_name_mismatch') {
+      const expected = searchParams.get('expected');
+      const actual = searchParams.get('actual');
+      toast.error(
+        `Account name mismatch: You selected "@${expected}" but installed on "@${actual}". Please try again with the correct organization.`,
+        { duration: 10000 }
+      );
     }
-  };
+  }, [searchParams]);
+
+  // Filter repositories by search term
+  const filteredRepos = searchTerm
+    ? (githubData?.repositories || []).filter(repo =>
+      repo.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      repo.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    : (githubData?.repositories || []);
 
   const handleImport = async (repo: GitHubRepo) => {
-    if (!organizationId || importingRepoId) return;
+    if (!githubData?.organizationId || importingRepoId) return;
 
     setImportingRepoId(repo.id);
 
     try {
       await importGitHubProject({
         orgSlug,
-        organizationId,
+        organizationId: githubData.organizationId,
         repoId: repo.id,
         repoFullName: repo.full_name,
         repoHtmlUrl: repo.html_url,
@@ -207,8 +193,8 @@ export default function GitHubImportPage() {
     window.location.href = githubAppInstallationUrl;
   };
 
-  const handleLinkInstallation = async (installation: typeof availableInstallations[0]) => {
-    if (!organizationId || linkingInstallation) return;
+  const handleLinkInstallation = async (installation: GitHubInstallation) => {
+    if (!githubData?.organizationId || linkingInstallation) return;
 
     setLinkingInstallation(true);
     try {
@@ -216,17 +202,15 @@ export default function GitHubImportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organizationId,
+          organizationId: githubData.organizationId,
           installationId: installation.installation_id,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to link installation');
-      }
+      if (!response.ok) throw new Error('Failed to link installation');
 
       toast.success(`Linked GitHub account: ${installation.github_account_login}`);
-      await fetchRepositories();
+      await refetch();
     } catch (error) {
       console.error('Error linking installation:', error);
       toast.error('Failed to link GitHub account. Please try again.');
@@ -236,7 +220,7 @@ export default function GitHubImportPage() {
   };
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="mb-8">
@@ -266,8 +250,35 @@ export default function GitHubImportPage() {
     );
   }
 
-  // Error: GitHub App not installed
-  if (error === 'not_installed') {
+  // Error state
+  if (error) {
+    return (
+      <div className="w-full max-w-2xl mx-auto px-6 py-10">
+        <div className="bg-card border border-red-500/30 rounded-md p-6 text-center">
+          <div className="w-12 h-12 rounded-md bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+          </div>
+          <h2 className="text-sm font-medium text-red-500 mb-1">Error fetching repositories</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            {error.message}
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => refetch()}>
+              Try again
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs px-3" asChild>
+              <Link href={`/dashboard/organizations/${orgSlug}/projects`}>
+                Back to projects
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not installed state
+  if (githubData?.status === 'not_installed') {
     return (
       <div className="w-full max-w-2xl mx-auto px-6 py-10">
         <div className="bg-card border border-border/40 rounded-md p-6 text-center">
@@ -342,33 +353,6 @@ export default function GitHubImportPage() {
     );
   }
 
-  // Error: Fetch error
-  if (error === 'fetch_error') {
-    return (
-      <div className="w-full max-w-2xl mx-auto px-6 py-10">
-        <div className="bg-card border border-red-500/30 rounded-md p-6 text-center">
-          <div className="w-12 h-12 rounded-md bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="h-6 w-6 text-red-500" />
-          </div>
-          <h2 className="text-sm font-medium text-red-500 mb-1">Error fetching repositories</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            There was an error loading your GitHub repositories.
-          </p>
-          <div className="flex items-center justify-center gap-2">
-            <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={fetchRepositories}>
-              Try again
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs px-3" asChild>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects`}>
-                Back to projects
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Main repository selection view
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-8">
@@ -393,10 +377,10 @@ export default function GitHubImportPage() {
             className="w-48 sm:w-64 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
           />
         </div>
-        {installationId && (
+        {githubData?.installationId && (
           <Button size="sm" variant="outline" className="h-7 text-xs px-3" asChild>
             <a
-              href={`https://github.com/settings/installations/${installationId}`}
+              href={`https://github.com/settings/installations/${githubData.installationId}`}
               target="_blank"
               rel="noopener noreferrer"
             >

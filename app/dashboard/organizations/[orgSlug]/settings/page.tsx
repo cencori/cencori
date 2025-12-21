@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, use } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -57,89 +58,98 @@ interface ProjectData {
   created_at: string;
 }
 
+// Hook to fetch org and projects with caching
+function useOrgSettings(orgSlug: string) {
+  return useQuery({
+    queryKey: ["orgSettings", orgSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
+
+      const { data: orgData, error: orgError } = await supabase
+        .from("organizations")
+        .select("id, name, slug, description, plan_id, organization_plans(name)")
+        .eq("slug", orgSlug)
+        .single();
+
+      if (orgError || !orgData) throw new Error("Organization not found");
+
+      const { data: projectsData } = await supabase
+        .from("projects")
+        .select("id, name, slug, status, created_at")
+        .eq("organization_id", orgData.id);
+
+      return {
+        organization: orgData as OrganizationData,
+        projects: (projectsData || []) as ProjectData[],
+      };
+    },
+    staleTime: 60 * 1000, // 1 minute
+  });
+}
+
 export default function OrganizationSettingsPage({
   params,
 }: {
   params: Promise<{ orgSlug: string }>;
 }) {
+  const { orgSlug } = use(params);
   const router = useRouter();
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  const [organization, setOrganization] = useState<OrganizationData | null>(null);
-  const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { updateOrganization: updateOrgContext } = useOrganizationProject();
+
+  // Local state
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
   const [isDeleteOrgDialogOpen, setIsDeleteOrgDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<ProjectData | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-
   const [orgName, setOrgName] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [slugCopied, setSlugCopied] = useState(false);
 
-  const { updateOrganization: updateOrgContext } = useOrganizationProject();
+  // Fetch org with caching - INSTANT ON REVISIT!
+  const { data, isLoading, error } = useOrgSettings(orgSlug);
+  const organization = data?.organization;
+  const projects = data?.projects || [];
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resolved = await params;
-        if (mounted && resolved && typeof resolved.orgSlug === "string") {
-          setOrgSlug(resolved.orgSlug);
-        }
-      } catch (e) {
-        console.error("Failed to resolve params:", e);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [params]);
+  // Sync form state when org loads
+  React.useEffect(() => {
+    if (organization) {
+      setOrgName(organization.name);
+      setOrgDescription(organization.description || "");
+    }
+  }, [organization]);
 
-  useEffect(() => {
-    if (!orgSlug) return;
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orgSettings", orgSlug] });
+      toast.success("Project deleted");
+      setIsDeleteProjectDialogOpen(false);
+      setProjectToDelete(null);
+    },
+    onError: () => toast.error("Failed to delete project"),
+  });
 
-    const fetchOrganizationData = async () => {
-      setLoading(true);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.push("/login");
-          return;
-        }
-
-        const { data: orgData, error: orgError } = await supabase
-          .from("organizations")
-          .select("id, name, slug, description, plan_id, organization_plans(name)")
-          .eq("slug", orgSlug)
-          .single();
-
-        if (orgError || !orgData) {
-          toast.error("Failed to load organization");
-          return;
-        }
-
-        setOrganization(orgData);
-        setOrgName(orgData.name);
-        setOrgDescription(orgData.description || "");
-
-        const { data: projectsData, error: projectsError } = await supabase
-          .from("projects")
-          .select("id, name, slug, status, created_at")
-          .eq("organization_id", orgData.id);
-
-        if (!projectsError) {
-          setProjects(projectsData || []);
-        }
-      } catch (err: unknown) {
-        toast.error("An unexpected error occurred");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrganizationData();
-  }, [orgSlug, router]);
+  // Delete org mutation
+  const deleteOrgMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("organizations").delete().eq("id", organization!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Organization deleted");
+      setIsDeleteOrgDialogOpen(false);
+      setConfirmDeleteText("");
+      router.push("/dashboard/organizations");
+    },
+    onError: () => toast.error("Failed to delete organization"),
+  });
 
   const handleSaveOrganization = async () => {
     if (!organization) return;
@@ -154,45 +164,13 @@ export default function OrganizationSettingsPage({
       toast.error("Failed to update organization");
     } else {
       toast.success("Organization updated");
-      setOrganization({ ...organization, name: orgName, description: orgDescription });
+      queryClient.invalidateQueries({ queryKey: ["orgSettings", orgSlug] });
       updateOrgContext(organization.id, { name: orgName, description: orgDescription });
     }
     setIsSaving(false);
   };
 
-  const handleDeleteProject = async () => {
-    if (!projectToDelete) return;
-
-    const { error } = await supabase.from("projects").delete().eq("id", projectToDelete.id);
-
-    if (error) {
-      toast.error("Failed to delete project");
-    } else {
-      toast.success("Project deleted");
-      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
-    }
-    setIsDeleteProjectDialogOpen(false);
-    setProjectToDelete(null);
-  };
-
-  const handleDeleteOrganization = async () => {
-    if (!organization || confirmDeleteText !== organization.name) return;
-
-    setIsDeleting(true);
-    const { error } = await supabase.from("organizations").delete().eq("id", organization.id);
-
-    if (error) {
-      toast.error("Failed to delete organization");
-      setIsDeleting(false);
-    } else {
-      toast.success("Organization deleted");
-      setIsDeleteOrgDialogOpen(false);
-      setConfirmDeleteText("");
-      router.push("/dashboard/organizations");
-    }
-  };
-
-  if (!orgSlug || loading) {
+  if (isLoading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <Skeleton className="h-5 w-40 mb-6" />
@@ -202,7 +180,7 @@ export default function OrganizationSettingsPage({
     );
   }
 
-  if (!organization) {
+  if (error || !organization) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="text-center py-16 flex flex-col items-center">
@@ -439,8 +417,14 @@ export default function OrganizationSettingsPage({
             <DialogClose asChild>
               <Button variant="outline" size="sm" className="h-7 text-xs">Cancel</Button>
             </DialogClose>
-            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleDeleteProject}>
-              Delete
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => projectToDelete && deleteProjectMutation.mutate(projectToDelete.id)}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -467,18 +451,18 @@ export default function OrganizationSettingsPage({
               value={confirmDeleteText}
               onChange={(e) => setConfirmDeleteText(e.target.value)}
               placeholder="Organization name"
-              disabled={isDeleting}
+              disabled={deleteOrgMutation.isPending}
               className="h-8 text-xs"
             />
           </div>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel disabled={isDeleting} className="h-7 text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteOrgMutation.isPending} className="h-7 text-xs">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteOrganization}
-              disabled={confirmDeleteText !== organization.name || isDeleting}
+              onClick={() => deleteOrgMutation.mutate()}
+              disabled={confirmDeleteText !== organization.name || deleteOrgMutation.isPending}
               className="h-7 text-xs bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {deleteOrgMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

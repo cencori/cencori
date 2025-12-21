@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
 import { Cpu, Zap, Settings } from 'lucide-react';
 import Link from 'next/link';
@@ -11,25 +13,23 @@ interface ProvidersOverviewProps {
     orgSlug: string;
 }
 
-export function ProvidersOverview({ orgSlug }: ProvidersOverviewProps) {
-    const [providerCount, setProviderCount] = useState(0);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchProviders();
-    }, [orgSlug]);
-
-    const fetchProviders = async () => {
-        try {
+// Hook to fetch provider count with caching
+function useProviderCount(orgSlug: string) {
+    return useQuery({
+        queryKey: ["orgProvidersCount", orgSlug],
+        queryFn: async () => {
             const res = await fetch(`/api/organizations/${orgSlug}/providers`);
+            if (!res.ok) return 0;
             const data = await res.json();
-            setProviderCount(data.providers?.length || 0);
-        } catch (error) {
-            console.error('Failed to fetch providers:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+            return (data.providers?.length || 0) as number;
+        },
+        staleTime: 30 * 1000, // 30 seconds
+    });
+}
+
+export function ProvidersOverview({ orgSlug }: ProvidersOverviewProps) {
+    // Fetch provider count with caching - INSTANT ON REVISIT!
+    const { data: providerCount = 0, isLoading } = useProviderCount(orgSlug);
 
     const coreProviders = [
         { name: 'OpenAI', models: 'GPT-4, GPT-3.5', icon: Zap },
@@ -65,7 +65,14 @@ export function ProvidersOverview({ orgSlug }: ProvidersOverviewProps) {
                         </div>
                     ))}
 
-                    {providerCount > 0 && (
+                    {isLoading ? (
+                        <div className="pt-2 border-t">
+                            <div className="flex items-center justify-between text-sm">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-5 w-8" />
+                            </div>
+                        </div>
+                    ) : providerCount > 0 && (
                         <div className="pt-2 border-t">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">Custom providers</span>

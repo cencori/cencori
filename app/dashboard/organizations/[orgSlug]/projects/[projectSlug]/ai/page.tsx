@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { use } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -17,23 +18,15 @@ interface AIStats {
     avgLatency: number;
 }
 
-export default function AIUsagePage() {
-    const params = useParams();
-    const projectSlug = params.projectSlug as string;
+interface PageProps {
+    params: Promise<{ orgSlug: string; projectSlug: string }>;
+}
 
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<AIStats | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [projectId, setProjectId] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetchProjectAndStats();
-    }, [projectSlug]);
-
-    async function fetchProjectAndStats() {
-        try {
-            setLoading(true);
-
+// Hook to fetch AI stats with caching
+function useAIStats(projectSlug: string) {
+    return useQuery({
+        queryKey: ["aiStats", projectSlug],
+        queryFn: async () => {
             // First get project ID from slug
             const response = await fetch(`/api/projects?slug=${projectSlug}`);
             if (!response.ok) throw new Error('Failed to fetch project');
@@ -42,23 +35,29 @@ export default function AIUsagePage() {
             const project = projects?.[0];
             if (!project) throw new Error('Project not found');
 
-            setProjectId(project.id);
-
             // Fetch AI stats
             const statsResponse = await fetch(`/api/projects/${project.id}/ai/stats?period=7d`);
             if (!statsResponse.ok) throw new Error('Failed to fetch stats');
 
             const data = await statsResponse.json();
-            setStats(data.stats);
-        } catch (err: unknown) {
-            console.error('[AI Usage] Error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to load AI usage data');
-        } finally {
-            setLoading(false);
-        }
-    }
+            return {
+                projectId: project.id,
+                stats: data.stats as AIStats,
+            };
+        },
+        staleTime: 30 * 1000,
+    });
+}
 
-    if (loading) {
+export default function AIUsagePage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
+
+    // Fetch stats with caching - INSTANT ON REVISIT!
+    const { data, isLoading, error } = useAIStats(projectSlug);
+    const stats = data?.stats;
+    const projectId = data?.projectId;
+
+    if (isLoading) {
         return (
             <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
                 <div className="flex items-center justify-between">
@@ -95,7 +94,7 @@ export default function AIUsagePage() {
                             <AlertCircle className="h-5 w-5 text-destructive" />
                             Error Loading AI Usage
                         </CardTitle>
-                        <CardDescription>{error || 'Unknown error occurred'}</CardDescription>
+                        <CardDescription>{error?.message || 'Unknown error occurred'}</CardDescription>
                     </CardHeader>
                 </Card>
             </div>
@@ -171,12 +170,12 @@ export default function AIUsagePage() {
             {/* View Logs Link */}
             {projectId && (
                 <div className="flex justify-center">
-                    <a
-                        href={`/dashboard/organizations/${params.orgSlug}/projects/${projectSlug}/ai/logs`}
+                    <Link
+                        href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/ai/logs`}
                         className="text-sm text-primary hover:underline"
                     >
                         View detailed request logs →
-                    </a>
+                    </Link>
                 </div>
             )}
         </div>

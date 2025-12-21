@@ -1,12 +1,13 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
+import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Card,
   CardContent,
@@ -46,98 +47,60 @@ interface ProjectData {
   status: 'active' | 'inactive';
 }
 
-export default function EditProjectPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ orgSlug: string; projectSlug: string }>;
-}) {
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  const [projectSlug, setProjectSlug] = useState<string | null>(null);
+}
+
+// Hook to fetch project with caching
+function useProjectForEdit(orgSlug: string, projectSlug: string) {
+  return useQuery({
+    queryKey: ["projectEdit", orgSlug, projectSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
+
+      const { data: orgData, error: orgError } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("slug", orgSlug)
+        .eq("owner_id", user.id)
+        .single();
+
+      if (orgError || !orgData) throw new Error("Organization not found or you don't have permission.");
+
+      const { data: projectData, error: fetchError } = await supabase
+        .from("projects")
+        .select("id, name, slug, description, visibility, status")
+        .eq("organization_id", orgData.id)
+        .eq("slug", projectSlug)
+        .single();
+
+      if (fetchError || !projectData) throw new Error("Project not found or you don't have permission.");
+      return projectData as ProjectData;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export default function EditProjectPage({ params }: PageProps) {
+  const { orgSlug, projectSlug } = use(params);
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-  );
-
-  useEffect(() => {
-    (async () => {
-      const resolved = await params;
-      setOrgSlug(resolved.orgSlug);
-      setProjectSlug(resolved.projectSlug);
-    })();
-  }, [params]);
-
-  // Get context to update breadcrumbs
   const { updateProject: updateProjectContext } = useOrganizationProject();
+
+  // Fetch project with caching
+  const { data: project, isLoading, error } = useProjectForEdit(orgSlug, projectSlug);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    values: project ? {
+      name: project.name,
+      description: project.description || "",
+      visibility: project.visibility,
+      status: project.status,
+    } : undefined,
   });
-
-  useEffect(() => {
-    if (!orgSlug || !projectSlug) return;
-
-    const fetchProject = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          toast.error("You must be logged in to view projects.");
-          router.push("/login");
-          return;
-        }
-
-        const { data: orgData, error: orgError } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("slug", orgSlug)
-          .eq("owner_id", user.id) // Ensure owner has access
-          .single();
-
-        if (orgError || !orgData) {
-          console.error("Error fetching organization:", orgError?.message);
-          setError("Organization not found or you don't have permission.");
-          setLoading(false);
-          return;
-        }
-
-        const { data: projectData, error: fetchError } = await supabase
-          .from("projects")
-          .select("id, name, slug, description, visibility, status")
-          .eq("organization_id", orgData.id)
-          .eq("slug", projectSlug)
-          .single();
-
-        if (fetchError || !projectData) {
-          console.error("Error fetching project:", fetchError?.message);
-          setError("Project not found or you don't have permission.");
-          setLoading(false);
-          return;
-        }
-
-        setProject(projectData);
-        form.reset({ // Pre-fill the form
-          name: projectData.name,
-          description: projectData.description || "",
-          visibility: projectData.visibility,
-          status: projectData.status,
-        });
-      } catch (err: unknown) {
-        console.error("Unexpected error:", (err as Error).message);
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProject();
-  }, [orgSlug, projectSlug, router, form, supabase]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
@@ -167,16 +130,14 @@ export default function EditProjectPage({
       toast.error("Failed to update project: " + updateError.message);
     } else {
       toast.success("Project updated successfully!");
-
-      // Update context for real-time breadcrumb updates
+      queryClient.invalidateQueries({ queryKey: ["projectEdit", orgSlug, projectSlug] });
       updateProjectContext(project.id, { name: values.name, description: values.description });
-
       router.push(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}`);
     }
     setSubmitting(false);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
         <p className="text-xl">Loading project...</p>
@@ -187,7 +148,7 @@ export default function EditProjectPage({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.16))]">
-        <p className="text-xl text-red-500">{error}</p>
+        <p className="text-xl text-red-500">{error.message}</p>
       </div>
     );
   }
@@ -230,7 +191,7 @@ export default function EditProjectPage({
             </div>
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="visibility">Visibility</Label>
-              <Select onValueChange={(value) => form.setValue("visibility", value as FormValues["visibility"])} defaultValue={form.getValues("visibility")}>
+              <Select onValueChange={(value) => form.setValue("visibility", value as FormValues["visibility"])} value={form.watch("visibility")}>
                 <SelectTrigger id="visibility">
                   <SelectValue placeholder="Select visibility" />
                 </SelectTrigger>
@@ -245,7 +206,7 @@ export default function EditProjectPage({
             </div>
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="status">Status</Label>
-              <Select onValueChange={(value) => form.setValue("status", value as FormValues["status"])} defaultValue={form.getValues("status")}>
+              <Select onValueChange={(value) => form.setValue("status", value as FormValues["status"])} value={form.watch("status")}>
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>

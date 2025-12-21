@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, use } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
-import { useParams } from 'next/navigation';
 import { Plus, Trash2, Power, PowerOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CustomProvider {
     id: string;
@@ -20,49 +21,77 @@ interface CustomProvider {
     created_at: string;
 }
 
-export default function ProvidersPage() {
-    const params = useParams();
-    const orgSlug = params.orgSlug as string;
-    const [providers, setProviders] = useState<CustomProvider[]>([]);
-    const [loading, setLoading] = useState(true);
+interface PageProps {
+    params: Promise<{ orgSlug: string }>;
+}
+
+// Hook to fetch org-level providers with caching
+function useOrgProviders(orgSlug: string) {
+    return useQuery({
+        queryKey: ["orgProviders", orgSlug],
+        queryFn: async () => {
+            const res = await fetch(`/api/organizations/${orgSlug}/providers`);
+            const data = await res.json();
+            return (data.providers || []) as CustomProvider[];
+        },
+        staleTime: 30 * 1000,
+    });
+}
+
+export default function ProvidersPage({ params }: PageProps) {
+    const { orgSlug } = use(params);
+    const queryClient = useQueryClient();
+
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [formData, setFormData] = useState({ name: '', baseUrl: '', apiKey: '', format: 'openai' });
 
-    useEffect(() => {
-        fetchProviders();
-    }, [orgSlug]);
+    // Fetch providers with caching - INSTANT ON REVISIT!
+    const { data: providers = [], isLoading } = useOrgProviders(orgSlug);
 
-    const fetchProviders = async () => {
-        const res = await fetch(`/api/organizations/${orgSlug}/providers`);
-        const data = await res.json();
-        setProviders(data.providers || []);
-        setLoading(false);
-    };
+    // Create provider mutation
+    const createMutation = useMutation({
+        mutationFn: async (data: typeof formData) => {
+            await fetch(`/api/organizations/${orgSlug}/providers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["orgProviders", orgSlug] });
+            setShowAddDialog(false);
+            setFormData({ name: '', baseUrl: '', apiKey: '', format: 'openai' });
+            toast.success('Provider created!');
+        },
+        onError: () => toast.error('Failed to create provider'),
+    });
 
-    const handleCreate = async () => {
-        await fetch(`/api/organizations/${orgSlug}/providers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData),
-        });
-        setShowAddDialog(false);
-        setFormData({ name: '', baseUrl: '', apiKey: '', format: 'openai' });
-        fetchProviders();
-    };
+    // Toggle provider mutation
+    const toggleMutation = useMutation({
+        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+            await fetch(`/api/organizations/${orgSlug}/providers/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isActive: !isActive }),
+            });
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orgProviders", orgSlug] }),
+    });
 
-    const handleToggle = async (id: string, isActive: boolean) => {
-        await fetch(`/api/organizations/${orgSlug}/providers/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isActive: !isActive }),
-        });
-        fetchProviders();
-    };
+    // Delete provider mutation
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
+            await fetch(`/api/organizations/${orgSlug}/providers/${id}`, { method: 'DELETE' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["orgProviders", orgSlug] });
+            toast.success('Provider deleted!');
+        },
+    });
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = (id: string) => {
         if (!confirm('Delete this provider?')) return;
-        await fetch(`/api/organizations/${orgSlug}/providers/${id}`, { method: 'DELETE' });
-        fetchProviders();
+        deleteMutation.mutate(id);
     };
 
     return (
@@ -92,7 +121,13 @@ export default function ProvidersPage() {
                                     <SelectItem value="anthropic">Anthropic Compatible</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button onClick={handleCreate} className="w-full rounded-none">Create Provider</Button>
+                            <Button
+                                onClick={() => createMutation.mutate(formData)}
+                                className="w-full rounded-none"
+                                disabled={createMutation.isPending}
+                            >
+                                {createMutation.isPending ? 'Creating...' : 'Create Provider'}
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -118,11 +153,23 @@ export default function ProvidersPage() {
                                     Format: <span className="font-medium">{provider.format}</span>
                                 </div>
                                 <div className="flex gap-2 pt-2">
-                                    <Button variant="outline" size="sm" className="rounded-none flex-1" onClick={() => handleToggle(provider.id, provider.is_active)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-none flex-1"
+                                        onClick={() => toggleMutation.mutate({ id: provider.id, isActive: provider.is_active })}
+                                        disabled={toggleMutation.isPending}
+                                    >
                                         {provider.is_active ? <PowerOff className="h-4 w-4 mr-1" /> : <Power className="h-4 w-4 mr-1" />}
                                         {provider.is_active ? 'Disable' : 'Enable'}
                                     </Button>
-                                    <Button variant="destructive" size="sm" className="rounded-none" onClick={() => handleDelete(provider.id)}>
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        className="rounded-none"
+                                        onClick={() => handleDelete(provider.id)}
+                                        disabled={deleteMutation.isPending}
+                                    >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -132,7 +179,7 @@ export default function ProvidersPage() {
                 ))}
             </div>
 
-            {providers.length === 0 && !loading && (
+            {providers.length === 0 && !isLoading && (
                 <div className="text-center py-12">
                     <p className="text-muted-foreground">No custom providers configured yet.</p>
                     <p className="text-sm text-muted-foreground mt-1">Click &quot;Add Provider&quot; to get started.</p>
