@@ -205,7 +205,7 @@ export default function Navbar({
 
     return (
         <header className={cn("fixed top-0 cursor-pointer left-0 right-0 z-50 bg-background/80 mb-16 backdrop-blur-xl border-b border-border/40", className)}>
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="max-w-screen-xl mx-auto px-4 md:px-6">
                 <NavbarComponent className="py-3">
                     <NavbarLeft className="gap-6">
                         <Link
