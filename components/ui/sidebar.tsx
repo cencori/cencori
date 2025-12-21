@@ -33,7 +33,7 @@ const SIDEBAR_WIDTH_ICON = "2.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
-  state: "expanded" | "collapsed"
+  state: "collapsed" | "expanded"
   open: boolean
   setOpen: (open: boolean) => void
   openMobile: boolean
