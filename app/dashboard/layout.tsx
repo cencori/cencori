@@ -35,6 +35,8 @@ import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetC
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
+import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
+
 
 // Optional header/nav links later
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -80,18 +82,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     null;
 
   return (
-    <MobileSheetProvider>
-      <OrganizationProjectProvider>
-        <EnvironmentProvider>
-          <LayoutContent
-            user={typedUser}
-            avatar={avatar}
-            name={name}>
-            {children}
-          </LayoutContent>
-        </EnvironmentProvider>
-      </OrganizationProjectProvider>
-    </MobileSheetProvider>
+    <ReactQueryProvider>
+      <MobileSheetProvider>
+        <OrganizationProjectProvider>
+          <EnvironmentProvider>
+            <LayoutContent
+              user={typedUser}
+              avatar={avatar}
+              name={name}>
+              {children}
+            </LayoutContent>
+          </EnvironmentProvider>
+        </OrganizationProjectProvider>
+      </MobileSheetProvider>
+    </ReactQueryProvider>
   );
 }
 
