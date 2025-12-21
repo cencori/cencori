@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, use } from 'react';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Power, PowerOff, Server } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { queryKeys } from '@/lib/hooks/useQueries';
 
 interface CustomProvider {
     id: string;
@@ -29,114 +31,109 @@ interface PageProps {
     }>;
 }
 
+// Hook to get projectId from slugs (with caching)
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectId", orgSlug, projectSlug],
+        queryFn: async () => {
+            const { data: orgData } = await supabase
+                .from('organizations')
+                .select('id')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (!orgData) throw new Error("Organization not found");
+
+            const { data: projectData } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('slug', projectSlug)
+                .eq('organization_id', orgData.id)
+                .single();
+
+            if (!projectData) throw new Error("Project not found");
+            return projectData.id;
+        },
+        staleTime: 5 * 60 * 1000, // IDs rarely change, cache for 5 min
+    });
+}
+
 export default function ProvidersPage({ params }: PageProps) {
-    const [projectId, setProjectId] = useState<string>('');
-    const [providers, setProviders] = useState<CustomProvider[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { orgSlug, projectSlug } = use(params);
+    const queryClient = useQueryClient();
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [formData, setFormData] = useState({ name: '', baseUrl: '', apiKey: '', format: 'openai' });
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
-        const fetchProjectId = async () => {
-            setLoading(true);
-            try {
-                const { projectSlug, orgSlug } = await params;
+    // Get projectId with caching
+    const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
-                const { data: orgData } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('slug', orgSlug)
-                    .single();
-
-                if (!orgData) return;
-
-                const { data: projectData } = await supabase
-                    .from('projects')
-                    .select('id')
-                    .eq('slug', projectSlug)
-                    .eq('organization_id', orgData.id)
-                    .single();
-
-                if (projectData) {
-                    setProjectId(projectData.id);
-                }
-            } catch (error) {
-                console.error('Error fetching project:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProjectId();
-    }, [params]);
-
-    useEffect(() => {
-        if (projectId) {
-            fetchProviders();
-        }
-    }, [projectId]);
-
-    const fetchProviders = async () => {
-        if (!projectId) return;
-        try {
+    // Fetch providers with React Query - DATA IS CACHED!
+    const { data: providers = [], isLoading: providersLoading } = useQuery({
+        queryKey: queryKeys.providers(projectId || ''),
+        queryFn: async () => {
             const res = await fetch(`/api/projects/${projectId}/providers`);
+            if (!res.ok) throw new Error("Failed to fetch providers");
             const data = await res.json();
-            setProviders(data.providers || []);
-        } catch (err) {
-            toast.error('Failed to load providers');
-        }
-    };
+            return data.providers || [];
+        },
+        enabled: !!projectId,
+        staleTime: 30 * 1000, // Cache for 30 seconds
+    });
 
-    const handleCreate = async () => {
-        if (!projectId) return;
-        setIsSubmitting(true);
-        try {
+    // Create mutation with cache invalidation
+    const createMutation = useMutation({
+        mutationFn: async (data: typeof formData) => {
             const res = await fetch(`/api/projects/${projectId}/providers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(data),
             });
             if (!res.ok) throw new Error('Failed to create provider');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.providers(projectId!) });
             setShowAddDialog(false);
             setFormData({ name: '', baseUrl: '', apiKey: '', format: 'openai' });
             toast.success('Provider created');
-            fetchProviders();
-        } catch (err) {
-            toast.error('Failed to create provider');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+        },
+        onError: () => toast.error('Failed to create provider'),
+    });
 
-
-    const handleToggle = async (id: string, isActive: boolean) => {
-        if (!projectId) return;
-        try {
+    // Toggle mutation
+    const toggleMutation = useMutation({
+        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
             await fetch(`/api/projects/${projectId}/providers/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isActive: !isActive }),
             });
+        },
+        onSuccess: (_, { isActive }) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.providers(projectId!) });
             toast.success(isActive ? 'Provider disabled' : 'Provider enabled');
-            fetchProviders();
-        } catch (err) {
-            toast.error('Failed to update provider');
-        }
-    };
+        },
+        onError: () => toast.error('Failed to update provider'),
+    });
 
-    const handleDelete = async (id: string) => {
-        if (!projectId) return;
-        if (!confirm('Delete this provider?')) return;
-        try {
+    // Delete mutation
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
             await fetch(`/api/projects/${projectId}/providers/${id}`, { method: 'DELETE' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.providers(projectId!) });
             toast.success('Provider deleted');
-            fetchProviders();
-        } catch (err) {
-            toast.error('Failed to delete provider');
-        }
+        },
+        onError: () => toast.error('Failed to delete provider'),
+    });
+
+    const handleDelete = (id: string) => {
+        if (!confirm('Delete this provider?')) return;
+        deleteMutation.mutate(id);
     };
 
+    const loading = projectLoading || providersLoading;
 
     if (loading) {
         return (
@@ -215,8 +212,13 @@ export default function ProvidersPage({ params }: PageProps) {
                             <DialogClose asChild>
                                 <Button variant="outline" size="sm" className="h-7 text-xs">Cancel</Button>
                             </DialogClose>
-                            <Button onClick={handleCreate} disabled={isSubmitting || !formData.name || !formData.baseUrl} size="sm" className="h-7 text-xs">
-                                {isSubmitting ? 'Creating...' : 'Create'}
+                            <Button
+                                onClick={() => createMutation.mutate(formData)}
+                                disabled={createMutation.isPending || !formData.name || !formData.baseUrl}
+                                size="sm"
+                                className="h-7 text-xs"
+                            >
+                                {createMutation.isPending ? 'Creating...' : 'Create'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -226,7 +228,7 @@ export default function ProvidersPage({ params }: PageProps) {
             {/* Provider Cards */}
             {providers.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {providers.map((provider) => (
+                    {providers.map((provider: CustomProvider) => (
                         <div
                             key={provider.id}
                             className="rounded-md border border-border/40 bg-card p-4"
@@ -254,7 +256,8 @@ export default function ProvidersPage({ params }: PageProps) {
                                     variant="outline"
                                     size="sm"
                                     className="h-6 text-[10px] flex-1"
-                                    onClick={() => handleToggle(provider.id, provider.is_active)}
+                                    onClick={() => toggleMutation.mutate({ id: provider.id, isActive: provider.is_active })}
+                                    disabled={toggleMutation.isPending}
                                 >
                                     {provider.is_active ? <PowerOff className="h-3 w-3 mr-1" /> : <Power className="h-3 w-3 mr-1" />}
                                     {provider.is_active ? 'Disable' : 'Enable'}
@@ -264,6 +267,7 @@ export default function ProvidersPage({ params }: PageProps) {
                                     size="sm"
                                     className="h-6 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
                                     onClick={() => handleDelete(provider.id)}
+                                    disabled={deleteMutation.isPending}
                                 >
                                     <Trash2 className="h-3 w-3" />
                                 </Button>
