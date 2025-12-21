@@ -9,8 +9,8 @@ import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, use } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 
@@ -229,139 +229,84 @@ export const cencori = new Cencori({
   );
 }
 
+// Hook to fetch project and organization details with caching
+function useProjectAndOrg(orgSlug: string, projectSlug: string) {
+  return useQuery({
+    queryKey: ["projectOverview", orgSlug, projectSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
+
+      const { data: orgData, error: orgError } = await browserSupabase
+        .from("organizations")
+        .select("id, name, slug")
+        .eq("slug", orgSlug)
+        .eq("owner_id", user.id)
+        .single();
+
+      if (orgError || !orgData) throw new Error("Organization not found");
+
+      const { data: projectData, error: projectError } = await browserSupabase
+        .from("projects")
+        .select("id, name, slug, description, visibility, status, created_at")
+        .eq("organization_id", orgData.id)
+        .eq("slug", projectSlug)
+        .single();
+
+      if (projectError || !projectData) throw new Error("Project not found");
+
+      return {
+        organization: orgData as OrganizationData,
+        project: projectData as ProjectData,
+      };
+    },
+    staleTime: 60 * 1000,
+  });
+}
 
 export default function ProjectDetailsPage({
   params,
 }: {
   params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
-  const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  const [projectSlug, setProjectSlug] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resolved = await params;
-        if (mounted && resolved) {
-          if (typeof resolved.orgSlug === "string") setOrgSlug(resolved.orgSlug);
-          if (typeof resolved.projectSlug === "string") setProjectSlug(resolved.projectSlug);
-        }
-      } catch (e) {
-        console.error("Failed to resolve params:", e);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [params]);
-
-  const router = useRouter();
-  const [organization, setOrganization] = useState<OrganizationData | null>(null);
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [aiStats, setAiStats] = useState<AIStats | null>(null);
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [period, setPeriod] = useState<string>('7d');
-  const [hasAnyRequests, setHasAnyRequests] = useState<boolean | null>(null);
+  const { orgSlug, projectSlug } = use(params);
   const { environment } = useEnvironment();
+  const [period, setPeriod] = useState<string>('7d');
 
-  useEffect(() => {
-    if (!orgSlug || !projectSlug) return;
+  // Fetch project and org with caching - INSTANT ON REVISIT!
+  const { data: projectData, isLoading: projectLoading, error } = useProjectAndOrg(orgSlug, projectSlug);
+  const organization = projectData?.organization;
+  const project = projectData?.project;
 
-    const fetchProjectDetails = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
+  // Fetch AI stats with caching
+  const { data: statsData } = useQuery<{ stats: AIStats; chartData: ChartDataPoint[] }>({
+    queryKey: ["aiStats", project?.id, period, environment],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/ai/stats?period=${period}&environment=${environment}`);
+      if (!response.ok) throw new Error("Failed to fetch stats");
+      return response.json();
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
 
-        if (userError || !user) {
-          router.push("/login");
-          return;
-        }
+  const aiStats = statsData?.stats || null;
+  const chartData = statsData?.chartData || [];
 
-        const { data: orgData, error: orgError } = await browserSupabase
-          .from("organizations")
-          .select("id, name, slug")
-          .eq("slug", orgSlug)
-          .eq("owner_id", user.id)
-          .single();
+  // Check if user has any requests (for showing getting started)
+  const { data: hasAnyRequestsData } = useQuery<boolean>({
+    queryKey: ["hasAnyRequests", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/ai/stats?period=all`);
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data.stats && data.stats.totalRequests > 0;
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
 
-        if (orgError || !orgData) {
-          notFound();
-          return;
-        }
-        setOrganization(orgData);
-
-        const { data: projectData, error: projectError } = await browserSupabase
-          .from("projects")
-          .select("id, name, slug, description, visibility, status, created_at")
-          .eq("organization_id", orgData.id)
-          .eq("slug", projectSlug)
-          .single();
-
-        if (projectError || !projectData) {
-          notFound();
-          return;
-        }
-        setProject(projectData);
-
-        fetchAIStats(projectData.id, period);
-        checkAnyRequests(projectData.id);
-      } catch (err: unknown) {
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    async function fetchAIStats(projectId: string, selectedPeriod: string) {
-      try {
-        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}&environment=${environment}`);
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setAiStats(statsData.stats);
-          setChartData(statsData.chartData || []);
-        }
-      } catch (err) {
-        console.log('AI stats not available yet');
-      }
-    }
-
-    async function checkAnyRequests(projectId: string) {
-      try {
-        const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=all`);
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setHasAnyRequests(statsData.stats && statsData.stats.totalRequests > 0);
-        } else {
-          setHasAnyRequests(false);
-        }
-      } catch (err) {
-        setHasAnyRequests(false);
-      }
-    }
-
-    fetchProjectDetails();
-  }, [orgSlug, projectSlug, router]);
-
-  useEffect(() => {
-    if (project?.id && environment) {
-      fetchAIStats(project.id, period);
-    }
-  }, [period, project, environment]);
-
-  async function fetchAIStats(projectId: string, selectedPeriod: string) {
-    try {
-      const statsResponse = await fetch(`/api/projects/${projectId}/ai/stats?period=${selectedPeriod}&environment=${environment}`);
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setAiStats(statsData.stats);
-        setChartData(statsData.chartData || []);
-      }
-    } catch (err) {
-      console.log('AI stats not available yet');
-    }
-  }
+  const hasAnyRequests = hasAnyRequestsData ?? null;
 
   const stats = {
     aiRequests: {
@@ -386,7 +331,7 @@ export default function ProjectDetailsPage({
     { id: "1", type: "info", message: "No AI activity yet", timestamp: "Start using the AI API" },
   ];
 
-  if (loading) {
+  if (projectLoading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
@@ -409,7 +354,7 @@ export default function ProjectDetailsPage({
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="text-center py-16">
-          <p className="text-sm text-red-500">{error || "Project or Organization not found."}</p>
+          <p className="text-sm text-red-500">{error?.message || "Project or Organization not found."}</p>
         </div>
       </div>
     );
@@ -432,10 +377,10 @@ export default function ProjectDetailsPage({
 
       {/* Getting Started Section */}
       <GettingStartedSection
-        orgSlug={orgSlug!}
-        projectSlug={projectSlug!}
+        orgSlug={orgSlug}
+        projectSlug={projectSlug}
         hasData={hasAnyRequests}
-        loading={loading}
+        loading={projectLoading}
       />
 
       {/* Analytics - Only show when user has data */}

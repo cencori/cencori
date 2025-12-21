@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, use } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { MetricCard } from '@/components/audit/MetricCard';
 import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
 import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
 import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, Loader2, BarChart3 } from 'lucide-react';
+import { ShieldAlert, BarChart3 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { queryKeys } from '@/lib/hooks/useQueries';
 
 interface TrendData {
     timestamp: string;
@@ -50,69 +52,67 @@ interface PageProps {
     }>;
 }
 
+// Hook to get projectId from slugs (with caching)
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectId", orgSlug, projectSlug],
+        queryFn: async () => {
+            const { data: orgData } = await supabase
+                .from('organizations')
+                .select('id')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (!orgData) throw new Error("Organization not found");
+
+            const { data: projectData } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('slug', projectSlug)
+                .eq('organization_id', orgData.id)
+                .single();
+
+            if (!projectData) throw new Error("Project not found");
+            return projectData.id;
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
 export default function AnalyticsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
     const { environment } = useEnvironment();
-    const [projectId, setProjectId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('7d');
-    const [overview, setOverview] = useState<OverviewData | null>(null);
-    const [trends, setTrends] = useState<TrendData[]>([]);
-    const [groupBy, setGroupBy] = useState<'hour' | 'day'>('day');
 
-    useEffect(() => {
-        const fetchProjectId = async () => {
-            setLoading(true);
-            try {
-                const { projectSlug, orgSlug } = await params;
+    // Get projectId with caching - INSTANT ON REVISIT!
+    const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
-                const { data: orgData } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('slug', orgSlug)
-                    .single();
+    // Fetch analytics overview with caching
+    const { data: overview } = useQuery<OverviewData>({
+        queryKey: queryKeys.analytics(projectId || '', timeRange),
+        queryFn: async () => {
+            const res = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}&environment=${environment}`);
+            if (!res.ok) throw new Error("Failed to fetch analytics");
+            return res.json();
+        },
+        enabled: !!projectId,
+        staleTime: 30 * 1000, // Cache for 30 seconds
+    });
 
-                if (!orgData) return;
+    // Fetch trends data with caching
+    const { data: trendsData } = useQuery({
+        queryKey: ["trends", projectId, timeRange, environment],
+        queryFn: async () => {
+            const res = await fetch(`/api/projects/${projectId}/analytics/trends?time_range=${timeRange}&environment=${environment}`);
+            if (!res.ok) throw new Error("Failed to fetch trends");
+            return res.json();
+        },
+        enabled: !!projectId,
+        staleTime: 30 * 1000,
+    });
 
-                const { data: projectData } = await supabase
-                    .from('projects')
-                    .select('id')
-                    .eq('slug', projectSlug)
-                    .eq('organization_id', orgData.id)
-                    .single();
-
-                if (projectData) {
-                    setProjectId(projectData.id);
-                }
-            } catch (error) {
-                console.error('Error fetching project:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProjectId();
-    }, [params]);
-
-    useEffect(() => {
-        if (!projectId) return;
-
-        const fetchAnalytics = async () => {
-            try {
-                const overviewRes = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}&environment=${environment}`);
-                const overviewData = await overviewRes.json();
-                setOverview(overviewData);
-
-                const trendsRes = await fetch(`/api/projects/${projectId}/analytics/trends?time_range=${timeRange}&environment=${environment}`);
-                const trendsData = await trendsRes.json();
-                setTrends(trendsData.trends || []);
-                setGroupBy(trendsData.group_by);
-            } catch (error) {
-                console.error('Error fetching analytics:', error);
-            }
-        };
-
-        fetchAnalytics();
-    }, [projectId, environment, timeRange]);
+    const trends: TrendData[] = trendsData?.trends || [];
+    const groupBy: 'hour' | 'day' = trendsData?.group_by || 'day';
 
     const calculateTrend = (dataPoints: TrendData[], getValue: (t: TrendData) => number) => {
         if (!dataPoints || dataPoints.length < 2) return 0;
@@ -127,7 +127,7 @@ export default function AnalyticsPage({ params }: PageProps) {
         return ((avgSecond - avgFirst) / avgFirst) * 100;
     };
 
-    if (loading) {
+    if (projectLoading) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <div className="mb-6">

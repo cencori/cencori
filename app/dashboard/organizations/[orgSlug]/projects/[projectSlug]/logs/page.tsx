@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, use } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
@@ -14,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -25,10 +26,36 @@ interface PageProps {
     }>;
 }
 
+// Hook to get projectId from slugs (with caching)
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectId", orgSlug, projectSlug],
+        queryFn: async () => {
+            const { data: orgData } = await supabase
+                .from('organizations')
+                .select('id')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (!orgData) throw new Error("Organization not found");
+
+            const { data: projectData } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('slug', projectSlug)
+                .eq('organization_id', orgData.id)
+                .single();
+
+            if (!projectData) throw new Error("Project not found");
+            return projectData.id;
+        },
+        staleTime: 5 * 60 * 1000, // IDs rarely change
+    });
+}
+
 export default function RequestLogsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
     const { environment } = useEnvironment();
-    const [projectId, setProjectId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
         status: 'all',
         model: 'all',
@@ -37,43 +64,8 @@ export default function RequestLogsPage({ params }: PageProps) {
     });
     const [searchInput, setSearchInput] = useState('');
 
-    // Fetch project ID from slug
-    useEffect(() => {
-        const fetchProjectId = async () => {
-            setLoading(true);
-            try {
-                const { projectSlug, orgSlug } = await params;
-
-                const { data: orgData } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('slug', orgSlug)
-                    .single();
-
-                if (!orgData) {
-                    console.error('Organization not found');
-                    return;
-                }
-
-                const { data: projectData } = await supabase
-                    .from('projects')
-                    .select('id')
-                    .eq('slug', projectSlug)
-                    .eq('organization_id', orgData.id)
-                    .single();
-
-                if (projectData) {
-                    setProjectId(projectData.id);
-                }
-            } catch (error) {
-                console.error('Error fetching project:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProjectId();
-    }, [params]);
+    // Get projectId with caching - INSTANT ON REVISIT!
+    const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -92,7 +84,7 @@ export default function RequestLogsPage({ params }: PageProps) {
 
     const hasActiveFilters = filters.status !== 'all' || filters.model !== 'all' || filters.search || filters.time_range !== '30d';
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <div className="mb-8">

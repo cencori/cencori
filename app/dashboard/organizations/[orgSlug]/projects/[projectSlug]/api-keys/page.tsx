@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, use } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,7 @@ import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { maskApiKey } from "@/lib/api-keys";
 import { toast } from "sonner";
+import { queryKeys } from "@/lib/hooks/useQueries";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -37,107 +38,86 @@ interface ApiKey {
     last_used_at: string | null;
 }
 
+// Hook to get projectId from slugs (with caching)
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectId", orgSlug, projectSlug],
+        queryFn: async () => {
+            const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
+            if (userError || !user) throw new Error("Not authenticated");
+
+            const { data: orgData, error: orgError } = await browserSupabase
+                .from("organizations")
+                .select("id")
+                .eq("slug", orgSlug)
+                .eq("owner_id", user.id)
+                .single();
+
+            if (orgError || !orgData) throw new Error("Organization not found");
+
+            const { data: projectData, error: projectError } = await browserSupabase
+                .from("projects")
+                .select("id")
+                .eq("organization_id", orgData.id)
+                .eq("slug", projectSlug)
+                .single();
+
+            if (projectError || !projectData) throw new Error("Project not found");
+            return projectData.id;
+        },
+        staleTime: 5 * 60 * 1000, // IDs rarely change
+    });
+}
+
 export default function ApiKeysPage({
     params,
 }: {
     params: Promise<{ orgSlug: string; projectSlug: string }>;
 }) {
-    const [orgSlug, setOrgSlug] = useState<string | null>(null);
-    const [projectSlug, setProjectSlug] = useState<string | null>(null);
-
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            try {
-                const resolved = await Promise.resolve(params);
-                if (mounted && resolved) {
-                    if (typeof resolved.orgSlug === "string") setOrgSlug(resolved.orgSlug);
-                    if (typeof resolved.projectSlug === "string") setProjectSlug(resolved.projectSlug);
-                }
-            } catch (e) {
-                console.error("Failed to resolve params:", e);
-            }
-        })();
-        return () => {
-            mounted = false;
-        };
-    }, [params]);
-
-    const router = useRouter();
+    const { orgSlug, projectSlug } = use(params);
+    const queryClient = useQueryClient();
     const { environment } = useEnvironment();
-    const [projectId, setProjectId] = useState<string | null>(null);
-    const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-    const [loading, setLoading] = useState(true);
     const [showGenerateDialog, setShowGenerateDialog] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [showRevokeDialog, setShowRevokeDialog] = useState(false);
     const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null);
-    const [revoking, setRevoking] = useState(false);
 
-    useEffect(() => {
-        if (!orgSlug || !projectSlug) return;
+    // Get projectId with caching
+    const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
-        const fetchProjectAndKeys = async () => {
-            setLoading(true);
-            try {
-                const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
-                if (userError || !user) {
-                    router.push("/login");
-                    return;
-                }
+    // Fetch API keys with React Query - DATA IS CACHED!
+    const { data: apiKeys = [], isLoading: keysLoading } = useQuery({
+        queryKey: queryKeys.apiKeys(projectId || ''),
+        queryFn: async () => {
+            const response = await fetch(`/api/projects/${projectId}/api-keys?environment=${environment}`);
+            if (!response.ok) throw new Error("Failed to fetch API keys");
+            const data = await response.json();
+            return data.apiKeys || [];
+        },
+        enabled: !!projectId,
+        staleTime: 30 * 1000, // Cache for 30 seconds
+    });
 
-                const { data: orgData, error: orgError } = await browserSupabase
-                    .from("organizations")
-                    .select("id")
-                    .eq("slug", orgSlug)
-                    .eq("owner_id", user.id)
-                    .single();
-
-                if (orgError || !orgData) {
-                    router.push("/dashboard/organizations");
-                    return;
-                }
-
-                const { data: projectData, error: projectError } = await browserSupabase
-                    .from("projects")
-                    .select("id")
-                    .eq("organization_id", orgData.id)
-                    .eq("slug", projectSlug)
-                    .single();
-
-                if (projectError || !projectData) {
-                    router.push(`/dashboard/organizations/${orgSlug}/projects`);
-                    return;
-                }
-
-                setProjectId(projectData.id);
-                await fetchApiKeys(projectData.id);
-            } catch (err) {
-                console.error("Unexpected error:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProjectAndKeys();
-    }, [orgSlug, projectSlug, router, environment]);
-
-    const fetchApiKeys = async (projId: string) => {
-        try {
-            const response = await fetch(`/api/projects/${projId}/api-keys?environment=${environment}`);
-            if (response.ok) {
-                const data = await response.json();
-                setApiKeys(data.apiKeys || []);
-            }
-        } catch (error) {
-            console.error("Error fetching API keys:", error);
-        }
-    };
+    // Revoke mutation with cache invalidation
+    const revokeMutation = useMutation({
+        mutationFn: async (keyId: string) => {
+            const response = await fetch(`/api/projects/${projectId}/api-keys/${keyId}`, {
+                method: "PATCH",
+            });
+            if (!response.ok) throw new Error("Failed to revoke API key");
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys(projectId!) });
+            toast.success("API key revoked successfully");
+            setShowRevokeDialog(false);
+            setKeyToRevoke(null);
+        },
+        onError: () => toast.error("Failed to revoke API key"),
+    });
 
     const handleKeyGenerated = () => {
-        if (projectId) {
-            fetchApiKeys(projectId);
-        }
+        queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys(projectId!) });
     };
 
     const handleCopy = async (key: ApiKey) => {
@@ -148,28 +128,9 @@ export default function ApiKeysPage({
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    const handleRevoke = async () => {
-        if (!keyToRevoke || !projectId) return;
-        setRevoking(true);
-        try {
-            const response = await fetch(
-                `/api/projects/${projectId}/api-keys/${keyToRevoke.id}`,
-                { method: "PATCH" }
-            );
-
-            if (!response.ok) {
-                throw new Error("Failed to revoke API key");
-            }
-
-            toast.success("API key revoked successfully");
-            handleKeyGenerated();
-        } catch (error) {
-            console.error("Error revoking API key:", error);
-            toast.error("Failed to revoke API key");
-        } finally {
-            setRevoking(false);
-            setShowRevokeDialog(false);
-            setKeyToRevoke(null);
+    const handleRevoke = () => {
+        if (keyToRevoke) {
+            revokeMutation.mutate(keyToRevoke.id);
         }
     };
 
@@ -179,6 +140,8 @@ export default function ApiKeysPage({
         const month = date.toLocaleString("en-US", { month: "short" });
         return `${month} ${day}, ${date.getFullYear()}`;
     };
+
+    const loading = projectLoading || keysLoading;
 
     if (loading) {
         return (
@@ -246,7 +209,7 @@ export default function ApiKeysPage({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {apiKeys.map((apiKey) => (
+                            {apiKeys.map((apiKey: ApiKey) => (
                                 <TableRow
                                     key={apiKey.id}
                                     className="hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
@@ -351,10 +314,10 @@ export default function ApiKeysPage({
                         <AlertDialogCancel className="h-7 text-xs">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleRevoke}
-                            disabled={revoking}
+                            disabled={revokeMutation.isPending}
                             className="h-7 text-xs bg-red-600 hover:bg-red-700"
                         >
-                            {revoking ? "Revoking..." : "Revoke"}
+                            {revokeMutation.isPending ? "Revoking..." : "Revoke"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
