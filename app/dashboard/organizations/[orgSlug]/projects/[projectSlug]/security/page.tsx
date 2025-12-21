@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, use } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { SecurityIncidentsTable } from '@/components/audit/SecurityIncidentsTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { X, ShieldAlert, Loader2 } from 'lucide-react';
+import { X, ShieldAlert } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -16,10 +17,36 @@ interface PageProps {
     }>;
 }
 
+// Hook to get projectId from slugs (with caching)
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useQuery({
+        queryKey: ["projectId", orgSlug, projectSlug],
+        queryFn: async () => {
+            const { data: orgData } = await supabase
+                .from('organizations')
+                .select('id')
+                .eq('slug', orgSlug)
+                .single();
+
+            if (!orgData) throw new Error("Organization not found");
+
+            const { data: projectData } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('slug', projectSlug)
+                .eq('organization_id', orgData.id)
+                .single();
+
+            if (!projectData) throw new Error("Project not found");
+            return projectData.id;
+        },
+        staleTime: 5 * 60 * 1000, // IDs rarely change
+    });
+}
+
 export default function SecurityIncidentsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
     const { environment } = useEnvironment();
-    const [projectId, setProjectId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
         severity: 'all',
         type: 'all',
@@ -27,39 +54,8 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
         time_range: '7d',
     });
 
-    useEffect(() => {
-        const fetchProjectId = async () => {
-            setLoading(true);
-            try {
-                const { projectSlug, orgSlug } = await params;
-
-                const { data: orgData } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('slug', orgSlug)
-                    .single();
-
-                if (!orgData) return;
-
-                const { data: projectData } = await supabase
-                    .from('projects')
-                    .select('id')
-                    .eq('slug', projectSlug)
-                    .eq('organization_id', orgData.id)
-                    .single();
-
-                if (projectData) {
-                    setProjectId(projectData.id);
-                }
-            } catch (error) {
-                console.error('Error fetching project:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProjectId();
-    }, [params]);
+    // Get projectId with caching - INSTANT ON REVISIT!
+    const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
 
     const handleClearFilters = () => {
         setFilters({
@@ -76,7 +72,7 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
         filters.reviewed !== 'all' ||
         filters.time_range !== '7d';
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <div className="mb-6">

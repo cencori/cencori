@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, AlertCircle, Key, Terminal } from "lucide-react";
+import { Loader2, Play, AlertCircle, Terminal } from "lucide-react";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -26,18 +27,52 @@ const MODELS = [
     { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", provider: "Google" },
 ];
 
+// Hook to check if project has API keys (with caching)
+function useProjectKeysCheck(orgSlug: string, projectSlug: string, environment: string) {
+    return useQuery({
+        queryKey: ["projectKeysCheck", orgSlug, projectSlug, environment],
+        queryFn: async () => {
+            const { data: orgData } = await supabase
+                .from("organizations")
+                .select("id")
+                .eq("slug", orgSlug)
+                .single();
+
+            if (!orgData) throw new Error("Organization not found");
+
+            const { data: projectData } = await supabase
+                .from("projects")
+                .select("id")
+                .eq("slug", projectSlug)
+                .eq("organization_id", orgData.id)
+                .single();
+
+            if (!projectData) throw new Error("Project not found");
+
+            const { data: keys } = await supabase
+                .from("api_keys")
+                .select("id")
+                .eq("project_id", projectData.id)
+                .eq("environment", environment)
+                .is("revoked_at", null)
+                .limit(1);
+
+            return {
+                hasKeys: Boolean(keys && keys.length > 0),
+                projectId: projectData.id,
+            };
+        },
+        staleTime: 60 * 1000, // Cache for 1 minute
+    });
+}
+
 export default function PlaygroundPage({ params }: PlaygroundPageProps) {
+    const { orgSlug, projectSlug } = use(params);
     const router = useRouter();
     const { environment } = useEnvironment();
 
-    const [orgSlug, setOrgSlug] = useState<string | null>(null);
-    const [projectSlug, setProjectSlug] = useState<string | null>(null);
-    const [hasKeys, setHasKeys] = useState(false);
-    const [checkingKeys, setCheckingKeys] = useState(true);
-
     const [apiKey, setApiKey] = useState("");
     const [apiKeyVisible, setApiKeyVisible] = useState(false);
-
     const [message, setMessage] = useState("");
     const [selectedModel, setSelectedModel] = useState("gpt-4o");
     const [response, setResponse] = useState("");
@@ -46,70 +81,9 @@ export default function PlaygroundPage({ params }: PlaygroundPageProps) {
     const [latency, setLatency] = useState<number | null>(null);
     const [tokens, setTokens] = useState<{ prompt: number; completion: number } | null>(null);
 
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            try {
-                const resolved = await params;
-                if (mounted && resolved) {
-                    setOrgSlug(resolved.orgSlug);
-                    setProjectSlug(resolved.projectSlug);
-                }
-            } catch (e) {
-                console.error("Failed to resolve params:", e);
-            }
-        })();
-        return () => { mounted = false; };
-    }, [params]);
-
-    useEffect(() => {
-        if (!orgSlug || !projectSlug) return;
-
-        const checkKeys = async () => {
-            try {
-                setCheckingKeys(true);
-
-                const { data: orgData } = await supabase
-                    .from("organizations")
-                    .select("id")
-                    .eq("slug", orgSlug)
-                    .single();
-
-                if (!orgData) {
-                    setCheckingKeys(false);
-                    return;
-                }
-
-                const { data: projectData } = await supabase
-                    .from("projects")
-                    .select("id")
-                    .eq("slug", projectSlug)
-                    .eq("organization_id", orgData.id)
-                    .single();
-
-                if (!projectData) {
-                    setCheckingKeys(false);
-                    return;
-                }
-
-                const { data: keys } = await supabase
-                    .from("api_keys")
-                    .select("id")
-                    .eq("project_id", projectData.id)
-                    .eq("environment", environment)
-                    .is("revoked_at", null)
-                    .limit(1);
-
-                setHasKeys(Boolean(keys && keys.length > 0));
-                setCheckingKeys(false);
-            } catch (error) {
-                console.error("Error checking keys:", error);
-                setCheckingKeys(false);
-            }
-        };
-
-        checkKeys();
-    }, [orgSlug, projectSlug, environment]);
+    // Check for API keys with caching - INSTANT ON REVISIT!
+    const { data: keysData, isLoading: checkingKeys } = useProjectKeysCheck(orgSlug, projectSlug, environment);
+    const hasKeys = keysData?.hasKeys ?? false;
 
     const handleSend = async () => {
         if (!message.trim() || !apiKey.trim()) return;

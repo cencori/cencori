@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { notFound, useParams, useRouter } from "next/navigation";
+import React, { useState, use } from "react";
+import { notFound, useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,6 +73,10 @@ interface RateLimitsData {
   };
 }
 
+interface PageProps {
+  params: Promise<{ orgSlug: string; projectSlug: string }>;
+}
+
 const WEBHOOK_EVENTS = [
   { value: 'request.completed', label: 'Request Completed' },
   { value: 'request.failed', label: 'Request Failed' },
@@ -82,11 +87,9 @@ const WEBHOOK_EVENTS = [
 ];
 
 const REGION_MAP: Record<string, { name: string; flag: string }> = {
-  // General regions (auto-routing)
   'americas': { name: 'Americas (Auto)', flag: '🌎' },
   'europe': { name: 'Europe (Auto)', flag: '🌍' },
   'asia-pacific': { name: 'Asia-Pacific (Auto)', flag: '🌏' },
-  // Specific regions
   'us-east-1': { name: 'US East (N. Virginia)', flag: '🇺🇸' },
   'us-west-1': { name: 'US West (N. California)', flag: '🇺🇸' },
   'us-west-2': { name: 'US West (Oregon)', flag: '🇺🇸' },
@@ -99,18 +102,46 @@ const REGION_MAP: Record<string, { name: string; flag: string }> = {
   'sa-east-1': { name: 'South America (São Paulo)', flag: '🇧🇷' },
   'me-south-1': { name: 'Middle East (Bahrain)', flag: '🇧🇭' },
   'af-south-1': { name: 'Africa (Cape Town)', flag: '🇿🇦' },
-  // Default fallback
   'default': { name: 'Americas (Auto)', flag: '🌎' },
 };
 
-export default function ProjectSettingsPage() {
-  const params = useParams();
-  const orgSlug = params.orgSlug as string;
-  const projectSlug = params.projectSlug as string;
+// Hook to fetch project details with caching
+function useProjectDetails(orgSlug: string, projectSlug: string) {
+  return useQuery({
+    queryKey: ["projectDetails", orgSlug, projectSlug],
+    queryFn: async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Not authenticated");
 
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+      const { data: organization } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("slug", orgSlug)
+        .single();
+
+      if (!organization) throw new Error("Organization not found");
+
+      const { data: projectData } = await supabase
+        .from("projects")
+        .select("id, name, slug, description, organization_id, visibility, status, region, request_timeout_seconds, max_retries, fallback_provider")
+        .eq("slug", projectSlug)
+        .eq("organization_id", organization.id)
+        .single();
+
+      if (!projectData) throw new Error("Project not found");
+      return projectData as ProjectData;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export default function ProjectSettingsPage({ params }: PageProps) {
+  const { orgSlug, projectSlug } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { updateProject: updateProjectContext } = useOrganizationProject();
+
+  // Local form state
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -119,200 +150,114 @@ export default function ProjectSettingsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [copiedSlug, setCopiedSlug] = useState(false);
-  const router = useRouter();
-
-  const { updateProject: updateProjectContext } = useOrganizationProject();
-
-  // Infrastructure state
-  const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
-  const [providers, setProviders] = useState<ProviderHealth[]>([]);
-  const [providersLoading, setProvidersLoading] = useState(false);
-  const [versions, setVersions] = useState<{ sdk: string; api: string; proxy: string } | null>(null);
-  const [rateLimits, setRateLimits] = useState<RateLimitsData | null>(null);
 
   // Webhook dialog state
   const [showWebhookDialog, setShowWebhookDialog] = useState(false);
   const [webhookName, setWebhookName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookEvents, setWebhookEvents] = useState<string[]>(['request.completed']);
-  const [creatingWebhook, setCreatingWebhook] = useState(false);
 
-  useEffect(() => {
-    const fetchProjectDetails = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (!orgSlug || !projectSlug) {
-          notFound();
-          return;
-        }
+  // Fetch project with caching - INSTANT ON REVISIT!
+  const { data: project, isLoading: projectLoading, error } = useProjectDetails(orgSlug, projectSlug);
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          notFound();
-          return;
-        }
-
-        const { data: organization, error: orgError } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("slug", orgSlug)
-          .single();
-
-        if (orgError || !organization) {
-          notFound();
-          return;
-        }
-
-        const { data: projectData, error: projectError } = await supabase
-          .from("projects")
-          .select("id, name, slug, description, organization_id, visibility, status, region, request_timeout_seconds, max_retries, fallback_provider")
-          .eq("slug", projectSlug)
-          .eq("organization_id", organization.id)
-          .single();
-
-        if (projectError || !projectData) {
-          notFound();
-          return;
-        }
-
-        setProject(projectData);
-        setProjectName(projectData.name);
-        setProjectDescription(projectData.description || "");
-        setProjectVisibility(projectData.visibility || 'private');
-        setProjectStatus(projectData.status || 'active');
-
-        // Fetch webhooks for this project
-        fetchWebhooks(projectData.id);
-        // Fetch provider health
-        fetchProviders();
-        // Fetch service versions
-        fetchVersions();
-        // Fetch rate limits
-        fetchRateLimits(projectData.id);
-      } catch {
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjectDetails();
-  }, [orgSlug, projectSlug]);
-
-  // Fetch webhooks for the project
-  const fetchWebhooks = async (projectId: string) => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}/webhooks`);
-      if (response.ok) {
-        const data = await response.json();
-        setWebhooks(data.webhooks || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch webhooks:', err);
+  // Sync form state when project loads
+  React.useEffect(() => {
+    if (project) {
+      setProjectName(project.name);
+      setProjectDescription(project.description || "");
+      setProjectVisibility(project.visibility || 'private');
+      setProjectStatus(project.status || 'active');
     }
-  };
+  }, [project]);
 
-  // Fetch provider health status
-  const fetchProviders = async () => {
-    setProvidersLoading(true);
-    try {
+  // Fetch webhooks with caching
+  const { data: webhooks = [] } = useQuery<WebhookData[]>({
+    queryKey: ["webhooks", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/webhooks`);
+      if (!response.ok) throw new Error("Failed to fetch webhooks");
+      const data = await response.json();
+      return data.webhooks || [];
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
+
+  // Fetch provider health with caching
+  const { data: providers = [], isLoading: providersLoading, refetch: refetchProviders } = useQuery<ProviderHealth[]>({
+    queryKey: ["providerHealth"],
+    queryFn: async () => {
       const response = await fetch('/api/providers/health');
-      if (response.ok) {
-        const data = await response.json();
-        setProviders(data.providers || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch provider health:', err);
-    } finally {
-      setProvidersLoading(false);
-    }
-  };
+      if (!response.ok) throw new Error("Failed to fetch providers");
+      const data = await response.json();
+      return data.providers || [];
+    },
+    staleTime: 60 * 1000,
+  });
 
-  // Fetch service versions
-  const fetchVersions = async () => {
-    try {
+  // Fetch service versions with caching
+  const { data: versions } = useQuery<{ sdk: string; api: string; proxy: string }>({
+    queryKey: ["serviceVersions"],
+    queryFn: async () => {
       const response = await fetch('/api/versions');
-      if (response.ok) {
-        const data = await response.json();
-        setVersions(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch versions:', err);
-    }
-  };
+      if (!response.ok) throw new Error("Failed to fetch versions");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // versions change rarely
+  });
 
-  // Fetch rate limits for the project
-  const fetchRateLimits = async (projectId: string) => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}/rate-limits`);
-      if (response.ok) {
-        const data = await response.json();
-        setRateLimits(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch rate limits:', err);
-    }
-  };
+  // Fetch rate limits with caching
+  const { data: rateLimits } = useQuery<RateLimitsData>({
+    queryKey: ["rateLimits", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/rate-limits`);
+      if (!response.ok) throw new Error("Failed to fetch rate limits");
+      return response.json();
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
 
-  // Create a new webhook
-  const handleCreateWebhook = async () => {
-    if (!project || !webhookName || !webhookUrl) {
-      toast.error('Name and URL are required');
-      return;
-    }
-
-    setCreatingWebhook(true);
-    try {
-      const response = await fetch(`/api/projects/${project.id}/webhooks`, {
+  // Create webhook mutation
+  const createWebhookMutation = useMutation({
+    mutationFn: async (data: { name: string; url: string; events: string[] }) => {
+      const response = await fetch(`/api/projects/${project!.id}/webhooks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: webhookName,
-          url: webhookUrl,
-          events: webhookEvents,
-        }),
+        body: JSON.stringify(data),
       });
-
-      if (response.ok) {
-        toast.success('Webhook created!');
-        setShowWebhookDialog(false);
-        setWebhookName('');
-        setWebhookUrl('');
-        setWebhookEvents(['request.completed']);
-        fetchWebhooks(project.id);
-      } else {
-        const data = await response.json();
-        toast.error(data.error || 'Failed to create webhook');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create webhook');
       }
-    } catch {
-      toast.error('Failed to create webhook');
-    } finally {
-      setCreatingWebhook(false);
-    }
-  };
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["webhooks", project?.id] });
+      setShowWebhookDialog(false);
+      setWebhookName('');
+      setWebhookUrl('');
+      setWebhookEvents(['request.completed']);
+      toast.success('Webhook created!');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
-  // Delete a webhook
-  const handleDeleteWebhook = async (webhookId: string) => {
-    if (!project) return;
-
-    try {
-      const response = await fetch(`/api/projects/${project.id}/webhooks/${webhookId}`, {
+  // Delete webhook mutation
+  const deleteWebhookMutation = useMutation({
+    mutationFn: async (webhookId: string) => {
+      const response = await fetch(`/api/projects/${project!.id}/webhooks/${webhookId}`, {
         method: 'DELETE',
       });
+      if (!response.ok) throw new Error('Failed to delete webhook');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["webhooks", project?.id] });
+      toast.success('Webhook deleted!');
+    },
+    onError: () => toast.error('Failed to delete webhook'),
+  });
 
-      if (response.ok) {
-        toast.success('Webhook deleted!');
-        setWebhooks(prev => prev.filter(w => w.id !== webhookId));
-      } else {
-        toast.error('Failed to delete webhook');
-      }
-    } catch {
-      toast.error('Failed to delete webhook');
-    }
-  };
-
-  // Toggle webhook event selection
   const toggleWebhookEvent = (event: string) => {
     setWebhookEvents(prev =>
       prev.includes(event)
@@ -331,10 +276,9 @@ export default function ProjectSettingsPage() {
   };
 
   const handleSave = async () => {
+    if (!project) return;
     setIsSaving(true);
     try {
-      if (!project) return;
-
       const { error: updateError } = await supabase
         .from("projects")
         .update({
@@ -348,7 +292,7 @@ export default function ProjectSettingsPage() {
       if (updateError) {
         toast.error("Failed to save.");
       } else {
-        setProject(prev => prev ? { ...prev, name: projectName, description: projectDescription, visibility: projectVisibility, status: projectStatus } : null);
+        queryClient.invalidateQueries({ queryKey: ["projectDetails", orgSlug, projectSlug] });
         toast.success("Saved!");
         updateProjectContext(project.id, { name: projectName, description: projectDescription });
       }
@@ -360,7 +304,7 @@ export default function ProjectSettingsPage() {
   };
 
   const handleDeleteProject = async () => {
-    if (deleteConfirmName !== project?.name) {
+    if (!project || deleteConfirmName !== project.name) {
       toast.error("Name doesn't match.");
       return;
     }
@@ -392,70 +336,20 @@ export default function ProjectSettingsPage() {
     projectStatus !== project.status
   );
 
-  if (loading) {
+  if (projectLoading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
-        {/* Header */}
         <div className="space-y-0.5">
           <Skeleton className="h-5 w-24" />
           <Skeleton className="h-3 w-48" />
         </div>
-
-        {/* Tabs */}
-        <div className="flex gap-4 border-b border-border/40 pb-2">
+        <div className="flex gap-4 border-b border-border/40 pb-2 mt-4">
           <Skeleton className="h-6 w-16" />
           <Skeleton className="h-6 w-24" />
         </div>
-
-        {/* General Settings Section */}
-        <div className="space-y-3">
+        <div className="space-y-3 mt-4">
           <Skeleton className="h-4 w-28" />
-          <div className="rounded-lg border border-border/60 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-              <div className="space-y-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-2 w-32" />
-              </div>
-              <Skeleton className="h-8 w-48" />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-              <div className="space-y-1">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-2 w-28" />
-              </div>
-              <div className="flex gap-2">
-                <Skeleton className="h-8 w-40" />
-                <Skeleton className="h-8 w-8" />
-              </div>
-            </div>
-            <div className="flex justify-end px-4 py-2 bg-muted/20">
-              <Skeleton className="h-7 w-14" />
-            </div>
-          </div>
-        </div>
-
-        {/* Project Status Section */}
-        <div className="space-y-3">
-          <div className="space-y-0.5">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-2 w-36" />
-          </div>
-          <div className="rounded-lg border border-border/60 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-              <div className="space-y-1">
-                <Skeleton className="h-3 w-12" />
-                <Skeleton className="h-2 w-40" />
-              </div>
-              <Skeleton className="h-8 w-28" />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="space-y-1">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-2 w-36" />
-              </div>
-              <Skeleton className="h-8 w-28" />
-            </div>
-          </div>
+          <Skeleton className="h-[200px]" />
         </div>
       </div>
     );
@@ -464,7 +358,7 @@ export default function ProjectSettingsPage() {
   if (error || !project) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-red-500">{error || "Project not found."}</p>
+        <p className="text-sm text-red-500">{error?.message || "Project not found."}</p>
       </div>
     );
   }
@@ -718,7 +612,7 @@ export default function ProjectSettingsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  onClick={fetchProviders}
+                  onClick={() => refetchProviders()}
                   disabled={providersLoading}
                 >
                   <RefreshCw className={`h-3 w-3 ${providersLoading ? 'animate-spin' : ''}`} />
@@ -734,10 +628,6 @@ export default function ProjectSettingsPage() {
                       </div>
                       <div className="flex items-center justify-between px-4 py-2">
                         <Skeleton className="h-3 w-20" />
-                        <Skeleton className="h-3 w-10" />
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2">
-                        <Skeleton className="h-3 w-18" />
                         <Skeleton className="h-3 w-10" />
                       </div>
                     </>
@@ -912,10 +802,10 @@ export default function ProjectSettingsPage() {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={handleCreateWebhook}
-                      disabled={creatingWebhook || !webhookName || !webhookUrl}
+                      onClick={() => createWebhookMutation.mutate({ name: webhookName, url: webhookUrl, events: webhookEvents })}
+                      disabled={createWebhookMutation.isPending || !webhookName || !webhookUrl}
                     >
-                      {creatingWebhook ? 'Creating...' : 'Create'}
+                      {createWebhookMutation.isPending ? 'Creating...' : 'Create'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -957,7 +847,7 @@ export default function ProjectSettingsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="text-red-500 text-xs"
-                              onClick={() => handleDeleteWebhook(webhook.id)}
+                              onClick={() => deleteWebhookMutation.mutate(webhook.id)}
                             >
                               <Trash2 className="h-3 w-3 mr-2" />
                               Delete
