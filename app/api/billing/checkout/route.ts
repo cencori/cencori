@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 
 export async function POST(req: NextRequest) {
   try {
-    const { tier, cycle, orgId } = await req.json();
+    const { tier, cycle, orgId, embedOrigin } = await req.json();
 
     // Validate inputs
     if (!tier || !cycle || !orgId) {
@@ -50,15 +50,22 @@ export async function POST(req: NextRequest) {
 
     console.log('[Checkout API] Creating checkout for org:', org.slug);
 
-    // Create Polar checkout session
-    const checkout = await polarClient.checkouts.create({
+    // Create Polar checkout session - with embed support if embedOrigin provided
+    const checkoutOptions: Parameters<typeof polarClient.checkouts.create>[0] = {
       products: [productId],
       successUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard/organizations/${org.slug}/billing?success=true`,
       metadata: {
         org_id: org.id,
         org_slug: org.slug,
       },
-    });
+    };
+
+    // Add embed origin for embedded checkout iframe communication
+    if (embedOrigin) {
+      checkoutOptions.embedOrigin = embedOrigin;
+    }
+
+    const checkout = await polarClient.checkouts.create(checkoutOptions);
 
     console.log('[Checkout API] Checkout created:', checkout.id);
     console.log('[Checkout API] Checkout URL:', checkout.url);
@@ -74,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('[Checkout API] Error creating checkout:', error);
-    
+
     let errorMessage = 'Unknown error';
     let errorStack = undefined;
 
