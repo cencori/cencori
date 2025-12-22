@@ -5,35 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
-import {
-    BookOpen,
-    Type,
-    Palette,
-    Grid3X3,
-    Box,
-    Layout,
-    Sparkles,
-    Image,
-    Accessibility,
-    CheckSquare,
-    ChevronRight,
-    Menu
-} from "lucide-react";
+import { ChevronRight, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
-    { name: "Introduction", href: "/design", icon: BookOpen },
-    { name: "Principles", href: "/design/principles", icon: Sparkles },
-    { name: "Typography", href: "/design/typography", icon: Type },
-    { name: "Colors", href: "/design/colors", icon: Palette },
-    { name: "Spacing", href: "/design/spacing", icon: Grid3X3 },
-    { name: "Components", href: "/design/components", icon: Box },
-    { name: "Layouts", href: "/design/layouts", icon: Layout },
-    { name: "Icons", href: "/design/icons", icon: Image },
-    { name: "Animation", href: "/design/animation", icon: Sparkles },
-    { name: "Accessibility", href: "/design/accessibility", icon: Accessibility },
-    { name: "Checklist", href: "/design/checklist", icon: CheckSquare },
+    { name: "Introduction", href: "/design" },
+    { name: "Principles", href: "/design/principles" },
+    { name: "Typography", href: "/design/typography" },
+    { name: "Colors", href: "/design/colors" },
+    { name: "Spacing", href: "/design/spacing" },
+    { name: "Components", href: "/design/components" },
+    { name: "Layouts", href: "/design/layouts" },
+    { name: "Icons", href: "/design/icons" },
+    { name: "Animation", href: "/design/animation" },
+    { name: "Accessibility", href: "/design/accessibility" },
+    { name: "Checklist", href: "/design/checklist" },
 ];
 
 function NavLink({ item, isActive, onClick }: {
@@ -46,13 +33,12 @@ function NavLink({ item, isActive, onClick }: {
             href={item.href}
             onClick={onClick}
             className={cn(
-                "flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors",
+                "block px-3 py-2 text-xs rounded-lg transition-colors",
                 isActive
                     ? "bg-foreground text-background font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
         >
-            <item.icon className="h-4 w-4" />
             {item.name}
         </Link>
     );
