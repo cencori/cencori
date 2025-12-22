@@ -95,7 +95,7 @@ export default function NewOrganizationPage() {
       name: values.name,
       slug: newSlug,
       subscription_tier: values.plan,
-      subscription_status: values.plan === 'free' ? 'active' : 'incomplete',
+      subscription_status: values.plan === 'free' ? 'active' : 'trialing',
       monthly_request_limit: requestLimit,
       monthly_requests_used: 0,
       owner_id: user.id,
