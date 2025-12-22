@@ -1,4 +1,26 @@
 {
+    "rewrites": [
+        {
+            "source": "/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "design.cencori.com"
+                }
+            ],
+            "destination": "/design/:path*"
+        },
+        {
+            "source": "/",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "design.cencori.com"
+                }
+            ],
+            "destination": "/design"
+        }
+    ],
     "crons": [
         {
             "path": "/api/cron/reset-usage",
