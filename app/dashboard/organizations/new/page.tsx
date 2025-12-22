@@ -3,7 +3,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
+import { CheckCircle, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Organization name must be at least 2 characters." }),
@@ -42,6 +43,10 @@ function getRequestLimit(tier: string): number {
 export default function NewOrganizationPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [createdOrg, setCreatedOrg] = useState<{ id: string; slug: string } | null>(null);
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
@@ -56,8 +61,57 @@ export default function NewOrganizationPage() {
     },
   });
 
+  const selectedPlan = form.watch("plan");
+  const isPaidPlan = selectedPlan === "pro" || selectedPlan === "team";
+
+  // Initialize Polar embed checkout handlers
+  useEffect(() => {
+    const initPolar = async () => {
+      try {
+        const { PolarEmbedCheckout } = await import('@polar-sh/checkout/embed');
+        PolarEmbedCheckout.init();
+      } catch (err) {
+        console.error('Failed to init Polar checkout:', err);
+      }
+    };
+    initPolar();
+  }, []);
+
+  // Open Polar checkout as overlay modal
+  const openPolarCheckout = useCallback(async (checkoutUrl: string) => {
+    try {
+      const { PolarEmbedCheckout } = await import('@polar-sh/checkout/embed');
+
+      console.log('[Checkout] Opening Polar overlay for:', checkoutUrl);
+
+      // This creates a fullscreen modal overlay
+      const checkout = await PolarEmbedCheckout.create(checkoutUrl, 'dark');
+
+      checkout.addEventListener('success', () => {
+        console.log('[Checkout] Payment successful!');
+        setSuccess(true);
+        toast.success('Payment successful!');
+      });
+
+      checkout.addEventListener('close', () => {
+        console.log('[Checkout] Modal closed');
+        setCheckoutLoading(false);
+        // If successful, redirect. Otherwise stay on page.
+        if (success && createdOrg) {
+          router.push(`/dashboard/organizations/${createdOrg.slug}/projects`);
+        }
+      });
+
+    } catch (err) {
+      console.error('[Checkout] Error opening overlay:', err);
+      toast.error('Failed to open checkout. Please try again.');
+      setCheckoutLoading(false);
+    }
+  }, [success, createdOrg, router]);
+
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -127,19 +181,70 @@ export default function NewOrganizationPage() {
       return;
     }
 
-    toast.success("Organization created successfully!");
+    setCreatedOrg(orgData);
+    toast.success("Organization created!");
+    setLoading(false);
 
-    if (values.plan === 'pro' || values.plan === 'team') {
-      router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
-    } else if (values.plan === 'enterprise') {
+    // Handle based on plan
+    if (values.plan === 'enterprise') {
       router.push(`/contact?plan=enterprise&org=${orgData.slug}`);
+    } else if (values.plan === 'pro' || values.plan === 'team') {
+      // Open Polar checkout overlay
+      setCheckoutLoading(true);
+
+      try {
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tier: values.plan,
+            cycle: 'monthly',
+            orgId: orgData.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create checkout');
+        }
+
+        // Open the overlay checkout
+        openPolarCheckout(data.checkoutUrl);
+
+      } catch (err) {
+        console.error("Error creating checkout:", err);
+        toast.error("Checkout failed. You can complete payment in billing settings.");
+        setCheckoutLoading(false);
+        router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
+      }
     } else {
+      // Free plan - go directly to projects
       router.push(`/dashboard/organizations/${orgData.slug}/projects`);
     }
-
-    setLoading(false);
   };
 
+  // Success state
+  if (success && createdOrg) {
+    return (
+      <div className="w-full max-w-2xl mx-auto px-6 py-20">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
+            <CheckCircle className="h-6 w-6 text-emerald-500" />
+          </div>
+          <h1 className="text-xl font-semibold">Organization Created!</h1>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Your organization has been created and your subscription is now active.
+          </p>
+          <Button onClick={() => router.push(`/dashboard/organizations/${createdOrg.slug}/projects`)} className="mt-4">
+            Go to Organization
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Form
   return (
     <div className="w-full max-w-2xl mx-auto px-6 py-10">
       {/* Header */}
@@ -227,9 +332,9 @@ export default function NewOrganizationPage() {
                   Learn more
                 </Link>
               </p>
-              {(form.watch("plan") === "pro" || form.watch("plan") === "team") && (
-                <p className="text-[11px] text-muted-foreground">
-                  You'll be redirected to checkout after creating.
+              {isPaidPlan && (
+                <p className="text-[11px] text-emerald-500">
+                  Payment will be collected in a secure overlay after creating.
                 </p>
               )}
             </div>
@@ -252,10 +357,22 @@ export default function NewOrganizationPage() {
           type="submit"
           size="sm"
           className="h-7 text-xs px-4"
-          disabled={loading}
+          disabled={loading || checkoutLoading}
           onClick={form.handleSubmit(onSubmit)}
         >
-          {loading ? "Creating..." : "Create organization"}
+          {loading ? (
+            <>
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Creating...
+            </>
+          ) : checkoutLoading ? (
+            <>
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Opening checkout...
+            </>
+          ) : (
+            "Create organization"
+          )}
         </Button>
       </div>
     </div>

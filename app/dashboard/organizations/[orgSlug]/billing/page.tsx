@@ -48,8 +48,9 @@ export default function BillingPage({ params }: PageProps) {
     const { orgSlug } = use(params);
     const searchParams = useSearchParams();
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+    const [autoCheckoutTriggered, setAutoCheckoutTriggered] = useState(false);
 
-    // Check for success param from Stripe
+    // Check for success param from Polar
     useEffect(() => {
         if (searchParams.get('success') === 'true') {
             setShowSuccessMessage(true);
@@ -84,6 +85,24 @@ export default function BillingPage({ params }: PageProps) {
             alert('Failed to start checkout. Please try again.');
         }
     };
+
+    // Auto-trigger checkout when redirected from org creation
+    useEffect(() => {
+        if (
+            org &&
+            !autoCheckoutTriggered &&
+            searchParams.get('upgrade') === 'true' &&
+            (org.subscription_tier === 'pro' || org.subscription_tier === 'team') &&
+            org.subscription_status !== 'active'
+        ) {
+            setAutoCheckoutTriggered(true);
+            // Delay slightly to show the page first
+            setTimeout(() => {
+                handleUpgrade(org.subscription_tier as 'pro' | 'team', 'monthly');
+            }, 500);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [org, autoCheckoutTriggered, searchParams]);
 
     if (isLoading) {
         return (
