@@ -103,8 +103,8 @@ export default function ChecklistPage() {
             <section className="rounded-xl border border-border/50 bg-muted/30 p-6 text-center">
                 <h3 className="text-sm font-semibold mb-2">Ready to ship?</h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Once you've checked all items, your changes are ready for review.
-                    Remember: it's easier to catch issues now than after deployment.
+                    Once you have checked all items, your changes are ready for review.
+                    Remember: catching issues now is easier than after deployment.
                 </p>
             </section>
         </div>
