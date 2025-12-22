@@ -77,9 +77,47 @@ export default function TypographyPage() {
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Typography</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
-                    Text scale and font weights for dashboard and landing page contexts.
+                    Font families, text scale, and font weights for dashboard and landing page contexts.
                 </p>
             </div>
+
+            {/* Font Families */}
+            <section className="space-y-4">
+                <h2 className="text-lg font-semibold">Font Families</h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-border/50 bg-card p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold">Montserrat</h3>
+                            <code className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">font-sans</code>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-4">Primary font for all UI text, headings, and body copy.</p>
+                        <div className="space-y-2 border-t border-border/40 pt-4">
+                            <p className="text-2xl font-bold">Aa Bb Cc</p>
+                            <p className="text-sm">The quick brown fox jumps over the lazy dog.</p>
+                            <p className="text-xs text-muted-foreground">0123456789</p>
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold font-mono">JetBrains Mono</h3>
+                            <code className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">font-mono</code>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-4">Monospace font for code, API keys, and technical content.</p>
+                        <div className="space-y-2 border-t border-border/40 pt-4 font-mono">
+                            <p className="text-2xl font-bold">Aa Bb Cc</p>
+                            <p className="text-sm">const api = new Cencori();</p>
+                            <p className="text-xs text-muted-foreground">0123456789</p>
+                        </div>
+                    </div>
+                </div>
+                <CodeBlock code={`// CSS Variables (set in layout.tsx)
+--font-sans: Montserrat
+--font-mono: JetBrains Mono
+
+// Tailwind usage
+className="font-sans"  // Default, usually not needed
+className="font-mono"  // For code blocks and technical text`} language="css" />
+            </section>
 
             {/* Dashboard Scale */}
             <section className="space-y-4">
