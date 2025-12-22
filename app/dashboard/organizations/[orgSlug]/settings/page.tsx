@@ -96,7 +96,7 @@ export default function OrganizationSettingsPage({
   const { orgSlug } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { updateOrganization: updateOrgContext } = useOrganizationProject();
+  const { updateOrganization: updateOrgContext, refetchData } = useOrganizationProject();
 
   // Local state
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
@@ -143,6 +143,8 @@ export default function OrganizationSettingsPage({
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate the organizations list cache
+      refetchData();
       toast.success("Organization deleted");
       setIsDeleteOrgDialogOpen(false);
       setConfirmDeleteText("");
