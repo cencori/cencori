@@ -21,7 +21,7 @@ import {
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
 import { Key, ScrollText, ShieldAlert, Activity, Server, Puzzle } from "lucide-react";
-import { CubeTransparentIcon } from "@heroicons/react/24/outline";
+import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -220,7 +220,7 @@ export default function ProjectLayoutClient({
         { href: `${basePath}/security`, icon: ShieldAlert, label: "Security" },
         { href: `${basePath}/providers`, icon: Server, label: "Providers", prefetch: createPrefetch("providers") },
         { href: `${basePath}/analytics`, icon: Activity, label: "Analytics", prefetch: createPrefetch("analytics") },
-        { href: `${basePath}/playground`, icon: CubeTransparentIcon, label: "Playground" },
+        { href: `${basePath}/playground`, icon: BeakerIcon, label: "Playground" },
         { href: `${basePath}/edge`, icon: Puzzle, label: "Edge" },
         { href: `${basePath}/settings`, icon: SettingsIcon, label: "Project Settings" },
     ];
