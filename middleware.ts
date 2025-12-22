@@ -80,6 +80,22 @@ function createBotResponse(url: string): Response {
 
 export async function middleware(request: NextRequest) {
   const userAgent = request.headers.get('user-agent') || '';
+  const hostname = request.headers.get('host') || '';
+
+  // Handle design.cencori.com subdomain routing
+  if (hostname.startsWith('design.') || hostname.startsWith('design.localhost')) {
+    const pathname = request.nextUrl.pathname;
+
+    // If accessing the root of design subdomain, go to /design
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/design', request.url));
+    }
+
+    // If the path doesn't already start with /design, rewrite it
+    if (!pathname.startsWith('/design')) {
+      return NextResponse.rewrite(new URL(`/design${pathname}`, request.url));
+    }
+  }
 
   // Check if this is a social media bot
   const isBot = SOCIAL_BOTS.some(bot => userAgent.includes(bot));
