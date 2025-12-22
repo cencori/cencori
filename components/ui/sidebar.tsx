@@ -32,6 +32,8 @@ const SIDEBAR_WIDTH_MOBILE = "16rem"
 const SIDEBAR_WIDTH_ICON = "2.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+type SidebarMode = "expanded" | "collapsed" | "hover"
+
 type SidebarContextProps = {
   state: "collapsed" | "expanded"
   open: boolean
@@ -40,6 +42,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  sidebarMode: SidebarMode
+  setSidebarMode: (mode: SidebarMode) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -88,6 +92,34 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
+  // Sidebar mode preference (expanded, collapsed, hover)
+  const [sidebarMode, _setSidebarMode] = React.useState<SidebarMode>("hover")
+
+  // Load saved mode from localStorage
+  React.useEffect(() => {
+    const savedMode = localStorage.getItem("cencori_sidebar_mode") as SidebarMode | null
+    if (savedMode && ["expanded", "collapsed", "hover"].includes(savedMode)) {
+      _setSidebarMode(savedMode)
+      // Sync initial open state with mode
+      if (savedMode === "expanded") {
+        _setOpen(true)
+      } else {
+        _setOpen(false)
+      }
+    }
+  }, [])
+
+  const setSidebarMode = React.useCallback((mode: SidebarMode) => {
+    _setSidebarMode(mode)
+    localStorage.setItem("cencori_sidebar_mode", mode)
+    // Also update open state based on mode
+    if (mode === "expanded") {
+      _setOpen(true)
+    } else {
+      _setOpen(false)
+    }
+  }, [])
+
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
@@ -122,8 +154,10 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      sidebarMode,
+      setSidebarMode,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, sidebarMode, setSidebarMode]
   )
 
   return (
@@ -165,7 +199,11 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
   expandOnHover?: boolean
 }) {
-  const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, setOpen, sidebarMode } = useSidebar()
+
+  // Use sidebarMode from context to determine if hover should expand
+  // This ensures we always use the latest mode value
+  const shouldExpandOnHover = sidebarMode === "hover"
 
   if (collapsible === "none") {
     return (
@@ -211,13 +249,13 @@ function Sidebar({
   }
 
   const handleMouseEnter = () => {
-    if (expandOnHover && collapsible === "icon") {
+    if (shouldExpandOnHover && collapsible === "icon") {
       setOpen(true)
     }
   }
 
   const handleMouseLeave = () => {
-    if (expandOnHover && collapsible === "icon") {
+    if (shouldExpandOnHover && collapsible === "icon") {
       setOpen(false)
     }
   }
@@ -280,30 +318,77 @@ function SidebarTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof Button> & { asChild?: boolean }) {
-  const { toggleSidebar } = useSidebar()
+  const { sidebarMode, setSidebarMode } = useSidebar()
+  const [menuOpen, setMenuOpen] = React.useState(false)
 
   const Comp = asChild ? Slot : Button;
 
   return (
-    <Comp
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      {children ? children : (
+    <div className="relative">
+      <Comp
+        data-sidebar="trigger"
+        data-slot="sidebar-trigger"
+        variant="ghost"
+        size="icon"
+        className={cn("size-7", className)}
+        onClick={(event) => {
+          onClick?.(event)
+          setMenuOpen(!menuOpen)
+        }}
+        {...props}
+      >
+        {children ? children : (
+          <>
+            <PanelLeftIcon />
+            <span className="sr-only">Toggle Sidebar</span>
+          </>
+        )}
+      </Comp>
+      {menuOpen && (
         <>
-          <PanelLeftIcon />
-          <span className="sr-only">Toggle Sidebar</span>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="absolute left-0 bottom-full mb-1 z-50 w-40 rounded-md border border-border/40 bg-popover p-1 shadow-md">
+            <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Sidebar control</p>
+            <button
+              className={cn(
+                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent",
+                sidebarMode === "expanded" && "font-medium"
+              )}
+              onClick={() => { setSidebarMode("expanded"); setMenuOpen(false); }}
+            >
+              {sidebarMode === "expanded" && <span className="w-1.5 h-1.5 rounded-full bg-foreground" />}
+              {sidebarMode !== "expanded" && <span className="w-1.5 h-1.5" />}
+              Expanded
+            </button>
+            <button
+              className={cn(
+                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent",
+                sidebarMode === "collapsed" && "font-medium"
+              )}
+              onClick={() => { setSidebarMode("collapsed"); setMenuOpen(false); }}
+            >
+              {sidebarMode === "collapsed" && <span className="w-1.5 h-1.5 rounded-full bg-foreground" />}
+              {sidebarMode !== "collapsed" && <span className="w-1.5 h-1.5" />}
+              Collapsed
+            </button>
+            <button
+              className={cn(
+                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent",
+                sidebarMode === "hover" && "font-medium"
+              )}
+              onClick={() => { setSidebarMode("hover"); setMenuOpen(false); }}
+            >
+              {sidebarMode === "hover" && <span className="w-1.5 h-1.5 rounded-full bg-foreground" />}
+              {sidebarMode !== "hover" && <span className="w-1.5 h-1.5" />}
+              Expand on hover
+            </button>
+          </div>
         </>
       )}
-    </Comp>
+    </div>
   )
 }
 
