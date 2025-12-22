@@ -1,29 +1,28 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, BookOpen, Paintbrush } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { ViewColumnsIcon, SparklesIcon, CommandLineIcon, MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-export const metadata = {
-    title: "Cenpact Design System",
-    description: "The design language for Cencori products",
-};
+import { useTheme } from "next-themes";
 
 const highlights = [
     {
         title: "Dense but Breathable",
         description: "Pack information tightly while maintaining visual hierarchy through whitespace.",
-        icon: Sparkles,
+        icon: ViewColumnsIcon,
     },
     {
         title: "Subtle Sophistication",
         description: "Prefer muted colors, soft borders, and understated hover effects.",
-        icon: Paintbrush,
+        icon: SparklesIcon,
     },
     {
         title: "Developer-First",
         description: "Design for power users who value efficiency over hand-holding.",
-        icon: BookOpen,
+        icon: CommandLineIcon,
     },
 ];
 
@@ -35,6 +34,8 @@ const quickLinks = [
 ];
 
 export default function DesignIntroPage() {
+    const { theme, setTheme } = useTheme();
+
     return (
         <div className="space-y-12">
             {/* Hero */}
@@ -74,17 +75,29 @@ export default function DesignIntroPage() {
                 </div>
             </section>
 
-            {/* Dark Mode Native */}
+            {/* Dark Mode Native - Interactive! */}
             <section className="rounded-xl border border-border/50 bg-card p-6">
                 <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0">
-                        <span className="text-lg">🌙</span>
-                    </div>
+                    <button
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        className="w-10 h-10 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                        aria-label="Toggle theme"
+                    >
+                        {theme === 'dark' ? (
+                            <SunIcon className="h-5 w-5" />
+                        ) : (
+                            <MoonIcon className="h-5 w-5" />
+                        )}
+                    </button>
                     <div>
-                        <h3 className="text-sm font-semibold mb-1">Dark Mode Native</h3>
+                        <h3 className="text-sm font-semibold mb-1">
+                            Dark Mode Native
+                            <Badge variant="outline" className="ml-2 text-[8px] px-1.5 py-0 rounded-full">
+                                Try it!
+                            </Badge>
+                        </h3>
                         <p className="text-xs text-muted-foreground">
-                            We design in dark mode first, then adapt for light. This ensures
-                            the dark experience is never an afterthought.
+                            We design in dark mode first, then adapt for light. Click the icon to toggle!
                         </p>
                     </div>
                 </div>
