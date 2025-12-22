@@ -16,6 +16,7 @@ import {
     SidebarRail,
     SidebarGroup,
     SidebarMenuSkeleton,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import { LayersIcon } from "@/components/animate-ui/icons/layers";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
@@ -88,6 +89,42 @@ function SidebarNavLink({
                 </Link>
             </SidebarMenuButton>
         </SidebarMenuItem>
+    );
+}
+
+// Sidebar that responds to mode preference
+function SidebarWithMode({
+    children,
+    className,
+    showRail = true,
+}: {
+    children: React.ReactNode;
+    className?: string;
+    showRail?: boolean;
+}) {
+    const { sidebarMode } = useSidebar();
+
+    // Map mode to sidebar props
+    // Note: We use collapsible="icon" for expanded mode too to get consistent styling
+    // The sidebar stays open because we set defaultOpen=true in SidebarProvider
+    const sidebarProps = {
+        expanded: { collapsible: "icon" as const, expandOnHover: false },
+        collapsed: { collapsible: "icon" as const, expandOnHover: false },
+        hover: { collapsible: "icon" as const, expandOnHover: true },
+    }[sidebarMode];
+
+    // Don't show rail in expanded mode
+    const shouldShowRail = showRail && sidebarMode !== "expanded";
+
+    return (
+        <Sidebar
+            collapsible={sidebarProps.collapsible}
+            expandOnHover={sidebarProps.expandOnHover}
+            className={className}
+        >
+            {children}
+            {shouldShowRail && <SidebarRail />}
+        </Sidebar>
     );
 }
 
@@ -165,7 +202,7 @@ export default function OrganizationLayoutClient({
         <SidebarProvider defaultOpen={false}>
             {/* Desktop Sidebar - hidden on mobile */}
             {!isProjectRoute && (
-                <Sidebar collapsible="icon" expandOnHover className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40 bg-sidebar">
+                <SidebarWithMode className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40 bg-sidebar">
                     <SidebarContent>
                         <SidebarGroup className="pt-3">
                             <SidebarMenu>
@@ -182,11 +219,10 @@ export default function OrganizationLayoutClient({
                             </SidebarMenu>
                         </SidebarGroup>
                     </SidebarContent>
-                    <SidebarRail />
                     <div className="absolute bottom-0 left-0 w-full p-1.5">
                         <SidebarTrigger />
                     </div>
-                </Sidebar>
+                </SidebarWithMode>
             )}
 
             {/* Mobile Sheet - slides up from bottom, only visible on mobile */}
