@@ -32,6 +32,8 @@ const SIDEBAR_WIDTH_MOBILE = "16rem"
 const SIDEBAR_WIDTH_ICON = "2.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+type SidebarMode = "expanded" | "collapsed" | "hover"
+
 type SidebarContextProps = {
   state: "collapsed" | "expanded"
   open: boolean
@@ -40,6 +42,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  sidebarMode: SidebarMode
+  setSidebarMode: (mode: SidebarMode) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -68,6 +72,34 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+
+  // Sidebar mode preference (expanded, collapsed, hover)
+  const [sidebarMode, _setSidebarMode] = React.useState<SidebarMode>("hover")
+
+  // Load saved mode from localStorage
+  React.useEffect(() => {
+    const savedMode = localStorage.getItem("cencori_sidebar_mode") as SidebarMode | null
+    if (savedMode && ["expanded", "collapsed", "hover"].includes(savedMode)) {
+      _setSidebarMode(savedMode)
+      // Sync initial open state with mode
+      if (savedMode === "expanded") {
+        _setOpen(true)
+      } else {
+        _setOpen(false)
+      }
+    }
+  }, [])
+
+  const setSidebarMode = React.useCallback((mode: SidebarMode) => {
+    _setSidebarMode(mode)
+    localStorage.setItem("cencori_sidebar_mode", mode)
+    // Also update open state based on mode
+    if (mode === "expanded") {
+      _setOpen(true)
+    } else {
+      _setOpen(false)
+    }
+  }, [])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -122,8 +154,10 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      sidebarMode,
+      setSidebarMode,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, sidebarMode, setSidebarMode]
   )
 
   return (
@@ -280,30 +314,70 @@ function SidebarTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof Button> & { asChild?: boolean }) {
-  const { toggleSidebar } = useSidebar()
+  const { sidebarMode, setSidebarMode } = useSidebar()
+  const [showMenu, setShowMenu] = React.useState(false)
 
   const Comp = asChild ? Slot : Button;
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    onClick?.(event)
+    setShowMenu(!showMenu)
+  }
+
+  const handleModeSelect = (mode: SidebarMode) => {
+    setSidebarMode(mode)
+    setShowMenu(false)
+  }
+
   return (
-    <Comp
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      {children ? children : (
-        <>
-          <PanelLeftIcon />
-          <span className="sr-only">Toggle Sidebar</span>
-        </>
+    <div className="relative">
+      <Comp
+        data-sidebar="trigger"
+        data-slot="sidebar-trigger"
+        variant="ghost"
+        size="icon"
+        className={cn("size-7", className)}
+        onClick={handleClick}
+        {...props}
+      >
+        {children ? children : (
+          <>
+            <PanelLeftIcon />
+            <span className="sr-only">Toggle Sidebar</span>
+          </>
+        )}
+      </Comp>
+      {showMenu && (
+        <div
+          className="absolute bottom-full left-0 mb-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md z-50"
+          onMouseLeave={() => setShowMenu(false)}
+        >
+          <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">Sidebar control</p>
+          <button
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+            onClick={() => handleModeSelect("expanded")}
+          >
+            <span className={cn("size-1.5 rounded-full", sidebarMode === "expanded" && "bg-foreground")} />
+            Expanded
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+            onClick={() => handleModeSelect("collapsed")}
+          >
+            <span className={cn("size-1.5 rounded-full", sidebarMode === "collapsed" && "bg-foreground")} />
+            Collapsed
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+            onClick={() => handleModeSelect("hover")}
+          >
+            <span className={cn("size-1.5 rounded-full", sidebarMode === "hover" && "bg-foreground")} />
+            Expand on hover
+          </button>
+        </div>
       )}
-    </Comp>
+    </div>
   )
 }
 
