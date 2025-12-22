@@ -125,19 +125,21 @@ className="font-mono"  // For code blocks and technical text`} language="css" />
                     <h2 className="text-lg font-semibold">Dashboard Scale</h2>
                     <p className="text-xs text-muted-foreground mt-1">Dense typography for information-rich interfaces.</p>
                 </div>
-                <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
-                    <div className="grid grid-cols-3 gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
-                        <span className="text-[10px] font-medium text-muted-foreground">Class</span>
-                        <span className="text-[10px] font-medium text-muted-foreground">Usage</span>
-                        <span className="text-[10px] font-medium text-muted-foreground">Example</span>
-                    </div>
-                    {dashboardScale.map((item) => (
-                        <div key={item.class} className="grid grid-cols-3 gap-4 px-4 py-3 border-b border-border/40 last:border-0">
-                            <code className="text-xs font-mono text-emerald-500">{item.class}</code>
-                            <span className="text-xs text-muted-foreground">{item.usage}</span>
-                            <span className={item.class}>{item.example}</span>
+                <div className="overflow-x-auto">
+                    <div className="rounded-xl border border-border/50 bg-card overflow-hidden min-w-[400px]">
+                        <div className="grid grid-cols-3 gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
+                            <span className="text-[10px] font-medium text-muted-foreground">Class</span>
+                            <span className="text-[10px] font-medium text-muted-foreground">Usage</span>
+                            <span className="text-[10px] font-medium text-muted-foreground">Example</span>
                         </div>
-                    ))}
+                        {dashboardScale.map((item) => (
+                            <div key={item.class} className="grid grid-cols-3 gap-4 px-4 py-3 border-b border-border/40 last:border-0">
+                                <code className="text-xs font-mono text-emerald-500">{item.class}</code>
+                                <span className="text-xs text-muted-foreground">{item.usage}</span>
+                                <span className={item.class}>{item.example}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </section>
 
@@ -147,19 +149,21 @@ className="font-mono"  // For code blocks and technical text`} language="css" />
                     <h2 className="text-lg font-semibold">Landing Page Scale</h2>
                     <p className="text-xs text-muted-foreground mt-1">Expressive typography for marketing contexts.</p>
                 </div>
-                <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
-                    <div className="grid grid-cols-3 gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
-                        <span className="text-[10px] font-medium text-muted-foreground">Class</span>
-                        <span className="text-[10px] font-medium text-muted-foreground">Usage</span>
-                        <span className="text-[10px] font-medium text-muted-foreground">Example</span>
-                    </div>
-                    {landingScale.map((item) => (
-                        <div key={item.class} className="grid grid-cols-3 gap-4 px-4 py-3 border-b border-border/40 last:border-0 items-center">
-                            <code className="text-xs font-mono text-emerald-500">{item.class}</code>
-                            <span className="text-xs text-muted-foreground">{item.usage}</span>
-                            <span className={item.class}>{item.example}</span>
+                <div className="overflow-x-auto">
+                    <div className="rounded-xl border border-border/50 bg-card overflow-hidden min-w-[400px]">
+                        <div className="grid grid-cols-3 gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
+                            <span className="text-[10px] font-medium text-muted-foreground">Class</span>
+                            <span className="text-[10px] font-medium text-muted-foreground">Usage</span>
+                            <span className="text-[10px] font-medium text-muted-foreground">Example</span>
                         </div>
-                    ))}
+                        {landingScale.map((item) => (
+                            <div key={item.class} className="grid grid-cols-3 gap-4 px-4 py-3 border-b border-border/40 last:border-0 items-center">
+                                <code className="text-xs font-mono text-emerald-500">{item.class}</code>
+                                <span className="text-xs text-muted-foreground">{item.usage}</span>
+                                <span className={item.class}>{item.example}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </section>
 

@@ -35,6 +35,12 @@ const quickLinks = [
 
 export default function DesignIntroPage() {
     const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = React.useState(false);
+
+    // Avoid hydration mismatch - only show theme toggle after mount
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
 
     return (
         <div className="space-y-12">
@@ -83,8 +89,12 @@ export default function DesignIntroPage() {
                         className="w-10 h-10 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                         aria-label="Toggle theme"
                     >
-                        {theme === 'dark' ? (
-                            <SunIcon className="h-5 w-5" />
+                        {mounted ? (
+                            theme === 'dark' ? (
+                                <SunIcon className="h-5 w-5" />
+                            ) : (
+                                <MoonIcon className="h-5 w-5" />
+                            )
                         ) : (
                             <MoonIcon className="h-5 w-5" />
                         )}

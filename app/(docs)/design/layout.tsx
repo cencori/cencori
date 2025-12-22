@@ -152,8 +152,8 @@ export default function DesignDocsLayout({
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 min-h-screen">
-                    <div className="max-w-4xl mx-auto px-6 py-12">
+                <main className="flex-1 min-h-screen overflow-x-hidden">
+                    <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
                         {children}
                     </div>
                 </main>
