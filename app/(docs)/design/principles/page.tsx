@@ -118,7 +118,7 @@ export default function PrinciplesPage() {
                             <div className="p-5">
                                 <div className="flex items-center gap-2 mb-3">
                                     <XCircle className="h-4 w-4 text-red-500" />
-                                    <span className="text-xs font-medium text-red-500">Don't</span>
+                                    <span className="text-xs font-medium text-red-500">Don&apos;t</span>
                                 </div>
                                 <ul className="space-y-2">
                                     {principle.donts.map((item) => (
