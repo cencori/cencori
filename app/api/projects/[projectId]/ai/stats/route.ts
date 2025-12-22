@@ -121,9 +121,35 @@ export async function GET(
             return acc;
         }, {} as DateAggregationMap);
 
-        const chartData = Object.values(requestsByDate || {}).sort((a: DateAggregation, b: DateAggregation) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+        // Find first request date to start chart 2 days before
+        let firstRequestDate: Date | null = null;
+        if (requests && requests.length > 0) {
+            const sortedByDate = [...requests].sort((a, b) =>
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            firstRequestDate = new Date(sortedByDate[0].created_at);
+        }
+
+        // Generate chart data with filled dates (2 days before first request to now)
+        const chartData: DateAggregation[] = [];
+        if (firstRequestDate) {
+            const chartStartDate = new Date(firstRequestDate);
+            chartStartDate.setDate(chartStartDate.getDate() - 2);
+            const endDate = new Date();
+
+            for (let d = new Date(chartStartDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                // Format as "Dec 22" style
+                const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const existing = requestsByDate?.[dateStr];
+                chartData.push({
+                    date: formattedDate,
+                    count: existing?.count || 0,
+                    cost: existing?.cost || 0,
+                    tokens: existing?.tokens || 0,
+                });
+            }
+        }
 
         // Group by model
         const requestsByModel = requests?.reduce((acc: ModelAggregationMap, r) => {

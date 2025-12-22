@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
-import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
+import { Bar, BarChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import React, { useState, use } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -395,9 +395,9 @@ export default function ProjectDetailsPage({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
-                <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
-                <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
-                <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
+                <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
+                <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
                 <SelectItem value="all" className="text-xs">All Time</SelectItem>
               </SelectContent>
             </Select>
@@ -409,24 +409,26 @@ export default function ProjectDetailsPage({
             <div className="rounded-md border border-border/40 bg-card p-4">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Requests</p>
               <p className="text-2xl font-semibold font-mono mb-2">{stats.aiRequests.value}</p>
-              <div className="h-16">
+              <div className="h-24">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ requests: { label: "Requests", color: "hsl(24 80% 50%)" } }}
                     className="h-full w-full"
                   >
-                    <LineChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-                      <Line
-                        dataKey="count"
-                        type="monotone"
-                        stroke="var(--color-requests)"
-                        strokeWidth={1.5}
-                        dot={(props: DotProps) => {
-                          const { key, ...rest } = props;
-                          return <CustomizedDot key={key} {...rest} stroke="var(--color-requests)" />;
-                        }}
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        interval="preserveStartEnd"
                       />
-                    </LineChart>
+                      <Bar
+                        dataKey="count"
+                        fill="var(--color-requests)"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
                   </ChartContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
@@ -439,24 +441,26 @@ export default function ProjectDetailsPage({
             <div className="rounded-md border border-border/40 bg-card p-4">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Cost</p>
               <p className="text-2xl font-semibold font-mono mb-2">{stats.aiCost.value}</p>
-              <div className="h-16">
+              <div className="h-24">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ cost: { label: "Cost", color: "hsl(142 76% 36%)" } }}
                     className="h-full w-full"
                   >
-                    <LineChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-                      <Line
-                        dataKey="cost"
-                        type="monotone"
-                        stroke="var(--color-cost)"
-                        strokeWidth={1.5}
-                        dot={(props: DotProps) => {
-                          const { key, ...rest } = props;
-                          return <CustomizedDot key={key} {...rest} stroke="var(--color-cost)" />;
-                        }}
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        interval="preserveStartEnd"
                       />
-                    </LineChart>
+                      <Bar
+                        dataKey="cost"
+                        fill="var(--color-cost)"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
                   </ChartContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
@@ -469,24 +473,26 @@ export default function ProjectDetailsPage({
             <div className="rounded-md border border-border/40 bg-card p-4">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Avg Latency</p>
               <p className="text-2xl font-semibold font-mono mb-2">{stats.avgLatency.value}</p>
-              <div className="h-16">
+              <div className="h-24">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ latency: { label: "Latency", color: "hsl(244 59% 59%)" } }}
                     className="h-full w-full"
                   >
-                    <LineChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-                      <Line
-                        dataKey="count"
-                        type="monotone"
-                        stroke="var(--color-latency)"
-                        strokeWidth={1.5}
-                        dot={(props: DotProps) => {
-                          const { key, ...rest } = props;
-                          return <CustomizedDot key={key} {...rest} stroke="var(--color-latency)" />;
-                        }}
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        interval="preserveStartEnd"
                       />
-                    </LineChart>
+                      <Bar
+                        dataKey="count"
+                        fill="var(--color-latency)"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
                   </ChartContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
