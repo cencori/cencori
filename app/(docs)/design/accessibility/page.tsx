@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, X, Keyboard, Eye, MousePointer } from "lucide-react";
+import { Copy, Check, X, Keyboard, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -151,7 +151,7 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
                     <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
                         <div className="flex items-center gap-2 mb-2">
                             <X className="h-4 w-4 text-red-500" />
-                            <span className="text-xs font-medium text-red-500">Don't</span>
+                            <span className="text-xs font-medium text-red-500">Do Not</span>
                         </div>
                         <ul className="space-y-1.5">
                             <li className="text-xs text-muted-foreground">Use color alone to convey information</li>
