@@ -190,7 +190,7 @@ export default function ComponentsPage() {
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium">With hint</label>
                             <Input placeholder="Email" className="h-8 text-sm" />
-                            <p className="text-[10px] text-muted-foreground">We'll never share your email</p>
+                            <p className="text-[10px] text-muted-foreground">We&apos;ll never share your email</p>
                         </div>
                     </div>
                 </div>
