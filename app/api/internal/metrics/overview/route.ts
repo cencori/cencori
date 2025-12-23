@@ -15,6 +15,9 @@ import type { TimePeriod } from '@/internal/analytics/lib/types';
 // For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
 
+// Founder emails - always have access as fallback
+const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+
 // Helper to check if user is an active admin
 async function isActiveAdmin(userId: string): Promise<boolean> {
     const supabase = createAdminClient();
@@ -35,10 +38,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin (or allow all in dev mode)
+    // Check if user is admin, founder, or in dev mode
     const isDev = process.env.NODE_ENV === 'development';
+    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
     const isAdmin = await isActiveAdmin(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isAdmin;
+    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || isAdmin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });

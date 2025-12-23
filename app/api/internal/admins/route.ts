@@ -5,6 +5,9 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 // For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
 
+// Founder emails - always have access as fallback
+const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+
 // Helper to check if user is an active admin
 async function getAdminStatus(userId: string) {
     const supabase = createAdminClient();
@@ -26,10 +29,11 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Dev mode bypass or admin check
+    // Dev mode bypass, founder, or admin check
     const isDev = process.env.NODE_ENV === 'development';
+    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
     const admin = await getAdminStatus(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || !!admin;
+    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
