@@ -484,6 +484,69 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* User Avatar Menu - hidden on mobile (mobile nav has it) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="hidden lg:inline-flex w-6 h-6 cursor-pointer items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors overflow-hidden"
+                aria-label="User menu"
+              >
+                {typeof avatar === "string" && avatar.length > 0 ? (
+                  <img src={avatar} alt={typeof name === "string" ? name : "User avatar"} className="w-full h-full object-cover" />
+                ) : (
+                  <CircleUserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-66 p-1" align="end" forceMount>
+              <div className="px-2 py-1.5 border-b border-border/40 mb-1">
+                <p className="text-xs font-medium truncate dark:text-white text-black">
+                  {user.email}
+                </p>
+              </div>
+              <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Account</p>
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/profile")}>
+                <CircleUserRound className="mr-2 h-3.5 w-3.5" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/settings")}>
+                <Settings className="mr-2 h-3.5 w-3.5" />
+                Settings
+              </DropdownMenuItem>
+              <div className="my-1 border-t border-border/40" />
+              <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Theme</p>
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("light")}>
+                {theme === "light" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                {theme !== "light" && <span className="mr-2 h-1.5 w-1.5" />}
+                Light
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("dark")}>
+                {theme === "dark" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                {theme !== "dark" && <span className="mr-2 h-1.5 w-1.5" />}
+                Dark
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("system")}>
+                {theme === "system" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                {theme !== "system" && <span className="mr-2 h-1.5 w-1.5" />}
+                System
+              </DropdownMenuItem>
+              <div className="my-1 border-t border-border/40" />
+              <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/")}>
+                Homepage
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  router.push("/login");
+                }}
+              >
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
