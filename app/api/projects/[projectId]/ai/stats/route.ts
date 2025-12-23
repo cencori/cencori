@@ -109,45 +109,91 @@ export async function GET(
             ? requests.reduce((sum, r) => sum + (r.latency_ms || 0), 0) / totalRequests
             : 0;
 
-        // Group by date for chart
-        const requestsByDate = requests?.reduce((acc: DateAggregationMap, r) => {
-            const date = new Date(r.created_at).toISOString().split('T')[0];
-            if (!acc[date]) {
-                acc[date] = { date, count: 0, cost: 0, tokens: 0 };
+        // Determine grouping granularity based on period
+        const getGroupKey = (dateStr: string): string => {
+            const d = new Date(dateStr);
+            if (period === '1h') {
+                // Group by 5-minute intervals
+                const minutes = Math.floor(d.getMinutes() / 5) * 5;
+                return `${d.getHours().toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            } else if (period === '24h') {
+                // Group by hour
+                return `${d.getHours().toString().padStart(2, '0')}:00`;
+            } else {
+                // Group by day
+                return d.toISOString().split('T')[0];
             }
-            acc[date].count += 1;
-            acc[date].cost += parseFloat(r.cost_usd || '0');
-            acc[date].tokens += r.total_tokens || 0;
+        };
+
+        // Group requests by the appropriate time unit
+        const requestsByTime = requests?.reduce((acc: DateAggregationMap, r) => {
+            const key = getGroupKey(r.created_at);
+            if (!acc[key]) {
+                acc[key] = { date: key, count: 0, cost: 0, tokens: 0 };
+            }
+            acc[key].count += 1;
+            acc[key].cost += parseFloat(r.cost_usd || '0');
+            acc[key].tokens += r.total_tokens || 0;
             return acc;
         }, {} as DateAggregationMap);
 
-        // Find first request date to start chart 2 days before
-        let firstRequestDate: Date | null = null;
-        if (requests && requests.length > 0) {
-            const sortedByDate = [...requests].sort((a, b) =>
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-            firstRequestDate = new Date(sortedByDate[0].created_at);
-        }
-
-        // Generate chart data with filled dates (2 days before first request to now)
+        // Generate chart data with filled time slots
         const chartData: DateAggregation[] = [];
-        if (firstRequestDate) {
-            const chartStartDate = new Date(firstRequestDate);
-            chartStartDate.setDate(chartStartDate.getDate() - 2);
-            const endDate = new Date();
 
-            for (let d = new Date(chartStartDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
-                // Format as "Dec 22" style
-                const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const existing = requestsByDate?.[dateStr];
+        if (period === '1h') {
+            // Generate 12 slots (every 5 minutes for the last hour)
+            for (let i = 11; i >= 0; i--) {
+                const slotTime = new Date(now.getTime() - i * 5 * 60 * 1000);
+                const minutes = Math.floor(slotTime.getMinutes() / 5) * 5;
+                const key = `${slotTime.getHours().toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                const existing = requestsByTime?.[key];
                 chartData.push({
-                    date: formattedDate,
+                    date: key,
                     count: existing?.count || 0,
                     cost: existing?.cost || 0,
                     tokens: existing?.tokens || 0,
                 });
+            }
+        } else if (period === '24h') {
+            // Generate 24 slots (every hour for the last 24 hours)
+            for (let i = 23; i >= 0; i--) {
+                const slotTime = new Date(now.getTime() - i * 60 * 60 * 1000);
+                const key = `${slotTime.getHours().toString().padStart(2, '0')}:00`;
+                const existing = requestsByTime?.[key];
+                chartData.push({
+                    date: key,
+                    count: existing?.count || 0,
+                    cost: existing?.cost || 0,
+                    tokens: existing?.tokens || 0,
+                });
+            }
+        } else {
+            // For 7d, 30d, all - group by day
+            let firstRequestDate: Date | null = null;
+            if (requests && requests.length > 0) {
+                const sortedByDate = [...requests].sort((a, b) =>
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+                firstRequestDate = new Date(sortedByDate[0].created_at);
+            }
+
+            if (firstRequestDate) {
+                const chartStartDate = new Date(firstRequestDate);
+                chartStartDate.setDate(chartStartDate.getDate() - 2);
+                const endDate = new Date();
+
+                for (let d = new Date(chartStartDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    // Format as "Dec 22" style
+                    const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const existing = requestsByTime?.[dateStr];
+                    chartData.push({
+                        date: formattedDate,
+                        count: existing?.count || 0,
+                        cost: existing?.cost || 0,
+                        tokens: existing?.tokens || 0,
+                    });
+                }
             }
         }
 
