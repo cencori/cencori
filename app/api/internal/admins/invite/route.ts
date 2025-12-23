@@ -8,6 +8,9 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
 
+// Founder emails - always have access as fallback
+const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+
 // Helper to check if user is a super_admin
 async function getSuperAdminStatus(userId: string) {
     const supabase = createAdminClient();
@@ -30,10 +33,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Dev mode bypass or super_admin check
+    // Dev mode bypass, founder, or super_admin check
     const isDev = process.env.NODE_ENV === 'development';
+    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
     const admin = await getSuperAdminStatus(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || !!admin;
+    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Super admin access required' }, { status: 403 });
