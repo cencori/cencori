@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings } from 'lucide-react';
 import { usePlatformMetrics } from '../hooks/useMetrics';
 import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import type { TimePeriod } from '../lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 export function AdminDashboard() {
     const [period, setPeriod] = useState<TimePeriod>('7d');
@@ -31,7 +33,15 @@ export function AdminDashboard() {
                     <h1 className="text-xl font-semibold">Platform Analytics</h1>
                     <p className="text-xs text-muted-foreground">Real-time metrics across all Cencori services</p>
                 </div>
-                <TimeRangeSelector value={period} onChange={setPeriod} />
+                <div className="flex items-center gap-3">
+                    <TimeRangeSelector value={period} onChange={setPeriod} />
+                    <Link href="/internal/settings">
+                        <Button variant="outline" size="sm" className="h-8 text-xs rounded-full">
+                            <Settings className="h-3.5 w-3.5 mr-1.5" />
+                            Team
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {isLoading ? (
