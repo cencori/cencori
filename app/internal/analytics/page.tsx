@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminDashboard } from '@/internal/analytics/pages/AdminDashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,15 +10,19 @@ export default function InternalAnalyticsPage() {
     const [inputEmail, setInputEmail] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [isChecking, setIsChecking] = useState(true);
     const [error, setError] = useState('');
 
-    // Check sessionStorage on mount
-    useState(() => {
-        const stored = sessionStorage.getItem('internal_admin_email');
-        if (stored) {
-            setIsAuthorized(true);
+    // Check sessionStorage on mount (client-side only)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const stored = sessionStorage.getItem('internal_admin_email');
+            if (stored) {
+                setIsAuthorized(true);
+            }
         }
-    });
+        setIsChecking(false);
+    }, []);
 
     async function handleVerify(e: React.FormEvent) {
         e.preventDefault();
@@ -42,13 +46,24 @@ export default function InternalAnalyticsPage() {
             }
 
             // Success - store in session and show dashboard
-            sessionStorage.setItem('internal_admin_email', inputEmail);
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('internal_admin_email', inputEmail);
+            }
             setIsAuthorized(true);
         } catch {
             setError('Failed to verify access');
         }
 
         setIsVerifying(false);
+    }
+
+    // Show loading while checking session
+    if (isChecking) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+        );
     }
 
     if (isAuthorized) {
