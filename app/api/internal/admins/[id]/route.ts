@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
+// Founder emails - always have access
+const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+
+// For development, allow all authenticated users temporarily
+const ALLOW_ALL_IN_DEV = true;
+
 // Helper to check if user is a super_admin
 async function getSuperAdminStatus(userId: string) {
     const supabase = createAdminClient();
@@ -29,9 +35,13 @@ export async function DELETE(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only super_admins can remove admins
+    // Dev mode bypass, founder, or super_admin check
+    const isDev = process.env.NODE_ENV === 'development';
+    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
     const admin = await getSuperAdminStatus(user.id);
-    if (!admin) {
+    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
+
+    if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Super admin access required' }, { status: 403 });
     }
 
