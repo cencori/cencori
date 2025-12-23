@@ -189,10 +189,10 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            className="w-6 h-6 flex items-center justify-center rounded-full border border-border/40 hover:bg-secondary transition-colors shrink-0"
+                            className="w-7 h-7 flex items-center justify-center rounded-full border border-border/100 hover:bg-secondary transition-colors shrink-0"
                             aria-label="Help"
                         >
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56 p-2">
@@ -226,13 +226,13 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            className="w-6 h-6 flex items-center justify-center rounded-full border border-border/40 hover:bg-secondary transition-colors shrink-0 overflow-hidden"
+                            className="w-7 h-7 flex items-center justify-center rounded-full border border-border/100 hover:bg-secondary transition-colors shrink-0 overflow-hidden"
                             aria-label="User menu"
                         >
                             {typeof avatar === "string" && avatar.length > 0 ? (
                                 <img src={avatar} alt="User avatar" className="w-full h-full object-cover" />
                             ) : (
-                                <CircleUserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                                <CircleUserRound className="h-4 w-4 text-muted-foreground" />
                             )}
                         </button>
                     </DropdownMenuTrigger>

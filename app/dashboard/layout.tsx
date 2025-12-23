@@ -434,10 +434,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="hidden lg:inline-flex w-6 h-6 items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors cursor-pointer"
+                className="hidden lg:inline-flex w-7 h-7 items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors cursor-pointer"
                 aria-label="Help"
               >
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 p-2">
@@ -490,13 +490,13 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="hidden lg:inline-flex w-6 h-6 cursor-pointer items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors overflow-hidden"
+                className="hidden lg:inline-flex w-7 h-7 cursor-pointer items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors overflow-hidden"
                 aria-label="User menu"
               >
                 {typeof avatar === "string" && avatar.length > 0 ? (
                   <img src={avatar} alt={typeof name === "string" ? name : "User avatar"} className="w-full h-full object-cover" />
                 ) : (
-                  <CircleUserRound className="h-3.5 w-3.5 text-muted-foreground" />
+                  <CircleUserRound className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
             </DropdownMenuTrigger>
