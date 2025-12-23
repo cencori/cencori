@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { createAdminClient } from '@/lib/supabaseAdmin';
 import {
     getAIGatewayMetrics,
     getSecurityMetrics,
@@ -11,16 +12,20 @@ import {
 } from '@/internal/analytics/lib/queries';
 import type { TimePeriod } from '@/internal/analytics/lib/types';
 
-// Admin emails - add your email here
-const ADMIN_EMAILS = [
-    'admin@cencori.com',
-    'founder@cencori.com',
-    'omogbolahanng@gmail.com',
-    // Add your email below
-];
-
-// For development, allow all authenticated users
+// For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
+
+// Helper to check if user is an active admin
+async function isActiveAdmin(userId: string): Promise<boolean> {
+    const supabase = createAdminClient();
+    const { data: admin } = await supabase
+        .from('cencori_admins')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+    return !!admin;
+}
 
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
@@ -32,7 +37,8 @@ export async function GET(req: NextRequest) {
 
     // Check if user is admin (or allow all in dev mode)
     const isDev = process.env.NODE_ENV === 'development';
-    const isAllowed = ALLOW_ALL_IN_DEV && isDev ? true : ADMIN_EMAILS.includes(user.email || '');
+    const isAdmin = await isActiveAdmin(user.id);
+    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isAdmin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
