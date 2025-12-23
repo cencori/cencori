@@ -18,31 +18,54 @@ const ALLOW_ALL_IN_DEV = true;
 // Founder emails - always have access as fallback
 const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
-// Helper to check if user is an active admin
-async function isActiveAdmin(userId: string): Promise<boolean> {
+// Helper to check if email is an authorized admin
+async function isAuthorizedAdmin(email: string): Promise<boolean> {
+    if (FOUNDER_EMAILS.includes(email.toLowerCase())) {
+        return true;
+    }
+
     const supabase = createAdminClient();
     const { data: admin } = await supabase
         .from('cencori_admins')
         .select('id')
-        .eq('user_id', userId)
+        .eq('email', email.toLowerCase())
         .eq('status', 'active')
         .single();
     return !!admin;
 }
 
 export async function GET(req: NextRequest) {
-    const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Check for admin email header (from frontend gate)
+    const adminEmail = req.headers.get('X-Admin-Email');
 
-    if (userError || !user) {
+    // Must have some form of authentication
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // In production, require either admin email header or logged-in user
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if (!adminEmail && !user && !isDev) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin, founder, or in dev mode
-    const isDev = process.env.NODE_ENV === 'development';
-    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
-    const isAdmin = await isActiveAdmin(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || isAdmin;
+    // Check authorization
+    let isAllowed = false;
+
+    // Check admin email from header first
+    if (adminEmail) {
+        isAllowed = await isAuthorizedAdmin(adminEmail);
+    }
+
+    // Fall back to logged-in user email
+    if (!isAllowed && user?.email) {
+        isAllowed = await isAuthorizedAdmin(user.email);
+    }
+
+    // Dev mode bypass
+    if (!isAllowed && ALLOW_ALL_IN_DEV && isDev) {
+        isAllowed = true;
+    }
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
