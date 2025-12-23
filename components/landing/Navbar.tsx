@@ -1,10 +1,11 @@
 "use client";
 
 import { type VariantProps } from "class-variance-authority";
-import { Menu, ChevronDown } from "lucide-react";
+import { Menu, ChevronDown, Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CircleUserRound } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -157,6 +158,7 @@ export default function Navbar({
     userProfile,
 }: NavbarProps) {
     const router = useRouter();
+    const { theme, setTheme } = useTheme();
 
     const productsDropdown: NavDropdown = {
         title: "Products",
@@ -305,28 +307,50 @@ export default function Navbar({
                                                 )}
                                             </Avatar>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-56 rounded-xl border-border/40 shadow-none" align="end" forceMount>
-                                            <DropdownMenuLabel className="font-normal">
-                                                <div className="flex flex-col space-y-1">
-                                                    <p className="text-sm font-medium leading-none">
-                                                        {userProfile?.name ?? "User"}
-                                                    </p>
-                                                </div>
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="cursor-pointer rounded-lg focus:bg-accent" onClick={() => router.push("/dashboard/profile")}>
-                                                <CircleUserRound className="mr-2 h-4 w-4" />
-                                                <span>Profile</span>
+                                        <DropdownMenuContent className="w-66 p-1" align="end" forceMount>
+                                            <div className="px-2 py-1.5 border-b border-border/40 mb-1">
+                                                <p className="text-xs font-medium truncate">
+                                                    {userProfile?.name ?? "User"}
+                                                </p>
+                                            </div>
+                                            <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Account</p>
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/profile")}>
+                                                <CircleUserRound className="mr-2 h-3.5 w-3.5" />
+                                                Profile
                                             </DropdownMenuItem>
-                                            {/* ... other menu items ... */}
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/settings")}>
+                                                <Settings className="mr-2 h-3.5 w-3.5" />
+                                                Settings
+                                            </DropdownMenuItem>
+                                            <div className="my-1 border-t border-border/40" />
+                                            <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Theme</p>
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("light")}>
+                                                {theme === "light" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                {theme !== "light" && <span className="mr-2 h-1.5 w-1.5" />}
+                                                Light
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("dark")}>
+                                                {theme === "dark" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                {theme !== "dark" && <span className="mr-2 h-1.5 w-1.5" />}
+                                                Dark
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("system")}>
+                                                {theme === "system" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                {theme !== "system" && <span className="mr-2 h-1.5 w-1.5" />}
+                                                System
+                                            </DropdownMenuItem>
+                                            <div className="my-1 border-t border-border/40" />
+                                            <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/organizations")}>
+                                                Dashboard
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem
+                                                className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
                                                 onClick={async () => {
                                                     await supabase.auth.signOut();
                                                     router.push("/login");
                                                 }}
-                                                className="cursor-pointer rounded-lg focus:bg-accent"
                                             >
-                                                <span>Log out</span>
+                                                Log out
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
