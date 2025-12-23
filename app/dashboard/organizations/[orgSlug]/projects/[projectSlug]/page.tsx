@@ -423,6 +423,10 @@ export default function ProjectDetailsPage({
                         tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
                         interval="preserveStartEnd"
                       />
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        content={<ChartTooltipContent hideLabel />}
+                      />
                       <Bar
                         dataKey="count"
                         fill="var(--color-requests)"
@@ -455,6 +459,10 @@ export default function ProjectDetailsPage({
                         tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
                         interval="preserveStartEnd"
                       />
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        content={<ChartTooltipContent hideLabel formatter={(value) => `$${Number(value).toFixed(6)}`} />}
+                      />
                       <Bar
                         dataKey="cost"
                         fill="var(--color-cost)"
@@ -486,6 +494,10 @@ export default function ProjectDetailsPage({
                         axisLine={false}
                         tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
                         interval="preserveStartEnd"
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        content={<ChartTooltipContent hideLabel />}
                       />
                       <Bar
                         dataKey="count"
