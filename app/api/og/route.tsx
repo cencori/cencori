@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
                             gap: "12px",
                         }}
                     >
+                        {/* C Monogram */}
                         <div
                             style={{
                                 display: "flex",
@@ -81,8 +82,15 @@ export async function GET(request: NextRequest) {
                                 height: "40px",
                                 background: PRIMARY,
                                 borderRadius: "8px",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "24px",
+                                fontWeight: 700,
+                                color: BACKGROUND,
                             }}
-                        />
+                        >
+                            C
+                        </div>
                         <span
                             style={{
                                 fontSize: "24px",
