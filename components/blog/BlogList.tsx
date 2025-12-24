@@ -5,7 +5,6 @@ import { BlogPost } from "@/lib/blog";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
-import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
 import { cn } from "@/lib/utils";
 
 interface BlogListProps {
@@ -28,49 +27,48 @@ export function BlogList({ posts, tags }: BlogListProps) {
     }, [posts, searchQuery, selectedTag]);
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto px-4 py-6 max-w-5xl">
             {/* Search and Filters */}
-            <div className="mb-8 space-y-8">
-                <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+            <div className="mb-6 space-y-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                     {/* Search */}
-                    <div className="w-full md:max-w-md">
+                    <div className="w-full md:max-w-xs">
                         <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
                                 type="text"
-                                placeholder="Search articles..."
+                                placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-11 h-12 rounded-full bg-background/50 border-zinc-900 focus-visible:ring-primary/20 transition-all duration-300 hover:border-primary/50 hover:bg-background/80"
+                                className="pl-9 h-9 text-sm bg-background border-border/50"
                             />
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery("")}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    <X className="h-4 w-4" />
+                                    <X className="h-3.5 w-3.5" />
                                 </button>
                             )}
                         </div>
                     </div>
 
                     {/* Tags */}
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-end">
+                    <div className="flex flex-wrap gap-1.5 justify-center md:justify-end">
                         {[
-                            { value: null, label: "All Posts" },
+                            { value: null, label: "All" },
                             { value: "Engineering", label: "Engineering" },
                             { value: "Announcement", label: "Announcement" },
                             { value: "Product", label: "Product" },
-                            { value: "Company News", label: "Company News" },
                         ].map((tag) => (
                             <button
                                 key={tag.label}
                                 onClick={() => setSelectedTag(tag.value === selectedTag ? null : tag.value)}
                                 className={cn(
-                                    "px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border",
+                                    "h-7 px-2.5 rounded text-xs font-medium transition-colors border",
                                     (tag.value === null ? !selectedTag : selectedTag === tag.value)
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-background border-border hover:border-primary/50 text-muted-foreground hover:text-foreground"
+                                        ? "bg-foreground text-background border-foreground"
+                                        : "bg-background border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                                 )}
                             >
                                 {tag.label}
@@ -82,28 +80,29 @@ export function BlogList({ posts, tags }: BlogListProps) {
 
             {/* Posts Grid */}
             {filteredPosts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredPosts.map((post) => (
                         <BlogCard key={post.slug} post={post} />
                     ))}
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                        <Search className="h-8 w-8 text-muted-foreground" />
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mb-3">
+                        <Search className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">No articles found</h3>
-                    <p className="text-muted-foreground max-w-sm">
-                        We couldn&apos;t find any articles matching your search. Try adjusting your filters or search terms.
+                    <h3 className="text-sm font-semibold mb-1">No articles found</h3>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                        Try adjusting your filters or search terms.
                     </p>
                     <button
                         onClick={() => { setSearchQuery(""); setSelectedTag(null); }}
-                        className="mt-6 text-primary hover:underline underline-offset-4 font-medium"
+                        className="mt-4 text-xs text-primary hover:underline underline-offset-4 font-medium"
                     >
-                        Clear all filters
+                        Clear filters
                     </button>
                 </div>
             )}
         </div>
     );
 }
+
