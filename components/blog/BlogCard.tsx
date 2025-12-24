@@ -1,10 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { BlogPost } from "@/lib/blog";
-import { Calendar, Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowUpRight } from "lucide-react";
 import { format } from "date-fns";
-import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
-import { Badge } from "@/components/ui/badge";
 
 interface BlogCardProps {
     post: BlogPost;
@@ -13,101 +11,84 @@ interface BlogCardProps {
 export function BlogCard({ post }: BlogCardProps) {
     return (
         <Link href={`/blog/${post.slug}`} className="block h-full group">
-            <TechnicalBorder
-                className="h-full bg-background/50 backdrop-blur-sm"
-                cornerSize={12}
-                borderWidth={1}
-                hoverEffect={true}
-            >
-                <div className="flex flex-col h-full">
-                    {/* Cover Image */}
-                    <div className="relative w-full h-52 overflow-hidden border-b border-border/40">
-                        {post.coverImage ? (
-                            <Image
-                                src={post.coverImage}
-                                alt={post.title}
-                                fill
-                                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                                <span className="text-4xl font-bold text-primary/20">Cencori</span>
-                            </div>
-                        )}
-
-                        {/* Date Badge */}
-                        <div className="absolute top-4 right-4">
-                            <Badge variant="secondary" className="bg-background/80 backdrop-blur-md border-border/50 text-xs font-mono">
-                                {format(new Date(post.date), "MMM d, yyyy")}
-                            </Badge>
+            <div className="h-full border border-border/50 rounded-lg overflow-hidden bg-background hover:border-border transition-colors">
+                {/* Cover Image */}
+                <div className="relative w-full h-36 overflow-hidden border-b border-border/40">
+                    {post.coverImage ? (
+                        <Image
+                            src={post.coverImage}
+                            alt={post.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-muted/50 flex items-center justify-center">
+                            <span className="text-lg font-semibold text-muted-foreground/30">Cencori</span>
                         </div>
-                    </div>
+                    )}
+                </div>
 
-                    {/* Content */}
-                    <div className="flex flex-col flex-1 p-6">
-                        {/* Tags */}
-                        {post.tags && post.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {post.tags.slice(0, 2).map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="text-[10px] uppercase tracking-wider font-semibold text-primary/80"
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
+                {/* Content */}
+                <div className="flex flex-col flex-1 p-4">
+                    {/* Tags */}
+                    {post.tags && post.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                            {post.tags.slice(0, 2).map((tag) => (
+                                <span
+                                    key={tag}
+                                    className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground"
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Title */}
+                    <h3 className="text-sm font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                        {post.title}
+                    </h3>
+
+                    {/* Excerpt */}
+                    <p className="text-xs text-muted-foreground mb-4 line-clamp-2 flex-1">
+                        {post.excerpt}
+                    </p>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-auto">
+                        {/* Author & Date */}
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            {post.authorDetails && post.authorDetails.length > 0 && (
+                                <>
+                                    {post.authorDetails[0].avatar && (
+                                        <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border/50">
+                                            <Image
+                                                src={post.authorDetails[0].avatar}
+                                                alt={post.authorDetails[0].name}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                        </div>
+                                    )}
+                                    <span>{post.authorDetails[0].name}</span>
+                                    <span className="text-muted-foreground/40">·</span>
+                                </>
+                            )}
+                            <span>{format(new Date(post.date), "MMM d")}</span>
+                        </div>
+
+                        {/* Read Time & Arrow */}
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {post.readTime}
                             </div>
-                        )}
-
-                        {/* Title */}
-                        <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
-                            {post.title}
-                        </h3>
-
-                        {/* Excerpt */}
-                        <p className="text-muted-foreground text-sm mb-6 line-clamp-3 flex-1 leading-relaxed">
-                            {post.excerpt}
-                        </p>
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between pt-4 border-t border-border/40 mt-auto">
-                            {/* Author */}
-                            <div className="flex items-center gap-2">
-                                {post.authorDetails && post.authorDetails.length > 0 && (
-                                    <div className="flex -space-x-2">
-                                        {post.authorDetails.slice(0, 1).map((author) => (
-                                            <div key={author.slug} className="flex items-center gap-2">
-                                                <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
-                                                    {author.avatar ? (
-                                                        <Image
-                                                            src={author.avatar}
-                                                            alt={author.name}
-                                                            fill
-                                                            className="object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-primary/20" />
-                                                    )}
-                                                </div>
-                                                <span className="text-xs font-medium text-muted-foreground">{author.name}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Read Time & Arrow */}
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {post.readTime}
-                                </div>
-                                <ArrowRight className="h-3 w-3 -rotate-45 group-hover:rotate-0 transition-transform duration-300 text-primary" />
-                            </div>
+                            <ArrowUpRight className="h-3 w-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform text-primary" />
                         </div>
                     </div>
                 </div>
-            </TechnicalBorder>
+            </div>
         </Link>
     );
 }
+

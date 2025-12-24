@@ -1,5 +1,22 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Changelog",
+  description: "New features, improvements, and fixes for Cencori.",
+  openGraph: {
+    title: "Changelog | Cencori",
+    description: "New features, improvements, and fixes for Cencori.",
+    images: ["/api/og?title=Changelog&subtitle=New features, improvements, and fixes&type=changelog"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Changelog | Cencori",
+    description: "New features, improvements, and fixes for Cencori.",
+    images: ["/api/og?title=Changelog&subtitle=New features, improvements, and fixes&type=changelog"],
+  },
+};
 
 // Changelog entry types
 type ChangeType = "feature" | "improvement" | "fix" | "breaking";

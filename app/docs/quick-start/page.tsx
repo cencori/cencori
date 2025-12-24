@@ -58,6 +58,15 @@ yarn add cencori
 pnpm add cencori`}
                     />
                 </div>
+
+                <div className="space-y-3 mt-4">
+                    <h3 className="text-base font-semibold">Python</h3>
+                    <CodeBlock
+                        filename="terminal"
+                        language="bash"
+                        code={`pip install cencori`}
+                    />
+                </div>
             </div>
 
             {/* Step 2: Get Your API Keys */}
@@ -103,6 +112,21 @@ pnpm add cencori`}
 export const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
 });`}
+                    />
+                </div>
+
+                <div className="space-y-3 mt-4">
+                    <h3 className="text-base font-semibold">Python</h3>
+                    <CodeBlock
+                        filename="main.py"
+                        language="python"
+                        code={`from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+# Or use environment variable
+import os
+cencori = Cencori(api_key=os.environ["CENCORI_API_KEY"])`}
                     />
                 </div>
 
