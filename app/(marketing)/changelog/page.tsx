@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import type { Metadata } from "next";
 
@@ -25,6 +26,7 @@ interface ChangelogEntry {
   version: string;
   date: string;
   title: string;
+  slug: string;
   type: ChangeType;
   items: string[];
 }
@@ -33,8 +35,9 @@ interface ChangelogEntry {
 const changelogData: ChangelogEntry[] = [
   {
     version: "1.5.0",
-    date: "2024-12-24",
+    date: "2025-12-24",
     title: "Python SDK Published",
+    slug: "python-sdk-published",
     type: "feature",
     items: [
       "Published cencori package to PyPI",
@@ -46,8 +49,9 @@ const changelogData: ChangelogEntry[] = [
   },
   {
     version: "1.4.0",
-    date: "2024-12-23",
+    date: "2025-12-23",
     title: "Cenpact Design System",
+    slug: "cenpact-design-system",
     type: "improvement",
     items: [
       "Introduced Cenpact: dense, developer-first design language",
@@ -59,8 +63,9 @@ const changelogData: ChangelogEntry[] = [
   },
   {
     version: "1.3.0",
-    date: "2024-12-20",
+    date: "2025-12-20",
     title: "Edge Feature (Preview)",
+    slug: "edge-feature-preview",
     type: "feature",
     items: [
       "Edge runtime support for low-latency regions",
@@ -71,8 +76,9 @@ const changelogData: ChangelogEntry[] = [
   },
   {
     version: "1.2.0",
-    date: "2024-12-15",
+    date: "2025-12-15",
     title: "TypeScript SDK Published",
+    slug: "typescript-sdk-published",
     type: "feature",
     items: [
       "Published cencori package to npm",
@@ -84,8 +90,9 @@ const changelogData: ChangelogEntry[] = [
   },
   {
     version: "1.0.0",
-    date: "2024-12-01",
+    date: "2025-12-01",
     title: "API Gateway Launch",
+    slug: "api-gateway-launch",
     type: "feature",
     items: [
       "Multi-provider support (OpenAI, Anthropic, Google Gemini)",
@@ -164,7 +171,11 @@ export default function ChangelogPage() {
                 </div>
 
                 {/* Title */}
-                <h2 className="text-xl font-semibold">{entry.title}</h2>
+                <Link href={`/blog/${entry.slug}`} className="group">
+                  <h2 className="text-xl font-semibold group-hover:text-primary transition-colors">
+                    {entry.title}
+                  </h2>
+                </Link>
 
                 {/* Items */}
                 <ul className="space-y-2 text-muted-foreground">

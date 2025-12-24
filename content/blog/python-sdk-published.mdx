@@ -1,0 +1,53 @@
+---
+title: "Python SDK Published"
+slug: "python-sdk-published"
+date: "2025-12-24"
+excerpt: "The Cencori Python SDK is now available on PyPI. Full feature parity with TypeScript, streaming support, and type-safe dataclasses."
+coverImage: ""
+authors:
+  - bola
+tags: ["Changelog", "Product"]
+published: true
+---
+
+Today we published the official Cencori Python SDK to PyPI.
+
+## Installation
+
+```bash
+pip install cencori
+```
+
+## Quick Start
+
+```python
+from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+response = cencori.ai.chat(
+    messages=[{"role": "user", "content": "Hello!"}],
+    model="gpt-4o",
+)
+
+print(response.content)
+```
+
+## Streaming
+
+```python
+for chunk in cencori.ai.chat_stream(
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    model="claude-3-opus",
+):
+    print(chunk.delta, end="")
+```
+
+## What's Included
+
+- **Full feature parity** with TypeScript SDK
+- **Streaming support** via httpx
+- **Type-safe dataclasses** for all responses
+- **Comprehensive error handling** with typed exceptions
+
+Published to [pypi.org/project/cencori](https://pypi.org/project/cencori/).
