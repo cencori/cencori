@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import type { Metadata } from "next";
 
@@ -25,6 +26,7 @@ interface ChangelogEntry {
   version: string;
   date: string;
   title: string;
+  slug: string;
   type: ChangeType;
   items: string[];
 }
@@ -32,38 +34,70 @@ interface ChangelogEntry {
 // Add new entries at the top of this array
 const changelogData: ChangelogEntry[] = [
   {
-    version: "1.2.0",
-    date: "2025-12-12",
-    title: "AI Infrastructure Positioning",
+    version: "1.5.0",
+    date: "2025-12-24",
+    title: "Python SDK Published",
+    slug: "python-sdk-published",
     type: "feature",
     items: [
-      "Updated brand positioning to 'AI Infrastructure for Production'",
-      "New hero tagline and subheadline",
-      "Repositioned docs, README, and landing page copy",
-      "Switched app font to Montserrat with JetBrains Mono for code",
+      "Published cencori package to PyPI",
+      "Full feature parity with TypeScript SDK",
+      "Streaming support with httpx",
+      "Type-safe dataclasses for all responses",
+      "Comprehensive error handling",
     ],
   },
   {
-    version: "1.1.0",
-    date: "2025-12-11",
-    title: "Dashboard UI Improvements",
+    version: "1.4.0",
+    date: "2025-12-23",
+    title: "Cenpact Design System",
+    slug: "cenpact-design-system",
     type: "improvement",
     items: [
-      "Cleaner organization cards with hover effects",
-      "Improved project table with better headers and date format",
-      "Fixed delete organization modal with AlertDialog",
-      "Added copy button for organization slug",
+      "Introduced Cenpact: dense, developer-first design language",
+      "Redesigned dashboard with compact layouts",
+      "Updated blog and docs with new typography scale",
+      "Dark mode native with subtle sophistication",
+      "Dynamic OG image generation with Cenpact styling",
+    ],
+  },
+  {
+    version: "1.3.0",
+    date: "2025-12-20",
+    title: "Edge Feature (Preview)",
+    slug: "edge-feature-preview",
+    type: "feature",
+    items: [
+      "Edge runtime support for low-latency regions",
+      "Automatic request routing to nearest edge node",
+      "Preview available for Pro tier users",
+      "Currently in beta, full release coming soon",
+    ],
+  },
+  {
+    version: "1.2.0",
+    date: "2025-12-15",
+    title: "TypeScript SDK Published",
+    slug: "typescript-sdk-published",
+    type: "feature",
+    items: [
+      "Published cencori package to npm",
+      "Full client with cencori.ai.chat() and cencori.ai.chatStream()",
+      "Typed responses and error handling",
+      "ESM and CommonJS support",
+      "Comprehensive documentation and examples",
     ],
   },
   {
     version: "1.0.0",
     date: "2025-12-01",
-    title: "Initial Release",
+    title: "API Gateway Launch",
+    slug: "api-gateway-launch",
     type: "feature",
     items: [
       "Multi-provider support (OpenAI, Anthropic, Google Gemini)",
       "Security scanning with PII detection and prompt injection protection",
-      "Credits-based billing with cost tracking",
+      "Credits-based billing with real-time cost tracking",
       "Real-time streaming with Server-Sent Events",
       "Complete audit logs for every request",
       "Dashboard with analytics and usage tracking",
@@ -137,7 +171,11 @@ export default function ChangelogPage() {
                 </div>
 
                 {/* Title */}
-                <h2 className="text-xl font-semibold">{entry.title}</h2>
+                <Link href={`/blog/${entry.slug}`} className="group">
+                  <h2 className="text-xl font-semibold group-hover:text-primary transition-colors">
+                    {entry.title}
+                  </h2>
+                </Link>
 
                 {/* Items */}
                 <ul className="space-y-2 text-muted-foreground">

@@ -1,7 +1,14 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const runtime = "nodejs";
+
+// Load logo as base64
+const logoPath = join(process.cwd(), "public", "cdark.png");
+const logoData = readFileSync(logoPath);
+const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
 
 // Cenpact colors
 const BACKGROUND = "#0d0d0d";
@@ -74,14 +81,12 @@ export async function GET(request: NextRequest) {
                             gap: "12px",
                         }}
                     >
-                        <div
-                            style={{
-                                display: "flex",
-                                width: "40px",
-                                height: "40px",
-                                background: PRIMARY,
-                                borderRadius: "8px",
-                            }}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={logoBase64}
+                            alt="Cencori"
+                            width={16}
+                            height={16}
                         />
                         <span
                             style={{

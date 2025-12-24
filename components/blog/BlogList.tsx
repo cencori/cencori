@@ -40,7 +40,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
                                 placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 h-9 text-sm bg-background border-border/50"
+                                className="pl-9 h-9 text-sm bg-background border-border/50 rounded-full"
                             />
                             {searchQuery && (
                                 <button
@@ -57,6 +57,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
                     <div className="flex flex-wrap gap-1.5 justify-center md:justify-end">
                         {[
                             { value: null, label: "All" },
+                            { value: "Changelog", label: "Changelog" },
                             { value: "Engineering", label: "Engineering" },
                             { value: "Announcement", label: "Announcement" },
                             { value: "Product", label: "Product" },
@@ -65,7 +66,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
                                 key={tag.label}
                                 onClick={() => setSelectedTag(tag.value === selectedTag ? null : tag.value)}
                                 className={cn(
-                                    "h-7 px-2.5 rounded text-xs font-medium transition-colors border",
+                                    "h-7 px-3 rounded-full text-xs font-medium transition-colors border",
                                     (tag.value === null ? !selectedTag : selectedTag === tag.value)
                                         ? "bg-foreground text-background border-foreground"
                                         : "bg-background border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
