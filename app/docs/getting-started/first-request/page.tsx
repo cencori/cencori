@@ -78,6 +78,9 @@ export default function MakeFirstRequestPage() {
                     Step 4: Install the SDK
                 </h2>
 
+                <p className="text-sm text-muted-foreground">
+                    <strong>JavaScript/TypeScript:</strong>
+                </p>
                 <CodeBlock
                     filename="terminal"
                     language="bash"
@@ -86,6 +89,15 @@ export default function MakeFirstRequestPage() {
 yarn add cencori
 # or
 pnpm add cencori`}
+                />
+
+                <p className="text-sm text-muted-foreground mt-4">
+                    <strong>Python:</strong>
+                </p>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`pip install cencori`}
                 />
             </div>
 
