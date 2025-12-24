@@ -57,6 +57,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
                     <div className="flex flex-wrap gap-1.5 justify-center md:justify-end">
                         {[
                             { value: null, label: "All" },
+                            { value: "Changelog", label: "Changelog" },
                             { value: "Engineering", label: "Engineering" },
                             { value: "Announcement", label: "Announcement" },
                             { value: "Product", label: "Product" },
