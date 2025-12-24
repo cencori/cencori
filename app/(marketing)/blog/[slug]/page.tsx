@@ -34,6 +34,14 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
         };
     }
 
+    // Use cover image or fall back to dynamic OG
+    const authorName = post.authorDetails[0]?.name || "";
+    const formattedDate = post.date ? new Date(post.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+
+    const ogImage = post.coverImage
+        ? post.coverImage
+        : `/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
+
     return {
         title: post.title,
         description: post.excerpt,
@@ -45,7 +53,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             authors: post.authorDetails.map((a) => a.name),
             images: [
                 {
-                    url: post.coverImage,
+                    url: ogImage,
                     width: 1200,
                     height: 630,
                     alt: post.title,
@@ -56,7 +64,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             card: "summary_large_image",
             title: post.title,
             description: post.excerpt,
-            images: [post.coverImage],
+            images: [ogImage],
         },
     };
 }

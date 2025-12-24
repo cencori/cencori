@@ -5,6 +5,18 @@ import { Footer } from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
     title: "Documentation",
+    description: "Cencori documentation - guides, API reference, and tutorials.",
+    openGraph: {
+        title: "Documentation | Cencori",
+        description: "Cencori documentation - guides, API reference, and tutorials.",
+        images: ["/api/og?title=Documentation&subtitle=Guides, API reference, and tutorials&type=docs"],
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Documentation | Cencori",
+        description: "Cencori documentation - guides, API reference, and tutorials.",
+        images: ["/api/og?title=Documentation&subtitle=Guides, API reference, and tutorials&type=docs"],
+    },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
