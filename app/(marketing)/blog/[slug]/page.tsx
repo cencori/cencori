@@ -1,17 +1,13 @@
 import { notFound } from "next/navigation";
 import { getPostBySlug, getAllPosts } from "@/lib/blog";
-import { AuthorBadge } from "@/components/blog/AuthorBadge";
-import { TagChip } from "@/components/blog/TagChip";
 import { parseMDX } from "@/lib/blog";
 import { format } from "date-fns";
-import { Calendar, Clock, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
-import { TechnicalBorder } from "@/components/landing/TechnicalBorder";
-import { CodeBlock } from "@/components/ai-elements/code-block";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -38,6 +34,14 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
         };
     }
 
+    // Use cover image or fall back to dynamic OG
+    const authorName = post.authorDetails[0]?.name || "";
+    const formattedDate = post.date ? new Date(post.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+
+    const ogImage = post.coverImage
+        ? post.coverImage
+        : `/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
+
     return {
         title: post.title,
         description: post.excerpt,
@@ -49,7 +53,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             authors: post.authorDetails.map((a) => a.name),
             images: [
                 {
-                    url: post.coverImage,
+                    url: ogImage,
                     width: 1200,
                     height: 630,
                     alt: post.title,
@@ -60,7 +64,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             card: "summary_large_image",
             title: post.title,
             description: post.excerpt,
-            images: [post.coverImage],
+            images: [ogImage],
         },
     };
 }
@@ -80,35 +84,46 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <Navbar />
 
             <main className="flex-1 pt-20">
-                {/* Background Elements */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
-
-                <article className="container mx-auto px-4 max-w-5xl py-16">
+                <article className="container mx-auto px-4 max-w-2xl py-12">
                     {/* Back Link */}
-                    <div className="mb-8 flex justify-center">
+                    <div className="mb-6">
                         <Link
                             href="/blog"
-                            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+                            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                            <ArrowLeft className="h-3 w-3" />
                             Blog
                         </Link>
                     </div>
 
                     {/* Header */}
-                    <header className="mb-32 text-center max-w-2xl mx-auto">
+                    <header className="mb-8">
+                        {/* Tags */}
+                        {post.tags && post.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {post.tags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Title */}
-                        <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight leading-tight">
+                        <h1 className="text-2xl font-bold mb-4 tracking-tight leading-tight">
                             {post.title}
                         </h1>
 
-                        {/* Meta & Author */}
-                        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+                        {/* Meta */}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                             {/* Author */}
                             {post.authorDetails.map((author) => (
                                 <div key={author.slug} className="flex items-center gap-2">
                                     {author.avatar && (
-                                        <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
+                                        <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border/50">
                                             <Image
                                                 src={author.avatar}
                                                 alt={author.name}
@@ -121,26 +136,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                 </div>
                             ))}
 
-                            <span className="text-muted-foreground/30">•</span>
-
-                            {/* Date */}
-                            <div>
-                                {format(new Date(post.date), "MMMM d, yyyy")}
-                            </div>
-
-                            <span className="text-muted-foreground/30">•</span>
-
-                            {/* Read Time */}
-                            <div>
-                                {post.readTime}
-                            </div>
+                            <span className="text-muted-foreground/40">·</span>
+                            <span>{format(new Date(post.date), "MMMM d, yyyy")}</span>
+                            <span className="text-muted-foreground/40">·</span>
+                            <span>{post.readTime}</span>
                         </div>
                     </header>
 
-                    {/* Hero Image - Hidden */}
-
                     {/* Content */}
-                    <div className="prose prose-zinc dark:prose-invert max-w-none prose-base prose-headings:font-bold prose-headings:tracking-tight prose-a:text-purple-400 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-strong:text-foreground prose-strong:font-semibold">
+                    <div className="prose prose-zinc dark:prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-p:text-muted-foreground prose-li:text-muted-foreground">
                         {content}
                     </div>
                 </article>
@@ -150,3 +154,4 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </div>
     );
 }
+
