@@ -78,7 +78,7 @@ function createBotResponse(url: string): Response {
   });
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const userAgent = request.headers.get('user-agent') || '';
 
   // Check if this is a social media bot
