@@ -14,18 +14,12 @@ export function BlogCard({ post }: BlogCardProps) {
             <div className="h-full border border-border/50 rounded-lg overflow-hidden bg-background hover:border-border transition-colors">
                 {/* Cover Image */}
                 <div className="relative w-full h-36 overflow-hidden border-b border-border/40">
-                    {post.coverImage ? (
-                        <Image
-                            src={post.coverImage}
-                            alt={post.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                    ) : (
-                        <div className="w-full h-full bg-muted/50 flex items-center justify-center">
-                            <span className="text-lg font-semibold text-muted-foreground/30">Cencori</span>
-                        </div>
-                    )}
+                    <Image
+                        src={post.coverImage || `/api/og?title=${encodeURIComponent(post.title)}&type=blog`}
+                        alt={post.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
                 </div>
 
                 {/* Content */}
