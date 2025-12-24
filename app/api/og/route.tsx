@@ -74,23 +74,16 @@ export async function GET(request: NextRequest) {
                             gap: "12px",
                         }}
                     >
-                        {/* C Monogram */}
-                        <div
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="https://cencori.com/cdark.png"
+                            alt="Cencori"
+                            width={40}
+                            height={40}
                             style={{
-                                display: "flex",
-                                width: "40px",
-                                height: "40px",
-                                background: PRIMARY,
                                 borderRadius: "8px",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "24px",
-                                fontWeight: 700,
-                                color: BACKGROUND,
                             }}
-                        >
-                            C
-                        </div>
+                        />
                         <span
                             style={{
                                 fontSize: "24px",
