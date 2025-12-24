@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Configure images to allow /api/og with query strings
+  images: {
+    localPatterns: [
+      {
+        pathname: "/api/og",
+        search: "",
+      },
+    ],
+  },
   // Aggressive caching for static assets (OG images, etc.)
   async headers() {
     return [
