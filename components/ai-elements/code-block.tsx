@@ -54,6 +54,11 @@ export async function highlightCode(
   language: BundledLanguage,
   showLineNumbers = false
 ) {
+  // Guard against undefined or null code
+  if (!code) {
+    return ["", ""];
+  }
+
   const transformers: ShikiTransformer[] = showLineNumbers
     ? [lineNumberTransformer]
     : [];

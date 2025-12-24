@@ -14,10 +14,16 @@ Cencori is the unified AI infrastructure for production applications. Instead of
 
 ### 1. Install the SDK
 
+**JavaScript/TypeScript:**
 ```bash
 npm install cencori
 # or: yarn add cencori
 # or: pnpm add cencori
+```
+
+**Python:**
+```bash
+pip install cencori
 ```
 
 ### 2. Set Environment Variables
@@ -77,6 +83,25 @@ const response = await cencori.ai.chat({
 });
 
 console.log(response.content);
+```
+
+**Python:**
+```python
+from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+response = cencori.ai.chat(
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello!"}
+    ],
+    model="gpt-4o",
+    temperature=0.7,
+    max_tokens=1000,
+)
+
+print(response.content)
 ```
 
 ### Parameters
