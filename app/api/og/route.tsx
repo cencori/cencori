@@ -76,13 +76,10 @@ export async function GET(request: NextRequest) {
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src="https://cencori.com/cdark.png"
+                            src="/public/cdark.png"
                             alt="Cencori"
-                            width={40}
-                            height={40}
-                            style={{
-                                borderRadius: "8px",
-                            }}
+                            width={16}
+                            height={16}
                         />
                         <span
                             style={{
