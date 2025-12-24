@@ -1,0 +1,59 @@
+---
+title: "TypeScript SDK Published"
+slug: "typescript-sdk-published"
+date: "2025-12-15"
+excerpt: "The official Cencori TypeScript SDK is now available on npm. Typed client, streaming support, and comprehensive error handling."
+coverImage: ""
+authors:
+  - bola
+tags: ["Changelog", "Product"]
+published: true
+---
+
+We published the official Cencori TypeScript SDK to npm.
+
+## Installation
+
+```bash
+npm install cencori
+```
+
+## Quick Start
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+
+console.log(response.content);
+```
+
+## Streaming
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'claude-3-opus',
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## What's Included
+
+- **Typed client** with full IntelliSense support
+- **Streaming support** for real-time chat UIs
+- **Error classes** (`SafetyError`, `RateLimitError`, `AuthenticationError`)
+- **ESM and CommonJS** support
+- **Comprehensive documentation**
+
+Published to [npmjs.com/package/cencori](https://www.npmjs.com/package/cencori).

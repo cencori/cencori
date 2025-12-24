@@ -1,0 +1,182 @@
+---
+title: "December Updates: SDKs, Design System, and Edge Preview"
+slug: "december-2024-updates"
+date: "2025-12-24"
+excerpt: "A look at what we've shipped this month: TypeScript and Python SDKs, the Cenpact design system, and our Edge preview."
+coverImage: ""
+authors:
+  - bola
+tags: ["Changelog", "Announcement", "Product"]
+published: true
+---
+
+December has been our most productive month yet. We've shipped major features that make Cencori easier to integrate, more pleasant to use, and faster at the edge. Here's everything that landed.
+
+## TypeScript SDK: First-Class Developer Experience
+
+We published the official Cencori TypeScript SDK to npm. Instead of writing raw fetch calls, you can now use a typed client:
+
+```bash
+npm install cencori
+```
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+});
+
+// Non-streaming
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+
+console.log(response.content);
+
+// Streaming
+const stream = cencori.ai.chatStream({
+  model: 'claude-3-opus',
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+**Why it matters:** Type safety catches errors at compile time. Streaming support enables real-time chat UIs. Error classes like `SafetyError` and `RateLimitError` let you handle edge cases gracefully.
+
+---
+
+## Python SDK: For Python Teams
+
+A potential customer's backend was in Python. We built the SDK they needed:
+
+```bash
+pip install cencori
+```
+
+```python
+from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+# Non-streaming
+response = cencori.ai.chat(
+    messages=[{"role": "user", "content": "Hello!"}],
+    model="gpt-4o",
+)
+
+print(response.content)
+
+# Streaming
+for chunk in cencori.ai.chat_stream(
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    model="claude-3-opus",
+):
+    print(chunk.delta, end="")
+```
+
+Full feature parity with the TypeScript SDK. Built with `httpx` for async support and type-safe dataclasses for all responses.
+
+**Published to PyPI:** [pypi.org/project/cencori](https://pypi.org/project/cencori/)
+
+---
+
+## Edge Preview: Low-Latency AI
+
+We're testing edge runtime support for Pro tier users. Early results:
+
+| Region | Before (Origin) | After (Edge) | Improvement |
+|--------|-----------------|--------------|-------------|
+| US West | 120ms | 45ms | 63% faster |
+| EU Central | 180ms | 55ms | 69% faster |
+| Asia Pacific | 250ms | 70ms | 72% faster |
+
+Requests automatically route to the nearest edge node. No code changes required—just enable it in your project settings.
+
+**Currently in beta.** Full release coming in Q1 2025.
+
+---
+
+## Cenpact Design System
+
+We redesigned Cencori with a new design language we call **Cenpact** (Cencori + Compact).
+
+### The Philosophy
+
+| Principle | What It Means |
+|-----------|---------------|
+| **Dense but Breathable** | Pack information tightly while maintaining visual hierarchy |
+| **Subtle Sophistication** | Muted colors, soft borders, understated hover effects |
+| **Developer-First** | Design for power users who value efficiency |
+| **Dark Mode Native** | Built for dark mode first |
+
+### What Changed
+
+- **Dashboard:** Compact cards, smaller typography, tighter spacing
+- **Blog:** Simplified cards, denser content, cleaner article pages
+- **Docs:** Reduced padding, smaller headers, focused reading experience
+- **Dynamic OG Images:** Auto-generated social preview cards with Cenpact styling
+
+The result is a UI that shows more information with less scrolling, without feeling cramped.
+
+---
+
+## API Gateway: The Foundation
+
+Everything builds on our core API Gateway, launched at the start of the month:
+
+- **Multi-provider support:** OpenAI, Anthropic, Google Gemini
+- **Security scanning:** PII detection, prompt injection protection
+- **Credits-based billing:** Real-time cost tracking
+- **Streaming:** Server-Sent Events for real-time responses
+- **Audit logs:** Complete visibility into every request
+
+This is the infrastructure layer that makes everything else possible.
+
+---
+
+## Real-World Impact
+
+Here's how these features work together in a production scenario:
+
+**Scenario:** You're building a customer support chatbot in Python.
+
+1. **Install the SDK:** `pip install cencori`
+2. **Use the typed client:** Full autocomplete and error handling
+3. **Stream responses:** Real-time output with `chat_stream()`
+4. **Security included:** PII automatically detected, prompt injection blocked
+5. **Edge routing:** 70% faster responses for global users
+6. **Monitor everything:** Dashboard shows costs, latency, and security incidents
+
+All this from a single `pip install`.
+
+---
+
+## What's Next
+
+- **Edge GA:** Full release with additional regions
+- **Go SDK:** For infrastructure teams
+- **Rust SDK:** For performance-critical applications
+- **Custom security rules:** Define your own threat detection logic
+
+---
+
+## Try It Now
+
+```bash
+# TypeScript
+npm install cencori
+
+# Python
+pip install cencori
+```
+
+Then visit [cencori.com/dashboard](/dashboard) to get your API key.
+
+Questions? Email [support@cencori.com](mailto:support@cencori.com).
+
+**The Cencori Team**
