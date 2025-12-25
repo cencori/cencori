@@ -16,15 +16,35 @@ const COUNTRY_NAMES: Record<string, string> = {
     PT: 'Portugal', CZ: 'Czech Republic', RO: 'Romania', HU: 'Hungary', UA: 'Ukraine',
 };
 
-interface GeoData {
+interface CountryStats {
     code: string;
     name: string;
     requests: number;
+    tokens: number;
+    cost: number;
+    avgLatency: number;
+    providers: Record<string, number>; // provider -> request count
+}
+
+interface DailyStats {
+    date: string;
+    countries: Record<string, number>; // country_code -> requests
+}
+
+interface AggregatedData {
+    countries: Record<string, {
+        requests: number;
+        tokens: number;
+        cost: number;
+        totalLatency: number;
+        providers: Record<string, number>;
+    }>;
+    timeline: Record<string, Record<string, number>>; // date -> country -> requests
 }
 
 /**
  * GET /api/projects/[projectId]/analytics/geo
- * Returns geographic distribution of API requests
+ * Returns comprehensive geographic analytics
  */
 export async function GET(
     request: NextRequest,
@@ -34,11 +54,16 @@ export async function GET(
         const { projectId } = await params;
         const supabase = createAdminClient();
 
-        // Get request counts by country
+        // Get last 7 days of data
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // Fetch all relevant request data
         const { data, error } = await supabase
             .from('ai_requests')
-            .select('country_code')
+            .select('country_code, total_tokens, cost_usd, latency_ms, model, created_at')
             .eq('project_id', projectId)
+            .gte('created_at', sevenDaysAgo.toISOString())
             .not('country_code', 'is', null);
 
         if (error) {
@@ -46,32 +71,111 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch geo data' }, { status: 500 });
         }
 
-        // Aggregate by country
-        const countryMap = new Map<string, number>();
+        // Aggregate data
+        const aggregated: AggregatedData = {
+            countries: {},
+            timeline: {},
+        };
+
         for (const row of data || []) {
-            if (row.country_code) {
-                const count = countryMap.get(row.country_code) || 0;
-                countryMap.set(row.country_code, count + 1);
+            const code = row.country_code;
+            if (!code) continue;
+
+            // Detect provider from model name
+            const provider = detectProvider(row.model || '');
+
+            // Initialize country if needed
+            if (!aggregated.countries[code]) {
+                aggregated.countries[code] = {
+                    requests: 0,
+                    tokens: 0,
+                    cost: 0,
+                    totalLatency: 0,
+                    providers: {},
+                };
             }
+
+            const country = aggregated.countries[code];
+            country.requests += 1;
+            country.tokens += row.total_tokens || 0;
+            country.cost += parseFloat(row.cost_usd) || 0;
+            country.totalLatency += row.latency_ms || 0;
+            country.providers[provider] = (country.providers[provider] || 0) + 1;
+
+            // Timeline aggregation (by date)
+            const date = new Date(row.created_at).toISOString().split('T')[0];
+            if (!aggregated.timeline[date]) {
+                aggregated.timeline[date] = {};
+            }
+            aggregated.timeline[date][code] = (aggregated.timeline[date][code] || 0) + 1;
         }
 
-        // Convert to array and sort by request count
-        const countries: GeoData[] = Array.from(countryMap.entries())
-            .map(([code, requests]) => ({
+        // Convert to response format
+        const countries: CountryStats[] = Object.entries(aggregated.countries)
+            .map(([code, stats]) => ({
                 code,
                 name: COUNTRY_NAMES[code] || code,
-                requests,
+                requests: stats.requests,
+                tokens: stats.tokens,
+                cost: Math.round(stats.cost * 100) / 100,
+                avgLatency: stats.requests > 0 ? Math.round(stats.totalLatency / stats.requests) : 0,
+                providers: stats.providers,
             }))
             .sort((a, b) => b.requests - a.requests);
 
-        const totalRequests = countries.reduce((sum, c) => sum + c.requests, 0);
+        // Format timeline (last 7 days)
+        const timeline: DailyStats[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            timeline.push({
+                date: dateStr,
+                countries: aggregated.timeline[dateStr] || {},
+            });
+        }
+
+        // Calculate totals
+        const totals = {
+            requests: countries.reduce((sum, c) => sum + c.requests, 0),
+            tokens: countries.reduce((sum, c) => sum + c.tokens, 0),
+            cost: Math.round(countries.reduce((sum, c) => sum + c.cost, 0) * 100) / 100,
+            avgLatency: countries.length > 0
+                ? Math.round(countries.reduce((sum, c) => sum + c.avgLatency, 0) / countries.length)
+                : 0,
+        };
+
+        // Provider breakdown across all countries
+        const providerTotals: Record<string, number> = {};
+        for (const country of countries) {
+            for (const [provider, count] of Object.entries(country.providers)) {
+                providerTotals[provider] = (providerTotals[provider] || 0) + count;
+            }
+        }
 
         return NextResponse.json({
             countries,
-            totalRequests,
+            timeline,
+            totals,
+            providerTotals,
         });
     } catch (error) {
         console.error('Geo analytics error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
+}
+
+// Detect provider from model name
+function detectProvider(model: string): string {
+    const lowerModel = model.toLowerCase();
+    if (lowerModel.includes('gpt') || lowerModel.includes('o1')) return 'OpenAI';
+    if (lowerModel.includes('claude')) return 'Anthropic';
+    if (lowerModel.includes('gemini')) return 'Google';
+    if (lowerModel.includes('mistral') || lowerModel.includes('mixtral')) return 'Mistral';
+    if (lowerModel.includes('llama')) return 'Meta';
+    if (lowerModel.includes('grok')) return 'xAI';
+    if (lowerModel.includes('qwen')) return 'Qwen';
+    if (lowerModel.includes('deepseek')) return 'DeepSeek';
+    if (lowerModel.includes('command')) return 'Cohere';
+    return 'Other';
 }
