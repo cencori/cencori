@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
+import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, getModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,28 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import Image from "next/image";
+
+// Provider logo mapping
+const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
+    openai: <OpenAI size={20} />,
+    anthropic: <Anthropic size={20} />,
+    google: <Google size={20} />,
+    mistral: <Mistral size={20} />,
+    cohere: <Cohere size={20} />,
+    perplexity: <Perplexity size={20} />,
+    groq: <span className="text-[11px] font-bold">G</span>,
+    together: <span className="text-[11px] font-bold">T</span>,
+    openrouter: <span className="text-[11px] font-bold">OR</span>,
+};
+
+function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {
+    const logo = PROVIDER_LOGOS[providerId];
+    const baseClass = size === 'sm'
+        ? "w-5 h-5 flex items-center justify-center rounded-md bg-muted/50"
+        : "w-8 h-8 flex items-center justify-center rounded-lg bg-muted/50";
+    return <div className={baseClass}>{logo}</div>;
+}
 
 interface ProviderKeyData {
     provider: string;
@@ -172,7 +195,10 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                 <Card key={provider.provider} className="relative rounded-lg border-border/50">
                                     <CardHeader className="pb-2">
                                         <div className="flex items-center justify-between">
-                                            <CardTitle className="text-sm font-medium">{provider.providerName}</CardTitle>
+                                            <div className="flex items-center gap-2">
+                                                {getProviderLogo(provider.provider, 'sm')}
+                                                <CardTitle className="text-sm font-medium">{provider.providerName}</CardTitle>
+                                            </div>
                                             <Switch
                                                 checked={provider.isActive}
                                                 onCheckedChange={(checked: boolean) => toggleMutation.mutate({ provider: provider.provider, isActive: checked })}
@@ -226,8 +252,8 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                             className="justify-start h-10 rounded-lg border-dashed"
                             onClick={() => openAddDialog(provider)}
                         >
-                            <Plus className="h-3 w-3 mr-2" />
-                            {provider.name}
+                            {getProviderLogo(provider.id, 'sm')}
+                            <span>{provider.name}</span>
                         </Button>
                     ))}
                 </div>
@@ -237,9 +263,12 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="rounded-xl sm:max-w-sm p-0 gap-0 border-border/50">
                     <DialogHeader className="px-4 py-3 border-b border-border/40">
-                        <DialogTitle className="text-sm font-medium">
-                            {selectedProvider?.name}
-                        </DialogTitle>
+                        <div className="flex items-center gap-2">
+                            {selectedProvider && getProviderLogo(selectedProvider.id)}
+                            <DialogTitle className="text-sm font-medium">
+                                {selectedProvider?.name}
+                            </DialogTitle>
+                        </div>
                         <DialogDescription className="text-[11px] text-muted-foreground">
                             Get your key from{" "}
                             <a href={selectedProvider?.website} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
