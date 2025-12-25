@@ -158,6 +158,61 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'grok-vision-beta', name: 'Grok Vision', type: 'chat', contextWindow: 8192, description: 'Multimodal understanding' },
         ],
     },
+    {
+        id: 'meta',
+        name: 'Meta AI',
+        icon: '/providers/meta.svg',
+        website: 'https://llama.meta.com',
+        docsUrl: 'https://llama.meta.com/docs',
+        keyPrefix: '',
+        models: [
+            { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', type: 'chat', contextWindow: 128000, description: 'Latest flagship model' },
+            { id: 'llama-3.2-90b-vision', name: 'Llama 3.2 90B Vision', type: 'chat', contextWindow: 128000, description: 'Multimodal understanding' },
+            { id: 'llama-3.1-405b', name: 'Llama 3.1 405B', type: 'chat', contextWindow: 128000, description: 'Largest open model' },
+            { id: 'llama-3.1-70b', name: 'Llama 3.1 70B', type: 'chat', contextWindow: 128000, description: 'Balanced performance' },
+            { id: 'llama-3.1-8b', name: 'Llama 3.1 8B', type: 'chat', contextWindow: 128000, description: 'Fast and efficient' },
+        ],
+    },
+    {
+        id: 'huggingface',
+        name: 'Hugging Face',
+        icon: '/providers/huggingface.svg',
+        website: 'https://huggingface.co',
+        docsUrl: 'https://huggingface.co/docs',
+        keyPrefix: 'hf_',
+        models: [
+            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', type: 'chat', contextWindow: 128000, description: 'Via HF Inference' },
+            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', type: 'chat', contextWindow: 32000, description: 'Via HF Inference' },
+            { id: 'mistralai/Mistral-7B-Instruct-v0.3', name: 'Mistral 7B', type: 'chat', contextWindow: 32000, description: 'Via HF Inference' },
+        ],
+    },
+    {
+        id: 'qwen',
+        name: 'Qwen',
+        icon: '/providers/qwen.svg',
+        website: 'https://qwenlm.ai',
+        docsUrl: 'https://qwen.readthedocs.io',
+        keyPrefix: '',
+        models: [
+            { id: 'qwen2.5-72b-instruct', name: 'Qwen 2.5 72B', type: 'chat', contextWindow: 128000, description: 'Flagship model' },
+            { id: 'qwen2.5-32b-instruct', name: 'Qwen 2.5 32B', type: 'chat', contextWindow: 128000, description: 'Balanced performance' },
+            { id: 'qwen2.5-coder-32b', name: 'Qwen 2.5 Coder 32B', type: 'code', contextWindow: 128000, description: 'Code specialized' },
+            { id: 'qwq-32b-preview', name: 'QwQ 32B', type: 'reasoning', contextWindow: 32000, description: 'Reasoning model' },
+        ],
+    },
+    {
+        id: 'deepseek',
+        name: 'DeepSeek',
+        icon: '/providers/deepseek.svg',
+        website: 'https://deepseek.com',
+        docsUrl: 'https://platform.deepseek.com/docs',
+        keyPrefix: 'sk-',
+        models: [
+            { id: 'deepseek-chat', name: 'DeepSeek V3', type: 'chat', contextWindow: 64000, description: 'Latest chat model' },
+            { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: 'reasoning', contextWindow: 64000, description: 'Reasoning model' },
+            { id: 'deepseek-coder', name: 'DeepSeek Coder', type: 'code', contextWindow: 64000, description: 'Code specialized' },
+        ],
+    },
 ];
 
 /**
