@@ -1,12 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Configure images to allow /api/og with query strings
+  // Configure images to allow all local paths (Next.js 16 requirement)
   images: {
     localPatterns: [
       {
-        pathname: "/api/og",
-        search: "",
+        pathname: "/**",
       },
     ],
   },

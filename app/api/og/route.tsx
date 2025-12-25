@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
                         <img
                             src={logoBase64}
                             alt="Cencori"
-                            width={16}
-                            height={16}
+                            width={24}
+                            height={24}
                         />
                         <span
                             style={{
