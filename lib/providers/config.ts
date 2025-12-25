@@ -145,6 +145,19 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'google/gemini-pro-1.5', name: 'Gemini 1.5 Pro (via OpenRouter)', type: 'chat', contextWindow: 2000000, description: 'Meta-provider' },
         ],
     },
+    {
+        id: 'xai',
+        name: 'xAI',
+        icon: '/providers/xai.svg',
+        website: 'https://x.ai',
+        docsUrl: 'https://docs.x.ai',
+        keyPrefix: 'xai-',
+        models: [
+            { id: 'grok-2', name: 'Grok 2', type: 'chat', contextWindow: 128000, description: 'Most capable Grok model' },
+            { id: 'grok-2-mini', name: 'Grok 2 Mini', type: 'chat', contextWindow: 128000, description: 'Fast and efficient' },
+            { id: 'grok-vision-beta', name: 'Grok Vision', type: 'chat', contextWindow: 8192, description: 'Multimodal understanding' },
+        ],
+    },
 ];
 
 /**
