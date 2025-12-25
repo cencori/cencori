@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
 import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, getModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
@@ -173,91 +173,52 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const availableProviders = SUPPORTED_PROVIDERS.filter(p => !data?.providers.find(dp => dp.provider === p.id && dp.hasKey));
 
     return (
-        <div className="space-y-6">
-            {/* Current Default */}
-            {data?.defaults && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Default:</span>
-                    <Badge variant="secondary" className="rounded-lg text-xs">
-                        {data.defaults.provider} / {data.defaults.model}
-                    </Badge>
-                </div>
-            )}
+        <div className="space-y-1">
+            {/* All Providers as a List */}
+            {SUPPORTED_PROVIDERS.map((provider) => {
+                const keyData = data?.providers.find(p => p.provider === provider.id);
+                const hasKey = keyData?.hasKey ?? false;
+                const isActive = keyData?.isActive ?? false;
+                const isDefault = data?.defaults?.provider === provider.id;
 
-            {/* Configured Providers */}
-            {configuredProviders.length > 0 && (
-                <div className="space-y-3">
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connected Providers</h4>
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        {configuredProviders.map((provider) => {
-                            const config = SUPPORTED_PROVIDERS.find(p => p.id === provider.provider);
-                            return (
-                                <Card key={provider.provider} className="relative rounded-lg border-border/50">
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                {getProviderLogo(provider.provider, 'sm')}
-                                                <CardTitle className="text-sm font-medium">{provider.providerName}</CardTitle>
-                                            </div>
-                                            <Switch
-                                                checked={provider.isActive}
-                                                onCheckedChange={(checked: boolean) => toggleMutation.mutate({ provider: provider.provider, isActive: checked })}
-                                                className="scale-75"
-                                            />
-                                        </div>
-                                        <CardDescription className="text-xs font-mono">
-                                            {provider.keyHint}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="flex-1 h-7 text-xs rounded-lg"
-                                                onClick={() => config && openAddDialog(config)}
-                                            >
-                                                <Key className="h-3 w-3 mr-1" />
-                                                Update
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-7 text-xs rounded-lg text-red-500 hover:text-red-600"
-                                                onClick={() => {
-                                                    if (confirm("Remove this provider key?")) {
-                                                        deleteKeyMutation.mutate(provider.provider);
-                                                    }
-                                                }}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+                return (
+                    <button
+                        key={provider.id}
+                        onClick={() => openAddDialog(provider)}
+                        className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                        {/* Left: Logo + Name */}
+                        <div className="flex items-center gap-3">
+                            {getProviderLogo(provider.id)}
+                            <span className="text-sm font-medium">{provider.name}</span>
+                            {isDefault && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded-md border-border/50">
+                                    Default
+                                </Badge>
+                            )}
+                        </div>
 
-            {/* Available Providers */}
-            <div className="space-y-3">
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Add Provider</h4>
-                <div className="grid gap-2 md:grid-cols-3 lg:grid-cols-4">
-                    {availableProviders.map((provider) => (
-                        <Button
-                            key={provider.id}
-                            variant="outline"
-                            className="justify-start h-10 rounded-lg border-dashed"
-                            onClick={() => openAddDialog(provider)}
-                        >
-                            {getProviderLogo(provider.id, 'sm')}
-                            <span>{provider.name}</span>
-                        </Button>
-                    ))}
-                </div>
-            </div>
+                        {/* Right: Status + Chevron */}
+                        <div className="flex items-center gap-2">
+                            {hasKey ? (
+                                <Badge className={`text-[10px] px-2 py-0.5 rounded-md ${isActive ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted text-muted-foreground'}`}>
+                                    {isActive ? (
+                                        <span className="flex items-center gap-1">
+                                            <Check className="h-3 w-3" />
+                                            Enabled
+                                        </span>
+                                    ) : 'Disabled'}
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                                    Not configured
+                                </Badge>
+                            )}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    </button>
+                );
+            })}
 
             {/* Add/Edit Dialog - Cenpact Design */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
