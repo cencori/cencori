@@ -25,8 +25,11 @@ interface GeoData {
     requests: number;
 }
 
+import type { TimeRange } from "./GeoAnalyticsSection";
+
 interface GeoMapProps {
     projectId: string;
+    timeRange?: TimeRange;
 }
 
 // Memoized geography component for performance
@@ -90,15 +93,15 @@ const MapGeography = memo(({
 });
 MapGeography.displayName = "MapGeography";
 
-export function GeoMap({ projectId }: GeoMapProps) {
+export function GeoMap({ projectId, timeRange = "7d" }: GeoMapProps) {
     const [hoveredCountry, setHoveredCountry] = useState<GeoData | null>(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
     // Fetch geographic data
     const { data, isLoading } = useQuery({
-        queryKey: ["geo-analytics", projectId],
+        queryKey: ["geo-analytics", projectId, timeRange],
         queryFn: async () => {
-            const res = await fetch(`/api/projects/${projectId}/analytics/geo`);
+            const res = await fetch(`/api/projects/${projectId}/analytics/geo?range=${timeRange}`);
             if (!res.ok) throw new Error("Failed to fetch geo data");
             return res.json();
         },

@@ -54,16 +54,28 @@ export async function GET(
         const { projectId } = await params;
         const supabase = createAdminClient();
 
-        // Get last 7 days of data
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        // Parse time range from query params
+        const { searchParams } = new URL(request.url);
+        const range = searchParams.get('range') || '7d';
+
+        // Calculate date range
+        const rangeMap: Record<string, number> = {
+            '24h': 1,
+            '7d': 7,
+            '30d': 30,
+            '90d': 90,
+        };
+        const days = rangeMap[range] || 7;
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
         // Fetch all relevant request data
         const { data, error } = await supabase
             .from('ai_requests')
             .select('country_code, total_tokens, cost_usd, latency_ms, model, created_at')
             .eq('project_id', projectId)
-            .gte('created_at', sevenDaysAgo.toISOString())
+            .gte('created_at', startDate.toISOString())
             .not('country_code', 'is', null);
 
         if (error) {
