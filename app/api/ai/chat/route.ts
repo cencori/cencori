@@ -47,6 +47,12 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabase = createAdminClient();
 
+    // Extract client IP and country from Vercel headers (or fallbacks)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || req.headers.get('x-real-ip')
+        || 'unknown';
+    const countryCode = req.headers.get('x-vercel-ip-country') || null;
+
     try {
         // 1. Validate API key
         const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
@@ -287,6 +293,8 @@ export async function POST(req: NextRequest) {
                                     end_user_id: userId,
                                     request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
                                     response_payload: { content: fullContent },
+                                    ip_address: clientIp,
+                                    country_code: countryCode,
                                 });
 
                                 if (streamLogError) {
@@ -373,6 +381,8 @@ export async function POST(req: NextRequest) {
             end_user_id: userId,
             request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
             response_payload: { content: response.content, finishReason: response.finishReason },
+            ip_address: clientIp,
+            country_code: countryCode,
         });
 
         if (logError) {
