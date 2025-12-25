@@ -155,7 +155,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
             {data?.defaults && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>Default:</span>
-                    <Badge variant="secondary" className="rounded-none text-xs">
+                    <Badge variant="secondary" className="rounded-lg text-xs">
                         {data.defaults.provider} / {data.defaults.model}
                     </Badge>
                 </div>
@@ -169,7 +169,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                         {configuredProviders.map((provider) => {
                             const config = SUPPORTED_PROVIDERS.find(p => p.id === provider.provider);
                             return (
-                                <Card key={provider.provider} className="relative rounded-none border-border/50">
+                                <Card key={provider.provider} className="relative rounded-lg border-border/50">
                                     <CardHeader className="pb-2">
                                         <div className="flex items-center justify-between">
                                             <CardTitle className="text-sm font-medium">{provider.providerName}</CardTitle>
@@ -188,7 +188,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="flex-1 h-7 text-xs rounded-none"
+                                                className="flex-1 h-7 text-xs rounded-lg"
                                                 onClick={() => config && openAddDialog(config)}
                                             >
                                                 <Key className="h-3 w-3 mr-1" />
@@ -197,7 +197,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-7 text-xs rounded-none text-red-500 hover:text-red-600"
+                                                className="h-7 text-xs rounded-lg text-red-500 hover:text-red-600"
                                                 onClick={() => {
                                                     if (confirm("Remove this provider key?")) {
                                                         deleteKeyMutation.mutate(provider.provider);
@@ -223,7 +223,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                         <Button
                             key={provider.id}
                             variant="outline"
-                            className="justify-start h-10 rounded-none border-dashed"
+                            className="justify-start h-10 rounded-lg border-dashed"
                             onClick={() => openAddDialog(provider)}
                         >
                             <Plus className="h-3 w-3 mr-2" />
@@ -235,7 +235,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
             {/* Add/Edit Dialog - Cenpact Design */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="rounded-none sm:max-w-sm p-0 gap-0 border-border/50">
+                <DialogContent className="rounded-xl sm:max-w-sm p-0 gap-0 border-border/50">
                     <DialogHeader className="px-4 py-3 border-b border-border/40">
                         <DialogTitle className="text-sm font-medium">
                             {selectedProvider?.name}
@@ -258,7 +258,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                     placeholder={selectedProvider?.keyPrefix || "sk-..."}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
-                                    className="h-8 pr-8 rounded-none text-[11px] font-mono bg-muted/30 border-border/50"
+                                    className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/30 border-border/50"
                                 />
                                 <Button
                                     type="button"
@@ -277,10 +277,10 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                             <div className="space-y-1.5">
                                 <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Default Model</Label>
                                 <Select value={selectedModel} onValueChange={setSelectedModel}>
-                                    <SelectTrigger className="h-8 rounded-none text-[11px] bg-muted/30 border-border/50">
+                                    <SelectTrigger className="h-8 rounded-lg text-[11px] bg-muted/30 border-border/50">
                                         <SelectValue placeholder="Select..." />
                                     </SelectTrigger>
-                                    <SelectContent className="rounded-none">
+                                    <SelectContent className="rounded-lg">
                                         {getModelsForProvider(selectedProvider.id).map((model) => (
                                             <SelectItem key={model.id} value={model.id} className="text-[11px] py-1.5">
                                                 <span>{model.name}</span>
@@ -307,13 +307,13 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                     </div>
 
                     <DialogFooter className="px-4 py-3 border-t border-border/40 bg-muted/20">
-                        <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-none text-[11px]">
+                        <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-lg text-[11px]">
                             Cancel
                         </Button>
                         <Button
                             onClick={handleAddKey}
                             disabled={!apiKey || addKeyMutation.isPending}
-                            className="h-7 px-3 rounded-none text-[11px] bg-foreground text-background hover:bg-foreground/90"
+                            className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
                         >
                             {addKeyMutation.isPending ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
