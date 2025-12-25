@@ -53,7 +53,7 @@ const MapGeography = memo(({
     const intensity = hasData ? Math.min(data.requests / maxRequests, 1) : 0;
     const fillColor = hasData
         ? `rgba(249, 115, 22, ${0.4 + intensity * 0.6})` // orange-500 with varying opacity
-        : "hsl(var(--muted))"; // use muted background for countries with no data
+        : "rgba(55, 56, 59, 1)"; // gray-700 equivalent, visible in light/dark
 
     // Get country name for tooltip
     const countryName = geo.properties?.name || geo.properties?.NAME || isoCode || 'Unknown';
