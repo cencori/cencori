@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
-import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity } from "@lobehub/icons";
+import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity, OpenRouter } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, getModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,13 +27,13 @@ import Image from "next/image";
 const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
     openai: <OpenAI size={20} />,
     anthropic: <Anthropic size={20} />,
-    google: <Google size={20} />,
-    mistral: <Mistral size={20} />,
-    cohere: <Cohere size={20} />,
-    perplexity: <Perplexity size={20} />,
+    google: <Google.Color size={20} />,
+    mistral: <Mistral.Color size={20} />,
+    cohere: <Cohere.Color size={20} />,
+    perplexity: <Perplexity.Color size={20} />,
     groq: <span className="text-[11px] font-bold">G</span>,
     together: <span className="text-[11px] font-bold">T</span>,
-    openrouter: <span className="text-[11px] font-bold">OR</span>,
+    openrouter: <OpenRouter size={20} />,
 };
 
 function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {
