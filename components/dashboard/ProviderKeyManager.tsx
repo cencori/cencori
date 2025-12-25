@@ -16,6 +16,7 @@ import { SUPPORTED_PROVIDERS, getModelsForProvider, type AIProviderConfig } from
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -168,8 +169,16 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="space-y-1">
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-3 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <Skeleton className="w-8 h-8 rounded-lg" />
+                            <Skeleton className="h-4 w-24" />
+                        </div>
+                        <Skeleton className="h-5 w-20 rounded-md" />
+                    </div>
+                ))}
             </div>
         );
     }
