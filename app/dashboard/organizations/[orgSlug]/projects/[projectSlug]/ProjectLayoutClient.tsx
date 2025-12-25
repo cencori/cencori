@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key, ScrollText, ShieldAlert, Activity, Server, Puzzle } from "lucide-react";
+import { Key, ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -216,9 +216,10 @@ export default function ProjectLayoutClient({
     const navItems = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
         { href: `${basePath}/api-keys`, icon: Key, label: "API Keys", prefetch: createPrefetch("api-keys") },
+        { href: `${basePath}/providers`, icon: Cpu, label: "Providers", prefetch: createPrefetch("providers") },
         { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
         { href: `${basePath}/security`, icon: ShieldAlert, label: "Security" },
-        { href: `${basePath}/providers`, icon: Server, label: "Providers", prefetch: createPrefetch("providers") },
+        { href: `${basePath}/custom-providers`, icon: Server, label: "Custom Providers" },
         { href: `${basePath}/analytics`, icon: Activity, label: "Analytics", prefetch: createPrefetch("analytics") },
         { href: `${basePath}/playground`, icon: BeakerIcon, label: "Playground" },
         { href: `${basePath}/edge`, icon: Puzzle, label: "Edge" },

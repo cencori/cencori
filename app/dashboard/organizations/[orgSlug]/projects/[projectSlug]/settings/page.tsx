@@ -31,7 +31,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ProviderKeyManager } from "@/components/dashboard/ProviderKeyManager";
 
 interface ProjectData {
   id: string;
@@ -375,7 +374,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
         </TabsList>
 
@@ -865,18 +863,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           </section>
         </TabsContent>
 
-        {/* PROVIDERS TAB */}
-        <TabsContent value="providers" className="space-y-6">
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-sm font-medium">AI Providers</h2>
-              <p className="text-xs text-muted-foreground">Connect your own API keys to route requests through Cencori.</p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-card p-4">
-              <ProviderKeyManager projectId={project.id} />
-            </div>
-          </section>
-        </TabsContent>
       </Tabs>
     </div>
   );
