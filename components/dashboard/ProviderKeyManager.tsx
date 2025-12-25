@@ -233,38 +233,38 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                 </div>
             </div>
 
-            {/* Add/Edit Dialog */}
+            {/* Add/Edit Dialog - Cenpact Design */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="rounded-none sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-base">
-                            {selectedProvider?.name} API Key
+                <DialogContent className="rounded-none sm:max-w-sm p-0 gap-0 border-border/50">
+                    <DialogHeader className="px-4 py-3 border-b border-border/40">
+                        <DialogTitle className="text-sm font-medium">
+                            {selectedProvider?.name}
                         </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            Enter your API key from{" "}
-                            <a href={selectedProvider?.website} target="_blank" rel="noopener noreferrer" className="underline">
-                                {selectedProvider?.website}
+                        <DialogDescription className="text-[11px] text-muted-foreground">
+                            Get your key from{" "}
+                            <a href={selectedProvider?.website} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
+                                {selectedProvider?.website?.replace('https://', '')}
                             </a>
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 py-4">
+                    <div className="px-4 py-3 space-y-3">
                         {/* API Key Input */}
-                        <div className="space-y-2">
-                            <Label className="text-xs">API Key</Label>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">API Key</Label>
                             <div className="relative">
                                 <Input
                                     type={showKey ? "text" : "password"}
-                                    placeholder={selectedProvider?.keyPrefix ? `${selectedProvider.keyPrefix}...` : "Enter API key"}
+                                    placeholder={selectedProvider?.keyPrefix || "sk-..."}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
-                                    className="pr-10 rounded-none text-xs font-mono"
+                                    className="h-8 pr-8 rounded-none text-[11px] font-mono bg-muted/30 border-border/50"
                                 />
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute right-0 top-0 h-full px-3"
+                                    className="absolute right-0 top-0 h-8 w-8 p-0"
                                     onClick={() => setShowKey(!showKey)}
                                 >
                                     {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
@@ -274,19 +274,17 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
                         {/* Model Selection */}
                         {selectedProvider && (
-                            <div className="space-y-2">
-                                <Label className="text-xs">Default Model</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Default Model</Label>
                                 <Select value={selectedModel} onValueChange={setSelectedModel}>
-                                    <SelectTrigger className="rounded-none text-xs">
-                                        <SelectValue placeholder="Select model" />
+                                    <SelectTrigger className="h-8 rounded-none text-[11px] bg-muted/30 border-border/50">
+                                        <SelectValue placeholder="Select..." />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-none">
                                         {getModelsForProvider(selectedProvider.id).map((model) => (
-                                            <SelectItem key={model.id} value={model.id} className="text-xs">
-                                                <div className="flex items-center gap-2">
-                                                    <span>{model.name}</span>
-                                                    <span className="text-muted-foreground">({model.type})</span>
-                                                </div>
+                                            <SelectItem key={model.id} value={model.id} className="text-[11px] py-1.5">
+                                                <span>{model.name}</span>
+                                                <span className="ml-1.5 text-muted-foreground">({model.type})</span>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -295,34 +293,36 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                         )}
 
                         {/* Set as Default */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 pt-1">
                             <Switch
                                 id="set-default"
                                 checked={setAsDefault}
                                 onCheckedChange={setSetAsDefault}
-                                className="scale-75"
+                                className="scale-75 data-[state=checked]:bg-foreground"
                             />
-                            <Label htmlFor="set-default" className="text-xs cursor-pointer">
-                                Set as default provider for this project
+                            <Label htmlFor="set-default" className="text-[11px] cursor-pointer text-muted-foreground">
+                                Set as project default
                             </Label>
                         </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={resetDialog} className="rounded-none text-xs">
+                    <DialogFooter className="px-4 py-3 border-t border-border/40 bg-muted/20">
+                        <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-none text-[11px]">
                             Cancel
                         </Button>
                         <Button
                             onClick={handleAddKey}
                             disabled={!apiKey || addKeyMutation.isPending}
-                            className="rounded-none text-xs"
+                            className="h-7 px-3 rounded-none text-[11px] bg-foreground text-background hover:bg-foreground/90"
                         >
                             {addKeyMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
-                                <Check className="h-3 w-3 mr-1" />
+                                <>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Save
+                                </>
                             )}
-                            Save Key
                         </Button>
                     </DialogFooter>
                 </DialogContent>
