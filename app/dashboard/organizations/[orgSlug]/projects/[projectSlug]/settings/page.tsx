@@ -374,6 +374,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
         </TabsList>
 
@@ -859,6 +860,146 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   ))}
                 </div>
               )}
+            </div>
+          </section>
+        </TabsContent>
+
+        {/* PROVIDERS TAB */}
+        <TabsContent value="providers" className="space-y-6">
+          {/* Default Provider & Model */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Default Provider</h2>
+              <p className="text-xs text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Default provider</p>
+                  <p className="text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
+                </div>
+                <Select defaultValue="openai">
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai" className="text-xs">OpenAI</SelectItem>
+                    <SelectItem value="anthropic" className="text-xs">Anthropic</SelectItem>
+                    <SelectItem value="google" className="text-xs">Google AI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Default model</p>
+                  <p className="text-[10px] text-muted-foreground">Fallback model when not specified.</p>
+                </div>
+                <Select defaultValue="gpt-4o">
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gpt-4o" className="text-xs">GPT-4o</SelectItem>
+                    <SelectItem value="gpt-4o-mini" className="text-xs">GPT-4o Mini</SelectItem>
+                    <SelectItem value="claude-3-5-sonnet" className="text-xs">Claude 3.5 Sonnet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </section>
+
+          {/* Rate Limiting */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Rate Limiting</h2>
+              <p className="text-xs text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Requests per minute</p>
+                  <p className="text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
+                </div>
+                <Input defaultValue="60" className="w-24 h-8 text-xs text-right" />
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Tokens per day</p>
+                  <p className="text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
+                </div>
+                <Input defaultValue="1000000" className="w-24 h-8 text-xs text-right" />
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Concurrent requests</p>
+                  <p className="text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
+                </div>
+                <Input defaultValue="10" className="w-24 h-8 text-xs text-right" />
+              </div>
+            </div>
+          </section>
+
+          {/* Fallback Configuration */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Fallback Configuration</h2>
+              <p className="text-xs text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Enable automatic fallback</p>
+                  <p className="text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
+                </div>
+                <Checkbox defaultChecked />
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Fallback provider</p>
+                  <p className="text-[10px] text-muted-foreground">Used when primary fails.</p>
+                </div>
+                <Select defaultValue="anthropic">
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anthropic" className="text-xs">Anthropic</SelectItem>
+                    <SelectItem value="openai" className="text-xs">OpenAI</SelectItem>
+                    <SelectItem value="google" className="text-xs">Google AI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">Max retries before fallback</p>
+                  <p className="text-[10px] text-muted-foreground">Attempts before switching provider.</p>
+                </div>
+                <Input defaultValue="3" className="w-24 h-8 text-xs text-right" />
+              </div>
+            </div>
+          </section>
+
+          {/* Regional Usage */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Regional Usage</h2>
+              <p className="text-xs text-muted-foreground">Monitor request distribution by region.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card p-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-lg font-semibold">45%</p>
+                  <p className="text-[10px] text-muted-foreground">Americas</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">35%</p>
+                  <p className="text-[10px] text-muted-foreground">Europe</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">20%</p>
+                  <p className="text-[10px] text-muted-foreground">Asia-Pacific</p>
+                </div>
+              </div>
             </div>
           </section>
         </TabsContent>
