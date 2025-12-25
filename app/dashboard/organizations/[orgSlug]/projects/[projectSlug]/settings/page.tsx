@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { GeoMap } from "@/components/dashboard/GeoMap";
 
 interface ProjectData {
   id: string;
@@ -979,28 +980,13 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
           </section>
 
-          {/* Regional Usage */}
+          {/* Geographic Usage */}
           <section className="space-y-3">
             <div>
-              <h2 className="text-sm font-medium">Regional Usage</h2>
-              <p className="text-xs text-muted-foreground">Monitor request distribution by region.</p>
+              <h2 className="text-sm font-medium">Requests by Geography</h2>
+              <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
             </div>
-            <div className="rounded-lg border border-border/60 bg-card p-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-lg font-semibold">45%</p>
-                  <p className="text-[10px] text-muted-foreground">Americas</p>
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">35%</p>
-                  <p className="text-[10px] text-muted-foreground">Europe</p>
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">20%</p>
-                  <p className="text-[10px] text-muted-foreground">Asia-Pacific</p>
-                </div>
-              </div>
-            </div>
+            <GeoMap projectId={project.id} />
           </section>
         </TabsContent>
 
