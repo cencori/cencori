@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS provider_keys (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     provider TEXT NOT NULL CHECK (provider IN (
         'openai', 'anthropic', 'google', 'mistral', 'groq', 
-        'cohere', 'together', 'perplexity', 'openrouter'
+        'cohere', 'together', 'perplexity', 'openrouter', 'xai'
     )),
     encrypted_key TEXT NOT NULL,
     key_hint TEXT, -- Last 4 characters for display (e.g., "...Qx4F")
