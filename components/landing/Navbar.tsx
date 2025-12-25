@@ -90,13 +90,13 @@ const ListItem = React.forwardRef<React.ElementRef<"a">, React.ComponentPropsWit
                 <a
                     ref={ref}
                     className={cn(
-                        "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                        "block select-none space-y-0.5 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
                         className
                     )}
                     {...props}
                 >
-                    <div className="text-sm font-medium leading-none">{title}</div>
-                    <p className="line-clamp-2 text-sm leading-snug text-muted-foreground mt-1">
+                    <div className="text-xs font-medium leading-none">{title}</div>
+                    <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground mt-0.5">
                         {children}
                     </p>
                 </a>
@@ -206,13 +206,13 @@ export default function Navbar({
     ];
 
     return (
-        <header className={cn("fixed top-0 cursor-pointer left-0 right-0 z-50 bg-background/80 mb-16 backdrop-blur-xl border-b border-border/40", className)}>
+        <header className={cn("fixed top-0 cursor-pointer left-0 right-0 z-50 bg-background/90 backdrop-blur-lg border-b border-border/30", className)}>
             <div className="max-w-screen-xl mx-auto px-4 md:px-6">
-                <NavbarComponent className="py-3">
+                <NavbarComponent className="py-2">
                     <NavbarLeft className="gap-6">
                         <Link
                             href={homeUrl}
-                            className="flex items-center gap-2 text-lg font-bold tracking-tight"
+                            className="flex items-center gap-1.5 text-sm font-semibold tracking-tight"
                         >
                             {logo}
                             {name}
@@ -224,13 +224,13 @@ export default function Navbar({
                                     if (isNavDropdown(item)) {
                                         return (
                                             <NavigationMenuItem key={index}>
-                                                <NavigationMenuTrigger className="h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5 data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground border-none">
+                                                <NavigationMenuTrigger className="h-7 px-2.5 text-xs font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50 focus:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground border-none">
                                                     {item.title}
                                                 </NavigationMenuTrigger>
                                                 <NavigationMenuContent className="rounded-xl border-border/40 shadow-none bg-background/95 backdrop-blur-xl">
                                                     {item.type === "mega" ? (
                                                         <div className="flex flex-col">
-                                                            <ul className="grid gap-2 p-4 md:w-[400px] lg:w-[600px] lg:grid-cols-2">
+                                                            <ul className="grid gap-1 p-3 md:w-[380px] lg:w-[500px] lg:grid-cols-2">
                                                                 {item.columns?.map((col, colIndex) => (
                                                                     <div key={colIndex} className="space-y-1">
                                                                         {col.map((link, linkIndex) => (
@@ -261,7 +261,7 @@ export default function Navbar({
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <ul className="grid w-[200px] gap-1 p-2 md:w-[300px]">
+                                                        <ul className="grid w-[180px] gap-0.5 p-1.5 md:w-[260px]">
                                                             {item.items?.map((link, linkIndex) => (
                                                                 <ListItem key={linkIndex} title={link.title} href={link.href}>
                                                                     {link.description}
@@ -275,7 +275,7 @@ export default function Navbar({
                                     } else {
                                         return (
                                             <NavigationMenuItem key={index}>
-                                                <NavigationMenuLink asChild className={cn(navigationMenuTriggerStyle(), "h-8 px-3 text-sm font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus:bg-foreground/5")}>
+                                                <NavigationMenuLink asChild className={cn(navigationMenuTriggerStyle(), "h-7 px-2.5 text-xs font-medium rounded-full bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50 focus:bg-muted/50")}>
                                                     <Link href={item.href}>
                                                         {item.title}
                                                     </Link>
@@ -360,7 +360,7 @@ export default function Navbar({
                                     <Button
                                         key={index}
                                         variant="default"
-                                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 h-8 px-3 text-xs font-medium"
+                                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 h-7 px-3 text-[11px] font-medium"
                                         asChild
                                     >
                                         <Link href={action.href}>
@@ -373,7 +373,7 @@ export default function Navbar({
                                     <Button
                                         key={index}
                                         variant="ghost"
-                                        className="hidden md:inline-flex h-8 px-3 text-xs font-medium rounded-full hover:bg-foreground/5 mr-2"
+                                        className="hidden md:inline-flex h-7 px-2.5 text-[11px] font-medium rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground mr-1"
                                         asChild
                                     >
                                         <Link href={action.href}>
