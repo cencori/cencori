@@ -7,8 +7,9 @@
  * Uses react-simple-maps for SVG rendering.
  */
 
-import { useState, memo } from "react";
+import { useState, memo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import {
     ComposableMap,
     Geographies,
@@ -38,11 +39,13 @@ const MapGeography = memo(({
     countryData,
     maxRequests,
     onHover,
+    baseColor,
 }: {
     geo: any;
     countryData: Map<string, GeoData>;
     maxRequests: number;
     onHover: (data: { name: string; code: string; requests: number } | null) => void;
+    baseColor: string;
 }) => {
     // Get ISO alpha-2 from geography properties
     const isoCode = geo.properties?.ISO_A2 || geo.properties?.iso_a2;
@@ -53,7 +56,7 @@ const MapGeography = memo(({
     const intensity = hasData ? Math.min(data.requests / maxRequests, 1) : 0;
     const fillColor = hasData
         ? `rgba(249, 115, 22, ${0.4 + intensity * 0.6})` // orange-500 with varying opacity
-        : "rgba(55, 56, 59, 1)"; // gray-700 equivalent, visible in light/dark
+        : baseColor;
 
     // Get country name for tooltip
     const countryName = geo.properties?.name || geo.properties?.NAME || isoCode || 'Unknown';
@@ -94,8 +97,19 @@ const MapGeography = memo(({
 MapGeography.displayName = "MapGeography";
 
 export function GeoMap({ projectId, timeRange = "7d" }: GeoMapProps) {
+    const { theme } = useTheme();
     const [hoveredCountry, setHoveredCountry] = useState<GeoData | null>(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Base color for no-data countries (Theme aware RGB)
+    // Dark: rgb(55, 65, 81) - gray-700
+    // Light: rgb(229, 231, 235) - gray-200
+    const baseColor = mounted && theme === 'light' ? "rgba(164, 165, 167, 1)" : "rgba(39, 41, 44, 1)";
 
     // Fetch geographic data
     const { data, isLoading } = useQuery({
@@ -152,6 +166,7 @@ export function GeoMap({ projectId, timeRange = "7d" }: GeoMapProps) {
                                     countryData={countryData}
                                     maxRequests={maxRequests}
                                     onHover={setHoveredCountry}
+                                    baseColor={baseColor}
                                 />
                             ))
                         }
