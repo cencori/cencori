@@ -33,6 +33,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { GeoMap } from "@/components/dashboard/GeoMap";
 import { RegionalCharts } from "@/components/dashboard/RegionalCharts";
+import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
 
 interface ProjectData {
   id: string;
@@ -987,8 +988,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <h2 className="text-sm font-medium">Requests by Geography</h2>
               <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
             </div>
-            <GeoMap projectId={project.id} />
-            <RegionalCharts projectId={project.id} />
+            <GeoAnalyticsSection projectId={project.id} />
           </section>
         </TabsContent>
 

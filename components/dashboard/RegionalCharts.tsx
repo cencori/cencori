@@ -60,8 +60,11 @@ interface GeoAnalytics {
     providerTotals: Record<string, number>;
 }
 
+import type { TimeRange } from "./GeoAnalyticsSection";
+
 interface RegionalChartsProps {
     projectId: string;
+    timeRange?: TimeRange;
 }
 
 // Color palette for charts
@@ -86,11 +89,11 @@ function formatNumber(num: number): string {
     return num.toString();
 }
 
-export function RegionalCharts({ projectId }: RegionalChartsProps) {
+export function RegionalCharts({ projectId, timeRange = "7d" }: RegionalChartsProps) {
     const { data, isLoading } = useQuery<GeoAnalytics>({
-        queryKey: ["geo-analytics-full", projectId],
+        queryKey: ["geo-analytics-full", projectId, timeRange],
         queryFn: async () => {
-            const res = await fetch(`/api/projects/${projectId}/analytics/geo`);
+            const res = await fetch(`/api/projects/${projectId}/analytics/geo?range=${timeRange}`);
             if (!res.ok) throw new Error("Failed to fetch geo data");
             return res.json();
         },
