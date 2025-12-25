@@ -22,7 +22,7 @@ import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { ActivityIcon } from "@/components/animate-ui/icons/activity";
 import { UnplugIcon } from "@/components/animate-ui/icons/unplug";
 import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
-import { Cpu } from "lucide-react";
+
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -161,14 +161,7 @@ export default function OrganizationLayoutClient({
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Providers">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/providers`}>
-                                            <Cpu className="h-4 w-4" />
-                                            <span>Providers</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
+
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Integrations">
                                         <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
@@ -233,14 +226,7 @@ export default function OrganizationLayoutClient({
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
-                                            <Link href={`/dashboard/organizations/${organization.slug}/providers`} onClick={() => setIsOpen(false)}>
-                                                <Cpu className="h-4 w-4" />
-                                                <span>Providers</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
+
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild>
                                             <Link href={`/dashboard/organizations/${organization.slug}/integrations`} onClick={() => setIsOpen(false)}>
