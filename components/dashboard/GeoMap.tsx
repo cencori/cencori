@@ -72,14 +72,16 @@ const MapGeography = memo(({
                     outline: "none",
                 },
                 hover: {
-                    fill: hasData ? "rgb(249, 115, 22)" : "hsl(var(--accent))",
-                    stroke: "hsl(var(--border))",
-                    strokeWidth: 0.5,
+                    fill: hasData ? `rgba(249, 115, 22, ${0.6 + intensity * 0.4})` : "rgba(249, 115, 22, 0.15)",
+                    stroke: "rgb(249, 115, 22)",
+                    strokeWidth: 1.5,
                     outline: "none",
                     cursor: "pointer",
                 },
                 pressed: {
-                    fill: hasData ? "rgb(234, 88, 12)" : "hsl(var(--muted))",
+                    fill: hasData ? "rgb(234, 88, 12)" : "rgba(249, 115, 22, 0.25)",
+                    stroke: "rgb(234, 88, 12)",
+                    strokeWidth: 1.5,
                     outline: "none",
                 },
             }}
