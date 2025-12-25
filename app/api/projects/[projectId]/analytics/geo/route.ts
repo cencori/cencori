@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 
 // Country name mapping (ISO 3166-1 alpha-2 to full name)
 const COUNTRY_NAMES: Record<string, string> = {
+    XX: 'Unknown', // For requests without country data
     US: 'United States', NG: 'Nigeria', GB: 'United Kingdom', DE: 'Germany',
     FR: 'France', CA: 'Canada', AU: 'Australia', IN: 'India', BR: 'Brazil',
     JP: 'Japan', KR: 'South Korea', SG: 'Singapore', NL: 'Netherlands',
@@ -70,13 +71,12 @@ export async function GET(
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Fetch all relevant request data
+        // Fetch all relevant request data (including those without country_code)
         const { data, error } = await supabase
             .from('ai_requests')
             .select('country_code, total_tokens, cost_usd, latency_ms, model, created_at')
             .eq('project_id', projectId)
-            .gte('created_at', startDate.toISOString())
-            .not('country_code', 'is', null);
+            .gte('created_at', startDate.toISOString());
 
         if (error) {
             console.error('Error fetching geo data:', error);
@@ -90,8 +90,8 @@ export async function GET(
         };
 
         for (const row of data || []) {
-            const code = row.country_code;
-            if (!code) continue;
+            // Use 'XX' for unknown/null country codes
+            const code = row.country_code || 'XX';
 
             // Detect provider from model name
             const provider = detectProvider(row.model || '');
