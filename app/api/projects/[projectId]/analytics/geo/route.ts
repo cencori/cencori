@@ -32,6 +32,11 @@ interface DailyStats {
     countries: Record<string, number>; // country_code -> requests
 }
 
+interface ProviderDailyStats {
+    date: string;
+    providers: Record<string, number>; // provider -> requests
+}
+
 interface AggregatedData {
     countries: Record<string, {
         requests: number;
@@ -41,6 +46,7 @@ interface AggregatedData {
         providers: Record<string, number>;
     }>;
     timeline: Record<string, Record<string, number>>; // date -> country -> requests
+    providerTimeline: Record<string, Record<string, number>>; // date -> provider -> requests
 }
 
 /**
@@ -87,6 +93,7 @@ export async function GET(
         const aggregated: AggregatedData = {
             countries: {},
             timeline: {},
+            providerTimeline: {},
         };
 
         for (const row of data || []) {
@@ -120,6 +127,12 @@ export async function GET(
                 aggregated.timeline[date] = {};
             }
             aggregated.timeline[date][code] = (aggregated.timeline[date][code] || 0) + 1;
+
+            // Provider timeline aggregation (by date and provider)
+            if (!aggregated.providerTimeline[date]) {
+                aggregated.providerTimeline[date] = {};
+            }
+            aggregated.providerTimeline[date][provider] = (aggregated.providerTimeline[date][provider] || 0) + 1;
         }
 
         // Convert to response format
@@ -165,9 +178,22 @@ export async function GET(
             }
         }
 
+        // Format provider timeline (based on selected days)
+        const providerTimeline: ProviderDailyStats[] = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            providerTimeline.push({
+                date: dateStr,
+                providers: aggregated.providerTimeline[dateStr] || {},
+            });
+        }
+
         return NextResponse.json({
             countries,
             timeline,
+            providerTimeline,
             totals,
             providerTotals,
         });
