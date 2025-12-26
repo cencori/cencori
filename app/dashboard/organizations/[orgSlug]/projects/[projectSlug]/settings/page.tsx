@@ -379,6 +379,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
+          <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
@@ -989,6 +990,90 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
             </div>
             <GeoAnalyticsSection projectId={project.id} />
+          </section>
+        </TabsContent>
+
+        {/* API TAB */}
+        <TabsContent value="api" className="space-y-6">
+          {/* API Keys */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">API Keys</h2>
+                <p className="text-xs text-muted-foreground">Manage authentication keys for your project.</p>
+              </div>
+              <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}>
+                  Manage Keys
+                </Link>
+              </Button>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/40">
+                <p className="text-xs font-medium">Key Types</p>
+              </div>
+              <div className="divide-y divide-border/40">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
+                      <Server className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium">Secret Keys</p>
+                      <p className="text-[10px] text-muted-foreground">For server-side use only. Never expose in browser.</p>
+                    </div>
+                  </div>
+                  <code className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">csk_xxx</code>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium">Publishable Keys</p>
+                      <p className="text-[10px] text-muted-foreground">Safe for browser use. Requires domain whitelisting.</p>
+                    </div>
+                  </div>
+                  <code className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">cpk_xxx</code>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SDK Integration */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">SDK Integration</h2>
+              <p className="text-xs text-muted-foreground">Quick start code snippets for your application.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/40">
+                <p className="text-xs font-medium">Installation</p>
+              </div>
+              <div className="p-4">
+                <pre className="text-[11px] font-mono bg-secondary/50 p-3 rounded-md overflow-x-auto">
+                  <code>npm install cencori</code>
+                </pre>
+              </div>
+              <div className="px-4 py-3 border-t border-border/40">
+                <p className="text-xs font-medium">Usage</p>
+              </div>
+              <div className="p-4 pt-0">
+                <pre className="text-[11px] font-mono bg-secondary/50 p-3 rounded-md overflow-x-auto whitespace-pre-wrap">
+                  <code>{`import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: 'csk_xxx' // or 'cpk_xxx' for browser
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }]
+});`}</code>
+                </pre>
+              </div>
+            </div>
           </section>
         </TabsContent>
 
