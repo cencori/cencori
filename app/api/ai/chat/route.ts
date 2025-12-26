@@ -47,11 +47,18 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabase = createAdminClient();
 
-    // Extract client IP and country from Vercel headers (or fallbacks)
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    // Extract client IP and country from headers
+    // Priority:
+    // 1. X-Cencori-User-Country / X-Cencori-User-IP (customer-provided end-user location)
+    // 2. x-vercel-ip-country (Vercel automatic geo, reflects calling server location)
+    // 3. x-forwarded-for / x-real-ip (fallback IP)
+    const clientIp = req.headers.get('x-cencori-user-ip')
+        || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
         || req.headers.get('x-real-ip')
         || 'unknown';
-    const countryCode = req.headers.get('x-vercel-ip-country') || null;
+    const countryCode = req.headers.get('x-cencori-user-country')
+        || req.headers.get('x-vercel-ip-country')
+        || null;
 
     try {
         // 1. Validate API key
