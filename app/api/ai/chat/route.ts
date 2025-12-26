@@ -73,6 +73,41 @@ async function lookupCountryFromIp(ip: string): Promise<string | null> {
     }
 }
 
+/**
+ * Validate if the origin/referer matches allowed domains for publishable keys
+ * Supports wildcard patterns like *.example.com
+ */
+function validateDomain(origin: string | null, allowedDomains: string[] | null): boolean {
+    if (!origin || !allowedDomains || allowedDomains.length === 0) {
+        return false;
+    }
+
+    try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+
+        return allowedDomains.some(pattern => {
+            // Exact match
+            if (hostname === pattern) return true;
+
+            // Wildcard match: *.example.com matches sub.example.com and example.com
+            if (pattern.startsWith('*.')) {
+                const baseDomain = pattern.slice(2);
+                return hostname === baseDomain || hostname.endsWith('.' + baseDomain);
+            }
+
+            // Allow localhost with any port for development
+            if (pattern === 'localhost' && hostname === 'localhost') {
+                return true;
+            }
+
+            return false;
+        });
+    } catch {
+        return false;
+    }
+}
+
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabase = createAdminClient();
@@ -122,6 +157,8 @@ export async function POST(req: NextRequest) {
         id,
         project_id,
         environment,
+        key_type,
+        allowed_domains,
         projects!inner(
           id,
           organization_id,
@@ -142,6 +179,19 @@ export async function POST(req: NextRequest) {
                 { error: 'Invalid API key' },
                 { status: 401 }
             );
+        }
+
+        // 4. Validate domain for publishable keys
+        if (keyData.key_type === 'publishable') {
+            const origin = req.headers.get('origin') || req.headers.get('referer');
+            const allowedDomains = keyData.allowed_domains as string[] | null;
+
+            if (!validateDomain(origin, allowedDomains)) {
+                return NextResponse.json(
+                    { error: 'Domain not allowed for this API key' },
+                    { status: 403 }
+                );
+            }
         }
 
         const project = keyData.projects as unknown as {

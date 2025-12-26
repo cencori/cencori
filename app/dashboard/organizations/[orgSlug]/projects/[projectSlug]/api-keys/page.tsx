@@ -6,7 +6,7 @@ import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Key, Plus, Copy, Check, MoreVertical, Trash2 } from "lucide-react";
+import { Key, Plus, Copy, Check, MoreVertical, Trash2, Globe, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
@@ -34,6 +34,8 @@ interface ApiKey {
     id: string;
     name: string;
     key_prefix: string;
+    key_type?: 'secret' | 'publishable';
+    allowed_domains?: string[] | null;
     created_at: string;
     last_used_at: string | null;
 }
@@ -202,9 +204,9 @@ export default function ApiKeysPage({
                             <TableRow className="hover:bg-transparent border-b border-border/40">
                                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Name</TableHead>
                                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">API Key</TableHead>
+                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Type</TableHead>
                                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Status</TableHead>
                                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Created</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Last Used</TableHead>
                                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -237,6 +239,32 @@ export default function ApiKeysPage({
                                         </div>
                                     </TableCell>
                                     <TableCell className="py-3">
+                                        <Badge
+                                            variant="outline"
+                                            className={`gap-1 text-[10px] px-2 py-0.5 ${apiKey.key_type === 'publishable'
+                                                ? 'border-blue-500/30 text-blue-600 dark:text-blue-400'
+                                                : 'border-foreground/20 text-foreground'
+                                                }`}
+                                        >
+                                            {apiKey.key_type === 'publishable' ? (
+                                                <>
+                                                    <Globe className="h-2.5 w-2.5" />
+                                                    Publishable
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Lock className="h-2.5 w-2.5" />
+                                                    Secret
+                                                </>
+                                            )}
+                                        </Badge>
+                                        {apiKey.key_type === 'publishable' && apiKey.allowed_domains && apiKey.allowed_domains.length > 0 && (
+                                            <p className="text-[9px] text-muted-foreground mt-0.5 truncate max-w-[120px]" title={apiKey.allowed_domains.join(', ')}>
+                                                {apiKey.allowed_domains.slice(0, 2).join(', ')}{apiKey.allowed_domains.length > 2 ? ` +${apiKey.allowed_domains.length - 2}` : ''}
+                                            </p>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
                                         <Badge variant="outline" className="gap-1.5 text-[11px] px-2 py-0.5 border-foreground/20 text-foreground">
                                             <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
                                             Active
@@ -244,9 +272,6 @@ export default function ApiKeysPage({
                                     </TableCell>
                                     <TableCell className="py-3 text-xs text-muted-foreground">
                                         {formatDate(apiKey.created_at)}
-                                    </TableCell>
-                                    <TableCell className="py-3 text-xs text-muted-foreground">
-                                        {apiKey.last_used_at ? formatDate(apiKey.last_used_at) : "Never"}
                                     </TableCell>
                                     <TableCell className="py-3 pr-4 text-right">
                                         <DropdownMenu>

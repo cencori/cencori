@@ -87,10 +87,35 @@ export async function POST(
 
         // Parse body
         const body = await request.json();
-        const { name, environment = "production" } = body;
+        const {
+            name,
+            environment = "production",
+            key_type = "secret",  // 'secret' or 'publishable'
+            allowed_domains = null  // Array of domain patterns for publishable keys
+        } = body;
 
         if (!name || typeof name !== "string" || name.trim().length === 0) {
             return NextResponse.json({ error: "Key name is required" }, { status: 400 });
+        }
+
+        // Validate key_type
+        if (!['secret', 'publishable'].includes(key_type)) {
+            return NextResponse.json({ error: "Invalid key_type. Must be 'secret' or 'publishable'" }, { status: 400 });
+        }
+
+        // Validate allowed_domains for publishable keys
+        if (key_type === 'publishable') {
+            if (!allowed_domains || !Array.isArray(allowed_domains) || allowed_domains.length === 0) {
+                return NextResponse.json({
+                    error: "Publishable keys require at least one allowed domain"
+                }, { status: 400 });
+            }
+            // Validate domain format
+            for (const domain of allowed_domains) {
+                if (typeof domain !== 'string' || domain.trim().length === 0) {
+                    return NextResponse.json({ error: "Invalid domain format" }, { status: 400 });
+                }
+            }
         }
 
         // Verify project ownership
@@ -115,9 +140,12 @@ export async function POST(
             return NextResponse.json({ error: "Only organization owners can create API keys" }, { status: 403 });
         }
 
-        // Generate API key
-        // Format: cen_[test_]randomString
-        const prefix = environment === "test" ? "cen_test_" : "cen_";
+        // Generate API key with new prefixes
+        // Format: csk_[test_]xxx for secret, cpk_[test_]xxx for publishable
+        const typePrefix = key_type === 'publishable' ? 'cpk' : 'csk';
+        const envSuffix = environment === "test" ? "_test" : "";
+        const prefix = `${typePrefix}${envSuffix}_`;
+
         const randomBytes = crypto.randomBytes(24);
         const keyString = randomBytes.toString("hex"); // 48 chars
         const apiKey = `${prefix}${keyString}`;
@@ -125,16 +153,21 @@ export async function POST(
         // Hash the key for storage
         const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
 
+        // Calculate prefix display length
+        const prefixDisplayLength = prefix.length + 4; // Show prefix + 4 chars
+
         // Store in database
         const { data: newKey, error: createError } = await supabase
             .from("api_keys")
             .insert({
                 project_id: projectId,
                 name: name.trim(),
-                key_prefix: apiKey.substring(0, environment === "test" ? 13 : 8) + "...",
+                key_prefix: apiKey.substring(0, prefixDisplayLength) + "...",
                 key_hash: keyHash,
                 created_by: user.id,
-                environment
+                environment,
+                key_type,
+                allowed_domains: key_type === 'publishable' ? allowed_domains : null
             })
             .select()
             .single();
