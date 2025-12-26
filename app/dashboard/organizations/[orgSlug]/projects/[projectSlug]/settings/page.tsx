@@ -34,6 +34,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { GeoMap } from "@/components/dashboard/GeoMap";
 import { RegionalCharts } from "@/components/dashboard/RegionalCharts";
 import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
+import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 
 interface ProjectData {
   id: string;
@@ -160,6 +161,21 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookEvents, setWebhookEvents] = useState<string[]>(['request.completed']);
 
+  // API Keys state
+  const [showCreateKeyDialog, setShowCreateKeyDialog] = useState(false);
+  const [createKeyType, setCreateKeyType] = useState<'secret' | 'publishable'>('secret');
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
+  // API Key interface
+  interface ApiKeyData {
+    id: string;
+    name: string;
+    key_prefix: string;
+    key_type?: 'secret' | 'publishable';
+    allowed_domains?: string[] | null;
+    created_at: string;
+  }
+
   // Fetch project with caching - INSTANT ON REVISIT!
   const { data: project, isLoading: projectLoading, error } = useProjectDetails(orgSlug, projectSlug);
 
@@ -197,6 +213,56 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     },
     staleTime: 60 * 1000,
   });
+
+  // Fetch API keys with caching
+  const { data: apiKeys = [], refetch: refetchApiKeys } = useQuery<ApiKeyData[]>({
+    queryKey: ["apiKeys", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/api-keys`);
+      if (!response.ok) throw new Error("Failed to fetch API keys");
+      const data = await response.json();
+      return data.apiKeys || [];
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
+
+  // Computed: split keys by type
+  const secretKeys = apiKeys.filter((k: ApiKeyData) => !k.key_type || k.key_type === 'secret');
+  const publishableKeys = apiKeys.filter((k: ApiKeyData) => k.key_type === 'publishable');
+
+  // Format relative date helper
+  const formatRelativeDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'today';
+    if (diffDays === 1) return 'yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Copy API key handler
+  const handleCopyKey = async (keyPrefix: string) => {
+    await navigator.clipboard.writeText(keyPrefix);
+    toast.success("Key prefix copied to clipboard");
+  };
+
+  // Revoke API key handler
+  const handleRevokeKey = async (keyId: string, keyName: string) => {
+    if (!confirm(`Are you sure you want to revoke "${keyName}"? This cannot be undone.`)) return;
+    try {
+      const response = await fetch(`/api/projects/${project!.id}/api-keys/${keyId}`, {
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error("Failed to revoke key");
+      toast.success("API key revoked");
+      refetchApiKeys();
+    } catch {
+      toast.error("Failed to revoke API key");
+    }
+  };
 
   // Fetch service versions with caching
   const { data: versions } = useQuery<{ sdk: string; api: string; proxy: string }>({
@@ -994,90 +1060,161 @@ export default function ProjectSettingsPage({ params }: PageProps) {
         </TabsContent>
 
         {/* API TAB */}
-        <TabsContent value="api" className="space-y-6">
-          {/* API Keys */}
+        <TabsContent value="api" className="space-y-8">
+          {/* Publishable Keys Section */}
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-medium">API Keys</h2>
-                <p className="text-xs text-muted-foreground">Manage authentication keys for your project.</p>
+                <h2 className="text-sm font-medium">Publishable keys</h2>
+                <p className="text-xs text-muted-foreground">Safe for browser use. Requires domain whitelisting for security.</p>
               </div>
-              <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-                <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}>
-                  Manage Keys
-                </Link>
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  setCreateKeyType('publishable');
+                  setShowCreateKeyDialog(true);
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                New publishable key
               </Button>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border/40">
-                <p className="text-xs font-medium">Key Types</p>
+              <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">Name</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">API Key</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase sr-only">Actions</span>
               </div>
-              <div className="divide-y divide-border/40">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
-                      <Server className="h-4 w-4 text-muted-foreground" />
+              {publishableKeys.length > 0 ? (
+                <div className="divide-y divide-border/40">
+                  {publishableKeys.map((key) => (
+                    <div key={key.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 items-center px-4 py-3">
+                      <div>
+                        <p className="text-xs font-medium">{key.name}</p>
+                        {key.allowed_domains && key.allowed_domains.length > 0 && (
+                          <p className="text-[10px] text-muted-foreground">{key.allowed_domains.join(', ')}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="text-[11px] font-mono bg-secondary px-2.5 py-1 rounded truncate max-w-[280px]">
+                          {key.key_prefix}
+                        </code>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleCopyKey(key.key_prefix)}>
+                          {copiedKeyId === key.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-36">
+                          <DropdownMenuItem
+                            className="text-xs text-red-600 cursor-pointer"
+                            onClick={() => handleRevokeKey(key.id, key.name)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Revoke key
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <div>
-                      <p className="text-xs font-medium">Secret Keys</p>
-                      <p className="text-[10px] text-muted-foreground">For server-side use only. Never expose in browser.</p>
-                    </div>
-                  </div>
-                  <code className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">csk_xxx</code>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
-                      <Globe className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium">Publishable Keys</p>
-                      <p className="text-[10px] text-muted-foreground">Safe for browser use. Requires domain whitelisting.</p>
-                    </div>
-                  </div>
-                  <code className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">cpk_xxx</code>
+              ) : (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-xs text-muted-foreground">No publishable keys yet</p>
                 </div>
+              )}
+              <div className="px-4 py-2 border-t border-border/40 bg-muted/20">
+                <p className="text-[10px] text-muted-foreground">Publishable keys can be safely shared publicly</p>
               </div>
             </div>
           </section>
 
-          {/* SDK Integration */}
+          {/* Secret Keys Section */}
           <section className="space-y-3">
-            <div>
-              <h2 className="text-sm font-medium">SDK Integration</h2>
-              <p className="text-xs text-muted-foreground">Quick start code snippets for your application.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Secret keys</h2>
+                <p className="text-xs text-muted-foreground">For server-side use only. Never expose in browser or client code.</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  setCreateKeyType('secret');
+                  setShowCreateKeyDialog(true);
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                New secret key
+              </Button>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border/40">
-                <p className="text-xs font-medium">Installation</p>
+              <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border/40 bg-muted/30">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">Name</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">API Key</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase sr-only">Actions</span>
               </div>
-              <div className="p-4">
-                <pre className="text-[11px] font-mono bg-secondary/50 p-3 rounded-md overflow-x-auto">
-                  <code>npm install cencori</code>
-                </pre>
-              </div>
-              <div className="px-4 py-3 border-t border-border/40">
-                <p className="text-xs font-medium">Usage</p>
-              </div>
-              <div className="p-4 pt-0">
-                <pre className="text-[11px] font-mono bg-secondary/50 p-3 rounded-md overflow-x-auto whitespace-pre-wrap">
-                  <code>{`import { Cencori } from 'cencori';
-
-const cencori = new Cencori({
-  apiKey: 'csk_xxx' // or 'cpk_xxx' for browser
-});
-
-const response = await cencori.ai.chat({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello!' }]
-});`}</code>
-                </pre>
-              </div>
+              {secretKeys.length > 0 ? (
+                <div className="divide-y divide-border/40">
+                  {secretKeys.map((key) => (
+                    <div key={key.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 items-center px-4 py-3">
+                      <div>
+                        <p className="text-xs font-medium">{key.name}</p>
+                        <p className="text-[10px] text-muted-foreground">Created {formatRelativeDate(key.created_at)}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="text-[11px] font-mono bg-secondary px-2.5 py-1 rounded truncate max-w-[280px]">
+                          {key.key_prefix}
+                        </code>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleCopyKey(key.key_prefix)}>
+                          {copiedKeyId === key.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-36">
+                          <DropdownMenuItem
+                            className="text-xs text-red-600 cursor-pointer"
+                            onClick={() => handleRevokeKey(key.id, key.name)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Revoke key
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-xs text-muted-foreground">No secret keys yet</p>
+                </div>
+              )}
             </div>
           </section>
         </TabsContent>
 
       </Tabs>
+
+      {/* Create API Key Dialog */}
+      {project && (
+        <GenerateKeyDialog
+          projectId={project.id}
+          open={showCreateKeyDialog}
+          onOpenChange={setShowCreateKeyDialog}
+          onKeyGenerated={() => refetchApiKeys()}
+        />
+      )}
     </div>
   );
 }
