@@ -35,8 +35,10 @@ console.log(response.content);
 Get your API key from the [Cencori Dashboard](https://cencori.com/dashboard):
 
 1. Create a project
-2. Navigate to API Keys
-3. Generate a new key
+2. Navigate to Settings → API tab
+3. Generate a new key:
+   - **Secret key (`csk_`)** - For server-side use only
+   - **Publishable key (`cpk_`)** - Safe for browser use (requires domain whitelisting)
 4. Copy and store it securely
 
 ## API Reference
@@ -49,7 +51,7 @@ Initialize the SDK client.
 import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
-  apiKey: 'your_api_key_here',
+  apiKey: 'csk_xxx', // Secret key for server-side
   baseUrl: 'https://cencori.com' // Optional, defaults to production
 });
 ```
@@ -159,8 +161,23 @@ For local development or testing:
 
 ```typescript
 const cencori = new Cencori({
-  apiKey: 'cen_test_...',
+  apiKey: 'csk_test_xxx', // Test secret key
   baseUrl: 'http://localhost:3000'
+});
+```
+
+## Browser Usage (Publishable Keys)
+
+For browser/client-side usage, use publishable keys:
+
+```typescript
+// Safe to use in browser - only works from allowed domains
+const cencori = new Cencori({
+  apiKey: 'cpk_xxx' // Publishable key
+});
+
+const response = await cencori.ai.chat({
+  messages: [{ role: 'user', content: 'Hello!' }]
 });
 ```
 
