@@ -1213,6 +1213,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           open={showCreateKeyDialog}
           onOpenChange={setShowCreateKeyDialog}
           onKeyGenerated={() => refetchApiKeys()}
+          defaultKeyType={createKeyType}
         />
       )}
     </div>
