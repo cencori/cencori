@@ -215,7 +215,6 @@ export default function ProjectLayoutClient({
 
     const navItems = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
-        { href: `${basePath}/api-keys`, icon: Key, label: "API Keys", prefetch: createPrefetch("api-keys") },
         { href: `${basePath}/providers`, icon: Cpu, label: "Providers", prefetch: createPrefetch("providers") },
         { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
         { href: `${basePath}/security`, icon: ShieldAlert, label: "Security" },

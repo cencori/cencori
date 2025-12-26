@@ -234,7 +234,7 @@ export function CommandPalette({
                         id: "api-keys",
                         label: "API Keys",
                         icon: <Key className="h-3.5 w-3.5" />,
-                        action: () => navigate(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`),
+                        action: () => navigate(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings?tab=api`),
                         keywords: ["token", "secret", "credentials", "key"],
                     },
                     {
