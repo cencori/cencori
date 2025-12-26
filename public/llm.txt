@@ -30,7 +30,7 @@ pip install cencori
 
 ```bash
 # .env
-CENCORI_API_KEY=cen_your_api_key_here
+CENCORI_API_KEY=csk_your_secret_key_here  # Server-side (csk_ prefix)
 ```
 
 ### 3. Initialize the Client
@@ -301,6 +301,29 @@ All security violations throw `SafetyError` with `reasons` array.
 5. **Monitor token usage** - Check dashboard for costs
 6. **Store API keys in env vars** - Never commit to version control
 7. **Use system role for instructions** - Never concatenate with user input
+8. **Use secret keys for servers** - Never expose `csk_` keys in client code
+9. **Use publishable keys for browsers** - Use `cpk_` keys with domain whitelisting
+
+## API Key Types
+
+Cencori supports two types of API keys:
+
+### Secret Keys (`csk_`)
+- For **server-side use only**
+- Full access to all features
+- Never expose in browser or client code
+- Example: `csk_abc123...`
+
+### Publishable Keys (`cpk_`)
+- Safe for **browser/client-side use**
+- Requires domain whitelisting
+- Only works from allowed domains
+- Example: `cpk_xyz789...`
+
+### Legacy Keys (`cen_`)
+- Existing keys created before key types
+- Treated as secret keys
+- Still fully functional
 
 ## Dashboard
 

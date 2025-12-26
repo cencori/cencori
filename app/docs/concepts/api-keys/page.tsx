@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Globe, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/docs/CodeBlock";
 
@@ -22,10 +22,7 @@ export default function APIKeysPage() {
                     What are API Keys?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    API keys are secret tokens that authenticate your application when making requests to Cencori. Each key is tied to a specific project and environment.
-                </p>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                    Think of API keys like passwords, they prove your application has permission to use Cencori&apos;s services.
+                    API keys authenticate your application when making requests to Cencori. Each key is tied to a specific project and can be configured for different use cases.
                 </p>
             </div>
 
@@ -34,32 +31,54 @@ export default function APIKeysPage() {
                 <h2 id="key-types" className="scroll-m-20 text-xl font-semibold tracking-tight">
                     Key Types
                 </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Cencori offers two types of API keys for different security requirements:
+                </p>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <div className="border border-border/40 rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-2">Production Keys</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="text-base font-semibold">Secret Keys</h3>
+                        </div>
                         <p className="text-sm text-muted-foreground mb-3">
-                            Format: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cen_...</code>
+                            Format: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">csk_...</code> or <code className="text-xs bg-muted px-1.5 py-0.5 rounded">csk_test_...</code>
                         </p>
                         <ul className="space-y-1 text-sm text-muted-foreground ml-6">
-                            <li className="list-disc">Use in live applications</li>
-                            <li className="list-disc">Counted toward production usage</li>
-                            <li className="list-disc">Billed against your credits</li>
-                            <li className="list-disc">Isolated from test data</li>
+                            <li className="list-disc">For <strong>server-side use only</strong></li>
+                            <li className="list-disc">Full access to all features</li>
+                            <li className="list-disc">Never expose in browser or client code</li>
+                            <li className="list-disc">Use in Node.js, Python, or server routes</li>
                         </ul>
                     </div>
 
                     <div className="border border-border/40 rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-2">Test Keys</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="text-base font-semibold">Publishable Keys</h3>
+                        </div>
                         <p className="text-sm text-muted-foreground mb-3">
-                            Format: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cen_test_...</code>
+                            Format: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cpk_...</code> or <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cpk_test_...</code>
                         </p>
                         <ul className="space-y-1 text-sm text-muted-foreground ml-6">
-                            <li className="list-disc">Use during development</li>
-                            <li className="list-disc">Separate analytics from production</li>
-                            <li className="list-disc">Still consumes credits</li>
-                            <li className="list-disc">Same features as production</li>
+                            <li className="list-disc">Safe for <strong>browser and client-side use</strong></li>
+                            <li className="list-disc">Requires domain whitelisting</li>
+                            <li className="list-disc">Only works from allowed domains</li>
+                            <li className="list-disc">Use for web apps, mobile apps, SPAs</li>
                         </ul>
+                    </div>
+
+                    <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Server className="h-4 w-4 text-amber-500" />
+                            <h3 className="text-base font-semibold text-amber-600 dark:text-amber-400">Legacy Keys</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                            Format: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cen_...</code> or <code className="text-xs bg-muted px-1.5 py-0.5 rounded">cen_test_...</code>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            Existing keys created before key types are fully functional and treated as secret keys. No migration required.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -71,18 +90,17 @@ export default function APIKeysPage() {
                 </h2>
 
                 <ol className="space-y-3 text-sm ml-6 list-decimal">
-                    <li>Go to your <Link href="/dashboard" className="text-primary hover:underline">Cencori Dashboard</Link></li>
-                    <li>Select your project</li>
-                    <li>Navigate to &quot;API Keys&quot; in the sidebar</li>
-                    <li>Click &quot;Generate New Key&quot;</li>
-                    <li>Choose environment (Production or Test)</li>
-                    <li>Add an optional description</li>
+                    <li>Go to your <Link href="/dashboard" className="text-primary hover:underline">project settings</Link></li>
+                    <li>Navigate to the &quot;API&quot; tab</li>
+                    <li>Click &quot;New secret key&quot; or &quot;New publishable key&quot;</li>
+                    <li>Enter a name for the key</li>
+                    <li>For publishable keys: add allowed domains (e.g., <code className="text-xs bg-muted px-1 py-0.5 rounded">localhost</code>, <code className="text-xs bg-muted px-1 py-0.5 rounded">*.myapp.com</code>)</li>
                     <li>Copy the key immediately - it won&apos;t be shown again!</li>
                 </ol>
 
                 <div className="mt-4 p-4 bg-muted/20 border border-border/40">
                     <p className="text-xs text-muted-foreground">
-                        <strong>Important:</strong> API keys are only displayed once during creation. Store them securely in environment variables.
+                        <strong>Important:</strong> API keys are only displayed once. Store them securely in environment variables.
                     </p>
                 </div>
             </div>
@@ -95,14 +113,14 @@ export default function APIKeysPage() {
 
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-base font-semibold mb-3">With SDK</h3>
+                        <h3 className="text-base font-semibold mb-3">Server-Side (Secret Key)</h3>
                         <CodeBlock
                             filename="app.ts"
                             language="typescript"
                             code={`import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
-  apiKey: process.env.CENCORI_API_KEY, // Store in environment variable
+  apiKey: process.env.CENCORI_API_KEY, // csk_xxx
 });
 
 const response = await cencori.ai.chat({
@@ -113,19 +131,57 @@ const response = await cencori.ai.chat({
                     </div>
 
                     <div>
-                        <h3 className="text-base font-semibold mb-3">With REST API</h3>
+                        <h3 className="text-base font-semibold mb-3">Browser (Publishable Key)</h3>
+                        <CodeBlock
+                            filename="browser.ts"
+                            language="typescript"
+                            code={`import { Cencori } from 'cencori';
+
+// Safe to use in browser - only works from allowed domains
+const cencori = new Cencori({
+  apiKey: 'cpk_xxx', // Publishable key
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});`}
+                        />
+                    </div>
+
+                    <div>
+                        <h3 className="text-base font-semibold mb-3">REST API</h3>
                         <CodeBlock
                             filename="request.sh"
                             language="bash"
                             code={`curl -X POST https://cencori.com/api/ai/chat \\
   -H "Content-Type: application/json" \\
-  -H "CENCORI_API_KEY: cen_xxx" \\
+  -H "CENCORI_API_KEY: csk_xxx" \\
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`}
                         />
                     </div>
+                </div>
+            </div>
+
+            {/* Domain Whitelisting */}
+            <div className="space-y-4">
+                <h2 id="domain-whitelisting" className="scroll-m-20 text-xl font-semibold tracking-tight">
+                    Domain Whitelisting
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Publishable keys require domain whitelisting for security. Requests from non-whitelisted domains return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">403 Forbidden</code>.
+                </p>
+
+                <div className="space-y-2">
+                    <h3 className="text-base font-semibold">Supported Patterns</h3>
+                    <ul className="space-y-1 text-sm text-muted-foreground ml-6">
+                        <li className="list-disc"><code className="text-xs bg-muted px-1 py-0.5 rounded">localhost</code> - Local development</li>
+                        <li className="list-disc"><code className="text-xs bg-muted px-1 py-0.5 rounded">myapp.com</code> - Exact domain</li>
+                        <li className="list-disc"><code className="text-xs bg-muted px-1 py-0.5 rounded">*.myapp.com</code> - All subdomains</li>
+                    </ul>
                 </div>
             </div>
 
@@ -139,23 +195,21 @@ const response = await cencori.ai.chat({
                     <div className="space-y-2">
                         <h3 className="text-base font-semibold">✅ Do</h3>
                         <ul className="space-y-2 text-sm ml-6">
-                            <li className="list-disc">Store keys in environment variables</li>
+                            <li className="list-disc">Use <strong>secret keys</strong> for server-side code</li>
+                            <li className="list-disc">Use <strong>publishable keys</strong> with domain restrictions for browsers</li>
+                            <li className="list-disc">Store secrets in environment variables</li>
                             <li className="list-disc">Use different keys for development and production</li>
                             <li className="list-disc">Rotate keys regularly (every 90 days)</li>
                             <li className="list-disc">Revoke unused or compromised keys immediately</li>
-                            <li className="list-disc">Keep keys server-side only (never in client code)</li>
-                            <li className="list-disc">Use descriptive names to track key usage</li>
                         </ul>
                     </div>
 
                     <div className="space-y-2">
                         <h3 className="text-base font-semibold">❌ Don&apos;t</h3>
                         <ul className="space-y-2 text-sm ml-6">
+                            <li className="list-disc">Expose secret keys (<code className="text-xs bg-muted px-1 py-0.5 rounded">csk_</code>) in client code</li>
                             <li className="list-disc">Commit keys to version control (git)</li>
                             <li className="list-disc">Share keys between environments</li>
-                            <li className="list-disc">Expose keys in client-side code</li>
-                            <li className="list-disc">Share keys with third parties</li>
-                            <li className="list-disc">Use production keys in development</li>
                             <li className="list-disc">Hard-code keys in your application</li>
                         </ul>
                     </div>
@@ -165,7 +219,7 @@ const response = await cencori.ai.chat({
             {/* Environment Variables */}
             <div className="space-y-4">
                 <h2 id="environment-variables" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Environment Variables Setup
+                    Environment Variables
                 </h2>
 
                 <div className="space-y-6">
@@ -174,22 +228,15 @@ const response = await cencori.ai.chat({
                         <CodeBlock
                             filename=".env"
                             language="bash"
-                            code={`# Production
-CENCORI_API_KEY=cen_xxx
+                            code={`# Server-side (secret key)
+CENCORI_API_KEY=csk_xxx
 
-# Test
-CENCORI_TEST_API_KEY=cen_test_xxx`}
+# Test environment
+CENCORI_TEST_API_KEY=csk_test_xxx
+
+# Browser (publishable key - can be public)
+NEXT_PUBLIC_CENCORI_PUBLISHABLE_KEY=cpk_xxx`}
                         />
-                    </div>
-
-                    <div>
-                        <h3 className="text-base font-semibold mb-3">Vercel</h3>
-                        <ol className="space-y-1 text-sm ml-6 list-decimal">
-                            <li>Go to Project Settings &gt; Environment Variables</li>
-                            <li>Add <code className="text-xs bg-muted px-1.5 py-0.5 rounded">CENCORI_API_KEY</code></li>
-                            <li>Select environments (Production, Preview, Development)</li>
-                            <li>Save</li>
-                        </ol>
                     </div>
                 </div>
             </div>
@@ -199,92 +246,13 @@ CENCORI_TEST_API_KEY=cen_test_xxx`}
                 <h2 id="rotation" className="scroll-m-20 text-xl font-semibold tracking-tight">
                     Key Rotation
                 </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                    Rotate keys regularly to minimize security risk:
-                </p>
-
                 <ol className="space-y-2 text-sm ml-6 list-decimal">
-                    <li>Generate a new API key in the dashboard</li>
-                    <li>Update your application&apos;s environment variables</li>
+                    <li>Generate a new API key</li>
+                    <li>Update your environment variables</li>
                     <li>Deploy the updated configuration</li>
                     <li>Verify the new key works</li>
-                    <li>Revoke the old key from the dashboard</li>
+                    <li>Revoke the old key</li>
                 </ol>
-
-                <div className="mt-4 p-4 bg-muted/20 border border-border/40">
-                    <p className="text-xs text-muted-foreground">
-                        <strong>Tip:</strong> Keep both keys active for a brief overlap period to avoid downtime during rotation.
-                    </p>
-                </div>
-            </div>
-
-            {/* Revoking Keys */}
-            <div className="space-y-4">
-                <h2 id="revoking" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Revoking Keys
-                </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                    If a key is compromised or no longer needed:
-                </p>
-
-                <ol className="space-y-2 text-sm ml-6 list-decimal">
-                    <li>Go to API Keys in your dashboard</li>
-                    <li>Find the key to revoke</li>
-                    <li>Click &quot;Revoke&quot;</li>
-                    <li>Confirm the action</li>
-                </ol>
-
-                <p className="text-sm text-muted-foreground leading-relaxed mt-4">
-                    Revoked keys immediately stop working. Any requests using that key will return a <code className="text-xs bg-muted px-1.5 py-0.5 rounded">401 Unauthorized</code> error.
-                </p>
-            </div>
-
-            {/* Monitoring Usage */}
-            <div className="space-y-4">
-                <h2 id="monitoring" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Monitoring Key Usage
-                </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                    Track which keys are being used in your dashboard:
-                </p>
-
-                <ul className="space-y-2 text-sm ml-6">
-                    <li className="list-disc">View request counts per key</li>
-                    <li className="list-disc">See last used timestamp</li>
-                    <li className="list-disc">Monitor costs per key</li>
-                    <li className="list-disc">Identify unused keys</li>
-                </ul>
-            </div>
-
-            {/* Troubleshooting */}
-            <div className="space-y-4">
-                <h2 id="troubleshooting" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Troubleshooting
-                </h2>
-
-                <div className="space-y-4">
-                    <div className="border border-border/40 rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-2">401 Unauthorized</h3>
-                        <p className="text-sm text-muted-foreground mb-2">Causes:</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground ml-6">
-                            <li className="list-disc">Invalid API key</li>
-                            <li className="list-disc">Key has been revoked</li>
-                            <li className="list-disc">Missing <code className="text-xs bg-muted px-1.5 py-0.5 rounded">CENCORI_API_KEY</code> header</li>
-                            <li className="list-disc">Typo in key value</li>
-                        </ul>
-                    </div>
-
-                    <div className="border border-border/40 rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-2">Key Not Working After Creation</h3>
-                        <p className="text-sm text-muted-foreground mb-2">Solutions:</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground ml-6">
-                            <li className="list-disc">Wait 30 seconds for propagation</li>
-                            <li className="list-disc">Check environment variable is set correctly</li>
-                            <li className="list-disc">Restart your application</li>
-                            <li className="list-disc">Verify no whitespace in key</li>
-                        </ul>
-                    </div>
-                </div>
             </div>
 
             {/* Navigation */}

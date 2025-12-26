@@ -48,7 +48,7 @@ npm install cencori
 import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
-  apiKey: 'your-api-key'
+  apiKey: 'csk_your_secret_key'  // Server-side secret key
 });
 
 const response = await cencori.ai.chat({
@@ -122,12 +122,16 @@ Track everything in your dashboard:
 - Error rates and filtering stats
 - Model usage breakdown
 
-### **Flexible API Keys**
+### **API Keys**
 
-- **Production Keys** - For live applications (`cen_...`)
-- **Test Keys** - For development (`cen_test_...`)
-- Environment-based data isolation
-- Easy key rotation
+Two types of API keys for different use cases:
+
+| Type | Prefix | Use Case |
+|------|--------|----------|
+| **Secret** | `csk_` | Server-side only, never expose in client |
+| **Publishable** | `cpk_` | Browser-safe, requires domain whitelisting |
+| **Test** | `csk_test_` / `cpk_test_` | Development environment |
+| **Legacy** | `cen_` | Existing keys, treated as secret |
 
 ### **Rate Limiting**
 
