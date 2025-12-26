@@ -43,22 +43,63 @@ function initializeProviders() {
     }
 }
 
+/**
+ * Lookup country code from IP address using ip-api.com (free tier: 45 req/min)
+ * Returns ISO alpha-2 country code or null on failure
+ */
+async function lookupCountryFromIp(ip: string): Promise<string | null> {
+    try {
+        // Skip lookup for private/localhost IPs
+        if (ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+            return null;
+        }
+
+        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
+            // Short timeout to not block the request
+            signal: AbortSignal.timeout(2000),
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (data.status === 'success' && data.countryCode) {
+            return data.countryCode;
+        }
+        return null;
+    } catch (error) {
+        // Silently fail - don't block the main request for geo lookup
+        console.warn('[Geo] IP lookup failed:', error);
+        return null;
+    }
+}
+
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabase = createAdminClient();
 
     // Extract client IP and country from headers
     // Priority:
-    // 1. X-Cencori-User-Country / X-Cencori-User-IP (customer-provided end-user location)
-    // 2. x-vercel-ip-country (Vercel automatic geo, reflects calling server location)
-    // 3. x-forwarded-for / x-real-ip (fallback IP)
-    const clientIp = req.headers.get('x-cencori-user-ip')
+    // 1. X-Cencori-User-Country (customer explicitly provides country)
+    // 2. Automatic geo lookup from X-Cencori-User-IP (customer provides end-user IP, we lookup)
+    // 3. x-vercel-ip-country (Vercel automatic geo, reflects calling server location)
+    const customerProvidedIp = req.headers.get('x-cencori-user-ip');
+    const clientIp = customerProvidedIp
         || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
         || req.headers.get('x-real-ip')
         || 'unknown';
-    const countryCode = req.headers.get('x-cencori-user-country')
-        || req.headers.get('x-vercel-ip-country')
-        || null;
+
+    // Determine country code
+    let countryCode = req.headers.get('x-cencori-user-country');
+
+    // If customer provided end-user IP but no country, do automatic lookup
+    if (!countryCode && customerProvidedIp) {
+        countryCode = await lookupCountryFromIp(customerProvidedIp);
+    }
+
+    // Fallback to Vercel's geo header (reflects calling server, not end-user)
+    if (!countryCode) {
+        countryCode = req.headers.get('x-vercel-ip-country');
+    }
 
     try {
         // 1. Validate API key
