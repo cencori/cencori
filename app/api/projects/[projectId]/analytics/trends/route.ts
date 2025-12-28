@@ -16,9 +16,13 @@ export async function GET(
         // Calculate time filter
         const now = new Date();
         let startTime: Date;
-        let groupBy: 'hour' | 'day' = 'day';
+        let groupBy: '10min' | 'hour' | 'day' = 'day';
 
         switch (timeRange) {
+            case '1h':
+                startTime = new Date(now.getTime() - 60 * 60 * 1000);
+                groupBy = '10min'; // Use 10-minute intervals for last hour
+                break;
             case '24h':
                 startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                 groupBy = 'hour';
@@ -40,13 +44,28 @@ export async function GET(
                 groupBy = 'day';
         }
 
-        // Get API keys for this environment
-        const { data: apiKeys } = await supabaseAdmin
+        // Get API keys for this environment (active = not revoked)
+        // Legacy keys (NULL environment) are treated as production keys
+        let apiKeysQuery = supabaseAdmin
             .from('api_keys')
-            .select('id')
+            .select('id, key_prefix, environment')
             .eq('project_id', projectId)
-            .eq('environment', environment)
-            .eq('is_active', true);
+            .is('revoked_at', null);
+
+        const { data: allApiKeys } = await apiKeysQuery;
+
+        // Filter keys based on environment
+        const apiKeys = allApiKeys?.filter(key => {
+            if (key.environment) {
+                return environment === 'production'
+                    ? key.environment === 'production'
+                    : key.environment === 'test';
+            } else {
+                // Legacy keys - check prefix for test
+                const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
+                return environment === 'production' ? !isTestKey : isTestKey;
+            }
+        });
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
@@ -81,7 +100,11 @@ export async function GET(
             const date = new Date(req.created_at);
             let key: string;
 
-            if (groupBy === 'hour') {
+            if (groupBy === '10min') {
+                // Group by 10-minute intervals for last hour view
+                const minutes = Math.floor(date.getMinutes() / 10) * 10;
+                key = `${String(date.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            } else if (groupBy === 'hour') {
                 // Group by hour
                 key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
             } else {

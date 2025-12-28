@@ -18,6 +18,9 @@ export async function GET(
         let startTime: Date;
 
         switch (timeRange) {
+            case '1h':
+                startTime = new Date(now.getTime() - 60 * 60 * 1000);
+                break;
             case '24h':
                 startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                 break;
@@ -34,13 +37,28 @@ export async function GET(
                 startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
-        // Get API keys for this environment
-        const { data: apiKeys } = await supabaseAdmin
+        // Get API keys for this environment (active = not revoked)
+        // Legacy keys (NULL environment) are treated as production keys
+        let apiKeysQuery = supabaseAdmin
             .from('api_keys')
-            .select('id')
+            .select('id, key_prefix, environment')
             .eq('project_id', projectId)
-            .eq('environment', environment)
-            .eq('is_active', true);
+            .is('revoked_at', null);
+
+        const { data: allApiKeys } = await apiKeysQuery;
+
+        // Filter keys based on environment
+        const apiKeys = allApiKeys?.filter(key => {
+            if (key.environment) {
+                return environment === 'production'
+                    ? key.environment === 'production'
+                    : key.environment === 'test';
+            } else {
+                // Legacy keys - check prefix for test
+                const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
+                return environment === 'production' ? !isTestKey : isTestKey;
+            }
+        });
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
