@@ -46,7 +46,22 @@ export async function GET(
         };
 
         const tier = org.subscription_tier as keyof typeof TIER_LIMITS;
-        const limits = TIER_LIMITS[tier] || TIER_LIMITS.free;
+        const tierLimits = TIER_LIMITS[tier] || TIER_LIMITS.free;
+
+        // Check for custom project settings that override tier limits
+        const { data: projectSettings } = await supabaseAdmin
+            .from('project_settings')
+            .select('requests_per_minute, tokens_per_day, concurrent_requests')
+            .eq('project_id', projectId)
+            .single();
+
+        // Use project settings if available, otherwise fall back to tier limits
+        const limits = {
+            perMinute: projectSettings?.requests_per_minute ?? tierLimits.perMinute,
+            tokensPerDay: projectSettings?.tokens_per_day ?? tierLimits.tokensPerDay,
+            concurrent: projectSettings?.concurrent_requests ?? tierLimits.concurrent,
+            monthly: tierLimits.monthly,
+        };
 
         // Get requests in the last minute (for requests/min)
         const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
@@ -78,6 +93,7 @@ export async function GET(
 
         return NextResponse.json({
             tier,
+            customLimits: !!projectSettings, // Indicates if using custom settings
             usage: {
                 requestsPerMinute: {
                     used: requestsLastMinute || 0,
@@ -106,3 +122,4 @@ export async function GET(
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
+
