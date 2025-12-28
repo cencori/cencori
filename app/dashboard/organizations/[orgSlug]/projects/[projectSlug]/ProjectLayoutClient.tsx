@@ -16,7 +16,6 @@ import {
     SidebarRail,
     SidebarGroup,
     SidebarTrigger,
-    SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
@@ -177,40 +176,25 @@ export default function ProjectLayoutClient({
 
     // Helper to check if a route is active
     const isActive = (path: string) => {
-        if (path.endsWith(project?.slug || '')) {
+        if (path.endsWith(projectSlug || '')) {
             return pathname === path;
         }
         return pathname.startsWith(path);
     };
 
+    // Only show not found if there's an error (not while loading)
     if (error) {
         notFound();
     }
 
-    if (isLoading || !project || !organization) {
-        return (
-            <SidebarProvider defaultOpen={false}>
-                <Sidebar collapsible="icon" className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40">
-                    <SidebarContent>
-                        <SidebarGroup className="pt-3">
-                            <SidebarMenu>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                                    <SidebarMenuSkeleton key={i} showIcon />
-                                ))}
-                            </SidebarMenu>
-                        </SidebarGroup>
-                    </SidebarContent>
-                </Sidebar>
-                <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
-            </SidebarProvider>
-        );
-    }
+    // Use URL params directly for nav - no need to wait for query!
+    const basePath = `/dashboard/organizations/${orgSlug}/projects/${projectSlug}`;
 
-    const basePath = `/dashboard/organizations/${organization.slug}/projects/${project.slug}`;
-
-    // Create prefetch functions for data-heavy pages
+    // Create prefetch functions for data-heavy pages (only if project data is loaded)
     const createPrefetch = (pageType: string) => () => {
-        prefetchProjectPage(queryClient, project.id, pageType);
+        if (project?.id) {
+            prefetchProjectPage(queryClient, project.id, pageType);
+        }
     };
 
     const navItems = [
