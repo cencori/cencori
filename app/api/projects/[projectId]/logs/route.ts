@@ -42,13 +42,22 @@ export async function GET(
         }
 
         // Get API keys for this environment (active = not revoked)
-        // Include keys with matching environment OR NULL environment (legacy keys)
-        const { data: apiKeys } = await supabaseAdmin
+        // Legacy keys (NULL environment) are treated as production keys
+        let apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id')
             .eq('project_id', projectId)
-            .is('revoked_at', null)
-            .or(`environment.eq.${environment},environment.is.null`);
+            .is('revoked_at', null);
+
+        if (environment === 'production') {
+            // Production: include 'production' keys AND legacy NULL keys
+            apiKeysQuery = apiKeysQuery.or('environment.eq.production,environment.is.null');
+        } else {
+            // Test/Development: only include 'test' keys
+            apiKeysQuery = apiKeysQuery.eq('environment', 'test');
+        }
+
+        const { data: apiKeys } = await apiKeysQuery;
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
