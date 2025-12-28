@@ -12,6 +12,7 @@ import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/provide
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
+import { geolocation, ipAddress } from '@vercel/functions';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -131,28 +132,31 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const supabase = createAdminClient();
 
-    // Extract client IP and country from headers
+    // Extract client IP and country using Vercel's official helpers
     // Priority:
     // 1. X-Cencori-User-Country (customer explicitly provides country)
-    // 2. Automatic geo lookup from X-Cencori-User-IP (customer provides end-user IP, we lookup)
-    // 3. x-vercel-ip-country (Vercel automatic geo, reflects calling server location)
-    const customerProvidedIp = req.headers.get('x-cencori-user-ip');
-    const clientIp = customerProvidedIp
-        || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-        || req.headers.get('x-real-ip')
-        || 'unknown';
+    // 2. X-Cencori-User-IP (customer provides end-user IP, we lookup)
+    // 3. Vercel's geolocation() helper (automatic, most reliable)
+    // 4. x-forwarded-for fallback
 
-    // Determine country code
+    // Get IP from Vercel helper or fallback
+    const customerProvidedIp = req.headers.get('x-cencori-user-ip');
+    const vercelIp = ipAddress(req);
+    const fallbackIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const clientIp = customerProvidedIp || vercelIp || fallbackIp || 'unknown';
+
+    // Get country code
     let countryCode = req.headers.get('x-cencori-user-country');
 
-    // If customer provided end-user IP but no country, do automatic lookup
+    // If customer provided IP but no country, do lookup
     if (!countryCode && customerProvidedIp) {
         countryCode = await lookupCountryFromIp(customerProvidedIp);
     }
 
-    // Fallback to Vercel's geo header (reflects calling server, not end-user)
+    // Use Vercel's geolocation helper (most reliable on Vercel)
     if (!countryCode) {
-        countryCode = req.headers.get('x-vercel-ip-country');
+        const geo = geolocation(req);
+        countryCode = geo.country || null;
     }
 
     try {
@@ -212,16 +216,9 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            // For publishable keys (browser → Cencori direct), the x-forwarded-for IP
-            // is the real end-user IP. ALWAYS do geo lookup since Vercel's header
-            // reflects the browser's location which we want to verify.
-            if (clientIp && clientIp !== 'unknown') {
-                const lookedUpCountry = await lookupCountryFromIp(clientIp);
-                if (lookedUpCountry) {
-                    countryCode = lookedUpCountry;
-                }
-                console.log('[Geo] Publishable key geo:', { clientIp, lookedUpCountry, finalCountryCode: countryCode });
-            }
+            // For publishable keys, Vercel's geolocation() already captures the browser's
+            // location correctly. Just log for debugging.
+            console.log('[Geo] Publishable key:', { clientIp, countryCode });
         }
 
         const project = keyData.projects as unknown as {
