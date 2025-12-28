@@ -44,31 +44,50 @@ function initializeProviders() {
 }
 
 /**
- * Lookup country code from IP address using ip-api.com (free tier: 45 req/min)
+ * Lookup country code from IP address using ipinfo.io (HTTPS, 50k req/month free)
+ * Fallback to ip-api.com if needed
  * Returns ISO alpha-2 country code or null on failure
  */
 async function lookupCountryFromIp(ip: string): Promise<string | null> {
     try {
         // Skip lookup for private/localhost IPs
-        if (ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+        if (!ip || ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.') || ip === '::1') {
             return null;
         }
 
-        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
-            // Short timeout to not block the request
-            signal: AbortSignal.timeout(2000),
+        // Try ipinfo.io first (HTTPS, more reliable)
+        try {
+            const response = await fetch(`https://ipinfo.io/${ip}/country`, {
+                signal: AbortSignal.timeout(3000),
+                headers: { 'Accept': 'text/plain' }
+            });
+
+            if (response.ok) {
+                const countryCode = (await response.text()).trim();
+                if (countryCode && countryCode.length === 2) {
+                    return countryCode.toUpperCase();
+                }
+            }
+        } catch (e) {
+            // ipinfo.io failed, try fallback
+        }
+
+        // Fallback to ip-api.com
+        const fallbackResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
+            signal: AbortSignal.timeout(3000),
         });
 
-        if (!response.ok) return null;
-
-        const data = await response.json();
-        if (data.status === 'success' && data.countryCode) {
-            return data.countryCode;
+        if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json();
+            if (data.status === 'success' && data.countryCode) {
+                return data.countryCode;
+            }
         }
+
         return null;
     } catch (error) {
         // Silently fail - don't block the main request for geo lookup
-        console.warn('[Geo] IP lookup failed:', error);
+        console.warn('[Geo] IP lookup failed for IP:', ip, error);
         return null;
     }
 }
@@ -194,9 +213,14 @@ export async function POST(req: NextRequest) {
             }
 
             // For publishable keys (browser → Cencori direct), the x-forwarded-for IP
-            // is the real end-user IP. Do geo lookup if we don't have country yet.
-            if (!countryCode && clientIp !== 'unknown') {
-                countryCode = await lookupCountryFromIp(clientIp);
+            // is the real end-user IP. ALWAYS do geo lookup since Vercel's header
+            // reflects the browser's location which we want to verify.
+            if (clientIp && clientIp !== 'unknown') {
+                const lookedUpCountry = await lookupCountryFromIp(clientIp);
+                if (lookedUpCountry) {
+                    countryCode = lookedUpCountry;
+                }
+                console.log('[Geo] Publishable key geo:', { clientIp, lookedUpCountry, finalCountryCode: countryCode });
             }
         }
 
