@@ -35,6 +35,7 @@ import { GeoMap } from "@/components/dashboard/GeoMap";
 import { RegionalCharts } from "@/components/dashboard/RegionalCharts";
 import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
+import { SUPPORTED_PROVIDERS, getModelsForProvider } from "@/lib/providers/config";
 
 interface ProjectData {
   id: string;
@@ -70,6 +71,7 @@ interface ProviderHealth {
 
 interface RateLimitsData {
   tier: string;
+  customLimits?: boolean;
   usage: {
     requestsPerMinute: { used: number; limit: number; percentage: number };
     tokensPerDay: { used: number; limit: number; percentage: number };
@@ -166,6 +168,18 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [createKeyType, setCreateKeyType] = useState<'secret' | 'publishable'>('secret');
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
+  // Provider Settings state
+  const [defaultProvider, setDefaultProvider] = useState('openai');
+  const [defaultModel, setDefaultModel] = useState('gpt-4o');
+  const [requestsPerMinute, setRequestsPerMinute] = useState('60');
+  const [tokensPerDay, setTokensPerDay] = useState('1000000');
+  const [concurrentRequests, setConcurrentRequests] = useState('10');
+  const [enableFallback, setEnableFallback] = useState(true);
+  const [fallbackProvider, setFallbackProvider] = useState('anthropic');
+  const [maxRetriesBeforeFallback, setMaxRetriesBeforeFallback] = useState('3');
+  const [isSavingProviders, setIsSavingProviders] = useState(false);
+  const [providerSettingsDirty, setProviderSettingsDirty] = useState(false);
+
   // API Key interface
   interface ApiKeyData {
     id: string;
@@ -226,6 +240,45 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     enabled: !!project?.id,
     staleTime: 30 * 1000,
   });
+
+  // Fetch provider settings
+  interface ProviderSettingsData {
+    default_provider: string;
+    default_model: string;
+    requests_per_minute: number;
+    tokens_per_day: number;
+    concurrent_requests: number;
+    enable_fallback: boolean;
+    fallback_provider: string;
+    max_retries_before_fallback: number;
+  }
+
+  const { data: providerSettings } = useQuery<{ settings: ProviderSettingsData }>({
+    queryKey: ["providerSettings", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/settings`);
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+    enabled: !!project?.id,
+    staleTime: 60 * 1000,
+  });
+
+  // Sync provider settings to state when loaded
+  React.useEffect(() => {
+    if (providerSettings?.settings) {
+      const s = providerSettings.settings;
+      setDefaultProvider(s.default_provider || 'openai');
+      setDefaultModel(s.default_model || 'gpt-4o');
+      setRequestsPerMinute(String(s.requests_per_minute || 60));
+      setTokensPerDay(String(s.tokens_per_day || 1000000));
+      setConcurrentRequests(String(s.concurrent_requests || 10));
+      setEnableFallback(s.enable_fallback ?? true);
+      setFallbackProvider(s.fallback_provider || 'anthropic');
+      setMaxRetriesBeforeFallback(String(s.max_retries_before_fallback || 3));
+      setProviderSettingsDirty(false);
+    }
+  }, [providerSettings]);
 
   // Computed: split keys by type
   const secretKeys = apiKeys.filter((k: ApiKeyData) => !k.key_type || k.key_type === 'secret');
@@ -652,6 +705,30 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
           </section>
 
+          {/* Default AI Configuration */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Default AI configuration</h2>
+              <p className="text-[10px] text-muted-foreground">Configure in Providers tab.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="divide-y divide-border/40">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-[10px] text-muted-foreground">Default Provider</span>
+                  <span className="text-[10px] font-medium">
+                    {SUPPORTED_PROVIDERS.find(p => p.id === providerSettings?.settings?.default_provider)?.name || 'OpenAI'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-[10px] text-muted-foreground">Default Model</span>
+                  <span className="text-[10px] font-mono">
+                    {providerSettings?.settings?.default_model || 'gpt-4o'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Service Versions + Provider Connections Grid */}
           <div className="grid grid-cols-2 gap-4">
             {/* Service Versions */}
@@ -730,7 +807,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Rate limits</h2>
-              <p className="text-[10px] text-muted-foreground">Current usage against your plan limits{rateLimits?.tier ? ` (${rateLimits.tier} tier)` : ''}.</p>
+              <p className="text-[10px] text-muted-foreground">
+                Current usage against your {rateLimits?.customLimits ? 'custom limits' : `plan limits (${rateLimits?.tier || 'free'} tier)`}.
+                {!rateLimits?.customLimits && ' Configure in Providers tab.'}
+              </p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               <div className="divide-y divide-border/40">
@@ -778,7 +858,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Request configuration</h2>
-              <p className="text-[10px] text-muted-foreground">Default settings for request handling.</p>
+              <p className="text-[10px] text-muted-foreground">Default settings for request handling. Configure in Providers tab.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               <div className="divide-y divide-border/40">
@@ -792,17 +872,30 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <ArrowPathIcon className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-[10px]">Max retries</span>
+                    <span className="text-[10px]">Max retries before fallback</span>
                   </div>
-                  <span className="text-[10px] font-mono">{project?.max_retries ?? 3}</span>
+                  <span className="text-[10px] font-mono">{providerSettings?.settings?.max_retries_before_fallback ?? 3}</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <Server className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-[10px]">Fallback provider</span>
+                    <span className="text-[10px]">Automatic fallback</span>
                   </div>
-                  <span className="text-[10px] font-mono">{project?.fallback_provider || 'None'}</span>
+                  <span className={`text-[10px] font-mono ${providerSettings?.settings?.enable_fallback ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                    {providerSettings?.settings?.enable_fallback ? 'Enabled' : 'Disabled'}
+                  </span>
                 </div>
+                {providerSettings?.settings?.enable_fallback && (
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Server className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[10px]">Fallback provider</span>
+                    </div>
+                    <span className="text-[10px] font-mono capitalize">
+                      {SUPPORTED_PROVIDERS.find(p => p.id === providerSettings?.settings?.fallback_provider)?.name || providerSettings?.settings?.fallback_provider || 'None'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -948,14 +1041,16 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs font-medium">Default provider</p>
                   <p className="text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
                 </div>
-                <Select defaultValue="openai">
-                  <SelectTrigger className="w-40 h-8 text-xs">
+                <Select value={defaultProvider} onValueChange={(v) => { setDefaultProvider(v); setProviderSettingsDirty(true); }}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai" className="text-xs">OpenAI</SelectItem>
-                    <SelectItem value="anthropic" className="text-xs">Anthropic</SelectItem>
-                    <SelectItem value="google" className="text-xs">Google AI</SelectItem>
+                  <SelectContent className="max-h-64">
+                    {SUPPORTED_PROVIDERS.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
+                        {provider.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -964,14 +1059,16 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs font-medium">Default model</p>
                   <p className="text-[10px] text-muted-foreground">Fallback model when not specified.</p>
                 </div>
-                <Select defaultValue="gpt-4o">
-                  <SelectTrigger className="w-40 h-8 text-xs">
+                <Select value={defaultModel} onValueChange={(v) => { setDefaultModel(v); setProviderSettingsDirty(true); }}>
+                  <SelectTrigger className="w-56 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gpt-4o" className="text-xs">GPT-4o</SelectItem>
-                    <SelectItem value="gpt-4o-mini" className="text-xs">GPT-4o Mini</SelectItem>
-                    <SelectItem value="claude-3-5-sonnet" className="text-xs">Claude 3.5 Sonnet</SelectItem>
+                  <SelectContent className="max-h-64">
+                    {getModelsForProvider(defaultProvider).map((model) => (
+                      <SelectItem key={model.id} value={model.id} className="text-xs">
+                        {model.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -990,21 +1087,33 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs font-medium">Requests per minute</p>
                   <p className="text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
                 </div>
-                <Input defaultValue="60" className="w-24 h-8 text-xs text-right" />
+                <Input
+                  value={requestsPerMinute}
+                  onChange={(e) => { setRequestsPerMinute(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-24 h-8 text-xs text-right"
+                />
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium">Tokens per day</p>
                   <p className="text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
                 </div>
-                <Input defaultValue="1000000" className="w-24 h-8 text-xs text-right" />
+                <Input
+                  value={tokensPerDay}
+                  onChange={(e) => { setTokensPerDay(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-24 h-8 text-xs text-right"
+                />
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium">Concurrent requests</p>
                   <p className="text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
                 </div>
-                <Input defaultValue="10" className="w-24 h-8 text-xs text-right" />
+                <Input
+                  value={concurrentRequests}
+                  onChange={(e) => { setConcurrentRequests(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-24 h-8 text-xs text-right"
+                />
               </div>
             </div>
           </section>
@@ -1021,21 +1130,26 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs font-medium">Enable automatic fallback</p>
                   <p className="text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
                 </div>
-                <Checkbox defaultChecked />
+                <Checkbox
+                  checked={enableFallback}
+                  onCheckedChange={(checked) => { setEnableFallback(!!checked); setProviderSettingsDirty(true); }}
+                />
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium">Fallback provider</p>
                   <p className="text-[10px] text-muted-foreground">Used when primary fails.</p>
                 </div>
-                <Select defaultValue="anthropic">
-                  <SelectTrigger className="w-40 h-8 text-xs">
+                <Select value={fallbackProvider} onValueChange={(v) => { setFallbackProvider(v); setProviderSettingsDirty(true); }} disabled={!enableFallback}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="anthropic" className="text-xs">Anthropic</SelectItem>
-                    <SelectItem value="openai" className="text-xs">OpenAI</SelectItem>
-                    <SelectItem value="google" className="text-xs">Google AI</SelectItem>
+                  <SelectContent className="max-h-64">
+                    {SUPPORTED_PROVIDERS.filter(p => p.id !== defaultProvider).map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
+                        {provider.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1044,10 +1158,65 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs font-medium">Max retries before fallback</p>
                   <p className="text-[10px] text-muted-foreground">Attempts before switching provider.</p>
                 </div>
-                <Input defaultValue="3" className="w-24 h-8 text-xs text-right" />
+                <Input
+                  value={maxRetriesBeforeFallback}
+                  onChange={(e) => { setMaxRetriesBeforeFallback(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-24 h-8 text-xs text-right"
+                  disabled={!enableFallback}
+                />
               </div>
             </div>
           </section>
+
+          {/* Save Button */}
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-muted-foreground">
+              {providerSettingsDirty ? "You have unsaved changes" : "All changes saved"}
+            </p>
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              disabled={!providerSettingsDirty || isSavingProviders}
+              onClick={async () => {
+                setIsSavingProviders(true);
+                try {
+                  const response = await fetch(`/api/projects/${project.id}/settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      default_provider: defaultProvider,
+                      default_model: defaultModel,
+                      requests_per_minute: parseInt(requestsPerMinute),
+                      tokens_per_day: parseInt(tokensPerDay),
+                      concurrent_requests: parseInt(concurrentRequests),
+                      enable_fallback: enableFallback,
+                      fallback_provider: fallbackProvider,
+                      max_retries_before_fallback: parseInt(maxRetriesBeforeFallback),
+                    }),
+                  });
+                  if (!response.ok) throw new Error('Failed to save settings');
+                  toast.success('Provider settings saved');
+                  setProviderSettingsDirty(false);
+                  // Refresh rate limits in Infrastructure tab to reflect new settings
+                  queryClient.invalidateQueries({ queryKey: ["rateLimits", project.id] });
+                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                } catch (error) {
+                  toast.error('Failed to save settings');
+                } finally {
+                  setIsSavingProviders(false);
+                }
+              }}
+            >
+              {isSavingProviders ? (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save changes'
+              )}
+            </Button>
+          </div>
 
           {/* Geographic Usage */}
           <section className="space-y-3">
