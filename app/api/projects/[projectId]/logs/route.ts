@@ -42,22 +42,30 @@ export async function GET(
         }
 
         // Get API keys for this environment (active = not revoked)
-        // Legacy keys (NULL environment) are treated as production keys
+        // For legacy keys (NULL environment), check key_prefix to determine environment:
+        // - Keys with '_test' in prefix → development
+        // - Other legacy keys → production
         let apiKeysQuery = supabaseAdmin
             .from('api_keys')
-            .select('id')
+            .select('id, key_prefix, environment')
             .eq('project_id', projectId)
             .is('revoked_at', null);
 
-        if (environment === 'production') {
-            // Production: include 'production' keys AND legacy NULL keys
-            apiKeysQuery = apiKeysQuery.or('environment.eq.production,environment.is.null');
-        } else {
-            // Test/Development: only include 'test' keys
-            apiKeysQuery = apiKeysQuery.eq('environment', 'test');
-        }
+        const { data: allApiKeys } = await apiKeysQuery;
 
-        const { data: apiKeys } = await apiKeysQuery;
+        // Filter keys based on environment
+        const apiKeys = allApiKeys?.filter(key => {
+            if (key.environment) {
+                // New keys with explicit environment
+                return environment === 'production'
+                    ? key.environment === 'production'
+                    : key.environment === 'test';
+            } else {
+                // Legacy keys (NULL environment) - check prefix
+                const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
+                return environment === 'production' ? !isTestKey : isTestKey;
+            }
+        });
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
