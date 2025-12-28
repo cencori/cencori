@@ -192,6 +192,12 @@ export async function POST(req: NextRequest) {
                     { status: 403 }
                 );
             }
+
+            // For publishable keys (browser → Cencori direct), the x-forwarded-for IP
+            // is the real end-user IP. Do geo lookup if we don't have country yet.
+            if (!countryCode && clientIp !== 'unknown') {
+                countryCode = await lookupCountryFromIp(clientIp);
+            }
         }
 
         const project = keyData.projects as unknown as {
