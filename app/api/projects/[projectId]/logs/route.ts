@@ -41,13 +41,13 @@ export async function GET(
                 break;
         }
 
-        // Get API keys for this environment
+        // Get API keys for this environment (active = not revoked)
         const { data: apiKeys } = await supabaseAdmin
             .from('api_keys')
             .select('id')
             .eq('project_id', projectId)
             .eq('environment', environment)
-            .eq('is_active', true);
+            .is('revoked_at', null);
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
