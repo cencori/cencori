@@ -65,33 +65,58 @@ export default function DesignIntroPage() {
                         </div>
                     ))}
                     {/* Dark Mode Native - Inline with toggle on right */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3">
-                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-                            <span className="text-sm font-medium shrink-0 sm:w-44">Dark Mode Native</span>
-                            <span className="text-xs text-muted-foreground">Design dark first, adapt for light. Try switching!</span>
+                    <div className="flex flex-col gap-1 px-4 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium">Dark Mode Native</span>
+                            {/* Theme Switcher */}
+                            <div className="flex w-fit rounded-full border border-border/40 bg-muted/30 shrink-0 sm:hidden">
+                                <button
+                                    onClick={() => setTheme('light')}
+                                    className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'light'
+                                        ? 'bg-foreground text-background'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    aria-label="Light mode"
+                                >
+                                    <SunIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                    onClick={() => setTheme('dark')}
+                                    className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'dark'
+                                        ? 'bg-foreground text-background'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    aria-label="Dark mode"
+                                >
+                                    <MoonIcon className="h-3 w-3" />
+                                </button>
+                            </div>
                         </div>
-                        {/* Theme Switcher */}
-                        <div className="flex rounded-full border border-border/40 bg-muted/30 shrink-0">
-                            <button
-                                onClick={() => setTheme('light')}
-                                className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'light'
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                                    }`}
-                                aria-label="Light mode"
-                            >
-                                <SunIcon className="h-3 w-3" />
-                            </button>
-                            <button
-                                onClick={() => setTheme('dark')}
-                                className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'dark'
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                                    }`}
-                                aria-label="Dark mode"
-                            >
-                                <MoonIcon className="h-3 w-3" />
-                            </button>
+                        <div className="flex items-center justify-between gap-4">
+                            <span className="text-xs text-muted-foreground">Design dark first, adapt for light. Try switching!</span>
+                            {/* Theme Switcher - Desktop only */}
+                            <div className="hidden sm:flex w-fit rounded-full border border-border/40 bg-muted/30 shrink-0">
+                                <button
+                                    onClick={() => setTheme('light')}
+                                    className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'light'
+                                        ? 'bg-foreground text-background'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    aria-label="Light mode"
+                                >
+                                    <SunIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                    onClick={() => setTheme('dark')}
+                                    className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'dark'
+                                        ? 'bg-foreground text-background'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    aria-label="Dark mode"
+                                >
+                                    <MoonIcon className="h-3 w-3" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
