@@ -3,26 +3,23 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { ViewColumnsIcon, SparklesIcon, CommandLineIcon, MoonIcon, SunIcon } from "@heroicons/react/24/outline";
+import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 
-const highlights = [
+const principles = [
     {
         title: "Dense but Breathable",
         description: "Pack information tightly while maintaining visual hierarchy through whitespace.",
-        icon: ViewColumnsIcon,
     },
     {
         title: "Subtle Sophistication",
-        description: "Prefer muted colors, soft borders, and understated hover effects.",
-        icon: SparklesIcon,
+        description: "Muted colors, soft borders, understated hover effects.",
     },
     {
         title: "Developer-First",
         description: "Design for power users who value efficiency over hand-holding.",
-        icon: CommandLineIcon,
     },
 ];
 
@@ -37,113 +34,100 @@ export default function DesignIntroPage() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
 
-    // Avoid hydration mismatch - only show theme toggle after mount
     React.useEffect(() => {
         setMounted(true);
     }, []);
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-10">
             {/* Hero */}
-            <div className="space-y-4">
-                <Badge variant="outline" className="rounded-full px-3 py-0.5 text-[10px]">
+            <div className="space-y-3">
+                <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[10px]">
                     v1.2
                 </Badge>
-                <h1 className="text-3xl font-bold tracking-tight">
+                <h1 className="text-2xl font-bold tracking-tight">
                     Cenpact Design System
                 </h1>
-                <p className="text-lg text-muted-foreground max-w-2xl">
-                    <strong>Cenpact</strong> = Cencori + Compact. A design philosophy prioritizing
+                <p className="text-sm text-muted-foreground max-w-xl">
+                    <strong className="text-foreground">Cenpact</strong> = Cencori + Compact. A design philosophy prioritizing
                     information density, subtle elegance, and developer-focused UX.
                 </p>
             </div>
 
-            {/* Core Principles */}
-            <section className="space-y-4">
-                <h2 className="text-lg font-semibold">Core Principles</h2>
-                <div className="grid gap-4 md:grid-cols-3">
-                    {highlights.map((item) => (
-                        <div
-                            key={item.title}
-                            className="rounded-xl border border-border/50 bg-card p-5 space-y-3"
-                        >
-                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                                <item.icon className="h-5 w-5 text-foreground" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-semibold">{item.title}</h3>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    {item.description}
-                                </p>
-                            </div>
+            {/* Core Principles - Compact List */}
+            <section className="space-y-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Core Principles</h2>
+                <div className="border border-border/40 rounded-lg divide-y divide-border/40">
+                    {principles.map((item) => (
+                        <div key={item.title} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4 px-4 py-3">
+                            <span className="text-sm font-medium shrink-0 sm:w-44">{item.title}</span>
+                            <span className="text-xs text-muted-foreground">{item.description}</span>
                         </div>
                     ))}
-                </div>
-            </section>
-
-            {/* Dark Mode Native - Interactive! */}
-            <section className="rounded-xl border border-border/50 bg-card p-6">
-                <div className="flex items-start gap-4">
-                    <button
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className="w-10 h-10 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                        aria-label="Toggle theme"
-                    >
-                        {mounted ? (
-                            theme === 'dark' ? (
-                                <SunIcon className="h-5 w-5" />
-                            ) : (
-                                <MoonIcon className="h-5 w-5" />
-                            )
-                        ) : (
-                            <MoonIcon className="h-5 w-5" />
-                        )}
-                    </button>
-                    <div>
-                        <h3 className="text-sm font-semibold mb-1">
-                            Dark Mode Native
-                            <Badge variant="outline" className="ml-2 text-[8px] px-1.5 py-0 rounded-full">
-                                Try it!
-                            </Badge>
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                            We design in dark mode first, then adapt for light. Click the icon to toggle!
-                        </p>
+                    {/* Dark Mode Native - Inline with toggle on right */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+                            <span className="text-sm font-medium shrink-0 sm:w-44">Dark Mode Native</span>
+                            <span className="text-xs text-muted-foreground">Design dark first, adapt for light. Try switching!</span>
+                        </div>
+                        {/* Theme Switcher */}
+                        <div className="flex rounded-full border border-border/40 bg-muted/30 shrink-0">
+                            <button
+                                onClick={() => setTheme('light')}
+                                className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'light'
+                                    ? 'bg-foreground text-background'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                aria-label="Light mode"
+                            >
+                                <SunIcon className="h-3 w-3" />
+                            </button>
+                            <button
+                                onClick={() => setTheme('dark')}
+                                className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full transition-all ${mounted && theme === 'dark'
+                                    ? 'bg-foreground text-background'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                aria-label="Dark mode"
+                            >
+                                <MoonIcon className="h-3 w-3" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
 
             {/* Quick Links */}
-            <section className="space-y-4">
-                <h2 className="text-lg font-semibold">Quick Links</h2>
-                <div className="grid gap-3 md:grid-cols-2">
+            <section className="space-y-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Quick Links</h2>
+                <div className="grid gap-2 md:grid-cols-2">
                     {quickLinks.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
-                            className="group flex items-center justify-between rounded-lg border border-border/50 bg-card p-4 hover:border-border hover:shadow-sm transition-all"
+                            className="group flex items-center justify-between rounded-lg border border-border/40 bg-card/50 px-4 py-3 hover:border-border hover:bg-card transition-all"
                         >
                             <div>
                                 <h3 className="text-sm font-medium group-hover:text-foreground">
                                     {link.name}
                                 </h3>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-[11px] text-muted-foreground">
                                     {link.description}
                                 </p>
                             </div>
-                            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-transform" />
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-transform" />
                         </Link>
                     ))}
                 </div>
             </section>
 
             {/* Get Started */}
-            <section className="rounded-xl border border-border/50 bg-muted/30 p-6 text-center">
-                <h2 className="text-sm font-semibold mb-2">Ready to build?</h2>
-                <p className="text-xs text-muted-foreground mb-4">
+            <section className="rounded-lg border border-border/40 bg-muted/20 px-6 py-5 text-center">
+                <h2 className="text-sm font-semibold mb-1">Ready to build?</h2>
+                <p className="text-xs text-muted-foreground mb-3">
                     Start with the typography scale and color system.
                 </p>
-                <Button size="sm" className="rounded-full" asChild>
+                <Button size="sm" className="h-7 px-3 text-xs rounded-full" asChild>
                     <Link href="/design/typography">
                         Get Started
                         <ArrowRight className="h-3 w-3 ml-1.5" />
