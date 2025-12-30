@@ -23,7 +23,7 @@ export class ProviderRouter {
 
     /**
      * Auto-detect provider from model name
-     * Returns the provider identifier (openai, anthropic, google, custom)
+     * Returns the provider identifier
      */
     detectProvider(modelName: string): string {
         // OpenAI models
@@ -44,6 +44,48 @@ export class ProviderRouter {
             return 'google';
         }
 
+        // Mistral models
+        if (modelName.startsWith('mistral-') ||
+            modelName.startsWith('codestral-') ||
+            modelName.startsWith('open-mistral-') ||
+            modelName.startsWith('open-mixtral-')) {
+            return 'mistral';
+        }
+
+        // Groq models (Llama, Mixtral, Gemma via Groq)
+        if (modelName.startsWith('llama-') ||
+            modelName.startsWith('llama2-') ||
+            modelName.startsWith('llama3-') ||
+            modelName.includes('llama') ||
+            modelName.startsWith('mixtral-')) {
+            return 'groq';
+        }
+
+        // Cohere models
+        if (modelName.startsWith('command-')) {
+            return 'cohere';
+        }
+
+        // xAI models
+        if (modelName.startsWith('grok-')) {
+            return 'xai';
+        }
+
+        // DeepSeek models
+        if (modelName.startsWith('deepseek-')) {
+            return 'deepseek';
+        }
+
+        // Perplexity models
+        if (modelName.includes('sonar')) {
+            return 'perplexity';
+        }
+
+        // Qwen models
+        if (modelName.startsWith('qwen-') || modelName.includes('qwen')) {
+            return 'qwen';
+        }
+
         // Explicit provider prefix format: "provider/model"
         // e.g., "openai/gpt-4", "anthropic/claude-3-opus"
         if (modelName.includes('/')) {
@@ -56,8 +98,8 @@ export class ProviderRouter {
             return modelName;
         }
 
-        // Default to Gemini for backwards compatibility
-        return 'google';
+        // Default to OpenAI for unknown models
+        return 'openai';
     }
 
     /**

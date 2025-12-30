@@ -1,0 +1,240 @@
+/**
+ * OpenAI-Compatible Provider
+ * 
+ * Handles all providers that use the OpenAI API format with different base URLs.
+ * Supports: Mistral, Groq, Together, Perplexity, OpenRouter, xAI, DeepSeek, Qwen
+ */
+
+import OpenAI from 'openai';
+import {
+    AIProvider,
+    UnifiedChatRequest,
+    UnifiedChatResponse,
+    StreamChunk,
+    ModelPricing,
+} from './base';
+import { getPricingFromDB } from './pricing';
+import { toOpenAIMessages, estimateTokenCount } from './utils';
+import { normalizeProviderError } from './errors';
+
+/**
+ * Provider configuration with base URLs
+ */
+export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name: string }> = {
+    mistral: {
+        baseURL: 'https://api.mistral.ai/v1',
+        name: 'Mistral AI',
+    },
+    groq: {
+        baseURL: 'https://api.groq.com/openai/v1',
+        name: 'Groq',
+    },
+    together: {
+        baseURL: 'https://api.together.xyz/v1',
+        name: 'Together AI',
+    },
+    perplexity: {
+        baseURL: 'https://api.perplexity.ai',
+        name: 'Perplexity',
+    },
+    openrouter: {
+        baseURL: 'https://openrouter.ai/api/v1',
+        name: 'OpenRouter',
+    },
+    xai: {
+        baseURL: 'https://api.x.ai/v1',
+        name: 'xAI',
+    },
+    deepseek: {
+        baseURL: 'https://api.deepseek.com',
+        name: 'DeepSeek',
+    },
+    qwen: {
+        baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        name: 'Qwen',
+    },
+    // Meta and HuggingFace typically go through other providers like Together or OpenRouter
+    meta: {
+        baseURL: 'https://api.together.xyz/v1', // Meta models via Together
+        name: 'Meta AI',
+    },
+    huggingface: {
+        baseURL: 'https://api-inference.huggingface.co/v1/',
+        name: 'Hugging Face',
+    },
+};
+
+/**
+ * Generic OpenAI-compatible provider
+ * Works with any provider that implements the OpenAI API format
+ */
+export class OpenAICompatibleProvider extends AIProvider {
+    readonly providerName: string;
+    private client: OpenAI;
+    private displayName: string;
+
+    constructor(providerName: string, apiKey: string, customBaseURL?: string) {
+        super();
+
+        this.providerName = providerName;
+
+        const config = OPENAI_COMPATIBLE_ENDPOINTS[providerName];
+        if (!config && !customBaseURL) {
+            throw new Error(`Unknown provider: ${providerName}. Provide a customBaseURL.`);
+        }
+
+        this.displayName = config?.name || providerName;
+        const baseURL = customBaseURL || config.baseURL;
+
+        // Initialize OpenAI client with custom base URL
+        this.client = new OpenAI({
+            apiKey,
+            baseURL,
+            // Some providers need extra headers
+            defaultHeaders: this.getDefaultHeaders(providerName),
+        });
+    }
+
+    /**
+     * Get provider-specific headers
+     */
+    private getDefaultHeaders(providerName: string): Record<string, string> {
+        const headers: Record<string, string> = {};
+
+        // OpenRouter requires additional headers
+        if (providerName === 'openrouter') {
+            headers['HTTP-Referer'] = 'https://cencori.com';
+            headers['X-Title'] = 'Cencori';
+        }
+
+        return headers;
+    }
+
+    async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const startTime = Date.now();
+
+        try {
+            const completion = await this.client.chat.completions.create({
+                model: request.model,
+                messages: toOpenAIMessages(request.messages),
+                temperature: request.temperature ?? 0.7,
+                max_tokens: request.maxTokens,
+                stream: false,
+                user: request.userId,
+            });
+
+            // Handle usage - some providers may not return it
+            const usage = completion.usage || {
+                prompt_tokens: estimateTokenCount(request.messages.map(m => m.content).join(' ')),
+                completion_tokens: estimateTokenCount(completion.choices[0]?.message?.content || ''),
+                total_tokens: 0,
+            };
+            usage.total_tokens = usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens);
+
+            const pricing = await this.getPricing(request.model);
+            const providerCost = this.calculateCost(
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                pricing
+            );
+            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
+
+            const finishReason = completion.choices[0]?.finish_reason;
+
+            return {
+                content: completion.choices[0]?.message?.content || '',
+                model: completion.model || request.model,
+                provider: this.providerName,
+                usage: {
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                },
+                cost: {
+                    providerCostUsd: providerCost,
+                    cencoriChargeUsd: cencoriCharge,
+                    markupPercentage: pricing.cencoriMarkupPercentage,
+                },
+                latencyMs: Date.now() - startTime,
+                finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                    ? finishReason
+                    : undefined,
+            };
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        try {
+            const stream = await this.client.chat.completions.create({
+                model: request.model,
+                messages: toOpenAIMessages(request.messages),
+                temperature: request.temperature ?? 0.7,
+                max_tokens: request.maxTokens,
+                stream: true,
+                user: request.userId,
+            });
+
+            for await (const chunk of stream) {
+                const delta = chunk.choices[0]?.delta?.content || '';
+                const finishReason = chunk.choices[0]?.finish_reason;
+
+                yield {
+                    delta,
+                    finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                        ? finishReason
+                        : undefined,
+                };
+            }
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    async countTokens(text: string, _model?: string): Promise<number> {
+        // Use rough estimation for OpenAI-compatible providers
+        return estimateTokenCount(text);
+    }
+
+    async getPricing(model: string): Promise<ModelPricing> {
+        return getPricingFromDB(this.providerName, model);
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            // Try to list models - most providers support this
+            await this.client.models.list();
+            return true;
+        } catch {
+            // Some providers don't support model listing, try a minimal chat
+            try {
+                await this.client.chat.completions.create({
+                    model: 'gpt-3.5-turbo', // Fallback model, may not work
+                    messages: [{ role: 'user', content: 'test' }],
+                    max_tokens: 1,
+                });
+                return true;
+            } catch {
+                return false;
+            }
+        }
+    }
+}
+
+/**
+ * Factory function to create provider instances
+ */
+export function createOpenAICompatibleProvider(
+    providerName: string,
+    apiKey: string
+): OpenAICompatibleProvider {
+    return new OpenAICompatibleProvider(providerName, apiKey);
+}
+
+/**
+ * Check if a provider is OpenAI-compatible
+ */
+export function isOpenAICompatible(providerName: string): boolean {
+    return providerName in OPENAI_COMPATIBLE_ENDPOINTS;
+}
