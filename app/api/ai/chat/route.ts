@@ -1,25 +1,33 @@
 /**
  * AI Chat API Route - Multi-Provider Support
  * 
- * Handles AI chat requests with support for OpenAI, Anthropic, Google Gemini, and custom providers
+ * Handles AI chat requests with support for multiple AI providers via BYOK
  * Includes tier-based access control, request limit enforcement, and streaming support
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
-import { GeminiProvider, OpenAIProvider, AnthropicProvider } from '@/lib/providers';
+import {
+    GeminiProvider,
+    OpenAIProvider,
+    AnthropicProvider,
+    OpenAICompatibleProvider,
+    CohereProvider,
+    isOpenAICompatible,
+} from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { geolocation, ipAddress } from '@vercel/functions';
+import { decryptApiKey } from '@/lib/encryption';
 
 // Initialize providers
 const router = new ProviderRouter();
 
-// Lazy initialization of providers
-function initializeProviders() {
-    if (!router.hasProvider('google')) {
+// Lazy initialization of default providers (env-based)
+function initializeDefaultProviders() {
+    if (!router.hasProvider('google') && process.env.GOOGLE_AI_API_KEY) {
         try {
             router.registerProvider('google', new GeminiProvider());
         } catch (error) {
@@ -41,6 +49,55 @@ function initializeProviders() {
         } catch (error) {
             console.warn('[API] Anthropic provider not available:', error);
         }
+    }
+}
+
+/**
+ * Initialize providers from BYOK keys stored in database
+ */
+async function initializeBYOKProviders(
+    supabase: ReturnType<typeof createAdminClient>,
+    projectId: string,
+    organizationId: string,
+    targetProvider: string
+): Promise<boolean> {
+    // Check if we already have this provider
+    if (router.hasProvider(targetProvider)) {
+        return true;
+    }
+
+    try {
+        // Fetch the provider key from database
+        const { data: providerKey, error } = await supabase
+            .from('provider_keys')
+            .select('encrypted_key, is_active')
+            .eq('project_id', projectId)
+            .eq('provider', targetProvider)
+            .single();
+
+        if (error || !providerKey || !providerKey.is_active) {
+            return false;
+        }
+
+        // Decrypt the API key
+        const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
+
+        // Create the appropriate provider
+        if (isOpenAICompatible(targetProvider)) {
+            router.registerProvider(
+                targetProvider,
+                new OpenAICompatibleProvider(targetProvider, apiKey)
+            );
+            return true;
+        } else if (targetProvider === 'cohere') {
+            router.registerProvider(targetProvider, new CohereProvider(apiKey));
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error(`[API] Failed to initialize BYOK provider ${targetProvider}:`, error);
+        return false;
     }
 }
 
@@ -309,28 +366,35 @@ export async function POST(req: NextRequest) {
         }
 
         // 4. Determine model and provider
-        const requestedModel = model || 'gemini-2.5-flash';
-        initializeProviders();
-
+        const requestedModel = model || 'gemini-2.0-flash';
         const providerName = router.detectProvider(requestedModel);
         const normalizedModel = router.normalizeModelName(requestedModel);
 
-        // 5. Check tier-based access control
-        const isPaidTier = tier !== 'free';
-        const isMultiModelRequest = providerName !== 'google';
+        // Initialize default providers (env-based)
+        initializeDefaultProviders();
 
-        if (isMultiModelRequest && !isPaidTier) {
-            return NextResponse.json(
-                {
-                    error: 'Multi-model access requires a paid subscription',
-                    message: 'OpenAI, Anthropic, and custom providers are only available on paid plans. Upgrade to access these models.',
-                    upgradeUrl: '/billing'
-                },
-                { status: 403 }
+        // Try to initialize BYOK provider if needed
+        if (!router.hasProvider(providerName)) {
+            const byokInitialized = await initializeBYOKProviders(
+                supabase,
+                project.id,
+                organizationId,
+                providerName
             );
+
+            if (!byokInitialized) {
+                return NextResponse.json(
+                    {
+                        error: `Provider '${providerName}' is not configured`,
+                        message: `Please add your ${providerName} API key in project settings to use this model.`,
+                        settingsUrl: `/dashboard/projects/${project.id}/providers`
+                    },
+                    { status: 400 }
+                );
+            }
         }
 
-        // 6. Get provider (removed credits check - using subscription limits instead)
+        // 5. Get provider (removed tier restrictions - BYOK means users bring their own keys)
         const provider = router.getProviderForModel(requestedModel);
 
         const chatRequest = {
