@@ -80,6 +80,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const [setAsDefault, setSetAsDefault] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [existingKeyHint, setExistingKeyHint] = useState<string | null>(null);
+    const [isProviderActive, setIsProviderActive] = useState(true);
 
     // Fetch provider keys
     const { data, isLoading } = useQuery<ProviderKeysResponse>({
@@ -171,8 +172,10 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
         const existingKey = data?.providers.find(p => p.provider === provider.id);
         if (existingKey?.hasKey) {
             setExistingKeyHint(existingKey.keyHint || '***');
+            setIsProviderActive(existingKey.isActive);
         } else {
             setExistingKeyHint(null);
+            setIsProviderActive(true);
         }
 
         setDialogOpen(true);
@@ -343,41 +346,70 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                 Set as project default
                             </Label>
                         </div>
-                    </div>
 
-                    <DialogFooter className="px-4 py-3 border-t border-border/40 bg-muted/20 flex justify-between">
-                        <div className="flex gap-2">
-                            {/* Delete button for existing keys */}
-                            {existingKeyHint && selectedProvider && (
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => {
+                        {/* Enable/Disable toggle for existing keys */}
+                        {existingKeyHint && (
+                            <div className="flex items-center gap-2 pt-1">
+                                <Switch
+                                    id="provider-enabled"
+                                    checked={isProviderActive}
+                                    onCheckedChange={(checked) => {
+                                        setIsProviderActive(checked);
                                         if (selectedProvider) {
-                                            deleteKeyMutation.mutate(selectedProvider.id);
+                                            toggleMutation.mutate({ provider: selectedProvider.id, isActive: checked });
                                         }
                                     }}
-                                    disabled={deleteKeyMutation.isPending}
-                                    className="h-7 px-3 rounded-lg text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                    {deleteKeyMutation.isPending ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Trash2 className="h-3 w-3 mr-1" />
-                                            Remove
-                                        </>
-                                    )}
+                                    className="scale-75 data-[state=checked]:bg-emerald-500"
+                                />
+                                <Label htmlFor="provider-enabled" className="text-[11px] cursor-pointer text-muted-foreground">
+                                    Provider enabled
+                                </Label>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="px-4 py-3 border-t border-border/40 bg-muted/20">
+                        <div className="w-full flex items-center justify-between">
+                            {/* Delete button on the left */}
+                            <div>
+                                {existingKeyHint && selectedProvider && (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => {
+                                            if (selectedProvider) {
+                                                deleteKeyMutation.mutate(selectedProvider.id);
+                                            }
+                                        }}
+                                        disabled={deleteKeyMutation.isPending}
+                                        className="h-7 px-3 rounded-lg text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                        {deleteKeyMutation.isPending ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Trash2 className="h-3 w-3 mr-1" />
+                                                Remove
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                            {/* Cancel and Save on the right */}
+                            <div className="flex gap-2">
+                                <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-lg text-[11px]">
+                                    Cancel
                                 </Button>
-                            )}
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-lg text-[11px]">
-                                {existingKeyHint ? 'Close' : 'Cancel'}
-                            </Button>
-                            {!existingKeyHint && (
                                 <Button
-                                    onClick={handleAddKey}
-                                    disabled={!apiKey || addKeyMutation.isPending}
+                                    onClick={() => {
+                                        if (existingKeyHint) {
+                                            // For existing keys, just close (toggle already saved)
+                                            resetDialog();
+                                        } else {
+                                            // For new keys, save
+                                            handleAddKey();
+                                        }
+                                    }}
+                                    disabled={!existingKeyHint && (!apiKey || addKeyMutation.isPending)}
                                     className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
                                 >
                                     {addKeyMutation.isPending ? (
@@ -386,7 +418,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                         'Save'
                                     )}
                                 </Button>
-                            )}
+                            </div>
                         </div>
                     </DialogFooter>
                 </DialogContent>
