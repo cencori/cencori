@@ -264,38 +264,50 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                     </DialogHeader>
 
                     <div className="px-4 py-3 space-y-3">
-                        {/* Existing Key Notice */}
-                        {existingKeyHint && (
-                            <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                <Check className="h-3 w-3 text-emerald-500" />
-                                <span className="text-[11px] text-emerald-500">
-                                    Current key: <span className="font-mono">{existingKeyHint}</span>
-                                </span>
-                            </div>
-                        )}
-
                         {/* API Key Input */}
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                {existingKeyHint ? 'New API Key (leave empty to keep current)' : 'API Key'}
-                            </Label>
+                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">API Key</Label>
                             <div className="relative">
-                                <Input
-                                    type={showKey ? "text" : "password"}
-                                    placeholder={existingKeyHint ? "Enter new key to update..." : (selectedProvider?.keyPrefix || "sk-...")}
-                                    value={apiKey}
-                                    onChange={(e) => setApiKey(e.target.value)}
-                                    className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/30 border-border/50"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="absolute right-0 top-0 h-8 w-8 p-0"
-                                    onClick={() => setShowKey(!showKey)}
-                                >
-                                    {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                </Button>
+                                {existingKeyHint ? (
+                                    // Show masked key for existing provider (disabled with eye toggle)
+                                    <>
+                                        <Input
+                                            type={showKey ? "text" : "password"}
+                                            value={`••••••••••••••••${existingKeyHint.replace('...', '')}`}
+                                            disabled
+                                            className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/50 border-border/50 cursor-not-allowed"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-8 w-8 p-0"
+                                            onClick={() => setShowKey(!showKey)}
+                                        >
+                                            {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    // New key input
+                                    <>
+                                        <Input
+                                            type={showKey ? "text" : "password"}
+                                            placeholder={selectedProvider?.keyPrefix || "sk-..."}
+                                            value={apiKey}
+                                            onChange={(e) => setApiKey(e.target.value)}
+                                            className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/30 border-border/50"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-8 w-8 p-0"
+                                            onClick={() => setShowKey(!showKey)}
+                                        >
+                                            {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -360,22 +372,21 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                         </div>
                         <div className="flex gap-2">
                             <Button variant="ghost" onClick={resetDialog} className="h-7 px-3 rounded-lg text-[11px]">
-                                {existingKeyHint && !apiKey ? 'Close' : 'Cancel'}
+                                {existingKeyHint ? 'Close' : 'Cancel'}
                             </Button>
-                            <Button
-                                onClick={handleAddKey}
-                                disabled={!apiKey || addKeyMutation.isPending}
-                                className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
-                            >
-                                {addKeyMutation.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <>
-                                        <Check className="h-3 w-3 mr-1" />
-                                        {existingKeyHint ? 'Update' : 'Save'}
-                                    </>
-                                )}
-                            </Button>
+                            {!existingKeyHint && (
+                                <Button
+                                    onClick={handleAddKey}
+                                    disabled={!apiKey || addKeyMutation.isPending}
+                                    className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
+                                >
+                                    {addKeyMutation.isPending ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        'Save'
+                                    )}
+                                </Button>
+                            )}
                         </div>
                     </DialogFooter>
                 </DialogContent>
