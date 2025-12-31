@@ -23,6 +23,7 @@ import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
 import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
+import { triggerFallbackWebhook } from '@/lib/webhooks';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -407,22 +408,148 @@ export async function POST(req: NextRequest) {
             userId,
         };
 
-        // 8. Handle streaming
+        // 8. Handle streaming with failover support
         if (stream === true) {
             const encoder = new TextEncoder();
+
+            // Fetch project settings for failover config
+            const { data: streamProjectSettings } = await supabase
+                .from('project_settings')
+                .select('settings')
+                .eq('project_id', project.id)
+                .single();
+
+            const streamEnableFallback = streamProjectSettings?.settings?.enable_fallback ?? true;
+            const streamConfiguredFallback = streamProjectSettings?.settings?.fallback_provider;
+            const streamMaxRetries = streamProjectSettings?.settings?.max_retries_before_fallback ?? 3;
+
+            // Helper function to attempt streaming with a provider
+            async function* tryStreamWithFallback(): AsyncGenerator<{
+                delta: string;
+                finishReason?: string;
+                actualProvider: string;
+                actualModel: string;
+                usedFallback: boolean;
+            }> {
+                let actualProvider = providerName;
+                let actualModel = normalizedModel;
+                let usedFallback = false;
+                let lastError: Error | null = null;
+
+                // Try primary provider if circuit is not open
+                if (!(await isCircuitOpen(providerName))) {
+                    for (let attempt = 0; attempt < streamMaxRetries; attempt++) {
+                        try {
+                            const streamGen = provider.stream(chatRequest);
+                            for await (const chunk of streamGen) {
+                                yield { ...chunk, actualProvider, actualModel, usedFallback };
+                            }
+                            await recordSuccess(providerName);
+                            return; // Success!
+                        } catch (error) {
+                            lastError = error instanceof Error ? error : new Error(String(error));
+                            console.warn(`[Failover/Stream] Attempt ${attempt + 1}/${streamMaxRetries} failed for ${providerName}:`, lastError.message);
+
+                            if (isNonRetryableError(error)) {
+                                throw error;
+                            }
+
+                            await recordFailure(providerName);
+
+                            if (attempt < streamMaxRetries - 1) {
+                                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+                            }
+                        }
+                    }
+                } else {
+                    console.log(`[Failover/Stream] Primary provider ${providerName} circuit is open`);
+                    lastError = new Error(`Provider ${providerName} circuit is open`);
+                }
+
+                // Try fallback providers
+                if (streamEnableFallback && lastError) {
+                    const fallbackChain = getFallbackChain(providerName, streamConfiguredFallback);
+                    console.log(`[Failover/Stream] Trying fallbacks:`, fallbackChain);
+
+                    for (const fallbackProviderName of fallbackChain) {
+                        if (await isCircuitOpen(fallbackProviderName)) {
+                            console.log(`[Failover/Stream] Skipping ${fallbackProviderName} - circuit open`);
+                            continue;
+                        }
+
+                        if (!router.hasProvider(fallbackProviderName)) {
+                            const initialized = await initializeBYOKProviders(
+                                supabase,
+                                project.id,
+                                organizationId,
+                                fallbackProviderName
+                            );
+                            if (!initialized) {
+                                console.log(`[Failover/Stream] Skipping ${fallbackProviderName} - not configured`);
+                                continue;
+                            }
+                        }
+
+                        try {
+                            const fallbackProvider = router.getProvider(fallbackProviderName);
+                            const fallbackModel = getFallbackModel(normalizedModel, fallbackProviderName);
+
+                            console.log(`[Failover/Stream] Trying ${fallbackProviderName} with model ${fallbackModel}`);
+
+                            actualProvider = fallbackProviderName;
+                            actualModel = fallbackModel;
+                            usedFallback = true;
+
+                            const streamGen = fallbackProvider.stream({
+                                ...chatRequest,
+                                model: fallbackModel,
+                            });
+
+                            for await (const chunk of streamGen) {
+                                yield { ...chunk, actualProvider, actualModel, usedFallback };
+                            }
+
+                            await recordSuccess(fallbackProviderName);
+
+                            // Trigger webhook for fallback event
+                            triggerFallbackWebhook(project.id, {
+                                original_provider: providerName,
+                                original_model: normalizedModel,
+                                fallback_provider: fallbackProviderName,
+                                fallback_model: fallbackModel,
+                                reason: lastError?.message || 'Primary provider failed',
+                            });
+
+                            console.log(`[Failover/Stream] Success with ${fallbackProviderName}`);
+                            return;
+                        } catch (fallbackError) {
+                            console.warn(`[Failover/Stream] Fallback ${fallbackProviderName} failed:`, fallbackError);
+                            await recordFailure(fallbackProviderName);
+                        }
+                    }
+                }
+
+                throw lastError || new Error('All providers failed');
+            }
 
             const customReadable = new ReadableStream({
                 async start(controller) {
                     try {
-                        const streamGen = provider.stream(chatRequest);
                         let fullContent = '';
+                        let streamActualProvider = providerName;
+                        let streamActualModel = normalizedModel;
+                        let streamUsedFallback = false;
 
-                        for await (const chunk of streamGen) {
+                        for await (const chunk of tryStreamWithFallback()) {
+                            // Track actual provider/model from first chunk
+                            streamActualProvider = chunk.actualProvider;
+                            streamActualModel = chunk.actualModel;
+                            streamUsedFallback = chunk.usedFallback;
+
                             // Accumulate content for security scanning
                             fullContent += chunk.delta;
 
                             // Real-time Output Security Scan
-                            // We check the accumulating content to catch PII leakage as it happens
                             const outputSecurity = checkOutputSecurity(fullContent, {
                                 inputText,
                                 inputSecurityResult: inputSecurity,
@@ -430,10 +557,8 @@ export async function POST(req: NextRequest) {
                             });
 
                             if (!outputSecurity.safe) {
-                                // Close stream with error
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Response blocked due to security content policy' })}\n\n`));
 
-                                // Log security incident
                                 await supabase.from('security_incidents').insert({
                                     project_id: project.id,
                                     api_key_id: keyData.id,
@@ -449,19 +574,30 @@ export async function POST(req: NextRequest) {
                                 });
 
                                 controller.close();
-                                return; // Stop processing
+                                return;
                             }
 
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: chunk.delta, finish_reason: chunk.finishReason })}\n\n`));
+                            // Include fallback info in first chunk if fallback was used
+                            const chunkData: Record<string, unknown> = {
+                                delta: chunk.delta,
+                                finish_reason: chunk.finishReason
+                            };
+                            if (streamUsedFallback && fullContent === chunk.delta) {
+                                chunkData.fallback_used = true;
+                                chunkData.original_provider = providerName;
+                                chunkData.original_model = normalizedModel;
+                            }
+
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`));
 
                             if (chunk.finishReason) {
-                                const promptTokens = await provider.countTokens(unifiedMessages.map(m => m.content).join(' '), normalizedModel);
-                                const completionTokens = await provider.countTokens(fullContent, normalizedModel);
-                                const pricing = await provider.getPricing(normalizedModel);
+                                const streamProvider = router.getProvider(streamActualProvider);
+                                const promptTokens = await streamProvider.countTokens(unifiedMessages.map(m => m.content).join(' '), streamActualModel);
+                                const completionTokens = await streamProvider.countTokens(fullContent, streamActualModel);
+                                const pricing = await streamProvider.getPricing(streamActualModel);
                                 const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
                                 const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-                                // Increment usage counter
                                 await supabase
                                     .from('organizations')
                                     .update({ monthly_requests_used: currentUsage + 1 })
@@ -470,8 +606,8 @@ export async function POST(req: NextRequest) {
                                 const { error: streamLogError } = await supabase.from('ai_requests').insert({
                                     project_id: project.id,
                                     api_key_id: keyData.id,
-                                    provider: providerName,
-                                    model: normalizedModel,
+                                    provider: streamActualProvider,
+                                    model: streamActualModel,
                                     prompt_tokens: promptTokens,
                                     completion_tokens: completionTokens,
                                     total_tokens: promptTokens + completionTokens,
@@ -480,9 +616,18 @@ export async function POST(req: NextRequest) {
                                     cencori_charge_usd: charge,
                                     markup_percentage: pricing.cencoriMarkupPercentage,
                                     latency_ms: Date.now() - startTime,
-                                    status: 'success',
+                                    status: streamUsedFallback ? 'success_fallback' : 'success',
                                     end_user_id: userId,
-                                    request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
+                                    request_payload: {
+                                        messages,
+                                        model,
+                                        temperature,
+                                        maxTokens,
+                                        max_tokens,
+                                        stream,
+                                        original_provider: streamUsedFallback ? providerName : undefined,
+                                        original_model: streamUsedFallback ? normalizedModel : undefined,
+                                    },
                                     response_payload: { content: fullContent },
                                     ip_address: clientIp,
                                     country_code: countryCode,
@@ -534,7 +679,7 @@ export async function POST(req: NextRequest) {
         let attempts = 0;
 
         // Check if primary provider circuit is open
-        if (isCircuitOpen(providerName)) {
+        if (await isCircuitOpen(providerName)) {
             console.log(`[Failover] Primary provider ${providerName} circuit is open, going to fallback`);
             lastError = new Error(`Provider ${providerName} circuit is open`);
         } else {
@@ -542,7 +687,7 @@ export async function POST(req: NextRequest) {
             for (attempts = 0; attempts < maxRetries; attempts++) {
                 try {
                     response = await provider.chat(chatRequest);
-                    recordSuccess(providerName);
+                    await recordSuccess(providerName);
                     break; // Success!
                 } catch (error) {
                     lastError = error instanceof Error ? error : new Error(String(error));
@@ -554,7 +699,7 @@ export async function POST(req: NextRequest) {
                         throw error;
                     }
 
-                    recordFailure(providerName);
+                    await recordFailure(providerName);
 
                     // Add exponential backoff between retries
                     if (attempts < maxRetries - 1) {
@@ -571,7 +716,7 @@ export async function POST(req: NextRequest) {
 
             for (const fallbackProviderName of fallbackChain) {
                 // Skip if circuit is open
-                if (isCircuitOpen(fallbackProviderName)) {
+                if (await isCircuitOpen(fallbackProviderName)) {
                     console.log(`[Failover] Skipping ${fallbackProviderName} - circuit is open`);
                     continue;
                 }
@@ -604,13 +749,22 @@ export async function POST(req: NextRequest) {
                     actualProvider = fallbackProviderName;
                     actualModel = fallbackModel;
                     usedFallback = true;
-                    recordSuccess(fallbackProviderName);
+                    await recordSuccess(fallbackProviderName);
+
+                    // Trigger webhook for fallback event
+                    triggerFallbackWebhook(project.id, {
+                        original_provider: providerName,
+                        original_model: normalizedModel,
+                        fallback_provider: fallbackProviderName,
+                        fallback_model: fallbackModel,
+                        reason: lastError?.message || 'Primary provider failed',
+                    });
 
                     console.log(`[Failover] Success with fallback ${fallbackProviderName}`);
                     break;
                 } catch (fallbackError) {
                     console.warn(`[Failover] Fallback ${fallbackProviderName} failed:`, fallbackError);
-                    recordFailure(fallbackProviderName);
+                    await recordFailure(fallbackProviderName);
                 }
             }
         }

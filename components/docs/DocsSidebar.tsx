@@ -31,6 +31,7 @@ const sidebarItems = [
             { title: "Organizations", href: "/docs/concepts/organizations" },
             { title: "API Keys", href: "/docs/concepts/api-keys" },
             { title: "Multi-Provider", href: "/docs/concepts/multi-provider" },
+            { title: "Failover", href: "/docs/concepts/failover" },
             { title: "Models", href: "/docs/concepts/models" },
             { title: "Streaming", href: "/docs/concepts/streaming" },
             { title: "Credits System", href: "/docs/concepts/credits" },
