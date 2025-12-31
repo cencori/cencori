@@ -1,9 +1,9 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, XCircle, ShieldAlert, AlertCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldAlert, AlertCircle, Clock, RefreshCw } from 'lucide-react';
 
 interface StatusBadgeProps {
-    status: 'success' | 'filtered' | 'blocked_output' | 'error' | 'rate_limited';
+    status: 'success' | 'success_fallback' | 'filtered' | 'blocked_output' | 'error' | 'rate_limited';
     className?: string;
     showIcon?: boolean;
 }
@@ -13,6 +13,11 @@ const statusConfig = {
         label: 'Success',
         color: 'bg-green-500/10 text-green-600 dark:text-green-500 border-green-500/20',
         icon: CheckCircle2,
+    },
+    success_fallback: {
+        label: 'Fallback',
+        color: 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20',
+        icon: RefreshCw,
     },
     filtered: {
         label: 'Filtered',

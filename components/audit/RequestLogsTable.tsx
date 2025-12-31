@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface RequestLog {
     id: string;
     created_at: string;
-    status: 'success' | 'filtered' | 'blocked_output' | 'error' | 'rate_limited';
+    status: 'success' | 'success_fallback' | 'filtered' | 'blocked_output' | 'error' | 'rate_limited';
     model: string;
     prompt_tokens: number;
     completion_tokens: number;

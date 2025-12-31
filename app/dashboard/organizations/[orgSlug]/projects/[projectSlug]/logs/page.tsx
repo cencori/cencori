@@ -153,6 +153,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                     <SelectContent>
                         <SelectItem value="all" className="text-xs">All statuses</SelectItem>
                         <SelectItem value="success" className="text-xs">Success</SelectItem>
+                        <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
                         <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
                         <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
                         <SelectItem value="error" className="text-xs">Error</SelectItem>

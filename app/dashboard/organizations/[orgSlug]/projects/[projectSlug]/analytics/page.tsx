@@ -12,6 +12,7 @@ import { ShieldAlert, BarChart3 } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryKeys } from '@/lib/hooks/useQueries';
+import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 
 interface TrendData {
     timestamp: string;
@@ -226,7 +227,7 @@ export default function AnalyticsPage({ params }: PageProps) {
 
             {/* Secondary Metrics */}
             {overview && (
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <MetricCard
                         title="Total Tokens"
                         value={overview.overview.total_tokens}
@@ -240,6 +241,12 @@ export default function AnalyticsPage({ params }: PageProps) {
                         title="Critical Incidents"
                         value={overview.overview.critical_incidents}
                         icon={<ShieldAlert className="h-3 w-3 text-red-500" />}
+                    />
+                    {/* Failover Metrics */}
+                    <FailoverMetrics
+                        projectId={projectId}
+                        environment={environment}
+                        timeRange={timeRange}
                     />
                 </div>
             )}
