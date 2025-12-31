@@ -16,10 +16,11 @@ import {
     SidebarRail,
     SidebarGroup,
     SidebarTrigger,
+    SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { Key, ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu } from "lucide-react";
+import { ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -123,6 +124,14 @@ async function prefetchProjectPage(
     }
 }
 
+// Nav item type
+interface NavItem {
+    href: string;
+    icon: React.ComponentType<{ animateOnHover?: boolean; className?: string }>;
+    label: string;
+    prefetch?: () => void;
+}
+
 // Sidebar link with prefetching
 function ProjectSidebarLink({
     href,
@@ -157,6 +166,36 @@ function ProjectSidebarLink({
     );
 }
 
+// Render nav group with optional divider
+function NavGroup({
+    items,
+    isActive,
+    onClick,
+    showDivider = true,
+}: {
+    items: NavItem[];
+    isActive: (path: string) => boolean;
+    onClick?: () => void;
+    showDivider?: boolean;
+}) {
+    return (
+        <>
+            {items.map((item) => (
+                <ProjectSidebarLink
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={isActive(item.href)}
+                    prefetch={item.prefetch}
+                    onClick={onClick}
+                />
+            ))}
+            {showDivider && <SidebarSeparator className="my-2 mx-0 w-full" />}
+        </>
+    );
+}
+
 export default function ProjectLayoutClient({
     children,
     params,
@@ -170,8 +209,7 @@ export default function ProjectLayoutClient({
     const { isOpen, setIsOpen } = useMobileSheet();
 
     // Fetch project and org with caching - INSTANT ON REVISIT!
-    const { data, isLoading, error } = useProjectLayout(orgSlug, projectSlug);
-    const organization = data?.organization;
+    const { data, error } = useProjectLayout(orgSlug, projectSlug);
     const project = data?.project;
 
     // Helper to check if a route is active
@@ -197,15 +235,25 @@ export default function ProjectLayoutClient({
         }
     };
 
-    const navItems = [
+    // Grouped navigation items
+    const coreItems: NavItem[] = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
-        { href: `${basePath}/providers`, icon: Cpu, label: "Providers", prefetch: createPrefetch("providers") },
-        { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
-        { href: `${basePath}/security`, icon: ShieldAlert, label: "Security" },
-        { href: `${basePath}/custom-providers`, icon: Server, label: "Custom Providers" },
         { href: `${basePath}/analytics`, icon: Activity, label: "Analytics", prefetch: createPrefetch("analytics") },
+        { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
+    ];
+
+    const infrastructureItems: NavItem[] = [
+        { href: `${basePath}/providers`, icon: Cpu, label: "Providers", prefetch: createPrefetch("providers") },
+        { href: `${basePath}/custom-providers`, icon: Server, label: "Custom Providers" },
         { href: `${basePath}/playground`, icon: BeakerIcon, label: "Playground" },
+    ];
+
+    const securityItems: NavItem[] = [
+        { href: `${basePath}/security`, icon: ShieldAlert, label: "Security" },
         { href: `${basePath}/edge`, icon: Puzzle, label: "Edge" },
+    ];
+
+    const settingsItems: NavItem[] = [
         { href: `${basePath}/settings`, icon: SettingsIcon, label: "Project Settings" },
     ];
 
@@ -216,16 +264,10 @@ export default function ProjectLayoutClient({
                 <SidebarContent>
                     <SidebarGroup className="pt-3">
                         <SidebarMenu>
-                            {navItems.map((item) => (
-                                <ProjectSidebarLink
-                                    key={item.href}
-                                    href={item.href}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    isActive={isActive(item.href)}
-                                    prefetch={item.prefetch}
-                                />
-                            ))}
+                            <NavGroup items={coreItems} isActive={isActive} />
+                            <NavGroup items={infrastructureItems} isActive={isActive} />
+                            <NavGroup items={securityItems} isActive={isActive} />
+                            <NavGroup items={settingsItems} isActive={isActive} showDivider={false} />
                         </SidebarMenu>
                     </SidebarGroup>
                 </SidebarContent>
@@ -241,16 +283,10 @@ export default function ProjectLayoutClient({
                     <div className="py-3">
                         <SidebarGroup>
                             <SidebarMenu>
-                                {navItems.map((item) => (
-                                    <ProjectSidebarLink
-                                        key={item.href}
-                                        href={item.href}
-                                        icon={item.icon}
-                                        label={item.label}
-                                        isActive={isActive(item.href)}
-                                        onClick={() => setIsOpen(false)}
-                                    />
-                                ))}
+                                <NavGroup items={coreItems} isActive={isActive} onClick={() => setIsOpen(false)} />
+                                <NavGroup items={infrastructureItems} isActive={isActive} onClick={() => setIsOpen(false)} />
+                                <NavGroup items={securityItems} isActive={isActive} onClick={() => setIsOpen(false)} />
+                                <NavGroup items={settingsItems} isActive={isActive} onClick={() => setIsOpen(false)} showDivider={false} />
                             </SidebarMenu>
                         </SidebarGroup>
                     </div>
@@ -263,3 +299,4 @@ export default function ProjectLayoutClient({
         </SidebarProvider>
     );
 }
+
