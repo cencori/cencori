@@ -21,6 +21,8 @@ import { UnifiedMessage } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
+import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
+import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -510,8 +512,113 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // 9. Non-streaming
-        const response = await provider.chat(chatRequest);
+        // 9. Non-streaming with failover support
+        let response;
+        let actualProvider = providerName;
+        let actualModel = normalizedModel;
+        let usedFallback = false;
+
+        // Fetch project settings for failover config
+        const { data: projectSettings } = await supabase
+            .from('project_settings')
+            .select('settings')
+            .eq('project_id', project.id)
+            .single();
+
+        const enableFallback = projectSettings?.settings?.enable_fallback ?? true;
+        const configuredFallbackProvider = projectSettings?.settings?.fallback_provider;
+        const maxRetries = projectSettings?.settings?.max_retries_before_fallback ?? 3;
+
+        // Try primary provider with retries
+        let lastError: Error | null = null;
+        let attempts = 0;
+
+        // Check if primary provider circuit is open
+        if (isCircuitOpen(providerName)) {
+            console.log(`[Failover] Primary provider ${providerName} circuit is open, going to fallback`);
+            lastError = new Error(`Provider ${providerName} circuit is open`);
+        } else {
+            // Try primary provider with retries
+            for (attempts = 0; attempts < maxRetries; attempts++) {
+                try {
+                    response = await provider.chat(chatRequest);
+                    recordSuccess(providerName);
+                    break; // Success!
+                } catch (error) {
+                    lastError = error instanceof Error ? error : new Error(String(error));
+                    console.warn(`[Failover] Attempt ${attempts + 1}/${maxRetries} failed for ${providerName}:`, lastError.message);
+
+                    // Don't retry non-retryable errors
+                    if (isNonRetryableError(error)) {
+                        console.log(`[Failover] Non-retryable error, not attempting fallback`);
+                        throw error;
+                    }
+
+                    recordFailure(providerName);
+
+                    // Add exponential backoff between retries
+                    if (attempts < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 100));
+                    }
+                }
+            }
+        }
+
+        // If primary failed and fallback is enabled, try fallback providers
+        if (!response && enableFallback && lastError) {
+            const fallbackChain = getFallbackChain(providerName, configuredFallbackProvider);
+            console.log(`[Failover] Primary ${providerName} failed after ${attempts} attempts, trying fallbacks:`, fallbackChain);
+
+            for (const fallbackProviderName of fallbackChain) {
+                // Skip if circuit is open
+                if (isCircuitOpen(fallbackProviderName)) {
+                    console.log(`[Failover] Skipping ${fallbackProviderName} - circuit is open`);
+                    continue;
+                }
+
+                // Initialize fallback provider if needed
+                if (!router.hasProvider(fallbackProviderName)) {
+                    const initialized = await initializeBYOKProviders(
+                        supabase,
+                        project.id,
+                        organizationId,
+                        fallbackProviderName
+                    );
+                    if (!initialized) {
+                        console.log(`[Failover] Skipping ${fallbackProviderName} - not configured`);
+                        continue;
+                    }
+                }
+
+                try {
+                    const fallbackProvider = router.getProvider(fallbackProviderName);
+                    const fallbackModel = getFallbackModel(normalizedModel, fallbackProviderName);
+
+                    console.log(`[Failover] Trying ${fallbackProviderName} with model ${fallbackModel}`);
+
+                    response = await fallbackProvider.chat({
+                        ...chatRequest,
+                        model: fallbackModel,
+                    });
+
+                    actualProvider = fallbackProviderName;
+                    actualModel = fallbackModel;
+                    usedFallback = true;
+                    recordSuccess(fallbackProviderName);
+
+                    console.log(`[Failover] Success with fallback ${fallbackProviderName}`);
+                    break;
+                } catch (fallbackError) {
+                    console.warn(`[Failover] Fallback ${fallbackProviderName} failed:`, fallbackError);
+                    recordFailure(fallbackProviderName);
+                }
+            }
+        }
+
+        // If still no response, throw the last error
+        if (!response) {
+            throw lastError || new Error('All providers failed');
+        }
 
         // Output Security Check
         const outputSecurity = checkOutputSecurity(response.content, {
@@ -552,12 +659,12 @@ export async function POST(req: NextRequest) {
             .update({ monthly_requests_used: currentUsage + 1 })
             .eq('id', organizationId);
 
-        // 11. Log request
+        // 11. Log request (using actual provider/model in case of fallback)
         const { error: logError } = await supabase.from('ai_requests').insert({
             project_id: project.id,
             api_key_id: keyData.id,
-            provider: providerName,
-            model: normalizedModel,
+            provider: actualProvider,
+            model: actualModel,
             prompt_tokens: response.usage.promptTokens,
             completion_tokens: response.usage.completionTokens,
             total_tokens: response.usage.totalTokens,
@@ -566,9 +673,18 @@ export async function POST(req: NextRequest) {
             cencori_charge_usd: response.cost.cencoriChargeUsd,
             markup_percentage: response.cost.markupPercentage,
             latency_ms: response.latencyMs,
-            status: 'success',
+            status: usedFallback ? 'success_fallback' : 'success',
             end_user_id: userId,
-            request_payload: { messages, model, temperature, maxTokens, max_tokens, stream },
+            request_payload: {
+                messages,
+                model,
+                temperature,
+                maxTokens,
+                max_tokens,
+                stream,
+                original_provider: usedFallback ? providerName : undefined,
+                original_model: usedFallback ? normalizedModel : undefined,
+            },
             response_payload: { content: response.content, finishReason: response.finishReason },
             ip_address: clientIp,
             country_code: countryCode,
@@ -579,16 +695,16 @@ export async function POST(req: NextRequest) {
             console.error('[API] Request data:', {
                 project_id: project.id,
                 api_key_id: keyData.id,
-                provider: providerName,
-                model: normalizedModel,
+                provider: actualProvider,
+                model: actualModel,
             });
         }
 
-        // 12. Return
+        // 12. Return (include fallback info in response)
         return NextResponse.json({
             content: response.content,
-            model: response.model,
-            provider: response.provider,
+            model: actualModel,
+            provider: actualProvider,
             usage: {
                 prompt_tokens: response.usage.promptTokens,
                 completion_tokens: response.usage.completionTokens,
@@ -596,6 +712,11 @@ export async function POST(req: NextRequest) {
             },
             cost_usd: response.cost.cencoriChargeUsd,
             finish_reason: response.finishReason,
+            ...(usedFallback && {
+                fallback_used: true,
+                original_model: normalizedModel,
+                original_provider: providerName,
+            }),
         });
 
     } catch (error: unknown) {
