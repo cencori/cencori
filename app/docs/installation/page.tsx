@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/docs/CodeBlock";
+import { SDKTabs } from "@/components/docs/SDKTabs";
 
 export default function InstallationPage() {
     return (
@@ -12,264 +13,36 @@ export default function InstallationPage() {
                     Installation
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Install and configure the Cencori SDK for your preferred language. We offer official SDKs for JavaScript/TypeScript and Python.
+                    Install and configure the Cencori SDK for your preferred language.
                 </p>
             </div>
 
-            {/* Language Selection */}
-            <div className="space-y-4">
-                <h2 id="choose-sdk" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Choose Your SDK
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <a href="#javascript" className="p-4 border border-border/60 rounded-lg hover:border-primary/50 hover:bg-muted/20 transition-colors">
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="font-semibold">JavaScript / TypeScript</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Node.js, Next.js, React, and other JS frameworks</p>
-                    </a>
-                    <a href="#python" className="p-4 border border-border/60 rounded-lg hover:border-primary/50 hover:bg-muted/20 transition-colors">
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="font-semibold">Python</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Django, FastAPI, Flask, and data science workflows</p>
-                    </a>
-                </div>
-            </div>
-
-            {/* ==================== JAVASCRIPT SDK ==================== */}
-            <div className="space-y-8 pt-8 border-t border-border/40">
-                <h2 id="javascript" className="scroll-m-20 text-2xl font-bold tracking-tight flex items-center gap-2">
-                    JavaScript / TypeScript SDK
-                </h2>
-
-                {/* JS System Requirements */}
-                <div className="space-y-4">
-                    <h3 id="js-requirements" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Requirements
-                    </h3>
-                    <ul className="space-y-2 text-sm ml-6">
-                        <li className="list-disc">
-                            <strong>Node.js:</strong> Version 18.0.0 or higher
-                        </li>
-                        <li className="list-disc">
-                            <strong>Package Manager:</strong> npm 8+, yarn 1.22+, or pnpm 7+
-                        </li>
-                        <li className="list-disc">
-                            <strong>TypeScript:</strong> Version 4.5+ (optional but recommended)
-                        </li>
-                    </ul>
-                </div>
-
-                {/* JS Package Installation */}
-                <div className="space-y-4">
-                    <h3 id="js-installation" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Installation
-                    </h3>
-
-                    <div className="space-y-3">
-                        <CodeBlock
-                            filename="terminal"
-                            language="bash"
-                            code={`# Using npm
-npm install cencori
-
-# Using yarn
-yarn add cencori
-
-# Using pnpm
-pnpm add cencori`}
-                        />
-                    </div>
-                </div>
-
-                {/* JS Initialization */}
-                <div className="space-y-4">
-                    <h3 id="js-initialization" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        SDK Initialization
-                    </h3>
-                    <CodeBlock
-                        filename="lib/cencori.ts"
-                        language="typescript"
-                        code={`import { Cencori } from "cencori";
-
-export const cencori = new Cencori({
-  apiKey: process.env.CENCORI_API_KEY!,
-});`}
-                    />
-                </div>
-
-                {/* JS Basic Usage */}
-                <div className="space-y-4">
-                    <h3 id="js-usage" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Basic Usage
-                    </h3>
-                    <CodeBlock
-                        filename="example.ts"
-                        language="typescript"
-                        code={`import { cencori } from "./lib/cencori";
-
-// Non-streaming
-const response = await cencori.ai.chat({
-  messages: [{ role: "user", content: "Hello!" }],
-  model: "gpt-4o"
-});
-
-console.log(response.content);
-
-// Streaming
-for await (const chunk of cencori.ai.chatStream({
-  messages: [{ role: "user", content: "Tell me a story" }],
-  model: "gpt-4o"
-})) {
-  process.stdout.write(chunk.delta);
-}`}
-                    />
-                </div>
-            </div>
-
-            {/* ==================== PYTHON SDK ==================== */}
-            <div className="space-y-8 pt-8 border-t border-border/40">
-                <h2 id="python" className="scroll-m-20 text-2xl font-bold tracking-tight flex items-center gap-2">
-                Python SDK
-                </h2>
-
-                {/* Python System Requirements */}
-                <div className="space-y-4">
-                    <h3 id="python-requirements" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Requirements
-                    </h3>
-                    <ul className="space-y-2 text-sm ml-6">
-                        <li className="list-disc">
-                            <strong>Python:</strong> Version 3.8 or higher
-                        </li>
-                        <li className="list-disc">
-                            <strong>pip:</strong> pip 21.0+ (comes with Python)
-                        </li>
-                    </ul>
-                </div>
-
-                {/* Python Package Installation */}
-                <div className="space-y-4">
-                    <h3 id="python-installation" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Installation
-                    </h3>
-
-                    <CodeBlock
-                        filename="terminal"
-                        language="bash"
-                        code={`# Using pip
-pip install cencori
-
-# Using pip with virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-pip install cencori
-
-# Using poetry
-poetry add cencori`}
-                    />
-
-                    <div className="p-4 bg-muted/20 border border-border/40">
-                        <p className="text-xs text-muted-foreground">
-                            <strong>Tip:</strong> We recommend using a virtual environment to avoid dependency conflicts. The SDK has minimal dependencies (only <code className="text-xs bg-muted px-1.5 py-0.5 rounded">httpx</code>).
-                        </p>
-                    </div>
-                </div>
-
-                {/* Python Initialization */}
-                <div className="space-y-4">
-                    <h3 id="python-initialization" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        SDK Initialization
-                    </h3>
-                    <CodeBlock
-                        filename="cencori_client.py"
-                        language="python"
-                        code={`import os
-from cencori import Cencori
-
-# Initialize with API key
-cencori = Cencori(api_key=os.environ.get("CENCORI_API_KEY"))
-
-# Or pass the key directly (not recommended for production)
-cencori = Cencori(api_key="cen_your_api_key_here")`}
-                    />
-                </div>
-
-                {/* Python Basic Usage */}
-                <div className="space-y-4">
-                    <h3 id="python-usage" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Basic Usage
-                    </h3>
-                    <CodeBlock
-                        filename="example.py"
-                        language="python"
-                        code={`from cencori import Cencori
-
-cencori = Cencori(api_key="your-api-key")
-
-# Non-streaming
-response = cencori.ai.chat(
-    messages=[{"role": "user", "content": "Hello!"}],
-    model="gpt-4o"
-)
-
-print(response.content)`}
-                    />
-                </div>
-
-                {/* Python Streaming */}
-                <div className="space-y-4">
-                    <h3 id="python-streaming" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Streaming Responses
-                    </h3>
-                    <CodeBlock
-                        filename="streaming.py"
-                        language="python"
-                        code={`from cencori import Cencori
-
-cencori = Cencori(api_key="your-api-key")
-
-# Streaming - real-time token output
-for chunk in cencori.ai.chat_stream(
-    messages=[{"role": "user", "content": "Tell me a story"}],
-    model="gpt-4o"
-):
-    print(chunk.delta, end="", flush=True)`}
-                    />
-                </div>
-
-                {/* Python Error Handling */}
-                <div className="space-y-4">
-                    <h3 id="python-errors" className="scroll-m-20 text-lg font-semibold tracking-tight">
-                        Error Handling
-                    </h3>
-                    <CodeBlock
-                        filename="error_handling.py"
-                        language="python"
-                        code={`from cencori import (
-    Cencori,
-    AuthenticationError,
-    RateLimitError,
-    SafetyError
-)
-
-cencori = Cencori(api_key="your-api-key")
-
-try:
-    response = cencori.ai.chat(
-        messages=[{"role": "user", "content": "Hello!"}]
-    )
-    print(response.content)
-except AuthenticationError:
-    print("Invalid API key - check your credentials")
-except RateLimitError:
-    print("Too many requests - slow down or upgrade your plan")
-except SafetyError as e:
-    print(f"Content blocked by safety filters: {e.reasons}")`}
-                    />
-                </div>
-            </div>
+            {/* SDK Tabs */}
+            <SDKTabs
+                defaultValue="javascript"
+                tabs={[
+                    {
+                        value: "javascript",
+                        label: "JavaScript / TypeScript",
+                        content: <JavaScriptContent />
+                    },
+                    {
+                        value: "python",
+                        label: "Python",
+                        content: <PythonContent />
+                    },
+                    {
+                        value: "go",
+                        label: "Go (coming soon)",
+                        disabled: true,
+                        content: (
+                            <div className="p-8 text-center border border-dashed border-border/60 rounded-lg">
+                                <p className="text-muted-foreground">Go SDK coming soon!</p>
+                            </div>
+                        )
+                    }
+                ]}
+            />
 
             {/* ==================== COMMON SECTIONS ==================== */}
 
@@ -302,7 +75,7 @@ CENCORI_API_KEY=cen_your_api_key_here`}
                     Supported Models
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Both SDKs support the same models across all providers:
+                    All SDKs support the same models across all providers:
                 </p>
 
                 <div className="overflow-x-auto">
@@ -421,3 +194,271 @@ which python  # Should point to your venv`}
     );
 }
 
+// ==================== JavaScript/TypeScript Content ====================
+async function JavaScriptContent() {
+    return (
+        <>
+            {/* Requirements */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Requirements
+                </h2>
+                <ul className="space-y-2 text-sm ml-6">
+                    <li className="list-disc">
+                        <strong>Node.js:</strong> Version 18.0.0 or higher
+                    </li>
+                    <li className="list-disc">
+                        <strong>Package Manager:</strong> npm 8+, yarn 1.22+, or pnpm 7+
+                    </li>
+                    <li className="list-disc">
+                        <strong>TypeScript:</strong> Version 4.5+ (optional but recommended)
+                    </li>
+                </ul>
+            </div>
+
+            {/* Installation */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Installation
+                </h2>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`# Using npm
+npm install cencori
+
+# Using yarn
+yarn add cencori
+
+# Using pnpm
+pnpm add cencori`}
+                />
+            </div>
+
+            {/* SDK Initialization */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    SDK Initialization
+                </h2>
+                <CodeBlock
+                    filename="lib/cencori.ts"
+                    language="typescript"
+                    code={`import { Cencori } from "cencori";
+
+export const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+});`}
+                />
+            </div>
+
+            {/* Basic Usage */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Basic Usage
+                </h2>
+                <CodeBlock
+                    filename="example.ts"
+                    language="typescript"
+                    code={`import { cencori } from "./lib/cencori";
+
+// Non-streaming
+const response = await cencori.ai.chat({
+  messages: [{ role: "user", content: "Hello!" }],
+  model: "gpt-4o"
+});
+
+console.log(response.content);`}
+                />
+            </div>
+
+            {/* Streaming */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Streaming Responses
+                </h2>
+                <CodeBlock
+                    filename="streaming.ts"
+                    language="typescript"
+                    code={`import { cencori } from "./lib/cencori";
+
+for await (const chunk of cencori.ai.chatStream({
+  messages: [{ role: "user", content: "Tell me a story" }],
+  model: "gpt-4o"
+})) {
+  process.stdout.write(chunk.delta);
+}`}
+                />
+            </div>
+
+            {/* Error Handling */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Error Handling
+                </h2>
+                <CodeBlock
+                    filename="errors.ts"
+                    language="typescript"
+                    code={`import { 
+  Cencori, 
+  AuthenticationError, 
+  RateLimitError, 
+  SafetyError 
+} from "cencori";
+
+try {
+  const response = await cencori.ai.chat({ messages: [...] });
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error("Invalid API key");
+  } else if (error instanceof RateLimitError) {
+    console.error("Too many requests");
+  } else if (error instanceof SafetyError) {
+    console.error("Content blocked:", error.reasons);
+  }
+}`}
+                />
+            </div>
+        </>
+    );
+}
+
+// ==================== Python Content ====================
+async function PythonContent() {
+    return (
+        <>
+            {/* Requirements */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Requirements
+                </h2>
+                <ul className="space-y-2 text-sm ml-6">
+                    <li className="list-disc">
+                        <strong>Python:</strong> Version 3.8 or higher
+                    </li>
+                    <li className="list-disc">
+                        <strong>pip:</strong> pip 21.0+ (comes with Python)
+                    </li>
+                </ul>
+            </div>
+
+            {/* Installation */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Installation
+                </h2>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`# Using pip
+pip install cencori
+
+# Using pip with virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+pip install cencori
+
+# Using poetry
+poetry add cencori`}
+                />
+                <div className="p-4 bg-muted/20 border border-border/40">
+                    <p className="text-xs text-muted-foreground">
+                        <strong>Tip:</strong> We recommend using a virtual environment to avoid dependency conflicts. The SDK has minimal dependencies (only <code className="text-xs bg-muted px-1.5 py-0.5 rounded">httpx</code>).
+                    </p>
+                </div>
+            </div>
+
+            {/* SDK Initialization */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    SDK Initialization
+                </h2>
+                <CodeBlock
+                    filename="cencori_client.py"
+                    language="python"
+                    code={`import os
+from cencori import Cencori
+
+# Initialize with API key from environment
+cencori = Cencori(api_key=os.environ.get("CENCORI_API_KEY"))
+
+# Or pass the key directly (not recommended for production)
+cencori = Cencori(api_key="cen_your_api_key_here")`}
+                />
+            </div>
+
+            {/* Basic Usage */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Basic Usage
+                </h2>
+                <CodeBlock
+                    filename="example.py"
+                    language="python"
+                    code={`from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+# Non-streaming
+response = cencori.ai.chat(
+    messages=[{"role": "user", "content": "Hello!"}],
+    model="gpt-4o"
+)
+
+print(response.content)`}
+                />
+            </div>
+
+            {/* Streaming */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Streaming Responses
+                </h2>
+                <CodeBlock
+                    filename="streaming.py"
+                    language="python"
+                    code={`from cencori import Cencori
+
+cencori = Cencori(api_key="your-api-key")
+
+# Streaming - real-time token output
+for chunk in cencori.ai.chat_stream(
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    model="gpt-4o"
+):
+    print(chunk.delta, end="", flush=True)`}
+                />
+            </div>
+
+            {/* Error Handling */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Error Handling
+                </h2>
+                <CodeBlock
+                    filename="error_handling.py"
+                    language="python"
+                    code={`from cencori import (
+    Cencori,
+    AuthenticationError,
+    RateLimitError,
+    SafetyError
+)
+
+cencori = Cencori(api_key="your-api-key")
+
+try:
+    response = cencori.ai.chat(
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    print(response.content)
+except AuthenticationError:
+    print("Invalid API key - check your credentials")
+except RateLimitError:
+    print("Too many requests - slow down or upgrade your plan")
+except SafetyError as e:
+    print(f"Content blocked by safety filters: {e.reasons}")`}
+                />
+            </div>
+        </>
+    );
+}
