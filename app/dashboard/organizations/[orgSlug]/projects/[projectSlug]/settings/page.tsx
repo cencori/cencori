@@ -11,6 +11,7 @@ import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MinimalScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -771,55 +772,57 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 </Button>
               </div>
               <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-                <div className="divide-y divide-border/40 max-h-[104px] overflow-y-auto">
-                  {providersLoading && providers.length === 0 ? (
-                    <>
-                      <div className="flex items-center justify-between px-4 py-2">
-                        <Skeleton className="h-3 w-16" />
-                        <Skeleton className="h-3 w-10" />
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2">
-                        <Skeleton className="h-3 w-20" />
-                        <Skeleton className="h-3 w-10" />
-                      </div>
-                    </>
-                  ) : providers.length > 0 ? (
-                    providers.map((provider) => (
-                      <div key={provider.name} className="flex items-center justify-between px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full ${provider.status === 'healthy' ? 'bg-emerald-500' :
-                            provider.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
-                            }`} />
-                          <span className="text-[10px]">{provider.name}</span>
-                          {provider.circuit?.state === 'open' && (
-                            <span className="text-[8px] px-1 py-0.5 rounded bg-red-500/10 text-red-500 font-medium">
-                              CIRCUIT OPEN
-                            </span>
-                          )}
-                          {provider.circuit?.state === 'half-open' && (
-                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-500 font-medium">
-                              TESTING
-                            </span>
-                          )}
+                <MinimalScrollArea className="max-h-[104px]">
+                  <div className="divide-y divide-border/40">
+                    {providersLoading && providers.length === 0 ? (
+                      <>
+                        <div className="flex items-center justify-between px-4 py-2">
+                          <Skeleton className="h-3 w-16" />
+                          <Skeleton className="h-3 w-10" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          {provider.circuit && provider.circuit.failures > 0 && (
-                            <span className="text-[9px] text-muted-foreground">
-                              {provider.circuit.failures} failures
-                            </span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {provider.latency ? `${provider.latency}ms` : provider.error || 'N/A'}
-                          </span>
+                        <div className="flex items-center justify-between px-4 py-2">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-3 w-10" />
                         </div>
+                      </>
+                    ) : providers.length > 0 ? (
+                      providers.map((provider) => (
+                        <div key={provider.name} className="flex items-center justify-between px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full ${provider.status === 'healthy' ? 'bg-emerald-500' :
+                              provider.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
+                              }`} />
+                            <span className="text-[10px]">{provider.name}</span>
+                            {provider.circuit?.state === 'open' && (
+                              <span className="text-[8px] px-1 py-0.5 rounded bg-red-500/10 text-red-500 font-medium">
+                                CIRCUIT OPEN
+                              </span>
+                            )}
+                            {provider.circuit?.state === 'half-open' && (
+                              <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-500 font-medium">
+                                TESTING
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {provider.circuit && provider.circuit.failures > 0 && (
+                              <span className="text-[9px] text-muted-foreground">
+                                {provider.circuit.failures} failures
+                              </span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground">
+                              {provider.latency ? `${provider.latency}ms` : provider.error || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-center">
+                        <p className="text-[10px] text-muted-foreground">Click refresh to check providers</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="px-4 py-3 text-center">
-                      <p className="text-[10px] text-muted-foreground">Click refresh to check providers</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </MinimalScrollArea>
               </div>
             </section>
           </div>
@@ -1046,12 +1049,12 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               )}
             </div>
           </section>
-        </TabsContent>
+        </TabsContent >
 
         {/* PROVIDERS TAB */}
-        <TabsContent value="providers" className="space-y-6">
+        < TabsContent value="providers" className="space-y-6" >
           {/* Default Provider & Model */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Default Provider</h2>
               <p className="text-xs text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
@@ -1094,10 +1097,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 </Select>
               </div>
             </div>
-          </section>
+          </section >
 
           {/* Rate Limiting */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Rate Limiting</h2>
               <p className="text-xs text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
@@ -1137,10 +1140,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 />
               </div>
             </div>
-          </section>
+          </section >
 
           {/* Fallback Configuration */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Fallback Configuration</h2>
               <p className="text-xs text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
@@ -1187,10 +1190,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 />
               </div>
             </div>
-          </section>
+          </section >
 
           {/* Save Button */}
-          <div className="flex items-center justify-between pt-2">
+          < div className="flex items-center justify-between pt-2" >
             <p className="text-xs text-muted-foreground">
               {providerSettingsDirty ? "You have unsaved changes" : "All changes saved"}
             </p>
@@ -1237,22 +1240,22 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 'Save changes'
               )}
             </Button>
-          </div>
+          </div >
 
           {/* Geographic Usage */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Requests by Geography</h2>
               <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
             </div>
             <GeoAnalyticsSection projectId={project.id} />
-          </section>
-        </TabsContent>
+          </section >
+        </TabsContent >
 
         {/* API TAB */}
-        <TabsContent value="api" className="space-y-8">
+        < TabsContent value="api" className="space-y-8" >
           {/* Publishable Keys Section */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-medium">Publishable keys</h2>
@@ -1322,10 +1325,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 <p className="text-[10px] text-muted-foreground">Publishable keys can be safely shared publicly</p>
               </div>
             </div>
-          </section>
+          </section >
 
           {/* Secret Keys Section */}
-          <section className="space-y-3">
+          < section className="space-y-3" >
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-medium">Secret keys</h2>
@@ -1391,21 +1394,23 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 </div>
               )}
             </div>
-          </section>
-        </TabsContent>
+          </section >
+        </TabsContent >
 
-      </Tabs>
+      </Tabs >
 
       {/* Create API Key Dialog */}
-      {project && (
-        <GenerateKeyDialog
-          projectId={project.id}
-          open={showCreateKeyDialog}
-          onOpenChange={setShowCreateKeyDialog}
-          onKeyGenerated={() => refetchApiKeys()}
-          defaultKeyType={createKeyType}
-        />
-      )}
-    </div>
+      {
+        project && (
+          <GenerateKeyDialog
+            projectId={project.id}
+            open={showCreateKeyDialog}
+            onOpenChange={setShowCreateKeyDialog}
+            onKeyGenerated={() => refetchApiKeys()}
+            defaultKeyType={createKeyType}
+          />
+        )
+      }
+    </div >
   );
 }
