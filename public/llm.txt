@@ -244,6 +244,38 @@ await cencori.ai.chat({ model: "gemini-2.5-flash", messages });
 
 All responses have the same format regardless of provider!
 
+## Provider Failover
+
+Cencori automatically handles provider failures:
+
+### How It Works
+1. Request fails → Retries with exponential backoff (up to 3 times)
+2. Still failing → Routes to fallback provider (e.g., OpenAI → Anthropic)
+3. Model mapping → GPT-5 → Claude Opus 4 (automatic equivalent)
+
+### Circuit Breaker
+After 5 consecutive failures, provider is skipped entirely for 60 seconds.
+
+### Fallback Response
+When fallback is used, response includes:
+
+```typescript
+{
+  content: "Hello!",
+  model: "claude-opus-4",       // Actual model used
+  provider: "anthropic",        // Actual provider
+  fallback_used: true,          // Indicates fallback was triggered
+  original_model: "gpt-5",      // What you requested
+  original_provider: "openai"   // Original provider
+}
+```
+
+### Configuration
+Configure in Settings → Infrastructure:
+- **Enable fallback**: On/Off
+- **Fallback provider**: Preferred backup (e.g., Anthropic)
+- **Max retries**: Attempts before failover (default: 3)
+
 ## Error Handling
 
 ```typescript
