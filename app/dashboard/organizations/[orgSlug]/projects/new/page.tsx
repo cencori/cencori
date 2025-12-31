@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 
 interface OrganizationData {
   id: string;
@@ -92,6 +93,7 @@ export default function NewProjectPage({ params }: PageProps) {
 
   // Fetch org with caching - INSTANT ON REVISIT!
   const { data: organization, isLoading: orgLoading, error: orgError } = useOrganization(orgSlug);
+  const { refetchData } = useOrganizationProject();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -157,6 +159,8 @@ export default function NewProjectPage({ params }: PageProps) {
       toast.error("Failed to create project. " + error.message);
     } else {
       toast.success("Project created successfully!");
+      // Refresh breadcrumb data
+      await refetchData();
       router.push(`/dashboard/organizations/${orgSlug}/projects/${newSlug}`);
     }
     setLoading(false);
