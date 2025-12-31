@@ -32,8 +32,14 @@ Building AI features is easy. Building them for production is hard:
 
 ### 1. Install the SDK
 
+**JavaScript/TypeScript:**
 ```bash
 npm install cencori
+```
+
+**Python:**
+```bash
+pip install cencori
 ```
 
 ### 2. Get Your API Key
@@ -44,6 +50,7 @@ npm install cencori
 
 ### 3. Make Your First Request
 
+**JavaScript/TypeScript:**
 ```typescript
 import { Cencori } from 'cencori';
 
@@ -59,8 +66,23 @@ const response = await cencori.ai.chat({
 console.log(response.content);
 ```
 
+**Python:**
+```python
+from cencori import Cencori
+
+cencori = Cencori(api_key="csk_your_secret_key")
+
+response = cencori.ai.chat(
+    messages=[{"role": "user", "content": "Hello!"}],
+    model="gpt-4o"  # or "claude-3-opus", "gemini-2.5-flash"
+)
+
+print(response.content)
+```
+
 ### 4. Stream Responses in Real-Time
 
+**JavaScript/TypeScript:**
 ```typescript
 const stream = cencori.ai.chatStream({
   messages: [{ role: 'user', content: 'Tell me a story' }],
@@ -71,6 +93,15 @@ const stream = cencori.ai.chatStream({
 for await (const chunk of stream) {
   process.stdout.write(chunk.delta);
 }
+```
+
+**Python:**
+```python
+for chunk in cencori.ai.chat_stream(
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    model="gpt-4o"
+):
+    print(chunk.delta, end="", flush=True)
 ```
 
 **That's it!** Cencori handles security, logging, and cost tracking automatically.
@@ -287,6 +318,7 @@ for await (const chunk of stream) {
 
 ### Error Handling
 
+**JavaScript/TypeScript:**
 ```typescript
 import { 
   Cencori, 
@@ -306,6 +338,25 @@ try {
     console.error('Content blocked:', error.reasons);
   }
 }
+```
+
+**Python:**
+```python
+from cencori import (
+    Cencori,
+    AuthenticationError,
+    RateLimitError,
+    SafetyError
+)
+
+try:
+    response = cencori.ai.chat(messages=[...])
+except AuthenticationError:
+    print("Invalid API key")
+except RateLimitError:
+    print("Rate limit exceeded")
+except SafetyError as e:
+    print(f"Content blocked: {e.reasons}")
 ```
 
 ---
