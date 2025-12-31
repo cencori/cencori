@@ -72,10 +72,10 @@ CENCORI_API_KEY=cen_your_api_key_here`}
             {/* Supported Models */}
             <div className="space-y-4">
                 <h2 id="supported-models" className="scroll-m-20 text-xl font-semibold tracking-tight">
-                    Supported Models
+                    Supported Providers & Models
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    All SDKs support the same models across all providers:
+                    All SDKs support 14+ providers with 50+ models:
                 </p>
 
                 <div className="overflow-x-auto">
@@ -83,21 +83,41 @@ CENCORI_API_KEY=cen_your_api_key_here`}
                         <thead>
                             <tr className="border-b border-border/40">
                                 <th className="text-left py-2 font-medium">Provider</th>
-                                <th className="text-left py-2 font-medium">Models</th>
+                                <th className="text-left py-2 font-medium">Key Models</th>
                             </tr>
                         </thead>
                         <tbody className="text-muted-foreground">
                             <tr className="border-b border-border/20">
                                 <td className="py-2">OpenAI</td>
-                                <td className="py-2 font-mono text-xs">gpt-4o, gpt-4-turbo, gpt-3.5-turbo</td>
+                                <td className="py-2 font-mono text-xs">gpt-5, gpt-4o, gpt-4o-mini, o3, o1</td>
                             </tr>
                             <tr className="border-b border-border/20">
                                 <td className="py-2">Anthropic</td>
-                                <td className="py-2 font-mono text-xs">claude-3-opus, claude-3-sonnet, claude-3-haiku</td>
+                                <td className="py-2 font-mono text-xs">claude-opus-4, claude-sonnet-4, claude-3-5-sonnet</td>
                             </tr>
                             <tr className="border-b border-border/20">
                                 <td className="py-2">Google</td>
-                                <td className="py-2 font-mono text-xs">gemini-2.5-flash, gemini-2.0-flash</td>
+                                <td className="py-2 font-mono text-xs">gemini-3-pro, gemini-2.5-flash, gemini-2.0-flash</td>
+                            </tr>
+                            <tr className="border-b border-border/20">
+                                <td className="py-2">xAI</td>
+                                <td className="py-2 font-mono text-xs">grok-4, grok-4.1, grok-3</td>
+                            </tr>
+                            <tr className="border-b border-border/20">
+                                <td className="py-2">Mistral</td>
+                                <td className="py-2 font-mono text-xs">mistral-large, codestral, devstral</td>
+                            </tr>
+                            <tr className="border-b border-border/20">
+                                <td className="py-2">DeepSeek</td>
+                                <td className="py-2 font-mono text-xs">deepseek-v3.2, deepseek-reasoner</td>
+                            </tr>
+                            <tr className="border-b border-border/20">
+                                <td className="py-2">Meta</td>
+                                <td className="py-2 font-mono text-xs">llama-4-maverick, llama-3.3-70b</td>
+                            </tr>
+                            <tr className="border-b border-border/20">
+                                <td className="py-2 text-muted-foreground/60">+ 7 more</td>
+                                <td className="py-2 text-xs text-muted-foreground/60">Groq, Cohere, Perplexity, Together, Qwen, OpenRouter, HuggingFace</td>
                             </tr>
                         </tbody>
                     </table>

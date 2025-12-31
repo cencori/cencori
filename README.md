@@ -205,9 +205,14 @@ AI design tools, coding assistants, chatbots, content generators?
 
 | Provider | Models | Streaming |
 |----------|--------|-----------|
-| **OpenAI** | GPT-4, GPT-4 Turbo, GPT-4o, GPT-3.5 Turbo | ✅ |
-| **Anthropic** | Claude 3 Opus, Sonnet, Haiku | ✅ |
-| **Google** | Gemini 2.5 Flash, Gemini 2.0 Flash | ✅ |
+| **OpenAI** | GPT-5, GPT-4o, GPT-4o Mini, o3, o1 | ✅ |
+| **Anthropic** | Claude Opus 4, Sonnet 4, 3.5 Sonnet | ✅ |
+| **Google** | Gemini 3 Pro, 2.5 Flash, 2.0 Flash | ✅ |
+| **xAI** | Grok 4, Grok 4.1, Grok 3 | ✅ |
+| **Mistral** | Mistral Large 3, Codestral, Devstral | ✅ |
+| **DeepSeek** | V3.2, Reasoner, Coder V2 | ✅ |
+| **Meta** | Llama 4 Maverick, Llama 3.3 70B | ✅ |
+| **+ 7 more** | Groq, Cohere, Perplexity, Together, Qwen, OpenRouter, HuggingFace | ✅ |
 | **Custom** | Any OpenAI/Anthropic compatible | ✅ |
 
 ---

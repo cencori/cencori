@@ -199,33 +199,55 @@ while (true) {
 }
 ```
 
-## Supported Models
+## Supported Models (14+ Providers)
 
 ### OpenAI
-| Model | Context | Input Cost | Output Cost |
-|-------|---------|------------|-------------|
-| `gpt-4o` | 128K | $5/1M | $15/1M |
-| `gpt-4-turbo` | 128K | $10/1M | $30/1M |
-| `gpt-3.5-turbo` | 16K | $0.50/1M | $1.50/1M |
+| Model | Context | Description |
+|-------|---------|-------------|
+| `gpt-5` | 256K | Latest flagship model |
+| `gpt-4o` | 128K | Omni-modal model |
+| `gpt-4o-mini` | 128K | Fast and cost-effective |
+| `o3` | 200K | Most advanced reasoning |
+| `o1` | 128K | Advanced reasoning model |
 
 ### Anthropic
-| Model | Context | Input Cost | Output Cost |
-|-------|---------|------------|-------------|
-| `claude-3-opus` | 200K | $15/1M | $75/1M |
-| `claude-3-sonnet` | 200K | $3/1M | $15/1M |
-| `claude-3-haiku` | 200K | $0.25/1M | $1.25/1M |
+| Model | Context | Description |
+|-------|---------|-------------|
+| `claude-opus-4` | 200K | Most capable Claude |
+| `claude-sonnet-4` | 200K | Balanced speed & capability |
+| `claude-3-5-sonnet` | 200K | Balance of speed and capability |
+| `claude-3-5-haiku` | 200K | Fast and efficient |
 
 ### Google Gemini
-| Model | Context | Input Cost | Output Cost |
-|-------|---------|------------|-------------|
-| `gemini-2.5-flash` | 1M | $0.15/1M | $0.60/1M |
-| `gemini-2.0-flash` | 1M | $0.10/1M | $0.40/1M |
+| Model | Context | Description |
+|-------|---------|-------------|
+| `gemini-3-pro` | 2M | Most powerful Gemini |
+| `gemini-2.5-flash` | 1M | Thinking capabilities |
+| `gemini-2.0-flash` | 1M | Fast model |
+
+### xAI (Grok)
+| Model | Context | Description |
+|-------|---------|-------------|
+| `grok-4` | 256K | Enhanced reasoning |
+| `grok-4.1` | 256K | Improved multimodal |
+| `grok-3` | 128K | DeepSearch, Big Brain Mode |
+
+### Additional Providers
+- **Mistral**: mistral-large-3, codestral, devstral
+- **DeepSeek**: deepseek-v3.2, deepseek-reasoner
+- **Meta (Llama)**: llama-4-maverick, llama-3.3-70b
+- **Groq**: Fast inference for Llama models
+- **Cohere**: command-a, command-r+
+- **Perplexity**: sonar-pro, sonar-reasoning-pro
+- **Together AI**: Access to 100+ open models
+- **OpenRouter**: Meta-provider for all models
 
 ### Model Selection Guide
 - **Chat/General**: `gemini-2.5-flash` (fast, cheap, good quality)
-- **Code**: `gpt-4o` (best coding)
-- **Documents**: `claude-3-opus` (200K context, strong reasoning)
-- **High-Volume**: `gpt-3.5-turbo` (low cost)
+- **Code**: `gpt-4o` or `codestral` (best coding)
+- **Reasoning**: `o3` or `deepseek-reasoner`
+- **Documents**: `claude-opus-4` (200K context, strong reasoning)
+- **Search**: `sonar-pro` (web-connected)
 
 ## Multi-Provider Switching
 
