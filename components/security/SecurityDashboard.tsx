@@ -83,15 +83,8 @@ export function SecurityDashboard({ projectId }: SecurityDashboardProps) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {/* Threat Score */}
                 <div className={`rounded-lg border border-border/40 ${threatLevel.bgColor} p-4`}>
-                    <div className="flex items-center gap-2 mb-1">
-                        {stats.threatScore >= 40 ? (
-                            <ShieldAlert className={`h-4 w-4 ${threatLevel.color}`} />
-                        ) : (
-                            <ShieldCheck className={`h-4 w-4 ${threatLevel.color}`} />
-                        )}
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Threat Score</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Threat Score</span>
+                    <div className="flex items-baseline gap-2 mt-1">
                         <span className={`text-2xl font-bold font-mono ${threatLevel.color}`}>
                             {stats.threatScore}
                         </span>
@@ -103,38 +96,31 @@ export function SecurityDashboard({ projectId }: SecurityDashboardProps) {
 
                 {/* Blocked 24h */}
                 <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (24h)</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (24h)</span>
+                    <div className="flex items-baseline gap-2 mt-1">
                         <span className="text-2xl font-bold font-mono">{stats.blocked24h}</span>
-                        {trendDirection === 'up' && <TrendingUp className="h-4 w-4 text-red-500" />}
-                        {trendDirection === 'down' && <TrendingDown className="h-4 w-4 text-emerald-500" />}
                     </div>
                 </div>
 
                 {/* Blocked 7d */}
                 <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (7d)</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (7d)</span>
+                    <div className="mt-1">
+                        <span className="text-2xl font-bold font-mono">{stats.blocked7d}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                            ({stats.blockedRate}% of requests)
+                        </span>
                     </div>
-                    <span className="text-2xl font-bold font-mono">{stats.blocked7d}</span>
-                    <span className="text-xs text-muted-foreground ml-2">
-                        ({stats.blockedRate}% of requests)
-                    </span>
                 </div>
 
                 {/* Pending Reviews */}
                 <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Pending Review</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Pending Review</span>
+                    <div className="mt-1">
+                        <span className={`text-2xl font-bold font-mono ${stats.pendingReviews > 0 ? 'text-amber-500' : ''}`}>
+                            {stats.pendingReviews}
+                        </span>
                     </div>
-                    <span className={`text-2xl font-bold font-mono ${stats.pendingReviews > 0 ? 'text-amber-500' : ''}`}>
-                        {stats.pendingReviews}
-                    </span>
                 </div>
             </div>
 

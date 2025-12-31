@@ -142,7 +142,7 @@ export default function SecurityPage({ params }: PageProps) {
                             value={filters.severity}
                             onValueChange={(value) => setFilters(prev => ({ ...prev, severity: value }))}
                         >
-                            <SelectTrigger className="w-[120px] h-7 text-xs">
+                            <SelectTrigger className="w-auto h-8 text-xs gap-2 px-3">
                                 <SelectValue placeholder="Severity" />
                             </SelectTrigger>
                             <SelectContent>
@@ -159,7 +159,7 @@ export default function SecurityPage({ params }: PageProps) {
                             value={filters.type}
                             onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
                         >
-                            <SelectTrigger className="w-[140px] h-7 text-xs">
+                            <SelectTrigger className="w-auto h-8 text-xs gap-2 px-3">
                                 <SelectValue placeholder="Type" />
                             </SelectTrigger>
                             <SelectContent>
@@ -177,7 +177,7 @@ export default function SecurityPage({ params }: PageProps) {
                             value={filters.reviewed}
                             onValueChange={(value) => setFilters(prev => ({ ...prev, reviewed: value }))}
                         >
-                            <SelectTrigger className="w-[110px] h-7 text-xs">
+                            <SelectTrigger className="w-auto h-8 text-xs gap-2 px-3">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -192,7 +192,7 @@ export default function SecurityPage({ params }: PageProps) {
                             value={filters.time_range}
                             onValueChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
                         >
-                            <SelectTrigger className="w-[100px] h-7 text-xs">
+                            <SelectTrigger className="w-auto h-8 text-xs gap-2 px-3">
                                 <SelectValue placeholder="Time" />
                             </SelectTrigger>
                             <SelectContent>
