@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge';
 import { RequestDetailModal } from './RequestDetailModal';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -128,8 +129,52 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
 
     if (loading && requests.length === 0) {
         return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                {/* Desktop skeleton */}
+                <div className="hidden md:block">
+                    {/* Header */}
+                    <div className="border-b border-border/40 px-4 py-2">
+                        <div className="grid grid-cols-7 gap-4">
+                            <Skeleton className="h-3 w-12" />
+                            <Skeleton className="h-3 w-10" />
+                            <Skeleton className="h-3 w-14" />
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-3 w-12 ml-auto" />
+                            <Skeleton className="h-3 w-10 ml-auto" />
+                            <Skeleton className="h-3 w-12 ml-auto" />
+                        </div>
+                    </div>
+                    {/* Rows */}
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <div key={i} className="border-b border-border/40 px-4 py-3 last:border-b-0">
+                            <div className="grid grid-cols-7 gap-4 items-center">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-3 w-20" />
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-3 w-full max-w-[200px]" />
+                                <Skeleton className="h-3 w-12 ml-auto" />
+                                <Skeleton className="h-3 w-16 ml-auto" />
+                                <Skeleton className="h-3 w-14 ml-auto" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {/* Mobile skeleton */}
+                <div className="md:hidden divide-y divide-border/40">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="p-3">
+                            <div className="flex items-start justify-between mb-1.5">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-3 w-14" />
+                            </div>
+                            <Skeleton className="h-3 w-full mb-1.5" />
+                            <div className="flex items-center justify-between">
+                                <Skeleton className="h-3 w-20" />
+                                <Skeleton className="h-3 w-24" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
