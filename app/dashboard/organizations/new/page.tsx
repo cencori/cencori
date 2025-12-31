@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { CheckCircle, Loader2 } from "lucide-react";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Organization name must be at least 2 characters." }),
@@ -46,6 +47,7 @@ export default function NewOrganizationPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [createdOrg, setCreatedOrg] = useState<{ id: string; slug: string } | null>(null);
+  const { refetchData } = useOrganizationProject();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -184,6 +186,9 @@ export default function NewOrganizationPage() {
     setCreatedOrg(orgData);
     toast.success("Organization created!");
     setLoading(false);
+
+    // Refresh breadcrumb data
+    await refetchData();
 
     // Handle based on plan
     if (values.plan === 'enterprise') {
