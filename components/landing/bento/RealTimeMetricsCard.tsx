@@ -85,7 +85,6 @@ export const RealTimeMetricsCard = () => {
                 title="Real-time Metrics"
                 description="Latency, cost, and usage—updated live."
                 accentColor="orange"
-                gridClassName="md:col-span-2 md:row-span-1"
             >
                 <div className="grid grid-cols-3 gap-4">
                     {/* Metric counters */}

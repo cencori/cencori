@@ -54,7 +54,6 @@ export const LatencyOverheadCard = () => {
                 title="Latency Overhead"
                 description="Near-zero latency added to your requests."
                 accentColor="green"
-                gridClassName="md:col-span-2 md:row-span-1"
             >
                 <div className="flex items-center gap-6">
                     {/* Large latency display */}

@@ -35,7 +35,6 @@ export const ModelRouterCard = () => {
                 title="Model Router"
                 description="Intelligent routing with automatic failover."
                 accentColor="green"
-                gridClassName="md:col-span-1 md:row-span-2"
             >
                 <div className="relative h-full flex flex-col items-center justify-between py-4">
                     {/* Request node */}

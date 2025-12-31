@@ -49,7 +49,6 @@ export const RequestPipelineCard = () => {
                 title="Request Pipeline"
                 description="Intercept, transform, and log every request."
                 accentColor="orange"
-                gridClassName="md:col-span-1 md:row-span-1"
             >
                 <div className="relative pt-4">
                     {/* Pipeline track */}
