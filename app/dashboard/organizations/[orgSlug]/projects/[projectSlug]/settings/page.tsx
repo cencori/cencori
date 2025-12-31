@@ -67,6 +67,10 @@ interface ProviderHealth {
   status: 'healthy' | 'degraded' | 'down';
   latency: number | null;
   error?: string;
+  circuit?: {
+    state: 'closed' | 'open' | 'half-open';
+    failures: number;
+  };
 }
 
 interface RateLimitsData {
@@ -787,10 +791,27 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                             provider.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
                             }`} />
                           <span className="text-[10px]">{provider.name}</span>
+                          {provider.circuit?.state === 'open' && (
+                            <span className="text-[8px] px-1 py-0.5 rounded bg-red-500/10 text-red-500 font-medium">
+                              CIRCUIT OPEN
+                            </span>
+                          )}
+                          {provider.circuit?.state === 'half-open' && (
+                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-500 font-medium">
+                              TESTING
+                            </span>
+                          )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground">
-                          {provider.latency ? `${provider.latency}ms` : provider.error || 'N/A'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {provider.circuit && provider.circuit.failures > 0 && (
+                            <span className="text-[9px] text-muted-foreground">
+                              {provider.circuit.failures} failures
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {provider.latency ? `${provider.latency}ms` : provider.error || 'N/A'}
+                          </span>
+                        </div>
                       </div>
                     ))
                   ) : (
