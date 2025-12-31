@@ -151,9 +151,14 @@ import type { ChatParams, ChatResponse, Message, StreamChunk } from 'cencori';
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo` |
-| Anthropic | `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` |
-| Google | `gemini-2.5-flash`, `gemini-2.0-flash` |
+| OpenAI | `gpt-5`, `gpt-4o`, `gpt-4o-mini`, `o3`, `o1` |
+| Anthropic | `claude-opus-4`, `claude-sonnet-4`, `claude-3-5-sonnet` |
+| Google | `gemini-3-pro`, `gemini-2.5-flash`, `gemini-2.0-flash` |
+| xAI | `grok-4`, `grok-4.1`, `grok-3` |
+| Mistral | `mistral-large`, `codestral`, `devstral` |
+| DeepSeek | `deepseek-v3.2`, `deepseek-reasoner` |
+| Meta | `llama-4-maverick`, `llama-3.3-70b` |
+| + 7 more | Groq, Cohere, Perplexity, Together, Qwen, OpenRouter, HuggingFace |
 
 ## Local Development
 
