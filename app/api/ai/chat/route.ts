@@ -24,9 +24,71 @@ import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
 import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
 import { triggerFallbackWebhook } from '@/lib/webhooks';
+import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
 
 // Initialize providers
 const router = new ProviderRouter();
+
+/**
+ * Fetch security settings from DB and convert to ProjectSecurityConfig
+ */
+async function getProjectSecurityConfig(
+    supabase: ReturnType<typeof createAdminClient>,
+    projectId: string
+): Promise<ProjectSecurityConfig> {
+    try {
+        const { data: settings } = await supabase
+            .from('security_settings')
+            .select('*')
+            .eq('project_id', projectId)
+            .single();
+
+        if (!settings) {
+            // Return defaults if no settings exist
+            return {
+                inputThreshold: 0.5,
+                outputThreshold: 0.6,
+                jailbreakThreshold: 0.7,
+                enableOutputScanning: true,
+                enableJailbreakDetection: true,
+                enableObfuscatedPII: true,
+                enableIntentAnalysis: true,
+            };
+        }
+
+        // Convert DB settings to ProjectSecurityConfig
+        // safety_threshold is 0-1 where higher = stricter
+        // We convert it to thresholds (lower = stricter for blocking)
+        const safetyThreshold = settings.safety_threshold ?? 0.7;
+
+        // Invert: high safety_threshold (stricter) = lower blocking threshold
+        const inputThreshold = 1 - safetyThreshold;
+        const outputThreshold = Math.max(0.1, inputThreshold - 0.1); // Output slightly stricter
+        const jailbreakThreshold = Math.max(0.2, inputThreshold);
+
+        return {
+            inputThreshold,
+            outputThreshold,
+            jailbreakThreshold,
+            enableOutputScanning: true,
+            enableJailbreakDetection: settings.filter_jailbreaks ?? true,
+            enableObfuscatedPII: settings.filter_pii ?? true,
+            enableIntentAnalysis: settings.filter_prompt_injection ?? true,
+        };
+    } catch (error) {
+        console.warn('[Security] Failed to fetch security settings:', error);
+        // Return defaults on error
+        return {
+            inputThreshold: 0.5,
+            outputThreshold: 0.6,
+            jailbreakThreshold: 0.7,
+            enableOutputScanning: true,
+            enableJailbreakDetection: true,
+            enableObfuscatedPII: true,
+            enableIntentAnalysis: true,
+        };
+    }
+}
 
 // Lazy initialization of default providers (env-based)
 function initializeDefaultProviders() {
@@ -341,7 +403,10 @@ export async function POST(req: NextRequest) {
         const lastUserMessage = unifiedMessages.slice().reverse().find(m => m.role === 'user');
         const inputText = lastUserMessage?.content || '';
 
-        const inputSecurity = checkInputSecurity(inputText, unifiedMessages);
+        // Fetch project security settings from DB
+        const securityConfig = await getProjectSecurityConfig(supabase, project.id);
+
+        const inputSecurity = checkInputSecurity(inputText, unifiedMessages, securityConfig);
 
         if (!inputSecurity.safe) {
             // Log security incident
