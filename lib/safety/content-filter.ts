@@ -14,8 +14,9 @@ export interface ContentFilterConfig {
 // Enhanced PII patterns including obfuscated formats
 const PII_PATTERNS = {
     email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/,
-    // Obfuscated email: "john dot smith at company dot org"
-    emailObfuscated: /\b[A-Za-z0-9._%-]+\s*(dot|at|\[at\]|\(at\))\s*[A-Za-z0-9.-]+\s*(dot|\[dot\]|\(dot\))\s*[A-Za-z]{2,}\b/gi,
+    // Obfuscated email patterns:
+    // "john dot smith at company dot org" or "john.smith [at] company [dot] org"
+    emailObfuscated: /\b[A-Za-z0-9]+\s*(?:dot|\[dot\]|\(dot\)|\.)\s*[A-Za-z0-9]+\s*(?:at|\[at\]|\(at\)|@)\s*[A-Za-z0-9.-]+\s*(?:dot|\[dot\]|\(dot\)|\.)\s*[A-Za-z]{2,}\b/i,
     phone: /\b(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/,
     ssn: /\b\d{3}-\d{2}-\d{4}\b/,
     creditCard: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/,
@@ -92,7 +93,7 @@ export function checkContent(text: string, config?: ContentFilterConfig): Safety
     // Check for obfuscated PII
     if (enableObfuscated && PII_PATTERNS.emailObfuscated.test(text)) {
         reasons.push('Potential obfuscated email format detected (dot/at notation)');
-        score -= 0.3; // Higher risk - intentional obfuscation
+        score -= 0.6; // High risk - intentional obfuscation suggests malicious intent
     }
 
     if (PII_PATTERNS.phone.test(text)) {
