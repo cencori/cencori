@@ -14,7 +14,7 @@ const faqData = [
     },
     {
         question: "What AI models and providers do you support?",
-        answer: "We support all major AI providers: OpenAI (GPT-4, GPT-4 Turbo, GPT-4 Mini), Anthropic (Claude 3 Opus, Sonnet, Haiku), and Google (Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro). You can switch between models dynamically in a single request - no code changes needed."
+        answer: "We support 14+ AI providers with 75+ models including: OpenAI (GPT-5, GPT-4o, o3), Anthropic (Claude Opus 4, Sonnet 4), Google (Gemini 3 Pro, Gemini 2.5 Flash), xAI (Grok 4), Mistral (Large 3), DeepSeek (V3.2), Cohere (Command A), Perplexity (Sonar Pro), and more. You can switch between models dynamically - no code changes needed."
     },
     {
         question: "Do you provide the API keys or do I bring my own?",
@@ -106,7 +106,7 @@ export function FAQ() {
                             What AI models and providers do you support?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
-                            We support all major AI providers: OpenAI (GPT-4, GPT-4 Turbo, GPT-4 Mini), Anthropic (Claude 3 Opus, Sonnet, Haiku), and Google (Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro). You can switch between models dynamically in a single request - no code changes needed. Custom model support is coming soon!
+                            We support 14+ AI providers with 75+ models including: OpenAI (GPT-5, GPT-4o, o3), Anthropic (Claude Opus 4, Sonnet 4), Google (Gemini 3 Pro, Gemini 2.5 Flash), xAI (Grok 4), Mistral (Large 3), DeepSeek (V3.2), Cohere (Command A), Perplexity (Sonar Pro), Meta (Llama 4), and more. You can switch between models dynamically - no code changes needed. BYOK (Bring Your Own Key) is fully supported!
                         </AccordionContent>
                     </AccordionItem>
 

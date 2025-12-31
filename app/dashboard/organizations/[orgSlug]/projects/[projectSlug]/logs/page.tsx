@@ -170,9 +170,12 @@ export default function RequestLogsPage({ params }: PageProps) {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all" className="text-xs">All models</SelectItem>
+                        <SelectItem value="gpt-5" className="text-xs">gpt-5</SelectItem>
+                        <SelectItem value="gpt-4o" className="text-xs">gpt-4o</SelectItem>
+                        <SelectItem value="claude-opus-4" className="text-xs">claude-opus-4</SelectItem>
+                        <SelectItem value="gemini-3-pro" className="text-xs">gemini-3-pro</SelectItem>
                         <SelectItem value="gemini-2.5-flash" className="text-xs">gemini-2.5-flash</SelectItem>
-                        <SelectItem value="gemini-1.5-pro" className="text-xs">gemini-1.5-pro</SelectItem>
-                        <SelectItem value="gemini-1.5-flash" className="text-xs">gemini-1.5-flash</SelectItem>
+                        <SelectItem value="grok-4" className="text-xs">grok-4</SelectItem>
                     </SelectContent>
                 </Select>
 

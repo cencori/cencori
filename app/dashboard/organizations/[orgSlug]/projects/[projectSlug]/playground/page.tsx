@@ -19,12 +19,20 @@ interface PlaygroundPageProps {
 }
 
 const MODELS = [
+    // OpenAI
+    { value: "gpt-5", label: "GPT-5", provider: "OpenAI" },
     { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
-    { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
-    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", provider: "Anthropic" },
-    { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku", provider: "Anthropic" },
-    { value: "gemini-2.0-flash-exp", label: "Gemini 2.0 Flash", provider: "Google" },
-    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", provider: "Google" },
+    { value: "o3", label: "o3 (Reasoning)", provider: "OpenAI" },
+    // Anthropic
+    { value: "claude-opus-4", label: "Claude Opus 4", provider: "Anthropic" },
+    { value: "claude-sonnet-4", label: "Claude Sonnet 4", provider: "Anthropic" },
+    // Google
+    { value: "gemini-3-pro", label: "Gemini 3 Pro", provider: "Google" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
+    // xAI
+    { value: "grok-4", label: "Grok 4", provider: "xAI" },
+    // DeepSeek
+    { value: "deepseek-v3.2", label: "DeepSeek V3.2", provider: "DeepSeek" },
 ];
 
 // Hook to check if project has API keys (with caching)
@@ -74,7 +82,7 @@ export default function PlaygroundPage({ params }: PlaygroundPageProps) {
     const [apiKey, setApiKey] = useState("");
     const [apiKeyVisible, setApiKeyVisible] = useState(false);
     const [message, setMessage] = useState("");
-    const [selectedModel, setSelectedModel] = useState("gpt-4o");
+    const [selectedModel, setSelectedModel] = useState("gpt-5");
     const [response, setResponse] = useState("");
     const [loading, setLoading] = useState(false);
     const [cost, setCost] = useState<number | null>(null);
