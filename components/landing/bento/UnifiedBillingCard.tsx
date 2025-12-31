@@ -44,7 +44,6 @@ export const UnifiedBillingCard = () => {
                 title="Unified Billing"
                 description="One bill. All providers. Full control."
                 accentColor="green"
-                gridClassName="md:col-span-1 md:row-span-1"
             >
                 <div className="space-y-4">
                     {/* Credit balance widget */}

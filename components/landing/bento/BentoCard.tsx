@@ -9,7 +9,6 @@ export interface BentoCardProps {
     className?: string;
     children?: React.ReactNode;
     accentColor?: "green" | "orange";
-    gridClassName?: string;
 }
 
 export const BentoCard = ({
@@ -18,18 +17,15 @@ export const BentoCard = ({
     className,
     children,
     accentColor = "green",
-    gridClassName,
 }: BentoCardProps) => {
     const accentStyles = {
         green: {
-            glow: "group-hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.4)]",
-            border: "group-hover:border-emerald-500/30",
-            gradient: "from-emerald-500/10 via-transparent to-transparent",
+            glow: "group-hover:bg-emerald-500/5",
+            titleHover: "group-hover:text-emerald-400",
         },
         orange: {
-            glow: "group-hover:shadow-[0_0_40px_-10px_rgba(249,115,22,0.4)]",
-            border: "group-hover:border-orange-500/30",
-            gradient: "from-orange-500/10 via-transparent to-transparent",
+            glow: "group-hover:bg-orange-500/5",
+            titleHover: "group-hover:text-orange-400",
         },
     };
 
@@ -38,29 +34,20 @@ export const BentoCard = ({
     return (
         <div
             className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all duration-500 h-full",
-                "hover:-translate-y-1",
+                "group relative flex flex-col h-full transition-colors duration-300",
                 styles.glow,
-                styles.border,
-                gridClassName,
                 className
             )}
         >
-            {/* Hover gradient overlay */}
-            <div
-                className={cn(
-                    "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-                    "bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))]",
-                    styles.gradient
-                )}
-            />
-
             {/* Content header */}
             <div className="relative z-10 flex flex-col gap-2">
-                <h3 className="text-xl font-semibold tracking-tight text-foreground">
+                <h3 className={cn(
+                    "text-lg font-semibold tracking-tight text-foreground transition-colors duration-300",
+                    styles.titleHover
+                )}>
                     {title}
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-[90%]">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                     {description}
                 </p>
             </div>

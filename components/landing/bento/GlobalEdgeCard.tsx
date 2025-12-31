@@ -103,7 +103,6 @@ export const GlobalEdgeCard = () => {
                 title="Global Edge"
                 description="12+ edge locations. Deploy close to your users."
                 accentColor="green"
-                gridClassName="md:col-span-1 md:row-span-1"
             >
                 <div className="relative w-full flex items-center justify-center overflow-hidden -mt-2">
                     {/* COBE Globe Canvas */}

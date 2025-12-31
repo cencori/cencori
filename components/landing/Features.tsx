@@ -1,4 +1,5 @@
 import React from "react";
+import { BentoGrid, BentoGridCell } from "./bento/BentoGrid";
 import {
     UnifiedProxyCard,
     RealTimeMetricsCard,
@@ -24,35 +25,37 @@ export const Features = () => {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 max-w-6xl mx-auto">
-                    {/* Row 1-2: Unified Proxy (2x2) spans both rows */}
-                    <div className="md:col-span-2 md:row-span-2 min-h-[420px]">
-                        <UnifiedProxyCard />
-                    </div>
+                <div className="max-w-6xl mx-auto">
+                    <BentoGrid>
+                        {/* Row 1-2: Unified Proxy (2x2) */}
+                        <BentoGridCell colSpan={2} rowSpan={2} className="min-h-[420px]">
+                            <UnifiedProxyCard />
+                        </BentoGridCell>
 
-                    {/* Row 1 right side: Real-time Metrics (2x1) */}
-                    <div className="md:col-span-2 min-h-[200px]">
-                        <RealTimeMetricsCard />
-                    </div>
+                        {/* Row 1 right side: Real-time Metrics (2x1) */}
+                        <BentoGridCell colSpan={2} className="min-h-[200px]">
+                            <RealTimeMetricsCard />
+                        </BentoGridCell>
 
-                    {/* Row 2 right side: Model Router + Unified Billing */}
-                    <div className="md:col-span-1 min-h-[200px]">
-                        <ModelRouterCard />
-                    </div>
-                    <div className="md:col-span-1 min-h-[200px]">
-                        <UnifiedBillingCard />
-                    </div>
+                        {/* Row 2 right side: Model Router + Unified Billing */}
+                        <BentoGridCell className="min-h-[200px]">
+                            <ModelRouterCard />
+                        </BentoGridCell>
+                        <BentoGridCell className="min-h-[200px]">
+                            <UnifiedBillingCard />
+                        </BentoGridCell>
 
-                    {/* Row 3: Request Pipeline + Latency Overhead + Global Edge */}
-                    <div className="md:col-span-1 min-h-[200px]">
-                        <RequestPipelineCard />
-                    </div>
-                    <div className="md:col-span-2 min-h-[200px]">
-                        <LatencyOverheadCard />
-                    </div>
-                    <div className="md:col-span-1 min-h-[200px]">
-                        <GlobalEdgeCard />
-                    </div>
+                        {/* Row 3: Request Pipeline + Latency Overhead + Global Edge */}
+                        <BentoGridCell className="min-h-[200px]">
+                            <RequestPipelineCard />
+                        </BentoGridCell>
+                        <BentoGridCell colSpan={2} className="min-h-[200px]">
+                            <LatencyOverheadCard />
+                        </BentoGridCell>
+                        <BentoGridCell className="min-h-[200px]">
+                            <GlobalEdgeCard />
+                        </BentoGridCell>
+                    </BentoGrid>
                 </div>
             </div>
         </section>
