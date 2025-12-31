@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 interface SecurityIncident {
     id: string;
     created_at: string;
@@ -108,8 +110,36 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
 
     if (loading && incidents.length === 0) {
         return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="space-y-4">
+                {/* Summary skeleton */}
+                <div className="grid grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="rounded-md border border-border/40 bg-card p-3">
+                            <Skeleton className="h-2.5 w-14 mb-1.5" />
+                            <Skeleton className="h-6 w-8" />
+                        </div>
+                    ))}
+                </div>
+                {/* Table skeleton */}
+                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                    <div className="border-b border-border/40 px-4 py-2">
+                        <div className="grid grid-cols-6 gap-4">
+                            {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-3 w-14" />)}
+                        </div>
+                    </div>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="border-b border-border/40 px-4 py-3 last:border-b-0">
+                            <div className="grid grid-cols-6 gap-4 items-center">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-3 w-16" />
+                                <Skeleton className="h-4 w-12" />
+                                <Skeleton className="h-3 w-10 ml-auto" />
+                                <Skeleton className="h-4 w-16 ml-auto" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -145,7 +175,7 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                     <p className="text-xs text-muted-foreground">
                         {filters.severity !== 'all' || filters.type !== 'all'
                             ? 'Try adjusting your filters'
-                            : 'Your project is secure! 🎉'
+                            : 'Your project is secure!'
                         }
                     </p>
                 </div>
