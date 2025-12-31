@@ -176,19 +176,16 @@ export function SecuritySettings({ projectId }: SecuritySettingsProps) {
                 </div>
                 <div className="p-4">
                     <div className="flex items-center gap-4">
-                        <span className="text-[10px] text-muted-foreground">Lenient</span>
+                        <span className="text-[10px] text-muted-foreground w-10">Lenient</span>
                         <Slider
-                            value={[currentSettings.safety_threshold ?? 0.7]}
-                            onValueChange={(values: number[]) => handleChange('safety_threshold', values[0])}
+                            value={(currentSettings.safety_threshold ?? 0.7) * 100}
+                            onChange={(value) => handleChange('safety_threshold', value / 100)}
                             min={0}
-                            max={1}
-                            step={0.1}
+                            max={100}
+                            step={5}
                             className="flex-1"
                         />
-                        <span className="text-[10px] text-muted-foreground">Strict</span>
-                        <Badge variant="outline" className="font-mono text-xs">
-                            {((currentSettings.safety_threshold ?? 0.7) * 100).toFixed(0)}%
-                        </Badge>
+                        <span className="text-[10px] text-muted-foreground w-8">Strict</span>
                     </div>
                 </div>
             </div>
