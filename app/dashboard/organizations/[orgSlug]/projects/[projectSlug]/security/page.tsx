@@ -3,10 +3,15 @@
 import { useState, use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { SecurityDashboard } from '@/components/security/SecurityDashboard';
+import { SecuritySettings } from '@/components/security/SecuritySettings';
+import { SecurityAuditLog } from '@/components/security/SecurityAuditLog';
+import { SecurityWebhooks } from '@/components/security/SecurityWebhooks';
 import { SecurityIncidentsTable } from '@/components/audit/SecurityIncidentsTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { X, ShieldAlert } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { X, ShieldAlert, LayoutDashboard, AlertTriangle, Settings, FileText, Webhook } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,9 +49,10 @@ function useProjectId(orgSlug: string, projectSlug: string) {
     });
 }
 
-export default function SecurityIncidentsPage({ params }: PageProps) {
+export default function SecurityPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const { environment } = useEnvironment();
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [filters, setFilters] = useState({
         severity: 'all',
         type: 'all',
@@ -79,8 +85,9 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
                     <Skeleton className="h-5 w-32" />
                     <Skeleton className="h-3 w-64 mt-1" />
                 </div>
-                <div className="flex gap-3 mb-4">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-7 w-28" />)}
+                <Skeleton className="h-10 w-full mb-4" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
                 </div>
                 <Skeleton className="h-[300px]" />
             </div>
@@ -95,7 +102,7 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
                         <ShieldAlert className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium">Project not found</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Unable to load security incidents</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Unable to load security settings</p>
                 </div>
             </div>
         );
@@ -106,94 +113,130 @@ export default function SecurityIncidentsPage({ params }: PageProps) {
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-base font-medium">Security</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">Monitor and review security threats in your AI requests</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                    Monitor threats, configure security settings, and manage alerts
+                </p>
             </div>
 
-            {/* Filters Row */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-                {/* Severity */}
-                <Select
-                    value={filters.severity}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, severity: value }))}
-                >
-                    <SelectTrigger className="w-[120px] h-7 text-xs">
-                        <SelectValue placeholder="Severity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all" className="text-xs">All severities</SelectItem>
-                        <SelectItem value="critical" className="text-xs">Critical</SelectItem>
-                        <SelectItem value="high" className="text-xs">High</SelectItem>
-                        <SelectItem value="medium" className="text-xs">Medium</SelectItem>
-                        <SelectItem value="low" className="text-xs">Low</SelectItem>
-                    </SelectContent>
-                </Select>
+            {/* Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList>
+                    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                    <TabsTrigger value="incidents">Incidents</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
+                    <TabsTrigger value="audit">Audit Log</TabsTrigger>
+                    <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+                </TabsList>
 
-                {/* Type */}
-                <Select
-                    value={filters.type}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-                >
-                    <SelectTrigger className="w-[140px] h-7 text-xs">
-                        <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all" className="text-xs">All types</SelectItem>
-                        <SelectItem value="jailbreak_attempt" className="text-xs">Jailbreak</SelectItem>
-                        <SelectItem value="pii_detection" className="text-xs">PII Detection</SelectItem>
-                        <SelectItem value="prompt_injection" className="text-xs">Prompt Injection</SelectItem>
-                        <SelectItem value="harmful_content" className="text-xs">Harmful Content</SelectItem>
-                        <SelectItem value="data_exfiltration" className="text-xs">Data Exfiltration</SelectItem>
-                    </SelectContent>
-                </Select>
+                {/* Dashboard Tab */}
+                <TabsContent value="dashboard" className="mt-0">
+                    <SecurityDashboard projectId={projectId} />
+                </TabsContent>
 
-                {/* Review Status */}
-                <Select
-                    value={filters.reviewed}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, reviewed: value }))}
-                >
-                    <SelectTrigger className="w-[110px] h-7 text-xs">
-                        <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                        <SelectItem value="false" className="text-xs">Pending</SelectItem>
-                        <SelectItem value="true" className="text-xs">Reviewed</SelectItem>
-                    </SelectContent>
-                </Select>
+                {/* Incidents Tab */}
+                <TabsContent value="incidents" className="mt-0">
+                    {/* Filters Row */}
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                        {/* Severity */}
+                        <Select
+                            value={filters.severity}
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, severity: value }))}
+                        >
+                            <SelectTrigger className="w-[120px] h-7 text-xs">
+                                <SelectValue placeholder="Severity" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All severities</SelectItem>
+                                <SelectItem value="critical" className="text-xs">Critical</SelectItem>
+                                <SelectItem value="high" className="text-xs">High</SelectItem>
+                                <SelectItem value="medium" className="text-xs">Medium</SelectItem>
+                                <SelectItem value="low" className="text-xs">Low</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                {/* Time Range */}
-                <Select
-                    value={filters.time_range}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
-                >
-                    <SelectTrigger className="w-[100px] h-7 text-xs">
-                        <SelectValue placeholder="Time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="1h" className="text-xs">1 Hour</SelectItem>
-                        <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
-                        <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
-                        <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
-                        <SelectItem value="all" className="text-xs">All Time</SelectItem>
-                    </SelectContent>
-                </Select>
+                        {/* Type */}
+                        <Select
+                            value={filters.type}
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
+                        >
+                            <SelectTrigger className="w-[140px] h-7 text-xs">
+                                <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All types</SelectItem>
+                                <SelectItem value="jailbreak_attempt" className="text-xs">Jailbreak</SelectItem>
+                                <SelectItem value="pii_detection" className="text-xs">PII Detection</SelectItem>
+                                <SelectItem value="prompt_injection" className="text-xs">Prompt Injection</SelectItem>
+                                <SelectItem value="harmful_content" className="text-xs">Harmful Content</SelectItem>
+                                <SelectItem value="data_exfiltration" className="text-xs">Data Exfiltration</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                {/* Clear Filters */}
-                {hasActiveFilters && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs px-2"
-                        onClick={handleClearFilters}
-                    >
-                        <X className="h-3 w-3 mr-1" />
-                        Clear
-                    </Button>
-                )}
-            </div>
+                        {/* Review Status */}
+                        <Select
+                            value={filters.reviewed}
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, reviewed: value }))}
+                        >
+                            <SelectTrigger className="w-[110px] h-7 text-xs">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                                <SelectItem value="false" className="text-xs">Pending</SelectItem>
+                                <SelectItem value="true" className="text-xs">Reviewed</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-            {/* Security incidents table */}
-            <SecurityIncidentsTable projectId={projectId} filters={filters} environment={environment} />
+                        {/* Time Range */}
+                        <Select
+                            value={filters.time_range}
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
+                        >
+                            <SelectTrigger className="w-[100px] h-7 text-xs">
+                                <SelectValue placeholder="Time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="1h" className="text-xs">1 Hour</SelectItem>
+                                <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
+                                <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
+                                <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
+                                <SelectItem value="all" className="text-xs">All Time</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Clear Filters */}
+                        {hasActiveFilters && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2"
+                                onClick={handleClearFilters}
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Security incidents table */}
+                    <SecurityIncidentsTable projectId={projectId} filters={filters} environment={environment} />
+                </TabsContent>
+
+                {/* Settings Tab */}
+                <TabsContent value="settings" className="mt-0">
+                    <SecuritySettings projectId={projectId} />
+                </TabsContent>
+
+                {/* Audit Log Tab */}
+                <TabsContent value="audit" className="mt-0">
+                    <SecurityAuditLog projectId={projectId} />
+                </TabsContent>
+
+                {/* Webhooks Tab */}
+                <TabsContent value="webhooks" className="mt-0">
+                    <SecurityWebhooks projectId={projectId} />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
