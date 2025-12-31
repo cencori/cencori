@@ -734,7 +734,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           </section>
 
           {/* Service Versions + Provider Connections Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Service Versions */}
             <section className="space-y-3">
               <h2 className="text-sm font-medium">Service versions</h2>
@@ -771,7 +771,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 </Button>
               </div>
               <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-                <div className="divide-y divide-border/40">
+                <div className="divide-y divide-border/40 max-h-[104px] overflow-y-auto">
                   {providersLoading && providers.length === 0 ? (
                     <>
                       <div className="flex items-center justify-between px-4 py-2">
