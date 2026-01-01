@@ -75,12 +75,11 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
         }
 
-        // Fetch security incidents
+        // Fetch security incidents (linked via request_id, not api_key_id)
         const { data: incidents, error: incError } = await supabaseAdmin
             .from('security_incidents')
             .select('*')
             .eq('project_id', projectId)
-            .in('api_key_id', apiKeyIds)
             .gte('created_at', startTime.toISOString());
 
         if (incError) {

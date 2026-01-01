@@ -47,7 +47,7 @@ export async function GET(
             .select('id')
             .eq('project_id', projectId)
             .eq('environment', environment)
-            .eq('is_active', true);
+            .is('revoked_at', null);
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
