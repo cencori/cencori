@@ -320,11 +320,21 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (keyError || !keyData) {
+            console.log('[AI Chat] API key validation failed:', { keyPrefix: apiKey.substring(0, 12) + '...', error: keyError?.message });
             return NextResponse.json(
                 { error: 'Invalid API key' },
                 { status: 401 }
             );
         }
+
+        // Log successful API key validation
+        console.log('[AI Chat] Request received:', {
+            apiKeyId: keyData.id,
+            projectId: keyData.project_id,
+            environment: keyData.environment,
+            keyType: keyData.key_type,
+            timestamp: new Date().toISOString()
+        });
 
         // 4. Validate domain for publishable keys
         if (keyData.key_type === 'publishable') {
@@ -910,12 +920,20 @@ export async function POST(req: NextRequest) {
         });
 
         if (logError) {
-            console.error('[API] Failed to log request:', logError);
-            console.error('[API] Request data:', {
+            console.error('[AI Chat] Failed to log request:', logError);
+            console.error('[AI Chat] Request data:', {
                 project_id: project.id,
                 api_key_id: keyData.id,
                 provider: actualProvider,
                 model: actualModel,
+            });
+        } else {
+            console.log('[AI Chat] Request logged successfully:', {
+                projectId: project.id,
+                apiKeyId: keyData.id,
+                model: actualModel,
+                status: usedFallback ? 'success_fallback' : 'success',
+                timestamp: new Date().toISOString()
             });
         }
 
