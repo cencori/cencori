@@ -92,7 +92,7 @@ async function getProjectSecurityConfig(
 
 // Lazy initialization of default providers (env-based)
 function initializeDefaultProviders() {
-    if (!router.hasProvider('google') && process.env.GOOGLE_AI_API_KEY) {
+    if (!router.hasProvider('google') && process.env.GEMINI_API_KEY) {
         try {
             router.registerProvider('google', new GeminiProvider());
         } catch (error) {
