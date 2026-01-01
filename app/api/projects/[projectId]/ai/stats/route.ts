@@ -177,12 +177,16 @@ export async function GET(
                 firstRequestDate = new Date(sortedByDate[0].created_at);
             }
 
+            // Always include today in the chart
+            const today = new Date();
+            today.setHours(23, 59, 59, 999); // End of today
+
             if (firstRequestDate) {
                 const chartStartDate = new Date(firstRequestDate);
                 chartStartDate.setDate(chartStartDate.getDate() - 2);
-                const endDate = new Date();
+                chartStartDate.setHours(0, 0, 0, 0); // Start of day
 
-                for (let d = new Date(chartStartDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                for (let d = new Date(chartStartDate); d <= today; d.setDate(d.getDate() + 1)) {
                     const dateStr = d.toISOString().split('T')[0];
                     // Format as "Dec 22" style
                     const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
