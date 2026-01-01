@@ -108,6 +108,35 @@ for chunk in cencori.ai.chat_stream(
 
 ---
 
+## Vercel AI SDK Integration
+
+Using Vercel AI SDK (`ai` package)? Cencori is a drop-in provider:
+
+```bash
+npm install @cencori/ai-provider ai
+```
+
+```typescript
+import { cencori } from '@cencori/ai-provider';
+import { streamText } from 'ai';
+
+const result = await streamText({
+  model: cencori('gemini-2.5-flash'),
+  messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+return result.toUIMessageStreamResponse();
+```
+
+**Works with everything in Vercel AI SDK:**
+- `streamText()` / `generateText()` - Server-side text generation
+- `useChat()` / `useCompletion()` - React hooks for chat UIs
+- `streamUI()` - Generative UI with React Server Components
+
+**Same Cencori benefits:** Safety filtering, analytics, cost tracking, multi-provider support.
+
+---
+
 ## Key Features
 
 ### **Multi-Provider AI Support**
@@ -444,16 +473,21 @@ View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)
 - Credits system
 - Custom providers
 
-**Phase 3 🚧 (In Progress)**
+**Phase 3 ✅ (Complete)**
+- Bring Your Own Keys (BYOK)
+- Vercel AI SDK provider (`@cencori/ai-provider`)
+- Provider failover and circuit breaker
 - Enhanced analytics with provider breakdowns
+
+**Phase 4 🚧 (In Progress)**
 - Advanced cost optimization
 - Payment integration for credit top-ups
+- Additional providers (Cohere, Together.ai, Groq)
 
 **Future**
-- Additional providers (Cohere, Together.ai, Groq)
-- Model fallback/retry logic
 - A/B testing infrastructure
-- Bring Your Own Keys (BYOK)
+- Model performance comparison
+- Fine-tuning support
 
 ---
 

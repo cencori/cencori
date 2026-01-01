@@ -67,6 +67,18 @@ pnpm add cencori`}
                         code={`pip install cencori`}
                     />
                 </div>
+
+                <div className="space-y-3 mt-4">
+                    <h3 className="text-base font-semibold">Vercel AI SDK (optional)</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Using Vercel AI SDK? Install the Cencori provider for seamless integration:
+                    </p>
+                    <CodeBlock
+                        filename="terminal"
+                        language="bash"
+                        code={`npm install @cencori/ai-provider ai`}
+                    />
+                </div>
             </div>
 
             {/* Step 2: Get Your API Keys */}
