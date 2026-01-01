@@ -1,10 +1,11 @@
 // src/cencori-chat-model.ts
 var CencoriChatLanguageModel = class {
   constructor(modelId, settings) {
-    this.specificationVersion = "v1";
+    this.specificationVersion = "v2";
     this.provider = "cencori";
     this.defaultObjectGenerationMode = "json";
     this.supportsImageUrls = false;
+    this.supportedUrls = {};
     this.modelId = modelId;
     this.settings = settings;
   }
@@ -65,7 +66,7 @@ var CencoriChatLanguageModel = class {
         messages,
         model: this.modelId,
         temperature: options.temperature,
-        maxTokens: options.maxTokens,
+        maxTokens: options.maxOutputTokens,
         stream: false,
         userId: this.settings.userId
       }),
@@ -76,21 +77,27 @@ var CencoriChatLanguageModel = class {
       throw new Error(`Cencori API error: ${error.error || response.statusText}`);
     }
     const data = await response.json();
+    const content = [{
+      type: "text",
+      text: data.content
+    }];
     return {
-      text: data.content,
+      content,
       finishReason: this.mapFinishReason(data.finish_reason),
       usage: {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens
+        inputTokens: data.usage.prompt_tokens,
+        outputTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens
       },
       rawCall: {
         rawPrompt: messages,
         rawSettings: {
           model: this.modelId,
           temperature: options.temperature,
-          maxTokens: options.maxTokens
+          maxOutputTokens: options.maxOutputTokens
         }
-      }
+      },
+      warnings: []
     };
   }
   async doStream(options) {
@@ -102,7 +109,7 @@ var CencoriChatLanguageModel = class {
         messages,
         model: this.modelId,
         temperature: options.temperature,
-        maxTokens: options.maxTokens,
+        maxTokens: options.maxOutputTokens,
         stream: true,
         userId: this.settings.userId
       }),
@@ -118,8 +125,9 @@ var CencoriChatLanguageModel = class {
     }
     const decoder = new TextDecoder();
     let buffer = "";
-    let promptTokens = 0;
-    let completionTokens = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let textPartId = "text-0";
     const stream = new ReadableStream({
       async pull(controller) {
         try {
@@ -128,7 +136,7 @@ var CencoriChatLanguageModel = class {
             controller.enqueue({
               type: "finish",
               finishReason: "stop",
-              usage: { promptTokens, completionTokens }
+              usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
             });
             controller.close();
             return;
@@ -144,7 +152,7 @@ var CencoriChatLanguageModel = class {
               controller.enqueue({
                 type: "finish",
                 finishReason: "stop",
-                usage: { promptTokens, completionTokens }
+                usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
               });
               controller.close();
               return;
@@ -152,17 +160,18 @@ var CencoriChatLanguageModel = class {
             try {
               const chunk = JSON.parse(data);
               if (chunk.delta) {
-                completionTokens += Math.ceil(chunk.delta.length / 4);
+                outputTokens += Math.ceil(chunk.delta.length / 4);
                 controller.enqueue({
                   type: "text-delta",
-                  textDelta: chunk.delta
+                  id: textPartId,
+                  delta: chunk.delta
                 });
               }
               if (chunk.finish_reason) {
                 controller.enqueue({
                   type: "finish",
                   finishReason: "stop",
-                  usage: { promptTokens, completionTokens }
+                  usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
                 });
                 controller.close();
                 return;
@@ -185,9 +194,10 @@ var CencoriChatLanguageModel = class {
         rawSettings: {
           model: this.modelId,
           temperature: options.temperature,
-          maxTokens: options.maxTokens
+          maxOutputTokens: options.maxOutputTokens
         }
-      }
+      },
+      warnings: []
     };
   }
 };

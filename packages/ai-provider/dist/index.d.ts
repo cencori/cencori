@@ -1,9 +1,9 @@
-import { LanguageModelV1, LanguageModelV1CallOptions, LanguageModelV1FunctionToolCall, LanguageModelV1FinishReason, LanguageModelV1CallWarning, LanguageModelV1LogProbs, LanguageModelV1ProviderMetadata, LanguageModelV1StreamPart } from '@ai-sdk/provider';
+import { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2Usage, LanguageModelV2CallWarning, LanguageModelV2StreamPart } from '@ai-sdk/provider';
 
 /**
  * Cencori Chat Language Model
  *
- * Implements the Vercel AI SDK's LanguageModelV1 interface
+ * Implements the Vercel AI SDK's LanguageModelV2 interface
  */
 
 interface CencoriChatModelSettings {
@@ -12,25 +12,22 @@ interface CencoriChatModelSettings {
     headers?: Record<string, string>;
     userId?: string;
 }
-declare class CencoriChatLanguageModel implements LanguageModelV1 {
-    readonly specificationVersion: "v1";
+declare class CencoriChatLanguageModel implements LanguageModelV2 {
+    readonly specificationVersion: "v2";
     readonly provider = "cencori";
     readonly defaultObjectGenerationMode: "json";
     readonly supportsImageUrls = false;
+    readonly supportedUrls: Record<string, RegExp[]>;
     readonly modelId: string;
     private readonly settings;
     constructor(modelId: string, settings: CencoriChatModelSettings);
     private getHeaders;
     private convertMessages;
     private mapFinishReason;
-    doGenerate(options: LanguageModelV1CallOptions): Promise<{
-        text?: string;
-        toolCalls?: LanguageModelV1FunctionToolCall[];
-        finishReason: LanguageModelV1FinishReason;
-        usage: {
-            promptTokens: number;
-            completionTokens: number;
-        };
+    doGenerate(options: LanguageModelV2CallOptions): Promise<{
+        content: LanguageModelV2Content[];
+        finishReason: LanguageModelV2FinishReason;
+        usage: LanguageModelV2Usage;
         rawCall: {
             rawPrompt: unknown;
             rawSettings: Record<string, unknown>;
@@ -38,12 +35,10 @@ declare class CencoriChatLanguageModel implements LanguageModelV1 {
         rawResponse?: {
             headers?: Record<string, string>;
         };
-        warnings?: LanguageModelV1CallWarning[];
-        logprobs?: LanguageModelV1LogProbs;
-        providerMetadata?: LanguageModelV1ProviderMetadata;
+        warnings: LanguageModelV2CallWarning[];
     }>;
-    doStream(options: LanguageModelV1CallOptions): Promise<{
-        stream: ReadableStream<LanguageModelV1StreamPart>;
+    doStream(options: LanguageModelV2CallOptions): Promise<{
+        stream: ReadableStream<LanguageModelV2StreamPart>;
         rawCall: {
             rawPrompt: unknown;
             rawSettings: Record<string, unknown>;
@@ -51,7 +46,7 @@ declare class CencoriChatLanguageModel implements LanguageModelV1 {
         rawResponse?: {
             headers?: Record<string, string>;
         };
-        warnings?: LanguageModelV1CallWarning[];
+        warnings: LanguageModelV2CallWarning[];
     }>;
 }
 
