@@ -147,6 +147,30 @@ import type { ChatParams, ChatResponse, Message, StreamChunk } from 'cencori';
 - ✅ Rate limiting protection
 - ✅ Streaming support with `chatStream()`
 
+## Vercel AI SDK Integration
+
+Using Vercel AI SDK? Use `@cencori/ai-provider` for seamless integration:
+
+```bash
+npm install @cencori/ai-provider ai
+```
+
+```typescript
+import { cencori } from '@cencori/ai-provider';
+import { streamText } from 'ai';
+
+const result = await streamText({
+  model: cencori('gpt-4o'),
+  messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+for await (const chunk of result.textStream) {
+  process.stdout.write(chunk);
+}
+```
+
+See [@cencori/ai-provider on npm](https://www.npmjs.com/package/@cencori/ai-provider) for full documentation.
+
 ## Supported Models
 
 | Provider | Models |

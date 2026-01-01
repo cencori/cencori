@@ -255,6 +255,43 @@ pnpm add cencori`}
                 />
             </div>
 
+            {/* Vercel AI SDK Integration */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Vercel AI SDK Integration
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Using Vercel AI SDK? Install the Cencori provider for seamless integration with <code className="text-xs bg-muted px-1.5 py-0.5 rounded">streamText()</code>, <code className="text-xs bg-muted px-1.5 py-0.5 rounded">generateText()</code>, and <code className="text-xs bg-muted px-1.5 py-0.5 rounded">useChat()</code>:
+                </p>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`npm install @cencori/ai-provider ai`}
+                />
+                <CodeBlock
+                    filename="app/api/chat/route.ts"
+                    language="typescript"
+                    code={`import { cencori } from "@cencori/ai-provider";
+import { streamText } from "ai";
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = await streamText({
+    model: cencori("gemini-2.5-flash"),
+    messages
+  });
+
+  return result.toUIMessageStreamResponse();
+}`}
+                />
+                <div className="p-4 bg-muted/20 border border-border/40">
+                    <p className="text-xs text-muted-foreground">
+                        <strong>Same benefits:</strong> Safety filtering, analytics, cost tracking, and multi-provider support — all through the familiar Vercel AI SDK patterns.
+                    </p>
+                </div>
+            </div>
+
             {/* SDK Initialization */}
             <div className="space-y-4">
                 <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
