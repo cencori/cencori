@@ -168,28 +168,39 @@ export async function GET(
                 });
             }
         } else {
-            // For 7d, 30d, all - group by day
+            // For 7d, 30d, all - group by day (using UTC dates consistently)
             let firstRequestDate: Date | null = null;
             if (requests && requests.length > 0) {
                 const sortedByDate = [...requests].sort((a, b) =>
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
                 firstRequestDate = new Date(sortedByDate[0].created_at);
+                console.log('[AI Stats] First request date:', sortedByDate[0].created_at);
+                console.log('[AI Stats] RequestsByTime keys:', Object.keys(requestsByTime || {}));
             }
 
-            // Always include today in the chart
-            const today = new Date();
-            today.setHours(23, 59, 59, 999); // End of today
+            // Get today's UTC date
+            const now = new Date();
+            const todayUTC = now.toISOString().split('T')[0];
+            console.log('[AI Stats] Today UTC:', todayUTC, 'Server time:', now.toISOString());
 
             if (firstRequestDate) {
-                const chartStartDate = new Date(firstRequestDate);
-                chartStartDate.setDate(chartStartDate.getDate() - 2);
-                chartStartDate.setHours(0, 0, 0, 0); // Start of day
+                // Start 2 days before first request
+                const startTs = firstRequestDate.getTime() - (2 * 24 * 60 * 60 * 1000);
+                // End at today (current UTC date)
+                const endTs = now.getTime();
 
-                for (let d = new Date(chartStartDate); d <= today; d.setDate(d.getDate() + 1)) {
+                // Iterate day by day using milliseconds (avoids timezone issues)
+                const msPerDay = 24 * 60 * 60 * 1000;
+                for (let ts = startTs; ts <= endTs; ts += msPerDay) {
+                    const d = new Date(ts);
                     const dateStr = d.toISOString().split('T')[0];
                     // Format as "Dec 22" style
-                    const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const formattedDate = new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        timeZone: 'UTC'
+                    });
                     const existing = requestsByTime?.[dateStr];
                     chartData.push({
                         date: formattedDate,
@@ -198,6 +209,25 @@ export async function GET(
                         tokens: existing?.tokens || 0,
                     });
                 }
+
+                // Ensure today is included (in case loop didn't reach it exactly)
+                const lastEntry = chartData[chartData.length - 1];
+                const todayFormatted = new Date(todayUTC + 'T12:00:00Z').toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: 'UTC'
+                });
+                if (lastEntry?.date !== todayFormatted) {
+                    const existing = requestsByTime?.[todayUTC];
+                    chartData.push({
+                        date: todayFormatted,
+                        count: existing?.count || 0,
+                        cost: existing?.cost || 0,
+                        tokens: existing?.tokens || 0,
+                    });
+                }
+
+                console.log('[AI Stats] Chart data dates:', chartData.map(c => c.date));
             }
         }
 
