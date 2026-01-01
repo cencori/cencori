@@ -513,38 +513,37 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             <h2 className="text-sm font-medium">General settings</h2>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               {/* Project Name */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Project name</p>
-                  <p className="text-[10px] text-muted-foreground">Displayed throughout the dashboard.</p>
+                  <p className="text-sm md:text-xs font-medium">Project name</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Displayed throughout the dashboard.</p>
                 </div>
                 <Input
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  className="w-64 h-8 text-sm"
+                  className="w-full md:w-64 h-10 md:h-8 text-sm"
                 />
               </div>
               {/* Project ID */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Project ID</p>
-                  <p className="text-[10px] text-muted-foreground">Reference used in APIs and URLs.</p>
+                  <p className="text-sm md:text-xs font-medium">Project ID</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Reference used in APIs and URLs.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Input
-                    value={project.slug}
-                    readOnly
-                    className="w-52 h-8 bg-muted/50 font-mono text-xs"
-                  />
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
+                  <span className="px-3 py-1.5 md:py-1 bg-muted/50 rounded-md font-mono text-sm md:text-xs text-muted-foreground">
+                    {project.slug}
+                  </span>
+                  <Button variant="outline" size="sm" className="h-8 md:h-7 text-xs gap-1.5" onClick={handleCopy}>
                     {copiedSlug ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    Copy
                   </Button>
                 </div>
               </div>
               {/* Save Button Row */}
-              <div className="flex justify-end px-4 py-2 bg-muted/20">
-                <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={isSaving || !hasChanges}>
-                  {isSaving ? "Saving..." : "Save"}
+              <div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+                <Button size="sm" className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs" onClick={handleSave} disabled={isSaving || !hasChanges}>
+                  {isSaving ? "Saving..." : "Save changes"}
                 </Button>
               </div>
             </div>
@@ -554,19 +553,19 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Project status</h2>
-              <p className="text-[10px] text-muted-foreground">Pause or activate your project.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Pause or activate your project.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               {/* Status Toggle */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Status</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-sm md:text-xs font-medium">Status</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">
                     {projectStatus === 'active' ? 'Your project is currently active.' : 'Your project is paused.'}
                   </p>
                 </div>
                 <Select value={projectStatus} onValueChange={(v: 'active' | 'inactive') => setProjectStatus(v)}>
-                  <SelectTrigger className="w-28 h-8 text-xs">
+                  <SelectTrigger className="w-full md:w-28 h-10 md:h-8 text-sm md:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -586,13 +585,13 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 </Select>
               </div>
               {/* Visibility */}
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Visibility</p>
-                  <p className="text-[10px] text-muted-foreground">Control who can view this project.</p>
+                  <p className="text-sm md:text-xs font-medium">Visibility</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Control who can view this project.</p>
                 </div>
                 <Select value={projectVisibility} onValueChange={(v: 'public' | 'private') => setProjectVisibility(v)}>
-                  <SelectTrigger className="w-28 h-8 text-xs">
+                  <SelectTrigger className="w-full md:w-28 h-10 md:h-8 text-sm md:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -608,15 +607,15 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Project analytics</h2>
-              <p className="text-[10px] text-muted-foreground">View usage and request statistics.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">View usage and request statistics.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Analytics</p>
-                  <p className="text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
+                  <p className="text-sm md:text-xs font-medium">Analytics</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                <Button variant="outline" size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs" asChild>
                   <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`}>
                     View
                   </Link>
@@ -629,23 +628,23 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section className="space-y-3">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Delete Project</h2>
-              <p className="text-[10px] text-muted-foreground">Permanently remove your project and its data.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Permanently remove your project and its data.</p>
             </div>
             <div className="rounded-lg border border-red-500/30 bg-red-500/5 overflow-hidden">
               <div className="px-4 py-3">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
-                  <div className="space-y-2 flex-1">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-5 w-5 md:h-4 md:w-4 text-red-500 mt-0.5 shrink-0" />
+                  <div className="space-y-2.5 md:space-y-2 flex-1">
                     <div className="space-y-0.5">
-                      <p className="text-xs font-medium">Deleting this project will remove all data.</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-sm md:text-xs font-medium">Deleting this project will remove all data.</p>
+                      <p className="text-xs md:text-[10px] text-muted-foreground">
                         This includes API keys, logs, and analytics. This action cannot be undone.
                       </p>
                     </div>
                     <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                       <DialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="h-7 text-xs gap-1.5">
-                          <Trash2 className="h-3 w-3" />
+                        <Button variant="destructive" size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs gap-1.5">
+                          <Trash2 className="h-4 w-4 md:h-3 md:w-3" />
                           Delete project
                         </Button>
                       </DialogTrigger>
@@ -1057,16 +1056,16 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Default Provider</h2>
-              <p className="text-xs text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Default provider</p>
-                  <p className="text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
+                  <p className="text-sm md:text-xs font-medium">Default provider</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
                 </div>
                 <Select value={defaultProvider} onValueChange={(v) => { setDefaultProvider(v); setProviderSettingsDirty(true); }}>
-                  <SelectTrigger className="w-48 h-8 text-xs">
+                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
@@ -1078,13 +1077,13 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Default model</p>
-                  <p className="text-[10px] text-muted-foreground">Fallback model when not specified.</p>
+                  <p className="text-sm md:text-xs font-medium">Default model</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Fallback model when not specified.</p>
                 </div>
                 <Select value={defaultModel} onValueChange={(v) => { setDefaultModel(v); setProviderSettingsDirty(true); }}>
-                  <SelectTrigger className="w-56 h-8 text-xs">
+                  <SelectTrigger className="w-full md:w-56 h-10 md:h-8 text-sm md:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
@@ -1103,40 +1102,40 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Rate Limiting</h2>
-              <p className="text-xs text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Requests per minute</p>
-                  <p className="text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
+                  <p className="text-sm md:text-xs font-medium">Requests per minute</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
                 </div>
                 <Input
                   value={requestsPerMinute}
                   onChange={(e) => { setRequestsPerMinute(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-24 h-8 text-xs text-right"
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
                 />
               </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Tokens per day</p>
-                  <p className="text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
+                  <p className="text-sm md:text-xs font-medium">Tokens per day</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
                 </div>
                 <Input
                   value={tokensPerDay}
                   onChange={(e) => { setTokensPerDay(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-24 h-8 text-xs text-right"
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
                 />
               </div>
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Concurrent requests</p>
-                  <p className="text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
+                  <p className="text-sm md:text-xs font-medium">Concurrent requests</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
                 </div>
                 <Input
                   value={concurrentRequests}
                   onChange={(e) => { setConcurrentRequests(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-24 h-8 text-xs text-right"
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
                 />
               </div>
             </div>
@@ -1146,26 +1145,27 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           < section className="space-y-3" >
             <div>
               <h2 className="text-sm font-medium">Fallback Configuration</h2>
-              <p className="text-xs text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Enable automatic fallback</p>
-                  <p className="text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
+                  <p className="text-sm md:text-xs font-medium">Enable automatic fallback</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
                 </div>
                 <Checkbox
                   checked={enableFallback}
                   onCheckedChange={(checked) => { setEnableFallback(!!checked); setProviderSettingsDirty(true); }}
+                  className="h-5 w-5 md:h-4 md:w-4"
                 />
               </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Fallback provider</p>
-                  <p className="text-[10px] text-muted-foreground">Used when primary fails.</p>
+                  <p className="text-sm md:text-xs font-medium">Fallback provider</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when primary fails.</p>
                 </div>
                 <Select value={fallbackProvider} onValueChange={(v) => { setFallbackProvider(v); setProviderSettingsDirty(true); }} disabled={!enableFallback}>
-                  <SelectTrigger className="w-48 h-8 text-xs">
+                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
@@ -1177,15 +1177,15 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-medium">Max retries before fallback</p>
-                  <p className="text-[10px] text-muted-foreground">Attempts before switching provider.</p>
+                  <p className="text-sm md:text-xs font-medium">Max retries before fallback</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Attempts before switching provider.</p>
                 </div>
                 <Input
                   value={maxRetriesBeforeFallback}
                   onChange={(e) => { setMaxRetriesBeforeFallback(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-24 h-8 text-xs text-right"
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
                   disabled={!enableFallback}
                 />
               </div>
