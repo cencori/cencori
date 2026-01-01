@@ -166,6 +166,59 @@ bg-muted/30         // Very subtle
 </div>
 ```
 
+### Tabs (Mobile-Responsive)
+```tsx
+// TabsTrigger must have whitespace-nowrap to prevent text wrapping on mobile
+// Component: components/ui/tabs.tsx
+<TabsTrigger
+  className={cn(
+    "px-3 md:px-4 py-3 text-xs md:text-sm font-medium",
+    "whitespace-nowrap shrink-0",  // Critical for mobile!
+    "text-muted-foreground hover:text-foreground",
+    "data-[state=active]:text-foreground"
+  )}
+>
+
+// TabsList should scroll horizontally on mobile
+<TabsList className="flex w-full flex-nowrap overflow-x-auto">
+```
+
+### Settings Form Rows (Mobile-Responsive)
+```tsx
+// Stacks vertically on mobile, horizontal on desktop
+<div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+  <div className="space-y-0.5">
+    <p className="text-sm md:text-xs font-medium">Label</p>
+    <p className="text-xs md:text-[10px] text-muted-foreground">Description</p>
+  </div>
+  <Input className="w-full md:w-64 h-10 md:h-8 text-sm md:text-xs" />
+</div>
+
+// For badges/read-only values
+<div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+  <div className="space-y-0.5">
+    <p className="text-sm md:text-xs font-medium">Project ID</p>
+    <p className="text-xs md:text-[10px] text-muted-foreground">Reference used in APIs.</p>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="px-3 py-1.5 md:py-1 bg-muted/50 rounded-md font-mono text-sm md:text-xs">
+      {value}
+    </span>
+    <Button variant="outline" size="sm" className="h-8 md:h-7 text-xs gap-1.5">
+      <Copy className="h-3 w-3" />
+      Copy
+    </Button>
+  </div>
+</div>
+
+// Save button row
+<div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+  <Button size="sm" className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs">
+    Save changes
+  </Button>
+</div>
+```
+
 ---
 
 ## Page Layouts
