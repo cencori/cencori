@@ -32,6 +32,14 @@ function CodeBlock({ code, language = "tsx" }: { code: string; language?: string
 }
 
 export default function ComponentsPage() {
+    const [activeTab, setActiveTab] = useState("general");
+    const demoTabs = [
+        { id: "general", label: "General", content: "General settings content" },
+        { id: "providers", label: "Providers", content: "Providers configuration" },
+        { id: "api-keys", label: "API Keys", content: "API key management" },
+        { id: "danger", label: "Danger", content: "Danger zone - destructive actions", isDanger: true },
+    ];
+
     return (
         <div className="space-y-12">
             {/* Header */}
@@ -145,9 +153,53 @@ export default function ComponentsPage() {
 </div>`} />
             </section>
 
-            {/* Form Rows */}
+            {/* Tabs */}
+            <section className="space-y-4">
+                <h2 className="text-lg font-semibold">Tabs</h2>
+                <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                        Tabs must use <code className="text-foreground bg-muted px-1 py-0.5 rounded">whitespace-nowrap</code> to prevent text like &quot;API Keys&quot; from wrapping on mobile.
+                    </p>
+                    <div className="border border-border/40 rounded-lg overflow-hidden">
+                        <div className="flex w-full flex-nowrap overflow-x-auto border-b border-border">
+                            {demoTabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-3 md:px-4 py-3 text-xs md:text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${activeTab === tab.id
+                                            ? tab.isDanger
+                                                ? "text-red-500 border-b-2 border-red-500"
+                                                : "text-foreground border-b-2 border-foreground"
+                                            : tab.isDanger
+                                                ? "text-red-500/60 hover:text-red-500"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="p-4 text-xs text-muted-foreground">
+                            {demoTabs.find((t) => t.id === activeTab)?.content}
+                        </div>
+                    </div>
+                </div>
+                <CodeBlock code={`// TabsTrigger - whitespace-nowrap is critical!
+<TabsTrigger className={cn(
+  "px-3 md:px-4 py-3 text-xs md:text-sm font-medium",
+  "whitespace-nowrap shrink-0",  // Prevents wrapping
+  "text-muted-foreground hover:text-foreground",
+  "data-[state=active]:text-foreground"
+)}>
+
+// TabsList - enables horizontal scroll on mobile
+<TabsList className="flex w-full flex-nowrap overflow-x-auto">`} />
+            </section>
+
+            {/* Form Rows - Desktop */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Form Rows</h2>
+                <p className="text-xs text-muted-foreground">Desktop-only horizontal layout.</p>
                 <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
                         <div className="space-y-0.5">
@@ -170,6 +222,59 @@ export default function ComponentsPage() {
     <p className="text-[10px] text-muted-foreground">Description</p>
   </div>
   <Input className="w-48 h-8 text-sm" />
+</div>`} />
+            </section>
+
+            {/* Settings Form Rows - Mobile Responsive */}
+            <section className="space-y-4">
+                <h2 className="text-lg font-semibold">Settings Form Rows (Mobile-Responsive)</h2>
+                <p className="text-xs text-muted-foreground">Stacks vertically on mobile, horizontal on desktop.</p>
+                <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
+                    {/* Input row */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                        <div className="space-y-0.5">
+                            <p className="text-sm md:text-xs font-medium">Project name</p>
+                            <p className="text-xs md:text-[10px] text-muted-foreground">Displayed throughout the dashboard.</p>
+                        </div>
+                        <Input defaultValue="My Project" className="w-full md:w-64 h-10 md:h-8 text-sm md:text-xs" />
+                    </div>
+                    {/* Badge row */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                        <div className="space-y-0.5">
+                            <p className="text-sm md:text-xs font-medium">Project ID</p>
+                            <p className="text-xs md:text-[10px] text-muted-foreground">Reference used in APIs.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1.5 md:py-1 bg-muted/50 rounded-md font-mono text-sm md:text-xs text-muted-foreground">
+                                my-project-id
+                            </span>
+                            <Button variant="outline" size="sm" className="h-8 md:h-7 text-xs gap-1.5">
+                                <Copy className="h-3 w-3" />
+                                Copy
+                            </Button>
+                        </div>
+                    </div>
+                    {/* Save button row */}
+                    <div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+                        <Button size="sm" className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs">
+                            Save changes
+                        </Button>
+                    </div>
+                </div>
+                <CodeBlock code={`// Stacks on mobile, horizontal on desktop
+<div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+  <div className="space-y-0.5">
+    <p className="text-sm md:text-xs font-medium">Label</p>
+    <p className="text-xs md:text-[10px] text-muted-foreground">Description</p>
+  </div>
+  <Input className="w-full md:w-64 h-10 md:h-8 text-sm md:text-xs" />
+</div>
+
+// Save button row
+<div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+  <Button size="sm" className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs">
+    Save changes
+  </Button>
 </div>`} />
             </section>
 
