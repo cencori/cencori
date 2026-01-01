@@ -166,10 +166,19 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const openAddDialog = (provider: AIProviderConfig) => {
         setSelectedProvider(provider);
         const models = getModelsForProvider(provider.id);
-        if (models.length > 0) setSelectedModel(models[0].id);
 
         // Check if provider already has a key
         const existingKey = data?.providers.find(p => p.provider === provider.id);
+
+        // If this provider is the default AND has a saved default model, use it
+        // Otherwise, use the first model in the list
+        if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.model) {
+            // Use the saved default model from the project settings
+            setSelectedModel(data.defaults.model);
+        } else if (models.length > 0) {
+            setSelectedModel(models[0].id);
+        }
+
         if (existingKey?.hasKey) {
             setExistingKeyHint(existingKey.keyHint || '***');
             setIsProviderActive(existingKey.isActive);

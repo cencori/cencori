@@ -175,14 +175,11 @@ export async function GET(
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
                 firstRequestDate = new Date(sortedByDate[0].created_at);
-                console.log('[AI Stats] First request date:', sortedByDate[0].created_at);
-                console.log('[AI Stats] RequestsByTime keys:', Object.keys(requestsByTime || {}));
             }
 
             // Get today's UTC date
             const now = new Date();
             const todayUTC = now.toISOString().split('T')[0];
-            console.log('[AI Stats] Today UTC:', todayUTC, 'Server time:', now.toISOString());
 
             if (firstRequestDate) {
                 // Start 2 days before first request
@@ -226,8 +223,6 @@ export async function GET(
                         tokens: existing?.tokens || 0,
                     });
                 }
-
-                console.log('[AI Stats] Chart data dates:', chartData.map(c => c.date));
             }
         }
 

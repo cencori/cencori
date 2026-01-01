@@ -20,15 +20,16 @@ export class AnthropicProvider extends AIProvider {
     readonly providerName = 'anthropic';
     private client: Anthropic;
 
-    constructor() {
+    constructor(apiKey?: string) {
         super();
 
-        if (!process.env.ANTHROPIC_API_KEY) {
-            throw new Error('ANTHROPIC_API_KEY is not configured');
+        const key = apiKey || process.env.ANTHROPIC_API_KEY;
+        if (!key) {
+            throw new Error('Anthropic API key is required - either pass it or set ANTHROPIC_API_KEY env var');
         }
 
         this.client = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY
+            apiKey: key
         });
     }
 
