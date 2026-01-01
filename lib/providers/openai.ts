@@ -20,15 +20,16 @@ export class OpenAIProvider extends AIProvider {
     readonly providerName = 'openai';
     private client: OpenAI;
 
-    constructor() {
+    constructor(apiKey?: string) {
         super();
 
-        if (!process.env.OPENAI_API_KEY) {
-            throw new Error('OPENAI_API_KEY is not configured');
+        const key = apiKey || process.env.OPENAI_API_KEY;
+        if (!key) {
+            throw new Error('OpenAI API key is required - either pass it or set OPENAI_API_KEY env var');
         }
 
         this.client = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY
+            apiKey: key
         });
     }
 

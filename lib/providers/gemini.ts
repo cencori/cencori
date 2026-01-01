@@ -20,14 +20,15 @@ export class GeminiProvider extends AIProvider {
     readonly providerName = 'google';
     private client: GoogleGenerativeAI;
 
-    constructor() {
+    constructor(apiKey?: string) {
         super();
 
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY is not configured');
+        const key = apiKey || process.env.GEMINI_API_KEY;
+        if (!key) {
+            throw new Error('Gemini API key is required - either pass it or set GEMINI_API_KEY env var');
         }
 
-        this.client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        this.client = new GoogleGenerativeAI(key);
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
