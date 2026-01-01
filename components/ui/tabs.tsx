@@ -30,7 +30,7 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     disabled={disabled}
     className={cn(
-      "group relative px-4 py-3 text-sm font-medium text-muted-foreground transition-colors",
+      "group relative px-3 md:px-4 py-3 text-xs md:text-sm font-medium text-muted-foreground transition-colors whitespace-nowrap shrink-0",
       "hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=active]:text-foreground",
       className
