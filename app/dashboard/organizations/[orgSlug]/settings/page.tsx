@@ -203,43 +203,51 @@ export default function OrganizationSettingsPage({
         <p className="text-xs text-muted-foreground mt-0.5">Manage your organization</p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="h-8">
-          <TabsTrigger value="general" className="text-xs h-7 px-3">General</TabsTrigger>
-          <TabsTrigger value="projects" className="text-xs h-7 px-3">Projects</TabsTrigger>
-          <TabsTrigger value="members" className="text-xs h-7 px-3">Members</TabsTrigger>
-          <TabsTrigger value="api-keys" className="text-xs h-7 px-3">API Keys</TabsTrigger>
-          <TabsTrigger value="danger" className="text-xs h-7 px-3 text-red-500 data-[state=active]:text-red-500">Danger</TabsTrigger>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
+          <TabsTrigger value="danger" className="text-red-500 data-[state=active]:text-red-500">Danger</TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
-        <TabsContent value="general">
-          <div className="rounded-md border border-border/40 bg-card p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-medium mb-0.5">Organization Information</h3>
-              <p className="text-[10px] text-muted-foreground">Update your organization&apos;s name and description</p>
+        <TabsContent value="general" className="space-y-6">
+          {/* Organization Information */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Organization Information</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Update your organization&apos;s name and description</p>
             </div>
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="org-name" className="text-xs">Name</Label>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              {/* Name */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Name</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Displayed throughout the dashboard.</p>
+                </div>
                 <Input
-                  id="org-name"
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
                   placeholder="Organization name"
-                  className="h-8 text-xs"
+                  className="w-full md:w-64 h-10 md:h-8 text-sm md:text-xs"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="org-slug" className="text-xs">Slug</Label>
-                <div className="flex gap-2">
-                  <Input id="org-slug" value={organization.slug} disabled className="h-8 text-xs bg-muted font-mono" />
+              {/* Slug */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Slug</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Cannot be changed after creation.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 md:py-1 bg-muted/50 rounded-md font-mono text-sm md:text-xs text-muted-foreground">
+                    {organization.slug}
+                  </span>
                   <Button
                     variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
+                    size="sm"
+                    className="h-8 md:h-7 text-xs gap-1.5"
                     onClick={() => {
                       navigator.clipboard.writeText(organization.slug);
                       setSlugCopied(true);
@@ -248,41 +256,44 @@ export default function OrganizationSettingsPage({
                     }}
                   >
                     {slugCopied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    Copy
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Cannot be changed after creation</p>
               </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="org-description" className="text-xs">Description</Label>
+              {/* Description */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Description</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">A brief description of your organization.</p>
+                </div>
                 <Input
-                  id="org-description"
                   value={orgDescription}
                   onChange={(e) => setOrgDescription(e.target.value)}
                   placeholder="Organization description"
-                  className="h-8 text-xs"
+                  className="w-full md:w-64 h-10 md:h-8 text-sm md:text-xs"
                 />
               </div>
-
-              <div className="space-y-1.5 pt-2">
-                <Label className="text-xs">Plan</Label>
-                <div>
-                  <Badge variant="outline" className="text-[10px] h-5">
-                    {organization.organization_plans?.[0]?.name
-                      ? organization.organization_plans[0].name.charAt(0).toUpperCase() +
-                      organization.organization_plans[0].name.slice(1)
-                      : "Free"}
-                  </Badge>
+              {/* Plan */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Plan</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Your current subscription tier.</p>
                 </div>
+                <Badge variant="outline" className="text-xs md:text-[10px] h-7 md:h-5 w-fit">
+                  {organization.organization_plans?.[0]?.name
+                    ? organization.organization_plans[0].name.charAt(0).toUpperCase() +
+                    organization.organization_plans[0].name.slice(1)
+                    : "Free"}
+                </Badge>
+              </div>
+              {/* Save Button Row */}
+              <div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+                <Button size="sm" className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs" onClick={handleSaveOrganization} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save changes"}
+                </Button>
               </div>
             </div>
-
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveOrganization} disabled={isSaving} size="sm" className="h-7 text-xs">
-                {isSaving ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </div>
+          </section>
         </TabsContent>
 
         {/* PROJECTS TAB */}
@@ -344,65 +355,82 @@ export default function OrganizationSettingsPage({
         </TabsContent>
 
         {/* MEMBERS TAB */}
-        <TabsContent value="members">
-          <div className="rounded-md border border-border/40 bg-card p-4">
-            <div className="text-center py-12 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium mb-1">Team Management Coming Soon</p>
-              <p className="text-xs text-muted-foreground">
-                Invite team members and assign roles
-              </p>
+        <TabsContent value="members" className="space-y-6">
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Team Members</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Invite and manage team members.</p>
             </div>
-          </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="text-center py-12 md:py-10 flex flex-col items-center px-4">
+                <div className="w-12 h-12 md:w-10 md:h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                  <Users className="h-6 w-6 md:h-5 md:w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium mb-1">Team Management Coming Soon</p>
+                <p className="text-xs text-muted-foreground">
+                  Invite team members and assign roles
+                </p>
+              </div>
+            </div>
+          </section>
         </TabsContent>
 
         {/* API KEYS TAB */}
-        <TabsContent value="api-keys">
-          <div className="rounded-md border border-border/40 bg-card p-4">
-            <div className="text-center py-12 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                <Key className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium mb-1">API Key Management Coming Soon</p>
-              <p className="text-xs text-muted-foreground">
-                Generate and manage API keys
-              </p>
+        <TabsContent value="api-keys" className="space-y-6">
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">API Keys</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Generate and manage organization-level API keys.</p>
             </div>
-          </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="text-center py-12 md:py-10 flex flex-col items-center px-4">
+                <div className="w-12 h-12 md:w-10 md:h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                  <Key className="h-6 w-6 md:h-5 md:w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium mb-1">API Key Management Coming Soon</p>
+                <p className="text-xs text-muted-foreground">
+                  Generate and manage API keys
+                </p>
+              </div>
+            </div>
+          </section>
         </TabsContent>
 
         {/* DANGER ZONE TAB */}
-        <TabsContent value="danger">
-          <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <h3 className="text-xs font-medium text-red-500">Danger Zone</h3>
+        <TabsContent value="danger" className="space-y-6">
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Delete Organization</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Permanently remove your organization and its data.</p>
             </div>
-            <p className="text-[10px] text-muted-foreground mb-4">
-              Irreversible and destructive actions
-            </p>
-
-            <div className="rounded-md border border-red-500/20 bg-red-500/5 p-4">
-              <h4 className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Delete Organization</h4>
-              <p className="text-[10px] text-muted-foreground mb-3">
-                Permanently delete this organization and all associated projects.
-              </p>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => {
-                  setConfirmDeleteText("");
-                  setIsDeleteOrgDialogOpen(true);
-                }}
-              >
-                <Trash2 className="h-3 w-3 mr-1.5" />
-                Delete Organization
-              </Button>
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 overflow-hidden">
+              <div className="px-4 py-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-5 w-5 md:h-4 md:w-4 text-red-500 mt-0.5 shrink-0" />
+                  <div className="space-y-2.5 md:space-y-2 flex-1">
+                    <div className="space-y-0.5">
+                      <p className="text-sm md:text-xs font-medium">Deleting this organization will remove all data.</p>
+                      <p className="text-xs md:text-[10px] text-muted-foreground">
+                        This includes all projects, API keys, logs, and analytics. This action cannot be undone.
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs gap-1.5"
+                      onClick={() => {
+                        setConfirmDeleteText("");
+                        setIsDeleteOrgDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 md:h-3 md:w-3" />
+                      Delete Organization
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
         </TabsContent>
       </Tabs>
 
