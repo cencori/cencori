@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "@cencori/ai-provider",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Cencori provider for Vercel AI SDK - use Cencori with streamText, generateText, and useChat",
     "main": "dist/index.js",
     "module": "dist/index.mjs",

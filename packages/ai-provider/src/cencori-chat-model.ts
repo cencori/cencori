@@ -70,37 +70,37 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
     private convertMessages(options: LanguageModelV3CallOptions): CencoriMessage[] {
         const messages: CencoriMessage[] = [];
 
-        // Handle prompt
-        if (options.prompt && typeof options.prompt === 'object' && 'system' in options.prompt && options.prompt.system) {
-            messages.push({ role: 'system', content: options.prompt.system as string });
+        // In V3, options.prompt is directly an array of LanguageModelV3Message
+        const promptMessages = options.prompt;
+
+        if (!promptMessages || !Array.isArray(promptMessages)) {
+            return messages;
         }
 
-        // Convert AI SDK messages to Cencori format
-        if (options.prompt && typeof options.prompt === 'object' && 'messages' in options.prompt) {
-            const promptMessages = options.prompt.messages as Array<{
-                role: string;
-                content: unknown;
-            }>;
+        for (const msg of promptMessages) {
+            let content = '';
 
-            for (const msg of promptMessages) {
-                let content = '';
-
-                if (typeof msg.content === 'string') {
-                    content = msg.content;
-                } else if (Array.isArray(msg.content)) {
-                    // Handle multipart messages (text + images)
-                    content = msg.content
+            if (msg.role === 'system') {
+                // System messages have content as string directly
+                content = msg.content as string;
+            } else if (msg.role === 'user' || msg.role === 'assistant') {
+                // User and assistant messages have content as array of parts
+                const msgContent = msg.content;
+                if (Array.isArray(msgContent)) {
+                    content = msgContent
                         .filter((part: { type: string }) => part.type === 'text')
                         .map((part: { type: string; text?: string }) => part.text || '')
                         .join('');
+                } else if (typeof msgContent === 'string') {
+                    content = msgContent;
                 }
+            }
 
-                if (content) {
-                    messages.push({
-                        role: msg.role as 'system' | 'user' | 'assistant',
-                        content,
-                    });
-                }
+            if (content && (msg.role === 'system' || msg.role === 'user' || msg.role === 'assistant')) {
+                messages.push({
+                    role: msg.role as 'system' | 'user' | 'assistant',
+                    content,
+                });
             }
         }
 
