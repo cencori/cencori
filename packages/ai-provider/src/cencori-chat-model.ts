@@ -1,17 +1,19 @@
 /**
  * Cencori Chat Language Model
  * 
- * Implements the Vercel AI SDK's LanguageModelV2 interface
+ * Implements the Vercel AI SDK's LanguageModelV3 interface (AI SDK v6 compatible)
  */
 
 import type {
-    LanguageModelV2,
-    LanguageModelV2CallOptions,
-    LanguageModelV2CallWarning,
-    LanguageModelV2FinishReason,
-    LanguageModelV2StreamPart,
-    LanguageModelV2Content,
-    LanguageModelV2Usage,
+    LanguageModelV3,
+    LanguageModelV3CallOptions,
+    LanguageModelV3GenerateResult,
+    LanguageModelV3StreamResult,
+    LanguageModelV3StreamPart,
+    LanguageModelV3Content,
+    LanguageModelV3Usage,
+    LanguageModelV3FinishReason,
+    SharedV3Warning,
 } from '@ai-sdk/provider';
 
 export interface CencoriChatModelSettings {
@@ -44,14 +46,12 @@ interface CencoriStreamChunk {
     finish_reason?: string;
 }
 
-export class CencoriChatLanguageModel implements LanguageModelV2 {
-    readonly specificationVersion = 'v2' as const;
+export class CencoriChatLanguageModel implements LanguageModelV3 {
+    readonly specificationVersion = 'v3' as const;
     readonly provider = 'cencori';
-    readonly defaultObjectGenerationMode = 'json' as const;
-    readonly supportsImageUrls = false;
-    readonly supportedUrls: Record<string, RegExp[]> = {};
 
     readonly modelId: string;
+    readonly supportedUrls: Record<string, RegExp[]> = {};
     private readonly settings: CencoriChatModelSettings;
 
     constructor(modelId: string, settings: CencoriChatModelSettings) {
@@ -67,10 +67,10 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
         };
     }
 
-    private convertMessages(options: LanguageModelV2CallOptions): CencoriMessage[] {
+    private convertMessages(options: LanguageModelV3CallOptions): CencoriMessage[] {
         const messages: CencoriMessage[] = [];
 
-        // Handle system prompt
+        // Handle prompt
         if (options.prompt && typeof options.prompt === 'object' && 'system' in options.prompt && options.prompt.system) {
             messages.push({ role: 'system', content: options.prompt.system as string });
         }
@@ -107,32 +107,52 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
         return messages;
     }
 
-    private mapFinishReason(reason?: string): LanguageModelV2FinishReason {
+    private mapFinishReason(reason?: string): LanguageModelV3FinishReason {
+        let unified: 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other';
+
         switch (reason) {
             case 'stop':
             case 'end_turn':
-                return 'stop';
+                unified = 'stop';
+                break;
             case 'length':
             case 'max_tokens':
-                return 'length';
+                unified = 'length';
+                break;
             case 'content_filter':
-                return 'content-filter';
+                unified = 'content-filter';
+                break;
             case 'tool_calls':
             case 'tool-calls':
-                return 'tool-calls';
+                unified = 'tool-calls';
+                break;
+            case 'error':
+                unified = 'error';
+                break;
             default:
-                return 'stop';
+                unified = 'stop';
         }
+
+        return { unified, raw: reason };
     }
 
-    async doGenerate(options: LanguageModelV2CallOptions): Promise<{
-        content: LanguageModelV2Content[];
-        finishReason: LanguageModelV2FinishReason;
-        usage: LanguageModelV2Usage;
-        rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> };
-        rawResponse?: { headers?: Record<string, string> };
-        warnings: LanguageModelV2CallWarning[];
-    }> {
+    private buildUsage(inputTokens: number, outputTokens: number): LanguageModelV3Usage {
+        return {
+            inputTokens: {
+                total: inputTokens,
+                noCache: inputTokens,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+            },
+            outputTokens: {
+                total: outputTokens,
+                text: outputTokens,
+                reasoning: undefined,
+            },
+        };
+    }
+
+    async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
         const messages = this.convertMessages(options);
 
         const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
@@ -156,38 +176,25 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
 
         const data = await response.json() as CencoriResponse;
 
-        const content: LanguageModelV2Content[] = [{
+        const content: LanguageModelV3Content[] = [{
             type: 'text',
             text: data.content,
+            providerMetadata: undefined,
         }];
+
+        const warnings: SharedV3Warning[] = [];
 
         return {
             content,
             finishReason: this.mapFinishReason(data.finish_reason),
-            usage: {
-                inputTokens: data.usage.prompt_tokens,
-                outputTokens: data.usage.completion_tokens,
-                totalTokens: data.usage.total_tokens,
-            },
-            rawCall: {
-                rawPrompt: messages,
-                rawSettings: {
-                    model: this.modelId,
-                    temperature: options.temperature,
-                    maxOutputTokens: options.maxOutputTokens,
-                },
-            },
-            warnings: [],
+            usage: this.buildUsage(data.usage.prompt_tokens, data.usage.completion_tokens),
+            warnings,
         };
     }
 
-    async doStream(options: LanguageModelV2CallOptions): Promise<{
-        stream: ReadableStream<LanguageModelV2StreamPart>;
-        rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> };
-        rawResponse?: { headers?: Record<string, string> };
-        warnings: LanguageModelV2CallWarning[];
-    }> {
+    async doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult> {
         const messages = this.convertMessages(options);
+        const self = this;
 
         const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
             method: 'POST',
@@ -217,19 +224,26 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
         let buffer = '';
         let inputTokens = 0;
         let outputTokens = 0;
-        let textPartId = 'text-0';
+        const textPartId = 'text-0';
+        let started = false;
 
-        const stream = new ReadableStream<LanguageModelV2StreamPart>({
+        const stream = new ReadableStream<LanguageModelV3StreamPart>({
             async pull(controller) {
                 try {
                     const { done, value } = await reader.read();
 
                     if (done) {
-                        // Send final usage and finish
+                        // End text block and finish
+                        if (started) {
+                            controller.enqueue({
+                                type: 'text-end',
+                                id: textPartId,
+                            });
+                        }
                         controller.enqueue({
                             type: 'finish',
-                            finishReason: 'stop',
-                            usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+                            finishReason: self.mapFinishReason('stop'),
+                            usage: self.buildUsage(inputTokens, outputTokens),
                         });
                         controller.close();
                         return;
@@ -245,10 +259,16 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
 
                         const data = line.slice(6);
                         if (data === '[DONE]') {
+                            if (started) {
+                                controller.enqueue({
+                                    type: 'text-end',
+                                    id: textPartId,
+                                });
+                            }
                             controller.enqueue({
                                 type: 'finish',
-                                finishReason: 'stop',
-                                usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+                                finishReason: self.mapFinishReason('stop'),
+                                usage: self.buildUsage(inputTokens, outputTokens),
                             });
                             controller.close();
                             return;
@@ -258,6 +278,15 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
                             const chunk = JSON.parse(data) as CencoriStreamChunk;
 
                             if (chunk.delta) {
+                                // Start text if not started
+                                if (!started) {
+                                    started = true;
+                                    controller.enqueue({
+                                        type: 'text-start',
+                                        id: textPartId,
+                                    });
+                                }
+
                                 outputTokens += Math.ceil(chunk.delta.length / 4); // Rough estimate
                                 controller.enqueue({
                                     type: 'text-delta',
@@ -267,10 +296,16 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
                             }
 
                             if (chunk.finish_reason) {
+                                if (started) {
+                                    controller.enqueue({
+                                        type: 'text-end',
+                                        id: textPartId,
+                                    });
+                                }
                                 controller.enqueue({
                                     type: 'finish',
-                                    finishReason: 'stop',
-                                    usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+                                    finishReason: self.mapFinishReason(chunk.finish_reason),
+                                    usage: self.buildUsage(inputTokens, outputTokens),
                                 });
                                 controller.close();
                                 return;
@@ -290,15 +325,6 @@ export class CencoriChatLanguageModel implements LanguageModelV2 {
 
         return {
             stream,
-            rawCall: {
-                rawPrompt: messages,
-                rawSettings: {
-                    model: this.modelId,
-                    temperature: options.temperature,
-                    maxOutputTokens: options.maxOutputTokens,
-                },
-            },
-            warnings: [],
         };
     }
 }

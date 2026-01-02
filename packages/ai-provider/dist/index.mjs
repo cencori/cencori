@@ -1,10 +1,8 @@
 // src/cencori-chat-model.ts
 var CencoriChatLanguageModel = class {
   constructor(modelId, settings) {
-    this.specificationVersion = "v2";
+    this.specificationVersion = "v3";
     this.provider = "cencori";
-    this.defaultObjectGenerationMode = "json";
-    this.supportsImageUrls = false;
     this.supportedUrls = {};
     this.modelId = modelId;
     this.settings = settings;
@@ -41,21 +39,45 @@ var CencoriChatLanguageModel = class {
     return messages;
   }
   mapFinishReason(reason) {
+    let unified;
     switch (reason) {
       case "stop":
       case "end_turn":
-        return "stop";
+        unified = "stop";
+        break;
       case "length":
       case "max_tokens":
-        return "length";
+        unified = "length";
+        break;
       case "content_filter":
-        return "content-filter";
+        unified = "content-filter";
+        break;
       case "tool_calls":
       case "tool-calls":
-        return "tool-calls";
+        unified = "tool-calls";
+        break;
+      case "error":
+        unified = "error";
+        break;
       default:
-        return "stop";
+        unified = "stop";
     }
+    return { unified, raw: reason };
+  }
+  buildUsage(inputTokens, outputTokens) {
+    return {
+      inputTokens: {
+        total: inputTokens,
+        noCache: inputTokens,
+        cacheRead: void 0,
+        cacheWrite: void 0
+      },
+      outputTokens: {
+        total: outputTokens,
+        text: outputTokens,
+        reasoning: void 0
+      }
+    };
   }
   async doGenerate(options) {
     const messages = this.convertMessages(options);
@@ -79,29 +101,20 @@ var CencoriChatLanguageModel = class {
     const data = await response.json();
     const content = [{
       type: "text",
-      text: data.content
+      text: data.content,
+      providerMetadata: void 0
     }];
+    const warnings = [];
     return {
       content,
       finishReason: this.mapFinishReason(data.finish_reason),
-      usage: {
-        inputTokens: data.usage.prompt_tokens,
-        outputTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens
-      },
-      rawCall: {
-        rawPrompt: messages,
-        rawSettings: {
-          model: this.modelId,
-          temperature: options.temperature,
-          maxOutputTokens: options.maxOutputTokens
-        }
-      },
-      warnings: []
+      usage: this.buildUsage(data.usage.prompt_tokens, data.usage.completion_tokens),
+      warnings
     };
   }
   async doStream(options) {
     const messages = this.convertMessages(options);
+    const self = this;
     const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
       method: "POST",
       headers: this.getHeaders(),
@@ -127,16 +140,23 @@ var CencoriChatLanguageModel = class {
     let buffer = "";
     let inputTokens = 0;
     let outputTokens = 0;
-    let textPartId = "text-0";
+    const textPartId = "text-0";
+    let started = false;
     const stream = new ReadableStream({
       async pull(controller) {
         try {
           const { done, value } = await reader.read();
           if (done) {
+            if (started) {
+              controller.enqueue({
+                type: "text-end",
+                id: textPartId
+              });
+            }
             controller.enqueue({
               type: "finish",
-              finishReason: "stop",
-              usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+              finishReason: self.mapFinishReason("stop"),
+              usage: self.buildUsage(inputTokens, outputTokens)
             });
             controller.close();
             return;
@@ -149,10 +169,16 @@ var CencoriChatLanguageModel = class {
             if (!line.startsWith("data: ")) continue;
             const data = line.slice(6);
             if (data === "[DONE]") {
+              if (started) {
+                controller.enqueue({
+                  type: "text-end",
+                  id: textPartId
+                });
+              }
               controller.enqueue({
                 type: "finish",
-                finishReason: "stop",
-                usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+                finishReason: self.mapFinishReason("stop"),
+                usage: self.buildUsage(inputTokens, outputTokens)
               });
               controller.close();
               return;
@@ -160,6 +186,13 @@ var CencoriChatLanguageModel = class {
             try {
               const chunk = JSON.parse(data);
               if (chunk.delta) {
+                if (!started) {
+                  started = true;
+                  controller.enqueue({
+                    type: "text-start",
+                    id: textPartId
+                  });
+                }
                 outputTokens += Math.ceil(chunk.delta.length / 4);
                 controller.enqueue({
                   type: "text-delta",
@@ -168,10 +201,16 @@ var CencoriChatLanguageModel = class {
                 });
               }
               if (chunk.finish_reason) {
+                if (started) {
+                  controller.enqueue({
+                    type: "text-end",
+                    id: textPartId
+                  });
+                }
                 controller.enqueue({
                   type: "finish",
-                  finishReason: "stop",
-                  usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+                  finishReason: self.mapFinishReason(chunk.finish_reason),
+                  usage: self.buildUsage(inputTokens, outputTokens)
                 });
                 controller.close();
                 return;
@@ -188,16 +227,7 @@ var CencoriChatLanguageModel = class {
       }
     });
     return {
-      stream,
-      rawCall: {
-        rawPrompt: messages,
-        rawSettings: {
-          model: this.modelId,
-          temperature: options.temperature,
-          maxOutputTokens: options.maxOutputTokens
-        }
-      },
-      warnings: []
+      stream
     };
   }
 };

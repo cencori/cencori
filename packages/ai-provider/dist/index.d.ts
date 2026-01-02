@@ -1,9 +1,9 @@
-import { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2Usage, LanguageModelV2CallWarning, LanguageModelV2StreamPart } from '@ai-sdk/provider';
+import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from '@ai-sdk/provider';
 
 /**
  * Cencori Chat Language Model
  *
- * Implements the Vercel AI SDK's LanguageModelV2 interface
+ * Implements the Vercel AI SDK's LanguageModelV3 interface (AI SDK v6 compatible)
  */
 
 interface CencoriChatModelSettings {
@@ -12,42 +12,19 @@ interface CencoriChatModelSettings {
     headers?: Record<string, string>;
     userId?: string;
 }
-declare class CencoriChatLanguageModel implements LanguageModelV2 {
-    readonly specificationVersion: "v2";
+declare class CencoriChatLanguageModel implements LanguageModelV3 {
+    readonly specificationVersion: "v3";
     readonly provider = "cencori";
-    readonly defaultObjectGenerationMode: "json";
-    readonly supportsImageUrls = false;
-    readonly supportedUrls: Record<string, RegExp[]>;
     readonly modelId: string;
+    readonly supportedUrls: Record<string, RegExp[]>;
     private readonly settings;
     constructor(modelId: string, settings: CencoriChatModelSettings);
     private getHeaders;
     private convertMessages;
     private mapFinishReason;
-    doGenerate(options: LanguageModelV2CallOptions): Promise<{
-        content: LanguageModelV2Content[];
-        finishReason: LanguageModelV2FinishReason;
-        usage: LanguageModelV2Usage;
-        rawCall: {
-            rawPrompt: unknown;
-            rawSettings: Record<string, unknown>;
-        };
-        rawResponse?: {
-            headers?: Record<string, string>;
-        };
-        warnings: LanguageModelV2CallWarning[];
-    }>;
-    doStream(options: LanguageModelV2CallOptions): Promise<{
-        stream: ReadableStream<LanguageModelV2StreamPart>;
-        rawCall: {
-            rawPrompt: unknown;
-            rawSettings: Record<string, unknown>;
-        };
-        rawResponse?: {
-            headers?: Record<string, string>;
-        };
-        warnings: LanguageModelV2CallWarning[];
-    }>;
+    private buildUsage;
+    doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult>;
+    doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult>;
 }
 
 /**
