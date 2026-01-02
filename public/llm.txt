@@ -293,6 +293,63 @@ await cencori.ai.chat({ model: "gemini-2.5-flash", messages });
 
 All responses have the same format regardless of provider!
 
+## Agent Frameworks
+
+Cencori works with any OpenAI-compatible agent framework. Just point your `base_url` to Cencori:
+
+### CrewAI
+
+```bash
+export OPENAI_API_KEY=your_cencori_api_key
+export OPENAI_API_BASE=https://api.cencori.com/v1
+```
+
+```python
+from crewai import Agent, Task, Crew
+
+researcher = Agent(role='Research Analyst', goal='Find insights')
+crew = Crew(agents=[researcher], tasks=[...])
+result = crew.kickoff()
+# Every LLM call logged in Cencori!
+```
+
+### AutoGen
+
+```python
+config_list = [{
+    "model": "gpt-4o",
+    "api_key": "your_cencori_api_key",
+    "base_url": "https://api.cencori.com/v1"
+}]
+
+assistant = AssistantAgent(name="assistant", llm_config={"config_list": config_list})
+```
+
+### LangChain
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+```
+
+### OpenAI SDK (Direct)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+```
+
+**Benefits:** Full observability, automatic failover, rate limiting, security scanning for all agent calls.
+
 ## Provider Failover
 
 Cencori automatically handles provider failures:

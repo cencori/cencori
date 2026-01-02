@@ -197,6 +197,17 @@ Two types of API keys for different use cases:
 
 Database-backed rate limiting prevents abuse and controls costs.
 
+### **Agent Framework Support**
+
+Cencori works with any OpenAI-compatible agent framework:
+
+- **CrewAI** - Set `OPENAI_API_BASE=https://api.cencori.com/v1`
+- **AutoGen** - Use `base_url` in config
+- **LangChain** - Pass `base_url` to ChatOpenAI
+- **OmniCoreAgent** - Configure in model_config
+
+One line change → full observability, failover, and security for all agent calls.
+
 ### **Complete Audit Logs**
 
 Every request is logged with:
