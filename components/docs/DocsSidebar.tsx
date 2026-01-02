@@ -37,6 +37,7 @@ const sidebarItems = [
             { title: "Credits System", href: "/docs/concepts/credits" },
             { title: "Rate Limiting", href: "/docs/concepts/rate-limiting" },
             { title: "Security", href: "/docs/concepts/security" },
+            { title: "Agent Frameworks", href: "/docs/concepts/agent-frameworks" },
         ],
     },
     {
