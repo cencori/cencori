@@ -208,6 +208,8 @@ Cencori works with any OpenAI-compatible agent framework:
 
 One line change → full observability, failover, and security for all agent calls.
 
+**Note:** Add your provider keys (OpenAI, Anthropic, etc.) in Cencori first—we route to providers using your keys.
+
 ### **Complete Audit Logs**
 
 Every request is logged with:

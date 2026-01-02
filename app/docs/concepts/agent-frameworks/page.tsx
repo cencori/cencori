@@ -53,7 +53,15 @@ export default function AgentFrameworksPage() {
 
                 <div className="mt-4 p-4 bg-muted/20 border border-border/40 rounded-lg">
                     <p className="text-xs text-muted-foreground">
-                        <strong>The Pattern:</strong> Set <code className="text-xs bg-muted px-1.5 py-0.5 rounded">base_url</code> to <code className="text-xs bg-muted px-1.5 py-0.5 rounded">https://api.cencori.com/v1</code> and use your Cencori API key. That&apos;s it.
+                        <strong>Prerequisites:</strong> Before using Cencori with agent frameworks, you must add your provider API keys (OpenAI, Anthropic, etc.) in your{" "}
+                        <Link href="/dashboard" className="text-primary hover:underline">Cencori project settings</Link>.
+                        Cencori routes requests to providers using your keys—we don&apos;t have our own models.
+                    </p>
+                </div>
+
+                <div className="mt-4 p-4 bg-muted/20 border border-border/40 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                        <strong>The Pattern:</strong> Set <code className="text-xs bg-muted px-1.5 py-0.5 rounded">base_url</code> to <code className="text-xs bg-muted px-1.5 py-0.5 rounded">https://api.cencori.com/v1</code> and use your Cencori API key. Cencori handles auth, logging, and security, then forwards to your configured provider.
                     </p>
                 </div>
             </div>
