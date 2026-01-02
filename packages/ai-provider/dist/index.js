@@ -44,24 +44,27 @@ var CencoriChatLanguageModel = class {
   }
   convertMessages(options) {
     const messages = [];
-    if (options.prompt && typeof options.prompt === "object" && "system" in options.prompt && options.prompt.system) {
-      messages.push({ role: "system", content: options.prompt.system });
+    const promptMessages = options.prompt;
+    if (!promptMessages || !Array.isArray(promptMessages)) {
+      return messages;
     }
-    if (options.prompt && typeof options.prompt === "object" && "messages" in options.prompt) {
-      const promptMessages = options.prompt.messages;
-      for (const msg of promptMessages) {
-        let content = "";
-        if (typeof msg.content === "string") {
-          content = msg.content;
-        } else if (Array.isArray(msg.content)) {
-          content = msg.content.filter((part) => part.type === "text").map((part) => part.text || "").join("");
+    for (const msg of promptMessages) {
+      let content = "";
+      if (msg.role === "system") {
+        content = msg.content;
+      } else if (msg.role === "user" || msg.role === "assistant") {
+        const msgContent = msg.content;
+        if (Array.isArray(msgContent)) {
+          content = msgContent.filter((part) => part.type === "text").map((part) => part.text || "").join("");
+        } else if (typeof msgContent === "string") {
+          content = msgContent;
         }
-        if (content) {
-          messages.push({
-            role: msg.role,
-            content
-          });
-        }
+      }
+      if (content && (msg.role === "system" || msg.role === "user" || msg.role === "assistant")) {
+        messages.push({
+          role: msg.role,
+          content
+        });
       }
     }
     return messages;
