@@ -31,6 +31,8 @@ Traditional observability tools don't understand LLMs. And LLM providers don't o
 
 Cencori exposes an OpenAI-compatible API. Every major agent framework already speaks this protocol—they just need a different `base_url`.
 
+> **Important:** Before using Cencori, add your provider API keys (OpenAI, Anthropic, etc.) in your [Cencori project settings](/dashboard). Cencori routes requests to providers using your keys—we don't have our own models.
+
 ```python
 # Before: Direct to OpenAI
 from openai import OpenAI

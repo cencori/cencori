@@ -297,6 +297,8 @@ All responses have the same format regardless of provider!
 
 Cencori works with any OpenAI-compatible agent framework. Just point your `base_url` to Cencori:
 
+**Prerequisite:** Add your provider API keys (OpenAI, Anthropic, Google) in your Cencori project settings first. Cencori routes requests to providers using your keys.
+
 ### CrewAI
 
 ```bash
