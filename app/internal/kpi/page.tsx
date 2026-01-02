@@ -49,6 +49,22 @@ export default async function InternalKPIDashboard() {
     const avgDailyRequests = Math.round((apiRequestsThisMonth || 0) / Math.max(1, now.getDate()));
     const uptime = 99.9; // Placeholder - integrate with monitoring
 
+    // Fetch manual KPI entries for this month
+    const periodMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const { data: kpiEntries } = await supabase
+        .from('kpi_entries')
+        .select('role_id, metric_key, metric_value')
+        .eq('period_month', periodMonth);
+
+    const getKPIValue = (roleId: string, metricKey: string): number => {
+        const entry = kpiEntries?.find((e: { role_id: string; metric_key: string }) => e.role_id === roleId && e.metric_key === metricKey);
+        return entry ? Number(entry.metric_value) : 0;
+    };
+
+    const contentPublished = getKPIValue('growth', 'content_published');
+    const criticalBugs = getKPIValue('engineering', 'critical_bugs');
+    const featuresShipped = getKPIValue('engineering', 'features_shipped');
+
     return (
         <div className="min-h-svh bg-background">
             {/* Header - Cenpact style */}
@@ -85,23 +101,29 @@ export default async function InternalKPIDashboard() {
 
                 {/* Growth + Product */}
                 <section className="space-y-3">
-                    <h2 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Growth + Product</h2>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Growth + Product</h2>
+                        <Link href="/internal/kpi/growth" className="text-[10px] text-primary hover:underline">Edit</Link>
+                    </div>
                     <div className="border border-border/40 rounded-lg divide-y divide-border/40 bg-card/50">
                         <KPIRow label="New Signups" value={signupsThisMonth || 0} suffix="this month" target={50} />
                         <KPIRow label="API Keys Created" value={activeApiKeys || 0} suffix="active" target={10} />
                         <KPIRow label="WAU (Weekly Active)" value={weeklyActiveUsers || 0} suffix="users" target={5} />
-                        <KPIRow label="Content Published" value={0} suffix="pieces" target={4} />
+                        <KPIRow label="Content Published" value={contentPublished} suffix="pieces" target={4} />
                     </div>
                 </section>
 
                 {/* Ops + Engineering */}
                 <section className="space-y-3">
-                    <h2 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Ops + Engineering</h2>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Ops + Engineering</h2>
+                        <Link href="/internal/kpi/engineering" className="text-[10px] text-primary hover:underline">Edit</Link>
+                    </div>
                     <div className="border border-border/40 rounded-lg divide-y divide-border/40 bg-card/50">
                         <KPIRow label="Uptime" value={`${uptime}%`} status={uptime >= 99.9 ? 'good' : 'warning'} />
                         <KPIRow label="P95 Latency" value="<500ms" status="good" />
-                        <KPIRow label="Critical Bugs" value={0} suffix="open" status="good" />
-                        <KPIRow label="Features Shipped" value={2} suffix="this month" target={2} />
+                        <KPIRow label="Critical Bugs" value={criticalBugs} suffix="open" status={criticalBugs === 0 ? 'good' : 'warning'} />
+                        <KPIRow label="Features Shipped" value={featuresShipped} suffix="this month" target={2} />
                     </div>
                 </section>
 
