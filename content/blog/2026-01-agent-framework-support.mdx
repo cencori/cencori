@@ -1,0 +1,148 @@
+---
+title: "Cencori Works With Any AI Agent Framework"
+slug: "agent-framework-support"
+date: "2026-01-02"
+excerpt: "Use Cencori with CrewAI, AutoGen, LangChain, and any OpenAI-compatible agent framework. Get full observability, failover, and security—automatically."
+coverImage: ""
+authors:
+  - bola
+tags: ["Announcement", "Agents", "Integration"]
+published: true
+---
+
+AI agents are changing how we build software. Instead of single LLM calls, agents make dozens or hundreds of autonomous decisions—coordinating tasks, using tools, and reasoning through complex problems.
+
+But with autonomy comes risk: runaway costs, silent failures, and zero visibility into what's happening.
+
+**Today we're announcing that Cencori works with every major agent framework out of the box.**
+
+## The Problem With Agent Infrastructure
+
+When you deploy an agent to production, you face immediate challenges:
+
+1. **No visibility:** Your agent makes 50 LLM calls to complete a task. Which ones failed? What did they cost?
+2. **Provider outages:** OpenAI goes down at 2am. Your agent stops working.
+3. **Cost explosions:** A bug causes infinite loops. You wake up to a $500 bill.
+4. **Security gaps:** Your agent gets prompt-injected and starts leaking data.
+
+Traditional observability tools don't understand LLMs. And LLM providers don't offer agent-level visibility.
+
+## The Solution: Point Your Agent to Cencori
+
+Cencori exposes an OpenAI-compatible API. Every major agent framework already speaks this protocol—they just need a different `base_url`.
+
+```python
+# Before: Direct to OpenAI
+from openai import OpenAI
+client = OpenAI()
+
+# After: Through Cencori (one line change)
+from openai import OpenAI
+client = OpenAI(
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+```
+
+That's it. Now every LLM call your agent makes is:
+- **Logged** with full request/response
+- **Protected** against prompt injection
+- **Tracked** for cost and latency
+- **Failover-ready** if providers go down
+
+## Framework Examples
+
+### CrewAI
+
+```bash
+export OPENAI_API_KEY=your_cencori_api_key
+export OPENAI_API_BASE=https://api.cencori.com/v1
+```
+
+```python
+from crewai import Agent, Task, Crew
+
+researcher = Agent(
+    role='Research Analyst',
+    goal='Find insights about market trends',
+)
+
+crew = Crew(agents=[researcher], tasks=[...])
+result = crew.kickoff()
+
+# Every LLM call logged in Cencori dashboard
+```
+
+### AutoGen
+
+```python
+from autogen import AssistantAgent
+
+config_list = [{
+    "model": "gpt-4o",
+    "api_key": "your_cencori_api_key",
+    "base_url": "https://api.cencori.com/v1"
+}]
+
+assistant = AssistantAgent(
+    name="assistant",
+    llm_config={"config_list": config_list}
+)
+```
+
+### LangChain
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+```
+
+## What You Get
+
+Once your agent routes through Cencori:
+
+| Feature | Benefit |
+|---------|---------|
+| **Full Observability** | Every call logged with tokens, cost, latency |
+| **Automatic Failover** | If OpenAI is down, route to Anthropic |
+| **Rate Limiting** | Prevent runaway agents from burning budget |
+| **Security Scanning** | Block prompt injection and PII leakage |
+| **Multi-Provider** | Use any model from any provider |
+
+## Real-World Example
+
+A customer was building a research agent using CrewAI. The agent would:
+1. Search the web for information
+2. Synthesize findings across multiple sources
+3. Generate a summary report
+
+**Before Cencori:** They had no idea which LLM calls were failing, what each report cost, or why some reports took 10x longer than others.
+
+**After Cencori:** They could see:
+- Each of the 23 LLM calls per report
+- Exact cost ($0.42 average per report)
+- P95 latency per call
+- 3 failed calls (OpenAI rate limits) that auto-failed-over to Anthropic
+
+No code changes except setting `OPENAI_API_BASE`.
+
+## Try It Now
+
+1. Get your API key: [cencori.com/dashboard](/dashboard)
+2. Set `base_url` to `https://api.cencori.com/v1`
+3. Run your agent
+
+See every LLM call in your dashboard within seconds.
+
+**Read the full documentation:** [/docs/concepts/agent-frameworks](/docs/concepts/agent-frameworks)
+
+---
+
+*Building something cool with agents? We'd love to hear about it. Reach out at [support@cencori.com](mailto:support@cencori.com).*
+
+**The Cencori Team**
