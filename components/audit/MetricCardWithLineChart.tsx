@@ -2,7 +2,7 @@
 
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Line, LineChart } from 'recharts';
+import { Bar, BarChart, XAxis } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -17,7 +17,7 @@ interface MetricCardWithLineChartProps {
     trend?: number;
     format?: 'number' | 'currency' | 'percentage' | 'ms';
     lineColor?: string;
-    yAxisDomain?: [number, number];
+    timeRange?: string;
 }
 
 const chartConfig = {
@@ -34,6 +34,7 @@ export function MetricCardWithLineChart({
     trend,
     format = 'number',
     lineColor = 'hsl(142, 71%, 45%)',
+    timeRange,
 }: MetricCardWithLineChartProps) {
     const formatValue = (val: string | number) => {
         if (typeof val === 'string') return val;
@@ -53,9 +54,25 @@ export function MetricCardWithLineChart({
     const isPositiveTrend = trend && trend > 0;
     const isNegativeTrend = trend && trend < 0;
 
+    // Get time range display from chart data
+    const getTimeRangeDisplay = () => {
+        if (chartData.length === 0) return null;
+        const first = chartData[0]?.label;
+        const last = chartData[chartData.length - 1]?.label;
+        if (first === last) return first;
+        return `${first} - ${last}`;
+    };
+
     return (
         <div className="rounded-md border border-border/40 bg-card p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
+            <div className="mb-1">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{title}</p>
+                {chartData.length > 0 && (
+                    <p className="text-[9px] text-muted-foreground/60 font-mono mt-0.5">
+                        {getTimeRangeDisplay()}
+                    </p>
+                )}
+            </div>
             <div className="flex items-center gap-2 mb-2">
                 <p className="text-xl font-semibold font-mono">{formatValue(value)}</p>
                 {trend !== undefined && trend !== 0 && (
@@ -77,30 +94,30 @@ export function MetricCardWithLineChart({
             </div>
 
             {chartData.length > 0 && (
-                <div className="h-12">
+                <div className="h-24">
                     <ChartContainer config={chartConfig} className="h-full w-full">
-                        <LineChart
+                        <BarChart
                             data={chartData}
-                            margin={{ left: 0, right: 0, top: 4, bottom: 0 }}
+                            margin={{ left: 0, right: 0, top: 8, bottom: 16 }}
                         >
+                            <XAxis
+                                dataKey="label"
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                                tickMargin={4}
+                                interval="preserveStartEnd"
+                            />
                             <ChartTooltip
                                 cursor={false}
                                 content={<ChartTooltipContent hideLabel />}
                             />
-                            <Line
+                            <Bar
                                 dataKey="value"
-                                type="monotone"
-                                stroke={lineColor}
-                                strokeWidth={1.5}
-                                dot={false}
-                                activeDot={{
-                                    r: 3,
-                                    fill: lineColor,
-                                    stroke: 'var(--background)',
-                                    strokeWidth: 2,
-                                }}
+                                fill={lineColor}
+                                radius={[2, 2, 0, 0]}
                             />
-                        </LineChart>
+                        </BarChart>
                     </ChartContainer>
                 </div>
             )}

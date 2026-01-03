@@ -120,6 +120,48 @@ export async function GET(
             low: incidents?.filter(i => i.severity === 'low').length || 0,
         };
 
+        // Cost by provider - start with all common providers at $0
+        const commonProviders = ['openai', 'anthropic', 'google', 'mistral', 'groq', 'cohere'];
+        const costByProvider: Record<string, number> = {};
+        commonProviders.forEach(p => costByProvider[p] = 0);
+        requests?.forEach(r => {
+            const provider = r.provider || 'unknown';
+            costByProvider[provider] = (costByProvider[provider] || 0) + (r.cost_usd || 0);
+        });
+
+        // Requests by provider - start with all common providers at 0
+        const requestsByProvider: Record<string, number> = {};
+        commonProviders.forEach(p => requestsByProvider[p] = 0);
+        requests?.forEach(r => {
+            const provider = r.provider || 'unknown';
+            requestsByProvider[provider] = (requestsByProvider[provider] || 0) + 1;
+        });
+
+        // Latency percentiles
+        const sortedLatencies = [...latencies].sort((a, b) => a - b);
+        const percentile = (arr: number[], p: number) => {
+            if (arr.length === 0) return 0;
+            const index = Math.ceil((p / 100) * arr.length) - 1;
+            return arr[Math.max(0, index)];
+        };
+
+        const latencyPercentiles = {
+            p50: Math.round(percentile(sortedLatencies, 50)),
+            p75: Math.round(percentile(sortedLatencies, 75)),
+            p90: Math.round(percentile(sortedLatencies, 90)),
+            p95: Math.round(percentile(sortedLatencies, 95)),
+            p99: Math.round(percentile(sortedLatencies, 99)),
+        };
+
+        // Requests by country (from geolocation if available)
+        const requestsByCountry: Record<string, number> = {};
+        requests?.forEach(r => {
+            const country = r.country || r.geolocation?.country || 'Unknown';
+            if (country && country !== 'Unknown') {
+                requestsByCountry[country] = (requestsByCountry[country] || 0) + 1;
+            }
+        });
+
         return NextResponse.json({
             overview: {
                 total_requests: totalRequests,
@@ -137,6 +179,10 @@ export async function GET(
             breakdown: {
                 model_usage: modelUsage,
                 incidents_by_severity: incidentsBySeverity,
+                cost_by_provider: costByProvider,
+                requests_by_provider: requestsByProvider,
+                latency_percentiles: latencyPercentiles,
+                requests_by_country: requestsByCountry,
             },
         });
 

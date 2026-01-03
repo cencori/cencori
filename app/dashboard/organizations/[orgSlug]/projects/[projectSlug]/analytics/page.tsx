@@ -7,12 +7,15 @@ import { MetricCard } from '@/components/audit/MetricCard';
 import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
 import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
 import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
+import { ModelUsageChart } from '@/components/analytics/ModelUsageChart';
+import { CostByProviderChart } from '@/components/analytics/CostByProviderChart';
+import { LatencyHistogram } from '@/components/analytics/LatencyHistogram';
+import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, BarChart3 } from 'lucide-react';
+import { ShieldAlert, BarChart3, Zap, DollarSign, Clock, Activity } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryKeys } from '@/lib/hooks/useQueries';
-import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 
 interface TrendData {
     timestamp: string;
@@ -43,6 +46,16 @@ interface OverviewData {
             medium: number;
             low: number;
         };
+        cost_by_provider: Record<string, number>;
+        requests_by_provider: Record<string, number>;
+        latency_percentiles: {
+            p50: number;
+            p75: number;
+            p90: number;
+            p95: number;
+            p99: number;
+        };
+        requests_by_country: Record<string, number>;
     };
 }
 
@@ -85,7 +98,7 @@ export default function AnalyticsPage({ params }: PageProps) {
     const { environment } = useEnvironment();
     const [timeRange, setTimeRange] = useState('7d');
 
-    // Get projectId with caching - INSTANT ON REVISIT!
+    // Get projectId with caching
     const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
     // Fetch analytics overview with caching
@@ -97,7 +110,7 @@ export default function AnalyticsPage({ params }: PageProps) {
             return res.json();
         },
         enabled: !!projectId,
-        staleTime: 30 * 1000, // Cache for 30 seconds
+        staleTime: 30 * 1000,
     });
 
     // Fetch trends data with caching
@@ -130,22 +143,22 @@ export default function AnalyticsPage({ params }: PageProps) {
 
     if (projectLoading) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <div className="mb-6">
                     <Skeleton className="h-5 w-24" />
                     <Skeleton className="h-3 w-48 mt-1" />
                 </div>
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28" />)}
+                <div className="grid grid-cols-5 gap-4 mb-6">
+                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-28" />)}
                 </div>
-                <Skeleton className="h-[200px]" />
+                <Skeleton className="h-[250px]" />
             </div>
         );
     }
 
     if (!projectId) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <div className="text-center py-16 flex flex-col items-center">
                     <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
                         <BarChart3 className="h-5 w-5 text-muted-foreground" />
@@ -157,32 +170,32 @@ export default function AnalyticsPage({ params }: PageProps) {
     }
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="w-full max-w-6xl mx-auto px-6 py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-base font-medium">Analytics</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">Insights and metrics for your AI requests</p>
+                    <h1 className="text-lg font-semibold">Analytics</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Real-time observability for your AI requests</p>
                 </div>
                 <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-[120px] h-7 text-xs">
+                    <SelectTrigger className="w-[130px] h-8 text-xs">
                         <SelectValue placeholder="Period" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="1h" className="text-xs">1 Hour</SelectItem>
-                        <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
-                        <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
-                        <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
-                        <SelectItem value="all" className="text-xs">All Time</SelectItem>
+                        <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
+                        <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
+                        <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
+                        <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                        <SelectItem value="90d" className="text-xs">Last 90 Days</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
 
-            {/* Primary Metrics */}
+            {/* Primary Metrics - 5 columns */}
             {overview && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
                     <MetricCardWithChart
-                        title="Total Requests"
+                        title="Requests"
                         value={overview.overview.total_requests}
                         chartData={trends.map(t => ({
                             label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
@@ -222,27 +235,48 @@ export default function AnalyticsPage({ params }: PageProps) {
                         trend={calculateTrend(trends, t => t.avg_latency)}
                         lineColor="hsl(24, 96%, 53%)"
                     />
-                </div>
-            )}
-
-            {/* Secondary Metrics */}
-            {overview && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <MetricCard
                         title="Total Tokens"
                         value={overview.overview.total_tokens}
+                        icon={<Zap className="h-3 w-3" />}
                     />
+                </div>
+            )}
+
+            {/* Area Chart - Full Width */}
+            {trends.length > 0 && (
+                <div className="mb-6">
+                    <RequestsAreaChart data={trends} groupBy={groupBy} />
+                </div>
+            )}
+
+            {/* Charts Row - 3 columns */}
+            {overview && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <ModelUsageChart data={overview.breakdown.model_usage} />
+                    <CostByProviderChart data={overview.breakdown.cost_by_provider} />
+                    <LatencyHistogram data={overview.breakdown.latency_percentiles} />
+                </div>
+            )}
+
+            {/* Security & Failover Row */}
+            {overview && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <MetricCard
                         title="Security Incidents"
                         value={overview.overview.total_incidents}
                         icon={<ShieldAlert className="h-3 w-3" />}
                     />
                     <MetricCard
-                        title="Critical Incidents"
-                        value={overview.overview.critical_incidents}
+                        title="Critical"
+                        value={overview.breakdown.incidents_by_severity.critical}
                         icon={<ShieldAlert className="h-3 w-3 text-red-500" />}
                     />
-                    {/* Failover Metrics */}
+                    <MetricCard
+                        title="High Priority"
+                        value={overview.breakdown.incidents_by_severity.high}
+                        icon={<ShieldAlert className="h-3 w-3 text-orange-500" />}
+                    />
                     <FailoverMetrics
                         projectId={projectId}
                         environment={environment}
@@ -251,19 +285,16 @@ export default function AnalyticsPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Area Chart */}
-            {trends.length > 0 && (
-                <RequestsAreaChart data={trends} groupBy={groupBy} />
-            )}
-
             {/* Empty State */}
             {overview && overview.overview.total_requests === 0 && (
-                <div className="text-center py-16 flex flex-col items-center rounded-md border border-border/40 bg-card">
-                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                <div className="text-center py-16 flex flex-col items-center rounded-lg border border-border/40 bg-card mt-6">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                        <Activity className="h-6 w-6 text-primary" />
                     </div>
                     <p className="text-sm font-medium mb-1">No data yet</p>
-                    <p className="text-xs text-muted-foreground">Make some AI requests to see analytics</p>
+                    <p className="text-xs text-muted-foreground max-w-[280px]">
+                        Make some AI requests to see your analytics come to life
+                    </p>
                 </div>
             )}
         </div>

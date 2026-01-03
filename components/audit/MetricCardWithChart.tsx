@@ -2,7 +2,7 @@
 
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Bar, BarChart } from 'recharts';
+import { Bar, BarChart, XAxis } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -50,9 +50,25 @@ export function MetricCardWithChart({
     const isPositiveTrend = trend && trend > 0;
     const isNegativeTrend = trend && trend < 0;
 
+    // Get time range display from chart data
+    const getTimeRangeDisplay = () => {
+        if (chartData.length === 0) return null;
+        const first = chartData[0]?.label;
+        const last = chartData[chartData.length - 1]?.label;
+        if (first === last) return first;
+        return `${first} - ${last}`;
+    };
+
     return (
         <div className="rounded-md border border-border/40 bg-card p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
+            <div className="mb-1">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{title}</p>
+                {chartData.length > 0 && (
+                    <p className="text-[9px] text-muted-foreground/60 font-mono mt-0.5">
+                        {getTimeRangeDisplay()}
+                    </p>
+                )}
+            </div>
             <div className="flex items-center gap-2 mb-2">
                 <p className="text-xl font-semibold font-mono">{formatValue(value)}</p>
                 {trend !== undefined && trend !== 0 && (
@@ -74,12 +90,20 @@ export function MetricCardWithChart({
             </div>
 
             {chartData.length > 0 && (
-                <div className="h-12">
+                <div className="h-24">
                     <ChartContainer config={chartConfig} className="h-full w-full">
                         <BarChart
                             data={chartData}
-                            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                            margin={{ top: 8, right: 0, bottom: 16, left: 0 }}
                         >
+                            <XAxis
+                                dataKey="label"
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                                tickMargin={4}
+                                interval="preserveStartEnd"
+                            />
                             <ChartTooltip
                                 cursor={false}
                                 content={<ChartTooltipContent hideLabel />}
@@ -87,7 +111,7 @@ export function MetricCardWithChart({
                             <Bar
                                 dataKey="value"
                                 fill="var(--color-value)"
-                                radius={2}
+                                radius={[2, 2, 0, 0]}
                             />
                         </BarChart>
                     </ChartContainer>
