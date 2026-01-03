@@ -119,6 +119,7 @@ function initializeDefaultProviders() {
 
 /**
  * Initialize providers from BYOK keys stored in database
+ * BYOK keys take priority over env-based defaults
  */
 async function initializeBYOKProviders(
     supabase: ReturnType<typeof createAdminClient>,
@@ -126,11 +127,6 @@ async function initializeBYOKProviders(
     organizationId: string,
     targetProvider: string
 ): Promise<boolean> {
-    // Check if we already have this provider
-    if (router.hasProvider(targetProvider)) {
-        return true;
-    }
-
     try {
         // Fetch the provider key from database
         const { data: providerKey, error } = await supabase
@@ -140,41 +136,49 @@ async function initializeBYOKProviders(
             .eq('provider', targetProvider)
             .single();
 
-        if (error || !providerKey || !providerKey.is_active) {
-            return false;
+        // If user has a BYOK key, use it (overrides env-based)
+        if (!error && providerKey && providerKey.is_active) {
+            // Decrypt the API key
+            const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
+
+            // Create the appropriate provider (will override any existing)
+            if (targetProvider === 'google') {
+                router.registerProvider(targetProvider, new GeminiProvider(apiKey));
+                console.log(`[BYOK] Using user's Google API key for project ${projectId}`);
+                return true;
+            } else if (targetProvider === 'openai') {
+                router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
+                console.log(`[BYOK] Using user's OpenAI API key for project ${projectId}`);
+                return true;
+            } else if (targetProvider === 'anthropic') {
+                router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
+                console.log(`[BYOK] Using user's Anthropic API key for project ${projectId}`);
+                return true;
+            } else if (isOpenAICompatible(targetProvider)) {
+                router.registerProvider(
+                    targetProvider,
+                    new OpenAICompatibleProvider(targetProvider, apiKey)
+                );
+                console.log(`[BYOK] Using user's ${targetProvider} API key for project ${projectId}`);
+                return true;
+            } else if (targetProvider === 'cohere') {
+                router.registerProvider(targetProvider, new CohereProvider(apiKey));
+                console.log(`[BYOK] Using user's Cohere API key for project ${projectId}`);
+                return true;
+            }
         }
 
-        // Decrypt the API key
-        const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
-
-        // Create the appropriate provider
-        if (targetProvider === 'google') {
-            // Google/Gemini provider
-            router.registerProvider(targetProvider, new GeminiProvider(apiKey));
-            return true;
-        } else if (targetProvider === 'openai') {
-            // OpenAI provider
-            router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
-            return true;
-        } else if (targetProvider === 'anthropic') {
-            // Anthropic provider
-            router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
-            return true;
-        } else if (isOpenAICompatible(targetProvider)) {
-            router.registerProvider(
-                targetProvider,
-                new OpenAICompatibleProvider(targetProvider, apiKey)
-            );
-            return true;
-        } else if (targetProvider === 'cohere') {
-            router.registerProvider(targetProvider, new CohereProvider(apiKey));
+        // No BYOK key - check if we have an env-based provider
+        if (router.hasProvider(targetProvider)) {
+            console.log(`[BYOK] No user key for ${targetProvider}, using env-based default`);
             return true;
         }
 
         return false;
     } catch (error) {
         console.error(`[API] Failed to initialize BYOK provider ${targetProvider}:`, error);
-        return false;
+        // Fall back to env-based if available
+        return router.hasProvider(targetProvider);
     }
 }
 
