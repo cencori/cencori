@@ -3,6 +3,7 @@ import { Montserrat, JetBrains_Mono } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CookieConsent } from "@/components/CookieConsent";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -235,6 +236,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           {/* Include the Navbar here */}
           {children}
+          <CookieConsent />
         </ThemeProvider>
       </body>
     </html>
