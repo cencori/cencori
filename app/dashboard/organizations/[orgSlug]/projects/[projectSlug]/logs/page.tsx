@@ -4,6 +4,7 @@ import { useState, use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
+import { LogsBarChart } from '@/components/audit/LogsBarChart';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { ExportButton } from '@/components/audit/ExportButton';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export default function RequestLogsPage({ params }: PageProps) {
     const [filters, setFilters] = useState({
         status: 'all',
         model: 'all',
-        time_range: '30d',
+        time_range: '1h',
         search: '',
     });
     const [searchInput, setSearchInput] = useState('');
@@ -139,6 +140,9 @@ export default function RequestLogsPage({ params }: PageProps) {
                 <h1 className="text-base font-medium">Logs</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">View and monitor all AI requests for this project.</p>
             </div>
+
+            {/* Logs Bar Chart */}
+            <LogsBarChart projectId={projectId} timeRange={filters.time_range} environment={environment} />
 
             {/* Filters Row */}
             <div className="flex flex-wrap items-center gap-3 mb-4">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
+import { ChartBarIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Bar, BarChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import React, { useState, use } from "react";
@@ -406,21 +407,27 @@ export default function ProjectDetailsPage({
           {/* Stats Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {/* Requests Card */}
-            <div className="rounded-md border border-border/40 bg-card p-4">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Requests</p>
-              <p className="text-2xl font-semibold font-mono mb-2">{stats.aiRequests.value}</p>
-              <div className="h-24">
+            <div className="rounded-xl border border-border/40 bg-card p-5">
+              <div className="flex items-center gap-2.5 mb-2">
+                <ChartBarIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Requests</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">API Calls</p>
+              <p className="text-3xl font-semibold mb-1">{stats.aiRequests.value}</p>
+              <p className="text-xs text-muted-foreground mb-3">{stats.aiRequests.change}</p>
+              <div className="h-28">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ requests: { label: "Requests", color: "hsl(24 80% 50%)" } }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
@@ -430,33 +437,38 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="count"
                         fill="var(--color-requests)"
-                        radius={[2, 2, 0, 0]}
+                        radius={[3, 3, 0, 0]}
                       />
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
                 )}
               </div>
-              <p className="text-[10px] text-emerald-500 mt-1">{stats.aiRequests.change}</p>
             </div>
 
             {/* Cost Card */}
-            <div className="rounded-md border border-border/40 bg-card p-4">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Cost</p>
-              <p className="text-2xl font-semibold font-mono mb-2">{stats.aiCost.value}</p>
-              <div className="h-24">
+            <div className="rounded-xl border border-border/40 bg-card p-5">
+              <div className="flex items-center gap-2.5 mb-2">
+                <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Cost</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">Total Spend</p>
+              <p className="text-3xl font-semibold mb-1">{stats.aiCost.value}</p>
+              <p className="text-xs text-muted-foreground mb-3">{stats.aiCost.change}</p>
+              <div className="h-28">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ cost: { label: "Cost", color: "hsl(142 76% 36%)" } }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
@@ -466,33 +478,38 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="cost"
                         fill="var(--color-cost)"
-                        radius={[2, 2, 0, 0]}
+                        radius={[3, 3, 0, 0]}
                       />
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">{stats.aiCost.change}</p>
             </div>
 
             {/* Latency Card */}
-            <div className="rounded-md border border-border/40 bg-card p-4">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Avg Latency</p>
-              <p className="text-2xl font-semibold font-mono mb-2">{stats.avgLatency.value}</p>
-              <div className="h-24">
+            <div className="rounded-xl border border-border/40 bg-card p-5">
+              <div className="flex items-center gap-2.5 mb-2">
+                <ClockIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Performance</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">Avg Latency</p>
+              <p className="text-3xl font-semibold mb-1">{stats.avgLatency.value}</p>
+              <p className="text-xs text-muted-foreground mb-3">{stats.avgLatency.change}</p>
+              <div className="h-28">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ latency: { label: "Latency", color: "hsl(244 59% 59%)" } }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
@@ -502,15 +519,14 @@ export default function ProjectDetailsPage({
                       <Bar
                         dataKey="count"
                         fill="var(--color-latency)"
-                        radius={[2, 2, 0, 0]}
+                        radius={[3, 3, 0, 0]}
                       />
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">{stats.avgLatency.change}</p>
             </div>
           </div>
 

@@ -105,19 +105,19 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         };
     }, [projectId, page]);
 
+    // Supabase-style timestamp: "02 Jan 26 17:41:47"
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-
-        if (diff < 60000) return 'Just now';
-        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-
-        const day = date.getDate();
-        const month = date.toLocaleString("en-US", { month: "short" });
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return `${month} ${day}, ${date.getFullYear()} ${time}`;
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = date.toLocaleString('en-US', { month: 'short' });
+        const year = date.getFullYear().toString().slice(-2);
+        const time = date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        return `${day} ${month} ${year} ${time}`;
     };
 
     const formatCost = (cost: number) => `$${cost.toFixed(6)}`;
@@ -201,41 +201,37 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                     <Table>
                         <TableHeader>
                             <TableRow className="hover:bg-transparent border-b border-border/40">
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Status</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Time</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Model</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8">Request</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Tokens</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right">Cost</TableHead>
-                                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-4">Latency</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-3 w-[180px]">Timestamp</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 w-[60px]">Status</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8">Path</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Tokens</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Cost</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-3 w-[80px]">Latency</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {requests.map((request) => (
                                 <TableRow
                                     key={request.id}
-                                    className="cursor-pointer hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
+                                    className="cursor-pointer hover:bg-muted/50 border-b border-border/40 last:border-b-0 transition-colors"
                                     onClick={() => handleRowClick(request.id)}
                                 >
-                                    <TableCell className="py-2.5 px-4">
-                                        <StatusBadge status={request.status} />
-                                    </TableCell>
-                                    <TableCell className="py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                                    <TableCell className="py-2 px-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                                         {formatDate(request.created_at)}
                                     </TableCell>
-                                    <TableCell className="py-2.5 text-xs font-mono text-muted-foreground">
-                                        {request.model}
+                                    <TableCell className="py-2">
+                                        <StatusBadge status={request.status} variant="code" />
                                     </TableCell>
-                                    <TableCell className="py-2.5 max-w-[300px] truncate text-xs">
-                                        {request.request_preview || 'No preview'}
+                                    <TableCell className="py-2 font-mono text-xs text-muted-foreground">
+                                        /ai/v1/chat/{request.model}
                                     </TableCell>
-                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
+                                    <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">
                                         {request.total_tokens.toLocaleString()}
                                     </TableCell>
-                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
+                                    <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">
                                         {formatCost(request.cost_usd)}
                                     </TableCell>
-                                    <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground pr-4">
+                                    <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground pr-3">
                                         {request.latency_ms}ms
                                     </TableCell>
                                 </TableRow>

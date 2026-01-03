@@ -72,7 +72,7 @@ export async function GET(
         // Fetch requests
         const { data: requests, error } = await supabaseAdmin
             .from('ai_requests')
-            .select('created_at, status, cost_usd, latency_ms')
+            .select('created_at, status, cost_usd, latency_ms, total_tokens')
             .eq('project_id', projectId)
             .in('api_key_id', apiKeyIds)
             .gte('created_at', startTime.toISOString())
@@ -93,6 +93,7 @@ export async function GET(
                 blocked_output: number;
                 error: number;
                 cost: number;
+                tokens: number;
                 avg_latency: number;
                 latencies: number[];
             }> = {};
@@ -107,7 +108,7 @@ export async function GET(
                     const key = `${String(current.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
                     buckets[key] = {
                         timestamp: key,
-                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, tokens: 0, avg_latency: 0, latencies: []
                     };
                     current.setMinutes(current.getMinutes() + 10);
                 }
@@ -118,7 +119,7 @@ export async function GET(
                     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')} ${String(current.getHours()).padStart(2, '0')}:00`;
                     buckets[key] = {
                         timestamp: key,
-                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, tokens: 0, avg_latency: 0, latencies: []
                     };
                     current.setHours(current.getHours() + 1);
                 }
@@ -129,7 +130,7 @@ export async function GET(
                     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
                     buckets[key] = {
                         timestamp: key,
-                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, tokens: 0, avg_latency: 0, latencies: []
                     };
                     current.setDate(current.getDate() + 1);
                 }
@@ -157,7 +158,7 @@ export async function GET(
             if (!trendData[key]) {
                 trendData[key] = {
                     timestamp: key,
-                    total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                    total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, tokens: 0, avg_latency: 0, latencies: []
                 };
             }
 
@@ -168,6 +169,7 @@ export async function GET(
             if (req.status === 'error') trendData[key].error++;
 
             trendData[key].cost += req.cost_usd || 0;
+            trendData[key].tokens += req.total_tokens || 0;
             if (req.latency_ms) {
                 trendData[key].latencies.push(req.latency_ms);
             }
@@ -185,6 +187,7 @@ export async function GET(
                 error: data.error,
                 success_rate: data.total > 0 ? Math.round((data.success / data.total) * 100) : 0,
                 cost: Math.round(data.cost * 1000000) / 1000000,
+                tokens: data.tokens,
                 avg_latency: data.latencies.length > 0
                     ? Math.round(data.latencies.reduce((a, b) => a + b, 0) / data.latencies.length)
                     : 0,

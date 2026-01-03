@@ -37,10 +37,18 @@ const chartConfig = {
 
 export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
     const formatXAxis = (timestamp: string) => {
-        if (groupBy === 'hour') {
-            return timestamp.split(' ')[1] || timestamp;
+        // For 10-minute intervals (format: "HH:MM")
+        if (timestamp.match(/^\d{2}:\d{2}$/)) {
+            return timestamp;
         }
-        return new Date(timestamp).toLocaleDateString(undefined, {
+        // For hourly (format: "YYYY-MM-DD HH:00")
+        if (timestamp.includes(' ')) {
+            return timestamp.split(' ')[1];
+        }
+        // For daily (format: "YYYY-MM-DD")
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return timestamp;
+        return date.toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric',
         });
