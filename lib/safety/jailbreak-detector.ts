@@ -5,6 +5,34 @@ export interface JailbreakDetectionResult {
     category?: 'social_engineering' | 'system_extraction' | 'behavioral_probe' | 'indirect_pii' | 'multi_vector';
 }
 
+// Patterns that indicate legitimate agent tool usage (WHITELIST)
+const AGENT_TOOL_PATTERNS = [
+    // XML-style tool calls (common in agent frameworks)
+    '<tool_call>',
+    '<tool_name>',
+    '<parameters>',
+    '</tool_call>',
+    '<thought>',
+    '<final_answer>',
+    // Function calling patterns
+    'tool_result',
+    'function_call',
+    'tool_use',
+    // File system operations
+    'list_directory',
+    'read_file',
+    'write_file',
+    'directory_tree',
+    'file_info',
+    // Common system paths (not sensitive data extraction)
+    '/home/',
+    '.bashrc',
+    '.gitconfig',
+    // MCP patterns
+    'mcp',
+    'allowed_directories',
+];
+
 // Patterns that indicate potential jailbreak attempts
 const JAILBREAK_PATTERNS = {
     // Social engineering - framing malicious requests as stories/roleplay
@@ -81,21 +109,38 @@ const JAILBREAK_PATTERNS = {
 // Suspicious question combinations
 const SUSPICIOUS_COMBINATIONS = [
     {
-        patterns: ['system', 'underlying', 'foundation'],
-        followed_by: ['email', 'contact', 'share', 'information'],
+        patterns: ['reveal your system', 'show me your instructions'],
+        followed_by: ['email', 'contact', 'share personal'],
         risk: 0.6,
     },
     {
-        patterns: ['story', 'writing', 'character'],
-        followed_by: ['email', 'phone', 'address', 'contact'],
+        patterns: ['story', 'writing a story', 'character'],
+        followed_by: ['real email', 'real phone', 'real address', 'actual contact'],
         risk: 0.7,
     },
     {
-        patterns: ['curious', 'intellectually'],
-        followed_by: ['how to', 'ways to', 'methods'],
+        patterns: ['genuinely curious', 'intellectually curious'],
+        followed_by: ['bypass', 'workaround', 'get around'],
         risk: 0.5,
     },
 ];
+
+/**
+ * Check if the content appears to be from a legitimate agent tool interaction
+ */
+function isAgentToolContext(text: string): boolean {
+    const lowerText = text.toLowerCase();
+    let matchCount = 0;
+
+    for (const pattern of AGENT_TOOL_PATTERNS) {
+        if (lowerText.includes(pattern.toLowerCase())) {
+            matchCount++;
+            if (matchCount >= 2) return true; // Two or more agent patterns = likely legitimate
+        }
+    }
+
+    return false;
+}
 
 /**
  * Detect potential jailbreak attempts using pattern matching and heuristics
@@ -104,6 +149,31 @@ export function detectJailbreak(
     text: string,
     conversationHistory?: Array<{ role: string; content: string }>
 ): JailbreakDetectionResult {
+    // Early exit: if this looks like agent tool usage, skip strict detection
+    if (isAgentToolContext(text)) {
+        return {
+            risk: 0,
+            patterns: [],
+            confidence: 0,
+            category: undefined,
+        };
+    }
+
+    // Also check conversation history for agent patterns
+    if (conversationHistory) {
+        const recentAgentUsage = conversationHistory.slice(-5).some(
+            m => isAgentToolContext(m.content)
+        );
+        if (recentAgentUsage) {
+            return {
+                risk: 0,
+                patterns: [],
+                confidence: 0,
+                category: undefined,
+            };
+        }
+    }
+
     const lowerText = text.toLowerCase();
     const patterns: string[] = [];
     let totalRisk = 0;
@@ -157,31 +227,45 @@ export function detectJailbreak(
     }
 
     // Check message structure - multiple unrelated questions is suspicious
+    // But only if they're actual user questions, not tool outputs
     const questionCount = (text.match(/\?/g) || []).length;
-    if (questionCount >= 3) {
+    const isToolOutput = text.includes('```') || text.includes('<tool') || text.includes('result');
+    if (questionCount >= 3 && !isToolOutput) {
         patterns.push('Multiple questions in single message');
         totalRisk += 0.2;
     }
 
     // Check message length - overly long messages with multiple topics
+    // Skip if this looks like tool output or code
     const messageLength = text.length;
-    if (messageLength > 500 && questionCount >= 2) {
+    if (messageLength > 500 && questionCount >= 2 && !isToolOutput) {
         patterns.push('Long message with multiple topics');
         totalRisk += 0.15;
     }
 
     // Check for conversation pattern - if history exists
-    if (conversationHistory && conversationHistory.length > 0) {
-        // Rapid topic switching is suspicious
+    // Only flag if there's ACTUAL suspicious topic switching (not just having multiple messages)
+    if (conversationHistory && conversationHistory.length >= 3) {
         const recentUserMessages = conversationHistory
             .filter(m => m.role === 'user')
-            .slice(-3);
+            .slice(-3)
+            .map(m => m.content.toLowerCase());
 
         if (recentUserMessages.length >= 2) {
-            // Simple heuristic: if recent messages are very different in content
-            // (This is a simplification - could be enhanced with semantic similarity)
-            patterns.push('Potential topic switching pattern');
-            totalRisk += 0.1;
+            // Check if messages are drastically different AND contain suspicious keywords
+            const hasSuspiciousSwitch = recentUserMessages.some(msg =>
+                JAILBREAK_PATTERNS.multi_vector.some(kw => msg.includes(kw))
+            ) && recentUserMessages.some(msg =>
+                Object.values(JAILBREAK_PATTERNS)
+                    .flat()
+                    .filter(kw => !JAILBREAK_PATTERNS.multi_vector.includes(kw))
+                    .some(kw => msg.includes(kw))
+            );
+
+            if (hasSuspiciousSwitch) {
+                patterns.push('Potential topic switching pattern');
+                totalRisk += 0.1;
+            }
         }
     }
 
@@ -208,3 +292,4 @@ export function isJailbreakRisky(
 ): boolean {
     return result.risk >= threshold && result.confidence >= 0.3;
 }
+
