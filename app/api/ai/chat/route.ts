@@ -490,28 +490,29 @@ export async function POST(req: NextRequest) {
         const providerName = router.detectProvider(requestedModel);
         const normalizedModel = router.normalizeModelName(requestedModel);
 
-        // Initialize default providers (env-based)
-        initializeDefaultProviders();
+        // BYOK takes priority - try to initialize user's provider key first
+        const byokInitialized = await initializeBYOKProviders(
+            supabase,
+            project.id,
+            organizationId,
+            providerName
+        );
 
-        // Try to initialize BYOK provider if needed
+        // If BYOK didn't work, fall back to env-based defaults
+        if (!byokInitialized) {
+            initializeDefaultProviders();
+        }
+
+        // If still no provider available, return error
         if (!router.hasProvider(providerName)) {
-            const byokInitialized = await initializeBYOKProviders(
-                supabase,
-                project.id,
-                organizationId,
-                providerName
+            return NextResponse.json(
+                {
+                    error: `Provider '${providerName}' is not configured`,
+                    message: `Please add your ${providerName} API key in project settings to use this model.`,
+                    settingsUrl: `/dashboard/projects/${project.id}/providers`
+                },
+                { status: 400 }
             );
-
-            if (!byokInitialized) {
-                return NextResponse.json(
-                    {
-                        error: `Provider '${providerName}' is not configured`,
-                        message: `Please add your ${providerName} API key in project settings to use this model.`,
-                        settingsUrl: `/dashboard/projects/${project.id}/providers`
-                    },
-                    { status: 400 }
-                );
-            }
         }
 
         // 5. Get provider (removed tier restrictions - BYOK means users bring their own keys)
