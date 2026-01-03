@@ -19,6 +19,7 @@ import {
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
+import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact } from '@/lib/safety/custom-data-rules';
 import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
@@ -86,6 +87,60 @@ async function getProjectSecurityConfig(
             enableJailbreakDetection: true,
             enableObfuscatedPII: true,
             enableIntentAnalysis: true,
+        };
+    }
+}
+
+/**
+ * Fetch custom data rules for a project and process content
+ */
+async function getAndProcessCustomRules(
+    supabase: ReturnType<typeof createAdminClient>,
+    projectId: string,
+    inputText: string,
+    responseText?: string
+): Promise<{
+    rules: CustomDataRule[];
+    inputResult: ProcessedContent;
+    outputResult?: ProcessedContent;
+}> {
+    try {
+        // Fetch active custom rules for this project
+        const { data: rules, error } = await supabase
+            .from('custom_data_rules')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('is_active', true)
+            .order('priority', { ascending: false });
+
+        if (error || !rules || rules.length === 0) {
+            return {
+                rules: [],
+                inputResult: { content: inputText, wasProcessed: false, matchedRules: [], shouldBlock: false },
+                outputResult: responseText
+                    ? { content: responseText, wasProcessed: false, matchedRules: [], shouldBlock: false }
+                    : undefined,
+            };
+        }
+
+        // Process input with custom rules (keywords, regex, JSON path only - AI detect is async)
+        const inputResult = await processCustomRules(inputText, rules);
+
+        // Process output if provided
+        let outputResult: ProcessedContent | undefined;
+        if (responseText) {
+            outputResult = await processCustomRules(responseText, rules);
+        }
+
+        return { rules, inputResult, outputResult };
+    } catch (error) {
+        console.warn('[CustomRules] Failed to process:', error);
+        return {
+            rules: [],
+            inputResult: { content: inputText, wasProcessed: false, matchedRules: [], shouldBlock: false },
+            outputResult: responseText
+                ? { content: responseText, wasProcessed: false, matchedRules: [], shouldBlock: false }
+                : undefined,
         };
     }
 }
@@ -485,6 +540,29 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // CUSTOM DATA RULES CHECK (for 'block' action rules)
+        const customRulesResult = await getAndProcessCustomRules(
+            supabase,
+            project.id,
+            inputText
+        );
+
+        // If any 'block' rule matched on input, reject the request
+        if (customRulesResult.inputResult.shouldBlock) {
+            const matchedRuleNames = customRulesResult.inputResult.matchedRules
+                .filter(r => r.rule.action === 'block')
+                .map(r => r.rule.name);
+
+            return NextResponse.json(
+                {
+                    error: 'Request blocked by data rule',
+                    message: 'This request contains content that matches a blocked data pattern.',
+                    matched_rules: matchedRuleNames,
+                },
+                { status: 403 }
+            );
+        }
+
         // 4. Determine model and provider
         const requestedModel = model || 'gemini-2.0-flash';
         const providerName = router.detectProvider(requestedModel);
@@ -721,6 +799,32 @@ export async function POST(req: NextRequest) {
                                     .update({ monthly_requests_used: currentUsage + 1 })
                                     .eq('id', organizationId);
 
+                                // Apply custom data rules to response for logging
+                                let streamLoggedContent = fullContent;
+                                let streamLoggedMessages = messages;
+                                if (customRulesResult.rules.length > 0) {
+                                    const streamResponseRulesResult = await processCustomRules(
+                                        fullContent,
+                                        customRulesResult.rules
+                                    );
+                                    streamLoggedContent = streamResponseRulesResult.content;
+
+                                    // Also mask input messages
+                                    if (customRulesResult.inputResult.wasProcessed) {
+                                        streamLoggedMessages = messages.map((msg: { role: string; content: string }) => ({
+                                            ...msg,
+                                            content: customRulesResult.inputResult.matchedRules.reduce((content: string, match: { rule: { action: string }; snippets: string[] }) => {
+                                                if (match.rule.action === 'mask') {
+                                                    return applyMask(content, match.snippets);
+                                                } else if (match.rule.action === 'redact') {
+                                                    return applyRedact(content, match.snippets);
+                                                }
+                                                return content;
+                                            }, msg.content)
+                                        }));
+                                    }
+                                }
+
                                 const { error: streamLogError } = await supabase.from('ai_requests').insert({
                                     project_id: project.id,
                                     api_key_id: keyData.id,
@@ -737,7 +841,7 @@ export async function POST(req: NextRequest) {
                                     status: streamUsedFallback ? 'success_fallback' : 'success',
                                     end_user_id: userId,
                                     request_payload: {
-                                        messages,
+                                        messages: streamLoggedMessages,
                                         model,
                                         temperature,
                                         maxTokens,
@@ -745,8 +849,9 @@ export async function POST(req: NextRequest) {
                                         stream,
                                         original_provider: streamUsedFallback ? providerName : undefined,
                                         original_model: streamUsedFallback ? normalizedModel : undefined,
+                                        data_rules_applied: customRulesResult.rules.length > 0,
                                     },
-                                    response_payload: { content: fullContent },
+                                    response_payload: { content: streamLoggedContent },
                                     ip_address: clientIp,
                                     country_code: countryCode,
                                 });
@@ -931,7 +1036,38 @@ export async function POST(req: NextRequest) {
             .update({ monthly_requests_used: currentUsage + 1 })
             .eq('id', organizationId);
 
-        // 11. Log request (using actual provider/model in case of fallback)
+        // 11. Apply custom data rules to response before logging
+        let loggedMessages = messages;
+        let loggedResponse = response.content;
+
+        if (customRulesResult.rules.length > 0) {
+            // Process response with custom rules
+            const responseRulesResult = await processCustomRules(
+                response.content,
+                customRulesResult.rules
+            );
+
+            // Apply masking/redaction to response for logging
+            loggedResponse = responseRulesResult.content;
+
+            // Also mask the input messages for logging
+            const inputRulesResult = customRulesResult.inputResult;
+            if (inputRulesResult.wasProcessed) {
+                loggedMessages = messages.map((msg: { role: string; content: string }) => ({
+                    ...msg,
+                    content: inputRulesResult.matchedRules.reduce((content, match) => {
+                        if (match.rule.action === 'mask') {
+                            return applyMask(content, match.snippets);
+                        } else if (match.rule.action === 'redact') {
+                            return applyRedact(content, match.snippets);
+                        }
+                        return content;
+                    }, msg.content)
+                }));
+            }
+        }
+
+        // 12. Log request (using actual provider/model in case of fallback)
         const { error: logError } = await supabase.from('ai_requests').insert({
             project_id: project.id,
             api_key_id: keyData.id,
@@ -948,7 +1084,7 @@ export async function POST(req: NextRequest) {
             status: usedFallback ? 'success_fallback' : 'success',
             end_user_id: userId,
             request_payload: {
-                messages,
+                messages: loggedMessages,
                 model,
                 temperature,
                 maxTokens,
@@ -956,8 +1092,9 @@ export async function POST(req: NextRequest) {
                 stream,
                 original_provider: usedFallback ? providerName : undefined,
                 original_model: usedFallback ? normalizedModel : undefined,
+                data_rules_applied: customRulesResult.rules.length > 0,
             },
-            response_payload: { content: response.content, finishReason: response.finishReason },
+            response_payload: { content: loggedResponse, finishReason: response.finishReason },
             ip_address: clientIp,
             country_code: countryCode,
         });
