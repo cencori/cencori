@@ -90,8 +90,9 @@ async function getProjectSecurityConfig(
     }
 }
 
-// Lazy initialization of default providers (env-based)
+// Lazy initialization of default providers (env-based fallbacks)
 function initializeDefaultProviders() {
+    // Google/Gemini
     if (!router.hasProvider('google') && process.env.GEMINI_API_KEY) {
         try {
             router.registerProvider('google', new GeminiProvider());
@@ -100,6 +101,7 @@ function initializeDefaultProviders() {
         }
     }
 
+    // OpenAI
     if (!router.hasProvider('openai') && process.env.OPENAI_API_KEY) {
         try {
             router.registerProvider('openai', new OpenAIProvider());
@@ -108,11 +110,43 @@ function initializeDefaultProviders() {
         }
     }
 
+    // Anthropic
     if (!router.hasProvider('anthropic') && process.env.ANTHROPIC_API_KEY) {
         try {
             router.registerProvider('anthropic', new AnthropicProvider());
         } catch (error) {
             console.warn('[API] Anthropic provider not available:', error);
+        }
+    }
+
+    // Cohere
+    if (!router.hasProvider('cohere') && process.env.COHERE_API_KEY) {
+        try {
+            router.registerProvider('cohere', new CohereProvider(process.env.COHERE_API_KEY));
+        } catch (error) {
+            console.warn('[API] Cohere provider not available:', error);
+        }
+    }
+
+    // OpenAI-compatible providers (xAI, DeepSeek, Groq, Mistral, etc.)
+    const openAICompatibleEnvVars: Record<string, string> = {
+        xai: 'XAI_API_KEY',
+        deepseek: 'DEEPSEEK_API_KEY',
+        groq: 'GROQ_API_KEY',
+        mistral: 'MISTRAL_API_KEY',
+        together: 'TOGETHER_API_KEY',
+        openrouter: 'OPENROUTER_API_KEY',
+        perplexity: 'PERPLEXITY_API_KEY',
+    };
+
+    for (const [provider, envVar] of Object.entries(openAICompatibleEnvVars)) {
+        const apiKey = process.env[envVar];
+        if (!router.hasProvider(provider) && apiKey) {
+            try {
+                router.registerProvider(provider, new OpenAICompatibleProvider(provider, apiKey));
+            } catch (error) {
+                console.warn(`[API] ${provider} provider not available:`, error);
+            }
         }
     }
 }
