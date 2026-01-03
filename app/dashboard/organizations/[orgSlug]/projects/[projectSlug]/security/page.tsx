@@ -8,10 +8,11 @@ import { SecuritySettings } from '@/components/security/SecuritySettings';
 import { SecurityAuditLog } from '@/components/security/SecurityAuditLog';
 import { SecurityWebhooks } from '@/components/security/SecurityWebhooks';
 import { SecurityIncidentsTable } from '@/components/audit/SecurityIncidentsTable';
+import { CustomDataRulesManager } from '@/components/security/CustomDataRulesManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, ShieldAlert, LayoutDashboard, AlertTriangle, Settings, FileText, Webhook } from 'lucide-react';
+import { X, ShieldAlert, LayoutDashboard, AlertTriangle, Settings, FileText, Webhook, Database } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -123,6 +124,7 @@ export default function SecurityPage({ params }: PageProps) {
                 <TabsList>
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="incidents">Incidents</TabsTrigger>
+                    <TabsTrigger value="data-rules">Data Rules</TabsTrigger>
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                     <TabsTrigger value="audit">Audit Log</TabsTrigger>
                     <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
@@ -220,6 +222,11 @@ export default function SecurityPage({ params }: PageProps) {
 
                     {/* Security incidents table */}
                     <SecurityIncidentsTable projectId={projectId} filters={filters} environment={environment} />
+                </TabsContent>
+
+                {/* Data Rules Tab */}
+                <TabsContent value="data-rules" className="mt-0">
+                    <CustomDataRulesManager projectId={projectId} />
                 </TabsContent>
 
                 {/* Settings Tab */}
