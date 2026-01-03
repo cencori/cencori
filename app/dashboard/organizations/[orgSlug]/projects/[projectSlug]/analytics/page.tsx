@@ -232,7 +232,7 @@ export default function AnalyticsPage({ params }: PageProps) {
             {overview && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                     <MetricCardWithChart
-                        title="Database"
+                        title="Edge Requests"
                         subtitle="REST Requests"
                         icon={<ChartBarIcon className="h-5 w-5" />}
                         value={overview.overview.total_requests}
