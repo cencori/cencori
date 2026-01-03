@@ -1,6 +1,36 @@
 {
     "rewrites": [
         {
+            "source": "/v1/chat/completions",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/ai/chat"
+        },
+        {
+            "source": "/v1/completions",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/ai/chat"
+        },
+        {
+            "source": "/v1/models",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/providers"
+        },
+        {
             "source": "/:path*",
             "has": [
                 {
