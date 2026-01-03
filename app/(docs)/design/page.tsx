@@ -3,10 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
+import { MoonIcon, SunIcon, ChartBarIcon, CurrencyDollarIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
+import { DashboardCard } from "@/components/ui/dashboard-card";
 
 const principles = [
     {
@@ -124,6 +125,65 @@ export default function DesignIntroPage() {
                             </button>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            {/* Dashboard Cards */}
+            <section className="space-y-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Dashboard Cards</h2>
+                <p className="text-xs text-muted-foreground">The standard card pattern for analytics and metrics. Icon + title header, subtitle, large value, optional chart.</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <DashboardCard
+                        title="Requests"
+                        subtitle="API Calls"
+                        icon={<ChartBarIcon className="h-5 w-5" />}
+                        value={1234}
+                        description="44 successful"
+                        chartData={[
+                            { label: "Dec 27", value: 10 },
+                            { label: "Dec 28", value: 25 },
+                            { label: "Dec 29", value: 15 },
+                            { label: "Dec 30", value: 40 },
+                            { label: "Dec 31", value: 35 },
+                            { label: "Jan 1", value: 20 },
+                            { label: "Jan 2", value: 30 },
+                        ]}
+                        chartColor="hsl(24 80% 50%)"
+                        chartLabel="Requests"
+                    />
+                    <DashboardCard
+                        title="Cost"
+                        subtitle="Total Spend"
+                        icon={<CurrencyDollarIcon className="h-5 w-5" />}
+                        value={0.005985}
+                        format="currency"
+                        description="1,520 tokens"
+                        chartData={[
+                            { label: "Dec 27", value: 0.001 },
+                            { label: "Dec 28", value: 0.002 },
+                            { label: "Dec 29", value: 0.001 },
+                            { label: "Dec 30", value: 0.0015 },
+                        ]}
+                        chartColor="hsl(142 76% 36%)"
+                        chartLabel="Cost"
+                        tooltipFormatter={(v) => `$${v.toFixed(6)}`}
+                    />
+                    <DashboardCard
+                        title="Performance"
+                        subtitle="Avg Latency"
+                        icon={<ClockIcon className="h-5 w-5" />}
+                        value={3380}
+                        format="ms"
+                        description="0 errors"
+                        chartData={[
+                            { label: "Dec 28", value: 2000 },
+                            { label: "Dec 30", value: 3500 },
+                            { label: "Jan 1", value: 3200 },
+                            { label: "Jan 2", value: 3800 },
+                        ]}
+                        chartColor="hsl(244 59% 59%)"
+                        chartLabel="Latency"
+                    />
                 </div>
             </section>
 

@@ -9,51 +9,71 @@ import {
     ChartTooltipContent,
 } from '@/components/ui/chart';
 
-interface MetricCardWithLineChartProps {
+interface DashboardCardProps {
+    /** Title displayed in the header next to the icon */
     title: string;
+    /** Subtitle/description below the title */
     subtitle?: string;
-    value: string | number;
-    chartData: Array<{ label: string; value: number }>;
-    format?: 'number' | 'currency' | 'percentage' | 'ms';
-    lineColor?: string;
+    /** Icon to display (pass a Heroicon component) */
     icon?: ReactNode;
-    lastUpdate?: string;
+    /** Main value to display prominently */
+    value: string | number;
+    /** Additional description below the value */
+    description?: string;
+    /** Format for the value display */
+    format?: 'number' | 'currency' | 'percentage' | 'ms';
+    /** Chart data for the bar chart */
+    chartData?: Array<{ label: string; value: number }>;
+    /** Color for the chart bars */
+    chartColor?: string;
+    /** Custom chart config label */
+    chartLabel?: string;
+    /** Custom tooltip formatter */
+    tooltipFormatter?: (value: number) => string;
+    /** Children for custom content instead of chart */
+    children?: ReactNode;
+    /** Additional class names */
+    className?: string;
 }
 
-export function MetricCardWithLineChart({
+export function DashboardCard({
     title,
     subtitle,
-    value,
-    chartData,
-    format = 'number',
-    lineColor = 'hsl(142, 71%, 45%)',
     icon,
-    lastUpdate,
-}: MetricCardWithLineChartProps) {
-    const chartConfig = {
-        value: {
-            label: 'Value',
-            color: lineColor,
-        },
-    } satisfies ChartConfig;
-
+    value,
+    description,
+    format = 'number',
+    chartData,
+    chartColor = 'hsl(142 76% 36%)',
+    chartLabel = 'Value',
+    tooltipFormatter,
+    children,
+    className = '',
+}: DashboardCardProps) {
     const formatValue = (val: string | number) => {
         if (typeof val === 'string') return val;
 
         switch (format) {
             case 'currency':
-                return `$${val.toFixed(6)}`;
+                return val >= 1 ? `$${val.toFixed(2)}` : `$${val.toFixed(6)}`;
             case 'percentage':
                 return `${val}%`;
             case 'ms':
-                return `${val}ms`;
+                return `${val.toLocaleString()}ms`;
             default:
                 return val.toLocaleString();
         }
     };
 
+    const chartConfig: ChartConfig = {
+        value: {
+            label: chartLabel,
+            color: chartColor,
+        },
+    };
+
     return (
-        <div className="rounded-xl border border-border/40 bg-card p-5">
+        <div className={`rounded-xl border border-border/40 bg-card p-5 ${className}`}>
             {/* Header with icon and title */}
             <div className="flex items-center gap-2.5 mb-2">
                 {icon && (
@@ -72,13 +92,15 @@ export function MetricCardWithLineChart({
             {/* Value */}
             <p className="text-3xl font-semibold mb-1">{formatValue(value)}</p>
 
-            {/* Last update time */}
-            {lastUpdate && (
-                <p className="text-xs text-muted-foreground mb-2">{lastUpdate}</p>
+            {/* Description */}
+            {description && (
+                <p className="text-xs text-muted-foreground mb-3">{description}</p>
             )}
 
-            {/* Chart */}
-            {chartData.length > 0 && (
+            {/* Chart or custom children */}
+            {children ? (
+                <div className="mt-4">{children}</div>
+            ) : chartData && chartData.length > 0 ? (
                 <div className="h-28 mt-4">
                     <ChartContainer config={chartConfig} className="h-full w-full">
                         <BarChart
@@ -95,17 +117,22 @@ export function MetricCardWithLineChart({
                             />
                             <ChartTooltip
                                 cursor={false}
-                                content={<ChartTooltipContent hideLabel />}
+                                content={
+                                    <ChartTooltipContent
+                                        hideLabel
+                                        formatter={tooltipFormatter ? (val) => tooltipFormatter(Number(val)) : undefined}
+                                    />
+                                }
                             />
                             <Bar
                                 dataKey="value"
-                                fill={lineColor}
+                                fill={chartColor}
                                 radius={[3, 3, 0, 0]}
                             />
                         </BarChart>
                     </ChartContainer>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }

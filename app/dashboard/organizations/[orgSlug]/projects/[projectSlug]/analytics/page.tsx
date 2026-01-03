@@ -10,9 +10,10 @@ import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
 import { ModelUsageChart } from '@/components/analytics/ModelUsageChart';
 import { CostByProviderChart } from '@/components/analytics/CostByProviderChart';
 import { LatencyHistogram } from '@/components/analytics/LatencyHistogram';
+import { TokenUsageChart } from '@/components/analytics/TokenUsageChart';
 import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, BarChart3, Zap, DollarSign, Clock, Activity } from 'lucide-react';
+import { ChartBarIcon, ShieldExclamationIcon, CurrencyDollarIcon, ClockIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryKeys } from '@/lib/hooks/useQueries';
@@ -25,6 +26,7 @@ interface TrendData {
     blocked_output: number;
     error: number;
     cost: number;
+    tokens: number;
     avg_latency: number;
 }
 
@@ -161,13 +163,48 @@ export default function AnalyticsPage({ params }: PageProps) {
             <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <div className="text-center py-16 flex flex-col items-center">
                     <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                        <ChartBarIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium">Project not found</p>
                 </div>
             </div>
         );
     }
+
+    // Helper to format timestamps like "Jan 2, 4:30pm"
+    const formatTimestamp = (timestamp: string) => {
+        // For 10-minute intervals (format: "HH:MM") - add today's date context
+        if (timestamp.match(/^\d{2}:\d{2}$/)) {
+            const [hours, minutes] = timestamp.split(':').map(Number);
+            const period = hours >= 12 ? 'pm' : 'am';
+            const hour12 = hours % 12 || 12;
+            const now = new Date();
+            const month = now.toLocaleDateString(undefined, { month: 'short' });
+            const day = now.getDate();
+            return `${month} ${day}, ${hour12}:${minutes.toString().padStart(2, '0')}${period}`;
+        }
+        // For hourly (format: "YYYY-MM-DD HH:00")
+        if (timestamp.includes(' ')) {
+            const [datePart, timePart] = timestamp.split(' ');
+            const date = new Date(datePart);
+            const hours = parseInt(timePart.split(':')[0]);
+            const period = hours >= 12 ? 'pm' : 'am';
+            const hour12 = hours % 12 || 12;
+            return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${hour12}:00${period}`;
+        }
+        // For daily (format: "YYYY-MM-DD")
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return timestamp;
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+
+    // Get last update time from trends
+    const getLastUpdateTime = () => {
+        if (trends.length === 0) return undefined;
+        const lastWithData = [...trends].reverse().find(t => t.total > 0);
+        if (!lastWithData) return undefined;
+        return formatTimestamp(lastWithData.timestamp);
+    };
 
     return (
         <div className="w-full max-w-6xl mx-auto px-6 py-8">
@@ -193,52 +230,55 @@ export default function AnalyticsPage({ params }: PageProps) {
 
             {/* Primary Metrics - 5 columns */}
             {overview && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                     <MetricCardWithChart
-                        title="Requests"
+                        title="Database"
+                        subtitle="REST Requests"
+                        icon={<ChartBarIcon className="h-5 w-5" />}
                         value={overview.overview.total_requests}
+                        lastUpdate={getLastUpdateTime()}
                         chartData={trends.map(t => ({
-                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            label: formatTimestamp(t.timestamp),
                             value: t.total
                         }))}
-                        trend={calculateTrend(trends, t => t.total)}
                     />
                     <MetricCardWithLineChart
-                        title="Success Rate"
+                        title="Auth"
+                        subtitle="Success Rate"
+                        icon={<BoltIcon className="h-5 w-5" />}
                         value={overview.overview.success_rate}
                         format="percentage"
+                        lastUpdate={getLastUpdateTime()}
                         chartData={trends.map(t => ({
-                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            label: formatTimestamp(t.timestamp),
                             value: t.total > 0 ? Math.round((t.success / t.total) * 100) : 0
                         }))}
-                        trend={calculateTrend(trends, t => t.total > 0 ? (t.success / t.total) * 100 : 0)}
                     />
                     <MetricCardWithLineChart
-                        title="Total Cost"
+                        title="Billing"
+                        subtitle="Total Cost"
+                        icon={<CurrencyDollarIcon className="h-5 w-5" />}
                         value={overview.overview.total_cost}
                         format="currency"
+                        lastUpdate={getLastUpdateTime()}
                         chartData={trends.map(t => ({
-                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            label: formatTimestamp(t.timestamp),
                             value: t.cost
                         }))}
-                        trend={calculateTrend(trends, t => t.cost)}
                         lineColor="hsl(217, 91%, 60%)"
                     />
                     <MetricCardWithLineChart
-                        title="Avg Latency"
+                        title="Performance"
+                        subtitle="Avg Latency"
+                        icon={<ClockIcon className="h-5 w-5" />}
                         value={overview.overview.avg_latency}
                         format="ms"
+                        lastUpdate={getLastUpdateTime()}
                         chartData={trends.map(t => ({
-                            label: new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                            label: formatTimestamp(t.timestamp),
                             value: t.avg_latency
                         }))}
-                        trend={calculateTrend(trends, t => t.avg_latency)}
                         lineColor="hsl(24, 96%, 53%)"
-                    />
-                    <MetricCard
-                        title="Total Tokens"
-                        value={overview.overview.total_tokens}
-                        icon={<Zap className="h-3 w-3" />}
                     />
                 </div>
             )}
@@ -247,6 +287,13 @@ export default function AnalyticsPage({ params }: PageProps) {
             {trends.length > 0 && (
                 <div className="mb-6">
                     <RequestsAreaChart data={trends} groupBy={groupBy} />
+                </div>
+            )}
+
+            {/* Token Usage Chart - Full Width */}
+            {trends.length > 0 && (
+                <div className="mb-6">
+                    <TokenUsageChart data={trends} groupBy={groupBy} />
                 </div>
             )}
 
@@ -265,17 +312,17 @@ export default function AnalyticsPage({ params }: PageProps) {
                     <MetricCard
                         title="Security Incidents"
                         value={overview.overview.total_incidents}
-                        icon={<ShieldAlert className="h-3 w-3" />}
+                        icon={<ShieldExclamationIcon className="h-4 w-4" />}
                     />
                     <MetricCard
                         title="Critical"
                         value={overview.breakdown.incidents_by_severity.critical}
-                        icon={<ShieldAlert className="h-3 w-3 text-red-500" />}
+                        icon={<ShieldExclamationIcon className="h-4 w-4 text-red-500" />}
                     />
                     <MetricCard
                         title="High Priority"
                         value={overview.breakdown.incidents_by_severity.high}
-                        icon={<ShieldAlert className="h-3 w-3 text-orange-500" />}
+                        icon={<ShieldExclamationIcon className="h-4 w-4 text-orange-500" />}
                     />
                     <FailoverMetrics
                         projectId={projectId}
@@ -289,7 +336,7 @@ export default function AnalyticsPage({ params }: PageProps) {
             {overview && overview.overview.total_requests === 0 && (
                 <div className="text-center py-16 flex flex-col items-center rounded-lg border border-border/40 bg-card mt-6">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                        <Activity className="h-6 w-6 text-primary" />
+                        <BoltIcon className="h-6 w-6 text-primary" />
                     </div>
                     <p className="text-sm font-medium mb-1">No data yet</p>
                     <p className="text-xs text-muted-foreground max-w-[280px]">

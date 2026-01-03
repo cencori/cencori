@@ -4,38 +4,28 @@ import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
-    ChartLegend,
-    ChartLegendContent,
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
 
-interface TrendData {
+interface TokenData {
     timestamp: string;
-    total: number;
-    success: number;
-    filtered: number;
-    blocked_output: number;
-    error: number;
+    tokens: number;
 }
 
-interface RequestsAreaChartProps {
-    data: TrendData[];
+interface TokenUsageChartProps {
+    data: TokenData[];
     groupBy: 'hour' | 'day';
 }
 
 const chartConfig = {
-    success: {
-        label: 'Successful',
-        color: 'hsl(142, 71%, 45%)',
-    },
-    filtered: {
-        label: 'Filtered',
-        color: 'hsl(0, 84%, 60%)',
+    tokens: {
+        label: 'Tokens',
+        color: 'hsl(262, 83%, 58%)',
     },
 } satisfies ChartConfig;
 
-export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
+export function TokenUsageChart({ data, groupBy }: TokenUsageChartProps) {
     const formatXAxis = (timestamp: string) => {
         // For 10-minute intervals (format: "HH:MM")
         if (timestamp.match(/^\d{2}:\d{2}$/)) {
@@ -54,14 +44,21 @@ export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
         });
     };
 
+    const totalTokens = data.reduce((sum, d) => sum + d.tokens, 0);
+
     return (
         <div className="rounded-lg border border-border/40 bg-card p-5">
             <div className="mb-4">
-                <h3 className="text-sm font-medium">Requests Over Time</h3>
-                <p className="text-[11px] text-muted-foreground">Traffic analysis</p>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Token Usage</h3>
+                    <span className="text-xs font-mono text-muted-foreground">
+                        {totalTokens.toLocaleString()} total
+                    </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Tokens consumed over time</p>
             </div>
 
-            <div className="h-[280px] w-full">
+            <div className="h-[200px] w-full">
                 <ChartContainer config={chartConfig} className="h-full w-full">
                     <LineChart
                         data={data}
@@ -88,50 +85,31 @@ export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
                             tickMargin={8}
                             tickCount={4}
                             tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                            width={35}
+                            width={45}
+                            tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
                         />
                         <ChartTooltip
                             cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4' }}
-                            content={<ChartTooltipContent indicator="dot" />}
+                            content={<ChartTooltipContent />}
                         />
                         <Line
-                            dataKey="success"
+                            dataKey="tokens"
                             type="linear"
-                            stroke="var(--color-success)"
+                            stroke="var(--color-tokens)"
                             strokeWidth={2}
                             dot={{
                                 r: 4,
-                                fill: 'var(--color-success)',
+                                fill: 'var(--color-tokens)',
                                 stroke: 'hsl(var(--card))',
                                 strokeWidth: 2,
                             }}
                             activeDot={{
                                 r: 6,
-                                fill: 'var(--color-success)',
+                                fill: 'var(--color-tokens)',
                                 stroke: 'hsl(var(--card))',
                                 strokeWidth: 2,
                             }}
                         />
-                        <Line
-                            dataKey="filtered"
-                            type="linear"
-                            stroke="var(--color-filtered)"
-                            strokeWidth={2}
-                            strokeDasharray="6 4"
-                            dot={{
-                                r: 4,
-                                fill: 'var(--color-filtered)',
-                                stroke: 'hsl(var(--card))',
-                                strokeWidth: 2,
-                            }}
-                            activeDot={{
-                                r: 6,
-                                fill: 'var(--color-filtered)',
-                                stroke: 'hsl(var(--card))',
-                                strokeWidth: 2,
-                            }}
-                        />
-                        <ChartLegend content={<ChartLegendContent />} />
                     </LineChart>
                 </ChartContainer>
             </div>
