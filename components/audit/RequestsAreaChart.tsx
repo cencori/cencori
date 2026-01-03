@@ -1,6 +1,6 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -47,59 +47,84 @@ export function RequestsAreaChart({ data, groupBy }: RequestsAreaChartProps) {
     };
 
     return (
-        <div className="rounded-md border border-border/40 bg-card p-4">
-            <div className="mb-3">
-                <h3 className="text-xs font-medium">Requests Over Time</h3>
-                <p className="text-[10px] text-muted-foreground">Traffic analysis</p>
+        <div className="rounded-lg border border-border/40 bg-card p-5">
+            <div className="mb-4">
+                <h3 className="text-sm font-medium">Requests Over Time</h3>
+                <p className="text-[11px] text-muted-foreground">Traffic analysis</p>
             </div>
 
-            <div className="h-[200px] w-full">
+            <div className="h-[280px] w-full">
                 <ChartContainer config={chartConfig} className="h-full w-full">
-                    <AreaChart
+                    <LineChart
                         data={data}
-                        margin={{ left: 0, right: 0, top: 4, bottom: 0 }}
+                        margin={{ left: 0, right: 12, top: 12, bottom: 0 }}
                     >
-                        <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.3} />
+                        <CartesianGrid
+                            horizontal={true}
+                            vertical={false}
+                            strokeDasharray="0"
+                            strokeOpacity={0.15}
+                            stroke="hsl(var(--muted-foreground))"
+                        />
                         <XAxis
                             dataKey="timestamp"
                             tickLine={false}
                             axisLine={false}
-                            tickMargin={8}
+                            tickMargin={12}
                             tickFormatter={formatXAxis}
-                            tick={{ fontSize: 10 }}
+                            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                         />
                         <YAxis
                             tickLine={false}
                             axisLine={false}
-                            tickMargin={4}
+                            tickMargin={8}
                             tickCount={4}
-                            tick={{ fontSize: 10 }}
-                            width={30}
+                            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                            width={35}
                         />
                         <ChartTooltip
-                            cursor={false}
+                            cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4' }}
                             content={<ChartTooltipContent indicator="dot" />}
                         />
-                        <Area
-                            dataKey="filtered"
-                            type="monotone"
-                            fill="var(--color-filtered)"
-                            fillOpacity={0.3}
-                            stroke="var(--color-filtered)"
-                            strokeWidth={1.5}
-                            stackId="a"
-                        />
-                        <Area
+                        <Line
                             dataKey="success"
-                            type="monotone"
-                            fill="var(--color-success)"
-                            fillOpacity={0.3}
+                            type="linear"
                             stroke="var(--color-success)"
-                            strokeWidth={1.5}
-                            stackId="a"
+                            strokeWidth={2}
+                            dot={{
+                                r: 4,
+                                fill: 'var(--color-success)',
+                                stroke: 'hsl(var(--card))',
+                                strokeWidth: 2,
+                            }}
+                            activeDot={{
+                                r: 6,
+                                fill: 'var(--color-success)',
+                                stroke: 'hsl(var(--card))',
+                                strokeWidth: 2,
+                            }}
+                        />
+                        <Line
+                            dataKey="filtered"
+                            type="linear"
+                            stroke="var(--color-filtered)"
+                            strokeWidth={2}
+                            strokeDasharray="6 4"
+                            dot={{
+                                r: 4,
+                                fill: 'var(--color-filtered)',
+                                stroke: 'hsl(var(--card))',
+                                strokeWidth: 2,
+                            }}
+                            activeDot={{
+                                r: 6,
+                                fill: 'var(--color-filtered)',
+                                stroke: 'hsl(var(--card))',
+                                strokeWidth: 2,
+                            }}
                         />
                         <ChartLegend content={<ChartLegendContent />} />
-                    </AreaChart>
+                    </LineChart>
                 </ChartContainer>
             </div>
         </div>

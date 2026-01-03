@@ -83,46 +83,81 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch trends' }, { status: 500 });
         }
 
-        // Group data by time period
-        const trendData: Record<string, {
-            timestamp: string;
-            total: number;
-            success: number;
-            filtered: number;
-            blocked_output: number;
-            error: number;
-            cost: number;
-            avg_latency: number;
-            latencies: number[];
-        }> = {};
+        // Generate all time buckets for the range (including empty ones)
+        const generateAllBuckets = () => {
+            const buckets: Record<string, {
+                timestamp: string;
+                total: number;
+                success: number;
+                filtered: number;
+                blocked_output: number;
+                error: number;
+                cost: number;
+                avg_latency: number;
+                latencies: number[];
+            }> = {};
+
+            const current = new Date(startTime);
+            const end = new Date(now);
+
+            if (groupBy === '10min') {
+                // 10-minute intervals for last hour
+                while (current <= end) {
+                    const minutes = Math.floor(current.getMinutes() / 10) * 10;
+                    const key = `${String(current.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    buckets[key] = {
+                        timestamp: key,
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                    };
+                    current.setMinutes(current.getMinutes() + 10);
+                }
+            } else if (groupBy === 'hour') {
+                // Hourly buckets
+                current.setMinutes(0, 0, 0);
+                while (current <= end) {
+                    const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')} ${String(current.getHours()).padStart(2, '0')}:00`;
+                    buckets[key] = {
+                        timestamp: key,
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                    };
+                    current.setHours(current.getHours() + 1);
+                }
+            } else {
+                // Daily buckets
+                current.setHours(0, 0, 0, 0);
+                while (current <= end) {
+                    const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+                    buckets[key] = {
+                        timestamp: key,
+                        total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
+                    };
+                    current.setDate(current.getDate() + 1);
+                }
+            }
+
+            return buckets;
+        };
+
+        // Start with all buckets pre-filled with zeros
+        const trendData = generateAllBuckets();
 
         requests?.forEach(req => {
             const date = new Date(req.created_at);
             let key: string;
 
             if (groupBy === '10min') {
-                // Group by 10-minute intervals for last hour view
                 const minutes = Math.floor(date.getMinutes() / 10) * 10;
                 key = `${String(date.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
             } else if (groupBy === 'hour') {
-                // Group by hour
                 key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
             } else {
-                // Group by day
                 key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             }
 
             if (!trendData[key]) {
                 trendData[key] = {
                     timestamp: key,
-                    total: 0,
-                    success: 0,
-                    filtered: 0,
-                    blocked_output: 0,
-                    error: 0,
-                    cost: 0,
-                    avg_latency: 0,
-                    latencies: [],
+                    total: 0, success: 0, filtered: 0, blocked_output: 0, error: 0, cost: 0, avg_latency: 0, latencies: []
                 };
             }
 
@@ -138,20 +173,22 @@ export async function GET(
             }
         });
 
-        // Calculate averages and format response
-        const trends = Object.values(trendData).map(data => ({
-            timestamp: data.timestamp,
-            total: data.total,
-            success: data.success,
-            filtered: data.filtered,
-            blocked_output: data.blocked_output,
-            error: data.error,
-            success_rate: data.total > 0 ? Math.round((data.success / data.total) * 100) : 0,
-            cost: Math.round(data.cost * 1000000) / 1000000, // Round to 6 decimals
-            avg_latency: data.latencies.length > 0
-                ? Math.round(data.latencies.reduce((a, b) => a + b, 0) / data.latencies.length)
-                : 0,
-        }));
+        // Calculate averages and format response (sorted by timestamp)
+        const trends = Object.values(trendData)
+            .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+            .map(data => ({
+                timestamp: data.timestamp,
+                total: data.total,
+                success: data.success,
+                filtered: data.filtered,
+                blocked_output: data.blocked_output,
+                error: data.error,
+                success_rate: data.total > 0 ? Math.round((data.success / data.total) * 100) : 0,
+                cost: Math.round(data.cost * 1000000) / 1000000,
+                avg_latency: data.latencies.length > 0
+                    ? Math.round(data.latencies.reduce((a, b) => a + b, 0) / data.latencies.length)
+                    : 0,
+            }));
 
         return NextResponse.json({ trends, group_by: groupBy });
 
