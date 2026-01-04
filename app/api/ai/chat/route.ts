@@ -24,7 +24,7 @@ import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
 import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
-import { triggerFallbackWebhook } from '@/lib/webhooks';
+import { triggerFallbackWebhook, triggerSecurityWebhook } from '@/lib/webhooks';
 import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
 
 // Initialize providers
@@ -516,18 +516,28 @@ export async function POST(req: NextRequest) {
         const inputSecurity = checkInputSecurity(inputText, unifiedMessages, securityConfig);
 
         if (!inputSecurity.safe) {
+            const severity = inputSecurity.riskScore > 0.8 ? 'critical' : 'high';
+
             // Log security incident
             await supabase.from('security_incidents').insert({
                 project_id: project.id,
                 api_key_id: keyData.id,
                 incident_type: inputSecurity.layer,
-                severity: inputSecurity.riskScore > 0.8 ? 'critical' : 'high',
+                severity,
                 description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
                 input_text: inputText,
                 risk_score: inputSecurity.riskScore,
                 details: inputSecurity.details,
                 action_taken: 'blocked',
                 end_user_id: userId
+            });
+
+            // Trigger security webhook (fire and forget)
+            triggerSecurityWebhook(project.id, {
+                incident_type: inputSecurity.layer,
+                severity,
+                description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
+                end_user_id: userId || undefined,
             });
 
             return NextResponse.json(
@@ -767,6 +777,14 @@ export async function POST(req: NextRequest) {
                                     details: outputSecurity.details,
                                     action_taken: 'blocked_stream',
                                     end_user_id: userId
+                                });
+
+                                // Trigger security webhook (fire and forget)
+                                triggerSecurityWebhook(project.id, {
+                                    incident_type: 'output_leakage',
+                                    severity: 'critical',
+                                    description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
+                                    end_user_id: userId || undefined,
                                 });
 
                                 controller.close();
@@ -1018,6 +1036,14 @@ export async function POST(req: NextRequest) {
                 details: outputSecurity.details,
                 action_taken: 'blocked',
                 end_user_id: userId
+            });
+
+            // Trigger security webhook (fire and forget)
+            triggerSecurityWebhook(project.id, {
+                incident_type: 'output_leakage',
+                severity: 'critical',
+                description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
+                end_user_id: userId || undefined,
             });
 
             return NextResponse.json(

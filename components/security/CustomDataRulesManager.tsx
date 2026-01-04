@@ -9,7 +9,13 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Edit2, Zap, Type, Code, Braces, Sparkles, Shield, EyeOff, Ban } from "lucide-react";
+import {
+    PlusIcon, TrashIcon, PencilIcon,
+    Bars3BottomLeftIcon, CodeBracketIcon, CommandLineIcon, SparklesIcon,
+    ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon,
+    DocumentTextIcon, ChevronDownIcon, UserGroupIcon, HeartIcon,
+    CurrencyDollarIcon, ScaleIcon
+} from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,9 +36,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type MatchType = 'keywords' | 'regex' | 'json_path' | 'ai_detect';
 type ActionType = 'mask' | 'redact' | 'block';
@@ -66,25 +81,25 @@ interface CustomDataRulesManagerProps {
 
 const MATCH_TYPE_INFO = {
     keywords: {
-        icon: Type,
+        icon: Bars3BottomLeftIcon,
         label: 'Keywords',
         description: 'Comma-separated keywords to match',
         placeholder: 'eggs, mortality, crop yield, revenue',
     },
     regex: {
-        icon: Code,
+        icon: CodeBracketIcon,
         label: 'Regex',
         description: 'Regular expression pattern',
         placeholder: '\\d+\\s*eggs?|\\$[\\d,]+',
     },
     json_path: {
-        icon: Braces,
+        icon: CommandLineIcon,
         label: 'JSON Path',
         description: 'Paths to sensitive JSON fields',
         placeholder: '$.user.email, $.payment.card',
     },
     ai_detect: {
-        icon: Sparkles,
+        icon: SparklesIcon,
         label: 'AI Detect',
         description: 'Describe what to detect in plain English',
         placeholder: 'Farm production numbers like egg counts, mortality rates, and crop yields',
@@ -93,24 +108,215 @@ const MATCH_TYPE_INFO = {
 
 const ACTION_INFO = {
     mask: {
-        icon: EyeOff,
+        icon: EyeSlashIcon,
         label: 'Mask',
         description: 'Replace with ****',
         color: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400',
     },
     redact: {
-        icon: Shield,
+        icon: ShieldCheckIcon,
         label: 'Redact',
         description: 'Replace with [REDACTED]',
         color: 'bg-orange-500/20 text-orange-700 dark:text-orange-400',
     },
     block: {
-        icon: Ban,
+        icon: NoSymbolIcon,
         label: 'Block',
         description: 'Block entire request',
         color: 'bg-red-500/20 text-red-700 dark:text-red-400',
     },
 };
+
+// Pre-built rule templates for different industries
+interface RuleTemplate {
+    name: string;
+    description: string;
+    match_type: MatchType;
+    pattern: string;
+    case_sensitive: boolean;
+    action: ActionType;
+    priority: number;
+}
+
+interface TemplateCategory {
+    name: string;
+    icon: typeof ShieldCheckIcon;
+    color: string;
+    templates: RuleTemplate[];
+}
+
+const RULE_TEMPLATES: TemplateCategory[] = [
+    {
+        name: 'General PII',
+        icon: UserGroupIcon,
+        color: 'text-blue-500',
+        templates: [
+            {
+                name: 'Email Addresses',
+                description: 'Detect and mask email addresses',
+                match_type: 'regex',
+                pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+            {
+                name: 'Phone Numbers',
+                description: 'Detect phone numbers in various formats',
+                match_type: 'regex',
+                pattern: '(\\+\\d{1,3}[.-\\s]?)?(\\(?\\d{2,3}\\)?[.-\\s]?)?\\d{3,4}[.-\\s]?\\d{4}',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+            {
+                name: 'Social Security Numbers',
+                description: 'Block requests containing SSN patterns',
+                match_type: 'regex',
+                pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b',
+                case_sensitive: false,
+                action: 'block',
+                priority: 20,
+            },
+        ],
+    },
+    {
+        name: 'Healthcare (HIPAA)',
+        icon: HeartIcon,
+        color: 'text-red-500',
+        templates: [
+            {
+                name: 'Medical Record Numbers',
+                description: 'Detect MRN patterns',
+                match_type: 'regex',
+                pattern: 'MRN[:\\s]?\\d{6,10}|\\bMR\\d{7,}\\b',
+                case_sensitive: false,
+                action: 'redact',
+                priority: 15,
+            },
+            {
+                name: 'Patient Health Info',
+                description: 'AI detection for diagnoses, medications, symptoms',
+                match_type: 'ai_detect',
+                pattern: 'Patient health information including diagnoses, medications, symptoms, treatment plans, and medical conditions',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+            {
+                name: 'Insurance IDs',
+                description: 'Health insurance member IDs',
+                match_type: 'regex',
+                pattern: '\\b[A-Z]{3}\\d{9}\\b|\\bMEMBER[:\\s]?\\d{8,}\\b',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+        ],
+    },
+    {
+        name: 'Finance (PCI)',
+        icon: CurrencyDollarIcon,
+        color: 'text-green-500',
+        templates: [
+            {
+                name: 'Credit Card Numbers',
+                description: 'Block credit card number patterns',
+                match_type: 'regex',
+                pattern: '\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b',
+                case_sensitive: false,
+                action: 'block',
+                priority: 20,
+            },
+            {
+                name: 'Bank Account Numbers',
+                description: 'Mask bank account and routing numbers',
+                match_type: 'regex',
+                pattern: '\\b(account|acct)[:\\s#]?\\d{8,17}\\b|\\b(routing)[:\\s#]?\\d{9}\\b',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 15,
+            },
+            {
+                name: 'Financial Amounts',
+                description: 'AI detection for sensitive financial data',
+                match_type: 'ai_detect',
+                pattern: 'Sensitive financial information like account balances, transaction amounts over $10,000, salary information, or investment portfolio values',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 5,
+            },
+        ],
+    },
+    {
+        name: 'Agriculture',
+        icon: SparklesIcon,
+        color: 'text-amber-500',
+        templates: [
+            {
+                name: 'Production Metrics',
+                description: 'Farm production data like yields and counts',
+                match_type: 'keywords',
+                pattern: 'eggs, mortality rate, crop yield, harvest, bushels, head count, livestock count',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+            {
+                name: 'Farm Financials',
+                description: 'AI detection for farm financial data',
+                match_type: 'ai_detect',
+                pattern: 'Farm financial metrics including revenue per acre, cost per head, profit margins, and operational expenses',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 10,
+            },
+            {
+                name: 'Location Data',
+                description: 'Farm locations and GPS coordinates',
+                match_type: 'regex',
+                pattern: '-?\\d{1,3}\\.\\d{4,},\\s*-?\\d{1,3}\\.\\d{4,}|\\b(farm|field|plot)\\s+(location|address)\\b',
+                case_sensitive: false,
+                action: 'redact',
+                priority: 15,
+            },
+        ],
+    },
+    {
+        name: 'Legal',
+        icon: ScaleIcon,
+        color: 'text-purple-500',
+        templates: [
+            {
+                name: 'Case Numbers',
+                description: 'Court case and docket numbers',
+                match_type: 'regex',
+                pattern: '\\b(case|docket)[:\\s#]?\\d{2,4}[-/]?[A-Z]{0,3}[-/]?\\d{4,8}\\b',
+                case_sensitive: false,
+                action: 'redact',
+                priority: 10,
+            },
+            {
+                name: 'Attorney-Client Privilege',
+                description: 'AI detection for privileged communications',
+                match_type: 'ai_detect',
+                pattern: 'Attorney-client privileged information, legal advice, litigation strategy, or confidential legal communications',
+                case_sensitive: false,
+                action: 'block',
+                priority: 20,
+            },
+            {
+                name: 'Contract Terms',
+                description: 'Sensitive contract clauses and terms',
+                match_type: 'keywords',
+                pattern: 'confidential, proprietary, trade secret, non-disclosure, indemnification, termination clause',
+                case_sensitive: false,
+                action: 'mask',
+                priority: 5,
+            },
+        ],
+    },
+];
 
 export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProps) {
     const queryClient = useQueryClient();
@@ -263,6 +469,21 @@ export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProp
         }
     };
 
+    const handleApplyTemplate = (template: RuleTemplate) => {
+        setEditingRule(null);
+        setFormData({
+            name: template.name,
+            description: template.description,
+            match_type: template.match_type,
+            pattern: template.pattern,
+            case_sensitive: template.case_sensitive,
+            action: template.action,
+            priority: template.priority,
+        });
+        setIsDialogOpen(true);
+        toast.success(`Template "${template.name}" loaded. Review and save to create the rule.`);
+    };
+
     const matchTypeInfo = MATCH_TYPE_INFO[formData.match_type];
 
     if (isLoading) {
@@ -291,34 +512,104 @@ export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProp
                         Define patterns for your domain-specific sensitive data
                     </p>
                 </div>
-                <Button
-                    size="sm"
-                    className="h-8 text-xs gap-1.5"
-                    onClick={() => setIsDialogOpen(true)}
-                >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Rule
-                </Button>
+                <div className="flex items-center gap-2">
+                    {/* Templates Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs gap-1.5"
+                            >
+                                <DocumentTextIcon className="h-3.5 w-3.5" />
+                                Templates
+                                <ChevronDownIcon className="h-3 w-3 opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64 p-0">
+                            <div className="p-2 border-b border-border/50">
+                                <span className="text-xs font-medium">Pre-built Templates</span>
+                            </div>
+                            <ScrollArea className="h-80">
+                                {RULE_TEMPLATES.map((category, index) => {
+                                    const CategoryIcon = category.icon;
+                                    return (
+                                        <div key={category.name}>
+                                            {index > 0 && <DropdownMenuSeparator />}
+                                            <DropdownMenuLabel className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70 flex items-center gap-2 py-2 px-3 bg-muted/30">
+                                                <CategoryIcon className={`h-4 w-4 ${category.color}`} />
+                                                {category.name}
+                                            </DropdownMenuLabel>
+                                            {category.templates.map((template) => (
+                                                <DropdownMenuItem
+                                                    key={template.name}
+                                                    className="text-xs pl-8 cursor-pointer py-2 mx-1 rounded-md"
+                                                    onClick={() => handleApplyTemplate(template)}
+                                                >
+                                                    <div>
+                                                        <div className="font-medium">{template.name}</div>
+                                                        <div className="text-muted-foreground text-[10px] mt-0.5">
+                                                            {template.description}
+                                                        </div>
+                                                    </div>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </div>
+                                    );
+                                })}
+                            </ScrollArea>
+                            {/* Scroll indicator */}
+                            <div className="flex items-center justify-center py-1.5 border-t border-border/50 bg-gradient-to-t from-background to-transparent">
+                                <ChevronDownIcon className="h-3 w-3 text-muted-foreground animate-bounce" />
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Add Rule Button */}
+                    <Button
+                        size="sm"
+                        className="h-8 text-xs gap-1.5"
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        Add Rule
+                    </Button>
+                </div>
             </div>
 
             {/* Rules List */}
             {rules.length === 0 ? (
                 <div className="text-center py-12 border border-dashed border-border/50 rounded-lg">
                     <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center mx-auto mb-3">
-                        <Shield className="h-5 w-5 text-muted-foreground" />
+                        <ShieldCheckIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium">No custom rules yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Create rules to detect and protect your sensitive data
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                        Create custom rules or use pre-built templates for Healthcare, Finance, Agriculture, and more
                     </p>
-                    <Button
-                        size="sm"
-                        className="mt-4 h-8 text-xs gap-1.5"
-                        onClick={() => setIsDialogOpen(true)}
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        Create First Rule
-                    </Button>
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1.5"
+                            onClick={() => {
+                                // Apply first template as example
+                                const firstTemplate = RULE_TEMPLATES[0].templates[0];
+                                handleApplyTemplate(firstTemplate);
+                            }}
+                        >
+                            <DocumentTextIcon className="h-3.5 w-3.5" />
+                            Use Template
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="h-8 text-xs gap-1.5"
+                            onClick={() => setIsDialogOpen(true)}
+                        >
+                            <PlusIcon className="h-3.5 w-3.5" />
+                            Create Rule
+                        </Button>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -341,12 +632,10 @@ export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProp
                                             <span className="text-sm font-medium truncate">
                                                 {rule.name}
                                             </span>
-                                            <Badge variant="outline" className="text-[10px] h-5 gap-1">
-                                                <MatchIcon className="h-3 w-3" />
+                                            <Badge variant="outline" className="text-[10px] h-5">
                                                 {MATCH_TYPE_INFO[rule.match_type].label}
                                             </Badge>
-                                            <Badge className={`text-[10px] h-5 gap-1 ${ActionInfo.color}`}>
-                                                <ActionIcon className="h-3 w-3" />
+                                            <Badge className={`text-[10px] h-5 ${ActionInfo.color}`}>
                                                 {ActionInfo.label}
                                             </Badge>
                                         </div>
@@ -373,7 +662,7 @@ export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProp
                                             className="h-8 w-8"
                                             onClick={() => handleEdit(rule)}
                                         >
-                                            <Edit2 className="h-3.5 w-3.5" />
+                                            <PencilIcon className="h-3.5 w-3.5" />
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -381,7 +670,7 @@ export function CustomDataRulesManager({ projectId }: CustomDataRulesManagerProp
                                             className="h-8 w-8 text-destructive hover:text-destructive"
                                             onClick={() => deleteMutation.mutate(rule.id)}
                                         >
-                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <TrashIcon className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                 </div>
