@@ -519,18 +519,32 @@ export async function POST(req: NextRequest) {
             const severity = inputSecurity.riskScore > 0.8 ? 'critical' : 'high';
 
             // Log security incident
-            await supabase.from('security_incidents').insert({
+            const { error: incidentError } = await supabase.from('security_incidents').insert({
                 project_id: project.id,
                 api_key_id: keyData.id,
                 incident_type: inputSecurity.layer,
                 severity,
                 description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
                 input_text: inputText,
-                risk_score: inputSecurity.riskScore,
+                risk_score: Math.min(Math.max(inputSecurity.riskScore, 0), 1),
                 details: inputSecurity.details,
                 action_taken: 'blocked',
-                end_user_id: userId
+                end_user_id: userId,
+                blocked_at: 'input',
+                detection_method: inputSecurity.layer
             });
+
+            if (incidentError) {
+                console.error('[SECURITY] Failed to log incident:', incidentError);
+                console.error('[SECURITY] Insert data:', {
+                    project_id: project.id,
+                    incident_type: inputSecurity.layer,
+                    severity,
+                    risk_score: inputSecurity.riskScore
+                });
+            } else {
+                console.log('[SECURITY] Incident logged successfully for project:', project.id);
+            }
 
             // Trigger security webhook (fire and forget)
             triggerSecurityWebhook(project.id, {
@@ -773,10 +787,12 @@ export async function POST(req: NextRequest) {
                                     description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
                                     input_text: inputText,
                                     output_text: fullContent,
-                                    risk_score: outputSecurity.riskScore,
+                                    risk_score: Math.min(Math.max(outputSecurity.riskScore, 0), 1),
                                     details: outputSecurity.details,
                                     action_taken: 'blocked_stream',
-                                    end_user_id: userId
+                                    end_user_id: userId,
+                                    blocked_at: 'output',
+                                    detection_method: 'automated_check'
                                 });
 
                                 // Trigger security webhook (fire and forget)
@@ -1032,10 +1048,12 @@ export async function POST(req: NextRequest) {
                 description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
                 input_text: inputText,
                 output_text: response.content,
-                risk_score: outputSecurity.riskScore,
+                risk_score: Math.min(Math.max(outputSecurity.riskScore, 0), 1),
                 details: outputSecurity.details,
                 action_taken: 'blocked',
-                end_user_id: userId
+                end_user_id: userId,
+                blocked_at: 'output',
+                detection_method: 'automated_check'
             });
 
             // Trigger security webhook (fire and forget)

@@ -25,6 +25,13 @@ const PII_PATTERNS = {
 // Expanded harmful keywords
 const HARMFUL_KEYWORDS = [
     'ignore previous instructions',
+    'ignore all instructions',
+    'ignore your instructions',
+    'ignore the instructions',
+    'disregard previous instructions',
+    'disregard all instructions',
+    'forget your instructions',
+    'forget previous instructions',
     'system prompt',
     'you are now',
     'jailbreak',
@@ -51,6 +58,10 @@ const HARMFUL_KEYWORDS = [
     'developer mode',
     'full access',
     'give me the code for',
+    'pretend you are',
+    'act as if you are',
+    'you are DAN',
+    'in DAN mode',
 ];
 
 // Intent analysis - patterns suggesting indirect malicious requests

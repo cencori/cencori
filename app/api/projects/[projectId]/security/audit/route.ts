@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 
-// GET - Fetch security audit log
+// GET - Fetch security audit log (from both security_audit_log and security_incidents tables)
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -52,33 +52,102 @@ export async function GET(
             break;
     }
 
-    // Build query
-    let query = supabase
-        .from('security_audit_log')
-        .select('*', { count: 'exact' })
-        .eq('project_id', projectId)
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false })
-        .range((page - 1) * perPage, page * perPage - 1);
+    // Security incident types vs admin event types
+    const securityIncidentTypes = ['content_filter', 'intent_analysis', 'jailbreak', 'prompt_injection', 'output_leakage', 'pii_input', 'pii_output'];
+    const adminEventTypes = ['settings_updated', 'api_key_created', 'api_key_deleted', 'api_key_rotated', 'webhook_created', 'webhook_deleted', 'incident_reviewed', 'ip_blocked', 'rate_limit_exceeded', 'auth_failed'];
 
-    if (eventType && eventType !== 'all') {
-        query = query.eq('event_type', eventType);
+    const allLogs: Array<{
+        id: string;
+        event_type: string;
+        actor_email: string | null;
+        actor_ip: string | null;
+        details: Record<string, unknown>;
+        created_at: string;
+    }> = [];
+
+    // Query security_incidents table (for security violations)
+    if (!eventType || eventType === 'all' || securityIncidentTypes.includes(eventType)) {
+        let incidentsQuery = supabase
+            .from('security_incidents')
+            .select('*')
+            .eq('project_id', projectId)
+            .gte('created_at', startDate.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(perPage);
+
+        if (eventType && eventType !== 'all' && securityIncidentTypes.includes(eventType)) {
+            incidentsQuery = incidentsQuery.eq('incident_type', eventType);
+        }
+
+        const { data: incidents, error: incidentsError } = await incidentsQuery;
+
+        if (incidentsError) {
+            console.error('Error fetching security incidents:', incidentsError);
+        } else if (incidents) {
+            // Map incidents to audit log format
+            for (const incident of incidents) {
+                allLogs.push({
+                    id: incident.id,
+                    event_type: incident.incident_type,
+                    actor_email: null,
+                    actor_ip: null,
+                    details: {
+                        severity: incident.severity,
+                        description: incident.description,
+                        action_taken: incident.action_taken,
+                        risk_score: incident.risk_score,
+                        input_preview: typeof incident.input_text === 'string' ? incident.input_text.substring(0, 100) : null,
+                        ...(incident.details && typeof incident.details === 'object' ? incident.details : {}),
+                    },
+                    created_at: incident.created_at,
+                });
+            }
+        }
     }
 
-    const { data: logs, count, error: logsError } = await query;
+    // Query security_audit_log table (for admin events)
+    if (!eventType || eventType === 'all' || adminEventTypes.includes(eventType)) {
+        let auditQuery = supabase
+            .from('security_audit_log')
+            .select('*')
+            .eq('project_id', projectId)
+            .gte('created_at', startDate.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(perPage);
 
-    if (logsError) {
-        console.error('Error fetching audit logs:', logsError);
-        return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 });
+        if (eventType && eventType !== 'all' && adminEventTypes.includes(eventType)) {
+            auditQuery = auditQuery.eq('event_type', eventType);
+        }
+
+        const { data: auditLogs, error: auditError } = await auditQuery;
+
+        if (auditError) {
+            console.error('Error fetching audit logs:', auditError);
+        } else if (auditLogs) {
+            for (const log of auditLogs) {
+                allLogs.push({
+                    id: log.id,
+                    event_type: log.event_type,
+                    actor_email: log.actor_email,
+                    actor_ip: log.actor_ip,
+                    details: log.details || {},
+                    created_at: log.created_at,
+                });
+            }
+        }
     }
+
+    // Sort by created_at descending and paginate
+    allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const paginatedLogs = allLogs.slice((page - 1) * perPage, page * perPage);
 
     return NextResponse.json({
-        logs: logs || [],
+        logs: paginatedLogs,
         pagination: {
             page,
             per_page: perPage,
-            total: count || 0,
-            total_pages: Math.ceil((count || 0) / perPage),
+            total: allLogs.length,
+            total_pages: Math.ceil(allLogs.length / perPage),
         }
     });
 }
