@@ -175,6 +175,37 @@ export async function GET(
             }
         });
 
+        // Also fetch security incidents and add to filtered/blocked counts
+        const { data: incidents } = await supabaseAdmin
+            .from('security_incidents')
+            .select('created_at, incident_type, action_taken')
+            .eq('project_id', projectId)
+            .gte('created_at', startTime.toISOString());
+
+        incidents?.forEach(incident => {
+            const date = new Date(incident.created_at);
+            let key: string;
+
+            if (groupBy === '10min') {
+                const minutes = Math.floor(date.getMinutes() / 10) * 10;
+                key = `${String(date.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            } else if (groupBy === 'hour') {
+                key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
+            } else {
+                key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            }
+
+            if (trendData[key]) {
+                trendData[key].total++;
+                // Block actions count as blocked, everything else as filtered
+                if (incident.action_taken === 'blocked' || incident.incident_type === 'data_rule_block') {
+                    trendData[key].blocked_output++;
+                } else {
+                    trendData[key].filtered++;
+                }
+            }
+        });
+
         // Calculate averages and format response (sorted by timestamp)
         const trends = Object.values(trendData)
             .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
