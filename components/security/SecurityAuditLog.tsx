@@ -42,6 +42,10 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
     output_leakage: <AlertTriangle className="h-3 w-3" />,
     pii_input: <Shield className="h-3 w-3" />,
     pii_output: <Shield className="h-3 w-3" />,
+    // Data rule incidents
+    data_rule_block: <Shield className="h-3 w-3" />,
+    data_rule_mask: <Shield className="h-3 w-3" />,
+    data_rule_redact: <Shield className="h-3 w-3" />,
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -64,6 +68,10 @@ const EVENT_LABELS: Record<string, string> = {
     output_leakage: 'Output Leakage',
     pii_input: 'PII Detected (Input)',
     pii_output: 'PII Detected (Output)',
+    // Data rule incidents
+    data_rule_block: 'Data Rule Blocked',
+    data_rule_mask: 'Data Masked',
+    data_rule_redact: 'Data Redacted',
 };
 
 function useAuditLog(projectId: string, page: number, eventType: string, timeRange: string) {
