@@ -23,6 +23,7 @@ interface AuditLogEntry {
 }
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
+    // Admin events
     settings_updated: <Settings className="h-3 w-3" />,
     api_key_created: <Key className="h-3 w-3" />,
     api_key_deleted: <Key className="h-3 w-3" />,
@@ -33,9 +34,18 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
     ip_blocked: <AlertTriangle className="h-3 w-3" />,
     rate_limit_exceeded: <AlertTriangle className="h-3 w-3" />,
     auth_failed: <X className="h-3 w-3" />,
+    // Security incidents
+    content_filter: <Shield className="h-3 w-3" />,
+    intent_analysis: <Shield className="h-3 w-3" />,
+    jailbreak: <AlertTriangle className="h-3 w-3" />,
+    prompt_injection: <AlertTriangle className="h-3 w-3" />,
+    output_leakage: <AlertTriangle className="h-3 w-3" />,
+    pii_input: <Shield className="h-3 w-3" />,
+    pii_output: <Shield className="h-3 w-3" />,
 };
 
 const EVENT_LABELS: Record<string, string> = {
+    // Admin events
     settings_updated: 'Settings Updated',
     api_key_created: 'API Key Created',
     api_key_deleted: 'API Key Deleted',
@@ -46,6 +56,14 @@ const EVENT_LABELS: Record<string, string> = {
     ip_blocked: 'IP Blocked',
     rate_limit_exceeded: 'Rate Limit Exceeded',
     auth_failed: 'Auth Failed',
+    // Security incidents
+    content_filter: 'Content Blocked',
+    intent_analysis: 'Intent Blocked',
+    jailbreak: 'Jailbreak Attempt',
+    prompt_injection: 'Prompt Injection',
+    output_leakage: 'Output Leakage',
+    pii_input: 'PII Detected (Input)',
+    pii_output: 'PII Detected (Output)',
 };
 
 function useAuditLog(projectId: string, page: number, eventType: string, timeRange: string) {
@@ -125,6 +143,13 @@ export function SecurityAuditLog({ projectId }: SecurityAuditLogProps) {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all" className="text-xs">All events</SelectItem>
+                        <SelectItem value="content_filter" className="text-xs">Content Blocked</SelectItem>
+                        <SelectItem value="intent_analysis" className="text-xs">Intent Blocked</SelectItem>
+                        <SelectItem value="jailbreak" className="text-xs">Jailbreak Attempt</SelectItem>
+                        <SelectItem value="prompt_injection" className="text-xs">Prompt Injection</SelectItem>
+                        <SelectItem value="output_leakage" className="text-xs">Output Leakage</SelectItem>
+                        <SelectItem value="pii_input" className="text-xs">PII (Input)</SelectItem>
+                        <SelectItem value="pii_output" className="text-xs">PII (Output)</SelectItem>
                         <SelectItem value="settings_updated" className="text-xs">Settings Updated</SelectItem>
                         <SelectItem value="api_key_created" className="text-xs">API Key Created</SelectItem>
                         <SelectItem value="api_key_deleted" className="text-xs">API Key Deleted</SelectItem>
