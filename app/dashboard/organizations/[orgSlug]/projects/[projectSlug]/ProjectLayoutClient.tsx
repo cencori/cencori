@@ -158,7 +158,7 @@ function ProjectSidebarLink({
         <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip={label} isActive={isActive}>
                 <Link href={href} onMouseEnter={handleMouseEnter} onClick={onClick}>
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-[18px] w-[18px]" />
                     <span>{label}</span>
                 </Link>
             </SidebarMenuButton>
