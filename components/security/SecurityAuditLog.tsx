@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FileText, Key, Shield, Settings, Webhook, AlertTriangle, UserX as X } from 'lucide-react';
+import { ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 
 interface SecurityAuditLogProps {
     projectId: string;
@@ -30,22 +31,24 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
     api_key_rotated: <Key className="h-3 w-3" />,
     webhook_created: <Webhook className="h-3 w-3" />,
     webhook_deleted: <Webhook className="h-3 w-3" />,
-    incident_reviewed: <Shield className="h-3 w-3" />,
+    incident_reviewed: <WrenchScrewdriverIcon className="h-3 w-3" />,
     ip_blocked: <AlertTriangle className="h-3 w-3" />,
     rate_limit_exceeded: <AlertTriangle className="h-3 w-3" />,
     auth_failed: <X className="h-3 w-3" />,
     // Security incidents
-    content_filter: <Shield className="h-3 w-3" />,
-    intent_analysis: <Shield className="h-3 w-3" />,
+    content_filter: <WrenchScrewdriverIcon className="h-3 w-3" />,
+    intent_analysis: <WrenchScrewdriverIcon className="h-3 w-3" />,
     jailbreak: <AlertTriangle className="h-3 w-3" />,
     prompt_injection: <AlertTriangle className="h-3 w-3" />,
     output_leakage: <AlertTriangle className="h-3 w-3" />,
-    pii_input: <Shield className="h-3 w-3" />,
-    pii_output: <Shield className="h-3 w-3" />,
+    pii_input: <WrenchScrewdriverIcon className="h-3 w-3" />,
+    pii_output: <WrenchScrewdriverIcon className="h-3 w-3" />,
     // Data rule incidents
-    data_rule_block: <Shield className="h-3 w-3" />,
-    data_rule_mask: <Shield className="h-3 w-3" />,
-    data_rule_redact: <Shield className="h-3 w-3" />,
+    data_rule_block: <NoSymbolIcon className="h-3 w-3" />,
+    data_rule_mask: <EyeSlashIcon className="h-3 w-3" />,
+    data_rule_redact: <ShieldCheckIcon className="h-3 w-3" />,
+    // Other
+    input: <WrenchScrewdriverIcon className="h-3 w-3" />,
 };
 
 const EVENT_LABELS: Record<string, string> = {
