@@ -102,9 +102,12 @@ export async function GET(
     // Get trend data (incidents per day for last 7 days)
     const trendData: { date: string; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
-        const dayStart = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+        const dayStart = new Date();
+        dayStart.setUTCDate(dayStart.getUTCDate() - i);
+        dayStart.setUTCHours(0, 0, 0, 0);
+
+        const dayEnd = new Date(dayStart);
+        dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
         const { count } = await supabase
             .from('security_incidents')
