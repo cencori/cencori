@@ -153,10 +153,25 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
 
                     {/* Tabs */}
                     <Tabs defaultValue="request" className="w-full">
-                        <TabsList className="h-8 p-0.5">
-                            <TabsTrigger value="request" className="text-xs h-7 px-3">Request</TabsTrigger>
-                            <TabsTrigger value="response" className="text-xs h-7 px-3">Response</TabsTrigger>
-                            <TabsTrigger value="metrics" className="text-xs h-7 px-3">Metrics</TabsTrigger>
+                        <TabsList className="h-10 w-full justify-start gap-4 rounded-none border-b border-border/40 bg-transparent p-0">
+                            <TabsTrigger
+                                value="request"
+                                className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-4 text-xs font-medium text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                            >
+                                Request
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="response"
+                                className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-4 text-xs font-medium text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                            >
+                                Response
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="metrics"
+                                className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-4 text-xs font-medium text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                            >
+                                Metrics
+                            </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="request" className="mt-3 space-y-2">

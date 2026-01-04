@@ -212,9 +212,13 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                                                 {formatDate(incident.created_at)}
                                             </TableCell>
                                             <TableCell className="py-2.5">
-                                                <Badge variant="outline" className="text-[10px] h-5">
-                                                    {incident.blocked_at}
-                                                </Badge>
+                                                {incident.blocked_at ? (
+                                                    <Badge variant="outline" className="text-[10px] h-5">
+                                                        {incident.blocked_at}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="py-2.5 text-right text-xs font-mono text-muted-foreground">
                                                 {(incident.risk_score * 100).toFixed(0)}%
@@ -258,7 +262,7 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
                                     </div>
                                     <p className="text-xs mb-1.5">{formatIncidentType(incident.incident_type)}</p>
                                     <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                        <span>{incident.blocked_at} block</span>
+                                        <span>{incident.blocked_at ? `${incident.blocked_at} block` : '—'}</span>
                                         <span className="font-mono">Risk: {(incident.risk_score * 100).toFixed(0)}%</span>
                                     </div>
                                 </div>
