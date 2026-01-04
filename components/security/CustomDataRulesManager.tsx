@@ -11,10 +11,10 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     PlusIcon, TrashIcon, PencilIcon,
-    Bars3BottomLeftIcon, CodeBracketIcon, CommandLineIcon, SparklesIcon,
+    Bars3BottomLeftIcon, CodeBracketIcon, CommandLineIcon, CpuChipIcon,
     ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon,
     DocumentTextIcon, ChevronDownIcon, UserGroupIcon, HeartIcon,
-    CurrencyDollarIcon, ScaleIcon
+    CurrencyDollarIcon, ScaleIcon, GlobeAltIcon
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,7 +99,7 @@ const MATCH_TYPE_INFO = {
         placeholder: '$.user.email, $.payment.card',
     },
     ai_detect: {
-        icon: SparklesIcon,
+        icon: CpuChipIcon,
         label: 'AI Detect',
         description: 'Describe what to detect in plain English',
         placeholder: 'Farm production numbers like egg counts, mortality rates, and crop yields',
@@ -250,7 +250,7 @@ const RULE_TEMPLATES: TemplateCategory[] = [
     },
     {
         name: 'Agriculture',
-        icon: SparklesIcon,
+        icon: GlobeAltIcon,
         color: 'text-amber-500',
         templates: [
             {
