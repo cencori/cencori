@@ -114,6 +114,7 @@ async function getAndProcessCustomRules(
             .order('priority', { ascending: false });
 
         if (error || !rules || rules.length === 0) {
+            console.log('[CustomRules] No rules found for project:', projectId, error ? `Error: ${error.message}` : '');
             return {
                 rules: [],
                 inputResult: { content: inputText, wasProcessed: false, matchedRules: [], shouldBlock: false },
@@ -123,8 +124,16 @@ async function getAndProcessCustomRules(
             };
         }
 
+        console.log('[CustomRules] Fetched', rules.length, 'rules for project:', projectId);
+        rules.forEach((r, i) => console.log(`  [${i}] ${r.name} (${r.match_type}/${r.action}): ${r.pattern.substring(0, 50)}...`));
+
         // Process input with custom rules (keywords, regex, JSON path only - AI detect is async)
         const inputResult = await processCustomRules(inputText, rules);
+        console.log('[CustomRules] Input processing result:', {
+            wasProcessed: inputResult.wasProcessed,
+            shouldBlock: inputResult.shouldBlock,
+            matchedRules: inputResult.matchedRules.map(m => m.rule.name)
+        });
 
         // Process output if provided
         let outputResult: ProcessedContent | undefined;

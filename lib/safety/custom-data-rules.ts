@@ -253,6 +253,7 @@ export async function processCustomRules(
         }
 
         if (matchResult.matched) {
+            console.log(`[CustomRules] ✅ MATCHED: ${rule.name} (${rule.match_type}), snippets:`, matchResult.snippets);
             matchedRules.push({ ...matchResult, rule });
 
             // Apply action
@@ -267,6 +268,8 @@ export async function processCustomRules(
                     processedText = applyRedact(processedText, matchResult.snippets);
                     break;
             }
+        } else {
+            console.log(`[CustomRules] ❌ No match: ${rule.name} (${rule.match_type})`);
         }
     }
 
