@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
+// Helper to map security incident types to log statuses
+function mapIncidentTypeToStatus(incidentType: string, actionTaken?: string): string {
+    // Block actions → blocked status
+    if (actionTaken === 'blocked' || incidentType === 'data_rule_block') {
+        return 'blocked_output';
+    }
+    // Rate limit
+    if (incidentType === 'rate_limit_exceeded') {
+        return 'rate_limited';
+    }
+    // Mask/Redact/Filter → filtered status
+    return 'filtered';
+}
+
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -151,16 +165,77 @@ export async function GET(
                 error_message: req.error_message,
                 filtered_reasons: req.filtered_reasons,
                 request_preview: requestPreview,
+                source: 'ai_request' as const,
             };
         }) || [];
 
+        // Also fetch security incidents if status filter matches blocked/filtered types
+        const shouldIncludeSecurityIncidents =
+            !status || status === 'all' ||
+            ['filtered', 'blocked_output', 'rate_limited', 'blocked'].includes(status);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let securityIncidents: any[] = [];
+
+        if (shouldIncludeSecurityIncidents) {
+            let incidentsQuery = supabaseAdmin
+                .from('security_incidents')
+                .select('*')
+                .eq('project_id', projectId);
+
+            if (startTime) {
+                incidentsQuery = incidentsQuery.gte('created_at', startTime.toISOString());
+            }
+
+            // Map status filter to incident types
+            if (status && status !== 'all') {
+                if (status === 'filtered') {
+                    incidentsQuery = incidentsQuery.in('incident_type', ['content_filter', 'jailbreak', 'prompt_injection', 'pii_input', 'data_rule_mask', 'data_rule_redact']);
+                } else if (status === 'blocked_output' || status === 'blocked') {
+                    incidentsQuery = incidentsQuery.in('incident_type', ['output_leakage', 'pii_output', 'data_rule_block']);
+                } else if (status === 'rate_limited') {
+                    incidentsQuery = incidentsQuery.eq('incident_type', 'rate_limit_exceeded');
+                }
+            }
+
+            const { data: incidents } = await incidentsQuery
+                .order('created_at', { ascending: false })
+                .limit(perPage);
+
+            // Map security incidents to match request log format
+            securityIncidents = (incidents || []).map(incident => ({
+                id: incident.id,
+                created_at: incident.created_at,
+                status: mapIncidentTypeToStatus(incident.incident_type, incident.action_taken),
+                model: '—',
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+                cost_usd: 0,
+                latency_ms: 0,
+                safety_score: incident.risk_score,
+                error_message: incident.description,
+                filtered_reasons: [incident.incident_type],
+                request_preview: incident.input_text?.substring(0, 100) || incident.description || '',
+                source: 'security_incident' as const,
+            }));
+        }
+
+        // Merge and sort by created_at
+        const allLogs = [...formattedRequests, ...securityIncidents]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, perPage);
+
+        // Calculate combined total (approximate - we'd need another query for exact count with incidents)
+        const totalWithIncidents = (count || 0) + securityIncidents.length;
+
         return NextResponse.json({
-            requests: formattedRequests,
+            requests: allLogs,
             pagination: {
                 page,
                 per_page: perPage,
-                total: count || 0,
-                total_pages: Math.ceil((count || 0) / perPage),
+                total: totalWithIncidents,
+                total_pages: Math.ceil(totalWithIncidents / perPage),
             },
         });
 
