@@ -60,7 +60,7 @@ export default function RequestLogsPage({ params }: PageProps) {
     const [filters, setFilters] = useState({
         status: 'all',
         model: 'all',
-        time_range: '1h',
+        time_range: '7d',
         search: '',
     });
     const [searchInput, setSearchInput] = useState('');
