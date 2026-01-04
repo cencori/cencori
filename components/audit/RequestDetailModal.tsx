@@ -97,12 +97,45 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
     if (loading || !request) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-[500px] p-0 top-[15%] translate-y-0">
-                    <DialogHeader className="px-4 pt-4 pb-3">
-                        <DialogTitle className="text-sm font-medium">Loading...</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <DialogContent className="sm:max-w-[540px] p-0 top-[10%] translate-y-0">
+                    {/* Skeleton Header */}
+                    <div className="px-4 pt-4 pb-3 border-b border-border/40">
+                        <div className="flex items-center gap-2">
+                            <div className="h-4 w-28 bg-secondary/80 rounded animate-pulse" />
+                            <div className="h-5 w-16 bg-emerald-500/20 rounded animate-pulse" />
+                        </div>
+                        <div className="h-3 w-48 bg-secondary/60 rounded animate-pulse mt-1.5" />
+                    </div>
+
+                    {/* Skeleton Content */}
+                    <div className="px-4 py-3 space-y-4">
+                        {/* Security Section */}
+                        <div>
+                            <div className="h-3 w-24 bg-secondary/60 rounded animate-pulse mb-2" />
+                            <div className="rounded-md border border-border/40 p-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="h-3 w-20 bg-secondary/60 rounded animate-pulse" />
+                                    <div className="h-4 w-10 bg-secondary/80 rounded animate-pulse" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabs Skeleton */}
+                        <div className="flex gap-4 border-b border-border/40 pb-2">
+                            <div className="h-3 w-14 bg-secondary/80 rounded animate-pulse" />
+                            <div className="h-3 w-16 bg-secondary/60 rounded animate-pulse" />
+                            <div className="h-3 w-14 bg-secondary/60 rounded animate-pulse" />
+                        </div>
+
+                        {/* Metrics Grid Skeleton */}
+                        <div className="grid grid-cols-3 gap-3">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="rounded-md border border-border/40 p-2.5">
+                                    <div className="h-2.5 w-16 bg-secondary/60 rounded animate-pulse mb-1.5" />
+                                    <div className="h-4 w-10 bg-secondary/80 rounded animate-pulse" />
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
