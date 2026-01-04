@@ -4,17 +4,14 @@ import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { SeverityBadge } from './SeverityBadge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ExternalLink, CheckCircle, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Loader2, ExternalLink, CheckCircle2, XCircle, ShieldAlert, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -111,7 +108,13 @@ export function IncidentDetailModal({ projectId, incidentId, open, onOpenChange,
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString();
+        return new Date(dateString).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
     };
 
     const formatIncidentType = (type: string) => {
@@ -123,190 +126,134 @@ export function IncidentDetailModal({ projectId, incidentId, open, onOpenChange,
     if (loading || !incident) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Loading Incident Details</DialogTitle>
-                    </DialogHeader>
+                <DialogContent className="max-w-lg">
                     <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 </DialogContent>
             </Dialog>
         );
     }
 
+    const riskPercent = Math.round((incident.risk_score || 0) * 100);
+    const hasPatterns = incident.details?.patterns_detected && incident.details.patterns_detected.length > 0;
+    const hasReasons = incident.details?.reasons && incident.details.reasons.length > 0;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        Security Incident
+            <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+                {/* Header */}
+                <DialogHeader className="px-5 pt-5 pb-4 pr-12 border-b border-border/40">
+                    <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                            <DialogTitle className="text-base font-semibold flex items-center gap-2">
+                                Security Incident
+                            </DialogTitle>
+                            <p className="text-xs text-muted-foreground">
+                                {formatDate(incident.created_at)}
+                            </p>
+                        </div>
                         <SeverityBadge severity={incident.severity} />
-                    </DialogTitle>
-                    <DialogDescription>
-                        {formatDate(incident.created_at)} • {formatIncidentType(incident.incident_type)}
-                    </DialogDescription>
+                    </div>
                 </DialogHeader>
 
-                <div className="space-y-6">
-                    {/* Key Metrics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Risk Score</p>
-                            <p className="text-2xl font-bold font-mono">
-                                {(incident.risk_score * 100).toFixed(0)}%
-                            </p>
+                <div className="px-5 py-4 space-y-4">
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                        <div className="bg-secondary/50 rounded-md p-2.5 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Risk</p>
+                            <p className="text-lg font-semibold font-mono">{riskPercent}%</p>
                         </div>
-                        <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Confidence</p>
-                            <p className="text-2xl font-bold font-mono">
-                                {(incident.confidence * 100).toFixed(0)}%
-                            </p>
+                        <div className="bg-secondary/50 rounded-md p-2.5 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Type</p>
+                            <p className="text-xs font-medium capitalize truncate">{incident.incident_type}</p>
                         </div>
-                        <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Blocked At</p>
-                            <p className="text-lg font-bold capitalize">{incident.blocked_at}</p>
+                        <div className="bg-secondary/50 rounded-md p-2.5 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Blocked</p>
+                            <p className="text-xs font-medium capitalize">{incident.blocked_at || '—'}</p>
                         </div>
-                        <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Status</p>
-                            <p className="text-lg font-bold">
-                                {incident.reviewed ? (
-                                    <span className="text-green-600">✓ Reviewed</span>
-                                ) : (
-                                    <span className="text-yellow-600">⋯ Pending</span>
-                                )}
+                        <div className="bg-secondary/50 rounded-md p-2.5 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Status</p>
+                            <p className={`text-xs font-medium ${incident.reviewed ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                {incident.reviewed ? 'Reviewed' : 'Pending'}
                             </p>
                         </div>
                     </div>
 
-                    <Separator />
-
-                    {/* Detected Patterns */}
-                    {incident.details.patterns_detected && incident.details.patterns_detected.length > 0 && (
-                        <div>
-                            <h3 className="text-sm font-semibold mb-3">Detected Patterns</h3>
-                            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
-                                <ul className="space-y-2">
-                                    {incident.details.patterns_detected.map((pattern, i) => (
-                                        <li key={i} className="flex items-start gap-2 text-sm">
-                                            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                                            <span>{pattern}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                    {/* Detection Details */}
+                    {(hasPatterns || hasReasons) && (
+                        <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                            <div className="px-3 py-2 border-b border-border/40 bg-secondary/30">
+                                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Detection Details</p>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Blocked Content */}
-                    {incident.details.blocked_content && (
-                        <div>
-                            <h3 className="text-sm font-semibold mb-3">Blocked Content</h3>
-                            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                                <p className="text-sm font-medium text-red-600 dark:text-red-500 mb-2">
-                                    Type: {incident.details.blocked_content.type}
-                                </p>
-                                <p className="text-xs text-muted-foreground mb-2">Examples:</p>
-                                <ul className="space-y-1">
-                                    {incident.details.blocked_content.examples.slice(0, 5).map((example, i) => (
-                                        <li key={i} className="text-sm font-mono text-red-600/80 dark:text-red-500/80">
-                                            • {example}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Reasons */}
-                    {incident.details.reasons && incident.details.reasons.length > 0 && (
-                        <div>
-                            <h3 className="text-sm font-semibold mb-3">Detection Reasons</h3>
-                            <ul className="space-y-1 text-sm text-muted-foreground">
-                                {incident.details.reasons.map((reason, i) => (
-                                    <li key={i}>• {reason}</li>
+                            <div className="p-3 space-y-2">
+                                {hasPatterns && incident.details.patterns_detected!.map((pattern, i) => (
+                                    <div key={i} className="flex items-start gap-2">
+                                        <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                        <span className="text-xs text-muted-foreground">{pattern}</span>
+                                    </div>
                                 ))}
-                            </ul>
+                                {hasReasons && incident.details.reasons!.map((reason, i) => (
+                                    <div key={`reason-${i}`} className="flex items-start gap-2">
+                                        <XCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                        <span className="text-xs text-muted-foreground">{reason}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
                     {/* Related Request */}
                     {incident.related_request && (
-                        <>
-                            <Separator />
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3">Related AI Request</h3>
-                                <div className="rounded-lg border p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div>
-                                            <p className="text-sm font-medium">
-                                                {incident.related_request.model}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatDate(incident.related_request.created_at)}
-                                            </p>
-                                        </div>
-                                        <Badge variant="outline">
-                                            {incident.related_request.status}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                                        {incident.related_request.preview || 'No preview available'}
-                                    </p>
-                                    <Link
-                                        href={`?view=logs&request=${incident.related_request.id}`}
-                                        className="inline-flex items-center text-sm text-blue-600 hover:underline"
-                                    >
-                                        View Full Request
-                                        <ExternalLink className="ml-1 h-3 w-3" />
-                                    </Link>
+                        <div className="rounded-md border border-border/40 bg-card p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] h-5">{incident.related_request.model}</Badge>
+                                    <span className="text-[10px] text-muted-foreground">{formatDate(incident.related_request.created_at)}</span>
                                 </div>
+                                <Link
+                                    href={`?view=logs&request=${incident.related_request.id}`}
+                                    className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                                >
+                                    View <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
                             </div>
-                        </>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{incident.related_request.preview || 'No preview'}</p>
+                        </div>
                     )}
 
-                    <Separator />
-
                     {/* Review Section */}
-                    <div>
-                        <h3 className="text-sm font-semibold mb-3">Review</h3>
-                        <div className="space-y-3">
-                            <Textarea
-                                placeholder="Add review notes (optional)..."
-                                value={reviewNotes}
-                                onChange={(e) => setReviewNotes(e.target.value)}
-                                rows={3}
-                                className="text-sm"
-                            />
-                            <div className="flex items-center justify-between">
-                                <div className="text-xs text-muted-foreground">
-                                    {incident.reviewed && incident.reviewed_at && (
-                                        <span>Reviewed on {formatDate(incident.reviewed_at)}</span>
-                                    )}
-                                </div>
-                                <Button
-                                    onClick={handleMarkReviewed}
-                                    disabled={reviewing}
-                                    variant={incident.reviewed ? 'outline' : 'default'}
-                                >
-                                    {reviewing ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Updating...
-                                        </>
-                                    ) : incident.reviewed ? (
-                                        <>
-                                            <AlertTriangle className="mr-2 h-4 w-4" />
-                                            Mark as Unreviewed
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Mark as Reviewed
-                                        </>
-                                    )}
-                                </Button>
+                    <div className="space-y-3 pt-2 border-t border-border/40">
+                        <Textarea
+                            placeholder="Add review notes (optional)..."
+                            value={reviewNotes}
+                            onChange={(e) => setReviewNotes(e.target.value)}
+                            rows={2}
+                            className="text-xs resize-none"
+                        />
+                        <div className="flex items-center justify-between">
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                {incident.reviewed && incident.reviewed_at && (
+                                    <>
+                                        <Clock className="h-3 w-3" />
+                                        <span>Reviewed {formatDate(incident.reviewed_at)}</span>
+                                    </>
+                                )}
                             </div>
+                            <Button
+                                onClick={handleMarkReviewed}
+                                disabled={reviewing}
+                                size="sm"
+                                variant={incident.reviewed ? 'outline' : 'default'}
+                                className="h-8 text-xs gap-1.5"
+                            >
+                                {reviewing ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                )}
+                                {reviewing ? 'Saving...' : incident.reviewed ? 'Mark Unreviewed' : 'Mark Reviewed'}
+                            </Button>
                         </div>
                     </div>
                 </div>
