@@ -586,6 +586,25 @@ export async function POST(req: NextRequest) {
                 .filter(r => r.rule.action === 'block')
                 .map(r => r.rule.name);
 
+            // Log the security incident for blocked data rule
+            const blockRule = customRulesResult.inputResult.matchedRules.find(r => r.rule.action === 'block');
+            if (blockRule) {
+                const { error: incidentError } = await supabase.from('security_incidents').insert({
+                    project_id: project.id,
+                    incident_type: 'data_rule_block',
+                    severity: 'high',
+                    risk_score: 0.8,
+                    description: `Blocked by data rule: ${blockRule.rule.name}`,
+                    input_text: inputText.substring(0, 500),
+                    blocked_at: 'input',
+                    detection_method: 'custom_data_rule',
+                    action_taken: 'blocked'
+                });
+                if (incidentError) {
+                    console.error('[CustomRules] Failed to log block incident:', incidentError);
+                }
+            }
+
             return NextResponse.json(
                 {
                     error: 'Request blocked by data rule',
@@ -594,6 +613,46 @@ export async function POST(req: NextRequest) {
                 },
                 { status: 403 }
             );
+        }
+
+        // Log mask/redact rule matches as incidents (lower severity)
+        if (customRulesResult.inputResult.wasProcessed && customRulesResult.inputResult.matchedRules.length > 0) {
+            const processedRules = customRulesResult.inputResult.matchedRules
+                .filter(r => r.rule.action === 'mask' || r.rule.action === 'redact');
+
+            for (const match of processedRules) {
+                const { error: incidentError } = await supabase.from('security_incidents').insert({
+                    project_id: project.id,
+                    incident_type: `data_rule_${match.rule.action}`,
+                    severity: 'medium',
+                    risk_score: 0.5,
+                    description: `Data ${match.rule.action}ed by rule: ${match.rule.name}`,
+                    input_text: inputText.substring(0, 500),
+                    blocked_at: 'input',
+                    detection_method: 'custom_data_rule',
+                    action_taken: match.rule.action
+                });
+                if (incidentError) {
+                    console.error(`[CustomRules] Failed to log ${match.rule.action} incident:`, incidentError);
+                }
+            }
+        }
+
+        // Apply mask/redact processing to the input messages
+        if (customRulesResult.inputResult.wasProcessed && !customRulesResult.inputResult.shouldBlock) {
+            // Find the last user message and replace its content with the processed version
+            const lastUserIndex = unifiedMessages.map(m => m.role).lastIndexOf('user');
+            if (lastUserIndex !== -1) {
+                const processedContent = customRulesResult.inputResult.content;
+                unifiedMessages[lastUserIndex] = {
+                    ...unifiedMessages[lastUserIndex],
+                    content: processedContent
+                };
+                console.log('[CustomRules] Applied mask/redact to input:', {
+                    original: inputText.substring(0, 100),
+                    processed: processedContent.substring(0, 100)
+                });
+            }
         }
 
         // 4. Determine model and provider
