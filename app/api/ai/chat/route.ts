@@ -1094,9 +1094,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // If still no response, throw the last error
+        // If still no response, provide a helpful error message
         if (!response) {
-            throw lastError || new Error('All providers failed');
+            const isCircuitError = lastError?.message?.includes('circuit is open');
+            const errorMessage = isCircuitError
+                ? `The AI provider (${providerName}) is temporarily unavailable due to repeated failures. Please try again in 60 seconds, or add a backup provider in Settings → Providers.`
+                : `All AI providers failed. Please try again or check your provider configuration.`;
+
+            console.error(`[AI Chat] All providers failed:`, lastError?.message);
+
+            return NextResponse.json(
+                {
+                    error: 'Provider temporarily unavailable',
+                    message: errorMessage,
+                    retry_after: isCircuitError ? 60 : undefined,
+                },
+                { status: 503 }
+            );
         }
 
         // Output Security Check
