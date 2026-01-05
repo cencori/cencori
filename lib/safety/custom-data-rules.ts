@@ -123,16 +123,24 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 
 /**
  * AI Detect - Uses Gemini 2.5 Flash to classify sensitive data
+ * Has a 5 second timeout to prevent blocking requests
  */
 export async function matchAIDetect(
     text: string,
     sensitiveDescription: string
 ): Promise<{ matched: boolean; snippets: string[] }> {
+    const TIMEOUT_MS = 5000; // 5 second timeout
+
     try {
         // Use Gemini 2.5 Flash for classification
         const gemini = new GeminiProvider();
 
-        const response = await gemini.chat({
+        // Create a timeout promise
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('AI Detect timeout')), TIMEOUT_MS);
+        });
+
+        const chatPromise = gemini.chat({
             model: 'gemini-2.5-flash',
             messages: [
                 {
@@ -158,6 +166,9 @@ Respond with JSON only.`
             maxTokens: 200,
         });
 
+        // Race between timeout and actual call
+        const response = await Promise.race([chatPromise, timeoutPromise]);
+
         // Parse the response
         const content = response.content.trim();
 
@@ -174,7 +185,8 @@ Respond with JSON only.`
             snippets: Array.isArray(result.snippets) ? result.snippets : [],
         };
     } catch (error) {
-        console.error('[AI Detect] Classification failed:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn('[AI Detect] Classification failed:', errorMessage);
         return { matched: false, snippets: [] };
     }
 }
@@ -244,9 +256,13 @@ export async function processCustomRules(
                     : { matched: false, snippets: [] };
                 break;
             case 'ai_detect':
-                // AI detect runs async - for now, skip in sync processing
-                // This will be handled in background job
-                matchResult = { matched: false, snippets: [] };
+                // AI detect runs async - call the matchAIDetect function
+                try {
+                    matchResult = await matchAIDetect(text, rule.pattern);
+                } catch (error) {
+                    console.warn(`[CustomRules] AI-detect failed for rule ${rule.name}:`, error);
+                    matchResult = { matched: false, snippets: [] };
+                }
                 break;
             default:
                 matchResult = { matched: false, snippets: [] };
