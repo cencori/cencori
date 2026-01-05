@@ -16,7 +16,7 @@ export const Hero = () => {
                 <div className="mb-8 animate-appear">
                     <Link href="/changelog" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                        <span className="mr-2">Coming Soon.</span>
+                        <span className="mr-2">Try AI Gateway for free.</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
                 </div>
