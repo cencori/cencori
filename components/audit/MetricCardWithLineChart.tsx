@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Bar, BarChart, XAxis } from 'recharts';
+import { Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
     ChartConfig,
     ChartContainer,
@@ -81,9 +81,9 @@ export function MetricCardWithLineChart({
             {chartData.length > 0 && (
                 <div className="h-28 mt-4">
                     <ChartContainer config={chartConfig} className="h-full w-full">
-                        <BarChart
+                        <LineChart
                             data={chartData}
-                            margin={{ top: 0, right: 0, bottom: 20, left: 0 }}
+                            margin={{ top: 5, right: 5, bottom: 20, left: 0 }}
                         >
                             <XAxis
                                 dataKey="label"
@@ -93,16 +93,19 @@ export function MetricCardWithLineChart({
                                 tickMargin={8}
                                 interval="preserveStartEnd"
                             />
+                            <YAxis hide />
                             <ChartTooltip
                                 cursor={false}
                                 content={<ChartTooltipContent hideLabel />}
                             />
-                            <Bar
+                            <Line
+                                type="monotone"
                                 dataKey="value"
-                                fill={lineColor}
-                                radius={[3, 3, 0, 0]}
+                                stroke={lineColor}
+                                strokeWidth={2}
+                                dot={false}
                             />
-                        </BarChart>
+                        </LineChart>
                     </ChartContainer>
                 </div>
             )}
