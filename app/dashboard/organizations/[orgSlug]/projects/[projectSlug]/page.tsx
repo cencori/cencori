@@ -533,22 +533,22 @@ export default function ProjectDetailsPage({
           {/* Activity and Info */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Recent Activity */}
-            <div className="rounded-md border border-border/40 bg-card p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="rounded-xl border border-border/40 bg-card p-5">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-xs font-medium">Recent Activity</h3>
-                  <p className="text-[10px] text-muted-foreground">Latest updates</p>
+                  <h3 className="text-sm font-medium">Recent Activity</h3>
+                  <p className="text-xs text-muted-foreground">Latest updates</p>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 text-xs" asChild>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                   <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`}>
                     View All
                   </Link>
                 </Button>
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex gap-2.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                  <div key={activity.id} className="flex gap-3">
+                    <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
                     <div>
                       <p className="text-xs">{activity.message}</p>
                       <p className="text-[10px] text-muted-foreground">{activity.timestamp}</p>
@@ -559,12 +559,12 @@ export default function ProjectDetailsPage({
             </div>
 
             {/* Project Information */}
-            <div className="rounded-md border border-border/40 bg-card p-4">
-              <div className="mb-3">
-                <h3 className="text-xs font-medium">Project Information</h3>
-                <p className="text-[10px] text-muted-foreground">Basic details</p>
+            <div className="rounded-xl border border-border/40 bg-card p-5">
+              <div className="mb-4">
+                <h3 className="text-sm font-medium">Project Information</h3>
+                <p className="text-xs text-muted-foreground">Basic details</p>
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Organization</span>
                   <span className="font-medium">{organization.name}</span>
@@ -575,12 +575,12 @@ export default function ProjectDetailsPage({
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Visibility</span>
-                  <Badge variant="outline" className="h-4 text-[10px] px-1.5">{project.visibility}</Badge>
+                  <Badge variant="outline" className="h-5 text-[10px] px-2">{project.visibility}</Badge>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Status</span>
-                  <Badge variant="outline" className="h-4 text-[10px] px-1.5 gap-1">
-                    <span className={`size-1 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  <Badge variant="outline" className="h-5 text-[10px] px-2 gap-1">
+                    <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
                     {project.status}
                   </Badge>
                 </div>

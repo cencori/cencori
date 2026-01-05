@@ -3,7 +3,6 @@
 import { useState, use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { MetricCard } from '@/components/audit/MetricCard';
 import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
 import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
 import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
@@ -309,20 +308,38 @@ export default function AnalyticsPage({ params }: PageProps) {
             {/* Security & Failover Row */}
             {overview && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <MetricCard
+                    <MetricCardWithLineChart
                         title="Security Incidents"
+                        subtitle="Total detected"
                         value={overview.overview.total_incidents}
-                        icon={<ShieldExclamationIcon className="h-4 w-4" />}
+                        icon={<ShieldExclamationIcon className="h-5 w-5" />}
+                        chartData={trends.map(t => ({
+                            label: formatTimestamp(t.timestamp),
+                            value: t.filtered + t.blocked_output
+                        }))}
+                        lineColor="hsl(280, 65%, 60%)"
                     />
-                    <MetricCard
+                    <MetricCardWithLineChart
                         title="Critical"
+                        subtitle="Severity level"
                         value={overview.breakdown.incidents_by_severity.critical}
-                        icon={<ShieldExclamationIcon className="h-4 w-4 text-red-500" />}
+                        icon={<ShieldExclamationIcon className="h-5 w-5 text-red-500" />}
+                        chartData={trends.map(t => ({
+                            label: formatTimestamp(t.timestamp),
+                            value: t.error
+                        }))}
+                        lineColor="hsl(0, 84%, 60%)"
                     />
-                    <MetricCard
+                    <MetricCardWithLineChart
                         title="High Priority"
+                        subtitle="Needs attention"
                         value={overview.breakdown.incidents_by_severity.high}
-                        icon={<ShieldExclamationIcon className="h-4 w-4 text-orange-500" />}
+                        icon={<ShieldExclamationIcon className="h-5 w-5 text-orange-500" />}
+                        chartData={trends.map(t => ({
+                            label: formatTimestamp(t.timestamp),
+                            value: t.filtered
+                        }))}
+                        lineColor="hsl(24, 96%, 53%)"
                     />
                     <FailoverMetrics
                         projectId={projectId}
