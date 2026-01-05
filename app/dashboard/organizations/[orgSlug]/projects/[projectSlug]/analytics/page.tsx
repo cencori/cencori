@@ -312,7 +312,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                         title="Security Incidents"
                         subtitle="Total detected"
                         value={overview.overview.total_incidents}
-                        icon={<ShieldExclamationIcon className="h-5 w-5" />}
                         chartData={trends.map(t => ({
                             label: formatTimestamp(t.timestamp),
                             value: t.filtered + t.blocked_output
@@ -323,7 +322,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                         title="Critical"
                         subtitle="Severity level"
                         value={overview.breakdown.incidents_by_severity.critical}
-                        icon={<ShieldExclamationIcon className="h-5 w-5 text-red-500" />}
                         chartData={trends.map(t => ({
                             label: formatTimestamp(t.timestamp),
                             value: t.error
@@ -334,7 +332,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                         title="High Priority"
                         subtitle="Needs attention"
                         value={overview.breakdown.incidents_by_severity.high}
-                        icon={<ShieldExclamationIcon className="h-5 w-5 text-orange-500" />}
                         chartData={trends.map(t => ({
                             label: formatTimestamp(t.timestamp),
                             value: t.filtered
