@@ -1,6 +1,7 @@
 export { BentoCard } from "./BentoCard";
 export { BentoGrid, BentoGridCell } from "./BentoGrid";
 export { UnifiedProxyCard } from "./UnifiedProxyCard";
+export { AIGatewayCard } from "./AIGatewayCard";
 export { RealTimeMetricsCard } from "./RealTimeMetricsCard";
 export { ModelRouterCard } from "./ModelRouterCard";
 export { RequestPipelineCard } from "./RequestPipelineCard";
