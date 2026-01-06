@@ -75,9 +75,9 @@ export const AIGatewayDiagram = () => {
                     </g>
 
                     {/* Lines: Input → Request */}
-                    <AnimatedPath d={`M ${150 + X} 85 L ${200 + X} 85 L ${200 + X} 55 L ${320 + X} 55`} />
-                    <AnimatedPath d={`M ${150 + X} 165 L ${200 + X} 165 L ${200 + X} 75 L ${320 + X} 75`} />
-                    <AnimatedPath d={`M ${150 + X} 245 L ${200 + X} 245 L ${200 + X} 95 L ${320 + X} 95`} />
+                    <AnimatedPath d={`M ${150 + X} 85 L ${250 + X} 85 L ${250 + X} 65 L ${320 + X} 65`} />
+                    <AnimatedPath d={`M ${150 + X} 165 L ${270 + X} 165 L ${270 + X} 65 L ${320 + X} 65`} />
+                    <AnimatedPath d={`M ${150 + X} 245 L ${290 + X} 245 L ${290 + X} 65 L ${320 + X} 65`} />
 
                     {/* CENTER: Main Flow */}
                     <g className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
