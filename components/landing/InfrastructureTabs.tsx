@@ -6,6 +6,7 @@ import { AIGatewayDiagram } from "./diagrams/AIGatewayDiagram";
 import { ComputeDiagram } from "./diagrams/ComputeDiagram";
 import { WorkflowDiagram } from "./diagrams/WorkflowDiagram";
 import { IntegrationDiagram } from "./diagrams/IntegrationDiagram";
+import { DataStorageDiagram } from "./diagrams/DataStorageDiagram";
 
 type TabKey = "gateway" | "compute" | "workflow" | "integration" | "storage";
 
@@ -69,15 +70,6 @@ const tabs: Tab[] = [
     },
 ];
 
-// Placeholder component for tabs not yet built
-const ComingSoonTab = ({ name }: { name: string }) => (
-    <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
-        <div className="text-6xl mb-4">🚧</div>
-        <p className="text-lg font-medium">{name} Animation</p>
-        <p className="text-sm">Coming soon...</p>
-    </div>
-);
-
 export const InfrastructureTabs = () => {
     const [activeTab, setActiveTab] = useState<TabKey>("gateway");
 
@@ -92,7 +84,7 @@ export const InfrastructureTabs = () => {
             case "integration":
                 return <IntegrationDiagram />;
             case "storage":
-                return <ComingSoonTab name="Data Storage" />;
+                return <DataStorageDiagram />;
             default:
                 return null;
         }
