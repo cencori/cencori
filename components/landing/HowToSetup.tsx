@@ -34,7 +34,7 @@ export const HowToSetup = () => {
             <div className="container mx-auto px-4 md:px-6">
                 <div className="text-center mb-10">
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-3 text-foreground">
-                        Get started in minutes
+                        Infrastructure in minutes
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
                         Three simple steps to production-ready AI infrastructure.
