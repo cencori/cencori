@@ -74,7 +74,6 @@ export const DataStorageDiagram = () => {
         textColor: string;
     }) => {
         const isHovered = hoveredNode === id;
-        const iconSize = Math.min(width, height) * 0.4;
 
         return (
             <g
@@ -99,7 +98,7 @@ export const DataStorageDiagram = () => {
                 {/* Centered icon */}
                 <foreignObject x={x} y={y} width={width} height={height}>
                     <div className="w-full h-full flex items-center justify-center">
-                        <Icon className={`${textColor.replace('text-', 'text-')} transition-transform duration-200 ${isHovered ? 'scale-110' : ''}`} style={{ width: iconSize, height: iconSize }} />
+                        <Icon className={`${textColor} w-5 h-5 transition-transform duration-200 ${isHovered ? 'scale-110' : ''}`} />
                     </div>
                 </foreignObject>
 
@@ -176,7 +175,7 @@ export const DataStorageDiagram = () => {
                 {/* Icon centered in top portion */}
                 <foreignObject x={x} y={y + 8} width={width} height={height * 0.55}>
                     <div className="w-full h-full flex items-center justify-center">
-                        <Icon className={`${textColor.replace('text-', 'text-')} transition-transform duration-200 ${isHovered ? 'scale-110' : ''}`} style={{ width: 28, height: 28 }} />
+                        <Icon className={`${textColor} w-7 h-7 transition-transform duration-200 ${isHovered ? 'scale-110' : ''}`} />
                     </div>
                 </foreignObject>
 
