@@ -263,3 +263,30 @@
     animation: marquee-reverse 40s linear infinite;
   }
 }
+
+/* Infrastructure diagram animations */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-dash {
+  animation: dash 1.5s linear infinite;
+}
+
+.animate-fade-in {
+  opacity: 0;
+  animation: fade-in 0.5s ease-out forwards;
+}

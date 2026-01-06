@@ -1,14 +1,5 @@
 import React from "react";
-import { BentoGrid, BentoGridCell } from "./bento/BentoGrid";
-import {
-    UnifiedProxyCard,
-    RealTimeMetricsCard,
-    ModelRouterCard,
-    RequestPipelineCard,
-    LatencyOverheadCard,
-    GlobalEdgeCard,
-    UnifiedBillingCard,
-} from "./bento";
+import { InfrastructureTabs } from "./InfrastructureTabs";
 
 export const Features = () => {
     return (
@@ -25,37 +16,8 @@ export const Features = () => {
                     </p>
                 </div>
 
-                <div className="max-w-6xl mx-auto">
-                    <BentoGrid>
-                        {/* Row 1-2: Unified Proxy (2x2) */}
-                        <BentoGridCell colSpan={2} rowSpan={2} className="min-h-[420px]">
-                            <UnifiedProxyCard />
-                        </BentoGridCell>
-
-                        {/* Row 1 right side: Real-time Metrics (2x1) */}
-                        <BentoGridCell colSpan={2} className="min-h-[200px]">
-                            <RealTimeMetricsCard />
-                        </BentoGridCell>
-
-                        {/* Row 2 right side: Model Router + Unified Billing */}
-                        <BentoGridCell className="min-h-[200px]">
-                            <ModelRouterCard />
-                        </BentoGridCell>
-                        <BentoGridCell className="min-h-[200px]">
-                            <UnifiedBillingCard />
-                        </BentoGridCell>
-
-                        {/* Row 3: Request Pipeline + Latency Overhead + Global Edge */}
-                        <BentoGridCell className="min-h-[200px]">
-                            <RequestPipelineCard />
-                        </BentoGridCell>
-                        <BentoGridCell colSpan={2} className="min-h-[200px]">
-                            <LatencyOverheadCard />
-                        </BentoGridCell>
-                        <BentoGridCell className="min-h-[200px]">
-                            <GlobalEdgeCard />
-                        </BentoGridCell>
-                    </BentoGrid>
+                <div className="max-w-5xl mx-auto">
+                    <InfrastructureTabs />
                 </div>
             </div>
         </section>
