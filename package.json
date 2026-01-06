@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
+    "@geist-ui/icons": "^1.0.2",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.2",
@@ -55,6 +56,7 @@
     "clsx": "^2.1.1",
     "cobe": "^0.6.5",
     "date-fns": "^4.1.0",
+    "geist": "^1.5.1",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.545.0",
     "motion": "^12.23.24",
