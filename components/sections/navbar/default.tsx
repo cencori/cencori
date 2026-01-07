@@ -86,36 +86,42 @@ export default function Navbar({
   name = siteConfig.name,
   homeUrl = siteConfig.url,
   mobileNavItems = [
-    { title: "Products", sublinks: [
-      { title: "Protect", href: siteConfig.links.products.ai },
-      { title: "Audit", href: siteConfig.links.products.audit },
-      { title: "Knight", href: siteConfig.links.products.knight },
-      { title: "Sandbox", href: siteConfig.links.products.sandbox },
-      { title: "Insights", href: siteConfig.links.products.insights },
-      { title: "Network", href: siteConfig.links.products.network },
-      { title: "Edge", href: siteConfig.links.products.edge },
-      { title: "Enterprise", href: siteConfig.links.products.enterprise },
-      { title: "Developer Tools", href: siteConfig.links.products.developerTools },
-    ]},
-    { title: "Solutions", sublinks: [
-      { title: "AI-first Startups", href: "/solutions/ai-startups" },
-      { title: "Platform & ISVs", href: "/solutions/platforms" },
-      { title: "Regulated Industries", href: "/solutions/regulated" },
-      { title: "Developer Teams", href: "/solutions/devtools" },
-      { title: "Protect Generated Apps", href: "/solutions/vibe-coded" },
-      { title: "Data-science Sandboxes", href: "/solutions/model-ops" },
-      { title: "Code Execution & Automation Safety", href: "/solutions/sandboxing" },
-    ]},
-    { title: "Resources", sublinks: [
-      { title: "Documentation", href: siteConfig.links.docs },
-      { title: "API Reference", href: "/docs/api" },
-      { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
-      { title: "Guides & Tutorials", href: "/resources/guides" },
-      { title: "Changelog", href: siteConfig.links.company.changelog },
-      { title: "Use Cases / Case Studies", href: siteConfig.links.company.customers },
-      { title: "Security & Compliance", href: "/security" },
-      { title: "Status & Incidents", href: "/status" },
-    ]},
+    {
+      title: "Products", sublinks: [
+        { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
+        { title: "Audit", href: siteConfig.links.products.audit },
+        { title: "Knight", href: siteConfig.links.products.knight },
+        { title: "Sandbox", href: siteConfig.links.products.sandbox },
+        { title: "Insights", href: siteConfig.links.products.insights },
+        { title: "Network", href: siteConfig.links.products.network },
+        { title: "Edge", href: siteConfig.links.products.edge },
+        { title: "Enterprise", href: siteConfig.links.products.enterprise },
+        { title: "Developer Tools", href: siteConfig.links.products.developerTools },
+      ]
+    },
+    {
+      title: "Solutions", sublinks: [
+        { title: "AI-first Startups", href: "/solutions/ai-startups" },
+        { title: "Platform & ISVs", href: "/solutions/platforms" },
+        { title: "Regulated Industries", href: "/solutions/regulated" },
+        { title: "Developer Teams", href: "/solutions/devtools" },
+        { title: "Protect Generated Apps", href: "/solutions/vibe-coded" },
+        { title: "Data-science Sandboxes", href: "/solutions/model-ops" },
+        { title: "Code Execution & Automation Safety", href: "/solutions/sandboxing" },
+      ]
+    },
+    {
+      title: "Resources", sublinks: [
+        { title: "Documentation", href: siteConfig.links.docs },
+        { title: "API Reference", href: "/docs/api" },
+        { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
+        { title: "Guides & Tutorials", href: "/resources/guides" },
+        { title: "Changelog", href: siteConfig.links.company.changelog },
+        { title: "Use Cases / Case Studies", href: siteConfig.links.company.customers },
+        { title: "Security & Compliance", href: "/security" },
+        { title: "Status & Incidents", href: "/status" },
+      ]
+    },
     { title: "Pricing", href: "/pricing" },
     { title: "Documentation", href: siteConfig.links.docs },
     { title: "Blog", href: siteConfig.links.company.blog },
@@ -139,7 +145,7 @@ export default function Navbar({
     type: "mega",
     columns: [
       [
-        { title: "Protect", href: siteConfig.links.products.ai, description: "Real-time request/response protection and policy enforcement.", icon: <Shield className="h-4 w-4" /> },
+        { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API for every provider with security and observability.", icon: <Shield className="h-4 w-4" /> },
         { title: "Audit", href: siteConfig.links.products.audit, description: "Immutable logs and exportable compliance reports.", icon: <Book className="h-4 w-4" /> },
         { title: "Knight", href: siteConfig.links.products.knight, description: "Build-time CI scanning and PR enforcement.", icon: <HardHat className="h-4 w-4" /> },
         { title: "Sandbox", href: siteConfig.links.products.sandbox, description: "Hardened execution environment for model-generated code.", icon: <FlaskConical className="h-4 w-4" /> },
@@ -287,78 +293,78 @@ export default function Navbar({
             {actions.map((action, index) => {
               if (action.isAvatar && isAuthenticated) {
                 return (
-          <DropdownMenu key="authenticated-avatar-menu">
-            <DropdownMenuTrigger asChild>
-              <Avatar className="h-7 w-7 cursor-pointer">
-                {userProfile?.avatar && userProfile.avatar.length > 0 ? (
-                  <AvatarImage
-                    src={userProfile.avatar}
-                    alt={
-                      typeof userProfile?.name === "string"
-                        ? userProfile.name
-                        : "User avatar"
-                    }
-                  />
-                ) : (
-                  <AvatarFallback>
-                    <CircleUserRound className="h-5 w-5 text-zinc-200" />
-                  </AvatarFallback>
-                )}
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-66" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-s leading-none text-white font-semibold">
-                    {userProfile?.name ?? ""}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/profile")}>
-                <CircleUserRound className="mr-2 h-4 w-4" />
-                <span className="text-xs">Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/billing")}>
-                <CreditCard className="mr-2 h-4 w-4" />
-                <span className="text-xs">Billing</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/settings")}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span className="text-xs"> Account Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/organizations")}>
-                
-                <span className="text-xs cursor-pointer">Dashboard</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/team")}>
-                <Users className="mr-2 h-4 w-4" />
-                <span className="text-xs">Team</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/invite-user")}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                <span className="text-xs">Invite User</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  router.push("/login");
-                }}
-                className="cursor-pointer"
-              >
-                <span className="text-xs">Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <DropdownMenu key="authenticated-avatar-menu">
+                    <DropdownMenuTrigger asChild>
+                      <Avatar className="h-7 w-7 cursor-pointer">
+                        {userProfile?.avatar && userProfile.avatar.length > 0 ? (
+                          <AvatarImage
+                            src={userProfile.avatar}
+                            alt={
+                              typeof userProfile?.name === "string"
+                                ? userProfile.name
+                                : "User avatar"
+                            }
+                          />
+                        ) : (
+                          <AvatarFallback>
+                            <CircleUserRound className="h-5 w-5 text-zinc-200" />
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-66" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-s leading-none text-white font-semibold">
+                            {userProfile?.name ?? ""}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/profile")}>
+                        <CircleUserRound className="mr-2 h-4 w-4" />
+                        <span className="text-xs">Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/billing")}>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        <span className="text-xs">Billing</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/settings")}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span className="text-xs"> Account Settings</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/organizations")}>
+
+                        <span className="text-xs cursor-pointer">Dashboard</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/team")}>
+                        <Users className="mr-2 h-4 w-4" />
+                        <span className="text-xs">Team</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/dashboard/invite-user")}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        <span className="text-xs">Invite User</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          await supabase.auth.signOut();
+                          router.push("/login");
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <span className="text-xs">Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 );
               } else if (action.isButton) {
                 return (
                   <Button
                     key={index}
-                 
+
                     asChild
                   >
                     <a href={action.href}>
