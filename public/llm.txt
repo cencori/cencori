@@ -203,7 +203,21 @@ export async function POST(req: Request) {
 ```typescript
 {
   delta: "Hello",           // The text chunk
-  finish_reason?: "stop"    // Only on last chunk
+  finish_reason?: "stop",   // Only on last chunk: 'stop' | 'length' | 'content_filter' | 'error'
+  error?: "Rate limit exceeded"  // Error message if stream failed
+}
+```
+
+### Handling Stream Errors
+
+```typescript
+for await (const chunk of stream) {
+  // Check for errors in stream
+  if (chunk.error) {
+    console.error('Stream error:', chunk.error);
+    break;
+  }
+  controller.enqueue(encoder.encode(chunk.delta));
 }
 ```
 
