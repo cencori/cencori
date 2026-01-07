@@ -62,6 +62,8 @@ export interface UnifiedChatResponse {
 export interface StreamChunk {
     delta: string;
     finishReason?: 'stop' | 'length' | 'content_filter';
+    /** Error message if the stream encountered an error */
+    error?: string;
 }
 
 /**

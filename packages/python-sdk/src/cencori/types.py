@@ -46,3 +46,4 @@ class StreamChunk:
     """A chunk from streaming response."""
     delta: str
     finish_reason: Optional[Literal["stop", "length", "content_filter", "error"]] = None
+    error: Optional[str] = None  # Error message if stream encountered an error

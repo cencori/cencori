@@ -30,6 +30,8 @@ export interface ChatResponse {
 export interface StreamChunk {
     delta: string;
     finish_reason?: 'stop' | 'length' | 'content_filter' | 'error';
+    /** Error message if the stream encountered an error (e.g., rate limit, provider failure) */
+    error?: string;
 }
 
 export class AIModule {
