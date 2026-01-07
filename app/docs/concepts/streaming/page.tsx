@@ -270,13 +270,10 @@ app.post('/chat', async (req, res) => {
   delta: string;
   
   // Reason why generation stopped (only on last chunk)
-  finish_reason?: 'stop' | 'length' | 'content_filter';
+  finish_reason?: 'stop' | 'length' | 'content_filter' | 'error';
   
-  // Model used
-  model?: string;
-  
-  // Provider
-  provider?: string;
+  // Error message if stream encountered an error (e.g., rate limit)
+  error?: string;
 }`}
                 />
 
@@ -306,22 +303,27 @@ app.post('/chat', async (req, res) => {
                 <CodeBlock
                     filename="error-handling.ts"
                     language="typescript"
-                    code={`try {
-  const stream = cencori.ai.chatStream({
-    model: 'gpt-4o',
-    messages,
-  });
+                    code={`const stream = cencori.ai.chatStream({
+  model: 'gemini-2.5-flash',
+  messages,
+});
 
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.delta);
+for await (const chunk of stream) {
+  // Check for error in stream chunk (e.g., rate limit, provider failure)
+  if (chunk.error) {
+    console.error('Stream error:', chunk.error);
+    // Handle gracefully - show user-friendly message
+    showError('Could not complete the response. Please try again.');
+    break;
   }
-} catch (error: any) {
-  if (error.code === 'SECURITY_VIOLATION') {
-    console.error('Content blocked by security filters');
-  } else if (error.status === 429) {
-    console.error('Rate limit exceeded, retry later');
-  } else {
-    console.error('Stream error:', error.message);
+  
+  // Normal processing
+  if (chunk.delta) {
+    appendToResponse(chunk.delta);
+  }
+  
+  if (chunk.finish_reason === 'error') {
+    console.error('Generation failed');
   }
 }`}
                 />

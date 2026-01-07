@@ -96,10 +96,16 @@ const stream = cencori.ai.chatStream({
   messages: [
     { role: 'user', content: 'Tell me a story' }
   ],
-  model: 'gpt-4o'
+  model: 'gemini-2.5-flash'
 });
 
 for await (const chunk of stream) {
+  // Check for stream errors (e.g., rate limit, provider failure)
+  if (chunk.error) {
+    console.error('Stream error:', chunk.error);
+    break;
+  }
+  
   process.stdout.write(chunk.delta);
 }
 ```
