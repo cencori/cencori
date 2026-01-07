@@ -703,13 +703,13 @@ export async function POST(req: NextRequest) {
             // Fetch project settings for failover config
             const { data: streamProjectSettings } = await supabase
                 .from('project_settings')
-                .select('settings')
+                .select('enable_fallback, fallback_provider, max_retries_before_fallback')
                 .eq('project_id', project.id)
                 .single();
 
-            const streamEnableFallback = streamProjectSettings?.settings?.enable_fallback ?? true;
-            const streamConfiguredFallback = streamProjectSettings?.settings?.fallback_provider;
-            const streamMaxRetries = streamProjectSettings?.settings?.max_retries_before_fallback ?? 3;
+            const streamEnableFallback = streamProjectSettings?.enable_fallback ?? true;
+            const streamConfiguredFallback = streamProjectSettings?.fallback_provider;
+            const streamMaxRetries = streamProjectSettings?.max_retries_before_fallback ?? 3;
 
             // Helper function to attempt streaming with a provider
             async function* tryStreamWithFallback(): AsyncGenerator<{
@@ -991,13 +991,13 @@ export async function POST(req: NextRequest) {
         // Fetch project settings for failover config
         const { data: projectSettings } = await supabase
             .from('project_settings')
-            .select('settings')
+            .select('enable_fallback, fallback_provider, max_retries_before_fallback')
             .eq('project_id', project.id)
             .single();
 
-        const enableFallback = projectSettings?.settings?.enable_fallback ?? true;
-        const configuredFallbackProvider = projectSettings?.settings?.fallback_provider;
-        const maxRetries = projectSettings?.settings?.max_retries_before_fallback ?? 3;
+        const enableFallback = projectSettings?.enable_fallback ?? true;
+        const configuredFallbackProvider = projectSettings?.fallback_provider;
+        const maxRetries = projectSettings?.max_retries_before_fallback ?? 3;
 
         // Try primary provider with retries
         let lastError: Error | null = null;
