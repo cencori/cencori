@@ -10,7 +10,7 @@ export const siteConfig = {
     signInUrl: "/login",
     x: "https://x.com/cencori",
     products: {
-      ai: "/ai",
+      aiGateway: "/ai-gateway",
       audit: "/audit",
       knight: "/knight",
       sandbox: "/psandbox",

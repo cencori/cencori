@@ -113,7 +113,7 @@ export default function Navbar({
     mobileNavItems = [
         {
             title: "Products", sublinks: [
-                { title: "AI Gateway", href: siteConfig.links.products.ai },
+                { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
                 { title: "Edge", href: "/edge" },
             ]
         },
@@ -165,7 +165,7 @@ export default function Navbar({
         type: "mega",
         columns: [
             [
-                { title: "AI Gateway", href: siteConfig.links.products.ai, description: "Real-time request/response protection." },
+                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API for every provider with security and observability." },
                 { title: "Edge", href: "/edge", description: "Platform integrations & edge middleware." },
             ],
         ],

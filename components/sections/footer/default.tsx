@@ -39,7 +39,7 @@ export default function FooterSection({
     {
       title: "Product",
       links: [
-        { text: "AI", href: siteConfig.links.products.ai },
+        { text: "AI Gateway", href: siteConfig.links.products.aiGateway },
         { text: "Audit", href: siteConfig.links.products.audit },
         { text: "Knight", href: siteConfig.links.products.knight },
         { text: "Sandbox", href: siteConfig.links.products.sandbox },
