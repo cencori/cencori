@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
-import { ChartBarIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, CurrencyDollarIcon, ClockIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { EXAMPLE_PROJECTS } from "@/config/examples";
 import { Bar, BarChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import React, { useState, use } from "react";
@@ -225,6 +226,33 @@ export const cencori = new Cencori({
             Docs
           </Link>
         </Button>
+      </div>
+
+      {/* Example Projects Section */}
+      <div className="mt-8 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Example projects</h3>
+          <Link href="/examples" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            View all →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {EXAMPLE_PROJECTS.slice(0, 4).map((project) => (
+            <a
+              key={project.id}
+              href={project.repoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-between p-3 border border-border/40 rounded-lg hover:bg-muted/30 hover:border-border/60 transition-all"
+            >
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-xs font-medium truncate">{project.name}</span>
+                <span className="text-[10px] text-muted-foreground truncate">{project.description}</span>
+              </div>
+              <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );
