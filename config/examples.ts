@@ -31,7 +31,7 @@ export const EXAMPLE_PROJECTS: ExampleProject[] = [
         id: 'ai-chat-starter',
         name: 'AI Chat Starter',
         description: 'Multi-provider chat application with streaming, provider fallback, and cost tracking.',
-        repoUrl: 'https://github.com/cencori/ai-chat-starter',
+        repoUrl: 'https://github.com/bolaabanjo/wisc',
         stack: ['Next.js', 'Cencori SDK', 'Vercel AI SDK'],
         category: 'app',
         featured: true,
