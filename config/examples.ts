@@ -18,11 +18,11 @@ export interface ExampleProject {
 
 export const EXAMPLE_PROJECTS: ExampleProject[] = [
     {
-        id: 'readme-wtf',
-        name: 'README.wtf',
-        description: 'AI-powered README generator. Paste a GitHub URL, get a professional README in seconds.',
-        repoUrl: 'https://github.com/cencori/readme-wtf',
-        demoUrl: 'https://readme.wtf',
+        id: 'repokeet',
+        name: 'Repokeet',
+        description: 'chat with any GitHub repository.',
+        repoUrl: 'https://github.com/bolaabanjo/repokeet',
+        demoUrl: 'https://repokeet.vercel.app',
         stack: ['Next.js', 'Cencori SDK', 'Tailwind CSS'],
         category: 'app',
         featured: true,
