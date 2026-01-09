@@ -187,7 +187,7 @@ export default function AIGatewayPage() {
 
             {/* Headline */}
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-              AI <span className="italic">Gateway</span>
+              AI Gateway
             </h1>
 
             {/* Subheadline */}
