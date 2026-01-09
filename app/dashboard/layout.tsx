@@ -37,6 +37,7 @@ import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentC
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { useTheme } from "next-themes";
+import { UpdateToast } from "@/components/ui/update-toast";
 
 
 // Optional header/nav links later
@@ -563,6 +564,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         orgSlug={orgSlug}
         projectSlug={projectSlug}
       />
+      <UpdateToast />
     </div>
   );
 }
