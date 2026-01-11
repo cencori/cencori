@@ -1,17 +1,17 @@
-# @cencori/ai-provider
+# @cencori/ai-sdk
 
-Cencori provider for [Vercel AI SDK](https://github.com/vercel/ai) - use Cencori with `streamText()`, `generateText()`, and `useChat()`.
+The Cencori AI SDK — the infrastructure layer for AI applications. Works with [Vercel AI SDK](https://github.com/vercel/ai), TanStack AI, and more.
 
 ## Installation
 
 ```bash
-npm install @cencori/ai-provider ai
+npm install @cencori/ai-sdk ai
 ```
 
 ## Quick Start
 
 ```typescript
-import { cencori } from '@cencori/ai-provider';
+import { cencori } from '@cencori/ai-sdk';
 import { streamText } from 'ai';
 
 const result = await streamText({
@@ -28,7 +28,7 @@ for await (const chunk of result.textStream) {
 
 ```typescript
 // app/api/chat/route.ts
-import { cencori } from '@cencori/ai-provider';
+import { cencori } from '@cencori/ai-sdk';
 import { streamText } from 'ai';
 
 export async function POST(req: Request) {
@@ -56,7 +56,7 @@ CENCORI_API_KEY=csk_your_key_here
 ### Custom Configuration
 
 ```typescript
-import { createCencori } from '@cencori/ai-provider';
+import { createCencori } from '@cencori/ai-sdk';
 
 const cencori = createCencori({
   apiKey: 'csk_your_key_here',
@@ -82,6 +82,15 @@ Use any model supported by Cencori:
 | Mistral | `mistral-large`, `codestral` |
 | DeepSeek | `deepseek-v3.2`, `deepseek-reasoner` |
 | + More | Groq, Cohere, Perplexity, Together, Meta, Qwen, HuggingFace |
+
+## Why Cencori?
+
+Unlike raw AI SDKs, Cencori gives you:
+
+- 🔒 **Security** — PII filtering, jailbreak detection, content moderation
+- 📊 **Observability** — Request logs, latency metrics, cost tracking
+- 💰 **Cost Control** — Budgets, alerts, per-route analytics
+- 🔌 **Multi-Provider** — One API key for OpenAI, Claude, Gemini, and more
 
 ## Features
 

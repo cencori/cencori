@@ -1,8 +1,8 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
-    "name": "@cencori/ai-provider",
+    "name": "@cencori/ai-sdk",
     "version": "0.2.1",
-    "description": "Cencori provider for Vercel AI SDK - use Cencori with streamText, generateText, and useChat",
+    "description": "Cencori AI SDK - The infrastructure layer for AI applications. Works with Vercel AI SDK, TanStack AI, and more.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
@@ -20,14 +20,18 @@
     "keywords": [
         "ai",
         "cencori",
-        "vercel",
         "ai-sdk",
+        "vercel",
+        "tanstack",
         "provider",
         "streaming",
         "llm",
         "openai",
         "anthropic",
-        "gemini"
+        "gemini",
+        "infrastructure",
+        "security",
+        "observability"
     ],
     "author": "FohnAI",
     "license": "MIT",

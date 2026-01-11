@@ -155,14 +155,14 @@ import type { ChatParams, ChatResponse, Message, StreamChunk } from 'cencori';
 
 ## Vercel AI SDK Integration
 
-Using Vercel AI SDK? Use `@cencori/ai-provider` for seamless integration:
+Using Vercel AI SDK? Use `@cencori/ai-sdk` for seamless integration:
 
 ```bash
-npm install @cencori/ai-provider ai
+npm install @cencori/ai-sdk ai
 ```
 
 ```typescript
-import { cencori } from '@cencori/ai-provider';
+import { cencori } from '@cencori/ai-sdk';
 import { streamText } from 'ai';
 
 const result = await streamText({
@@ -175,7 +175,7 @@ for await (const chunk of result.textStream) {
 }
 ```
 
-See [@cencori/ai-provider on npm](https://www.npmjs.com/package/@cencori/ai-provider) for full documentation.
+See [@cencori/ai-sdk on npm](https://www.npmjs.com/package/@cencori/ai-sdk) for full documentation.
 
 ## Supported Models
 
