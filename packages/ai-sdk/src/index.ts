@@ -1,17 +1,14 @@
 /**
- * Cencori AI Provider for Vercel AI SDK
+ * Cencori AI SDK - Main Entry Point
  * 
- * @example
- * import { cencori } from '@cencori/ai-sdk';
- * import { streamText } from 'ai';
+ * This package provides integrations for multiple AI SDK ecosystems:
  * 
- * const result = await streamText({
- *   model: cencori('gemini-2.5-flash'),
- *   messages: [{ role: 'user', content: 'Hello!' }]
- * });
+ * @example Vercel AI SDK
+ * import { cencori } from '@cencori/ai-sdk/vercel';
+ * 
+ * @example TanStack AI (coming soon)
+ * import { cencori } from '@cencori/ai-sdk/tanstack';
  */
 
-export { cencori, createCencori } from './cencori-provider';
-export type { CencoriProvider } from './cencori-provider';
-export type { CencoriProviderSettings, CencoriChatSettings } from './types';
-export { CencoriChatLanguageModel } from './cencori-chat-model';
+// Re-export Vercel integration as default for backwards compatibility
+export * from './vercel';

@@ -1,7 +1,11 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-    entry: ['src/index.ts'],
+    entry: {
+        'index': 'src/index.ts',
+        'vercel/index': 'src/vercel/index.ts',
+        'tanstack/index': 'src/tanstack/index.ts',
+    },
     format: ['cjs', 'esm'],
     dts: true,
     splitting: false,

@@ -1,4 +1,4 @@
-// src/cencori-chat-model.ts
+// src/vercel/cencori-chat-model.ts
 var CencoriChatLanguageModel = class {
   constructor(modelId, settings) {
     this.specificationVersion = "v3";
@@ -235,7 +235,7 @@ var CencoriChatLanguageModel = class {
   }
 };
 
-// src/cencori-provider.ts
+// src/vercel/cencori-provider.ts
 function createCencori(options = {}) {
   const baseUrl = options.baseUrl ?? "https://cencori.com";
   const apiKey = options.apiKey ?? process.env.CENCORI_API_KEY;
