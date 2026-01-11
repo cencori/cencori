@@ -69,15 +69,15 @@ export async function POST(req: Request) {
 
 ## Vercel AI SDK Integration
 
-Using Vercel AI SDK? Install `@cencori/ai-provider` for drop-in compatibility:
+Using Vercel AI SDK? Install `@cencori/ai-sdk` for drop-in compatibility:
 
 ```bash
-npm install @cencori/ai-provider ai
+npm install @cencori/ai-sdk ai
 ```
 
 ```typescript
 // app/api/chat/route.ts
-import { cencori } from "@cencori/ai-provider";
+import { cencori } from "@cencori/ai-sdk";
 import { streamText } from "ai";
 
 export async function POST(req: Request) {

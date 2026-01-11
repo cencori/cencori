@@ -2,7 +2,7 @@
  * Cencori AI Provider for Vercel AI SDK
  * 
  * @example
- * import { cencori } from '@cencori/ai-provider';
+ * import { cencori } from '@cencori/ai-sdk';
  * import { streamText } from 'ai';
  * 
  * const result = await streamText({

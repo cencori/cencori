@@ -266,12 +266,12 @@ pnpm add cencori`}
                 <CodeBlock
                     filename="terminal"
                     language="bash"
-                    code={`npm install @cencori/ai-provider ai`}
+                    code={`npm install @cencori/ai-sdk ai`}
                 />
                 <CodeBlock
                     filename="app/api/chat/route.ts"
                     language="typescript"
-                    code={`import { cencori } from "@cencori/ai-provider";
+                    code={`import { cencori } from "@cencori/ai-sdk";
 import { streamText } from "ai";
 
 export async function POST(req: Request) {
