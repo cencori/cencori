@@ -10,8 +10,9 @@ import { UnifiedMessage } from './base';
  * OpenAI message format
  */
 export interface OpenAIMessage {
-    role: 'system' | 'user' | 'assistant';
+    role: 'system' | 'user' | 'assistant' | 'tool';
     content: string;
+    tool_call_id?: string;
 }
 
 /**
@@ -37,6 +38,7 @@ export function toOpenAIMessages(messages: UnifiedMessage[]): OpenAIMessage[] {
     return messages.map(msg => ({
         role: msg.role,
         content: msg.content,
+        ...(msg.toolCallId ? { tool_call_id: msg.toolCallId } : {}),
     }));
 }
 
@@ -128,7 +130,7 @@ export function validateMessages(messages: UnifiedMessage[]): void {
             throw new Error('Each message must have role and content');
         }
 
-        if (!['system', 'user', 'assistant'].includes(msg.role)) {
+        if (!['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
             throw new Error(`Invalid message role: ${msg.role}`);
         }
     }

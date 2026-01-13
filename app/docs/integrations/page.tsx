@@ -61,6 +61,132 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
+      {/* ==================== SDK INTEGRATIONS ==================== */}
+      <div className="space-y-6 pt-8 border-t border-border/40">
+        <h2 id="sdk-integrations" className="scroll-m-20 text-2xl font-bold tracking-tight">
+          SDK Integrations
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Cencori provides first-class SDK adapters for popular AI frameworks, enabling seamless integration with your preferred tooling.
+        </p>
+
+        {/* Vercel AI SDK */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Vercel AI SDK</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Drop-in integration with the Vercel AI SDK. Works with <code className="text-xs bg-muted px-1.5 py-0.5 rounded">streamText()</code>, <code className="text-xs bg-muted px-1.5 py-0.5 rounded">generateText()</code>, and <code className="text-xs bg-muted px-1.5 py-0.5 rounded">useChat()</code>.
+          </p>
+          <CodeBlock
+            filename="terminal"
+            language="bash"
+            code={`npm install @cencori/ai-sdk ai`}
+          />
+          <CodeBlock
+            filename="app/api/chat/route.ts"
+            language="typescript"
+            code={`import { cencori } from "@cencori/ai-sdk";
+import { streamText } from "ai";
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = await streamText({
+    model: cencori("gpt-4o"),
+    messages,
+  });
+
+  return result.toUIMessageStreamResponse();
+}`}
+          />
+
+          <h4 className="text-base font-semibold mt-6">Tool Calling (Vercel AI SDK)</h4>
+          <CodeBlock
+            filename="tools.ts"
+            language="typescript"
+            code={`import { cencori } from "@cencori/ai-sdk";
+import { generateText, tool } from "ai";
+import { z } from "zod";
+
+const result = await generateText({
+  model: cencori("gpt-4o"),
+  prompt: "What's the weather in San Francisco?",
+  tools: {
+    getWeather: tool({
+      description: "Get weather for a location",
+      parameters: z.object({
+        location: z.string(),
+      }),
+      execute: async ({ location }) => {
+        return { temperature: 72, condition: "sunny" };
+      },
+    }),
+  },
+});
+
+// Access tool calls
+for (const tc of result.toolCalls) {
+  console.log(tc.toolName, tc.args);
+}`}
+          />
+        </div>
+
+        {/* TanStack AI */}
+        <div className="space-y-4 mt-8">
+          <h3 className="text-lg font-semibold">TanStack AI</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Native adapter for TanStack AI with streaming, structured output, and tool calling support.
+          </p>
+          <CodeBlock
+            filename="terminal"
+            language="bash"
+            code={`npm install @cencori/ai-sdk @tanstack/ai`}
+          />
+          <CodeBlock
+            filename="chat.ts"
+            language="typescript"
+            code={`import { cencori } from "@cencori/ai-sdk/tanstack";
+
+const adapter = cencori("gpt-4o");
+
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: "user", content: "Hello!" }]
+})) {
+  if (chunk.type === "content") {
+    process.stdout.write(chunk.delta);
+  }
+}`}
+          />
+
+          <h4 className="text-base font-semibold mt-6">Tool Calling (TanStack AI)</h4>
+          <CodeBlock
+            filename="tools-tanstack.ts"
+            language="typescript"
+            code={`import { cencori } from "@cencori/ai-sdk/tanstack";
+
+const adapter = cencori("gpt-4o");
+
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: "user", content: "Get weather for NYC" }],
+  tools: {
+    getWeather: {
+      name: "getWeather",
+      description: "Get weather for a location",
+      inputSchema: { 
+        type: "object", 
+        properties: { location: { type: "string" } } 
+      },
+    },
+  },
+})) {
+  if (chunk.type === "tool_call") {
+    console.log("Tool call:", chunk.toolCall);
+    // { id: "call_123", type: "function", function: { name: "getWeather", arguments: '{"location":"NYC"}' } }
+  }
+}`}
+          />
+        </div>
+      </div>
+
       {/* ==================== VERCEL SECTION ==================== */}
       <div className="space-y-6 pt-8 border-t border-border/40">
         <div className="flex items-center gap-3">

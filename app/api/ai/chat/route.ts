@@ -17,7 +17,7 @@ import {
     isOpenAICompatible,
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
-import { UnifiedMessage } from '@/lib/providers/base';
+import { UnifiedMessage, ToolCall } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact } from '@/lib/safety/custom-data-rules';
 import { geolocation, ipAddress } from '@vercel/functions';
@@ -500,7 +500,7 @@ export async function POST(req: NextRequest) {
 
         // 3. Parse request body
         const body = await req.json();
-        const { messages, model, temperature, maxTokens, max_tokens, stream, userId } = body;
+        const { messages, model, temperature, maxTokens, max_tokens, stream, userId, tools, toolChoice } = body;
 
         if (!messages || !Array.isArray(messages)) {
             return NextResponse.json(
@@ -694,6 +694,8 @@ export async function POST(req: NextRequest) {
             temperature,
             maxTokens: maxTokens || max_tokens,
             userId,
+            tools,
+            toolChoice,
         };
 
         // 8. Handle streaming with failover support
@@ -715,6 +717,7 @@ export async function POST(req: NextRequest) {
             async function* tryStreamWithFallback(): AsyncGenerator<{
                 delta: string;
                 finishReason?: string;
+                toolCalls?: ToolCall[];
                 actualProvider: string;
                 actualModel: string;
                 usedFallback: boolean;
@@ -884,6 +887,10 @@ export async function POST(req: NextRequest) {
                                 chunkData.fallback_used = true;
                                 chunkData.original_provider = providerName;
                                 chunkData.original_model = normalizedModel;
+                            }
+                            // Include tool calls if present
+                            if (chunk.toolCalls && chunk.toolCalls.length > 0) {
+                                chunkData.tool_calls = chunk.toolCalls;
                             }
 
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`));

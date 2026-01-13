@@ -23,6 +23,14 @@ declare class CencoriChatLanguageModel implements LanguageModelV3 {
     private convertMessages;
     private mapFinishReason;
     private buildUsage;
+    /**
+     * Convert Vercel AI SDK tools to Cencori format
+     */
+    private convertTools;
+    /**
+     * Convert Vercel AI SDK tool choice to Cencori format
+     */
+    private convertToolChoice;
     doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult>;
     doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult>;
 }

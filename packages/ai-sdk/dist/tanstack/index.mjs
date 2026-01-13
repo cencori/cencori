@@ -49,6 +49,14 @@ var CencoriTextAdapter = class {
    * Stream chat completions from the model
    */
   async *chatStream(options) {
+    const tools = options.tools ? Object.values(options.tools).map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema || {}
+      }
+    })) : void 0;
     const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
       method: "POST",
       headers: {
@@ -62,7 +70,8 @@ var CencoriTextAdapter = class {
         temperature: options.temperature,
         maxTokens: options.maxTokens,
         stream: true,
-        userId: options.modelOptions?.userId
+        userId: options.modelOptions?.userId,
+        tools
       }),
       signal: options.abortController?.signal
     });
@@ -148,13 +157,33 @@ var CencoriTextAdapter = class {
               };
               yield contentChunk;
             }
+            if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+              for (const tc of chunk.tool_calls) {
+                const toolCallChunk = {
+                  type: "tool_call",
+                  id: this.generateId(),
+                  model: this.model,
+                  timestamp: Date.now(),
+                  toolCall: {
+                    id: tc.id,
+                    type: "function",
+                    function: {
+                      name: tc.function.name,
+                      arguments: tc.function.arguments
+                    }
+                  },
+                  index: 0
+                };
+                yield toolCallChunk;
+              }
+            }
             if (chunk.finish_reason) {
               const doneChunk = {
                 type: "done",
                 id: this.generateId(),
                 model: this.model,
                 timestamp: Date.now(),
-                finishReason: chunk.finish_reason === "stop" ? "stop" : null,
+                finishReason: chunk.finish_reason === "tool_calls" ? "tool_calls" : chunk.finish_reason === "stop" ? "stop" : null,
                 usage: {
                   promptTokens,
                   completionTokens,

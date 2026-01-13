@@ -9,8 +9,39 @@
  * Unified message format across all providers
  */
 export interface UnifiedMessage {
-    role: 'system' | 'user' | 'assistant';
+    role: 'system' | 'user' | 'assistant' | 'tool';
     content: string;
+    /** Tool call ID (for tool role messages) */
+    toolCallId?: string;
+}
+
+/**
+ * Tool function definition (OpenAI-compatible format)
+ */
+export interface ToolFunction {
+    name: string;
+    description: string;
+    parameters: Record<string, any>; // JSON Schema
+}
+
+/**
+ * Tool definition wrapper
+ */
+export interface Tool {
+    type: 'function';
+    function: ToolFunction;
+}
+
+/**
+ * Tool call from the model
+ */
+export interface ToolCall {
+    id: string;
+    type: 'function';
+    function: {
+        name: string;
+        arguments: string; // JSON string
+    };
 }
 
 /**
@@ -22,7 +53,11 @@ export interface UnifiedChatRequest {
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
-    userId?: string; // Optional end-user tracking for multi-tenant apps
+    userId?: string;
+    /** Tools available to the model */
+    tools?: Tool[];
+    /** Control tool usage: 'auto' | 'none' | 'required' | specific tool */
+    toolChoice?: 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
 }
 
 /**
@@ -53,7 +88,9 @@ export interface UnifiedChatResponse {
     usage: TokenUsage;
     cost: CostBreakdown;
     latencyMs: number;
-    finishReason?: 'stop' | 'length' | 'content_filter' | 'error';
+    finishReason?: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'error';
+    /** Tool calls requested by the model */
+    toolCalls?: ToolCall[];
 }
 
 /**
@@ -61,9 +98,11 @@ export interface UnifiedChatResponse {
  */
 export interface StreamChunk {
     delta: string;
-    finishReason?: 'stop' | 'length' | 'content_filter';
+    finishReason?: 'stop' | 'length' | 'content_filter' | 'tool_calls';
     /** Error message if the stream encountered an error */
     error?: string;
+    /** Tool calls in this chunk (streamed incrementally) */
+    toolCalls?: ToolCall[];
 }
 
 /**

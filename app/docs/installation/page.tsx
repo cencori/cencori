@@ -292,6 +292,41 @@ export async function POST(req: Request) {
                 </div>
             </div>
 
+            {/* TanStack AI Integration */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    TanStack AI Integration
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Using TanStack AI? Install the Cencori adapter with TanStack AI:
+                </p>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`npm install @cencori/ai-sdk @tanstack/ai`}
+                />
+                <CodeBlock
+                    filename="chat.ts"
+                    language="typescript"
+                    code={`import { cencori } from "@cencori/ai-sdk/tanstack";
+
+const adapter = cencori("gpt-4o");
+
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: "user", content: "Hello!" }]
+})) {
+  if (chunk.type === "content") {
+    process.stdout.write(chunk.delta);
+  }
+}`}
+                />
+                <div className="p-4 bg-muted/20 border border-border/40">
+                    <p className="text-xs text-muted-foreground">
+                        <strong>Full features:</strong> Streaming, structured output, and tool calling — all routed through Cencori&apos;s unified gateway.
+                    </p>
+                </div>
+            </div>
+
             {/* SDK Initialization */}
             <div className="space-y-4">
                 <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">

@@ -24,8 +24,33 @@ export interface CencoriChatModelSettings {
 }
 
 interface CencoriMessage {
-    role: 'system' | 'user' | 'assistant';
+    role: 'system' | 'user' | 'assistant' | 'tool';
     content: string;
+    toolCallId?: string;
+}
+
+/**
+ * Tool definition in Cencori format (OpenAI-compatible)
+ */
+interface CencoriTool {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: Record<string, any>;
+    };
+}
+
+/**
+ * Tool call from the model
+ */
+interface CencoriToolCall {
+    id: string;
+    type: 'function';
+    function: {
+        name: string;
+        arguments: string;
+    };
 }
 
 interface CencoriResponse {
@@ -39,11 +64,13 @@ interface CencoriResponse {
     };
     cost_usd: number;
     finish_reason?: string;
+    tool_calls?: CencoriToolCall[];
 }
 
 interface CencoriStreamChunk {
     delta: string;
     finish_reason?: string;
+    tool_calls?: CencoriToolCall[];
 }
 
 export class CencoriChatLanguageModel implements LanguageModelV3 {
@@ -152,8 +179,51 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
         };
     }
 
+    /**
+     * Convert Vercel AI SDK tools to Cencori format
+     */
+    private convertTools(options: LanguageModelV3CallOptions): CencoriTool[] | undefined {
+        if (!options.tools || options.tools.length === 0) {
+            return undefined;
+        }
+
+        return options.tools
+            .filter(t => t.type === 'function')
+            .map(t => ({
+                type: 'function' as const,
+                function: {
+                    name: t.name,
+                    description: t.description || '',
+                    parameters: t.inputSchema as Record<string, any>,
+                },
+            }));
+    }
+
+    /**
+     * Convert Vercel AI SDK tool choice to Cencori format
+     */
+    private convertToolChoice(options: LanguageModelV3CallOptions): string | { type: 'function'; function: { name: string } } | undefined {
+        const tc = options.toolChoice;
+        if (!tc) return undefined;
+
+        switch (tc.type) {
+            case 'auto':
+                return 'auto';
+            case 'none':
+                return 'none';
+            case 'required':
+                return 'required';
+            case 'tool':
+                return { type: 'function', function: { name: tc.toolName } };
+            default:
+                return undefined;
+        }
+    }
+
     async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
         const messages = this.convertMessages(options);
+        const tools = this.convertTools(options);
+        const toolChoice = this.convertToolChoice(options);
 
         const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
             method: 'POST',
@@ -165,6 +235,8 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                 maxTokens: options.maxOutputTokens,
                 stream: false,
                 userId: this.settings.userId,
+                tools,
+                toolChoice,
             }),
             signal: options.abortSignal,
         });
@@ -176,11 +248,30 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
 
         const data = await response.json() as CencoriResponse;
 
-        const content: LanguageModelV3Content[] = [{
-            type: 'text',
-            text: data.content,
-            providerMetadata: undefined,
-        }];
+        // Build content array
+        const content: LanguageModelV3Content[] = [];
+
+        // Add text content if present
+        if (data.content) {
+            content.push({
+                type: 'text',
+                text: data.content,
+                providerMetadata: undefined,
+            });
+        }
+
+        // Add tool calls if present
+        if (data.tool_calls && data.tool_calls.length > 0) {
+            for (const tc of data.tool_calls) {
+                content.push({
+                    type: 'tool-call',
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    input: tc.function.arguments,
+                    providerMetadata: undefined,
+                });
+            }
+        }
 
         const warnings: SharedV3Warning[] = [];
 
@@ -194,6 +285,8 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
 
     async doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult> {
         const messages = this.convertMessages(options);
+        const tools = this.convertTools(options);
+        const toolChoice = this.convertToolChoice(options);
         const self = this;
 
         const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
@@ -206,6 +299,8 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                 maxTokens: options.maxOutputTokens,
                 stream: true,
                 userId: this.settings.userId,
+                tools,
+                toolChoice,
             }),
             signal: options.abortSignal,
         });
@@ -277,6 +372,7 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                         try {
                             const chunk = JSON.parse(data) as CencoriStreamChunk;
 
+                            // Handle text delta
                             if (chunk.delta) {
                                 // Start text if not started
                                 if (!started) {
@@ -293,6 +389,20 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                                     id: textPartId,
                                     delta: chunk.delta,
                                 });
+                            }
+
+                            // Handle tool calls
+                            if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+                                for (const tc of chunk.tool_calls) {
+                                    // Emit complete tool-call event
+                                    controller.enqueue({
+                                        type: 'tool-call',
+                                        toolCallId: tc.id,
+                                        toolName: tc.function.name,
+                                        input: tc.function.arguments,
+                                        providerMetadata: undefined,
+                                    });
+                                }
                             }
 
                             if (chunk.finish_reason) {
