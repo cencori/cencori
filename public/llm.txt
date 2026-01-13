@@ -94,6 +94,87 @@ export async function POST(req: Request) {
 
 Works with `streamText()`, `generateText()`, `useChat()`, and all Vercel AI SDK features.
 
+## TanStack AI Integration
+
+Using TanStack AI? Install `@cencori/ai-sdk` with the TanStack subpath:
+
+```bash
+npm install @cencori/ai-sdk @tanstack/ai
+```
+
+```typescript
+import { cencori } from "@cencori/ai-sdk/tanstack";
+
+const adapter = cencori("gpt-4o");
+
+// Streaming
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: "user", content: "Hello!" }]
+})) {
+  if (chunk.type === "content") {
+    console.log(chunk.delta);
+  }
+}
+```
+
+Works with `chatStream()`, structured output, and all TanStack AI features.
+
+## Tool Calling / Function Calling
+
+Cencori supports tool calling across all providers with a unified interface.
+
+### Vercel AI SDK Tool Calling
+
+```typescript
+import { cencori } from "@cencori/ai-sdk";
+import { generateText, tool } from "ai";
+import { z } from "zod";
+
+const result = await generateText({
+  model: cencori("gpt-4o"),
+  prompt: "What is the weather in San Francisco?",
+  tools: {
+    getWeather: tool({
+      description: "Get the current weather for a location",
+      parameters: z.object({
+        location: z.string().describe("The city name"),
+      }),
+      execute: async ({ location }) => {
+        return { temperature: 72, condition: "sunny" };
+      },
+    }),
+  },
+});
+
+// Access tool calls
+for (const toolCall of result.toolCalls) {
+  console.log(`Called ${toolCall.toolName} with args:`, toolCall.args);
+}
+```
+
+### TanStack AI Tool Calling
+
+```typescript
+import { cencori } from "@cencori/ai-sdk/tanstack";
+
+const adapter = cencori("gpt-4o");
+
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: "user", content: "Get weather for NYC" }],
+  tools: {
+    getWeather: {
+      name: "getWeather",
+      description: "Get weather for a location",
+      inputSchema: { type: "object", properties: { location: { type: "string" } } },
+    },
+  },
+})) {
+  if (chunk.type === "tool_call") {
+    console.log("Tool call:", chunk.toolCall);
+    // { id: "call_123", type: "function", function: { name: "getWeather", arguments: '{"location":"NYC"}' } }
+  }
+}
+
 ## Chat API Reference
 
 ### Basic Usage

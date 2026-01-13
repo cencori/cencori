@@ -24,17 +24,70 @@ for await (const chunk of result.textStream) {
 }
 ```
 
-## TanStack AI Integration (Coming Soon)
+### Tool Calling (Vercel AI SDK)
+
+```typescript
+import { cencori } from '@cencori/ai-sdk/vercel';
+import { generateText, tool } from 'ai';
+import { z } from 'zod';
+
+const result = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'What is the weather in San Francisco?',
+  tools: {
+    getWeather: tool({
+      description: 'Get the current weather for a location',
+      parameters: z.object({
+        location: z.string().describe('The city name'),
+      }),
+      execute: async ({ location }) => {
+        return { temperature: 72, condition: 'sunny' };
+      },
+    }),
+  },
+});
+```
+
+## TanStack AI Integration
 
 ```typescript
 import { cencori } from '@cencori/ai-sdk/tanstack';
-import { chat } from '@tanstack/ai';
 
-const result = await chat({
-  adapter: cencori,
-  model: 'gpt-4o',
+const adapter = cencori('gpt-4o');
+
+for await (const chunk of adapter.chatStream({
   messages: [{ role: 'user', content: 'Hello!' }]
-});
+})) {
+  if (chunk.type === 'content') {
+    process.stdout.write(chunk.delta);
+  }
+}
+```
+
+### Tool Calling (TanStack AI)
+
+```typescript
+import { cencori } from '@cencori/ai-sdk/tanstack';
+
+const adapter = cencori('gpt-4o');
+
+for await (const chunk of adapter.chatStream({
+  messages: [{ role: 'user', content: 'Get weather for NYC' }],
+  tools: {
+    getWeather: {
+      name: 'getWeather',
+      description: 'Get weather for a location',
+      inputSchema: { 
+        type: 'object', 
+        properties: { location: { type: 'string' } } 
+      },
+    },
+  },
+})) {
+  if (chunk.type === 'tool_call') {
+    console.log('Tool call:', chunk.toolCall);
+  }
+}
 ```
 
 ## Configuration
@@ -74,6 +127,7 @@ const cencori = createCencori({
 - 📊 **Observability** — Request logs, latency metrics, cost tracking
 - 💰 **Cost Control** — Budgets, alerts, per-route analytics
 - 🔌 **Multi-Provider** — One API key for all AI providers
+- 🛠️ **Tool Calling** — Full support for function calling across providers
 
 ## License
 

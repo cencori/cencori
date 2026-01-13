@@ -116,7 +116,7 @@ export class OpenAICompatibleProvider extends AIProvider {
         try {
             const completion = await this.client.chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages),
+                messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 stream: false,
@@ -169,7 +169,7 @@ export class OpenAICompatibleProvider extends AIProvider {
         try {
             const stream = await this.client.chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages),
+                messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 stream: true,

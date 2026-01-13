@@ -5,12 +5,14 @@
  */
 
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import {
     AIProvider,
     UnifiedChatRequest,
     UnifiedChatResponse,
     StreamChunk,
     ModelPricing,
+    ToolCall,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
@@ -37,13 +39,25 @@ export class OpenAIProvider extends AIProvider {
         const startTime = Date.now();
 
         try {
+            // Convert tools to OpenAI format
+            const tools: ChatCompletionTool[] | undefined = request.tools?.map(t => ({
+                type: 'function' as const,
+                function: {
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters,
+                },
+            }));
+
             const completion = await this.client.chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages),
+                messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 stream: false,
                 user: request.userId,
+                tools,
+                tool_choice: request.toolChoice as any,
             });
 
             const usage = completion.usage!;
@@ -57,11 +71,36 @@ export class OpenAIProvider extends AIProvider {
 
             const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage);
 
-            // Normalize finish_reason to our type
+            // Parse finish reason
             const finishReason = completion.choices[0].finish_reason;
 
+            // Parse tool calls if present
+            const message = completion.choices[0].message;
+            const toolCalls: ToolCall[] | undefined = message.tool_calls?.map(tc => {
+                // Handle different tool call types
+                if (tc.type === 'function') {
+                    return {
+                        id: tc.id,
+                        type: 'function' as const,
+                        function: {
+                            name: tc.function.name,
+                            arguments: tc.function.arguments,
+                        },
+                    };
+                }
+                // For other types, create a placeholder
+                return {
+                    id: tc.id,
+                    type: 'function' as const,
+                    function: {
+                        name: 'unknown',
+                        arguments: '{}',
+                    },
+                };
+            });
+
             return {
-                content: completion.choices[0].message.content || '',
+                content: message.content || '',
                 model: completion.model,
                 provider: this.providerName,
                 usage: {
@@ -75,9 +114,11 @@ export class OpenAIProvider extends AIProvider {
                     markupPercentage: pricing.cencoriMarkupPercentage,
                 },
                 latencyMs: Date.now() - startTime,
-                finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
-                    ? finishReason
-                    : undefined,
+                finishReason: finishReason === 'tool_calls' ? 'tool_calls'
+                    : finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                        ? finishReason
+                        : undefined,
+                toolCalls,
             };
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
@@ -86,24 +127,75 @@ export class OpenAIProvider extends AIProvider {
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
         try {
+            // Convert tools to OpenAI format
+            const tools: ChatCompletionTool[] | undefined = request.tools?.map(t => ({
+                type: 'function' as const,
+                function: {
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters,
+                },
+            }));
+
             const stream = await this.client.chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages),
+                messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 stream: true,
                 user: request.userId,
+                tools,
+                tool_choice: request.toolChoice as any,
             });
+
+            // Track tool calls across chunks (they stream incrementally)
+            const toolCallsInProgress: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
             for await (const chunk of stream) {
                 const delta = chunk.choices[0]?.delta?.content || '';
                 const finishReason = chunk.choices[0]?.finish_reason;
+                const toolCallDeltas = chunk.choices[0]?.delta?.tool_calls;
+
+                // Accumulate tool call data
+                if (toolCallDeltas) {
+                    for (const tc of toolCallDeltas) {
+                        const existing = toolCallsInProgress.get(tc.index);
+                        if (existing) {
+                            // Append to existing tool call
+                            if (tc.function?.arguments) {
+                                existing.arguments += tc.function.arguments;
+                            }
+                        } else {
+                            // New tool call
+                            toolCallsInProgress.set(tc.index, {
+                                id: tc.id || '',
+                                name: tc.function?.name || '',
+                                arguments: tc.function?.arguments || '',
+                            });
+                        }
+                    }
+                }
+
+                // Build tool calls array if we have completed calls
+                let toolCalls: ToolCall[] | undefined;
+                if (finishReason === 'tool_calls' && toolCallsInProgress.size > 0) {
+                    toolCalls = Array.from(toolCallsInProgress.values()).map(tc => ({
+                        id: tc.id,
+                        type: 'function' as const,
+                        function: {
+                            name: tc.name,
+                            arguments: tc.arguments,
+                        },
+                    }));
+                }
 
                 yield {
                     delta,
-                    finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
-                        ? finishReason
-                        : undefined,
+                    finishReason: finishReason === 'tool_calls' ? 'tool_calls'
+                        : finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
+                            ? finishReason
+                            : undefined,
+                    toolCalls,
                 };
             }
         } catch (error) {

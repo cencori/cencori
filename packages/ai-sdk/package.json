@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "@cencori/ai-sdk",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Cencori AI SDK - The infrastructure layer for AI applications. Works with Vercel AI SDK, TanStack AI, and more.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",

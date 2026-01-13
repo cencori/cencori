@@ -110,8 +110,45 @@ var CencoriChatLanguageModel = class {
       }
     };
   }
+  /**
+   * Convert Vercel AI SDK tools to Cencori format
+   */
+  convertTools(options) {
+    if (!options.tools || options.tools.length === 0) {
+      return void 0;
+    }
+    return options.tools.filter((t) => t.type === "function").map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description || "",
+        parameters: t.inputSchema
+      }
+    }));
+  }
+  /**
+   * Convert Vercel AI SDK tool choice to Cencori format
+   */
+  convertToolChoice(options) {
+    const tc = options.toolChoice;
+    if (!tc) return void 0;
+    switch (tc.type) {
+      case "auto":
+        return "auto";
+      case "none":
+        return "none";
+      case "required":
+        return "required";
+      case "tool":
+        return { type: "function", function: { name: tc.toolName } };
+      default:
+        return void 0;
+    }
+  }
   async doGenerate(options) {
     const messages = this.convertMessages(options);
+    const tools = this.convertTools(options);
+    const toolChoice = this.convertToolChoice(options);
     const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
       method: "POST",
       headers: this.getHeaders(),
@@ -121,7 +158,9 @@ var CencoriChatLanguageModel = class {
         temperature: options.temperature,
         maxTokens: options.maxOutputTokens,
         stream: false,
-        userId: this.settings.userId
+        userId: this.settings.userId,
+        tools,
+        toolChoice
       }),
       signal: options.abortSignal
     });
@@ -130,11 +169,25 @@ var CencoriChatLanguageModel = class {
       throw new Error(`Cencori API error: ${error.error || response.statusText}`);
     }
     const data = await response.json();
-    const content = [{
-      type: "text",
-      text: data.content,
-      providerMetadata: void 0
-    }];
+    const content = [];
+    if (data.content) {
+      content.push({
+        type: "text",
+        text: data.content,
+        providerMetadata: void 0
+      });
+    }
+    if (data.tool_calls && data.tool_calls.length > 0) {
+      for (const tc of data.tool_calls) {
+        content.push({
+          type: "tool-call",
+          toolCallId: tc.id,
+          toolName: tc.function.name,
+          input: tc.function.arguments,
+          providerMetadata: void 0
+        });
+      }
+    }
     const warnings = [];
     return {
       content,
@@ -145,6 +198,8 @@ var CencoriChatLanguageModel = class {
   }
   async doStream(options) {
     const messages = this.convertMessages(options);
+    const tools = this.convertTools(options);
+    const toolChoice = this.convertToolChoice(options);
     const self = this;
     const response = await fetch(`${this.settings.baseUrl}/api/ai/chat`, {
       method: "POST",
@@ -155,7 +210,9 @@ var CencoriChatLanguageModel = class {
         temperature: options.temperature,
         maxTokens: options.maxOutputTokens,
         stream: true,
-        userId: this.settings.userId
+        userId: this.settings.userId,
+        tools,
+        toolChoice
       }),
       signal: options.abortSignal
     });
@@ -230,6 +287,17 @@ var CencoriChatLanguageModel = class {
                   id: textPartId,
                   delta: chunk.delta
                 });
+              }
+              if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+                for (const tc of chunk.tool_calls) {
+                  controller.enqueue({
+                    type: "tool-call",
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    input: tc.function.arguments,
+                    providerMetadata: void 0
+                  });
+                }
               }
               if (chunk.finish_reason) {
                 if (started) {

@@ -20,6 +20,7 @@ import type {
     ContentStreamChunk,
     DoneStreamChunk,
     ErrorStreamChunk,
+    ToolCallStreamChunk,
     Modality,
     DefaultMessageMetadataByModality,
 } from '@tanstack/ai';
@@ -130,6 +131,16 @@ class CencoriTextAdapter implements TextAdapter<
      * Stream chat completions from the model
      */
     async *chatStream(options: TextOptions<CencoriModelOptions>): AsyncIterable<StreamChunk> {
+        // Convert tools to Cencori format if present
+        const tools = options.tools ? Object.values(options.tools).map(t => ({
+            type: 'function' as const,
+            function: {
+                name: t.name,
+                description: t.description,
+                parameters: t.inputSchema || {},
+            },
+        })) : undefined;
+
         const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
             method: 'POST',
             headers: {
@@ -144,6 +155,7 @@ class CencoriTextAdapter implements TextAdapter<
                 maxTokens: options.maxTokens,
                 stream: true,
                 userId: options.modelOptions?.userId,
+                tools,
             }),
             signal: options.abortController?.signal,
         });
@@ -242,13 +254,36 @@ class CencoriTextAdapter implements TextAdapter<
                             yield contentChunk;
                         }
 
+                        // Handle tool calls
+                        if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+                            for (const tc of chunk.tool_calls) {
+                                const toolCallChunk: ToolCallStreamChunk = {
+                                    type: 'tool_call',
+                                    id: this.generateId(),
+                                    model: this.model,
+                                    timestamp: Date.now(),
+                                    toolCall: {
+                                        id: tc.id,
+                                        type: 'function',
+                                        function: {
+                                            name: tc.function.name,
+                                            arguments: tc.function.arguments,
+                                        },
+                                    },
+                                    index: 0,
+                                };
+                                yield toolCallChunk;
+                            }
+                        }
+
                         if (chunk.finish_reason) {
                             const doneChunk: DoneStreamChunk = {
                                 type: 'done',
                                 id: this.generateId(),
                                 model: this.model,
                                 timestamp: Date.now(),
-                                finishReason: chunk.finish_reason === 'stop' ? 'stop' : null,
+                                finishReason: chunk.finish_reason === 'tool_calls' ? 'tool_calls'
+                                    : chunk.finish_reason === 'stop' ? 'stop' : null,
                                 usage: {
                                     promptTokens,
                                     completionTokens,
