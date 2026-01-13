@@ -32,6 +32,7 @@ export async function GET(
         const timeRange = searchParams.get('time_range') || '24h'; // '1h' | '24h' | '7d' | '30d' | 'all'
         const search = searchParams.get('search');
         const environment = searchParams.get('environment') || 'production'; // 'production' | 'test'
+        const apiKeyId = searchParams.get('api_key_id'); // Filter by specific API key
 
         // Calculate time filter
         let startTime: Date | null = null;
@@ -61,7 +62,7 @@ export async function GET(
         // - Other legacy keys → production
         let apiKeysQuery = supabaseAdmin
             .from('api_keys')
-            .select('id, key_prefix, environment')
+            .select('id, name, key_prefix, environment')
             .eq('project_id', projectId)
             .is('revoked_at', null);
 
@@ -81,6 +82,12 @@ export async function GET(
             }
         });
 
+        // Create a map of API key ID → prefix for display
+        const apiKeyMap: Record<string, { name: string; prefix: string }> = {};
+        apiKeys?.forEach(k => {
+            apiKeyMap[k.id] = { name: k.name, prefix: k.key_prefix };
+        });
+
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
         // If no API keys found for environment, return empty results
@@ -97,11 +104,14 @@ export async function GET(
         }
 
         // Build query
+        // If filtering by specific API key, use that; otherwise use all keys for environment
+        const targetKeyIds = apiKeyId && apiKeyId !== 'all' ? [apiKeyId] : apiKeyIds;
+
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*', { count: 'exact' })
             .eq('project_id', projectId)
-            .in('api_key_id', apiKeyIds);
+            .in('api_key_id', targetKeyIds);
 
         // Apply filters
         if (status && status !== 'all') {
@@ -151,11 +161,17 @@ export async function GET(
                 requestPreview = '';
             }
 
+            // Get API key info for this request
+            const keyInfo = apiKeyMap[req.api_key_id];
+
             return {
                 id: req.id,
                 created_at: req.created_at,
                 status: req.status,
                 model: req.model,
+                api_key_id: req.api_key_id,
+                api_key_name: keyInfo?.name || 'Unknown',
+                api_key_prefix: keyInfo?.prefix || 'unknown',
                 prompt_tokens: req.prompt_tokens,
                 completion_tokens: req.completion_tokens,
                 total_tokens: req.total_tokens,

@@ -33,6 +33,7 @@ interface RequestLogsTableProps {
         model?: string;
         time_range?: string;
         search?: string;
+        api_key_id?: string;
     };
 }
 
@@ -55,6 +56,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                 ...(filters.model && { model: filters.model }),
                 ...(filters.time_range && { time_range: filters.time_range }),
                 ...(filters.search && { search: filters.search }),
+                ...(filters.api_key_id && { api_key_id: filters.api_key_id }),
             });
 
             const response = await fetch(`/api/projects/${projectId}/logs?${params}`);

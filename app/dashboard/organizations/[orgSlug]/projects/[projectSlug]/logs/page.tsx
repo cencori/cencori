@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, X } from 'lucide-react';
+import { Search, X, Key } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -25,6 +25,13 @@ interface PageProps {
         orgSlug: string;
         projectSlug: string;
     }>;
+}
+
+interface ApiKey {
+    id: string;
+    name: string;
+    key_prefix: string;
+    environment: string | null;
 }
 
 // Hook to get projectId from slugs (with caching)
@@ -62,11 +69,39 @@ export default function RequestLogsPage({ params }: PageProps) {
         model: 'all',
         time_range: '7d',
         search: '',
+        api_key_id: 'all',
     });
     const [searchInput, setSearchInput] = useState('');
 
     // Get projectId with caching - INSTANT ON REVISIT!
     const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
+
+    // Fetch API keys for dropdown filter
+    const { data: apiKeys } = useQuery<ApiKey[]>({
+        queryKey: ['api-keys-filter', projectId, environment],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('api_keys')
+                .select('id, name, key_prefix, environment')
+                .eq('project_id', projectId)
+                .is('revoked_at', null);
+            return (data as ApiKey[]) || [];
+        },
+        enabled: !!projectId,
+        staleTime: 60 * 1000,
+    });
+
+    // Filter API keys by current environment
+    const filteredApiKeys = apiKeys?.filter(key => {
+        if (key.environment) {
+            return environment === 'production'
+                ? key.environment === 'production'
+                : key.environment === 'test';
+        }
+        // Legacy keys without explicit environment
+        const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
+        return environment === 'production' ? !isTestKey : isTestKey;
+    });
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,11 +114,12 @@ export default function RequestLogsPage({ params }: PageProps) {
             model: 'all',
             time_range: '30d',
             search: '',
+            api_key_id: 'all',
         });
         setSearchInput('');
     };
 
-    const hasActiveFilters = filters.status !== 'all' || filters.model !== 'all' || filters.search || filters.time_range !== '30d';
+    const hasActiveFilters = filters.status !== 'all' || filters.model !== 'all' || filters.search || filters.time_range !== '30d' || filters.api_key_id !== 'all';
 
     if (isLoading) {
         return (
@@ -189,6 +225,24 @@ export default function RequestLogsPage({ params }: PageProps) {
                     value={filters.time_range}
                     onChange={(value) => setFilters(prev => ({ ...prev, time_range: value }))}
                 />
+
+                {/* API Key filter */}
+                <Select
+                    value={filters.api_key_id}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, api_key_id: value }))}
+                >
+                    <SelectTrigger className="w-[160px] h-7 text-xs">
+                        <SelectValue placeholder="All API keys" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all" className="text-xs">API keys</SelectItem>
+                        {filteredApiKeys?.map(key => (
+                            <SelectItem key={key.id} value={key.id} className="text-xs">
+                                {key.name} ({key.key_prefix}...)
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
 
                 {/* Search */}
                 <form onSubmit={handleSearchSubmit} className="relative">
