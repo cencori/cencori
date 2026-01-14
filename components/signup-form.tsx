@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +19,22 @@ type SignupFormProps = React.ComponentProps<"form">;
 
 export function SignupForm({ className, ...props }: SignupFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Determine where to redirect after signup
+  const getRedirectUrl = () => {
+    if (redirectParam) {
+      if (redirectParam.startsWith("/")) {
+        return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}${redirectParam}`;
+      }
+      return redirectParam;
+    }
+    return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}/dashboard/organizations`;
+  };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -55,8 +68,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       }
 
       // Decide redirect after sign up
-      const redirectTo =
-        `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}/dashboard/organizations`;
+      const redirectTo = getRedirectUrl();
 
       // Create user with password
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -78,7 +90,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         body: JSON.stringify({ email }),
       }).catch(console.error);
 
-      router.push("/dashboard/organizations");
+      router.push(redirectParam || "/dashboard/organizations");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unexpected error";
       setError(msg);
@@ -91,8 +103,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     setError(null);
     setLoading(true);
     try {
-      const redirectTo =
-        `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}/dashboard/organizations/new`;
+      const redirectTo = getRedirectUrl();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo },
