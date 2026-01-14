@@ -18,7 +18,7 @@ export async function POST(
     const supabaseAdmin = createAdminClient();
 
     // Find the invite
-    console.log('[Invites Accept] Looking for invite with token:', token);
+    console.log('[Accept] Looking for invite with token:', token);
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
         .select('*, organizations(name, slug)')
@@ -26,16 +26,16 @@ export async function POST(
         .single();
 
     if (inviteError) {
-        console.error('[Invites Accept] Error finding invite:', inviteError);
+        console.error('[Accept] Error finding invite:', inviteError);
         return NextResponse.json({ error: 'Invalid invite link', details: inviteError.message }, { status: 404 });
     }
 
     if (!invite) {
-        console.error('[Invites Accept] No invite found for token');
+        console.error('[Accept] No invite found for token:', token);
         return NextResponse.json({ error: 'Invalid invite link' }, { status: 404 });
     }
 
-    console.log('[Invites Accept] Found invite for:', invite.email, 'org:', invite.organization_id);
+    console.log('[Accept] Found invite:', { id: invite.id, email: invite.email, org: invite.organization_id });
 
     // Check if already accepted
     if (invite.accepted_at) {
