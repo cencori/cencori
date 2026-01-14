@@ -21,7 +21,7 @@ export async function POST(
     console.log('[Accept] Looking for invite with token:', token);
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
-        .select('*, organizations(name, slug)')
+        .select('id, organization_id, email, role, invite_token, expires_at, accepted_at')
         .eq('invite_token', token)
         .single();
 
@@ -36,6 +36,18 @@ export async function POST(
     }
 
     console.log('[Accept] Found invite:', { id: invite.id, email: invite.email, org: invite.organization_id });
+
+    // Fetch organization separately
+    const { data: org, error: orgError } = await supabaseAdmin
+        .from('organizations')
+        .select('name, slug')
+        .eq('id', invite.organization_id)
+        .single();
+
+    if (orgError || !org) {
+        console.error('[Accept] Error finding organization for invite:', orgError);
+        return NextResponse.json({ error: 'Organization not found for this invite' }, { status: 404 });
+    }
 
     // Check if already accepted
     if (invite.accepted_at) {
@@ -72,7 +84,7 @@ export async function POST(
         return NextResponse.json({
             success: true,
             message: 'You are already a member of this organization',
-            organizationSlug: invite.organizations?.slug,
+            organizationSlug: org?.slug,
         });
     }
 
@@ -98,8 +110,8 @@ export async function POST(
 
     return NextResponse.json({
         success: true,
-        message: `Welcome to ${invite.organizations?.name || 'the organization'}!`,
-        organizationSlug: invite.organizations?.slug,
+        message: `Welcome to ${org?.name || 'the organization'}!`,
+        organizationSlug: org?.slug,
     });
 }
 
@@ -112,13 +124,19 @@ export async function GET(
     const supabaseAdmin = createAdminClient();
 
     // Find the invite
+    console.log('[Accept GET] Looking for invite with token:', token);
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
-        .select('email, role, expires_at, accepted_at, organizations(name)')
+        .select('email, role, expires_at, accepted_at, organization_id')
         .eq('invite_token', token)
         .single();
 
-    if (inviteError || !invite) {
+    if (inviteError) {
+        console.error('[Accept GET] Error finding invite:', inviteError);
+        return NextResponse.json({ error: 'Invalid invite link' }, { status: 404 });
+    }
+
+    if (!invite) {
         return NextResponse.json({ error: 'Invalid invite link' }, { status: 404 });
     }
 
@@ -130,10 +148,16 @@ export async function GET(
         return NextResponse.json({ error: 'This invite has expired' }, { status: 400 });
     }
 
+    // Fetch organization name separately
+    const { data: org } = await supabaseAdmin
+        .from('organizations')
+        .select('name')
+        .eq('id', invite.organization_id)
+        .single();
+
     return NextResponse.json({
         email: invite.email,
         role: invite.role,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        organizationName: (invite.organizations as any)?.name,
+        organizationName: org?.name || 'Unknown Organization',
     });
 }
