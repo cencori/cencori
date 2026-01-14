@@ -37,8 +37,15 @@ function InvitePageContent() {
 
         // Check auth status and fetch invite details
         const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user ? { email: user.email || "" } : null);
+            // Use getSession which is more reliable on client-side
+            const { data: { session }, error } = await supabase.auth.getSession();
+            console.log('[Invite] Session check:', { hasSession: !!session, error });
+
+            if (session?.user) {
+                setUser({ email: session.user.email || "" });
+            } else {
+                setUser(null);
+            }
             setAuthChecked(true);
 
             // Fetch invite details
@@ -65,6 +72,21 @@ function InvitePageContent() {
         };
 
         init();
+
+        // Listen for auth state changes (e.g., user logs in from another tab or redirects back)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+            if (session?.user) {
+                setUser({ email: session.user.email || "" });
+            } else {
+                setUser(null);
+            }
+            setAuthChecked(true);
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, [token]);
 
     const handleAccept = async () => {
