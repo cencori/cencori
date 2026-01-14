@@ -1,8 +1,9 @@
+import { Suspense } from "react";
 import { SignupForm } from "@/components/signup-form";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
 
-export default function SignupPage() {
+function SignupPageContent() {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
@@ -25,5 +26,13 @@ export default function SignupPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-svh flex items-center justify-center">Loading...</div>}>
+      <SignupPageContent />
+    </Suspense>
   );
 }
