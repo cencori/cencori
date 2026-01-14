@@ -24,12 +24,14 @@ function InvitePageContent() {
     const [errorMessage, setErrorMessage] = useState<string>("");
     const [isAccepting, setIsAccepting] = useState(false);
     const [user, setUser] = useState<{ email: string } | null>(null);
+    const [authChecked, setAuthChecked] = useState(false);
     const [orgSlug, setOrgSlug] = useState<string | null>(null);
 
     useEffect(() => {
         if (!token) {
             setStatus("error");
             setErrorMessage("Invalid invite link - no token provided");
+            setAuthChecked(true);
             return;
         }
 
@@ -37,6 +39,7 @@ function InvitePageContent() {
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user ? { email: user.email || "" } : null);
+            setAuthChecked(true);
 
             // Fetch invite details
             try {
@@ -172,7 +175,11 @@ function InvitePageContent() {
                         </div>
                     </div>
 
-                    {user ? (
+                    {!authChecked ? (
+                        <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : user ? (
                         user.email.toLowerCase() === inviteDetails?.email.toLowerCase() ? (
                             <Button
                                 className="w-full"
