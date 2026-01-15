@@ -19,44 +19,71 @@ interface ExportButtonProps {
         time_range?: string;
         search?: string;
     };
+    environment?: string;
 }
 
-export function ExportButton({ projectId, filters }: ExportButtonProps) {
+export function ExportButton({ projectId, filters, environment = 'production' }: ExportButtonProps) {
     const [isExporting, setIsExporting] = useState(false);
 
     const handleExport = async (format: 'csv' | 'json') => {
         setIsExporting(true);
         try {
-            const response = await fetch(`/api/projects/${projectId}/logs/export`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ format, filters }),
-            });
+            // Calculate date range from time_range filter
+            const now = new Date();
+            let from: string | undefined;
+
+            switch (filters.time_range) {
+                case '1h':
+                    from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+                    break;
+                case '24h':
+                    from = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case '7d':
+                    from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case '30d':
+                    from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case '90d':
+                    from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case 'all':
+                    from = undefined;
+                    break;
+                default:
+                    from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            }
+
+            // Build URL using unified export API
+            let url = `/api/projects/${projectId}/export?type=logs&format=${format}&environment=${environment}`;
+            if (from) url += `&from=${from}`;
+
+            const response = await fetch(url);
 
             if (!response.ok) {
-                throw new Error('Export failed');
+                const error = await response.json();
+                throw new Error(error.error || 'Export failed');
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
+            const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
+            a.href = downloadUrl;
 
             const contentDisposition = response.headers.get('Content-Disposition');
             const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-            a.download = filenameMatch ? filenameMatch[1] : `cencori-logs.${format}`;
+            a.download = filenameMatch ? filenameMatch[1] : `logs-export.${format}`;
 
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            window.URL.revokeObjectURL(downloadUrl);
 
             toast.success(`Exported logs as ${format.toUpperCase()}`);
         } catch (error) {
             console.error('Export error:', error);
-            toast.error('Failed to export logs');
+            toast.error(error instanceof Error ? error.message : 'Failed to export logs');
         } finally {
             setIsExporting(false);
         }

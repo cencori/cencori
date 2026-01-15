@@ -16,6 +16,7 @@ import { ChartBarIcon, ShieldExclamationIcon, CurrencyDollarIcon, ClockIcon, Bol
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryKeys } from '@/lib/hooks/useQueries';
+import { ExportDialog } from '@/components/dashboard/ExportDialog';
 
 interface TrendData {
     timestamp: string;
@@ -213,18 +214,21 @@ export default function AnalyticsPage({ params }: PageProps) {
                     <h1 className="text-lg font-semibold">Analytics</h1>
                     <p className="text-xs text-muted-foreground mt-0.5">Real-time observability for your AI requests</p>
                 </div>
-                <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-[130px] h-8 text-xs">
-                        <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
-                        <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
-                        <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
-                        <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
-                        <SelectItem value="90d" className="text-xs">Last 90 Days</SelectItem>
-                    </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                    <ExportDialog projectId={projectId} type="analytics" environment={environment} />
+                    <Select value={timeRange} onValueChange={setTimeRange}>
+                        <SelectTrigger className="w-[130px] h-8 text-xs">
+                            <SelectValue placeholder="Period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
+                            <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
+                            <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
+                            <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
+                            <SelectItem value="90d" className="text-xs">Last 90 Days</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Primary Metrics - 5 columns */}
