@@ -11,7 +11,7 @@ export default function DocsPage() {
                     Cencori Documentation
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Cencori is the unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.
+                    Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.
                 </p>
             </div>
 
@@ -51,7 +51,7 @@ export default function DocsPage() {
                     Why Cencori?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Cencori gives you everything you need to ship AI to production: a unified API, automatic security, complete logging, and real-time cost tracking. Instead of integrating with each provider separately, you integrate once with Cencori.
+                    Cencori gives you everything you need to ship AI to production: security, observability, cost tracking, and scale. Integrate once and get a complete platform.
                 </p>
 
                 <div className="space-y-3 mt-4">
@@ -177,7 +177,7 @@ export default function DocsPage() {
                     <div>
                         <h3 className="text-base font-semibold mb-2">Multi-Provider Support</h3>
                         <p className="text-sm text-muted-foreground leading-relaxed mb-2">
-                            Switch between AI providers without changing your application code. Cencori provides a unified API that works with all major providers.
+                            Switch between AI providers without changing your application code. Cencori routes to all major providers with built-in failover.
                         </p>
                     </div>
                 </div>

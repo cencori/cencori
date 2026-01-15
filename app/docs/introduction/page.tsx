@@ -21,10 +21,10 @@ export default function IntroductionPage() {
                     What is Cencori?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Cencori is the unified API for AI providers. Instead of integrating with OpenAI, Anthropic, and Google separately, you integrate once with Cencori and get all providers — plus security, observability, and cost control.
+                    Cencori is the infrastructure for AI production. We provide a complete platform for shipping AI — from an API gateway with multi-provider routing and security, to compute, workflows, and observability.
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Think of it as the infrastructure layer for AI: one SDK, every provider, with production-ready features like PII detection, audit logs, and real-time analytics built-in.
+                    Think of it as the infrastructure layer for AI: everything you need to go from prototype to production, with security, compliance, and cost tracking built-in.
                 </p>
             </div>
 

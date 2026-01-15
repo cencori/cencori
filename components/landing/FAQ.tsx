@@ -10,7 +10,7 @@ import {
 const faqData = [
     {
         question: "How does Cencori actually work?",
-        answer: "Cencori acts as a secure gateway between your application and AI providers. You make one simple change - replace your AI API endpoint with Cencori's. We route your requests, apply security checks, log everything for compliance, and return the AI response. Your existing code stays the same - just point it to Cencori's API instead of OpenAI or Anthropic directly."
+        answer: "Cencori is a complete platform for shipping AI to production. It includes an AI gateway for routing and security, compute for running models, and tools for workflows and observability. You integrate once with Cencori, and we handle infrastructure (security checks, compute, cost tracking) so you can focus on your product."
     },
     {
         question: "What AI models and providers do you support?",
@@ -50,11 +50,11 @@ const faqData = [
     },
     {
         question: "How is Cencori different from using OpenAI directly?",
-        answer: "OpenAI gives you the model. Cencori gives you production-ready AI infrastructure including security (prompt injection, PII detection, content filtering), multi-provider support (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost optimization (track spend per user/feature), and a unified API (one integration, all providers). Think of it as the difference between using Stripe vs. building your own payment processor."
+        answer: "OpenAI gives you the model. Cencori gives you everything else — the infrastructure for AI production. This includes security (prompt injection, PII detection, content filtering), multi-provider routing (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost tracking (spend per user/feature), plus compute and workflow capabilities. Think of it as the difference between renting a database vs. using Supabase."
     },
     {
         question: "What is Cencori?",
-        answer: "Cencori is the unified AI infrastructure for production applications. One API for every AI provider with built-in security, observability, and cost control. It's the security layer for AI applications built by FohnAI."
+        answer: "Cencori is the infrastructure for AI production. We provide a complete platform for shipping AI — from an API gateway with multi-provider routing and security, to compute, workflows, and observability. Whether you're building a chatbot or orchestrating agents, Cencori handles infrastructure so you can focus on your product."
     },
 ];
 
@@ -97,7 +97,7 @@ export function FAQ() {
                             How does Cencori actually work?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
-                            Cencori acts as a secure gateway between your application and AI providers. You make one simple change - replace your AI API endpoint with Cencori&apos;s. We route your requests, apply security checks, log everything for compliance, and return the AI response. Your existing code stays the same - just point it to cencori&apos;s API instead of OpenAI or Anthropic directly.
+                            Cencori is a complete platform for shipping AI to production. It includes an AI gateway for routing and security, compute for running models, and tools for workflows and observability. You integrate once with Cencori, and we handle infrastructure — security checks, logging, cost tracking — so you can focus on your product.
                         </AccordionContent>
                     </AccordionItem>
 
@@ -206,9 +206,9 @@ export function FAQ() {
                                 <li>Multi-provider support (switch between GPT-4, Claude, Gemini)</li>
                                 <li>Audit logs &amp; compliance (SOC 2, GDPR)</li>
                                 <li>Cost optimization (track spend per user/feature)</li>
-                                <li>Unified API (one integration, all providers)</li>
+                                <li>Cost tracking (spend per user/feature)</li>
                             </ul>
-                            <p className="mt-2">Think of it as the difference between using Stripe vs. building your own payment processor.</p>
+                            <p className="mt-2">Think of it as the difference between renting a database vs. using Supabase.</p>
                         </AccordionContent>
                     </AccordionItem>
 
@@ -217,7 +217,7 @@ export function FAQ() {
                             What&apos;s the difference between FohnAI and Cencori?
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground">
-                            <strong className="text-foreground">FohnAI</strong> is the AI R&D company building infrastructure to protect AI systems and the people who use them. <strong className="text-foreground">Cencori</strong> is our flagship product - the security layer for AI applications.
+                            <strong className="text-foreground">FohnAI</strong> is the AI R&D company building infrastructure to protect AI systems and the people who use them. <strong className="text-foreground">Cencori</strong> is our flagship product — the infrastructure for AI production.
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>

@@ -16,7 +16,7 @@ const steps = [
     {
         number: "03",
         title: "Start building",
-        description: "Use any AI provider through a single, unified API.",
+        description: "Use any AI provider with security and observability built-in.",
         code: `import { Cencori } from 'cencori'
 
 const client = new Cencori({ apiKey: 'your-key' })

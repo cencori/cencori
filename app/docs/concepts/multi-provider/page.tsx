@@ -12,7 +12,7 @@ export default function MultiProviderPage() {
                     Multi-Provider Support
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Use OpenAI, Anthropic, and Google Gemini through one unified API. Switch providers with a single parameter - no code changes required.
+                    Use OpenAI, Anthropic, and Google Gemini through one platform. Switch providers with a single parameter — no code changes required.
                 </p>
             </div>
 
@@ -22,7 +22,7 @@ export default function MultiProviderPage() {
                     Overview
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    One of Cencori&apos;s most powerful features is multi-provider support. Instead of being locked into one AI provider, you can use multiple providers through a single, unified API.
+                    Multi-provider routing is one of Cencori&apos;s core capabilities. Instead of being locked into one AI provider, you can use multiple providers through one platform with built-in failover.
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                     This gives you:

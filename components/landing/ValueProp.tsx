@@ -13,11 +13,11 @@ export const ValueProp = () => {
                     {/* Left: Content */}
                     <div className="flex flex-col gap-8">
                         <h2 className="text-3xl md:text-5xl font-bold tracking-tighter">
-                            One API for <br />
-                            <span className="text-muted-foreground">every AI provider</span>
+                            Everything you need <br />
+                            <span className="text-muted-foreground">to ship AI</span>
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed">
-                            Stop rewriting integrations for every provider. Cencori gives you a unified API that works with OpenAI, Anthropic, and Google — with security, logging, and cost tracking built-in.
+                            From gateway to compute to workflows. Cencori handles infrastructure so you can focus on your product — with security, logging, and cost tracking built-in.
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">

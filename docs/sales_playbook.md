@@ -28,11 +28,11 @@
 
 ## What Is Cencori?
 
-Cencori is **AI infrastructure for production applications**. We provide a unified API that connects to every major AI provider (OpenAI, Anthropic, Google) while automatically handling security, compliance, and cost tracking.
+Cencori is **the infrastructure for AI production**. We provide a unified API that connects to every major AI provider (OpenAI, Anthropic, Google) while automatically handling security, compliance, and cost tracking.
 
 ## The One-Liner
 
-> "Cencori is the Stripe for AI — one integration for all providers, with security and compliance built in."
+> "Cencori is the infrastructure for AI production — one integration for all providers, with security and compliance built in."
 
 ## Why It Matters
 
