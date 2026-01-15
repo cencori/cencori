@@ -3,7 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Package, Terminal, Cloud, Shield, Code2, Workflow, Blocks } from "lucide-react";
+import { ExternalLink, Terminal, Blocks } from "lucide-react";
+import { Microsoft, GoogleCloud, Cloudflare } from "@lobehub/icons";
 import Link from "next/link";
 
 // SDK section
@@ -59,7 +60,7 @@ const platforms = [
     {
         name: "Cloudflare",
         description: "Edge runtime integration for AI Gateway",
-        icon: <Cloud className="h-6 w-6 text-orange-500" />,
+        icon: <Cloudflare.Color size={24} />,
         url: "https://cloudflare.com",
         status: "coming-q3" as const,
     },
@@ -96,13 +97,13 @@ const enterprise = [
     {
         name: "Microsoft Purview",
         description: "Data loss prevention integration",
-        icon: <Shield className="h-6 w-6 text-blue-500" />,
+        icon: <Microsoft.Color size={24} />,
         status: "enterprise" as const,
     },
     {
         name: "Google Cloud DLP",
         description: "Sensitive data protection integration",
-        icon: <Shield className="h-6 w-6 text-red-500" />,
+        icon: <GoogleCloud.Color size={24} />,
         status: "enterprise" as const,
     },
 ];
