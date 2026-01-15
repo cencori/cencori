@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
     Dialog,
@@ -35,6 +35,8 @@ export default function ProfilePage() {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state
     const [firstName, setFirstName] = useState("");
@@ -100,6 +102,59 @@ export default function ProfilePage() {
         }
     };
 
+    // Handle avatar file selection
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset input so same file can be selected again
+        e.target.value = "";
+
+        setIsUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await fetch("/api/user/avatar", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Failed to upload avatar");
+            }
+
+            toast.success("Avatar updated");
+            queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to upload avatar");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Handle avatar removal
+    const handleRemoveAvatar = async () => {
+        setIsUploading(true);
+        try {
+            const response = await fetch("/api/user/avatar", {
+                method: "DELETE",
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to remove avatar");
+            }
+
+            toast.success("Avatar removed");
+            queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to remove avatar");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     // Delete account
     const handleDeleteAccount = async () => {
         try {
@@ -148,20 +203,44 @@ export default function ProfilePage() {
                             <AvatarImage src={profile?.avatar_url || undefined} alt="Profile" />
                             <AvatarFallback className="text-lg">{initials}</AvatarFallback>
                         </Avatar>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={handleFileSelect}
+                        />
                         <button
-                            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                            onClick={() => toast.info("Avatar upload coming soon!")}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
                         >
-                            <Camera className="h-5 w-5 text-white" />
+                            {isUploading ? (
+                                <Loader2 className="h-5 w-5 text-white animate-spin" />
+                            ) : (
+                                <Camera className="h-5 w-5 text-white" />
+                            )}
                         </button>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">
-                            Click to upload a new avatar
+                            Click avatar to upload a new image
                         </p>
                         <p className="text-[10px] text-muted-foreground/60">
-                            JPG, PNG, or GIF. Max 2MB.
+                            JPG, PNG, GIF, or WebP. Max 2MB.
                         </p>
+                        {profile?.avatar_url && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 -ml-2"
+                                onClick={handleRemoveAvatar}
+                                disabled={isUploading}
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Remove avatar
+                            </Button>
+                        )}
                     </div>
                 </div>
             </section>
