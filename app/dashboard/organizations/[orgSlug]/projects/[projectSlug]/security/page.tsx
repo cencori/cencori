@@ -9,10 +9,11 @@ import { SecurityAuditLog } from '@/components/security/SecurityAuditLog';
 import { SecurityWebhooks } from '@/components/security/SecurityWebhooks';
 import { SecurityIncidentsTable } from '@/components/audit/SecurityIncidentsTable';
 import { CustomDataRulesManager } from '@/components/security/CustomDataRulesManager';
+import { AIDetectTest } from '@/components/security/AIDetectTest';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, ShieldAlert, LayoutDashboard, AlertTriangle, Settings, FileText, Webhook, Database } from 'lucide-react';
+import { X, ShieldAlert, LayoutDashboard, AlertTriangle, Settings, FileText, Webhook, Database, Sparkles } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -125,9 +126,9 @@ export default function SecurityPage({ params }: PageProps) {
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="incidents">Incidents</TabsTrigger>
                     <TabsTrigger value="data-rules">Data Rules</TabsTrigger>
+                    <TabsTrigger value="ai-detect">AI Detect</TabsTrigger>
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                     <TabsTrigger value="audit">Audit Log</TabsTrigger>
-                    <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
                 </TabsList>
 
                 {/* Dashboard Tab */}
@@ -239,9 +240,17 @@ export default function SecurityPage({ params }: PageProps) {
                     <SecurityAuditLog projectId={projectId} />
                 </TabsContent>
 
-                {/* Webhooks Tab */}
-                <TabsContent value="webhooks" className="mt-0">
-                    <SecurityWebhooks projectId={projectId} />
+                {/* AI Detect Tab */}
+                <TabsContent value="ai-detect" className="mt-0">
+                    <div className="max-w-2xl">
+                        <div className="mb-4">
+                            <h2 className="text-sm font-medium">AI-Powered Content Detection</h2>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Test content against AI detection to identify sensitive data, security risks, and policy violations.
+                            </p>
+                        </div>
+                        <AIDetectTest projectId={projectId} />
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>
