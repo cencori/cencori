@@ -276,6 +276,7 @@
     opacity: 0;
     transform: translateY(5px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -289,4 +290,29 @@
 .animate-fade-in {
   opacity: 0;
   animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Sonner Toast Type Styling */
+[data-sonner-toast][data-type="success"] {
+  background: hsl(142 76% 36% / 0.15) !important;
+  border-color: hsl(142 76% 36% / 0.3) !important;
+  color: hsl(142 76% 36%) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background: hsl(0 84% 60% / 0.15) !important;
+  border-color: hsl(0 84% 60% / 0.3) !important;
+  color: hsl(0 84% 60%) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  background: hsl(38 92% 50% / 0.15) !important;
+  border-color: hsl(38 92% 50% / 0.3) !important;
+  color: hsl(38 92% 50%) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  background: hsl(217 91% 60% / 0.15) !important;
+  border-color: hsl(217 91% 60% / 0.3) !important;
+  color: hsl(217 91% 60%) !important;
 }
