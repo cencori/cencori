@@ -36,6 +36,7 @@ import { MobileNav } from "@/components/dashboard/MobileNav";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
+import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { UpdateToast } from "@/components/ui/update-toast";
 
@@ -139,6 +140,21 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Fetch user profile to get custom avatar
+  const { data: userProfile } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const response = await fetch("/api/user/profile");
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.profile;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Use custom avatar from profile, fallback to OAuth avatar
+  const displayAvatar = userProfile?.avatar_url || avatar;
 
   // ⌘K keyboard shortcut for command palette
   React.useEffect(() => {
@@ -494,8 +510,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                 className="hidden lg:inline-flex w-7 h-7 cursor-pointer items-center justify-center rounded-full border border-border/40 bg-transparent hover:bg-secondary transition-colors overflow-hidden"
                 aria-label="User menu"
               >
-                {typeof avatar === "string" && avatar.length > 0 ? (
-                  <img src={avatar} alt={typeof name === "string" ? name : "User avatar"} className="w-full h-full object-cover" />
+                {typeof displayAvatar === "string" && displayAvatar.length > 0 ? (
+                  <img src={displayAvatar} alt={typeof name === "string" ? name : "User avatar"} className="w-full h-full object-cover" />
                 ) : (
                   <CircleUserRound className="h-4 w-4 text-muted-foreground" />
                 )}
@@ -552,7 +568,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       </header>
 
       {/* Mobile Navigation Bar - only visible on mobile screens */}
-      <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={avatar} />
+      <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} />
 
       <main className="p-4 md:p-6 pt-20 lg:pt-14">
         {children}
