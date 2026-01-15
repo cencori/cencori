@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu } from "lucide-react";
+import { ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu, Webhook } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -254,6 +254,7 @@ export default function ProjectLayoutClient({
     ];
 
     const settingsItems: NavItem[] = [
+        { href: `${basePath}/webhooks`, icon: Webhook, label: "Webhooks" },
         { href: `${basePath}/settings`, icon: SettingsIcon, label: "Project Settings" },
     ];
 
