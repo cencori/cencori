@@ -2,9 +2,9 @@
 
 # Cencori
 
-**AI Infrastructure for Production**
+**The Infrastructure for AI Production**
 
-The unified API for AI providers. Connect your app once, use OpenAI, Anthropic, or Google — with built-in security, observability, and cost control.
+Ship AI with built-in security, observability, and scale. One platform for everything — from gateway to compute to workflows.
 
 ---
 

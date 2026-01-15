@@ -87,10 +87,10 @@ const keywords = [
 export const metadata: Metadata = {
   metadataBase: new URL('https://cencori.com'),
   title: {
-    default: "Cencori | The AI Infrastructure Platform",
+    default: "Cencori | The Infrastructure for AI Production",
     template: "%s - Cencori",
   },
-  description: "Cencori is the unified AI infrastructure for production applications. One API for every AI provider with built-in security, observability, and cost control. Deploy secure, compliant AI at scale.",
+  description: "Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
   keywords: keywords,
   authors: [{ name: "Cencori" }],
   creator: "Cencori",
@@ -102,14 +102,14 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://cencori.com",
     siteName: "Cencori",
-    title: "Cencori | The AI Infrastructure Platform",
-    description: "The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
+    title: "Cencori | The Infrastructure for AI Production",
+    description: "Ship AI with built-in security, observability, and scale — all in one platform.",
     images: [
       {
         url: "https://cencori.com/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Cencori - The AI Infrastructure Platform",
+        alt: "Cencori - The Infrastructure for AI Production",
       },
     ],
   },
@@ -119,8 +119,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@cencori",
     creator: "@cencori",
-    title: "Cencori | The AI Infrastructure Platform",
-    description: "The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
+    title: "Cencori | The Infrastructure for AI Production",
+    description: "Ship AI with built-in security, observability, and scale — all in one platform.",
     images: ["https://cencori.com/og-image.jpg"],
   },
 
@@ -163,7 +163,7 @@ const organizationSchema = {
   "name": "Cencori",
   "url": "https://cencori.com",
   "logo": "https://cencori.com/clight.png",
-  "description": "Cencori is the unified AI infrastructure for production applications. One API for every AI provider with built-in security, observability, and cost control.",
+  "description": "Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
   "sameAs": [
     "https://x.com/cencori",
     "https://github.com/cencori",
@@ -182,7 +182,7 @@ const softwareApplicationSchema = {
   "name": "Cencori",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Cloud",
-  "description": "The unified AI infrastructure platform for production applications. One API for every AI provider with built-in security, observability, and cost control.",
+  "description": "The infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
   "url": "https://cencori.com",
   "offers": {
     "@type": "Offer",

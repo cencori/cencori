@@ -22,8 +22,8 @@ function createBotResponse(url: string): Response {
   const baseUrl = 'https://cencori.com';
 
   // Determine page-specific metadata
-  let title = 'Cencori | The AI Infrastructure Platform';
-  let description = 'The unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.';
+  let title = 'Cencori | The Infrastructure for AI Production';
+  let description = 'Ship AI with built-in security, observability, and scale. One platform for everything.';
   let ogImage = `${baseUrl}/og-image.jpg`;
   let canonicalUrl = baseUrl;
 
@@ -54,7 +54,7 @@ function createBotResponse(url: string): Response {
   <meta property="og:image" content="${ogImage}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Cencori - The AI Infrastructure Platform">
+  <meta property="og:image:alt" content="Cencori - The Infrastructure for AI Production">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Cencori">

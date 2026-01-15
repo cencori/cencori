@@ -23,12 +23,12 @@ export const Hero = () => {
 
                 {/* Headline */}
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-                    AI Infrastructure <span className="italic">for</span> Production
+                    The Infrastructure <span className="italic">for</span> AI Production
                 </h1>
 
                 {/* Subheadline */}
                 <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
-                    The unified API for every AI provider. Security, observability, and cost control, all built-in.
+                    Ship AI with built-in security, observability, and scale. One platform for everything.
                 </p>
 
                 {/* CTAs */}

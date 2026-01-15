@@ -13,14 +13,14 @@ export default function AboutPage() {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Our Mission</h2>
         <p className="text-zinc-300 leading-relaxed">
-          Cencori is a multi-tenant AI infrastructure platform designed to help teams build, deploy, and scale AI-driven applications with consistency and reliability.
+          Cencori is the infrastructure for AI production. We provide a complete platform for shipping AI — from gateway to compute to workflows — so teams can focus on building products, not infrastructure.
         </p>
       </section>
 
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Our Vision</h2>
         <p className="text-zinc-300 leading-relaxed">
-          To unify how developers create, protect, and scale AI systems across different use cases, ranging from experimental prototypes to enterprise-grade solutions.
+          To be the foundation layer for every AI application — handling security, observability, and scale so developers can ship AI with confidence.
         </p>
       </section>
 

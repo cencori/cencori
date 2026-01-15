@@ -2,7 +2,7 @@ export const siteConfig = {
   name: "cencori",
   url: "https://cencori.com",
   description:
-    "Cencori is the unified AI infrastructure for production applications. One API for every provider with built-in security, observability, and cost control.",
+    "Cencori is the infrastructure for AI production. Security, observability, and scale — all in one platform.",
   links: {
     github: "https://github.com/cencori",
     docs: "https://cencori.com/docs",
