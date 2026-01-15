@@ -156,10 +156,10 @@ function ProjectSidebarLink({
 
     return (
         <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={label} isActive={isActive}>
+            <SidebarMenuButton asChild tooltip={label} isActive={isActive} size="sm">
                 <Link href={href} onMouseEnter={handleMouseEnter} onClick={onClick}>
-                    <Icon className="h-[18px] w-[18px]" />
-                    <span>{label}</span>
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="text-xs">{label}</span>
                 </Link>
             </SidebarMenuButton>
         </SidebarMenuItem>
