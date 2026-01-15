@@ -120,10 +120,7 @@ export function AIDetectTest({ projectId }: AIDetectTestProps) {
                         Analyzing...
                     </>
                 ) : (
-                    <>
-                        <Sparkles className="h-3 w-3 mr-1.5" />
-                        Analyze with AI
-                    </>
+                    "Analyze with AI"
                 )}
             </Button>
 
