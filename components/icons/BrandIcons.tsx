@@ -219,3 +219,28 @@ export function VueLogo({ className, ...props }: IconProps) {
         </svg>
     );
 }
+
+// Microsoft Logo (4 squares)
+export function MicrosoftLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 23 23" className={className} {...props}>
+            <path fill="#f35325" d="M1 1h10v10H1z" />
+            <path fill="#81bc06" d="M12 1h10v10H12z" />
+            <path fill="#05a6f0" d="M1 12h10v10H1z" />
+            <path fill="#ffba08" d="M12 12h10v10H12z" />
+        </svg>
+    );
+}
+
+// Google Cloud Logo
+export function GoogleCloudLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 24 24" className={className} {...props}>
+            <path fill="#EA4335" d="M12.19 5.599c.531 0 1.049.094 1.525.266l1.262-1.262A6.604 6.604 0 0 0 12.19 4c-2.382 0-4.478 1.25-5.656 3.127l1.469 1.14a4.99 4.99 0 0 1 4.187-2.668z" />
+            <path fill="#4285F4" d="M15.715 8.267l1.469-1.14A6.607 6.607 0 0 1 18.79 12c0 .751-.125 1.472-.354 2.145l-1.469-1.14a4.984 4.984 0 0 0-.252-2.738z" />
+            <path fill="#FBBC05" d="M6.534 13.867l-1.469 1.14A6.608 6.608 0 0 1 5.59 12c0-1.124.28-2.182.776-3.107l1.469 1.14a4.984 4.984 0 0 0-.301 3.834z" />
+            <path fill="#34A853" d="M12.19 18.401a4.99 4.99 0 0 1-4.187-2.268l-1.469 1.14A6.603 6.603 0 0 0 12.19 20c.951 0 1.858-.201 2.674-.563l-1.262-1.262a5.003 5.003 0 0 1-1.412.226z" />
+            <circle fill="#4285F4" cx="12.19" cy="12" r="2.5" />
+        </svg>
+    );
+}
