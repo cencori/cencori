@@ -138,51 +138,51 @@ export default function OrganizationLayoutClient({
                         <SidebarGroup className="pt-3">
                             <SidebarMenu>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Projects">
+                                    <SidebarMenuButton asChild tooltip="Projects" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/projects`}>
                                             <LayersIcon animateOnHover />
-                                            <span>Projects</span>
+                                            <span className="text-[13px]">Projects</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Billing">
+                                    <SidebarMenuButton asChild tooltip="Billing" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/billing`}>
                                             <PanelTopIcon animateOnHover />
-                                            <span>Billing</span>
+                                            <span className="text-[13px]">Billing</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Usage">
+                                    <SidebarMenuButton asChild tooltip="Usage" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/usage`}>
                                             <ActivityIcon animateOnHover />
-                                            <span>Usage</span>
+                                            <span className="text-[13px]">Usage</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
 
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Integrations">
+                                    <SidebarMenuButton asChild tooltip="Integrations" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
                                             <UnplugIcon animateOnHover />
-                                            <span>Integrations</span>
+                                            <span className="text-[13px]">Integrations</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Teams">
+                                    <SidebarMenuButton asChild tooltip="Teams" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/teams`}>
                                             <UserRoundIcon animateOnHover />
-                                            <span>Teams</span>
+                                            <span className="text-[13px]">Teams</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Settings">
+                                    <SidebarMenuButton asChild tooltip="Settings" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/settings`}>
                                             <SettingsIcon animateOnHover />
-                                            <span>Settings</span>
+                                            <span className="text-[13px]">Settings</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -203,51 +203,51 @@ export default function OrganizationLayoutClient({
                             <SidebarGroup>
                                 <SidebarMenu>
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/projects`} onClick={() => setIsOpen(false)}>
                                                 <LayersIcon animateOnHover />
-                                                <span>Projects</span>
+                                                <span className="text-[13px]">Projects</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/billing`} onClick={() => setIsOpen(false)}>
                                                 <PanelTopIcon animateOnHover />
-                                                <span>Billing</span>
+                                                <span className="text-[13px]">Billing</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/usage`} onClick={() => setIsOpen(false)}>
                                                 <ActivityIcon animateOnHover />
-                                                <span>Usage</span>
+                                                <span className="text-[13px]">Usage</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
 
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/integrations`} onClick={() => setIsOpen(false)}>
                                                 <UnplugIcon animateOnHover />
-                                                <span>Integrations</span>
+                                                <span className="text-[13px]">Integrations</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/teams`} onClick={() => setIsOpen(false)}>
                                                 <UserRoundIcon animateOnHover />
-                                                <span>Teams</span>
+                                                <span className="text-[13px]">Teams</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
+                                        <SidebarMenuButton asChild size="sm">
                                             <Link href={`/dashboard/organizations/${organization.slug}/settings`} onClick={() => setIsOpen(false)}>
                                                 <SettingsIcon animateOnHover />
-                                                <span>Settings</span>
+                                                <span className="text-[13px]">Settings</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
