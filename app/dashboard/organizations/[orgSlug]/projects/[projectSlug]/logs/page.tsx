@@ -270,7 +270,7 @@ export default function RequestLogsPage({ params }: PageProps) {
 
                 {/* Export button - pushed to right */}
                 <div className="ml-auto">
-                    <ExportButton projectId={projectId} filters={filters} />
+                    <ExportButton projectId={projectId} filters={filters} environment={environment} />
                 </div>
             </div>
 
