@@ -1,8 +1,8 @@
 # CENCORI
 ## Sales Onboarding & Enablement Playbook
 
-**Version 1.0**  
-**Last Updated:** December 2025  
+**Version 2.0**  
+**Last Updated:** January 2026  
 **Classification:** Internal Use Only
 
 ---
@@ -11,16 +11,17 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Company Overview](#2-company-overview)
-3. [Product Deep Dive](#3-product-deep-dive)
-4. [Ideal Customer Profile](#4-ideal-customer-profile)
-5. [Pricing & Packaging](#5-pricing--packaging)
-6. [Competitive Landscape](#6-competitive-landscape)
-7. [Objection Handling](#7-objection-handling)
-8. [Sales Process](#8-sales-process)
-9. [Discovery Framework](#9-discovery-framework)
-10. [Demo Playbook](#10-demo-playbook)
-11. [Email Templates](#11-email-templates)
-12. [Resources & Links](#12-resources--links)
+3. [The Platform](#3-the-platform)
+4. [AI Gateway Deep Dive](#4-ai-gateway-deep-dive)
+5. [Ideal Customer Profile](#5-ideal-customer-profile)
+6. [Pricing & Packaging](#6-pricing--packaging)
+7. [Competitive Landscape](#7-competitive-landscape)
+8. [Objection Handling](#8-objection-handling)
+9. [Sales Process](#9-sales-process)
+10. [Discovery Framework](#10-discovery-framework)
+11. [Demo Playbook](#11-demo-playbook)
+12. [Email Templates](#12-email-templates)
+13. [Resources & Links](#13-resources--links)
 
 ---
 
@@ -28,32 +29,53 @@
 
 ## What Is Cencori?
 
-Cencori is **the infrastructure for AI production**. We provide a unified API that connects to every major AI provider (OpenAI, Anthropic, Google) while automatically handling security, compliance, and cost tracking.
+Cencori is **the infrastructure for AI production**. We provide a complete platform for shipping AI — from gateway to compute to workflows — so teams can focus on building products, not infrastructure.
+
+## The Platform Vision
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                               CENCORI                                   │
+├─────────────┬─────────────┬─────────────┬─────────────┬─────────────────┤
+│  AI Gateway │   Compute   │  Workflows  │ Integration │   Data Storage  │
+│  (Live Now) │  (Coming)   │  (Coming)   │   (Coming)  │    (Coming)     │
+├─────────────┴─────────────┴─────────────┴─────────────┴─────────────────┤
+│                     Security • Observability • Scale                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Today:** AI Gateway is live — multi-provider routing, security, compliance, cost control.
+
+**Tomorrow:** Compute, Workflows, Integration, and Data Storage will complete the platform.
 
 ## The One-Liner
 
-> "Cencori is the infrastructure for AI production — one integration for all providers, with security and compliance built in."
+> "Cencori is the infrastructure for AI production — everything you need to ship AI, starting with the gateway."
 
 ## Why It Matters
 
 Companies building with AI face a growing set of challenges:
 
-- **Security risks**: Prompt injection attacks, PII leaks, unsafe content generation
-- **Compliance burden**: SOC 2, GDPR, HIPAA requirements with no easy solution
-- **Provider lock-in**: Tied to one AI provider with no easy way to switch
-- **Cost blindness**: No visibility into AI spend until the bill arrives
-- **Integration complexity**: Different SDKs, rate limits, and error handling for each provider
+| Challenge | Reality |
+|-----------|---------|
+| **Infrastructure fragmentation** | Different tools for gateway, compute, workflows, observability |
+| **Security gaps** | Prompt injection, PII leaks, unsafe content — no unified solution |
+| **Compliance burden** | SOC 2, GDPR, HIPAA requirements scattered across tools |
+| **Provider lock-in** | Tied to one AI provider with no easy way to switch |
+| **Cost blindness** | No visibility into AI spend until the bill arrives |
+| **Scaling pain** | What works in prototype breaks in production |
 
-Cencori solves all of these with a single integration that takes less than an hour to implement.
+Cencori solves these by providing one platform that handles infrastructure so you can focus on your product.
 
 ## The Business Case
 
 | Problem | Without Cencori | With Cencori |
 |---------|-----------------|--------------|
-| Security implementation | 3-6 months engineering | 10 minutes |
+| Security implementation | 3-6 months engineering | 10 minutes (AI Gateway) |
 | Compliance readiness | 6-12 months + auditor costs | Built-in, audit-ready logs |
-| Provider switching | Weeks of refactoring | One line of code |
+| Provider switching | Weeks of refactoring | One parameter change |
 | Cost tracking | Monthly surprise bills | Real-time dashboards |
+| Infrastructure management | Multiple vendors, integrations | One platform |
 
 ---
 
@@ -64,13 +86,26 @@ Cencori solves all of these with a single integration that takes less than an ho
 Cencori is built by **FohnAI**, an AI research and development company focused on making AI systems safer and more reliable for production use.
 
 **Mission Statement:**  
-*Make AI infrastructure as reliable as web infrastructure.*
+*Be the foundation layer for every AI application — handling security, observability, and scale so developers can ship AI with confidence.*
 
 **Company Values:**
 - Security first, always
 - Developer experience matters
 - Transparency in pricing and data handling
 - Ship fast, but ship right
+- Build for the long term
+
+## What We're Building
+
+Cencori is not just a point solution — it's a platform. We're building the full stack for AI production:
+
+| Product | Status | What It Does |
+|---------|--------|--------------|
+| **AI Gateway** | ✅ Live | Multi-provider routing, security, observability, cost control |
+| **Compute** | 🔜 Coming | Serverless functions, GPU access, edge deployment |
+| **Workflows** | 🔜 Coming | Visual AI pipeline builder, orchestration, human-in-loop |
+| **Integration** | 🔜 Coming | SDKs, agent frameworks, platform connectors |
+| **Data Storage** | 🔜 Coming | Vector database, knowledge base, RAG infrastructure |
 
 ## Leadership
 
@@ -82,16 +117,75 @@ Cencori is built by **FohnAI**, an AI research and development company focused o
 
 ---
 
-# 3. Product Deep Dive
+# 3. The Platform
 
-## How Cencori Works
+## Platform Philosophy
 
-Cencori operates as an **AI gateway** — a secure proxy layer between your application and AI providers.
+We believe AI infrastructure should work like modern web infrastructure:
+
+| Web Infrastructure | AI Infrastructure (Cencori) |
+|--------------------|----------------------------|
+| Vercel handles deployment | Cencori handles AI gateway |
+| Supabase handles database | Cencori handles AI data storage |
+| Temporal handles workflows | Cencori handles AI workflows |
+
+Instead of stitching together point solutions, developers get one platform purpose-built for AI.
+
+## The Stack
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           YOUR APPLICATION                              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           CENCORI PLATFORM                              │
+│                                                                         │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────────────────┐ │
+│  │ AI Gateway│  │  Compute  │  │ Workflows │  │  Integration + Data   │ │
+│  │           │  │           │  │           │  │                       │ │
+│  │ • Routing │  │ • GPU     │  │ • Chains  │  │ • SDKs                │ │
+│  │ • Security│  │ • Edge    │  │ • Agents  │  │ • Vector DB           │ │
+│  │ • Logging │  │ • Scale   │  │ • HITL    │  │ • RAG                 │ │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────────────────┘ │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │           Unified: Security • Observability • Billing               ││
+│  └─────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│           AI PROVIDERS: OpenAI • Anthropic • Google • etc.              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Selling the Platform
+
+When positioning Cencori, lead with the platform vision:
+
+**For Executives:**
+"Cencori is the infrastructure layer for AI — like Vercel for AI applications. You integrate once and get everything: gateway, compute, workflows, and data — with security and compliance built in."
+
+**For Technical Buyers:**
+"We're building the full stack so you don't have to. AI Gateway is live today. Compute and Workflows are coming. One SDK, one dashboard, one bill."
+
+**For Developers:**
+"It's everything you need to ship AI to production. Start with the gateway, grow into the platform."
+
+---
+
+# 4. AI Gateway Deep Dive
+
+## What Is AI Gateway?
+
+AI Gateway is the **first product** in the Cencori platform. It's a secure proxy layer between your application and AI providers.
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Your App      │────▶│    Cencori      │────▶│  AI Provider    │
-│                 │     │   (Gateway)     │     │ (OpenAI, etc.)  │
+│   Your App      │────▶│  AI Gateway     │────▶│  AI Provider    │
+│                 │     │                 │     │ (OpenAI, etc.)  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                               │
                               ▼
@@ -115,23 +209,26 @@ const openai = new OpenAI({
 });
 ```
 
-## Core Features
+## Core Capabilities
 
-### 1. Unified Multi-Provider API
+### 1. Multi-Provider Routing
 
 **What it does:** One API that routes to OpenAI, Anthropic, or Google based on the model you specify.
 
-**Key benefit:** Switch providers with a single line change. No code refactoring required.
+**Key benefit:** Switch providers with a single parameter. No code refactoring required.
 
 **Supported Models:**
 
 | Provider | Models Available |
 |----------|------------------|
-| OpenAI | GPT-4, GPT-4 Turbo, GPT-4 Mini, GPT-3.5 Turbo |
-| Anthropic | Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku |
-| Google | Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro |
+| OpenAI | GPT-4o, GPT-4 Turbo, GPT-4, GPT-3.5 Turbo, o1, o3 |
+| Anthropic | Claude 3 Opus, Sonnet, Haiku, Claude 4 |
+| Google | Gemini 2.5 Flash, Gemini 2.0, Gemini Pro |
+| xAI | Grok 4 |
+| Mistral | Large 3, Medium, Small |
+| DeepSeek | V3.2 |
 
-**Coming Soon:** Mistral, Cohere, Groq, Llama via Together.ai
+**Coming Soon:** Cohere, Perplexity, Meta Llama via Together.ai
 
 ### 2. Security Suite
 
@@ -165,7 +262,7 @@ const openai = new OpenAI({
 - Enterprise: Customizable (30 days to indefinite)
 
 **Compliance Standards:**
-- SOC 2 Type II (Expected Q2 2025)
+- SOC 2 Type II (Expected Q2 2026)
 - GDPR compliant
 - HIPAA ready (Enterprise tier)
 
@@ -180,11 +277,6 @@ const openai = new OpenAI({
 - Set spending limits per project
 - Email alerts at 50%, 80%, 100% of budget
 - Hard caps available (requests blocked at limit)
-
-**Cost Optimization:**
-- Model comparison recommendations
-- Unused project identification
-- Token efficiency insights
 
 ### 5. Analytics & Observability
 
@@ -202,7 +294,7 @@ const openai = new OpenAI({
 
 ---
 
-# 4. Ideal Customer Profile
+# 5. Ideal Customer Profile
 
 ## Primary Target Market
 
@@ -238,10 +330,10 @@ const openai = new OpenAI({
    - Pain: Privileged information exposure
    - Example use cases: Contract analysis, research, document drafting
 
-5. **E-commerce & Retail**
-   - Why: High volume, cost sensitivity
-   - Pain: Customer data protection, cost control
-   - Example use cases: Product recommendations, customer service, search
+5. **AI-Native Startups**
+   - Why: Building AI-first products, need infrastructure
+   - Pain: Don't want to build undifferentiated infrastructure
+   - Example use cases: AI agents, chatbots, content generation
 
 ## Buyer Personas
 
@@ -254,17 +346,17 @@ const openai = new OpenAI({
 
 **Key Motivations:**
 - Reduce security risk and liability
-- Meet compliance requirements efficiently
 - Avoid building undifferentiated infrastructure
+- Ship AI features faster
 
 **Pain Points:**
-- "We don't have 6 months to build AI security"
-- "Our compliance audit found gaps in our AI logging"
+- "We don't have 6 months to build AI infrastructure"
+- "I need one platform, not five point solutions"
 - "I can't justify the engineering time for this"
 
 **What They Care About:**
+- Platform vision and roadmap
 - Enterprise-grade security
-- Compliance certifications
 - Reliable uptime and support
 
 ### Secondary Decision Maker: Engineering Lead / Staff Engineer
@@ -314,11 +406,11 @@ const openai = new OpenAI({
 ## Buying Signals
 
 **Strong signals (reach out immediately):**
-- Posted a job for "AI Security Engineer"
+- Posted a job for "AI Security Engineer" or "AI Platform Engineer"
 - Had a public AI-related security incident
 - Announced SOC 2 or HIPAA compliance initiative
 - Recently raised Series A+ funding
-- Mentioned AI cost concerns in earnings call or interview
+- Mentioned AI infrastructure challenges in earnings call or interview
 
 **Medium signals (add to outreach sequence):**
 - Using OpenAI or Anthropic API (check job posts, GitHub)
@@ -333,13 +425,13 @@ const openai = new OpenAI({
 
 ---
 
-# 5. Pricing & Packaging
+# 6. Pricing & Packaging
 
 ## Pricing Philosophy
 
 1. **Transparent**: No hidden fees, no surprises
 2. **Scalable**: Start free, grow with usage
-3. **Value-based**: Price reflects risk mitigation and time saved
+3. **Value-based**: Price reflects infrastructure you don't have to build
 
 ## Tier Comparison
 
@@ -349,6 +441,7 @@ const openai = new OpenAI({
 | **Requests/month** | 1,000 | 50,000 | 250,000 | Unlimited |
 | **Projects** | 1 | Unlimited | Unlimited | Unlimited |
 | **Team Members** | 1 | 3 | 10 | Unlimited |
+| **AI Gateway** | ✅ | ✅ | ✅ | ✅ |
 | **Security Features** | Basic | All | All | All + Custom |
 | **Support** | Community | Email (24hr) | Priority (4hr) | Dedicated |
 | **Log Retention** | 30 days | 60 days | 90 days | Custom |
@@ -356,7 +449,6 @@ const openai = new OpenAI({
 | **Webhooks** | No | Yes | Yes | Yes |
 | **SSO/SAML** | No | No | No | Yes |
 | **SLA** | No | No | No | Yes (99.9%+) |
-| **Custom Integrations** | No | No | No | Yes |
 
 ## Understanding the Cost Model
 
@@ -367,7 +459,7 @@ const openai = new OpenAI({
 
 **Example calculation (Pro tier, 30K requests/month):**
 - Cencori subscription: $49
-- Average request cost: $0.002 (GPT-4 Mini average)
+- Average request cost: $0.002 (GPT-4o mini average)
 - AI usage: 30,000 × $0.002 = $60
 - Cencori markup (15%): $9
 - **Total monthly cost: $49 + $60 + $9 = $118**
@@ -376,7 +468,7 @@ const openai = new OpenAI({
 - We handle all provider billing (consolidated invoice)
 - We provide security scanning on every request
 - We maintain the infrastructure and routing
-- Customers save time managing multiple provider accounts
+- You're paying for infrastructure, not just pass-through
 
 ## Discount Guidelines
 
@@ -390,7 +482,17 @@ const openai = new OpenAI({
 
 ---
 
-# 6. Competitive Landscape
+# 7. Competitive Landscape
+
+## Market Positioning
+
+Cencori competes in multiple categories because we're building a platform:
+
+| Category | Competitors | How We Win |
+|----------|-------------|------------|
+| AI Gateway | Portkey, Helicone, LiteLLM | Security-first, platform vision |
+| AI Observability | LangSmith, Braintrust | Gateway + future platform |
+| AI Infrastructure | Build in-house | Time to value, breadth |
 
 ## Competitive Overview
 
@@ -398,10 +500,10 @@ const openai = new OpenAI({
 
 | Competitor | Focus Area | Strengths | Weaknesses |
 |------------|------------|-----------|------------|
-| **Helicone** | Observability | Great logging UI, open source | No security features |
-| **Portkey** | AI Gateway | Multi-provider, good docs | Less security focus |
-| **LangSmith** | LangChain Ecosystem | Deep LangChain integration | Framework lock-in |
-| **Braintrust** | Eval & Logging | Strong eval tools | Not a gateway |
+| **Portkey** | AI Gateway | Multi-provider, good docs | No platform vision, limited security |
+| **Helicone** | Observability | Great logging UI, open source | No security features, no gateway |
+| **LangSmith** | LangChain Ecosystem | Deep LangChain integration | Framework lock-in, narrow focus |
+| **LiteLLM** | Open Source Gateway | Free, self-host | No managed service, no security |
 
 ### Indirect Competitors
 
@@ -409,9 +511,32 @@ const openai = new OpenAI({
 |------------|------------------|--------------|
 | **Build In-house** | "We can build this ourselves" | See objection handling |
 | **Direct API** | "We'll just use OpenAI directly" | No security, compliance, or multi-provider |
-| **Cloud Provider AI** | "We use AWS Bedrock / Azure OpenAI" | Single provider, limited security |
+| **Cloud Provider AI** | "We use AWS Bedrock / Azure OpenAI" | Single provider, limited security, no platform |
 
 ## Competitive Battle Cards
+
+### vs. Portkey
+
+**Their pitch:** "AI Gateway for production"
+
+**Where they win:**
+- Good multi-provider support
+- Solid documentation
+- Lower price point for basic use
+
+**Where we win:**
+- Deeper security features (PII, prompt injection)
+- Compliance focus (audit logs, SOC 2 path)
+- Platform vision (Compute, Workflows coming)
+- Better positioned for regulated industries
+
+**Landmine question:**
+"What's your plan for meeting SOC 2 requirements for your AI features?"
+
+**If they mention Portkey:**
+"Portkey is a solid gateway product. The main differences are our security depth and our platform vision. We built Cencori for companies that need compliance-ready infrastructure today, and a full AI platform tomorrow. If you're in a regulated industry or expect to scale beyond just a gateway, we're a better long-term fit."
+
+---
 
 ### vs. Helicone
 
@@ -424,38 +549,15 @@ const openai = new OpenAI({
 
 **Where we win:**
 - Security features (PII, prompt injection)
-- Compliance focus (audit logs, SOC 2 path)
-- Multi-provider routing
+- Gateway functionality (routing, failover)
+- Platform vision
 - Managed service with SLA
 
-**Landmine question to ask prospect:**
+**Landmine question:**
 "How are you planning to handle PII detection and prompt injection protection?"
 
 **If they mention Helicone:**
-"Helicone is great for observability. We actually complement it well — we focus on security and compliance, while they focus on debugging and analytics. Many customers use both. That said, if security and compliance are important, you'll need a solution like Cencori regardless."
-
----
-
-### vs. Portkey
-
-**Their pitch:** "AI Gateway for production"
-
-**Where they win:**
-- Good multi-provider support
-- Solid documentation
-- Lower price point for basic use
-
-**Where we win:**
-- Deeper security features
-- Better compliance positioning
-- Simpler pricing model
-- More responsive support
-
-**Landmine question to ask prospect:**
-"What's your plan for meeting SOC 2 requirements for your AI features?"
-
-**If they mention Portkey:**
-"Portkey is a solid gateway product. The main difference is our security focus — we were built specifically for companies that need compliance-ready AI infrastructure. If you're in a regulated industry or expect to go through SOC 2, our audit logging and security features will save you significant time."
+"Helicone is great for observability. We actually complement it — we focus on gateway and security, they focus on debugging and analytics. That said, if you need security and routing, you'll need something like Cencori regardless. And as our platform grows, observability is built in."
 
 ---
 
@@ -472,57 +574,56 @@ const openai = new OpenAI({
 - 3-6 months faster to production
 - Continuous security updates
 - No maintenance burden
-- Proven at scale
+- Platform grows with you
 
 **Response framework:**
 
 "You absolutely could build this. The question is whether you should. Let me break down what's involved:
 
-1. **Security layer**: PII detection, prompt injection defense, content filtering. This alone is 2-3 months of work, and you need ML expertise.
-
-2. **Audit logging**: SOC 2 compliant logging with encryption, retention policies, export capabilities. Another 1-2 months.
-
+**Just for the gateway:**
+1. **Security layer**: PII detection, prompt injection defense, content filtering. 2-3 months, requires ML expertise.
+2. **Audit logging**: SOC 2 compliant logging with encryption, retention, export. 1-2 months.
 3. **Multi-provider routing**: Different SDKs, rate limits, error handling, failover. 1-2 months.
+4. **Cost tracking**: Token counting, pricing, dashboards, alerts. 1 month.
+5. **Ongoing maintenance**: Security patches, new attacks, API changes. Continuous.
 
-4. **Cost tracking**: Token counting, pricing calculation, dashboards, alerts. 1 month.
+**Total: 6-9 months, $300K+ in engineering cost.**
 
-5. **Ongoing maintenance**: Security patches, new attack patterns, provider API changes. Continuous.
+And that's just the gateway. When you need compute, workflows, or data storage, you build again.
 
-Total: 6-9 months of engineering time, plus ongoing maintenance. At a fully-loaded cost of $150-200K per engineer, you're looking at $300K+ for the initial build.
-
-Cencori gives you all of this in a 10-minute integration for a fraction of the cost. That 6 months of engineering time could be spent on features that differentiate your product."
+Cencori gives you all of this in 10 minutes. And as our platform grows, you get Compute, Workflows, and more — without building."
 
 ---
 
-# 7. Objection Handling
+# 8. Objection Handling
 
 ## Price Objections
 
 ### "It's too expensive"
 
 **Response:**
-"I understand. Let's break down the value:
+"I understand. Let me break down the value:
 
-- **Engineering time saved**: Building this in-house would take 3-6 months of senior engineering time. At a fully-loaded cost of $150K/engineer, that's $75K-$150K just in salary.
+- **Engineering time saved**: Building just the gateway in-house takes 3-6 months. At $150K/engineer fully loaded, that's $75K-$150K in salary alone.
 
-- **Risk mitigation**: A single AI security incident can cost millions in breach notification, legal fees, and reputation damage. We're insurance against that.
+- **Infrastructure you don't build**: We're not just a gateway. As our platform grows, you get Compute, Workflows, Data Storage — all without building.
 
-- **Time to compliance**: SOC 2 readiness for AI takes 6-12 months to build. We give you audit-ready logs from day one.
+- **Risk mitigation**: A single AI security incident can cost millions. We're insurance against that.
 
-At $49-149/month, you're getting enterprise-grade infrastructure for less than the cost of a single engineer-day per month.
+At $49-149/month, you're getting infrastructure that would cost you $300K+ to build.
 
-What specific budget constraints are you working with? There may be ways we can structure this differently."
+What specific budget constraints are you working with?"
 
 ### "Can you do a discount?"
 
 **Response:**
-"We want to make this work for you. A few options:
+"We want to make this work. A few options:
 
-1. **Annual commitment**: We offer 17% off for annual prepay (2 months free)
-2. **Startup program**: If you've raised less than $2M, we have a startup tier with 50% off the first year
-3. **Pilot pricing**: We can do a shorter-term pilot at reduced cost to prove value before full commitment
+1. **Annual commitment**: 17% off (2 months free)
+2. **Startup program**: If you've raised less than $2M, 50% off first year
+3. **Pilot pricing**: Short-term pilot at reduced cost to prove value
 
-Which of these might work for your situation?"
+Which might work for your situation?"
 
 ---
 
@@ -531,64 +632,69 @@ Which of these might work for your situation?"
 ### "What about latency?"
 
 **Response:**
-"Great question. Our overhead is typically 10-50ms for security checks. 
+"Our overhead is typically 10-50ms for security checks.
 
-Here's context: The AI model response itself takes 1-5 seconds depending on the model and prompt. So our 10-50ms adds less than 1-3% to total latency.
+Context: The AI model response itself takes 1-5 seconds. So we add less than 1-3% to total latency.
 
-Our servers run on Vercel's edge network across 20+ global regions, so requests route from the nearest location to minimize network latency.
+Our servers run on Vercel's edge network across 20+ regions, routing from the nearest location.
 
-Would you like to run a quick latency test in your environment? I can set you up with a free tier instantly."
+Want to run a quick latency test? I can set you up with a free tier instantly."
 
 ### "We're worried about vendor lock-in"
 
 **Response:**
 "That's actually one of our key value propositions. Cencori *reduces* lock-in:
 
-1. **Provider independence**: You can switch from OpenAI to Anthropic with a single parameter change. No code refactoring.
+1. **Provider independence**: Switch from OpenAI to Anthropic with one parameter change.
 
-2. **Standard API**: We follow OpenAI's API structure, which is becoming the industry standard. If you ever leave Cencori, your code will work directly with any provider.
+2. **Standard API**: We follow OpenAI's API structure, which is the industry standard. If you leave Cencori, your code works directly with providers.
 
-3. **Data portability**: You can export all your logs and data at any time. We don't hold your data hostage.
+3. **Data portability**: Export all logs and data anytime.
 
-4. **No long-term contracts**: We offer monthly terms. You can leave anytime.
+4. **No long-term contracts**: Monthly terms. Leave anytime.
 
-The irony is that using OpenAI directly creates *more* lock-in than using Cencori."
+The irony is using OpenAI directly creates *more* lock-in than using Cencori."
 
 ### "How do we know it's secure?"
 
 **Response:**
-"We take security seriously. Here's what we do:
+"We take security seriously:
 
-1. **Encryption**: All data encrypted in transit (TLS 1.3) and at rest (AES-256)
-
-2. **SOC 2**: We're currently in the SOC 2 Type II certification process (expected Q2 2025)
-
-3. **No training**: We never use your data to train models. Period.
-
+1. **Encryption**: TLS 1.3 in transit, AES-256 at rest
+2. **SOC 2**: Type II certification in progress (expected Q2 2026)
+3. **No training**: We never use your data to train models
 4. **No sharing**: We don't share your data with third parties
+5. **Infrastructure**: Built on SOC 2 compliant providers (Supabase, Vercel)
 
-5. **Access controls**: Role-based access, audit logs on admin actions, SSO for enterprise
-
-6. **Infrastructure**: Built on Supabase (SOC 2, HIPAA compliant) and Vercel (SOC 2, ISO 27001)
-
-We're happy to complete your security questionnaire and do a call with your security team."
+Happy to complete your security questionnaire or do a call with your security team."
 
 ---
 
-## Business Objections
+## Strategic Objections
+
+### "You're just a gateway — we need more"
+
+**Response:**
+"You're right that we lead with the gateway today. But Cencori is a platform:
+
+- **Today**: AI Gateway with security, compliance, cost control
+- **Coming**: Compute (serverless, GPU), Workflows (orchestration, agents), Data Storage (vector DB, RAG)
+
+We're building the full stack for AI production. You start with the gateway, and as we ship more, you get access to the full platform with the same integration.
+
+Would you like to see the roadmap?"
 
 ### "We need to talk to more stakeholders"
 
 **Response:**
-"Absolutely. Who else needs to be involved in this decision? 
+"Absolutely. Who else needs to be involved?
 
-I'd be happy to join a call with your [Security team / Finance / Engineering leads] to address their specific concerns. I can also prepare materials tailored to each stakeholder:
+I can prepare materials for each stakeholder:
+- **Security**: Our security whitepaper and SOC 2 roadmap
+- **Finance**: ROI calculator and cost comparison
+- **Engineering**: Technical docs and integration guide
 
-- For Security: Our security whitepaper and SOC 2 roadmap
-- For Finance: ROI calculator and cost comparison
-- For Engineering: Technical documentation and integration guide
-
-Would it be helpful if I sent those over before the next conversation?"
+Would it help if I sent those before the next conversation?"
 
 ### "We're not ready yet"
 
@@ -596,38 +702,25 @@ Would it be helpful if I sent those over before the next conversation?"
 "Totally understand. When you say 'not ready,' is that:
 
 a) You haven't started building AI features yet?
-b) You have AI in production but security isn't a priority right now?
-c) You're in the middle of something else and timing is bad?
+b) You have AI in production but infrastructure isn't a priority?
+c) Bad timing — you're in the middle of something else?
 
-*[Listen to response, then:]*
+*[Listen, then:]*
 
-That makes sense. A lot of our customers started with our free tier just to get familiar with the platform before their AI initiative kicked into high gear. Would it be useful to set that up now so you're ready when the time comes?"
-
-### "We had a bad experience with a similar vendor"
-
-**Response:**
-"I'm sorry to hear that. Would you mind sharing what went wrong? I want to make sure we can address those concerns upfront.
-
-*[Listen to response]*
-
-Thank you for sharing that. Here's how we handle that differently:
-
-*[Address specific concern with specific Cencori feature/policy]*
-
-Would you be open to a short pilot to prove we can deliver where the other vendor fell short?"
+Many customers start with our free tier to get familiar before their AI initiative kicks into high gear. Would that be useful?"
 
 ---
 
-# 8. Sales Process
+# 9. Sales Process
 
 ## Sales Stages
 
 | Stage | Definition | Exit Criteria |
 |-------|------------|---------------|
-| **Lead** | Inbound inquiry or outbound contact made | Qualified as potential fit |
+| **Lead** | Inbound inquiry or outbound contact | Qualified as potential fit |
 | **Discovery** | Initial call completed | Understand needs, timeline, budget |
 | **Demo** | Product demonstrated | Technical fit confirmed |
-| **Evaluation** | Proof of concept or trial | Value proven in their environment |
+| **Evaluation** | Trial or POC | Value proven in their environment |
 | **Proposal** | Formal proposal sent | Pricing and terms discussed |
 | **Negotiation** | Terms being finalized | Agreement on price and scope |
 | **Closed Won** | Contract signed | 🎉 |
@@ -642,21 +735,17 @@ Would you be open to a short pilot to prove we can deliver where the other vendo
 | Mid-market (Team) | 2-4 weeks |
 | Enterprise | 4-12 weeks |
 
-## Key Metrics to Track
+## Key Metrics
 
-- **Discovery to Demo Conversion**: Target 70%+
-- **Demo to Trial Conversion**: Target 50%+
-- **Trial to Close Conversion**: Target 60%+
-- **Average Deal Size**: Track by segment
-- **Sales Cycle Length**: Track trend over time
+- **Discovery to Demo**: Target 70%+
+- **Demo to Trial**: Target 50%+
+- **Trial to Close**: Target 60%+
 
 ---
 
-# 9. Discovery Framework
+# 10. Discovery Framework
 
 ## Pre-Call Research
-
-Before every discovery call, research:
 
 1. **Company**: What do they do? Recent news? Funding?
 2. **Person**: Role, tenure, LinkedIn background
@@ -666,66 +755,76 @@ Before every discovery call, research:
 ## Discovery Call Structure (30 minutes)
 
 ### Opening (2 min)
-"Thanks for making time today. I've done some research on [Company] and I'm excited to learn more about what you're building. My goal today is to understand your situation and see if Cencori might be a fit. If it's not, I'll tell you honestly. Sound good?"
+"Thanks for making time. I've done some research on [Company] and I'm excited to learn more. My goal is to understand your situation and see if Cencori is a fit. If it's not, I'll tell you honestly. Sound good?"
 
 ### Situation Questions (5 min)
 
-1. "Tell me about your current AI implementation. What models are you using and for what use cases?"
+1. "Tell me about your AI implementation. What models are you using and for what?"
 
-2. "How are you integrating with AI providers today? Direct API or through a framework?"
+2. "How are you integrating with AI providers today — direct API, framework, or something else?"
 
-3. "How many requests per month are you doing? Any sense of growth trajectory?"
+3. "How many requests per month? Growth trajectory?"
 
-### Pain Questions (10 min)
+### Infrastructure Questions (8 min)
 
-4. "What happens if OpenAI has an outage? Do you have failover?"
+4. "Walk me through your current AI infrastructure stack. What tools are you using for gateway, observability, security?"
 
-5. "How are you handling security today — things like PII detection or prompt injection protection?"
+5. "What would happen if OpenAI had an outage? Do you have failover?"
 
-6. "Are you subject to any compliance requirements like SOC 2, HIPAA, or GDPR?"
+6. "How are you handling security — PII detection, prompt injection protection?"
 
-7. "How do you track AI costs today? Do you have visibility into spend by customer or feature?"
+7. "Are you subject to compliance requirements — SOC 2, HIPAA, GDPR?"
 
-8. "What would happen if you needed to switch from OpenAI to Anthropic? How long would that take?"
+8. "How do you track AI costs? Visibility into spend by customer or feature?"
+
+### Platform Questions (5 min)
+
+9. "Beyond the gateway, what else are you building? Agents, workflows, RAG?"
+
+10. "How much engineering time is going into AI infrastructure vs. product features?"
 
 ### Impact Questions (5 min)
 
-9. "If you could wave a magic wand and fix one thing about your AI infrastructure today, what would it be?"
+11. "If you could wave a magic wand and fix one thing about your AI infrastructure, what would it be?"
 
-10. "What's the cost of *not* solving this? Are there projects blocked or risks you're carrying?"
+12. "What's the cost of *not* solving this? Projects blocked, risks you're carrying?"
 
-### Timeline & Next Steps (8 min)
+### Timeline & Next Steps (5 min)
 
-11. "What's your timeline for addressing this?"
+13. "What's your timeline for addressing this?"
 
-12. "Who else would be involved in making a decision?"
+14. "Who else would be involved in a decision?"
 
-13. "What would you need to see from us to feel confident moving forward?"
+15. "What would you need to see to feel confident moving forward?"
 
-**Close with next step:**
-"Based on what you've shared, I think there's a strong fit here. Would you be open to a demo next week where I can show you exactly how Cencori would work in your environment?"
+**Close:**
+"Based on what you've shared, I think there's a strong fit. Would you be open to a demo where I show you exactly how Cencori works?"
 
 ---
 
-# 10. Demo Playbook
+# 11. Demo Playbook
 
 ## Demo Preparation
 
-1. **Create a custom demo project** with prospect's company name
-2. **Prepare example prompts** relevant to their use case
-3. **Load sample data** that mirrors their scenarios (fake/generic)
-4. **Test your environment** — make sure everything works
+1. Create a custom demo project with prospect's company name
+2. Prepare example prompts relevant to their use case
+3. Load sample data that mirrors their scenarios
+4. Test your environment
 
-## Demo Structure (20-25 minutes)
+## Demo Structure (25 minutes)
 
-### 1. Recap & Agenda (2 min)
+### 1. Set the Stage (3 min)
 
-"[Name], last time we talked you mentioned [key pain point]. Today I'll show you exactly how Cencori addresses that. I'll cover:
+"[Name], last time we talked you mentioned [key pain point]. Today I'll show you how Cencori addresses that.
+
+But first, let me set context: Cencori is the infrastructure for AI production. AI Gateway is live today, and we're building Compute, Workflows, and Data Storage to complete the platform. Today I'll focus on the gateway — that's where most customers start.
+
+I'll cover:
 1. How integration works
 2. Security in action
 3. Cost visibility
 
-Then we'll leave time for questions. Does that work?"
+Then we'll leave time for questions."
 
 ### 2. Integration Demo (5 min)
 
@@ -741,43 +840,53 @@ const openai = new OpenAI({
 });
 ```
 
-Key talking points:
+Key points:
 - "This is the entire integration. Your existing code stays the same."
-- "You can switch models by changing one parameter."
-- "Works with any OpenAI-compatible library or framework."
+- "Switch models by changing one parameter."
+- "Works with any OpenAI-compatible library."
 
 Make a live request and show it succeed.
 
 ### 3. Security Demo (7 min)
 
 **PII Detection:**
-Send a prompt containing a fake email/phone number:
+Send a prompt containing a fake email/phone:
 - Show it being flagged in the dashboard
 - Show the safety score
 - Explain blocking vs. logging modes
 
 **Prompt Injection:**
 Send a known injection pattern:
-- Show the injection being detected
-- Show the risk score calculation
+- Show detection
+- Show risk score
 - Explain configurable thresholds
 
-Key talking point:
-"This is happening on every request, automatically. No engineering work required."
+Key point:
+"This happens on every request, automatically. No engineering work required."
 
 ### 4. Cost & Analytics Demo (5 min)
 
 Show the dashboard:
 - Real-time cost tracking
 - Model usage breakdown
-- Request trends over time
+- Request trends
 
-Key talking points:
-- "You'll never be surprised by an AI bill again."
-- "You can see exactly which features or customers are driving costs."
-- "Budget alerts notify you before you exceed limits."
+Key points:
+- "Never be surprised by an AI bill again."
+- "See exactly which features or customers drive costs."
+- "Budget alerts before you exceed limits."
 
-### 5. Q&A & Next Steps (5 min)
+### 5. Platform Vision (2 min)
+
+"What I've shown you is AI Gateway — our first product. Coming soon:
+
+- **Compute**: Serverless functions, GPU access
+- **Workflows**: Pipeline builder, agent orchestration
+- **Data Storage**: Vector database, RAG
+
+You start with the gateway. As we ship more, you get access to the full platform."
+
+### 6. Q&A & Next Steps (3 min)
 
 "What questions do you have?"
 
@@ -785,28 +894,28 @@ Key talking points:
 
 "Based on what you've seen, does this solve the problems we discussed?"
 
-*[If yes]:* "Great. The natural next step would be a trial in your environment. I can set you up on our free tier today — takes about 10 minutes. Would you have time tomorrow to do a quick implementation call?"
+*[If yes]:* "Great. Next step is a trial in your environment. I can set you up on free tier today — takes 10 minutes. Would you have time tomorrow for a quick implementation call?"
 
 ---
 
-# 11. Email Templates
+# 12. Email Templates
 
 ## Initial Outreach (Cold)
 
-**Subject:** Quick question about [Company]'s AI security
+**Subject:** [Company]'s AI infrastructure
 
 Hi [Name],
 
-I noticed [Company] is building with [AI use case/model — from job post or public info]. As you scale AI in production, I'm curious how you're handling security — things like prompt injection protection and PII detection.
+I noticed [Company] is building with [AI use case — from job post or public info]. As you scale AI in production, I'm curious what your infrastructure stack looks like — gateway, security, observability.
 
 Most teams I talk to either:
-a) Haven't prioritized it yet (scary but common)
-b) Are building something custom (expensive and slow)
-c) Are looking for a better solution
+a) Are stitching together point solutions (gateway here, logging there, security somewhere else)
+b) Building infrastructure in-house (expensive and slow)
+c) Looking for something better
 
-If you're in category (b) or (c), Cencori might be worth a look. We're AI infrastructure with security built in — one integration, all providers.
+If you're in (a) or (b), Cencori might be worth a look. We're the infrastructure for AI production — starting with a gateway that handles security and compliance, with compute and workflows coming.
 
-Worth a 15-minute call to see if there's a fit?
+Worth a 15-minute call?
 
 [Your name]
 
@@ -818,7 +927,7 @@ Worth a 15-minute call to see if there's a fit?
 
 Hi [Name],
 
-Great talking with you today. To recap:
+Great talking today. To recap:
 
 **What we heard:**
 - [Pain point 1]
@@ -828,17 +937,15 @@ Great talking with you today. To recap:
 **What we can do:**
 - [How Cencori solves pain point 1]
 - [How Cencori solves pain point 2]
+- [Platform vision if relevant]
 
 **Next step:**
 I'll send a calendar invite for a demo on [date]. I'll prepare examples specific to [their use case].
 
-In the meantime, here are some resources:
-- [Link to relevant docs]
+Resources:
+- [Link to docs]
 - [Link to case study if available]
 
-Let me know if you have any questions before then.
-
-Best,
 [Your name]
 
 ---
@@ -849,20 +956,19 @@ Best,
 
 Hi [Name],
 
-Thanks for your time in the demo today. Great questions from the team.
+Thanks for the demo today. Great questions from the team.
 
-**As discussed:**
-- [Key takeaway 1]
-- [Key takeaway 2]
+**Key takeaways:**
+- [Takeaway 1]
+- [Takeaway 2]
 
 **Next step:** 
-[Trial setup / Send proposal / Security review call — whatever was agreed]
+[Trial setup / Proposal / Security review — whatever was agreed]
 
-I'll [action you're taking] and follow up by [date].
+I'll [action you're taking] by [date].
 
-Questions in the meantime? Just reply here.
+Questions? Just reply.
 
-Best,
 [Your name]
 
 ---
@@ -873,16 +979,15 @@ Best,
 
 Hi [Name],
 
-Just following up on the proposal I sent last week. Have you had a chance to review?
+Following up on the proposal I sent last week. Have you had a chance to review?
 
-Happy to jump on a quick call to walk through any questions or discuss terms.
+Happy to jump on a call to walk through questions or discuss terms.
 
-Best,
 [Your name]
 
 ---
 
-# 12. Resources & Links
+# 13. Resources & Links
 
 ## Public Resources
 
@@ -890,9 +995,9 @@ Best,
 |----------|-----|
 | Website | https://cencori.com |
 | Documentation | https://cencori.com/docs |
-| Pricing Page | https://cencori.com/pricing |
-| Contact Form | https://cencori.com/contact |
-| Quick Start Guide | https://cencori.com/docs/quick-start |
+| Pricing | https://cencori.com/pricing |
+| Contact | https://cencori.com/contact |
+| Quick Start | https://cencori.com/docs/quick-start |
 | API Reference | https://cencori.com/docs/api |
 
 ## Internal Resources
@@ -918,22 +1023,31 @@ Best,
 # Appendix: Quick Reference Card
 
 ## The Pitch (30 seconds)
-"Cencori is AI infrastructure for production. We're a unified API for every AI provider — OpenAI, Anthropic, Google — with security, compliance, and cost tracking built in. Think Stripe for AI. One integration, all providers, automatic security."
+
+"Cencori is the infrastructure for AI production. We're building the full stack — gateway, compute, workflows — so you can focus on your product instead of infrastructure.
+
+AI Gateway is live today: one API for every provider, with security, compliance, and cost tracking built in.
+
+You integrate once. As we ship more, you get access to the full platform."
 
 ## Key Numbers
+
 - **10 minutes**: Average integration time
 - **10-50ms**: Added latency
 - **3-6 months**: Engineering time saved vs. build
 - **$0**: Starting price (free tier)
-- **3**: AI providers supported today
+- **15+**: AI providers supported
 
 ## Top 3 Differentiators
-1. Security-first (PII detection, prompt injection defense)
-2. Compliance-ready (audit logs, SOC 2 path)
-3. True multi-provider (one API, all providers)
+
+1. **Platform, not point solution** — Gateway today, Compute and Workflows coming
+2. **Security-first** — PII detection, prompt injection defense built in
+3. **Compliance-ready** — Audit logs, SOC 2 path, enterprise grade
 
 ---
 
 *End of Sales Playbook*
+
+*Version 2.0 — January 2026*
 
 *For questions or updates, contact: [Sales Lead]*
