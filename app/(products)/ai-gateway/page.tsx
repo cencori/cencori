@@ -181,7 +181,7 @@ export default function AIGatewayPage() {
               <Link href="/" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
                 <span className="mr-2">Try AI Gateway</span>
-                <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+                <ChevronRightIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </Link>
             </div>
 
@@ -199,7 +199,7 @@ export default function AIGatewayPage() {
             <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
               <Link href={siteConfig.links.getStartedUrl}>
                 <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                  Get Started Free <ArrowRightIcon className="ml-2 h-4 w-4" />
+                  Get Started Free <ArrowRightIcon className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Button>
               </Link>
               <Link href="/docs">
@@ -215,7 +215,7 @@ export default function AIGatewayPage() {
               <div className="flex flex-wrap justify-center gap-4">
                 {providers.map((provider) => (
                   <div key={provider.name} className="opacity-50 hover:opacity-100 transition-opacity">
-                    <provider.icon className="w-6 h-6" />
+                    <provider.icon className="w-6 h-6" aria-hidden="true" />
                   </div>
                 ))}
               </div>
@@ -267,7 +267,7 @@ export default function AIGatewayPage() {
                       >
                         {/* Icon */}
                         <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-4", colors.bg, colors.border, "border")}>
-                          <pillar.icon className={cn("h-4 w-4", colors.text)} />
+                          <pillar.icon className={cn("h-4 w-4", colors.text)} aria-hidden="true" />
                         </div>
 
                         {/* Content */}
@@ -281,7 +281,7 @@ export default function AIGatewayPage() {
                         <ul className="mt-auto space-y-1.5">
                           {pillar.features.map((feature, i) => (
                             <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <CheckCircleIcon className={cn("w-3 h-3", colors.text)} />
+                              <CheckCircleIcon className={cn("w-3 h-3", colors.text)} aria-hidden="true" />
                               {feature}
                             </li>
                           ))}
@@ -321,7 +321,7 @@ export default function AIGatewayPage() {
                 <div className="mt-6">
                   <Link href="/docs/quickstart">
                     <Button variant="outline" size="sm" className="h-8 px-4 text-xs rounded-full">
-                      Read the Quickstart <ArrowRightIcon className="ml-2 w-3 h-3" />
+                      Read the Quickstart <ArrowRightIcon className="ml-2 w-3 h-3" aria-hidden="true" />
                     </Button>
                   </Link>
                 </div>
@@ -396,7 +396,7 @@ export default function AIGatewayPage() {
                   <Link href={siteConfig.links.getStartedUrl}>
                     <Button size="sm" className="h-8 px-4 text-xs rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
                       Get Started Free
-                      <ArrowRightIcon className="ml-1.5 w-3 h-3" />
+                      <ArrowRightIcon className="ml-1.5 w-3 h-3" aria-hidden="true" />
                     </Button>
                   </Link>
                   <Link href="/pricing">
