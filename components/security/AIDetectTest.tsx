@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, Sparkles, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
+import { ShieldCheckIcon, ShieldExclamationIcon, XCircleIcon } from "@heroicons/react/24/solid";
 
 interface AIDetectTestProps {
     projectId: string;
@@ -77,10 +78,10 @@ export function AIDetectTest({ projectId }: AIDetectTestProps) {
 
     const getRecommendationIcon = (rec: string) => {
         switch (rec) {
-            case "block": return <ShieldX className="h-4 w-4 text-red-500" />;
-            case "redact": return <ShieldAlert className="h-4 w-4 text-orange-500" />;
-            case "mask": return <ShieldAlert className="h-4 w-4 text-amber-500" />;
-            default: return <ShieldCheck className="h-4 w-4 text-emerald-500" />;
+            case "block": return <XCircleIcon className="h-4 w-4 text-red-500" />;
+            case "redact": return <ShieldExclamationIcon className="h-4 w-4 text-orange-500" />;
+            case "mask": return <ShieldExclamationIcon className="h-4 w-4 text-amber-500" />;
+            default: return <ShieldCheckIcon className="h-4 w-4 text-emerald-500" />;
         }
     };
 
