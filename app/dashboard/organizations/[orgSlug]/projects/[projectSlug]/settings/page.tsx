@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell } from "lucide-react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -185,6 +185,13 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [isSavingProviders, setIsSavingProviders] = useState(false);
   const [providerSettingsDirty, setProviderSettingsDirty] = useState(false);
 
+  // Budget Settings state
+  const [monthlyBudget, setMonthlyBudget] = useState('');
+  const [spendCap, setSpendCap] = useState('');
+  const [enforceSpendCap, setEnforceSpendCap] = useState(false);
+  const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
+
   // API Key interface
   interface ApiKeyData {
     id: string;
@@ -345,6 +352,38 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     staleTime: 30 * 1000,
   });
 
+  // Fetch budget settings
+  interface BudgetSettingsData {
+    monthly_budget: number | null;
+    spend_cap: number | null;
+    enforce_spend_cap: boolean;
+    budget_alerts_enabled: boolean;
+    current_spend: number;
+    percent_used: number | null;
+    is_cap_reached: boolean;
+  }
+
+  const { data: budgetSettings, refetch: refetchBudget } = useQuery<BudgetSettingsData>({
+    queryKey: ["budgetSettings", project?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${project!.id}/budget`);
+      if (!response.ok) throw new Error("Failed to fetch budget settings");
+      return response.json();
+    },
+    enabled: !!project?.id,
+    staleTime: 30 * 1000,
+  });
+
+  // Sync budget settings to state
+  React.useEffect(() => {
+    if (budgetSettings) {
+      setMonthlyBudget(budgetSettings.monthly_budget?.toString() || '');
+      setSpendCap(budgetSettings.spend_cap?.toString() || '');
+      setEnforceSpendCap(budgetSettings.enforce_spend_cap || false);
+      setBudgetAlertsEnabled(budgetSettings.budget_alerts_enabled ?? true);
+    }
+  }, [budgetSettings]);
+
   // Create webhook mutation
   const createWebhookMutation = useMutation({
     mutationFn: async (data: { name: string; url: string; events: string[] }) => {
@@ -501,6 +540,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
@@ -678,6 +718,198 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     </Dialog>
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+        </TabsContent>
+
+        {/* BUDGET TAB */}
+        <TabsContent value="budget" className="space-y-6">
+          {/* Current Spend */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Current month spend</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Your AI usage cost this billing period.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="px-4 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">${budgetSettings?.current_spend?.toFixed(2) || '0.00'}</p>
+                      <p className="text-xs text-muted-foreground">spent this month</p>
+                    </div>
+                  </div>
+                  {budgetSettings?.monthly_budget && (
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {budgetSettings.percent_used?.toFixed(0) || 0}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        of ${budgetSettings.monthly_budget.toFixed(2)} budget
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {budgetSettings?.monthly_budget && (
+                  <div className="w-full bg-muted/50 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${(budgetSettings.percent_used || 0) >= 100
+                          ? 'bg-red-500'
+                          : (budgetSettings.percent_used || 0) >= 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                      style={{ width: `${Math.min(budgetSettings.percent_used || 0, 100)}%` }}
+                    />
+                  </div>
+                )}
+                {budgetSettings?.is_cap_reached && (
+                  <div className="mt-3 flex items-center gap-2 text-red-500 text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>Spend cap reached — requests are being blocked</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Budget Configuration */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Budget configuration</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Set spending limits and alerts.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              {/* Monthly Budget */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Monthly budget</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Get alerts when you approach this amount.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="100"
+                    value={monthlyBudget}
+                    onChange={(e) => setMonthlyBudget(e.target.value)}
+                    className="w-full md:w-28 h-10 md:h-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Spend Cap */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Spend cap (hard limit)</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Block requests when this limit is reached.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="150"
+                    value={spendCap}
+                    onChange={(e) => setSpendCap(e.target.value)}
+                    className="w-full md:w-28 h-10 md:h-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Enforce Spend Cap */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Enforce spend cap</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">When enabled, requests will be blocked at the cap.</p>
+                </div>
+                <Checkbox
+                  checked={enforceSpendCap}
+                  onCheckedChange={(checked) => setEnforceSpendCap(checked === true)}
+                />
+              </div>
+
+              {/* Budget Alerts */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-0.5">
+                    <p className="text-sm md:text-xs font-medium">Budget alerts</p>
+                    <p className="text-xs md:text-[10px] text-muted-foreground">Email alerts at 50%, 80%, and 100% of budget.</p>
+                  </div>
+                </div>
+                <Checkbox
+                  checked={budgetAlertsEnabled}
+                  onCheckedChange={(checked) => setBudgetAlertsEnabled(checked === true)}
+                />
+              </div>
+
+              {/* Save Button */}
+              <div className="flex justify-end px-4 py-2.5 md:py-2 bg-muted/20">
+                <Button
+                  size="sm"
+                  className="h-9 md:h-7 px-4 md:px-3 text-sm md:text-xs"
+                  disabled={isSavingBudget}
+                  onClick={async () => {
+                    if (!project) return;
+                    setIsSavingBudget(true);
+                    try {
+                      const response = await fetch(`/api/projects/${project.id}/budget`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          monthly_budget: monthlyBudget ? parseFloat(monthlyBudget) : null,
+                          spend_cap: spendCap ? parseFloat(spendCap) : null,
+                          enforce_spend_cap: enforceSpendCap,
+                          budget_alerts_enabled: budgetAlertsEnabled,
+                        }),
+                      });
+                      if (!response.ok) throw new Error('Failed to save');
+                      toast.success('Budget settings saved!');
+                      refetchBudget();
+                    } catch {
+                      toast.error('Failed to save budget settings');
+                    } finally {
+                      setIsSavingBudget(false);
+                    }
+                  }}
+                >
+                  {isSavingBudget ? 'Saving...' : 'Save changes'}
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          {/* Alert History */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Alert thresholds</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Alerts are sent when budget reaches these levels.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="divide-y divide-border/40">
+                {[50, 80, 100].map((threshold) => (
+                  <div key={threshold} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${threshold >= 100 ? 'bg-red-500' :
+                          threshold >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`} />
+                      <span className="text-xs">{threshold}% of budget</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {budgetSettings?.monthly_budget
+                        ? `$${(budgetSettings.monthly_budget * threshold / 100).toFixed(2)}`
+                        : '—'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </section>

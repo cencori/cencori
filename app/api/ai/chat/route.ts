@@ -26,6 +26,7 @@ import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/cir
 import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
 import { triggerFallbackWebhook, triggerSecurityWebhook } from '@/lib/webhooks';
 import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
+import { checkSpendCap, checkAndSendBudgetAlerts } from '@/lib/budgets';
 
 // Initialize providers
 const router = new ProviderRouter();
@@ -495,6 +496,23 @@ export async function POST(req: NextRequest) {
                     upgrade_url: '/billing'
                 },
                 { status: 429 }
+            );
+        }
+
+        // 3.5 Check spend cap before processing request
+        const spendCapResult = await checkSpendCap(project.id);
+        if (!spendCapResult.allowed) {
+            return NextResponse.json(
+                {
+                    error: 'Spend cap reached',
+                    message: spendCapResult.reason || 'Monthly spend cap has been reached.',
+                    spend: {
+                        current: spendCapResult.status.currentSpend,
+                        cap: spendCapResult.status.spendCap,
+                    },
+                    upgrade_url: '/billing'
+                },
+                { status: 402 }
             );
         }
 
@@ -969,6 +987,11 @@ export async function POST(req: NextRequest) {
                                     console.error('[API] Failed to log streaming request:', streamLogError);
                                 }
 
+                                // Check and send budget alerts after logging cost
+                                checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
+                                    console.error('[Budget] Failed to check budget alerts:', err);
+                                });
+
                                 controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                             }
                         }
@@ -1235,6 +1258,11 @@ export async function POST(req: NextRequest) {
         if (logError) {
             console.error('[AI Chat] Failed to log request:', logError);
         }
+
+        // Check and send budget alerts after logging cost
+        checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
+            console.error('[Budget] Failed to check budget alerts:', err);
+        });
 
         // 12. Return (include fallback info in response)
         return NextResponse.json({
