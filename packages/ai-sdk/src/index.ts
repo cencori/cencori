@@ -1,14 +1,67 @@
 /**
- * Cencori AI SDK - Main Entry Point
+ * Cencori AI SDK
  * 
- * This package provides integrations for multiple AI SDK ecosystems:
+ * The unified infrastructure layer for AI applications.
+ * One SDK. Every AI primitive. Always secure. Always logged.
  * 
- * @example Vercel AI SDK
- * import { cencori } from '@cencori/ai-sdk/vercel';
+ * @example Unified SDK (Recommended)
+ * ```typescript
+ * import { Cencori } from 'cencori';
  * 
- * @example TanStack AI (coming soon)
- * import { cencori } from '@cencori/ai-sdk/tanstack';
+ * const cencori = new Cencori({ apiKey: 'csk_...' });
+ * 
+ * // AI Gateway
+ * await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
+ * 
+ * // Compute (coming soon)
+ * await cencori.compute.run('my-function', { input: data });
+ * 
+ * // Workflow (coming soon)
+ * await cencori.workflow.trigger('pipeline-id', { data });
+ * 
+ * // Storage (coming soon)
+ * await cencori.storage.vectors.search('query');
+ * ```
+ * 
+ * @example Vercel AI SDK Integration
+ * ```typescript
+ * import { cencori } from 'cencori/vercel';
+ * import { streamText } from 'ai';
+ * 
+ * const result = await streamText({
+ *   model: cencori('gpt-4o'),
+ *   messages: [{ role: 'user', content: 'Hello!' }]
+ * });
+ * ```
+ * 
+ * @example TanStack AI Integration
+ * ```typescript
+ * import { cencori } from 'cencori/tanstack';
+ * ```
  */
 
-// Re-export Vercel integration as default for backwards compatibility
-export * from './vercel';
+// Unified SDK
+export { Cencori } from './cencori';
+export type {
+    CencoriConfig,
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
+    CompletionRequest,
+    EmbeddingRequest,
+    EmbeddingResponse,
+} from './types';
+
+// Namespace exports for advanced usage
+export { AINamespace } from './ai';
+export { ComputeNamespace } from './compute';
+export { WorkflowNamespace } from './workflow';
+export { StorageNamespace } from './storage';
+
+// Default export for convenience
+export { Cencori as default } from './cencori';
+
+// Re-export Vercel integration for backwards compatibility
+// Users can also import from 'cencori/vercel' directly
+export { cencori, createCencori } from './vercel';
+export type { CencoriProvider, CencoriProviderSettings, CencoriChatSettings } from './vercel';

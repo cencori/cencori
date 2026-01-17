@@ -16,7 +16,7 @@ export interface CencoriProvider {
      * @returns A LanguageModelV1 compatible model
      * 
      * @example
-     * import { cencori } from '@cencori/ai-sdk';
+     * import { cencori } from 'cencori';
      * import { streamText } from 'ai';
      * 
      * const result = await streamText({
@@ -39,7 +39,7 @@ export interface CencoriProvider {
  * @returns A Cencori provider
  * 
  * @example
- * import { createCencori } from '@cencori/ai-sdk';
+ * import { createCencori } from 'cencori';
  * 
  * const cencori = createCencori({
  *   apiKey: process.env.CENCORI_API_KEY
@@ -81,7 +81,7 @@ export function createCencori(options: CencoriProviderSettings = {}): CencoriPro
  * Uses CENCORI_API_KEY environment variable (lazy initialization)
  * 
  * @example
- * import { cencori } from '@cencori/ai-sdk';
+ * import { cencori } from 'cencori';
  * import { streamText } from 'ai';
  * 
  * const result = await streamText({

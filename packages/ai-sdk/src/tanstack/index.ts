@@ -2,7 +2,7 @@
  * Cencori AI SDK - TanStack AI Integration
  * 
  * @example
- * import { cencori } from '@cencori/ai-sdk/tanstack';
+ * import { cencori } from 'cencori/tanstack';
  * import { chat } from '@tanstack/ai';
  * 
  * const result = await chat({
@@ -359,7 +359,7 @@ class CencoriTextAdapter implements TextAdapter<
  * Create a Cencori adapter for TanStack AI
  * 
  * @example
- * import { createCencori } from '@cencori/ai-sdk/tanstack';
+ * import { createCencori } from 'cencori/tanstack';
  * 
  * const myProvider = createCencori({ apiKey: 'csk_...' });
  * const adapter = myProvider('gpt-4o');
@@ -375,7 +375,7 @@ export function createCencori(options: CencoriProviderOptions = {}) {
  * Uses CENCORI_API_KEY environment variable
  * 
  * @example
- * import { cencori } from '@cencori/ai-sdk/tanstack';
+ * import { cencori } from 'cencori/tanstack';
  * import { chat } from '@tanstack/ai';
  * 
  * const result = await chat({

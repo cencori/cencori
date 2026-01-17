@@ -36,11 +36,11 @@ declare class CencoriChatLanguageModel implements LanguageModelV3 {
 }
 
 /**
- * Types for Cencori AI Provider
+ * Types for Cencori AI Provider (Vercel AI SDK Integration)
  */
 interface CencoriProviderSettings {
     /**
-     * Cencori API key (csk_ or cpk_ prefix)
+     * Cencori API key (csk_ prefix)
      */
     apiKey?: string;
     /**
@@ -75,7 +75,7 @@ interface CencoriProvider {
      * @returns A LanguageModelV1 compatible model
      *
      * @example
-     * import { cencori } from '@cencori/ai-sdk';
+     * import { cencori } from 'cencori';
      * import { streamText } from 'ai';
      *
      * const result = await streamText({
@@ -96,7 +96,7 @@ interface CencoriProvider {
  * @returns A Cencori provider
  *
  * @example
- * import { createCencori } from '@cencori/ai-sdk';
+ * import { createCencori } from 'cencori';
  *
  * const cencori = createCencori({
  *   apiKey: process.env.CENCORI_API_KEY
@@ -113,7 +113,7 @@ declare function createCencori(options?: CencoriProviderSettings): CencoriProvid
  * Uses CENCORI_API_KEY environment variable (lazy initialization)
  *
  * @example
- * import { cencori } from '@cencori/ai-sdk';
+ * import { cencori } from 'cencori';
  * import { streamText } from 'ai';
  *
  * const result = await streamText({
