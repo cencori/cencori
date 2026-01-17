@@ -1,15 +1,11 @@
 # Cencori
 
-Official SDK for Cencori - The Security Layer for AI Development.
+**The unified infrastructure layer for AI applications.**
 
-## Installation
+One SDK. Every AI primitive. Always secure. Always logged.
 
 ```bash
 npm install cencori
-# or
-yarn add cencori
-# or
-pnpm add cencori
 ```
 
 ## Quick Start
@@ -17,152 +13,65 @@ pnpm add cencori
 ```typescript
 import { Cencori } from 'cencori';
 
-const cencori = new Cencori({
-  apiKey: process.env.CENCORI_API_KEY!
+const cencori = new Cencori({ 
+  apiKey: process.env.CENCORI_API_KEY 
 });
 
+// AI Gateway - Chat with any model
 const response = await cencori.ai.chat({
-  messages: [
-    { role: 'user', content: 'Hello, AI!' }
-  ]
-});
-
-console.log(response.content);
-```
-
-## Authentication
-
-Get your API key from the [Cencori Dashboard](https://cencori.com/dashboard):
-
-1. Create a project
-2. Navigate to Settings → API tab
-3. Generate a new key:
-   - **Secret key (`csk_`)** - For server-side use only
-   - **Publishable key (`cpk_`)** - Safe for browser use (requires domain whitelisting)
-4. Copy and store it securely
-
-## API Reference
-
-### Cencori
-
-Initialize the SDK client.
-
-```typescript
-import { Cencori } from 'cencori';
-
-const cencori = new Cencori({
-  apiKey: 'csk_xxx', // Secret key for server-side
-  baseUrl: 'https://cencori.com' // Optional, defaults to production
-});
-```
-
-### AI Module
-
-#### `ai.chat(params)`
-
-Send a chat message to the AI (non-streaming).
-
-**Parameters:**
-- `messages`: Array of message objects with `role` ('system' | 'user' | 'assistant') and `content`
-- `model`: Optional AI model (defaults to 'gemini-2.5-flash')
-- `temperature`: Optional temperature (0-1)
-- `maxTokens`: Optional max tokens for response
-- `userId`: Optional user ID for rate limiting
-
-**Example:**
-
-```typescript
-const response = await cencori.ai.chat({
-  messages: [
-    { role: 'user', content: 'Explain quantum computing' }
-  ],
   model: 'gpt-4o',
-  temperature: 0.7
+  messages: [{ role: 'user', content: 'Hello!' }]
 });
 
 console.log(response.content);
-console.log(response.usage); // Token usage stats
-console.log(response.cost_usd); // Cost in USD
 ```
 
-#### `ai.chatStream(params)`
+## Products
 
-Stream a chat response token-by-token.
+| Product | Status | Description |
+|---------|--------|-------------|
+| **AI Gateway** | ✅ Available | Multi-provider routing, security, observability |
+| **Compute** | 🚧 Coming Soon | Serverless functions, GPU access |
+| **Workflow** | 🚧 Coming Soon | Visual AI pipelines, orchestration |
+| **Storage** | 🚧 Coming Soon | Vector database, knowledge base, RAG |
+| **Integration** | ✅ Available | SDKs, Vercel AI, TanStack |
 
-**Example:**
+## AI Gateway
+
+### Chat Completions
 
 ```typescript
-const stream = cencori.ai.chatStream({
+const response = await cencori.ai.chat({
+  model: 'gpt-4o', // or 'claude-3-opus', 'gemini-1.5-pro', etc.
   messages: [
-    { role: 'user', content: 'Tell me a story' }
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'What is the capital of France?' }
   ],
-  model: 'gemini-2.5-flash'
+  temperature: 0.7,
+  maxTokens: 1000
 });
 
-for await (const chunk of stream) {
-  // Check for stream errors (e.g., rate limit, provider failure)
-  if (chunk.error) {
-    console.error('Stream error:', chunk.error);
-    break;
-  }
-  
-  process.stdout.write(chunk.delta);
-}
+console.log(response.content);
+console.log(response.usage); // { promptTokens, completionTokens, totalTokens }
 ```
 
-## Error Handling
-
-The SDK includes custom error classes for common scenarios:
+### Embeddings
 
 ```typescript
-import {
-  Cencori,
-  AuthenticationError,
-  RateLimitError,
-  SafetyError
-} from 'cencori';
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: 'Hello world'
+});
 
-try {
-  const response = await cencori.ai.chat({ messages: [...] });
-} catch (error) {
-  if (error instanceof AuthenticationError) {
-    console.error('Invalid API key');
-  } else if (error instanceof RateLimitError) {
-    console.error('Too many requests, please slow down');
-  } else if (error instanceof SafetyError) {
-    console.error('Content blocked:', error.reasons);
-  }
-}
+console.log(response.embeddings[0]); // [0.1, 0.2, ...]
 ```
 
-## TypeScript Support
+## Framework Integrations
 
-The SDK is written in TypeScript and includes full type definitions.
+### Vercel AI SDK
 
 ```typescript
-import type { ChatParams, ChatResponse, Message, StreamChunk } from 'cencori';
-```
-
-## Features
-
-- ✅ Full TypeScript support with type definitions
-- ✅ Built-in authentication
-- ✅ Automatic retry logic with exponential backoff
-- ✅ Custom error classes
-- ✅ Content safety filtering (PII, prompt injection, harmful content)
-- ✅ Rate limiting protection
-- ✅ Streaming support with `chatStream()`
-
-## Vercel AI SDK Integration
-
-Using Vercel AI SDK? Use `@cencori/ai-sdk` for seamless integration:
-
-```bash
-npm install @cencori/ai-sdk ai
-```
-
-```typescript
-import { cencori } from '@cencori/ai-sdk';
+import { cencori } from 'cencori/vercel';
 import { streamText } from 'ai';
 
 const result = await streamText({
@@ -171,57 +80,77 @@ const result = await streamText({
 });
 
 for await (const chunk of result.textStream) {
-  process.stdout.write(chunk);
+  console.log(chunk);
 }
 ```
 
-See [@cencori/ai-sdk on npm](https://www.npmjs.com/package/@cencori/ai-sdk) for full documentation.
-
-## Supported Models
-
-| Provider | Models |
-|----------|--------|
-| OpenAI | `gpt-5`, `gpt-4o`, `gpt-4o-mini`, `o3`, `o1` |
-| Anthropic | `claude-opus-4`, `claude-sonnet-4`, `claude-3-5-sonnet` |
-| Google | `gemini-3-pro`, `gemini-2.5-flash`, `gemini-2.0-flash` |
-| xAI | `grok-4`, `grok-4.1`, `grok-3` |
-| Mistral | `mistral-large`, `codestral`, `devstral` |
-| DeepSeek | `deepseek-v3.2`, `deepseek-reasoner` |
-| Meta | `llama-4-maverick`, `llama-3.3-70b` |
-| + 7 more | Groq, Cohere, Perplexity, Together, Qwen, OpenRouter, HuggingFace |
-
-## Local Development
-
-For local development or testing:
+### With React/Next.js
 
 ```typescript
-const cencori = new Cencori({
-  apiKey: 'csk_test_xxx', // Test secret key
-  baseUrl: 'http://localhost:3000'
+import { cencori } from 'cencori/vercel';
+import { useChat } from 'ai/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/chat'
+  });
+  
+  return (
+    <div>
+      {messages.map(m => <div key={m.id}>{m.content}</div>)}
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+      </form>
+    </div>
+  );
+}
+```
+
+## Coming Soon
+
+### Compute
+
+```typescript
+// 🚧 Coming Soon
+await cencori.compute.run('my-function', { 
+  input: { data: 'hello' } 
 });
 ```
 
-## Browser Usage (Publishable Keys)
-
-For browser/client-side usage, use publishable keys:
+### Workflow
 
 ```typescript
-// Safe to use in browser - only works from allowed domains
-const cencori = new Cencori({
-  apiKey: 'cpk_xxx' // Publishable key
-});
-
-const response = await cencori.ai.chat({
-  messages: [{ role: 'user', content: 'Hello!' }]
+// 🚧 Coming Soon
+await cencori.workflow.trigger('data-enrichment', { 
+  data: { userId: '123' } 
 });
 ```
 
-## Support
+### Storage
 
-- **Documentation**: [cencori.com/docs](https://cencori.com/docs)
-- **Dashboard**: [cencori.com/dashboard](https://cencori.com/dashboard)
-- **GitHub**: [github.com/cencori](https://github.com/cencori)
+```typescript
+// 🚧 Coming Soon
+const results = await cencori.storage.vectors.search('query', { 
+  limit: 5 
+});
+
+await cencori.storage.knowledge.query('What is our refund policy?');
+```
+
+## Why Cencori?
+
+- **🛡️ Security Built-in**: PII detection, content filtering, jailbreak protection
+- **📊 Observability**: Every request logged, every token tracked
+- **💰 Cost Control**: Budget alerts, spend caps, per-request costing
+- **🔄 Multi-Provider**: Switch between OpenAI, Anthropic, Google, etc.
+- **⚡ One SDK**: AI, compute, storage, workflows - unified
+
+## Links
+
+- [Documentation](https://cencori.com/docs)
+- [Dashboard](https://cencori.com/dashboard)
+- [GitHub](https://github.com/cencori/cencori)
 
 ## License
 
-MIT © FohnAI
+MIT

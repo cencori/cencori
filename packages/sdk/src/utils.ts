@@ -1,7 +1,15 @@
+/**
+ * Utility functions for Cencori SDK
+ */
+
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Fetch with automatic retry on 5xx errors
+ * Uses exponential backoff: 1s, 2s, 4s
+ */
 export async function fetchWithRetry(
     url: string,
     options: RequestInit,
