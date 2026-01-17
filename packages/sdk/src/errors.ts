@@ -1,3 +1,9 @@
+/**
+ * Cencori Error Classes
+ * 
+ * Custom error types for better error handling
+ */
+
 export class CencoriError extends Error {
     constructor(
         message: string,

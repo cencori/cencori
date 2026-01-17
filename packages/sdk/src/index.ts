@@ -1,7 +1,85 @@
-export { CencoriClient } from './client';
-export { CencoriClient as Cencori } from './client'; // Alias for convenience
-export * from './types';
-export * from './errors';
+/**
+ * Cencori AI SDK
+ * 
+ * The unified infrastructure layer for AI applications.
+ * One SDK. Every AI primitive. Always secure. Always logged.
+ * 
+ * @example Unified SDK (Recommended)
+ * ```typescript
+ * import { Cencori } from 'cencori';
+ * 
+ * const cencori = new Cencori({ apiKey: 'csk_...' });
+ * 
+ * // AI Gateway
+ * await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
+ * 
+ * // Streaming
+ * for await (const chunk of cencori.ai.chatStream({ model: 'gpt-4o', messages })) {
+ *   process.stdout.write(chunk.delta);
+ * }
+ * 
+ * // Compute (coming soon)
+ * await cencori.compute.run('my-function', { input: data });
+ * 
+ * // Workflow (coming soon)
+ * await cencori.workflow.trigger('pipeline-id', { data });
+ * 
+ * // Storage (coming soon)
+ * await cencori.storage.vectors.search('query');
+ * ```
+ * 
+ * @example Vercel AI SDK Integration
+ * ```typescript
+ * import { cencori } from 'cencori/vercel';
+ * import { streamText } from 'ai';
+ * 
+ * const result = await streamText({
+ *   model: cencori('gpt-4o'),
+ *   messages: [{ role: 'user', content: 'Hello!' }]
+ * });
+ * ```
+ * 
+ * @example TanStack AI Integration
+ * ```typescript
+ * import { cencori } from 'cencori/tanstack';
+ * ```
+ */
 
-// Default export for: import Cencori from 'cencori'
-export { CencoriClient as default } from './client';
+// Unified SDK
+export { Cencori } from './cencori';
+export type {
+    CencoriConfig,
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
+    CompletionRequest,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    RequestOptions,
+} from './types';
+
+// Error classes
+export {
+    CencoriError,
+    AuthenticationError,
+    RateLimitError,
+    SafetyError,
+} from './errors';
+
+// Utilities
+export { fetchWithRetry } from './utils';
+
+// Namespace exports for advanced usage
+export { AINamespace, type StreamChunk } from './ai';
+export { ComputeNamespace } from './compute';
+export { WorkflowNamespace } from './workflow';
+export { StorageNamespace } from './storage';
+
+// Default export for convenience
+export { Cencori as default } from './cencori';
+
+// Re-export Vercel integration for backwards compatibility
+// Users can also import from 'cencori/vercel' directly
+export { cencori, createCencori } from './vercel';
+export type { CencoriProvider, CencoriProviderSettings, CencoriChatSettings } from './vercel';
+
