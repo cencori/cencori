@@ -1,8 +1,8 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
-    "name": "@cencori/ai-sdk",
-    "version": "0.4.0",
-    "description": "Cencori AI SDK - The infrastructure layer for AI applications. Works with Vercel AI SDK, TanStack AI, and more.",
+    "name": "cencori",
+    "version": "1.0.0",
+    "description": "Cencori - The unified infrastructure layer for AI applications. One SDK for AI Gateway, Compute, Workflow, and Storage.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
@@ -21,6 +21,26 @@
             "types": "./dist/tanstack/index.d.ts",
             "import": "./dist/tanstack/index.mjs",
             "require": "./dist/tanstack/index.js"
+        },
+        "./ai": {
+            "types": "./dist/ai/index.d.ts",
+            "import": "./dist/ai/index.mjs",
+            "require": "./dist/ai/index.js"
+        },
+        "./compute": {
+            "types": "./dist/compute/index.d.ts",
+            "import": "./dist/compute/index.mjs",
+            "require": "./dist/compute/index.js"
+        },
+        "./workflow": {
+            "types": "./dist/workflow/index.d.ts",
+            "import": "./dist/workflow/index.mjs",
+            "require": "./dist/workflow/index.js"
+        },
+        "./storage": {
+            "types": "./dist/storage/index.d.ts",
+            "import": "./dist/storage/index.mjs",
+            "require": "./dist/storage/index.js"
         }
     },
     "files": [
@@ -31,19 +51,22 @@
         "ai",
         "cencori",
         "ai-sdk",
-        "vercel",
-        "tanstack",
-        "provider",
-        "streaming",
+        "ai-gateway",
         "llm",
         "openai",
         "anthropic",
         "gemini",
+        "vercel",
+        "tanstack",
         "infrastructure",
         "security",
-        "observability"
+        "observability",
+        "serverless",
+        "workflow",
+        "vector-database",
+        "rag"
     ],
-    "author": "FohnAI",
+    "author": "Cencori",
     "license": "MIT",
     "repository": {
         "type": "git",
@@ -60,6 +83,11 @@
     },
     "peerDependencies": {
         "@ai-sdk/provider": ">=1.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@ai-sdk/provider": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@ai-sdk/provider": "^3.0.0",

@@ -1,10 +1,10 @@
 /**
- * Types for Cencori AI Provider
+ * Types for Cencori AI Provider (Vercel AI SDK Integration)
  */
 
 export interface CencoriProviderSettings {
     /**
-     * Cencori API key (csk_ or cpk_ prefix)
+     * Cencori API key (csk_ prefix)
      */
     apiKey?: string;
 

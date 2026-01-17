@@ -2,7 +2,7 @@
  * Cencori AI SDK - Vercel AI SDK Integration
  * 
  * @example
- * import { cencori } from '@cencori/ai-sdk/vercel';
+ * import { cencori } from 'cencori/vercel';
  * import { streamText } from 'ai';
  * 
  * const result = await streamText({
