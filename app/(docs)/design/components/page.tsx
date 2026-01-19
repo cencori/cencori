@@ -42,7 +42,6 @@ export default function ComponentsPage() {
 
     return (
         <div className="space-y-12">
-            {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Components</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
@@ -50,11 +49,9 @@ export default function ComponentsPage() {
                 </p>
             </div>
 
-            {/* Buttons */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Buttons</h2>
                 <div className="rounded-xl border border-border/50 bg-card p-6 space-y-6">
-                    {/* Live examples */}
                     <div className="flex flex-wrap gap-3">
                         <Button className="h-9 px-4 text-sm rounded-full">
                             Primary
@@ -88,8 +85,6 @@ export default function ComponentsPage() {
 </Button>`} />
                 </div>
             </section>
-
-            {/* Badges */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Badges</h2>
                 <div className="rounded-xl border border-border/50 bg-card p-6 space-y-6">
@@ -119,18 +114,15 @@ export default function ComponentsPage() {
                 </div>
             </section>
 
-            {/* Cards */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Cards</h2>
                 <div className="grid gap-4 md:grid-cols-2">
-                    {/* Standard Card */}
                     <div className="rounded-xl border border-border/50 bg-card p-5">
                         <h3 className="text-sm font-semibold mb-1">Standard Card</h3>
                         <p className="text-xs text-muted-foreground">
                             Basic card with subtle border and padding.
                         </p>
                     </div>
-                    {/* Highlighted Card */}
                     <div className="relative rounded-xl border border-border bg-card p-5 shadow-lg">
                         <Badge variant="outline" className="absolute -top-2.5 left-4 rounded-full px-2 py-0.5 text-[10px] bg-background">
                             Popular
@@ -153,7 +145,6 @@ export default function ComponentsPage() {
 </div>`} />
             </section>
 
-            {/* Tabs */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Tabs</h2>
                 <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
@@ -196,7 +187,6 @@ export default function ComponentsPage() {
 <TabsList className="flex w-full flex-nowrap overflow-x-auto">`} />
             </section>
 
-            {/* Form Rows - Desktop */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Form Rows</h2>
                 <p className="text-xs text-muted-foreground">Desktop-only horizontal layout.</p>

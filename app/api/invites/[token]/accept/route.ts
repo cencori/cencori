@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// POST /api/invites/[token]/accept - Accept an invite
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ token: string }> }
@@ -17,7 +16,6 @@ export async function POST(
 
     const supabaseAdmin = createAdminClient();
 
-    // Find the invite
     console.log('[Accept] Looking for invite with token:', token);
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
@@ -37,7 +35,6 @@ export async function POST(
 
     console.log('[Accept] Found invite:', { id: invite.id, email: invite.email, org: invite.organization_id });
 
-    // Fetch organization separately
     const { data: org, error: orgError } = await supabaseAdmin
         .from('organizations')
         .select('name, slug')
@@ -49,24 +46,19 @@ export async function POST(
         return NextResponse.json({ error: 'Organization not found for this invite' }, { status: 404 });
     }
 
-    // Check if already accepted
     if (invite.accepted_at) {
         return NextResponse.json({ error: 'This invite has already been used' }, { status: 400 });
     }
-
-    // Check if expired
     if (new Date(invite.expires_at) < new Date()) {
         return NextResponse.json({ error: 'This invite has expired' }, { status: 400 });
     }
 
-    // Check if email matches (case-insensitive)
     if (invite.email.toLowerCase() !== user.email?.toLowerCase()) {
         return NextResponse.json({
             error: `This invite was sent to ${invite.email}. Please log in with that email address.`
         }, { status: 403 });
     }
 
-    // Check if already a member
     const { data: existingMember } = await supabaseAdmin
         .from('organization_members')
         .select('id')
@@ -75,7 +67,6 @@ export async function POST(
         .single();
 
     if (existingMember) {
-        // Already a member, just mark invite as accepted
         await supabaseAdmin
             .from('organization_invites')
             .update({ accepted_at: new Date().toISOString() })
@@ -88,7 +79,6 @@ export async function POST(
         });
     }
 
-    // Add user to organization
     const { error: memberError } = await supabaseAdmin
         .from('organization_members')
         .insert({
@@ -102,7 +92,6 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to join organization' }, { status: 500 });
     }
 
-    // Mark invite as accepted
     await supabaseAdmin
         .from('organization_invites')
         .update({ accepted_at: new Date().toISOString() })
@@ -115,7 +104,6 @@ export async function POST(
     });
 }
 
-// GET /api/invites/[token]/accept - Get invite details (for the accept page)
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ token: string }> }
@@ -123,7 +111,6 @@ export async function GET(
     const { token } = await params;
     const supabaseAdmin = createAdminClient();
 
-    // Find the invite
     console.log('[Accept GET] Looking for invite with token:', token);
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
@@ -148,7 +135,6 @@ export async function GET(
         return NextResponse.json({ error: 'This invite has expired' }, { status: 400 });
     }
 
-    // Fetch organization name separately
     const { data: org } = await supabaseAdmin
         .from('organizations')
         .select('name')

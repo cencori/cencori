@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
         const isOverBudget = threshold >= 100;
         const subject = isOverBudget
-            ? `⚠️ Budget exceeded for ${projectName}`
+            ? `Budget exceeded for ${projectName}`
             : `Budget alert: ${projectName} at ${threshold}%`;
 
         const html = `

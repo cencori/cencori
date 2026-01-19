@@ -6,7 +6,6 @@ export async function POST(req: NextRequest) {
   try {
     const { tier, cycle, orgId, embedOrigin } = await req.json();
 
-    // Validate inputs
     if (!tier || !cycle || !orgId) {
       return NextResponse.json(
         { error: 'Missing required fields: tier, cycle, orgId' },
@@ -28,11 +27,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get product ID for this tier/cycle
     const productId = getProductId(tier, cycle);
     console.log('[Checkout API] Product ID:', productId);
 
-    // Get organization details
     const supabaseAdmin = createAdminClient();
     const { data: org, error: orgError } = await supabaseAdmin
       .from('organizations')
@@ -50,7 +47,6 @@ export async function POST(req: NextRequest) {
 
     console.log('[Checkout API] Creating checkout for org:', org.slug);
 
-    // Create Polar checkout session - with embed support if embedOrigin provided
     const checkoutOptions: Parameters<typeof polarClient.checkouts.create>[0] = {
       products: [productId],
       successUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard/organizations/${org.slug}/billing?success=true`,
@@ -60,7 +56,6 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    // Add embed origin for embedded checkout iframe communication
     if (embedOrigin) {
       checkoutOptions.embedOrigin = embedOrigin;
     }

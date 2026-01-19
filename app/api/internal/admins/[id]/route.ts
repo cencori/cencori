@@ -47,7 +47,6 @@ export async function DELETE(
 
     const supabaseAdmin = createAdminClient();
 
-    // Get the admin to be removed
     const { data: targetAdmin } = await supabaseAdmin
         .from('cencori_admins')
         .select('id, role, user_id')
@@ -58,12 +57,9 @@ export async function DELETE(
         return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
     }
 
-    // Prevent removing yourself
     if (targetAdmin.user_id === user.id) {
         return NextResponse.json({ error: 'You cannot remove yourself' }, { status: 400 });
     }
-
-    // For pending invites, delete entirely. For active admins, set to revoked.
     const { error: deleteError } = await supabaseAdmin
         .from('cencori_admins')
         .update({ status: 'revoked' })

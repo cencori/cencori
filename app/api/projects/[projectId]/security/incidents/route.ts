@@ -9,17 +9,15 @@ export async function GET(
     const { projectId } = await params;
 
     try {
-        // Get query parameters
         const searchParams = req.nextUrl.searchParams;
         const page = parseInt(searchParams.get('page') || '1');
         const perPage = parseInt(searchParams.get('per_page') || '50');
-        const severity = searchParams.get('severity'); // 'critical' | 'high' | 'medium' | 'low' | 'all'
+        const severity = searchParams.get('severity');
         const incidentType = searchParams.get('type');
-        const reviewed = searchParams.get('reviewed'); // 'true' | 'false' | 'all'
+        const reviewed = searchParams.get('reviewed');
         const timeRange = searchParams.get('time_range') || '7d';
-        const environment = searchParams.get('environment') || 'production'; // 'production' | 'test'
+        const environment = searchParams.get('environment') || 'production';
 
-        // Calculate time filter
         let startTime: Date | null = null;
         const now = new Date();
 
@@ -41,7 +39,6 @@ export async function GET(
                 break;
         }
 
-        // Get API keys for this environment
         const { data: apiKeys } = await supabaseAdmin
             .from('api_keys')
             .select('id')
@@ -51,7 +48,6 @@ export async function GET(
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
-        // If no API keys found for environment, return empty results
         if (apiKeyIds.length === 0) {
             return NextResponse.json({
                 incidents: [],
@@ -65,13 +61,11 @@ export async function GET(
             });
         }
 
-        // Build query - filter by project directly (blocked requests may not have ai_request_id)
         let query = supabaseAdmin
             .from('security_incidents')
             .select('*', { count: 'exact' })
             .eq('project_id', projectId);
 
-        // Apply filters
         if (severity && severity !== 'all') {
             query = query.eq('severity', severity);
         }
@@ -90,7 +84,6 @@ export async function GET(
             query = query.gte('created_at', startTime.toISOString());
         }
 
-        // Get summary stats (always for the filtered time range, regardless of other filters)
         let statsQuery = supabaseAdmin
             .from('security_incidents')
             .select('severity')
@@ -102,7 +95,6 @@ export async function GET(
 
         const { data: statsData } = await statsQuery;
 
-        // Calculate counts by severity
         const summary = {
             critical: statsData?.filter(i => i.severity === 'critical').length || 0,
             high: statsData?.filter(i => i.severity === 'high').length || 0,
@@ -110,7 +102,6 @@ export async function GET(
             low: statsData?.filter(i => i.severity === 'low').length || 0,
         };
 
-        // Apply pagination to main query
         const offset = (page - 1) * perPage;
         query = query
             .order('created_at', { ascending: false })

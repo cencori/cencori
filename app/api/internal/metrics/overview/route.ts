@@ -12,13 +12,10 @@ import {
 } from '@/internal/analytics/lib/queries';
 import type { TimePeriod } from '@/internal/analytics/lib/types';
 
-// For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
 
-// Founder emails - always have access as fallback
 const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
-// Helper to check if email is an authorized admin
 async function isAuthorizedAdmin(email: string): Promise<boolean> {
     if (FOUNDER_EMAILS.includes(email.toLowerCase())) {
         return true;
@@ -35,34 +32,26 @@ async function isAuthorizedAdmin(email: string): Promise<boolean> {
 }
 
 export async function GET(req: NextRequest) {
-    // Check for admin email header (from frontend gate)
     const adminEmail = req.headers.get('X-Admin-Email');
 
-    // Must have some form of authentication
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // In production, require either admin email header or logged-in user
     const isDev = process.env.NODE_ENV === 'development';
 
     if (!adminEmail && !user && !isDev) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check authorization
     let isAllowed = false;
 
-    // Check admin email from header first
     if (adminEmail) {
         isAllowed = await isAuthorizedAdmin(adminEmail);
     }
 
-    // Fall back to logged-in user email
     if (!isAllowed && user?.email) {
         isAllowed = await isAuthorizedAdmin(user.email);
     }
-
-    // Dev mode bypass
     if (!isAllowed && ALLOW_ALL_IN_DEV && isDev) {
         isAllowed = true;
     }
@@ -75,7 +64,6 @@ export async function GET(req: NextRequest) {
     const period = (searchParams.get('period') || '7d') as TimePeriod;
 
     try {
-        // Fetch all metrics in parallel
         const [aiGateway, security, organizations, projects, apiKeys, users, billing] = await Promise.all([
             getAIGatewayMetrics(period),
             getSecurityMetrics(period),

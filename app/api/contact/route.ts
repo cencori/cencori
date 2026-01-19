@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Email routing based on inquiry type
 const emailRouting: Record<string, string> = {
     general: 'hello@cencori.com',
     support: 'support@cencori.com',
@@ -15,7 +14,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { name, email, company, type, subject, message } = body;
 
-        // Validate required fields
         if (!name || !email || !subject || !message) {
             return NextResponse.json(
                 { error: 'Missing required fields' },
@@ -23,10 +21,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get the target email based on inquiry type
         const targetEmail = emailRouting[type] || emailRouting.general;
 
-        // Send email to the appropriate team
         const { data, error } = await resend.emails.send({
             from: 'Cencori Contact <contact@cencori.com>',
             to: [targetEmail],

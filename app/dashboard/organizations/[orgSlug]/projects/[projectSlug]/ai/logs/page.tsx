@@ -26,7 +26,6 @@ interface PageProps {
     params: Promise<{ orgSlug: string; projectSlug: string }>;
 }
 
-// Hook to get project ID from slug
 function useProjectId(projectSlug: string) {
     return useQuery({
         queryKey: ["projectIdForLogs", projectSlug],
@@ -38,11 +37,10 @@ function useProjectId(projectSlug: string) {
             if (!project) throw new Error('Project not found');
             return project.id as string;
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes - IDs don't change
+        staleTime: 5 * 60 * 1000,
     });
 }
 
-// Hook to fetch logs with pagination
 function useAILogs(projectId: string | undefined, page: number) {
     return useQuery({
         queryKey: ["aiLogs", projectId, page],
@@ -56,7 +54,7 @@ function useAILogs(projectId: string | undefined, page: number) {
             };
         },
         enabled: !!projectId,
-        staleTime: 15 * 1000, // 15 seconds - logs change frequently
+        staleTime: 15 * 1000,
     });
 }
 
@@ -64,10 +62,7 @@ export default function AILogsPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const [page, setPage] = useState(1);
 
-    // Fetch project ID with caching
     const { data: projectId } = useProjectId(projectSlug);
-
-    // Fetch logs with pagination
     const { data: logsData, isLoading } = useAILogs(projectId, page);
     const logs = logsData?.logs || [];
     const totalPages = logsData?.totalPages || 1;
@@ -97,7 +92,6 @@ export default function AILogsPage({ params }: PageProps) {
 
     return (
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">AI Request Logs</h1>
@@ -111,7 +105,6 @@ export default function AILogsPage({ params }: PageProps) {
                 </Link>
             </div>
 
-            {/* Logs Table */}
             <Card>
                 <CardHeader>
                     <CardTitle>Recent Requests</CardTitle>
@@ -158,7 +151,6 @@ export default function AILogsPage({ params }: PageProps) {
                         </div>
                     )}
 
-                    {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between mt-6">
                             <p className="text-sm text-muted-foreground">

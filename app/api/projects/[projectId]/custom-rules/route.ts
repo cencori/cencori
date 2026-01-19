@@ -1,9 +1,3 @@
-/**
- * Custom Data Rules API
- * 
- * CRUD operations for project-specific custom data classification rules
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
@@ -13,7 +7,6 @@ interface RouteParams {
     }>;
 }
 
-// GET - List all rules for a project
 export async function GET(req: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const supabase = createAdminClient();
@@ -38,7 +31,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     }
 }
 
-// POST - Create a new rule
 export async function POST(req: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const supabase = createAdminClient();
@@ -47,7 +39,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         const body = await req.json();
         const { name, description, match_type, pattern, case_sensitive, action, priority } = body;
 
-        // Validate required fields
         if (!name || !match_type || !pattern || !action) {
             return NextResponse.json(
                 { error: 'Missing required fields: name, match_type, pattern, action' },
@@ -55,7 +46,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        // Validate match_type
         if (!['keywords', 'regex', 'json_path', 'ai_detect'].includes(match_type)) {
             return NextResponse.json(
                 { error: 'Invalid match_type. Must be: keywords, regex, json_path, or ai_detect' },
@@ -63,7 +53,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        // Validate action
         if (!['mask', 'redact', 'block'].includes(action)) {
             return NextResponse.json(
                 { error: 'Invalid action. Must be: mask, redact, or block' },
@@ -71,7 +60,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        // Validate regex pattern if applicable
         if (match_type === 'regex') {
             try {
                 new RegExp(pattern);

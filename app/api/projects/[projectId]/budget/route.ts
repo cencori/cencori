@@ -1,9 +1,3 @@
-/**
- * Budget Settings API
- * 
- * Get and update budget settings for a project.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getBudgetStatus, updateBudgetSettings } from '@/lib/budgets';
@@ -42,7 +36,6 @@ export async function PUT(
     try {
         const body = await req.json();
 
-        // Validate input
         const settings: {
             monthlyBudget?: number | null;
             spendCap?: number | null;
@@ -78,7 +71,6 @@ export async function PUT(
             return NextResponse.json({ error: result.error }, { status: 500 });
         }
 
-        // Return updated status
         const status = await getBudgetStatus(projectId);
 
         return NextResponse.json({

@@ -9,7 +9,6 @@ interface WebhookBody {
     secret?: string;
 }
 
-// GET - List all webhooks for a project
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -22,7 +21,6 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -33,7 +31,6 @@ export async function GET(
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Fetch webhooks
     const { data: webhooks, error: webhooksError } = await supabase
         .from('webhooks')
         .select('id, name, url, events, is_active, created_at, last_triggered_at, failure_count')
@@ -47,7 +44,6 @@ export async function GET(
     return NextResponse.json({ webhooks });
 }
 
-// POST - Create a new webhook
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -60,7 +56,6 @@ export async function POST(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -73,22 +68,17 @@ export async function POST(
 
     const body: WebhookBody = await req.json();
 
-    // Validate required fields
     if (!body.name || !body.url) {
         return NextResponse.json({ error: 'Name and URL are required' }, { status: 400 });
     }
-
-    // Validate URL format
     try {
         new URL(body.url);
     } catch {
         return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
 
-    // Generate a secret if not provided
     const secret = body.secret || crypto.randomBytes(32).toString('hex');
 
-    // Create webhook
     const { data: webhook, error: createError } = await supabase
         .from('webhooks')
         .insert({

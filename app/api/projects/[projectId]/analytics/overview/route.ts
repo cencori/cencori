@@ -13,7 +13,6 @@ export async function GET(
         const timeRange = searchParams.get('time_range') || '7d';
         const environment = searchParams.get('environment') || 'production';
 
-        // Calculate time filter
         const now = new Date();
         let startTime: Date;
 
@@ -37,8 +36,6 @@ export async function GET(
                 startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
-        // Get API keys for this environment (active = not revoked)
-        // Legacy keys (NULL environment) are treated as production keys
         let apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, key_prefix, environment')
@@ -47,14 +44,12 @@ export async function GET(
 
         const { data: allApiKeys } = await apiKeysQuery;
 
-        // Filter keys based on environment
         const apiKeys = allApiKeys?.filter(key => {
             if (key.environment) {
                 return environment === 'production'
                     ? key.environment === 'production'
                     : key.environment === 'test';
             } else {
-                // Legacy keys - check prefix for test
                 const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
                 return environment === 'production' ? !isTestKey : isTestKey;
             }
@@ -62,7 +57,6 @@ export async function GET(
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
-        // Fetch all requests in time range
         const { data: requests, error: reqError } = await supabaseAdmin
             .from('ai_requests')
             .select('*')
@@ -75,7 +69,6 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
         }
 
-        // Fetch security incidents (linked via request_id, not api_key_id)
         const { data: incidents, error: incError } = await supabaseAdmin
             .from('security_incidents')
             .select('*')
@@ -86,7 +79,6 @@ export async function GET(
             console.error('[Analytics API] Error fetching incidents:', incError);
         }
 
-        // Calculate metrics
         const totalRequests = requests?.length || 0;
         const successfulRequests = requests?.filter(r => r.status === 'success').length || 0;
         const filteredRequests = requests?.filter(r => r.status === 'filtered').length || 0;
@@ -106,13 +98,10 @@ export async function GET(
         const totalIncidents = incidents?.length || 0;
         const criticalIncidents = incidents?.filter(i => i.severity === 'critical').length || 0;
 
-        // Model usage breakdown
         const modelUsage: Record<string, number> = {};
         requests?.forEach(r => {
             modelUsage[r.model] = (modelUsage[r.model] || 0) + 1;
         });
-
-        // Security incidents by severity
         const incidentsBySeverity = {
             critical: incidents?.filter(i => i.severity === 'critical').length || 0,
             high: incidents?.filter(i => i.severity === 'high').length || 0,
@@ -120,7 +109,6 @@ export async function GET(
             low: incidents?.filter(i => i.severity === 'low').length || 0,
         };
 
-        // Cost by provider - start with all common providers at $0
         const commonProviders = ['openai', 'anthropic', 'google', 'mistral', 'groq', 'cohere'];
         const costByProvider: Record<string, number> = {};
         commonProviders.forEach(p => costByProvider[p] = 0);
@@ -129,7 +117,6 @@ export async function GET(
             costByProvider[provider] = (costByProvider[provider] || 0) + (r.cost_usd || 0);
         });
 
-        // Requests by provider - start with all common providers at 0
         const requestsByProvider: Record<string, number> = {};
         commonProviders.forEach(p => requestsByProvider[p] = 0);
         requests?.forEach(r => {
@@ -137,7 +124,6 @@ export async function GET(
             requestsByProvider[provider] = (requestsByProvider[provider] || 0) + 1;
         });
 
-        // Latency percentiles
         const sortedLatencies = [...latencies].sort((a, b) => a - b);
         const percentile = (arr: number[], p: number) => {
             if (arr.length === 0) return 0;
@@ -153,7 +139,6 @@ export async function GET(
             p99: Math.round(percentile(sortedLatencies, 99)),
         };
 
-        // Requests by country (from geolocation if available)
         const requestsByCountry: Record<string, number> = {};
         requests?.forEach(r => {
             const country = r.country || r.geolocation?.country || 'Unknown';
@@ -169,7 +154,7 @@ export async function GET(
                 filtered_requests: filteredRequests,
                 blocked_output_requests: blockedOutputRequests,
                 error_requests: errorRequests,
-                success_rate: Math.round(successRate * 10) / 10, // Round to 1 decimal
+                success_rate: Math.round(successRate * 10) / 10,    
                 total_cost: totalCost,
                 total_tokens: totalTokens,
                 avg_latency: Math.round(avgLatency),

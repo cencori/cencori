@@ -13,7 +13,6 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const supabase = createAdminClient();
 
-    // Calculate time filter
     const now = new Date();
     const startDate = new Date();
 
@@ -35,7 +34,6 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     try {
-        // Get total requests count
         const { count: totalRequests } = await supabase
             .from('ai_requests')
             .select('*', { count: 'exact', head: true })
@@ -44,7 +42,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             .gte('created_at', startDate.toISOString())
             .lte('created_at', now.toISOString());
 
-        // Get fallback requests
         const { data: fallbackRequests, count: fallbackCount } = await supabase
             .from('ai_requests')
             .select('request_payload, provider, model', { count: 'exact' })
@@ -54,12 +51,9 @@ export async function GET(request: Request, { params }: RouteParams) {
             .gte('created_at', startDate.toISOString())
             .lte('created_at', now.toISOString());
 
-        // Calculate fallback rate
         const fallbackRate = totalRequests && totalRequests > 0
             ? ((fallbackCount || 0) / totalRequests) * 100
             : 0;
-
-        // Aggregate by provider flows
         const byProvider: Record<string, { original: string; fallback: string; count: number }[]> = {};
         const reasonCounts: Record<string, number> = {};
 
@@ -70,7 +64,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             const fallbackProvider = req.provider || 'unknown';
             const fallbackModel = req.model || 'unknown';
 
-            // Track provider flows
             if (!byProvider[originalProvider]) {
                 byProvider[originalProvider] = [];
             }
@@ -89,12 +82,9 @@ export async function GET(request: Request, { params }: RouteParams) {
                 });
             }
 
-            // Track reasons (from error message if available)
             const reason = (payload?.fallback_reason as string) || 'Provider unavailable';
             reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
         });
-
-        // Sort reasons by count
         const topReasons = Object.entries(reasonCounts)
             .map(([reason, count]) => ({ reason, count }))
             .sort((a, b) => b.count - a.count)

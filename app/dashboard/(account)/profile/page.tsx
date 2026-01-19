@@ -38,13 +38,11 @@ export default function ProfilePage() {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Form state
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [username, setUsername] = useState("");
     const [isDirty, setIsDirty] = useState(false);
 
-    // Fetch user profile
     const { data: profile, isLoading } = useQuery<UserProfile>({
         queryKey: ["userProfile"],
         queryFn: async () => {
@@ -55,7 +53,6 @@ export default function ProfilePage() {
         },
     });
 
-    // Sync form state when profile loads
     useEffect(() => {
         if (profile) {
             setFirstName(profile.first_name || "");
@@ -65,7 +62,6 @@ export default function ProfilePage() {
         }
     }, [profile]);
 
-    // Handle form changes
     const handleChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (
         e: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -73,7 +69,6 @@ export default function ProfilePage() {
         setIsDirty(true);
     };
 
-    // Save profile
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -102,12 +97,9 @@ export default function ProfilePage() {
         }
     };
 
-    // Handle avatar file selection
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        // Reset input so same file can be selected again
         e.target.value = "";
 
         setIsUploading(true);
@@ -134,7 +126,6 @@ export default function ProfilePage() {
         }
     };
 
-    // Handle avatar removal
     const handleRemoveAvatar = async () => {
         setIsUploading(true);
         try {
@@ -155,7 +146,6 @@ export default function ProfilePage() {
         }
     };
 
-    // Delete account
     const handleDeleteAccount = async () => {
         try {
             const response = await fetch("/api/user/profile", {
@@ -194,7 +184,6 @@ export default function ProfilePage() {
                 </p>
             </div>
 
-            {/* Avatar Section */}
             <section className="space-y-3">
                 <h2 className="text-sm font-medium">Avatar</h2>
                 <div className="flex items-center gap-4">
@@ -245,7 +234,6 @@ export default function ProfilePage() {
                 </div>
             </section>
 
-            {/* Personal Information */}
             <section className="space-y-4">
                 <h2 className="text-sm font-medium">Personal Information</h2>
                 <div className="rounded-lg border border-border/60 bg-card p-4 space-y-4">
@@ -314,7 +302,6 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Save Button */}
                 <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-muted-foreground">
                         {isDirty ? "You have unsaved changes" : "All changes saved"}
@@ -337,7 +324,6 @@ export default function ProfilePage() {
                 </div>
             </section>
 
-            {/* Danger Zone */}
             <section className="space-y-3">
                 <h2 className="text-sm font-medium text-red-500">Danger Zone</h2>
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">

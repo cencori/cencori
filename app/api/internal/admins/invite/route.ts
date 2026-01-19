@@ -5,13 +5,10 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// For development, allow all authenticated users temporarily
 const ALLOW_ALL_IN_DEV = true;
 
-// Founder emails - always have access as fallback
 const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
-// Helper to check if user is a super_admin
 async function getSuperAdminStatus(userId: string) {
     const supabase = createAdminClient();
     const { data: admin } = await supabase
@@ -24,7 +21,6 @@ async function getSuperAdminStatus(userId: string) {
     return admin;
 }
 
-// POST /api/internal/admins/invite - Invite a new admin
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -33,7 +29,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Dev mode bypass, founder, or super_admin check
     const isDev = process.env.NODE_ENV === 'development';
     const isFounder = FOUNDER_EMAILS.includes(user.email || '');
     const admin = await getSuperAdminStatus(user.id);
@@ -56,7 +51,6 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = createAdminClient();
 
-    // Check if already invited
     const { data: existing } = await supabaseAdmin
         .from('cencori_admins')
         .select('id, status')
@@ -71,7 +65,6 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
     }
 
-    // Create invite
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('cencori_admins')
         .insert({
@@ -88,11 +81,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
     }
 
-    // Generate invite link
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const inviteLink = `${baseUrl}/internal/invite?token=${invite.invite_token}`;
 
-    // Send invite email via Resend
     try {
         const { error: emailError } = await resend.emails.send({
             from: 'Cencori <team@cencori.com>',
@@ -141,7 +132,6 @@ export async function POST(req: NextRequest) {
 
         if (emailError) {
             console.error('[Admins] Failed to send invite email:', emailError);
-            // Don't fail the request, invite was still created
         }
     } catch (emailErr) {
         console.error('[Admins] Email sending error:', emailErr);

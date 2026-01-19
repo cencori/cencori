@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// POST /api/organizations/[orgSlug]/invites - Create a new invite
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ orgSlug: string }> }
@@ -18,7 +17,6 @@ export async function POST(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get organization by slug
     const supabaseAdmin = createAdminClient();
     const { data: org, error: orgError } = await supabaseAdmin
         .from('organizations')
@@ -30,7 +28,6 @@ export async function POST(
         return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    // Check if user is owner or admin
     const isOwner = org.owner_id === user.id;
     const { data: membership } = await supabaseAdmin
         .from('organization_members')
@@ -58,7 +55,6 @@ export async function POST(
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if user is already a member (by checking auth.users email)
     const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
     const matchingUser = existingAuthUser?.users?.find(
         u => u.email?.toLowerCase() === normalizedEmail
@@ -77,7 +73,6 @@ export async function POST(
         }
     }
 
-    // Check if already invited
     const { data: existingInvite } = await supabaseAdmin
         .from('organization_invites')
         .select('id, accepted_at')
@@ -90,7 +85,6 @@ export async function POST(
         return NextResponse.json({ error: 'An invite has already been sent to this email' }, { status: 400 });
     }
 
-    // Create invite
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('organization_invites')
         .insert({
@@ -107,11 +101,9 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
     }
 
-    // Generate invite link
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const inviteLink = `${baseUrl}/invite?token=${invite.invite_token}`;
 
-    // Send invite email via Resend
     console.log('[Invites] Attempting to send email to:', normalizedEmail);
     try {
         const { data: emailData, error: emailError } = await resend.emails.send({
@@ -178,7 +170,6 @@ export async function POST(
     });
 }
 
-// GET /api/organizations/[orgSlug]/invites - List pending invites
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ orgSlug: string }> }
@@ -191,7 +182,6 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get organization by slug
     const { data: org } = await supabase
         .from('organizations')
         .select('id')
@@ -202,7 +192,6 @@ export async function GET(
         return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    // Check if user is a member of this org
     const { data: membership } = await supabase
         .from('organization_members')
         .select('id')
@@ -214,7 +203,6 @@ export async function GET(
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get pending invites
     const { data: invites, error } = await supabase
         .from('organization_invites')
         .select('id, email, role, created_at, expires_at')

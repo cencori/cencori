@@ -27,7 +27,6 @@ export async function PATCH(
         const { projectId } = await params;
         const body: ProviderSettings = await request.json();
 
-        // Validate projectId
         const { data: project, error: projectError } = await supabaseAdmin
             .from("projects")
             .select("id")
@@ -41,7 +40,6 @@ export async function PATCH(
             );
         }
 
-        // Check if settings exist for this project
         const { data: existingSettings } = await supabaseAdmin
             .from("project_settings")
             .select("id")
@@ -49,7 +47,6 @@ export async function PATCH(
             .single();
 
         if (existingSettings) {
-            // Update existing settings
             const { error: updateError } = await supabaseAdmin
                 .from("project_settings")
                 .update({
@@ -73,7 +70,6 @@ export async function PATCH(
                 );
             }
         } else {
-            // Insert new settings
             const { error: insertError } = await supabaseAdmin
                 .from("project_settings")
                 .insert({
@@ -121,15 +117,12 @@ export async function GET(
             .single();
 
         if (error && error.code !== "PGRST116") {
-            // PGRST116 = no rows found
             console.error("Error fetching settings:", error);
             return NextResponse.json(
                 { error: "Failed to fetch settings" },
                 { status: 500 }
             );
         }
-
-        // Return defaults if no settings exist
         return NextResponse.json({
             settings: settings || {
                 default_provider: "openai",

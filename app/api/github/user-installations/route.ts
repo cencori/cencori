@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
 
-    // Get the organization ID from query params
     const { searchParams } = new URL(req.url);
     const currentOrgId = searchParams.get('organizationId');
 
@@ -13,7 +12,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Missing organizationId parameter' }, { status: 400 });
     }
 
-    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
@@ -21,7 +19,6 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Verify user owns the current organization
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id, owner_id')
@@ -32,13 +29,10 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        // Use admin client to read installation data (bypass RLS)
         const supabaseAdmin = createAdminClient();
 
         console.log('[User Installations] Current org ID:', currentOrgId);
         console.log('[User Installations] User ID:', user.id);
-
-        // Get all installations already linked to the current organization
         const { data: currentOrgLinks, error: currentLinksError } = await supabaseAdmin
             .from('organization_github_installations')
             .select('installation_id')
@@ -52,7 +46,6 @@ export async function GET(req: NextRequest) {
         const currentOrgInstallationIds = currentOrgLinks?.map(link => link.installation_id) || [];
         console.log('[User Installations] Current org already has these installations:', currentOrgInstallationIds);
 
-        // Get all organizations owned by the user
         const { data: userOrgs, error: userOrgsError } = await supabaseAdmin
             .from('organizations')
             .select('id')
@@ -66,7 +59,6 @@ export async function GET(req: NextRequest) {
         const userOrgIds = userOrgs.map(o => o.id);
         console.log('[User Installations] User owns', userOrgIds.length, 'organizations');
 
-        // Get all installations linked to any of the user's organizations
         const { data: allUserLinks, error: allLinksError } = await supabaseAdmin
             .from('organization_github_installations')
             .select('installation_id')
@@ -82,11 +74,9 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ installations: [] });
         }
 
-        // Get unique installation IDs across all user's orgs
         const allUserInstallationIds = [...new Set(allUserLinks.map(link => link.installation_id))];
         console.log('[User Installations] User has these installations across all orgs:', allUserInstallationIds);
 
-        // Filter out installations already linked to current org
         const availableInstallationIds = allUserInstallationIds.filter(
             id => !currentOrgInstallationIds.includes(id)
         );
@@ -98,7 +88,6 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ installations: [] });
         }
 
-        // Get installation details
         const { data: installations, error: installationsError } = await supabaseAdmin
             .from('github_app_installations')
             .select('installation_id, github_account_type, github_account_login, github_account_name')

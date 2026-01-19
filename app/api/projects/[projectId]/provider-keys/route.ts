@@ -1,9 +1,3 @@
-/**
- * Provider Keys API Routes (BYOK - Bring Your Own Key)
- * GET - List all provider keys for a project (with status)
- * POST - Add/update a provider key
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
@@ -28,7 +22,6 @@ export async function GET(
     try {
         const { projectId } = await params;
 
-        // Verify project exists and get default settings
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id, default_provider, default_model')
@@ -39,7 +32,6 @@ export async function GET(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        // Get all configured provider keys
         const { data: providerKeys, error } = await supabase
             .from('provider_keys')
             .select('provider, key_hint, is_active, created_at')
@@ -49,7 +41,6 @@ export async function GET(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Build response with all providers (configured and unconfigured)
         const keyMap = new Map(providerKeys?.map(k => [k.provider, k]) || []);
 
         const providers: ProviderKeyResponse[] = SUPPORTED_PROVIDERS.map(p => {
@@ -86,7 +77,6 @@ export async function POST(
     try {
         const { projectId } = await params;
 
-        // Verify project exists
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id, organization_id')
@@ -100,7 +90,6 @@ export async function POST(
         const body = await req.json();
         const { provider, apiKey, setAsDefault, defaultModel } = body;
 
-        // Validate provider
         const providerConfig = getProvider(provider);
         if (!providerConfig) {
             return NextResponse.json(
@@ -113,13 +102,10 @@ export async function POST(
             return NextResponse.json({ error: 'API key is required' }, { status: 400 });
         }
 
-        // Encrypt the API key
         const encryptedKey = encryptApiKey(apiKey, project.organization_id);
 
-        // Get key hint (last 4 characters)
         const keyHint = apiKey.length > 4 ? `...${apiKey.slice(-4)}` : '****';
 
-        // Upsert provider key
         const { data: providerKey, error } = await supabase
             .from('provider_keys')
             .upsert({
@@ -140,7 +126,6 @@ export async function POST(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Update project defaults if requested
         if (setAsDefault || defaultModel) {
             const projectUpdate: Record<string, string> = {};
             if (setAsDefault) projectUpdate.default_provider = provider;

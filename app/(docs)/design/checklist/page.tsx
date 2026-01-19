@@ -62,7 +62,6 @@ const checklist = [
 export default function ChecklistPage() {
     return (
         <div className="space-y-12">
-            {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Design Review Checklist</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
@@ -70,7 +69,6 @@ export default function ChecklistPage() {
                 </p>
             </div>
 
-            {/* Checklist */}
             <div className="space-y-6">
                 {checklist.map((section) => (
                     <section
@@ -99,7 +97,6 @@ export default function ChecklistPage() {
                 ))}
             </div>
 
-            {/* Summary */}
             <section className="rounded-xl border border-border/50 bg-muted/30 p-6 text-center">
                 <h3 className="text-sm font-semibold mb-2">Ready to ship?</h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">

@@ -7,7 +7,6 @@ interface RouteParams {
     params: Promise<{ projectId: string }>;
 }
 
-// Provider API endpoints
 const PROVIDER_ENDPOINTS: Record<string, string> = {
     openai: 'https://api.openai.com/v1/chat/completions',
     groq: 'https://api.groq.com/openai/v1/chat/completions',
@@ -20,13 +19,10 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
     qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
 };
 
-// POST - Test content against AI-detect rules
 export async function POST(req: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
-
-    // Verify auth
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,7 +36,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'Content is required' }, { status: 400 });
         }
 
-        // Get project with default provider/model settings
         const { data: project } = await supabaseAdmin
             .from('projects')
             .select('organization_id, default_provider, default_model')
@@ -54,7 +49,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         const defaultProvider = project.default_provider || 'openai';
         const defaultModel = project.default_model || 'gpt-4o-mini';
 
-        // Fetch the provider key for the project's default provider first, then fall back to any available
         const { data: providerKeys } = await supabaseAdmin
             .from('provider_keys')
             .select('provider, encrypted_key, is_active')
@@ -67,20 +61,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             }, { status: 400 });
         }
 
-        // Prefer the project's default provider, otherwise use the first available
         let providerKey = providerKeys.find(pk => pk.provider === defaultProvider);
         let modelToUse = defaultModel;
 
         if (!providerKey) {
-            // Fall back to first available provider
             providerKey = providerKeys[0];
-            // Can't use the project's default model if we're using a different provider
             modelToUse = getDefaultModelForProvider(providerKey.provider);
         }
 
         const apiKey = decryptApiKey(providerKey.encrypted_key, project.organization_id);
-
-        // Create the detection prompt
         const detectionPrompt = prompt || 'Analyze the following content and determine if it contains sensitive information, personal data, offensive content, or potential security risks.';
 
 
@@ -98,7 +87,6 @@ Respond with a JSON object containing:
 
 ${detectionPrompt}`;
 
-        // Call AI provider based on type
         let result;
         const provider = providerKey.provider;
 
@@ -109,10 +97,8 @@ ${detectionPrompt}`;
         } else if (provider === 'cohere') {
             result = await callCohere(apiKey, systemPrompt, content);
         } else if (PROVIDER_ENDPOINTS[provider]) {
-            // Use OpenAI-compatible endpoint
             result = await callOpenAICompatible(apiKey, systemPrompt, content, PROVIDER_ENDPOINTS[provider], modelToUse, provider);
         } else {
-            // Fallback to OpenAI format with generic endpoint
             result = await callOpenAICompatible(apiKey, systemPrompt, content, 'https://api.openai.com/v1/chat/completions', modelToUse, provider);
         }
 
@@ -124,7 +110,6 @@ ${detectionPrompt}`;
     }
 }
 
-// Default models for providers when no project default is set
 function getDefaultModelForProvider(provider: string): string {
     const defaults: Record<string, string> = {
         openai: 'gpt-4o-mini',
@@ -168,12 +153,10 @@ async function callAnthropic(apiKey: string, systemPrompt: string, content: stri
     const data = await response.json();
     const analysisText = data.content[0].text;
 
-    // Try to parse JSON from response
     let analysis;
     try {
         analysis = JSON.parse(analysisText);
     } catch {
-        // If not valid JSON, wrap in default structure
         analysis = {
             is_flagged: false,
             confidence: 0,
@@ -243,7 +226,6 @@ async function callGoogle(apiKey: string, systemPrompt: string, content: string,
     };
 }
 
-// Generic OpenAI-compatible API caller (works with OpenAI, Groq, Mistral, Together, Perplexity, OpenRouter, xAI, DeepSeek, Qwen)
 async function callOpenAICompatible(
     apiKey: string,
     systemPrompt: string,

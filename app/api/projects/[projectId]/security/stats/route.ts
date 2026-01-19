@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 
-// GET - Fetch security dashboard stats
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -14,7 +13,6 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -30,7 +28,6 @@ export async function GET(
     const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Get incident counts by severity (last 30 days)
     const { data: severityCounts } = await supabase
         .from('security_incidents')
         .select('severity')
@@ -48,35 +45,30 @@ export async function GET(
         severityBreakdown[inc.severity as keyof typeof severityBreakdown]++;
     });
 
-    // Get blocked count last 24h
     const { count: blocked24h } = await supabase
         .from('security_incidents')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .gte('created_at', last24h);
 
-    // Get blocked count last 7d
     const { count: blocked7d } = await supabase
         .from('security_incidents')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .gte('created_at', last7d);
 
-    // Get pending reviews
     const { count: pendingReviews } = await supabase
         .from('security_incidents')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .eq('reviewed', false);
 
-    // Get total requests in last 7d for blocked rate calculation
     const { count: totalRequests7d } = await supabase
         .from('ai_requests')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .gte('created_at', last7d);
 
-    // Calculate threat score (weighted average)
     const totalIncidents30d = severityCounts?.length || 0;
     const threatScore = totalIncidents30d > 0
         ? Math.min(100, Math.round(
@@ -87,7 +79,6 @@ export async function GET(
         ))
         : 0;
 
-    // Get incident types breakdown
     const { data: typeCounts } = await supabase
         .from('security_incidents')
         .select('incident_type')
@@ -99,7 +90,6 @@ export async function GET(
         typeBreakdown[inc.incident_type] = (typeBreakdown[inc.incident_type] || 0) + 1;
     });
 
-    // Get trend data (incidents per day for last 7 days)
     const trendData: { date: string; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
         const dayStart = new Date();

@@ -9,20 +9,16 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        // Get authenticated user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        // Fetch profile from user_profiles table
         const { data: profile, error: profileError } = await supabaseAdmin
             .from("user_profiles")
             .select("*")
             .eq("id", user.id)
             .single();
 
-        // If no profile exists, return defaults with auth data
         if (profileError && profileError.code === "PGRST116") {
             return NextResponse.json({
                 profile: {
@@ -59,7 +55,6 @@ export async function PATCH(request: NextRequest) {
         const supabaseAdmin = createAdminClient();
         const body = await request.json();
 
-        // Get authenticated user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -67,7 +62,6 @@ export async function PATCH(request: NextRequest) {
 
         const { first_name, last_name, username, avatar_url } = body;
 
-        // Check if username is taken (if provided)
         if (username) {
             const { data: existingUser } = await supabaseAdmin
                 .from("user_profiles")
@@ -81,7 +75,6 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
-        // Check if profile exists
         const { data: existingProfile } = await supabaseAdmin
             .from("user_profiles")
             .select("id")
@@ -89,7 +82,6 @@ export async function PATCH(request: NextRequest) {
             .single();
 
         if (existingProfile) {
-            // Update existing profile
             const { error: updateError } = await supabaseAdmin
                 .from("user_profiles")
                 .update({
@@ -106,7 +98,6 @@ export async function PATCH(request: NextRequest) {
                 return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
             }
         } else {
-            // Insert new profile
             const { error: insertError } = await supabaseAdmin
                 .from("user_profiles")
                 .insert({
@@ -135,19 +126,15 @@ export async function DELETE(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        // Get authenticated user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Delete user profile first (cascades may also handle this)
         await supabaseAdmin
             .from("user_profiles")
             .delete()
             .eq("id", user.id);
-
-        // Delete user from auth
         const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
 
         if (deleteError) {

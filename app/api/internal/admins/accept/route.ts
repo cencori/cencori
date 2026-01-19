@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// POST /api/internal/admins/accept - Accept an invite
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -20,7 +19,6 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = createAdminClient();
 
-    // Find the invite
     const { data: invite, error: inviteError } = await supabaseAdmin
         .from('cencori_admins')
         .select('id, email, status')
@@ -39,21 +37,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invite has been revoked' }, { status: 400 });
     }
 
-    // Verify the user's email matches the invite
     if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
         return NextResponse.json({
             error: `This invite is for ${invite.email}. Please log in with that email.`
         }, { status: 403 });
     }
 
-    // Accept the invite
     const { error: updateError } = await supabaseAdmin
         .from('cencori_admins')
         .update({
             user_id: user.id,
             status: 'active',
             accepted_at: new Date().toISOString(),
-            invite_token: null, // Clear the token after use
+            invite_token: null,
         })
         .eq('id', invite.id);
 

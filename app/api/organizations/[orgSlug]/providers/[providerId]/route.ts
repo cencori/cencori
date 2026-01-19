@@ -1,9 +1,3 @@
-/**
- * Individual Custom Provider API Routes
- * PATCH - Update provider
- * DELETE - Delete provider
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
@@ -19,7 +13,6 @@ export async function PATCH(
     const body = await req.json();
     const { name, baseUrl, apiKey, format, isActive } = body;
     
-    // Get organization
     const { data: org } = await supabase
       .from('organizations')
       .select('id')
@@ -30,7 +23,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
     
-    // Prepare update data
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (baseUrl !== undefined) updateData.base_url = baseUrl;
@@ -40,7 +32,6 @@ export async function PATCH(
       updateData.api_key_encrypted = apiKey ? encryptApiKey(apiKey, org.id) : null;
     }
     
-    // Update provider
     const { data: provider, error } = await supabase
       .from('custom_providers')
       .update(updateData)
@@ -69,7 +60,6 @@ export async function DELETE(
   try {
     const { orgSlug, providerId } = await params;
     
-    // Get organization
     const { data: org } = await supabase
       .from('organizations')
       .select('id')
@@ -80,7 +70,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
     
-    // Delete provider (cascade will delete models)
     const { error } = await supabase
       .from('custom_providers')
       .delete()

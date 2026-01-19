@@ -46,7 +46,6 @@ export default function AnimationPage() {
 
     return (
         <div className="space-y-12">
-            {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Animation</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
@@ -54,7 +53,6 @@ export default function AnimationPage() {
                 </p>
             </div>
 
-            {/* CSS Transitions */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">CSS Transitions</h2>
                 <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
@@ -67,22 +65,18 @@ export default function AnimationPage() {
                 </div>
             </section>
 
-            {/* Hover Effects */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Hover Effects</h2>
                 <div className="rounded-xl border border-border/50 bg-card p-6 space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
-                        {/* Card hover */}
                         <div className="rounded-xl border border-border/50 bg-card p-4 transition-all hover:border-border hover:shadow-lg cursor-pointer">
                             <p className="text-xs font-medium">Card Hover</p>
                             <p className="text-[10px] text-muted-foreground">Shadow on hover</p>
                         </div>
-                        {/* Button with arrow */}
                         <Button variant="outline" className="group h-10 rounded-lg">
                             Button Hover
                             <ArrowRight className="h-3 w-3 ml-1.5 transition-transform group-hover:translate-x-0.5" />
                         </Button>
-                        {/* Scale */}
                         <div className="rounded-xl border border-border/50 bg-muted/30 p-4 transition-transform hover:scale-105 cursor-pointer flex items-center justify-center">
                             <p className="text-xs">Scale Effect</p>
                         </div>
@@ -99,7 +93,6 @@ className="transition-transform hover:scale-105"`} />
                 </div>
             </section>
 
-            {/* Framer Motion */}
             <section className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Framer Motion</h2>
@@ -108,7 +101,6 @@ className="transition-transform hover:scale-105"`} />
                     </Button>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    {/* Fade In */}
                     <div className="rounded-xl border border-border/50 bg-card p-6">
                         <p className="text-xs font-medium mb-4">Fade In</p>
                         <motion.div
@@ -121,7 +113,6 @@ className="transition-transform hover:scale-105"`} />
                             <span className="text-xs text-muted-foreground">Content</span>
                         </motion.div>
                     </div>
-                    {/* Slide Up */}
                     <div className="rounded-xl border border-border/50 bg-card p-6">
                         <p className="text-xs font-medium mb-4">Slide Up</p>
                         <motion.div
@@ -156,7 +147,6 @@ className="transition-transform hover:scale-105"`} />
 </motion.div>`} />
             </section>
 
-            {/* Staggered */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Staggered Children</h2>
                 <div className="rounded-xl border border-border/50 bg-card p-6">
@@ -183,7 +173,6 @@ className="transition-transform hover:scale-105"`} />
                 </div>
             </section>
 
-            {/* Guidelines */}
             <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
                 <h3 className="text-sm font-semibold text-emerald-500 mb-3">Animation Guidelines</h3>
                 <ul className="space-y-2">

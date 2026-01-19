@@ -1,10 +1,3 @@
-/**
- * Individual Provider API Routes (Project-level)
- * GET - Get provider details
- * PATCH - Update provider
- * DELETE - Delete provider
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 

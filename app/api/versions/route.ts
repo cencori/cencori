@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// Service version helpers
 const VERSIONS = {
-    // Read proxy version from root package.json
     getProxyVersion: () => {
         try {
             const packagePath = join(process.cwd(), 'package.json');
@@ -15,7 +13,6 @@ const VERSIONS = {
         }
     },
 
-    // Read SDK version from packages/sdk/package.json
     getSdkVersion: () => {
         try {
             const sdkPackagePath = join(process.cwd(), 'packages', 'sdk', 'package.json');
@@ -26,7 +23,6 @@ const VERSIONS = {
         }
     },
 
-    // API version - the current API endpoint version
     apiVersion: 'v1',
 };
 

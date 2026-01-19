@@ -22,12 +22,10 @@ interface PageProps {
     params: Promise<{ orgSlug: string; projectSlug: string }>;
 }
 
-// Hook to fetch AI stats with caching
 function useAIStats(projectSlug: string) {
     return useQuery({
         queryKey: ["aiStats", projectSlug],
         queryFn: async () => {
-            // First get project ID from slug
             const response = await fetch(`/api/projects?slug=${projectSlug}`);
             if (!response.ok) throw new Error('Failed to fetch project');
 
@@ -35,7 +33,6 @@ function useAIStats(projectSlug: string) {
             const project = projects?.[0];
             if (!project) throw new Error('Project not found');
 
-            // Fetch AI stats
             const statsResponse = await fetch(`/api/projects/${project.id}/ai/stats?period=7d`);
             if (!statsResponse.ok) throw new Error('Failed to fetch stats');
 
@@ -52,7 +49,6 @@ function useAIStats(projectSlug: string) {
 export default function AIUsagePage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
 
-    // Fetch stats with caching - INSTANT ON REVISIT!
     const { data, isLoading, error } = useAIStats(projectSlug);
     const stats = data?.stats;
     const projectId = data?.projectId;
@@ -103,7 +99,6 @@ export default function AIUsagePage({ params }: PageProps) {
 
     return (
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">AI Usage</h1>
@@ -112,7 +107,6 @@ export default function AIUsagePage({ params }: PageProps) {
                 <Badge variant="secondary">Last 7 days</Badge>
             </div>
 
-            {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -167,7 +161,6 @@ export default function AIUsagePage({ params }: PageProps) {
                 </Card>
             </div>
 
-            {/* View Logs Link */}
             {projectId && (
                 <div className="flex justify-center">
                     <Link

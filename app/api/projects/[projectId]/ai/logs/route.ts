@@ -9,7 +9,6 @@ export async function GET(
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
 
-    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
@@ -21,11 +20,10 @@ export async function GET(
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '50');
-        const status = searchParams.get('status'); // 'success', 'error', 'filtered'
+        const status = searchParams.get('status');
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
 
-        // Verify user has access to project
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id, organization_id')
@@ -36,7 +34,6 @@ export async function GET(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        // Verify user is member of organization
         const { data: member, error: memberError } = await supabase
             .from('organization_members')
             .select('id')
@@ -48,7 +45,6 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        // Build query
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*', { count: 'exact' })

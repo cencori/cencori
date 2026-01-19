@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// Country name mapping (ISO 3166-1 alpha-2 to full name)
 const COUNTRY_NAMES: Record<string, string> = {
-    XX: 'Unknown', // For requests without country data
+    XX: 'Unknown',
     US: 'United States', NG: 'Nigeria', GB: 'United Kingdom', DE: 'Germany',
     FR: 'France', CA: 'Canada', AU: 'Australia', IN: 'India', BR: 'Brazil',
     JP: 'Japan', KR: 'South Korea', SG: 'Singapore', NL: 'Netherlands',
@@ -24,17 +23,17 @@ interface CountryStats {
     tokens: number;
     cost: number;
     avgLatency: number;
-    providers: Record<string, number>; // provider -> request count
+    providers: Record<string, number>;
 }
 
 interface DailyStats {
     date: string;
-    countries: Record<string, number>; // country_code -> requests
+    countries: Record<string, number>;
 }
 
 interface ProviderDailyStats {
     date: string;
-    providers: Record<string, number>; // provider -> requests
+    providers: Record<string, number>;
 }
 
 interface AggregatedData {
@@ -45,14 +44,9 @@ interface AggregatedData {
         totalLatency: number;
         providers: Record<string, number>;
     }>;
-    timeline: Record<string, Record<string, number>>; // date -> country -> requests
-    providerTimeline: Record<string, Record<string, number>>; // date -> provider -> requests
+    timeline: Record<string, Record<string, number>>;
+    providerTimeline: Record<string, Record<string, number>>;
 }
-
-/**
- * GET /api/projects/[projectId]/analytics/geo
- * Returns comprehensive geographic analytics
- */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -61,11 +55,9 @@ export async function GET(
         const { projectId } = await params;
         const supabase = createAdminClient();
 
-        // Parse time range from query params
         const { searchParams } = new URL(request.url);
         const range = searchParams.get('range') || '7d';
 
-        // Calculate date range
         const rangeMap: Record<string, number> = {
             '24h': 1,
             '7d': 7,
@@ -77,7 +69,6 @@ export async function GET(
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Fetch all relevant request data (including those without country_code)
         const { data, error } = await supabase
             .from('ai_requests')
             .select('country_code, total_tokens, cost_usd, latency_ms, model, created_at')
@@ -89,7 +80,6 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch geo data' }, { status: 500 });
         }
 
-        // Aggregate data
         const aggregated: AggregatedData = {
             countries: {},
             timeline: {},
@@ -97,13 +87,9 @@ export async function GET(
         };
 
         for (const row of data || []) {
-            // Use 'XX' for unknown/null country codes
             const code = row.country_code || 'XX';
-
-            // Detect provider from model name
             const provider = detectProvider(row.model || '');
 
-            // Initialize country if needed
             if (!aggregated.countries[code]) {
                 aggregated.countries[code] = {
                     requests: 0,
@@ -121,21 +107,18 @@ export async function GET(
             country.totalLatency += row.latency_ms || 0;
             country.providers[provider] = (country.providers[provider] || 0) + 1;
 
-            // Timeline aggregation (by date)
             const date = new Date(row.created_at).toISOString().split('T')[0];
             if (!aggregated.timeline[date]) {
                 aggregated.timeline[date] = {};
             }
             aggregated.timeline[date][code] = (aggregated.timeline[date][code] || 0) + 1;
 
-            // Provider timeline aggregation (by date and provider)
             if (!aggregated.providerTimeline[date]) {
                 aggregated.providerTimeline[date] = {};
             }
             aggregated.providerTimeline[date][provider] = (aggregated.providerTimeline[date][provider] || 0) + 1;
         }
 
-        // Convert to response format
         const countries: CountryStats[] = Object.entries(aggregated.countries)
             .map(([code, stats]) => ({
                 code,
@@ -148,7 +131,6 @@ export async function GET(
             }))
             .sort((a, b) => b.requests - a.requests);
 
-        // Format timeline (last 7 days)
         const timeline: DailyStats[] = [];
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
@@ -160,7 +142,6 @@ export async function GET(
             });
         }
 
-        // Calculate totals
         const totals = {
             requests: countries.reduce((sum, c) => sum + c.requests, 0),
             tokens: countries.reduce((sum, c) => sum + c.tokens, 0),
@@ -170,7 +151,6 @@ export async function GET(
                 : 0,
         };
 
-        // Provider breakdown across all countries
         const providerTotals: Record<string, number> = {};
         for (const country of countries) {
             for (const [provider, count] of Object.entries(country.providers)) {
@@ -178,7 +158,6 @@ export async function GET(
             }
         }
 
-        // Format provider timeline (based on selected days)
         const providerTimeline: ProviderDailyStats[] = [];
         for (let i = days - 1; i >= 0; i--) {
             const date = new Date();
@@ -203,7 +182,6 @@ export async function GET(
     }
 }
 
-// Detect provider from model name
 function detectProvider(model: string): string {
     const lowerModel = model.toLowerCase();
     if (lowerModel.includes('gpt') || lowerModel.includes('o1')) return 'OpenAI';

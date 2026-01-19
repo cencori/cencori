@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// Founder emails - always have access
 const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
-// POST /api/internal/admins/verify - Check if email is an admin
 export async function POST(req: NextRequest) {
     const body = await req.json();
     const { email } = body;
@@ -15,12 +13,9 @@ export async function POST(req: NextRequest) {
 
     const emailLower = email.toLowerCase();
 
-    // Check if founder
     if (FOUNDER_EMAILS.includes(emailLower)) {
         return NextResponse.json({ authorized: true, role: 'founder' });
     }
-
-    // Check if in cencori_admins
     const supabase = createAdminClient();
     const { data: admin } = await supabase
         .from('cencori_admins')

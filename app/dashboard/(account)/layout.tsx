@@ -22,7 +22,6 @@ export default function AccountLayout({
 
     return (
         <div className="flex min-h-[calc(100vh-6rem)]">
-            {/* Sidebar */}
             <aside className="hidden lg:flex w-56 flex-col border-r border-border/40 pr-6">
                 <div className="mb-4">
                     <Link
@@ -56,7 +55,6 @@ export default function AccountLayout({
                 </nav>
             </aside>
 
-            {/* Mobile Navigation */}
             <div className="lg:hidden mb-4 overflow-x-auto pb-2">
                 <div className="flex gap-1 min-w-max">
                     {navItems.map((item) => {
@@ -80,7 +78,6 @@ export default function AccountLayout({
                 </div>
             </div>
 
-            {/* Main Content */}
             <main className="flex-1 lg:pl-6 flex justify-center">
                 <div className="w-full max-w-2xl">{children}</div>
             </main>

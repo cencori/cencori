@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
 
-    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
@@ -20,7 +19,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
-        // Verify user owns the organization
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id')
@@ -33,10 +31,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        // Use admin client to bypass RLS for reading/writing installation data
         const supabaseAdmin = createAdminClient();
 
-        // Verify installation exists
         const { data: installation, error: installationError } = await supabaseAdmin
             .from('github_app_installations')
             .select('installation_id')
@@ -48,7 +44,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Installation not found' }, { status: 404 });
         }
 
-        // Create the link
         const { error: linkError } = await supabaseAdmin
             .from('organization_github_installations')
             .upsert({

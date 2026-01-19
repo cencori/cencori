@@ -14,7 +14,6 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            {/* Settings sections */}
             <div className="space-y-4">
                 <Link
                     href="/dashboard/profile"
