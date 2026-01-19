@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// Helper to map security incident types to log statuses
 function mapIncidentTypeToStatus(incidentType: string, actionTaken?: string): string {
-    // Block actions → blocked status
     if (actionTaken === 'blocked' || incidentType === 'data_rule_block') {
         return 'blocked_output';
     }
-    // Rate limit
     if (incidentType === 'rate_limit_exceeded') {
         return 'rate_limited';
     }
-    // Mask/Redact/Filter → filtered status
     return 'filtered';
 }
 
@@ -23,18 +19,16 @@ export async function GET(
     const { projectId } = await params;
 
     try {
-        // Get query parameters
         const searchParams = req.nextUrl.searchParams;
         const page = parseInt(searchParams.get('page') || '1');
         const perPage = parseInt(searchParams.get('per_page') || '50');
-        const status = searchParams.get('status'); // 'success' | 'filtered' | 'blocked_output' | 'error' | null
+        const status = searchParams.get('status');
         const model = searchParams.get('model');
-        const timeRange = searchParams.get('time_range') || '24h'; // '1h' | '24h' | '7d' | '30d' | 'all'
+        const timeRange = searchParams.get('time_range') || '24h';
         const search = searchParams.get('search');
-        const environment = searchParams.get('environment') || 'production'; // 'production' | 'test'
-        const apiKeyId = searchParams.get('api_key_id'); // Filter by specific API key
+        const environment = searchParams.get('environment') || 'production';
+        const apiKeyId = searchParams.get('api_key_id');
 
-        // Calculate time filter
         let startTime: Date | null = null;
         const now = new Date();
 
@@ -56,10 +50,6 @@ export async function GET(
                 break;
         }
 
-        // Get API keys for this environment (active = not revoked)
-        // For legacy keys (NULL environment), check key_prefix to determine environment:
-        // - Keys with '_test' in prefix → development
-        // - Other legacy keys → production
         let apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, name, key_prefix, environment')
@@ -68,21 +58,16 @@ export async function GET(
 
         const { data: allApiKeys } = await apiKeysQuery;
 
-        // Filter keys based on environment
         const apiKeys = allApiKeys?.filter(key => {
             if (key.environment) {
-                // New keys with explicit environment
                 return environment === 'production'
                     ? key.environment === 'production'
                     : key.environment === 'test';
             } else {
-                // Legacy keys (NULL environment) - check prefix
                 const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
                 return environment === 'production' ? !isTestKey : isTestKey;
             }
         });
-
-        // Create a map of API key ID → prefix for display
         const apiKeyMap: Record<string, { name: string; prefix: string }> = {};
         apiKeys?.forEach(k => {
             apiKeyMap[k.id] = { name: k.name, prefix: k.key_prefix };
@@ -90,7 +75,6 @@ export async function GET(
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
-        // If no API keys found for environment, return empty results
         if (apiKeyIds.length === 0) {
             return NextResponse.json({
                 requests: [],
@@ -103,8 +87,6 @@ export async function GET(
             });
         }
 
-        // Build query
-        // If filtering by specific API key, use that; otherwise use all keys for environment
         const targetKeyIds = apiKeyId && apiKeyId !== 'all' ? [apiKeyId] : apiKeyIds;
 
         let query = supabaseAdmin
@@ -113,7 +95,6 @@ export async function GET(
             .eq('project_id', projectId)
             .in('api_key_id', targetKeyIds);
 
-        // Apply filters
         if (status && status !== 'all') {
             query = query.eq('status', status);
         }
@@ -127,11 +108,9 @@ export async function GET(
         }
 
         if (search) {
-            // Search in request payload content (first message)
             query = query.or(`error_message.ilike.%${search}%,request_payload->>messages->>0->>content.ilike.%${search}%`);
         }
 
-        // Apply pagination
         const offset = (page - 1) * perPage;
         query = query
             .order('created_at', { ascending: false })
@@ -147,9 +126,7 @@ export async function GET(
             );
         }
 
-        // Format response with request preview
         const formattedRequests = requests?.map(req => {
-            // Extract first message content for preview
             let requestPreview = '';
             try {
                 const messages = req.request_payload?.messages;
@@ -161,7 +138,6 @@ export async function GET(
                 requestPreview = '';
             }
 
-            // Get API key info for this request
             const keyInfo = apiKeyMap[req.api_key_id];
 
             return {
@@ -185,12 +161,10 @@ export async function GET(
             };
         }) || [];
 
-        // Also fetch security incidents if status filter matches blocked/filtered types
         const shouldIncludeSecurityIncidents =
             !status || status === 'all' ||
             ['filtered', 'blocked_output', 'rate_limited', 'blocked'].includes(status);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let securityIncidents: any[] = [];
 
         if (shouldIncludeSecurityIncidents) {
@@ -203,7 +177,6 @@ export async function GET(
                 incidentsQuery = incidentsQuery.gte('created_at', startTime.toISOString());
             }
 
-            // Map status filter to incident types
             if (status && status !== 'all') {
                 if (status === 'filtered') {
                     incidentsQuery = incidentsQuery.in('incident_type', ['content_filter', 'jailbreak', 'prompt_injection', 'pii_input', 'data_rule_mask', 'data_rule_redact']);
@@ -218,7 +191,6 @@ export async function GET(
                 .order('created_at', { ascending: false })
                 .limit(perPage);
 
-            // Map security incidents to match request log format
             securityIncidents = (incidents || []).map(incident => ({
                 id: incident.id,
                 created_at: incident.created_at,
@@ -237,12 +209,9 @@ export async function GET(
             }));
         }
 
-        // Merge and sort by created_at
         const allLogs = [...formattedRequests, ...securityIncidents]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .slice(0, perPage);
-
-        // Calculate combined total (approximate - we'd need another query for exact count with incidents)
         const totalWithIncidents = (count || 0) + securityIncidents.length;
 
         return NextResponse.json({

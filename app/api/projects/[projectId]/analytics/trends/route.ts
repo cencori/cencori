@@ -13,7 +13,6 @@ export async function GET(
         const timeRange = searchParams.get('time_range') || '7d';
         const environment = searchParams.get('environment') || 'production';
 
-        // Calculate time filter
         const now = new Date();
         let startTime: Date;
         let groupBy: '10min' | 'hour' | 'day' = 'day';
@@ -21,7 +20,7 @@ export async function GET(
         switch (timeRange) {
             case '1h':
                 startTime = new Date(now.getTime() - 60 * 60 * 1000);
-                groupBy = '10min'; // Use 10-minute intervals for last hour
+                groupBy = '10min';
                 break;
             case '24h':
                 startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -44,8 +43,6 @@ export async function GET(
                 groupBy = 'day';
         }
 
-        // Get API keys for this environment (active = not revoked)
-        // Legacy keys (NULL environment) are treated as production keys
         let apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, key_prefix, environment')
@@ -54,14 +51,12 @@ export async function GET(
 
         const { data: allApiKeys } = await apiKeysQuery;
 
-        // Filter keys based on environment
         const apiKeys = allApiKeys?.filter(key => {
             if (key.environment) {
                 return environment === 'production'
                     ? key.environment === 'production'
                     : key.environment === 'test';
             } else {
-                // Legacy keys - check prefix for test
                 const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
                 return environment === 'production' ? !isTestKey : isTestKey;
             }
@@ -69,7 +64,6 @@ export async function GET(
 
         const apiKeyIds = apiKeys?.map(k => k.id) || [];
 
-        // Fetch requests
         const { data: requests, error } = await supabaseAdmin
             .from('ai_requests')
             .select('created_at, status, cost_usd, latency_ms, total_tokens')
@@ -83,7 +77,6 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch trends' }, { status: 500 });
         }
 
-        // Generate all time buckets for the range (including empty ones)
         const generateAllBuckets = () => {
             const buckets: Record<string, {
                 timestamp: string;
@@ -102,7 +95,6 @@ export async function GET(
             const end = new Date(now);
 
             if (groupBy === '10min') {
-                // 10-minute intervals for last hour
                 while (current <= end) {
                     const minutes = Math.floor(current.getMinutes() / 10) * 10;
                     const key = `${String(current.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -113,7 +105,6 @@ export async function GET(
                     current.setMinutes(current.getMinutes() + 10);
                 }
             } else if (groupBy === 'hour') {
-                // Hourly buckets
                 current.setMinutes(0, 0, 0);
                 while (current <= end) {
                     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')} ${String(current.getHours()).padStart(2, '0')}:00`;
@@ -124,7 +115,6 @@ export async function GET(
                     current.setHours(current.getHours() + 1);
                 }
             } else {
-                // Daily buckets
                 current.setHours(0, 0, 0, 0);
                 while (current <= end) {
                     const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
@@ -139,7 +129,6 @@ export async function GET(
             return buckets;
         };
 
-        // Start with all buckets pre-filled with zeros
         const trendData = generateAllBuckets();
 
         requests?.forEach(req => {
@@ -175,7 +164,6 @@ export async function GET(
             }
         });
 
-        // Also fetch security incidents and add to filtered/blocked counts
         const { data: incidents } = await supabaseAdmin
             .from('security_incidents')
             .select('created_at, incident_type, action_taken')
@@ -197,7 +185,6 @@ export async function GET(
 
             if (trendData[key]) {
                 trendData[key].total++;
-                // Block actions count as blocked, everything else as filtered
                 if (incident.action_taken === 'blocked' || incident.incident_type === 'data_rule_block') {
                     trendData[key].blocked_output++;
                 } else {
@@ -206,7 +193,6 @@ export async function GET(
             }
         });
 
-        // Calculate averages and format response (sorted by timestamp)
         const trends = Object.values(trendData)
             .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
             .map(data => ({

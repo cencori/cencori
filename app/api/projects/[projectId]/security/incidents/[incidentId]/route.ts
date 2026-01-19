@@ -9,7 +9,6 @@ export async function GET(
     const { projectId, incidentId } = await params;
 
     try {
-        // Fetch the specific incident
         const { data: incident, error } = await supabaseAdmin
             .from('security_incidents')
             .select('*')
@@ -24,7 +23,6 @@ export async function GET(
             );
         }
 
-        // Fetch related AI request if linked
         let relatedRequest = null;
         if (incident.ai_request_id) {
             const { data: requestData } = await supabaseAdmin
@@ -34,7 +32,6 @@ export async function GET(
                 .single();
 
             if (requestData) {
-                // Extract preview from request
                 let requestPreview = '';
                 try {
                     const messages = requestData.request_payload?.messages;

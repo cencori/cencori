@@ -1,9 +1,3 @@
-/**
- * Individual Provider Key API Routes
- * PATCH - Update key or toggle active status
- * DELETE - Remove provider key
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
@@ -19,7 +13,6 @@ export async function PATCH(
         const body = await req.json();
         const { apiKey, isActive } = body;
 
-        // Get project for encryption
         const { data: project } = await supabase
             .from('projects')
             .select('organization_id')
@@ -34,13 +27,10 @@ export async function PATCH(
             updated_at: new Date().toISOString(),
         };
 
-        // Update API key if provided
         if (apiKey) {
             updateData.encrypted_key = encryptApiKey(apiKey, project.organization_id);
             updateData.key_hint = apiKey.length > 4 ? `...${apiKey.slice(-4)}` : '****';
         }
-
-        // Update active status if provided
         if (typeof isActive === 'boolean') {
             updateData.is_active = isActive;
         }

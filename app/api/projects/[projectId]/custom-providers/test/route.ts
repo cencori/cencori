@@ -1,9 +1,3 @@
-/**
- * Test Custom Provider Connection
- * 
- * Makes a test request to a custom provider to verify connectivity.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey } from '@/lib/encryption';
@@ -31,7 +25,6 @@ export async function POST(
         let apiFormat: 'openai' | 'anthropic';
         let testModel: string;
 
-        // If provider_id is given, fetch from database
         if (body.provider_id) {
             const { data: provider, error } = await supabase
                 .from('custom_providers')
@@ -47,7 +40,6 @@ export async function POST(
                 );
             }
 
-            // Get the organization_id for decryption
             const { data: project } = await supabase
                 .from('projects')
                 .select('organization_id')
@@ -66,7 +58,6 @@ export async function POST(
             apiFormat = provider.api_format;
             testModel = provider.custom_models?.[0]?.model_name || body.model || 'gpt-3.5-turbo';
         } else {
-            // Use provided values for testing before saving
             if (!body.base_url || !body.api_key) {
                 return NextResponse.json(
                     { error: 'base_url and api_key are required', success: false },
@@ -80,11 +71,9 @@ export async function POST(
             testModel = body.model || 'gpt-3.5-turbo';
         }
 
-        // Make test request based on API format
         const startTime = Date.now();
 
         if (apiFormat === 'openai') {
-            // OpenAI-compatible test
             const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -124,7 +113,6 @@ export async function POST(
             });
 
         } else if (apiFormat === 'anthropic') {
-            // Anthropic-compatible test
             const response = await fetch(`${baseUrl}/messages`, {
                 method: 'POST',
                 headers: {

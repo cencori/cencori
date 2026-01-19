@@ -1,9 +1,3 @@
-/**
- * Custom Providers API Routes
- * GET - List all custom providers for organization
- * POST - Create new custom provider
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
@@ -17,7 +11,6 @@ export async function GET(
     try {
         const { orgSlug } = await params;
 
-        // Get organization by slug
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id')
@@ -28,7 +21,6 @@ export async function GET(
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        // Get custom providers
         const { data: providers, error } = await supabase
             .from('custom_providers')
             .select(`
@@ -63,7 +55,6 @@ export async function POST(
     try {
         const { orgSlug } = await params;
 
-        // Get organization
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id')
@@ -77,7 +68,6 @@ export async function POST(
         const body = await req.json();
         const { name, baseUrl, apiKey, format, models } = body;
 
-        // Validate input
         if (!name || !baseUrl || !format) {
             return NextResponse.json(
                 { error: 'Missing required fields: name, baseUrl, format' },
@@ -85,10 +75,8 @@ export async function POST(
             );
         }
 
-        // Encrypt API key if provided
         const encryptedKey = apiKey ? encryptApiKey(apiKey, org.id) : null;
 
-        // Create provider
         const { data: provider, error } = await supabase
             .from('custom_providers')
             .insert({
@@ -106,7 +94,6 @@ export async function POST(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Add models if provided
         if (models && Array.isArray(models) && models.length > 0) {
             const modelsToInsert = models.map((model: { name: string; modelId: string }) => ({
                 provider_id: provider.id,

@@ -1,9 +1,3 @@
-/**
- * Custom Providers API Routes (Project-level)
- * GET - List all custom providers for project
- * POST - Create new custom provider
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
@@ -17,7 +11,6 @@ export async function GET(
     try {
         const { projectId } = await params;
 
-        // Verify project exists
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id')
@@ -28,7 +21,6 @@ export async function GET(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        // Get custom providers
         const { data: providers, error } = await supabase
             .from('custom_providers')
             .select(`
@@ -63,7 +55,6 @@ export async function POST(
     try {
         const { projectId } = await params;
 
-        // Verify project exists and get org
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id, organization_id')
@@ -84,10 +75,8 @@ export async function POST(
             );
         }
 
-        // Encrypt API key if provided
         const encryptedKey = apiKey ? encryptApiKey(apiKey, project.organization_id) : null;
 
-        // Create provider
         const { data: provider, error } = await supabase
             .from('custom_providers')
             .insert({
@@ -105,7 +94,6 @@ export async function POST(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Add models if provided
         if (models && Array.isArray(models) && models.length > 0) {
             const modelsToInsert = models.map((model: { name: string; modelId: string }) => ({
                 provider_id: provider.id,

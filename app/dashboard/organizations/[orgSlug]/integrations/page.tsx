@@ -7,7 +7,6 @@ import { ExternalLink, Terminal, Blocks } from "lucide-react";
 import { Microsoft, GoogleCloud, Cloudflare } from "@lobehub/icons";
 import Link from "next/link";
 
-// SDK section
 const sdks = [
     {
         name: "TypeScript / JavaScript",
@@ -32,7 +31,6 @@ const sdks = [
     },
 ];
 
-// Platform integrations
 const platforms = [
     {
         name: "Vercel",
@@ -66,7 +64,6 @@ const platforms = [
     },
 ];
 
-// Developer tools
 const devTools = [
     {
         name: "GitHub Actions",
@@ -92,7 +89,6 @@ const devTools = [
     },
 ];
 
-// Enterprise connectors
 const enterprise = [
     {
         name: "Microsoft Purview",
@@ -108,7 +104,6 @@ const enterprise = [
     },
 ];
 
-// Agent frameworks
 const frameworks = [
     {
         name: "LangChain",
@@ -145,12 +140,9 @@ function StatusBadge({ status }: { status: "stable" | "coming-soon" | "coming-q2
 export default function IntegrationsPage() {
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
-            {/* Header */}
             <div className="mb-8">
                 <h1 className="text-base font-medium">Integrations</h1>
             </div>
-
-            {/* SDKs */}
             <section className="mb-8">
                 <h2 className="text-[13px] font-medium mb-4">SDKs</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -175,7 +167,6 @@ export default function IntegrationsPage() {
                 </div>
             </section>
 
-            {/* Agent Frameworks */}
             <section className="mb-8">
                 <h2 className="text-[13px] font-medium mb-4">Agent Frameworks</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -196,7 +187,6 @@ export default function IntegrationsPage() {
                 </div>
             </section>
 
-            {/* Platform Marketplaces */}
             <section className="mb-8">
                 <h2 className="text-[13px] font-medium mb-4">Platform Marketplaces</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -217,7 +207,6 @@ export default function IntegrationsPage() {
                 </div>
             </section>
 
-            {/* Developer Tools */}
             <section className="mb-8">
                 <h2 className="text-[13px] font-medium mb-4">Developer Tools</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -238,7 +227,6 @@ export default function IntegrationsPage() {
                 </div>
             </section>
 
-            {/* Enterprise Connectors */}
             <section>
                 <h2 className="text-[13px] font-medium mb-4">Enterprise Connectors</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

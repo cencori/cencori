@@ -1,9 +1,3 @@
-/**
- * Custom Data Rules API - Individual Rule Operations
- * 
- * GET, PATCH, DELETE for a specific rule
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
@@ -14,7 +8,6 @@ interface RouteParams {
     }>;
 }
 
-// GET - Get a single rule
 export async function GET(req: NextRequest, { params }: RouteParams) {
     const { projectId, ruleId } = await params;
     const supabase = createAdminClient();
@@ -38,7 +31,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     }
 }
 
-// PATCH - Update a rule
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const { projectId, ruleId } = await params;
     const supabase = createAdminClient();
@@ -47,7 +39,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         const body = await req.json();
         const allowedFields = ['name', 'description', 'match_type', 'pattern', 'case_sensitive', 'action', 'is_active', 'priority'];
 
-        // Filter to only allowed fields
         const updates: Record<string, unknown> = {};
         for (const field of allowedFields) {
             if (body[field] !== undefined) {
@@ -59,7 +50,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        // Validate match_type if provided
         if (updates.match_type && !['keywords', 'regex', 'json_path', 'ai_detect'].includes(updates.match_type as string)) {
             return NextResponse.json(
                 { error: 'Invalid match_type. Must be: keywords, regex, json_path, or ai_detect' },
@@ -67,7 +57,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        // Validate action if provided
         if (updates.action && !['mask', 'redact', 'block'].includes(updates.action as string)) {
             return NextResponse.json(
                 { error: 'Invalid action. Must be: mask, redact, or block' },
@@ -75,7 +64,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        // Validate regex if match_type is regex
         if (updates.match_type === 'regex' && updates.pattern) {
             try {
                 new RegExp(updates.pattern as string);
@@ -108,7 +96,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 }
 
-// DELETE - Delete a rule
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
     const { projectId, ruleId } = await params;
     const supabase = createAdminClient();

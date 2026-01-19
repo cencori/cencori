@@ -38,7 +38,6 @@ const wcagContrast = [
 export default function AccessibilityPage() {
     return (
         <div className="space-y-12">
-            {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Accessibility</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
@@ -46,7 +45,6 @@ export default function AccessibilityPage() {
                 </p>
             </div>
 
-            {/* Focus States */}
             <section className="space-y-4">
                 <div className="flex items-center gap-2">
                     <Keyboard className="h-5 w-5 text-muted-foreground" />
@@ -70,7 +68,6 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
                 </div>
             </section>
 
-            {/* Keyboard Navigation */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Keyboard Navigation</h2>
                 <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
@@ -95,7 +92,6 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
                 </div>
             </section>
 
-            {/* ARIA Patterns */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">ARIA Patterns</h2>
                 <CodeBlock code={`// Icon-only buttons MUST have aria-label
@@ -122,7 +118,6 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
 <p id="email-hint" className="text-[10px]">We won't share your email</p>`} />
             </section>
 
-            {/* Color Contrast */}
             <section className="space-y-4">
                 <div className="flex items-center gap-2">
                     <Eye className="h-5 w-5 text-muted-foreground" />
@@ -144,7 +139,6 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
                 </div>
             </section>
 
-            {/* Warnings */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Common Mistakes</h2>
                 <div className="grid gap-3 md:grid-cols-2">

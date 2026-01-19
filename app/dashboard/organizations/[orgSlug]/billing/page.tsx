@@ -26,7 +26,6 @@ interface PageProps {
     params: Promise<{ orgSlug: string }>;
 }
 
-// Hook to fetch org billing data with caching
 function useOrgBilling(orgSlug: string) {
     return useQuery({
         queryKey: ["orgBilling", orgSlug],
@@ -40,7 +39,7 @@ function useOrgBilling(orgSlug: string) {
             if (error || !data) throw new Error("Organization not found");
             return data as Organization;
         },
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: 30 * 1000,
     });
 }
 
@@ -50,7 +49,6 @@ export default function BillingPage({ params }: PageProps) {
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [autoCheckoutTriggered, setAutoCheckoutTriggered] = useState(false);
 
-    // Check for success param from Polar
     useEffect(() => {
         if (searchParams.get('success') === 'true') {
             setShowSuccessMessage(true);
@@ -60,7 +58,6 @@ export default function BillingPage({ params }: PageProps) {
         }
     }, [searchParams]);
 
-    // Fetch org billing with caching - INSTANT ON REVISIT!
     const { data: org, isLoading, error } = useOrgBilling(orgSlug);
 
     const handleUpgrade = async (tier: 'pro' | 'team', cycle: 'monthly' | 'annual') => {
@@ -86,7 +83,6 @@ export default function BillingPage({ params }: PageProps) {
         }
     };
 
-    // Auto-trigger checkout when redirected from org creation
     useEffect(() => {
         if (
             org &&
@@ -96,12 +92,10 @@ export default function BillingPage({ params }: PageProps) {
             org.subscription_status !== 'active'
         ) {
             setAutoCheckoutTriggered(true);
-            // Delay slightly to show the page first
             setTimeout(() => {
                 handleUpgrade(org.subscription_tier as 'pro' | 'team', 'monthly');
             }, 500);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [org, autoCheckoutTriggered, searchParams]);
 
     if (isLoading) {
@@ -174,13 +168,11 @@ export default function BillingPage({ params }: PageProps) {
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
-            {/* Header */}
             <div className="mb-6">
                 <h1 className="text-base font-medium">Billing</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">Manage your subscription and monitor usage</p>
             </div>
 
-            {/* Success Message */}
             {showSuccessMessage && (
                 <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-500/10 border border-emerald-500/20">
                     <CheckCircle className="h-4 w-4 text-emerald-500" />
@@ -190,7 +182,6 @@ export default function BillingPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Usage Overview */}
             <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
                 <div className="flex items-center justify-between mb-2">
                     <div>
@@ -218,7 +209,6 @@ export default function BillingPage({ params }: PageProps) {
                 </div>
             </div>
 
-            {/* Subscription Details */}
             {org.subscription_tier !== 'free' && org.subscription_current_period_end && (
                 <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
                     <h3 className="text-xs font-medium mb-2">Subscription</h3>
@@ -238,7 +228,6 @@ export default function BillingPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Pricing Tiers */}
             <div>
                 <h2 className="text-sm font-medium mb-4">Available Plans</h2>
                 <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">

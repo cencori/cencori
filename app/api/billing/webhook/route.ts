@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getLimitForTier, type SubscriptionTier } from '@/lib/polarClient';
 import crypto from 'crypto';
-
-// Polar webhook event types (actual events from Polar)
 type PolarWebhookEvent = {
     type: string;
     data: {
@@ -14,13 +12,10 @@ type PolarWebhookEvent = {
         current_period_start?: string;
         current_period_end?: string;
         metadata?: Record<string, string>;
-        // For checkout.created events
         product_price_id?: string;
         products?: string[];
     };
 };
-
-// Helper to map product ID to tier
 function getProductIdToTier(productId: string): SubscriptionTier {
     const proMonthly = process.env.POLAR_PRODUCT_PRO_MONTHLY;
     const proAnnual = process.env.POLAR_PRODUCT_PRO_ANNUAL;
@@ -36,7 +31,6 @@ function getProductIdToTier(productId: string): SubscriptionTier {
     return 'free';
 }
 
-// Verify Polar webhook signature
 function verifyPolarSignature(
     payload: string,
     signature: string | null,
@@ -48,11 +42,9 @@ function verifyPolarSignature(
     }
 
     try {
-        // Polar uses HMAC SHA256 for webhook signatures
         const hmac = crypto.createHmac('sha256', secret);
         const digest = hmac.update(payload).digest('hex');
 
-        // Compare signatures (constant-time comparison to prevent timing attacks)
         return crypto.timingSafeEqual(
             Buffer.from(signature),
             Buffer.from(digest)
@@ -65,12 +57,9 @@ function verifyPolarSignature(
 
 export async function POST(req: NextRequest) {
     try {
-        // Get raw body for signature verification
         const rawBody = await req.text();
         const signature = req.headers.get('x-polar-signature');
         const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
-
-        // Verify signature if secret is configured
         if (webhookSecret) {
             if (!verifyPolarSignature(rawBody, signature, webhookSecret)) {
                 console.error('[Polar Webhook] Invalid signature');
@@ -90,10 +79,8 @@ export async function POST(req: NextRequest) {
         console.log('[Polar Webhook] Received event:', event.type);
         console.log('[Polar Webhook] Event data:', JSON.stringify(event.data, null, 2));
 
-        // Extract org ID from metadata
         const orgId = event.data.metadata?.org_id;
 
-        // Handle subscription lifecycle events
         switch (event.type) {
             case 'subscription.created':
             case 'subscription.active':
@@ -160,21 +147,18 @@ export async function POST(req: NextRequest) {
             }
 
             case 'order.paid': {
-                // Order paid - subscription should also fire subscription.active
                 console.log('[Polar Webhook] Order paid - waiting for subscription.active event');
                 break;
             }
 
             case 'checkout.created':
             case 'checkout.updated':
-                // Informational events - no action needed
                 console.log(`[Polar Webhook] Checkout event: ${event.type}`);
                 break;
 
             case 'organization.updated':
             case 'customer.created':
             case 'customer.updated':
-                // Polar internal events - no action needed
                 console.log(`[Polar Webhook] Informational event: ${event.type}`);
                 break;
 

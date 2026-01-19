@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 
-// GET - Fetch security audit log (from both security_audit_log and security_incidents tables)
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -14,7 +13,6 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -25,14 +23,12 @@ export async function GET(
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Parse query params
     const url = new URL(req.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 100);
     const eventType = url.searchParams.get('event_type');
     const timeRange = url.searchParams.get('time_range') || '7d';
 
-    // Calculate time filter
     let startDate = new Date();
     switch (timeRange) {
         case '1h':
@@ -52,7 +48,6 @@ export async function GET(
             break;
     }
 
-    // Security incident types vs admin event types
     const securityIncidentTypes = ['content_filter', 'intent_analysis', 'jailbreak', 'prompt_injection', 'output_leakage', 'pii_input', 'pii_output'];
     const adminEventTypes = ['settings_updated', 'api_key_created', 'api_key_deleted', 'api_key_rotated', 'webhook_created', 'webhook_deleted', 'incident_reviewed', 'ip_blocked', 'rate_limit_exceeded', 'auth_failed'];
 
@@ -65,7 +60,6 @@ export async function GET(
         created_at: string;
     }> = [];
 
-    // Query security_incidents table (for security violations)
     if (!eventType || eventType === 'all' || securityIncidentTypes.includes(eventType)) {
         let incidentsQuery = supabase
             .from('security_incidents')
@@ -84,7 +78,6 @@ export async function GET(
         if (incidentsError) {
             console.error('Error fetching security incidents:', incidentsError);
         } else if (incidents) {
-            // Map incidents to audit log format
             for (const incident of incidents) {
                 allLogs.push({
                     id: incident.id,
@@ -105,7 +98,6 @@ export async function GET(
         }
     }
 
-    // Query security_audit_log table (for admin events)
     if (!eventType || eventType === 'all' || adminEventTypes.includes(eventType)) {
         let auditQuery = supabase
             .from('security_audit_log')
@@ -137,7 +129,6 @@ export async function GET(
         }
     }
 
-    // Sort by created_at descending and paginate
     allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     const paginatedLogs = allLogs.slice((page - 1) * perPage, page * perPage);
 

@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// Server-Sent Events endpoint for real-time log updates
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -9,15 +8,12 @@ export async function GET(
     const { projectId } = await params;
     const supabaseAdmin = createAdminClient();
 
-    //  Create SSE stream
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
         async start(controller) {
-            // Send initial connection message
             const data = `data: ${JSON.stringify({ type: 'connected', project_id: projectId })}\n\n`;
             controller.enqueue(encoder.encode(data));
 
-            // Set up realtime subscription
             const channel = supabaseAdmin
                 .channel(`logs_${projectId}`)
                 .on(
@@ -30,7 +26,6 @@ export async function GET(
                     },
                     (payload) => {
                         try {
-                            // Format the new request
                             const req = payload.new;
                             let requestPreview = '';
 
@@ -60,7 +55,6 @@ export async function GET(
                                 request_preview: requestPreview,
                             };
 
-                            // Send to client
                             const data = `data: ${JSON.stringify({
                                 type: 'new_request',
                                 request: formattedRequest,
@@ -74,7 +68,6 @@ export async function GET(
                 )
                 .subscribe();
 
-            // Keep connection alive with heartbeat
             const heartbeat = setInterval(() => {
                 try {
                     controller.enqueue(encoder.encode(': heartbeat\n\n'));
@@ -82,9 +75,8 @@ export async function GET(
                     console.error('[SSE] Heartbeat error:', error);
                     clearInterval(heartbeat);
                 }
-            }, 30000); // Every 30 seconds
+            }, 30000);
 
-            // Cleanup on close
             req.signal.addEventListener('abort', () => {
                 clearInterval(heartbeat);
                 channel.unsubscribe();
@@ -98,7 +90,7 @@ export async function GET(
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache, no-transform',
             'Connection': 'keep-alive',
-            'X-Accel-Buffering': 'no', // Disable nginx buffering
+            'X-Accel-Buffering': 'no',
         },
     });
 }

@@ -5,12 +5,10 @@ import { join } from "path";
 
 export const runtime = "nodejs";
 
-// Load logo as base64
 const logoPath = join(process.cwd(), "public", "cdark.png");
 const logoData = readFileSync(logoPath);
 const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
 
-// Cenpact colors
 const BACKGROUND = "#0d0d0d";
 const FOREGROUND = "#fafafa";
 const MUTED = "#a1a1aa";
@@ -19,14 +17,12 @@ const PRIMARY = "#ffffff";
 export async function GET(request: NextRequest) {
     const url = new URL(request.url);
 
-    // Get query params
     const title = url.searchParams.get("title") || "Cencori";
     const subtitle = url.searchParams.get("subtitle") || "";
-    const type = url.searchParams.get("type") || "page"; // blog, changelog, docs, page
+    const type = url.searchParams.get("type") || "page";
     const author = url.searchParams.get("author") || "";
     const date = url.searchParams.get("date") || "";
 
-    // Type badge text
     const typeLabels: Record<string, string> = {
         blog: "Blog",
         changelog: "Changelog",
@@ -48,7 +44,6 @@ export async function GET(request: NextRequest) {
                     fontFamily: "system-ui, -apple-system, sans-serif",
                 }}
             >
-                {/* Top row: Type badge + Logo */}
                 <div
                     style={{
                         display: "flex",
@@ -57,7 +52,6 @@ export async function GET(request: NextRequest) {
                         marginBottom: "auto",
                     }}
                 >
-                    {/* Type badge */}
                     {typeLabels[type] && (
                         <div
                             style={{
@@ -73,7 +67,6 @@ export async function GET(request: NextRequest) {
                         </div>
                     )}
 
-                    {/* Logo */}
                     <div
                         style={{
                             display: "flex",
@@ -81,7 +74,6 @@ export async function GET(request: NextRequest) {
                             gap: "12px",
                         }}
                     >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={logoBase64}
                             alt="Cencori"
@@ -100,7 +92,6 @@ export async function GET(request: NextRequest) {
                     </div>
                 </div>
 
-                {/* Main content */}
                 <div
                     style={{
                         display: "flex",
@@ -109,7 +100,6 @@ export async function GET(request: NextRequest) {
                         flex: 1,
                     }}
                 >
-                    {/* Title */}
                     <div
                         style={{
                             display: "flex",
@@ -124,7 +114,6 @@ export async function GET(request: NextRequest) {
                         {title}
                     </div>
 
-                    {/* Subtitle */}
                     {subtitle && (
                         <div
                             style={{
@@ -141,7 +130,6 @@ export async function GET(request: NextRequest) {
                     )}
                 </div>
 
-                {/* Footer: Author + Date */}
                 {(author || date) && (
                     <div
                         style={{
@@ -159,7 +147,6 @@ export async function GET(request: NextRequest) {
                                     gap: "12px",
                                 }}
                             >
-                                {/* Author avatar placeholder */}
                                 <div
                                     style={{
                                         display: "flex",

@@ -8,7 +8,6 @@ interface WebhookUpdateBody {
     is_active?: boolean;
 }
 
-// PATCH - Update a webhook
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string; webhookId: string }> }
@@ -21,7 +20,6 @@ export async function PATCH(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify webhook exists and user has access
     const { data: webhook, error: webhookError } = await supabase
         .from('webhooks')
         .select('id, project_id, projects!inner(organization_id, organizations!inner(owner_id))')
@@ -35,7 +33,6 @@ export async function PATCH(
 
     const body: WebhookUpdateBody = await req.json();
 
-    // Validate URL if provided
     if (body.url) {
         try {
             new URL(body.url);
@@ -44,7 +41,6 @@ export async function PATCH(
         }
     }
 
-    // Update webhook
     const { data: updatedWebhook, error: updateError } = await supabase
         .from('webhooks')
         .update({
@@ -63,7 +59,6 @@ export async function PATCH(
     return NextResponse.json({ webhook: updatedWebhook });
 }
 
-// DELETE - Delete a webhook
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string; webhookId: string }> }
@@ -76,7 +71,6 @@ export async function DELETE(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify webhook exists and user has access
     const { data: webhook, error: webhookError } = await supabase
         .from('webhooks')
         .select('id, project_id, projects!inner(organization_id, organizations!inner(owner_id))')
@@ -88,7 +82,6 @@ export async function DELETE(
         return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
     }
 
-    // Delete webhook
     const { error: deleteError } = await supabase
         .from('webhooks')
         .delete()

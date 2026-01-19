@@ -58,7 +58,6 @@ const opacityPatterns = [
 export default function ColorsPage() {
     return (
         <div className="space-y-12">
-            {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight">Colors</h1>
                 <p className="text-sm text-muted-foreground max-w-2xl">
@@ -66,7 +65,6 @@ export default function ColorsPage() {
                 </p>
             </div>
 
-            {/* Semantic Colors */}
             <section className="space-y-4">
                 <div>
                     <h2 className="text-lg font-semibold">Semantic Tokens</h2>
@@ -85,7 +83,6 @@ export default function ColorsPage() {
                 </div>
             </section>
 
-            {/* Accent Colors */}
             <section className="space-y-4">
                 <div>
                     <h2 className="text-lg font-semibold">Accent Colors</h2>
@@ -105,7 +102,6 @@ export default function ColorsPage() {
                 </div>
             </section>
 
-            {/* Opacity Patterns */}
             <section className="space-y-4">
                 <div>
                     <h2 className="text-lg font-semibold">Opacity Patterns</h2>
@@ -127,7 +123,6 @@ export default function ColorsPage() {
                 </div>
             </section>
 
-            {/* Code Example */}
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Usage Example</h2>
                 <CodeBlock code={`// Semantic tokens (theme-aware)
@@ -145,7 +140,6 @@ className="border-border/50"
 className="bg-muted/30"`} />
             </section>
 
-            {/* Warning */}
             <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
                 <div className="flex items-start gap-3">
                     <span className="text-lg">⚠️</span>

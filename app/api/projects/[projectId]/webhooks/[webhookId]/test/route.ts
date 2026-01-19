@@ -7,19 +7,14 @@ interface RouteParams {
     params: Promise<{ projectId: string; webhookId: string }>;
 }
 
-// POST - Test a webhook by sending a test event
 export async function POST(req: NextRequest, { params }: RouteParams) {
     const { projectId, webhookId } = await params;
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
-
-    // Verify auth
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    // Fetch webhook
     const { data: webhook, error: webhookError } = await supabaseAdmin
         .from('webhooks')
         .select('id, name, url, secret, events, is_active, project_id')
@@ -31,14 +26,12 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
     }
 
-    // Create test payload
     const testPayload = createWebhookEvent('test', projectId, {
         message: 'This is a test webhook delivery from Cencori',
         webhook_name: webhook.name,
         timestamp: new Date().toISOString(),
     });
 
-    // Deliver test webhook
     const result = await deliverWebhook(
         {
             id: webhook.id,
@@ -49,7 +42,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             is_active: webhook.is_active,
         },
         testPayload,
-        1 // Only 1 attempt for test
+        1
     );
 
     if (result.success) {

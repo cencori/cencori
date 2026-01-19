@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-// Rate limit tiers (requests per month)
 const TIER_LIMITS = {
     free: { monthly: 1000, perMinute: 60, tokensPerDay: 100000, concurrent: 10 },
     pro: { monthly: 50000, perMinute: 500, tokensPerDay: 1000000, concurrent: 50 },
@@ -18,14 +17,12 @@ export async function GET(
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
 
-    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
-        // Get project with organization
         const { data: project, error: projectError } = await supabase
             .from('projects')
             .select('id, organization_id, organizations!inner(id, subscription_tier, monthly_requests_used, monthly_request_limit)')
@@ -36,7 +33,6 @@ export async function GET(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const orgData = project.organizations as any;
         const org = {
             id: orgData?.id || '',
@@ -48,14 +44,12 @@ export async function GET(
         const tier = org.subscription_tier as keyof typeof TIER_LIMITS;
         const tierLimits = TIER_LIMITS[tier] || TIER_LIMITS.free;
 
-        // Check for custom project settings that override tier limits
         const { data: projectSettings } = await supabaseAdmin
             .from('project_settings')
             .select('requests_per_minute, tokens_per_day, concurrent_requests')
             .eq('project_id', projectId)
             .single();
 
-        // Use project settings if available, otherwise fall back to tier limits
         const limits = {
             perMinute: projectSettings?.requests_per_minute ?? tierLimits.perMinute,
             tokensPerDay: projectSettings?.tokens_per_day ?? tierLimits.tokensPerDay,
@@ -63,7 +57,6 @@ export async function GET(
             monthly: tierLimits.monthly,
         };
 
-        // Get requests in the last minute (for requests/min)
         const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
         const { count: requestsLastMinute } = await supabaseAdmin
             .from('ai_requests')
@@ -71,7 +64,6 @@ export async function GET(
             .eq('project_id', projectId)
             .gte('created_at', oneMinuteAgo);
 
-        // Get tokens used today
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const { data: tokenData } = await supabaseAdmin
@@ -82,8 +74,6 @@ export async function GET(
 
         const tokensToday = tokenData?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0;
 
-        // Get concurrent requests (requests in the last 30 seconds that are still "processing")
-        // For now, we estimate based on requests in the last 5 seconds
         const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
         const { count: concurrentEstimate } = await supabaseAdmin
             .from('ai_requests')
@@ -93,7 +83,7 @@ export async function GET(
 
         return NextResponse.json({
             tier,
-            customLimits: !!projectSettings, // Indicates if using custom settings
+            customLimits: !!projectSettings,
             usage: {
                 requestsPerMinute: {
                     used: requestsLastMinute || 0,

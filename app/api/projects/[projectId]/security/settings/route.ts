@@ -17,7 +17,6 @@ interface SecuritySettings {
     alert_on_low: boolean;
 }
 
-// GET - Fetch security settings for a project
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -30,7 +29,6 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -41,7 +39,6 @@ export async function GET(
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Fetch settings
     const { data: settings, error: settingsError } = await supabase
         .from('security_settings')
         .select('*')
@@ -52,7 +49,6 @@ export async function GET(
         return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
     }
 
-    // Return default settings if none exist
     if (!settings) {
         return NextResponse.json({
             settings: {
@@ -76,7 +72,6 @@ export async function GET(
     return NextResponse.json({ settings });
 }
 
-// PUT - Update security settings
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
@@ -89,7 +84,6 @@ export async function PUT(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, organization_id, organizations!inner(owner_id)')
@@ -102,14 +96,12 @@ export async function PUT(
 
     const body: Partial<SecuritySettings> = await req.json();
 
-    // Validate safety_threshold
     if (body.safety_threshold !== undefined) {
         if (body.safety_threshold < 0 || body.safety_threshold > 1) {
             return NextResponse.json({ error: 'Safety threshold must be between 0 and 1' }, { status: 400 });
         }
     }
 
-    // Validate IP allowlist format
     if (body.ip_allowlist !== undefined && body.ip_allowlist !== null) {
         const ipRegex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
         for (const ip of body.ip_allowlist) {
@@ -119,7 +111,6 @@ export async function PUT(
         }
     }
 
-    // Upsert settings
     const { data: settings, error: upsertError } = await supabase
         .from('security_settings')
         .upsert({
@@ -136,7 +127,6 @@ export async function PUT(
         return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
     }
 
-    // Log the settings update
     await supabase.from('security_audit_log').insert({
         project_id: projectId,
         event_type: 'settings_updated',

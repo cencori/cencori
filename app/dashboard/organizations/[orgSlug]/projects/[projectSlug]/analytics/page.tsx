@@ -68,7 +68,6 @@ interface PageProps {
     }>;
 }
 
-// Hook to get projectId from slugs (with caching)
 function useProjectId(orgSlug: string, projectSlug: string) {
     return useQuery({
         queryKey: ["projectId", orgSlug, projectSlug],
@@ -100,10 +99,8 @@ export default function AnalyticsPage({ params }: PageProps) {
     const { environment } = useEnvironment();
     const [timeRange, setTimeRange] = useState('7d');
 
-    // Get projectId with caching
     const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
-    // Fetch analytics overview with caching
     const { data: overview } = useQuery<OverviewData>({
         queryKey: queryKeys.analytics(projectId || '', timeRange),
         queryFn: async () => {
@@ -115,7 +112,6 @@ export default function AnalyticsPage({ params }: PageProps) {
         staleTime: 30 * 1000,
     });
 
-    // Fetch trends data with caching
     const { data: trendsData } = useQuery({
         queryKey: ["trends", projectId, timeRange, environment],
         queryFn: async () => {
@@ -171,9 +167,7 @@ export default function AnalyticsPage({ params }: PageProps) {
         );
     }
 
-    // Helper to format timestamps like "Jan 2, 4:30pm"
     const formatTimestamp = (timestamp: string) => {
-        // For 10-minute intervals (format: "HH:MM") - add today's date context
         if (timestamp.match(/^\d{2}:\d{2}$/)) {
             const [hours, minutes] = timestamp.split(':').map(Number);
             const period = hours >= 12 ? 'pm' : 'am';
@@ -183,7 +177,6 @@ export default function AnalyticsPage({ params }: PageProps) {
             const day = now.getDate();
             return `${month} ${day}, ${hour12}:${minutes.toString().padStart(2, '0')}${period}`;
         }
-        // For hourly (format: "YYYY-MM-DD HH:00")
         if (timestamp.includes(' ')) {
             const [datePart, timePart] = timestamp.split(' ');
             const date = new Date(datePart);
@@ -192,13 +185,11 @@ export default function AnalyticsPage({ params }: PageProps) {
             const hour12 = hours % 12 || 12;
             return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${hour12}:00${period}`;
         }
-        // For daily (format: "YYYY-MM-DD")
         const date = new Date(timestamp);
         if (isNaN(date.getTime())) return timestamp;
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     };
 
-    // Get last update time from trends
     const getLastUpdateTime = () => {
         if (trends.length === 0) return undefined;
         const lastWithData = [...trends].reverse().find(t => t.total > 0);
@@ -208,7 +199,6 @@ export default function AnalyticsPage({ params }: PageProps) {
 
     return (
         <div className="w-full max-w-6xl mx-auto px-6 py-8">
-            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-lg font-semibold">Analytics</h1>
@@ -231,7 +221,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                 </div>
             </div>
 
-            {/* Primary Metrics - 5 columns */}
             {overview && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                     <MetricCardWithChart
@@ -286,21 +275,18 @@ export default function AnalyticsPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Area Chart - Full Width */}
             {trends.length > 0 && (
                 <div className="mb-6">
                     <RequestsAreaChart data={trends} groupBy={groupBy} />
                 </div>
             )}
 
-            {/* Token Usage Chart - Full Width */}
             {trends.length > 0 && (
                 <div className="mb-6">
                     <TokenUsageChart data={trends} groupBy={groupBy} />
                 </div>
             )}
 
-            {/* Charts Row - 3 columns */}
             {overview && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <ModelUsageChart data={overview.breakdown.model_usage} />
@@ -309,7 +295,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Security & Failover Row */}
             {overview && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <MetricCardWithLineChart
@@ -350,7 +335,6 @@ export default function AnalyticsPage({ params }: PageProps) {
                 </div>
             )}
 
-            {/* Empty State */}
             {overview && overview.overview.total_requests === 0 && (
                 <div className="text-center py-16 flex flex-col items-center rounded-lg border border-border/40 bg-card mt-6">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">

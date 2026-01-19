@@ -10,15 +10,13 @@ export async function POST(
 
     try {
         const body = await req.json();
-        const { format = 'csv', filters } = body; // format: 'csv' | 'json'
+        const { format = 'csv', filters } = body;
 
-        // Build query with same filters as logs endpoint
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*')
             .eq('project_id', projectId);
 
-        // Apply filters
         if (filters?.status && filters.status !== 'all') {
             query = query.eq('status', filters.status);
         }
@@ -51,10 +49,9 @@ export async function POST(
             query = query.gte('created_at', startTime.toISOString());
         }
 
-        // Limit export size to prevent abuse
         query = query
             .order('created_at', { ascending: false })
-            .limit(10000); // Max 10k records per export
+            .limit(10000);
 
         const { data: requests, error } = await query;
 
@@ -74,7 +71,6 @@ export async function POST(
         }
 
         if (format === 'csv') {
-            // Generate CSV
             const headers = [
                 'ID',
                 'Timestamp',
@@ -122,7 +118,6 @@ export async function POST(
             });
 
         } else if (format === 'json') {
-            // Generate JSON
             const exportData = {
                 export_date: new Date().toISOString(),
                 project_id: projectId,

@@ -6,7 +6,6 @@ interface RouteParams {
     params: Promise<{ projectId: string }>;
 }
 
-// Convert array of objects to CSV string
 function toCSV(data: Record<string, unknown>[], columns: string[]): string {
     if (data.length === 0) return columns.join(',') + '\n';
 
@@ -16,7 +15,6 @@ function toCSV(data: Record<string, unknown>[], columns: string[]): string {
             const value = row[col];
             if (value === null || value === undefined) return '';
             const str = String(value);
-            // Escape quotes and wrap in quotes if contains comma, quote, or newline
             if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                 return `"${str.replace(/"/g, '""')}"`;
             }
@@ -26,25 +24,16 @@ function toCSV(data: Record<string, unknown>[], columns: string[]): string {
 
     return [header, ...rows].join('\n');
 }
-
-// GET /api/projects/[projectId]/export
-// Query params:
-// - type: 'logs' | 'analytics' | 'security-incidents'
-// - format: 'csv' | 'json'
-// - from: ISO date string
-// - to: ISO date string
 export async function GET(req: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const supabase = await createServerClient();
     const supabaseAdmin = createAdminClient();
 
-    // Verify auth
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify project access
     const { data: project, error: projectError } = await supabaseAdmin
         .from('projects')
         .select('id, name, organization_id')
@@ -55,7 +44,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Get query parameters
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get('type') || 'logs';
     const format = searchParams.get('format') || 'csv';
@@ -69,7 +57,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         let filename = '';
 
         if (type === 'logs') {
-            // Get API keys for environment
             const { data: allApiKeys } = await supabaseAdmin
                 .from('api_keys')
                 .select('id, environment, key_prefix')
@@ -86,7 +73,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 return environment === 'production' ? !isTestKey : isTestKey;
             }).map(k => k.id) || [];
 
-            // Build query
             let query = supabaseAdmin
                 .from('ai_requests')
                 .select('id, created_at, status, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, safety_score, error_message')
@@ -119,7 +105,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             const { data: incidents, error } = await query;
             if (error) throw error;
 
-            // Truncate long text fields for export
             data = (incidents || []).map(inc => ({
                 ...inc,
                 input_text: inc.input_text?.substring(0, 500) || '',
@@ -129,7 +114,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             filename = `security-incidents-${projectId}-${new Date().toISOString().split('T')[0]}`;
 
         } else if (type === 'analytics') {
-            // Aggregate daily stats
             let query = supabaseAdmin
                 .from('ai_requests')
                 .select('created_at, status, model, prompt_tokens, completion_tokens, cost_usd, latency_ms')
@@ -143,7 +127,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             const { data: requests, error } = await query;
             if (error) throw error;
 
-            // Aggregate by day
             const dailyStats: Record<string, {
                 date: string;
                 requests: number;
@@ -177,7 +160,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 if (req.latency_ms) dailyStats[date].latencies.push(req.latency_ms);
             });
 
-            // Calculate averages
             data = Object.values(dailyStats).map(d => ({
                 date: d.date,
                 requests: d.requests,
@@ -197,7 +179,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'Invalid export type' }, { status: 400 });
         }
 
-        // Return response based on format
         if (format === 'json') {
             return new NextResponse(JSON.stringify(data, null, 2), {
                 headers: {

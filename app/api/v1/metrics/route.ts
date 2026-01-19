@@ -1,10 +1,3 @@
-/**
- * Public Metrics API (v1)
- * 
- * Returns analytics data for a project via API key authentication.
- * This allows programmatic access to metrics for dashboards, alerting, etc.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
@@ -79,7 +72,6 @@ function getPeriodDates(period: string): { start: Date; end: Date } {
 export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
 
-    // Get API key from header
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!apiKey) {
         return NextResponse.json(
@@ -88,7 +80,6 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    // Validate API key and get project
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
     const { data: keyData, error: keyError } = await supabase
         .from('api_keys')
@@ -103,12 +94,9 @@ export async function GET(req: NextRequest) {
 
     const projectId = keyData.project_id;
 
-    // Parse query params
     const searchParams = req.nextUrl.searchParams;
     const period = searchParams.get('period') || '24h';
     const { start, end } = getPeriodDates(period);
-
-    // Fetch request data for the period
     const { data: requests, error } = await supabase
         .from('ai_requests')
         .select('status, cost_usd, latency_ms, prompt_tokens, completion_tokens, total_tokens, provider, model')
@@ -121,7 +109,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch metrics' }, { status: 500 });
     }
 
-    // Calculate metrics
     const total = requests?.length || 0;
     const success = requests?.filter(r => r.status === 'success' || r.status === 'success_fallback').length || 0;
     const errored = requests?.filter(r => r.status === 'error').length || 0;
@@ -132,14 +119,12 @@ export async function GET(req: NextRequest) {
     const totalCompletionTokens = requests?.reduce((sum, r) => sum + (r.completion_tokens || 0), 0) || 0;
     const totalTokens = requests?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0;
 
-    // Latency calculations
     const latencies = requests?.map(r => r.latency_ms).filter((l): l is number => l !== null).sort((a, b) => a - b) || [];
     const avgLatency = latencies.length > 0 ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0;
     const p50 = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.5)] : null;
     const p90 = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.9)] : null;
     const p99 = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.99)] : null;
 
-    // Provider breakdown
     const providers: { [key: string]: { requests: number; cost_usd: number } } = {};
     requests?.forEach(r => {
         if (r.provider) {
@@ -151,7 +136,6 @@ export async function GET(req: NextRequest) {
         }
     });
 
-    // Model breakdown
     const models: { [key: string]: { requests: number; cost_usd: number } } = {};
     requests?.forEach(r => {
         if (r.model) {
@@ -163,7 +147,6 @@ export async function GET(req: NextRequest) {
         }
     });
 
-    // Round cost values
     Object.values(providers).forEach(p => p.cost_usd = Math.round(p.cost_usd * 10000) / 10000);
     Object.values(models).forEach(m => m.cost_usd = Math.round(m.cost_usd * 10000) / 10000);
 

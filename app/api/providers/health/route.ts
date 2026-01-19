@@ -12,7 +12,6 @@ interface ProviderHealth {
     };
 }
 
-// Provider API endpoints to ping (using their models endpoints)
 const PROVIDERS = [
     {
         name: 'OpenAI',
@@ -57,14 +56,12 @@ const PROVIDERS = [
 async function pingProvider(provider: typeof PROVIDERS[0]): Promise<ProviderHealth> {
     const apiKey = process.env[provider.envKey];
 
-    // Get circuit breaker state
     const circuitState = await getCircuitStatus(provider.id);
     const circuit = {
         state: circuitState.state,
         failures: circuitState.failures,
     };
 
-    // If circuit is open, mark as down without pinging
     if (circuitState.state === 'open') {
         return {
             name: provider.name,
@@ -93,7 +90,6 @@ async function pingProvider(provider: typeof PROVIDERS[0]): Promise<ProviderHeal
             ...provider.headers,
         };
 
-        // Anthropic uses x-api-key instead of Bearer
         if (provider.name === 'Anthropic') {
             headers['x-api-key'] = apiKey;
             delete headers['Authorization'];
@@ -107,13 +103,12 @@ async function pingProvider(provider: typeof PROVIDERS[0]): Promise<ProviderHeal
         const response = await fetch(url, {
             method: 'GET',
             headers,
-            signal: AbortSignal.timeout(5000), // 5s timeout
+            signal: AbortSignal.timeout(5000),
         });
 
         const latency = Date.now() - start;
 
         if (response.ok || response.status === 401 || response.status === 403) {
-            // 401/403 means the endpoint is reachable, just auth issue (which is fine for ping)
             const status = circuitState.state === 'half-open' ? 'degraded' :
                 latency > 500 ? 'degraded' : 'healthy';
             return {
@@ -143,11 +138,9 @@ async function pingProvider(provider: typeof PROVIDERS[0]): Promise<ProviderHeal
     }
 }
 
-// GET - Check health of all AI providers
 export async function GET() {
     const results = await Promise.all(PROVIDERS.map(pingProvider));
 
-    // Calculate summary
     const healthy = results.filter(p => p.status === 'healthy').length;
     const degraded = results.filter(p => p.status === 'degraded').length;
     const down = results.filter(p => p.status === 'down').length;

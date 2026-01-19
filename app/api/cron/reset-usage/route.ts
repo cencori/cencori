@@ -1,19 +1,10 @@
-/**
- * Monthly Usage Reset Cron Job
- * 
- * Endpoint called by Vercel Cron to reset monthly usage counters
- * Runs on the 1st of each month at midnight UTC
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { resetMonthlyUsage } from '@/lib/usage';
 
 export async function POST(req: NextRequest) {
     try {
-        // Verify authorization (Vercel Cron sends this header)
         const authHeader = req.headers.get('authorization');
 
-        // Check for cron secret
         if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
             console.error('[Cron] Unauthorized usage reset attempt');
             return NextResponse.json(
@@ -55,7 +46,6 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// Also support GET for manual testing (only in development)
 export async function GET(req: NextRequest) {
     if (process.env.NODE_ENV === 'production') {
         return NextResponse.json(
