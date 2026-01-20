@@ -15,11 +15,38 @@ from cencori import Cencori
 
 cencori = Cencori(api_key="your-api-key")
 
+# Chat
 response = cencori.ai.chat(
     messages=[{"role": "user", "content": "Hello!"}]
 )
-
 print(response.content)
+
+# Embeddings
+embedding = cencori.ai.embeddings(
+    input="Hello world",
+    model="text-embedding-3-small"
+)
+print(len(embedding.embeddings[0]))
+```
+
+## Async Support
+
+All methods have async counterparts:
+
+```python
+import asyncio
+from cencori import Cencori
+
+async def main():
+    cencori = Cencori()
+    
+    # Async chat
+    response = await cencori.ai.async_chat(
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    print(response.content)
+
+asyncio.run(main())
 ```
 
 ## Streaming
@@ -30,6 +57,48 @@ for chunk in cencori.ai.chat_stream(
     model="gpt-4o"
 ):
     print(chunk.delta, end="", flush=True)
+```
+
+
+## Project Management
+
+```python
+from cencori.types import CreateProjectParams
+
+# List projects
+projects = cencori.projects.list(org_slug="my-org")
+
+# Create project
+project = cencori.projects.create(
+    org_slug="my-org",
+    params=CreateProjectParams(name="New Project")
+)
+```
+
+## API Key Management
+
+```python
+from cencori.types import CreateAPIKeyParams
+
+# Create API key
+key = cencori.api_keys.create(
+    project_id="proj_123",
+    params=CreateAPIKeyParams(name="Dev Key", environment="dev")
+)
+print(f"Secret Key: {key.key}") # Only shown once!
+
+# Get key stats
+stats = cencori.api_keys.get_stats(project_id="proj_123", key_id=key.id)
+```
+
+## Metrics & Analytics
+
+```python
+# Get usage metrics for last 24 hours
+metrics = cencori.metrics.get(period="24h")
+
+print(f"Total Requests: {metrics.requests.total}")
+print(f"Total Cost: ${metrics.cost.total_usd}")
 ```
 
 ## Error Handling
