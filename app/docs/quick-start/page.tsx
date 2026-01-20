@@ -69,6 +69,15 @@ pnpm add cencori`}
                 </div>
 
                 <div className="space-y-3 mt-4">
+                    <h3 className="text-base font-semibold">Go</h3>
+                    <CodeBlock
+                        filename="terminal"
+                        language="bash"
+                        code={`go get github.com/cencori/cencori-go`}
+                    />
+                </div>
+
+                <div className="space-y-3 mt-4">
                     <h3 className="text-base font-semibold">Vercel AI SDK (optional)</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                         Using Vercel AI SDK? Install the Cencori provider for seamless integration:
@@ -142,6 +151,26 @@ cencori = Cencori(api_key=os.environ["CENCORI_API_KEY"])`}
                     />
                 </div>
 
+                <div className="space-y-3 mt-4">
+                    <h3 className="text-base font-semibold">Go</h3>
+                    <CodeBlock
+                        filename="main.go"
+                        language="go"
+                        code={`package main
+
+import (
+    "os"
+    "github.com/cencori/cencori-go"
+)
+
+func main() {
+    client, err := cencori.NewClient(
+        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    )
+}`}
+                    />
+                </div>
+
                 <div className="mt-4 p-4 bg-muted/20 border border-border/40">
                     <p className="text-xs text-muted-foreground">
                         <strong>Tip:</strong> Store your API keys in environment variables (.env file) and never commit them to version control.
@@ -185,6 +214,37 @@ export async function POST(req: Request) {
       { status: 403 }
     );
   }
+}`}
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Go</h3>
+                    <CodeBlock
+                        filename="main.go"
+                        language="go"
+                        code={`package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "github.com/cencori/cencori-go"
+)
+
+func main() {
+    client, _ := cencori.NewClient(
+        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    )
+
+    resp, _ := client.Chat.Create(context.Background(), &cencori.ChatParams{
+        Model: "gpt-4o",
+        Messages: []cencori.Message{
+            {Role: "user", Content: "Hello!"},
+        },
+    })
+
+    fmt.Println(resp.Choices[0].Message.Content)
 }`}
                     />
                 </div>

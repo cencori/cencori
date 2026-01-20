@@ -26,6 +26,11 @@ npm install cencori
 pip install cencori
 ```
 
+**Go:**
+```bash
+go get github.com/cencori/cencori-go
+```
+
 ### 2. Set Environment Variables
 
 ```bash
@@ -64,6 +69,34 @@ export async function POST(req: Request) {
     content: response.content,
     usage: response.usage,
   });
+}
+```
+
+**Go:**
+```go
+// main.go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "github.com/cencori/cencori-go"
+)
+
+func main() {
+    client, _ := cencori.NewClient(
+        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    )
+
+    resp, _ := client.Chat.Create(context.Background(), &cencori.ChatParams{
+        Model: "gpt-4o",
+        Messages: []cencori.Message{
+            {Role: "user", Content: "Hello!"},
+        },
+    })
+
+    fmt.Println(resp.Choices[0].Message.Content)
 }
 ```
 
@@ -212,6 +245,20 @@ response = cencori.ai.chat(
 print(response.content)
 ```
 
+**Go:**
+```go
+resp, _ := client.Chat.Create(ctx, &cencori.ChatParams{
+    Model: "gpt-4o",
+    Messages: []cencori.Message{
+        {Role: "system", Content: "You are a helpful assistant."},
+        {Role: "user", Content: "Hello!"},
+    },
+    Temperature: cencori.Float64(0.7),
+    MaxTokens:   cencori.Int(1000),
+})
+fmt.Println(resp.Choices[0].Message.Content)
+```
+
 ### Parameters
 
 | Parameter | Type | Required | Description |
@@ -318,6 +365,22 @@ while (true) {
   if (done) break;
   const chunk = decoder.decode(value);
   setResponse(prev => prev + chunk);
+}
+```
+
+**Go (Client, Streaming):**
+```go
+stream, _ := client.Chat.Stream(context.Background(), &cencori.ChatParams{
+    Model: "claude-3-opus",
+    Messages: []cencori.Message{
+        {Role: "user", Content: "Tell me a story"},
+    },
+})
+
+for chunk := range stream {
+    if len(chunk.Choices) > 0 {
+        fmt.Print(chunk.Choices[0].Delta.Content)
+    }
 }
 ```
 

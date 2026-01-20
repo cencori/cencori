@@ -33,13 +33,8 @@ export default function InstallationPage() {
                     },
                     {
                         value: "go",
-                        label: "Go (coming soon)",
-                        disabled: true,
-                        content: (
-                            <div className="p-8 text-center border border-dashed border-border/60 rounded-lg">
-                                <p className="text-muted-foreground">Go SDK coming soon!</p>
-                            </div>
-                        )
+                        label: "Go",
+                        content: <GoContent />
                     }
                 ]}
             />
@@ -549,6 +544,125 @@ except RateLimitError:
     print("Too many requests - slow down or upgrade your plan")
 except SafetyError as e:
     print(f"Content blocked by safety filters: {e.reasons}")`}
+                />
+            </div>
+        </>
+    );
+}
+
+// ==================== Go Content ====================
+async function GoContent() {
+    return (
+        <>
+            {/* Requirements */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Requirements
+                </h2>
+                <ul className="space-y-2 text-sm ml-6">
+                    <li className="list-disc">
+                        <strong>Go:</strong> Version 1.21 or higher
+                    </li>
+                </ul>
+            </div>
+
+            {/* Installation */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Installation
+                </h2>
+                <CodeBlock
+                    filename="terminal"
+                    language="bash"
+                    code={`go get github.com/cencori/cencori-go`}
+                />
+            </div>
+
+            {/* SDK Initialization */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    SDK Initialization
+                </h2>
+                <CodeBlock
+                    filename="main.go"
+                    language="go"
+                    code={`import (
+    "context"
+    "os"
+    "github.com/cencori/cencori-go"
+)
+
+client, _ := cencori.NewClient(
+    cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+)`}
+                />
+            </div>
+
+            {/* Basic Usage */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Basic Usage
+                </h2>
+                <CodeBlock
+                    filename="main.go"
+                    language="go"
+                    code={`resp, err := client.Chat.Create(context.Background(), &cencori.ChatParams{
+    Model: "gpt-4o",
+    Messages: []cencori.Message{
+        {Role: "user", Content: "Hello world!"},
+    },
+})
+
+if err != nil {
+    panic(err)
+}
+
+fmt.Println(resp.Choices[0].Message.Content)`}
+                />
+            </div>
+
+            {/* Streaming */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Streaming Responses
+                </h2>
+                <CodeBlock
+                    filename="main.go"
+                    language="go"
+                    code={`stream, err := client.Chat.Stream(context.Background(), &cencori.ChatParams{
+    Model: "claude-3-opus",
+    Messages: []cencori.Message{
+        {Role: "user", Content: "Write a poem"},
+    },
+})
+
+for chunk := range stream {
+    if len(chunk.Choices) > 0 {
+        fmt.Print(chunk.Choices[0].Delta.Content)
+    }
+}`}
+                />
+            </div>
+
+            {/* Error Handling */}
+            <div className="space-y-4">
+                <h2 className="scroll-m-20 text-lg font-semibold tracking-tight">
+                    Error Handling
+                </h2>
+                <CodeBlock
+                    filename="main.go"
+                    language="go"
+                    code={`import "errors"
+
+_, err := client.Chat.Create(ctx, params)
+
+if errors.Is(err, cencori.ErrInvalidAPIKey) {
+    // Handle invalid key
+} else if errors.Is(err, cencori.ErrRateLimited) {
+    // Handle rate limit
+} else if errors.Is(err, cencori.ErrContentFiltered) {
+    // Handle safety filter
+}`}
                 />
             </div>
         </>
