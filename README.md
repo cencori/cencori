@@ -42,6 +42,11 @@ npm install cencori
 pip install cencori
 ```
 
+**Go:**
+```bash
+go get github.com/cencori/cencori-go
+```
+
 ### 2. Get Your API Key
 
 1. Sign up at [cencori.com](https://cencori.com)
@@ -80,6 +85,33 @@ response = cencori.ai.chat(
 print(response.content)
 ```
 
+**Go:**
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "github.com/cencori/cencori-go"
+)
+
+func main() {
+    client, _ := cencori.NewClient(
+        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    )
+    
+    resp, _ := client.Chat.Create(context.Background(), &cencori.ChatParams{
+        Model: "gpt-4o",
+        Messages: []cencori.Message{
+            {Role: "user", Content: "Hello!"},
+        },
+    })
+    
+    fmt.Println(resp.Choices[0].Message.Content)
+}
+```
+
 ### 4. Stream Responses in Real-Time
 
 **JavaScript/TypeScript:**
@@ -102,6 +134,22 @@ for chunk in cencori.ai.chat_stream(
     model="gpt-4o"
 ):
     print(chunk.delta, end="", flush=True)
+```
+
+**Go:**
+```go
+stream, _ := client.Chat.Stream(context.Background(), &cencori.ChatParams{
+    Model: "gpt-4o",
+    Messages: []cencori.Message{
+        {Role: "user", Content: "Tell me a story"},
+    },
+})
+
+for chunk := range stream {
+    if len(chunk.Choices) > 0 {
+        fmt.Print(chunk.Choices[0].Delta.Content)
+    }
+}
 ```
 
 **That's it!** Cencori handles security, logging, and cost tracking automatically.
@@ -404,6 +452,21 @@ except RateLimitError:
     print("Rate limit exceeded")
 except SafetyError as e:
     print(f"Content blocked: {e.reasons}")
+```
+
+**Go:**
+```go
+import "errors"
+
+_, err := client.Chat.Create(ctx, params)
+
+if errors.Is(err, cencori.ErrInvalidAPIKey) {
+    // Handle invalid key
+} else if errors.Is(err, cencori.ErrRateLimited) {
+    // Handle rate limit
+} else if errors.Is(err, cencori.ErrContentFiltered) {
+    // Handle safety filter
+}
 ```
 
 ---
