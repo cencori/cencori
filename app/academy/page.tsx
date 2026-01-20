@@ -44,7 +44,7 @@ const courses = [
 
 export default function AcademyPage() {
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto mt-24">
             {/* Header */}
             <div className="text-center mb-12">
                 <Badge variant="secondary" className="mb-4">
