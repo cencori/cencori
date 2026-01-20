@@ -44,8 +44,7 @@ const courses = [
 
 export default function AcademyPage() {
     return (
-        <div className="max-w-4xl mx-auto mt-24">
-            {/* Header */}
+        <div className="max-w-4xl mx-auto mt-32">
             <div className="text-center mb-12">
                 <Badge variant="secondary" className="mb-4">
                     Interactive Learning
@@ -59,7 +58,6 @@ export default function AcademyPage() {
                 </p>
             </div>
 
-            {/* Featured Course */}
             <div className="mb-12">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                     Start Here
@@ -105,7 +103,6 @@ export default function AcademyPage() {
                 ))}
             </div>
 
-            {/* Other Courses */}
             <div>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                     More Courses
@@ -153,7 +150,6 @@ export default function AcademyPage() {
                 </div>
             </div>
 
-            {/* CTA */}
             <div className="mt-16 text-center py-12 border-t border-border/40">
                 <h2 className="text-xl font-semibold mb-2">Ready to get started?</h2>
                 <p className="text-muted-foreground mb-6">
