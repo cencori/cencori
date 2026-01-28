@@ -25,6 +25,7 @@ export function TitleSlide() {
                         height={60}
                         className="h-14 w-auto"
                         priority
+                        unoptimized
                     />
                 </div>
 
