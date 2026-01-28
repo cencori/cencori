@@ -86,17 +86,24 @@ export async function middleware(request: NextRequest) {
         request: { headers: request.headers },
     });
 
-    // Handle pitch subdomain
-    if (domain === 'pitch.cencori.com' || domain === 'pitch.localhost') {
-        const url = request.nextUrl.clone();
-        url.pathname = `/pitch${url.pathname}`;
-        response = NextResponse.rewrite(url);
-    }
-    // Handle design subdomain
-    else if (domain === 'design.cencori.com' || domain === 'design.localhost') {
-        const url = request.nextUrl.clone();
-        url.pathname = `/design${url.pathname}`;
-        response = NextResponse.rewrite(url);
+    const pathname = request.nextUrl.pathname;
+    // Skip rewriting for static files (images, etc)
+    // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
+    const isFile = pathname.includes('.') && !pathname.startsWith('/.well-known');
+
+    if (!isFile) {
+        // Handle pitch subdomain
+        if (domain === 'pitch.cencori.com' || domain === 'pitch.localhost') {
+            const url = request.nextUrl.clone();
+            url.pathname = `/pitch${url.pathname}`;
+            response = NextResponse.rewrite(url);
+        }
+        // Handle design subdomain
+        else if (domain === 'design.cencori.com' || domain === 'design.localhost') {
+            const url = request.nextUrl.clone();
+            url.pathname = `/design${url.pathname}`;
+            response = NextResponse.rewrite(url);
+        }
     }
 
     // 3. Supabase Auth Session Refresh
