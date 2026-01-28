@@ -43,7 +43,7 @@ export default function PitchLayout({
             const pdf = new jsPDF({
                 orientation: "landscape",
                 unit: "px",
-                format: [1920, 1080], // Match slide aspect ratio
+                format: [1280, 720], // Adjusted resolution for better scaling/readability
             });
 
             for (let i = 0; i < slides.length; i++) {
@@ -52,16 +52,17 @@ export default function PitchLayout({
                 // Capture slide
                 const imgData = await toJpeg(slide, {
                     quality: 0.95,
-                    width: 1920,
-                    height: 1080,
+                    width: 1280,
+                    height: 720,
+                    pixelRatio: 2, // High DPI capture for text sharpness
                     backgroundColor: "#0a0a0a", // Force dark background if transparent
                     style: {
                         transform: 'scale(1)', // Ensure no unintended scaling
                     }
                 });
 
-                if (i > 0) pdf.addPage([1920, 1080], "landscape");
-                pdf.addImage(imgData, "JPEG", 0, 0, 1920, 1080);
+                if (i > 0) pdf.addPage([1280, 720], "landscape");
+                pdf.addImage(imgData, "JPEG", 0, 0, 1280, 720);
 
                 // Small delay to prevent UI freeze
                 await new Promise(r => setTimeout(r, 100));
@@ -146,15 +147,15 @@ export default function PitchLayout({
                     position: "fixed",
                     top: "-10000px",
                     left: "-10000px",
-                    width: "1920px",
-                    height: "1080px", // Fixed 16:9 1080p size for capture
+                    width: "1280px",
+                    height: "720px", // Fixed 16:9 720p logical size for larger elements
                     pointerEvents: "none",
                 }}
             >
                 {PITCH_SLIDES.map((slide) => (
                     <div
                         key={slide.id}
-                        style={{ width: "1920px", height: "1080px" }}
+                        style={{ width: "1280px", height: "720px" }}
                         className="bg-card text-foreground"
                     >
                         <slide.component />
