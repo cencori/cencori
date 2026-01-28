@@ -43,7 +43,7 @@ const team = [
         name: "Daniel Oreofe",
         role: "Co-Founder & COO",
         bio: "Operations leader scaling startups from 0 to 1. Expert in go-to-market strategy and building high-performing teams.",
-        avatar: "/daniel.png",
+        avatar: "/daniel-avatar.png",
         links: {
             linkedin: "https://linkedin.com/in/TheDanielOreofe",
             twitter: "https://twitter.com/TheDanielOreofe",
