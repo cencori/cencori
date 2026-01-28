@@ -14,27 +14,65 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import script from "next/script";
+import { PITCH_SLIDES } from "@/lib/pitch-slides";
+import { toJpeg } from "html-to-image";
+import jsPDF from "jspdf";
+import { useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+
 export default function PitchLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const handleExport = async (format: "pdf" | "pptx" | "docx") => {
-        try {
-            const response = await fetch(`/api/pitch/export?format=${format}`);
-            if (!response.ok) throw new Error("Export failed");
+    const exportContainerRef = useRef<HTMLDivElement>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `cencori-pitch-deck.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+    const handleExport = async (format: "pdf" | "pptx" | "docx") => {
+        if (format !== "pdf") {
+            alert("Only PDF export is fully supported right now.");
+            return;
+        }
+
+        if (!exportContainerRef.current) return;
+
+        try {
+            setIsExporting(true);
+            const slides = Array.from(exportContainerRef.current.children) as HTMLElement[];
+            const pdf = new jsPDF({
+                orientation: "landscape",
+                unit: "px",
+                format: [1920, 1080], // Match slide aspect ratio
+            });
+
+            for (let i = 0; i < slides.length; i++) {
+                const slide = slides[i];
+
+                // Capture slide
+                const imgData = await toJpeg(slide, {
+                    quality: 0.95,
+                    width: 1920,
+                    height: 1080,
+                    backgroundColor: "#0a0a0a", // Force dark background if transparent
+                    style: {
+                        transform: 'scale(1)', // Ensure no unintended scaling
+                    }
+                });
+
+                if (i > 0) pdf.addPage([1920, 1080], "landscape");
+                pdf.addImage(imgData, "JPEG", 0, 0, 1920, 1080);
+
+                // Small delay to prevent UI freeze
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            pdf.save("cencori-pitch-deck.pdf");
         } catch (error) {
             console.error("Export error:", error);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -57,9 +95,14 @@ export default function PitchLayout({
                                     variant="outline"
                                     size="sm"
                                     className="h-8 px-3 text-xs rounded-full gap-1.5"
+                                    disabled={isExporting}
                                 >
-                                    <ArrowDownTrayIcon className="h-3 w-3" />
-                                    Export
+                                    {isExporting ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <ArrowDownTrayIcon className="h-3 w-3" />
+                                    )}
+                                    {isExporting ? "Exporting..." : "Export"}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
@@ -67,10 +110,14 @@ export default function PitchLayout({
                                     <span className="text-xs">Download PDF</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleExport("pptx")}>
-                                    <span className="text-xs">Download PPTX</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Download PPTX (Soon)
+                                    </span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleExport("docx")}>
-                                    <span className="text-xs">Download DOCX</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Download DOCX (Soon)
+                                    </span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -91,6 +138,29 @@ export default function PitchLayout({
 
             {/* Main Content */}
             <main className="pt-14">{children}</main>
+
+            {/* Off-screen Export Container */}
+            <div
+                ref={exportContainerRef}
+                style={{
+                    position: "fixed",
+                    top: "-10000px",
+                    left: "-10000px",
+                    width: "1920px",
+                    height: "1080px", // Fixed 16:9 1080p size for capture
+                    pointerEvents: "none",
+                }}
+            >
+                {PITCH_SLIDES.map((slide) => (
+                    <div
+                        key={slide.id}
+                        style={{ width: "1920px", height: "1080px" }}
+                        className="bg-card text-foreground"
+                    >
+                        <slide.component />
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
