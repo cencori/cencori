@@ -1,0 +1,10 @@
+export { TitleSlide } from "./TitleSlide";
+export { ProblemSlide } from "./ProblemSlide";
+export { SolutionSlide } from "./SolutionSlide";
+export { ProductSlide } from "./ProductSlide";
+export { MarketSlide } from "./MarketSlide";
+export { HowItWorksSlide } from "./HowItWorksSlide";
+export { BusinessModelSlide } from "./BusinessModelSlide";
+export { TractionSlide } from "./TractionSlide";
+export { TeamSlide } from "./TeamSlide";
+export { AskSlide } from "./AskSlide";

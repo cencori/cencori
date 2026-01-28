@@ -49,6 +49,26 @@
                 }
             ],
             "destination": "/design"
+        },
+        {
+            "source": "/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "pitch.cencori.com"
+                }
+            ],
+            "destination": "/pitch/:path*"
+        },
+        {
+            "source": "/",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "pitch.cencori.com"
+                }
+            ],
+            "destination": "/pitch"
         }
     ],
     "crons": [
