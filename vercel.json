@@ -71,6 +71,23 @@
             "destination": "/pitch"
         }
     ],
+    "redirects": [
+        {
+            "source": "/old-path",
+            "destination": "/new-path",
+            "permanent": true
+        },
+        {
+            "source": "/temporary-service",
+            "destination": "/maintenance",
+            "permanent": false
+        },
+        {
+            "source": "/old-blog/:slug",
+            "destination": "/new-blog/:slug",
+            "permanent": true
+        }
+    ],
     "crons": [
         {
             "path": "/api/cron/reset-usage",
