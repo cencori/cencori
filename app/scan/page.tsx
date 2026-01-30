@@ -6,9 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusIcon, Search, Shield } from "lucide-react";
+import { PlusIcon, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+// Heroicons archive-box-arrow-down icon
+const ArchiveBoxArrowDownIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+    </svg>
+);
 
 interface ScanProject {
     id: string;
@@ -198,7 +205,7 @@ export default function ScanDashboardPage() {
             ) : (
                 <div className="text-center py-16 flex flex-col items-center justify-center">
                     <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <Shield className="h-5 w-5 text-muted-foreground" />
+                        <ArchiveBoxArrowDownIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium mb-1">No projects found</p>
                     <p className="text-xs text-muted-foreground mb-4">
