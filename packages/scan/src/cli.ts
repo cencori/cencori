@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { scan, type ScanResult, type ScanIssue } from './scanner/index.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
@@ -28,6 +28,7 @@ const typeLabels: Record<string, string> = {
     pii: 'PII',
     route: 'ROUTES',
     config: 'CONFIG',
+    vulnerability: 'VULNERABILITIES',
 };
 
 /**
@@ -142,6 +143,11 @@ function printFixes(issues: ScanIssue[]): void {
     const hasSecrets = issues.some(i => i.type === 'secret');
     const hasPII = issues.some(i => i.type === 'pii');
     const hasConfig = issues.some(i => i.type === 'config');
+    const hasVulnerabilities = issues.some(i => i.type === 'vulnerability');
+    const hasXSS = issues.some(i => i.category === 'xss');
+    const hasInjection = issues.some(i => i.category === 'injection');
+    const hasCORS = issues.some(i => i.category === 'cors');
+    const hasDebug = issues.some(i => i.category === 'debug');
 
     if (hasSecrets) {
         console.log(chalk.gray('    - Use environment variables for secrets'));
@@ -152,6 +158,21 @@ function printFixes(issues: ScanIssue[]): void {
     }
     if (hasPII) {
         console.log(chalk.gray('    - Remove personal data from source code'));
+    }
+    if (hasXSS) {
+        console.log(chalk.gray('    - Sanitize user input before rendering HTML'));
+        console.log(chalk.gray('    - Use textContent instead of innerHTML'));
+    }
+    if (hasInjection) {
+        console.log(chalk.gray('    - Use parameterized queries for SQL'));
+        console.log(chalk.gray('    - Avoid using eval and dynamic code execution'));
+    }
+    if (hasCORS) {
+        console.log(chalk.gray('    - Configure CORS with specific allowed origins'));
+    }
+    if (hasDebug) {
+        console.log(chalk.gray('    - Remove console.log statements before production'));
+        console.log(chalk.gray('    - Use environment variables for debug flags'));
     }
 
     console.log();
