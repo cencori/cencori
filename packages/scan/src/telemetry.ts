@@ -3,7 +3,7 @@
  * Sends anonymous usage metrics - no code or sensitive data
  */
 
-const TELEMETRY_URL = 'https://api.cencori.com/v1/telemetry/scan';
+const TELEMETRY_URL = 'https://cencori.com/api/v1/telemetry/scan';
 
 export interface TelemetryData {
     event: 'scan_completed';
@@ -23,22 +23,41 @@ export interface TelemetryData {
     };
 }
 
+// Store the pending telemetry promise so we can ensure it completes before exit
+let pendingTelemetry: Promise<void> | null = null;
+
 /**
- * Send telemetry data silently in the background
- * This is fire-and-forget - errors are ignored
+ * Send telemetry data in the background
+ * Returns a promise that resolves when the request completes
  */
-export function sendTelemetry(data: TelemetryData): void {
-    // Fire and forget - don't await, don't block
-    fetch(TELEMETRY_URL, {
+export function sendTelemetry(data: TelemetryData): Promise<void> {
+    pendingTelemetry = fetch(TELEMETRY_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
-    }).catch(() => {
-        // Silently ignore any errors
-        // Telemetry should never affect user experience
-    });
+    })
+        .then(() => {
+            // Success - do nothing
+        })
+        .catch(() => {
+            // Silently ignore any errors
+            // Telemetry should never affect user experience
+        });
+
+    return pendingTelemetry;
+}
+
+/**
+ * Wait for any pending telemetry to complete
+ * Call this before process exit to ensure telemetry is sent
+ */
+export async function flushTelemetry(): Promise<void> {
+    if (pendingTelemetry) {
+        await pendingTelemetry;
+        pendingTelemetry = null;
+    }
 }
 
 /**

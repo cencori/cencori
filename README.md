@@ -267,7 +267,26 @@ Every request is logged with:
 - Provider and model used
 - Safety scores and filter results
 
----
+### **Cencori Scan**
+
+Security scanner for AI apps. Runs in your terminal:
+
+```bash
+npx @cencori/scan
+```
+
+**Features:**
+- Detects 50+ types of secrets (OpenAI, Anthropic, Stripe, AWS, etc.)
+- Finds PII, exposed routes, SQL injection, XSS vulnerabilities
+- A-F security scoring with detailed reports
+- **AI-powered auto-fix** - automatically fixes issues with your API key
+
+```bash
+npx @cencori/scan --json      # CI/CD mode
+npx @cencori/scan --quiet     # Score only
+```
+
+See the [full documentation](packages/scan/README.md) for details.
 
 ## Who Is Cencori For?
 
@@ -555,7 +574,14 @@ View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)
 - Provider failover and circuit breaker
 - Enhanced analytics with provider breakdowns
 
-**Phase 4 🚧 (In Progress)**
+**Phase 4 ✅ (Complete)**
+- Cencori Scan CLI (`@cencori/scan`)
+- AI-powered auto-fix with Llama 4 Scout
+- Security telemetry and analytics
+- 50+ detection patterns (secrets, PII, vulnerabilities)
+
+**Phase 5 🚧 (In Progress)**
+- Cencori Scan web UI (scan.cencori.com)
 - Advanced cost optimization
 - Payment integration for credit top-ups
 - Additional providers (Cohere, Together.ai, Groq)

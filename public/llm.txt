@@ -602,6 +602,103 @@ All security violations throw `SafetyError` with `reasons` array.
 8. **Use secret keys for servers** - Never expose `csk_` keys in client code
 9. **Use publishable keys for browsers** - Use `cpk_` keys with domain whitelisting
 
+## Cencori Scan (@cencori/scan)
+
+Security scanner for AI apps. Detect hardcoded secrets, PII leaks, exposed routes, and security vulnerabilities — with AI-powered auto-fix.
+
+### Quick Start
+
+```bash
+npx @cencori/scan
+```
+
+Run in any project directory to instantly scan for security issues.
+
+### What It Detects
+
+| Category | Examples |
+|----------|----------|
+| **API Keys & Secrets** | OpenAI, Anthropic, Google AI, Supabase, Stripe, AWS, GitHub, Firebase + 20 more |
+| **PII** | Email addresses, phone numbers, SSNs, credit cards |
+| **Exposed Routes** | Next.js/Express routes without authentication |
+| **Vulnerabilities** | SQL injection, XSS, insecure CORS, hardcoded passwords |
+
+### CLI Options
+
+```bash
+npx @cencori/scan            # Scan current directory
+npx @cencori/scan ./path     # Scan specific path
+npx @cencori/scan --json     # Output JSON (for CI/CD)
+npx @cencori/scan --quiet    # Score only
+npx @cencori/scan --no-prompt # Non-interactive mode
+```
+
+### AI Auto-Fix (Pro)
+
+After scanning, enter `y` when prompted to auto-fix issues:
+
+```
+? Would you like Cencori to auto-fix these issues? (y/n)
+> y
+
+? Enter your Cencori API key: ************************
+  (Get one at https://cencori.com/dashboard)
+
+✔ API key saved to ~/.cencorirc
+✔ Analyzing with AI...
+✔ Applied 10 fixes
+```
+
+The AI will:
+1. Analyze each issue for false positives
+2. Generate secure code fixes
+3. Apply fixes automatically
+
+Your API key is saved for future scans.
+
+### Programmatic Usage
+
+```typescript
+import { scan } from '@cencori/scan';
+
+const result = await scan('./my-project');
+
+console.log(result.score);        // 'A' | 'B' | 'C' | 'D' | 'F'
+console.log(result.issues);       // Array of detected issues
+console.log(result.filesScanned); // Number of files scanned
+```
+
+### Security Score
+
+| Score | Meaning |
+|-------|---------|
+| **A-Tier** | Excellent - No issues |
+| **B-Tier** | Good - Minor improvements |
+| **C-Tier** | Fair - Some concerns |
+| **D-Tier** | Poor - Significant issues |
+| **F-Tier** | Critical - Secrets exposed |
+
+### CI/CD Integration (GitHub Actions)
+
+```yaml
+name: Security Scan
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Cencori Scan
+        run: npx @cencori/scan --json > scan-results.json
+      - name: Check for failures
+        run: |
+          SCORE=$(jq -r '.score' scan-results.json)
+          if [[ "$SCORE" == "F" ]]; then
+            echo "Security scan failed"
+            exit 1
+          fi
+```
+
 ## API Key Types
 
 Cencori supports two types of API keys:
@@ -636,3 +733,5 @@ After integration, visit your Cencori dashboard to see:
 - Dashboard: https://cencori.com
 - Full Docs: https://cencori.com/docs
 - Pricing: https://cencori.com/pricing
+- Cencori Scan (CLI): https://www.npmjs.com/package/@cencori/scan
+- Cencori Scan (Web): https://scan.cencori.com
