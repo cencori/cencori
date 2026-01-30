@@ -90,7 +90,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {/* Logo + Wordmark */}
-                    <Link href="/scan" className="flex items-center gap-2">
+                    <Link href="/" className="flex items-center gap-2">
                         <Image
                             src="/logo white.svg"
                             alt="Cencori"
