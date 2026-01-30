@@ -233,19 +233,12 @@ export async function POST(
     }
 
     try {
-        // Get GitHub installation
-        const adminSupabase = createAdminClient();
-        const { data: installation, error: installError } = await adminSupabase
-            .from('github_installations')
-            .select('installation_id')
-            .eq('user_id', user.id)
-            .single();
-
-        if (installError || !installation) {
-            return NextResponse.json({ error: 'GitHub not connected' }, { status: 400 });
+        // Use the installation ID stored in the project
+        if (!project.github_installation_id) {
+            return NextResponse.json({ error: 'GitHub not connected for this project' }, { status: 400 });
         }
 
-        const octokit = await getInstallationOctokit(installation.installation_id);
+        const octokit = await getInstallationOctokit(project.github_installation_id);
         const [owner, repo] = project.github_repo_full_name.split('/');
 
         // Fetch commits from GitHub
