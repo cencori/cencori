@@ -56,6 +56,17 @@ interface ScanRun {
     results?: { issues: ScanIssue[] };
 }
 
+interface Changelog {
+    id: string;
+    project_id: string;
+    title: string | null;
+    markdown: string;
+    period_start: string;
+    period_end: string;
+    commit_count: number;
+    created_at: string;
+}
+
 const scoreColors: Record<string, string> = {
     A: "bg-emerald-500",
     B: "bg-blue-500",
@@ -92,10 +103,13 @@ export default function ProjectDetailPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
+    const [isGeneratingChangelog, setIsGeneratingChangelog] = useState(false);
     const [project, setProject] = useState<ScanProject | null>(null);
     const [scans, setScans] = useState<ScanRun[]>([]);
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
+    const [changelogs, setChangelogs] = useState<Changelog[]>([]);
+    const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
 
     // Fetch project data
     useEffect(() => {
@@ -118,6 +132,45 @@ export default function ProjectDetailPage() {
         };
         fetchProject();
     }, [projectId]);
+
+    // Fetch changelogs
+    useEffect(() => {
+        const fetchChangelogs = async () => {
+            try {
+                const response = await fetch(`/api/scan/projects/${projectId}/changelog`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setChangelogs(data.changelogs || []);
+                }
+            } catch (err) {
+                console.error('Error fetching changelogs:', err);
+            }
+        };
+        fetchChangelogs();
+    }, [projectId]);
+
+    const handleGenerateChangelog = async () => {
+        if (!project) return;
+
+        setIsGeneratingChangelog(true);
+        try {
+            const response = await fetch(`/api/scan/projects/${projectId}/changelog`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ since: '1 week ago' }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setChangelogs(prev => [data.changelog, ...prev]);
+                setSelectedChangelog(data.changelog);
+            }
+        } catch (err) {
+            console.error('Error generating changelog:', err);
+        } finally {
+            setIsGeneratingChangelog(false);
+        }
+    };
 
     const handleRunScan = async () => {
         if (!project) return;
@@ -410,17 +463,78 @@ export default function ProjectDetailPage() {
                             <h2 className="text-[13px] font-medium">Changelog</h2>
                             <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
                         </div>
-                        <Button size="sm" className="h-7 text-xs px-3">
-                            Generate Changelog
+                        <Button
+                            size="sm"
+                            className="h-7 text-xs px-3"
+                            onClick={handleGenerateChangelog}
+                            disabled={isGeneratingChangelog}
+                        >
+                            {isGeneratingChangelog ? (
+                                <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
+                            ) : (
+                                "Generate Changelog"
+                            )}
                         </Button>
                     </div>
-                    <div className="text-center py-16 flex flex-col items-center justify-center">
-                        <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                            <GitBranch className="h-5 w-5 text-muted-foreground" />
+
+                    {changelogs.length === 0 ? (
+                        <div className="text-center py-16 flex flex-col items-center justify-center">
+                            <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                                <GitBranch className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm font-medium mb-1">No changelogs generated yet</p>
+                            <p className="text-xs text-muted-foreground">Click &quot;Generate Changelog&quot; to create your first one</p>
                         </div>
-                        <p className="text-sm font-medium mb-1">No changelogs generated yet</p>
-                        <p className="text-xs text-muted-foreground">Click "Generate Changelog" to create your first one</p>
-                    </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {/* Changelog list */}
+                            <div className="flex gap-4">
+                                {/* Sidebar with changelog list */}
+                                <div className="w-48 shrink-0 space-y-1">
+                                    {changelogs.map((changelog) => {
+                                        const isSelected = selectedChangelog?.id === changelog.id;
+                                        const date = new Date(changelog.created_at).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        });
+                                        return (
+                                            <button
+                                                key={changelog.id}
+                                                onClick={() => setSelectedChangelog(changelog)}
+                                                className={cn(
+                                                    "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
+                                                    isSelected
+                                                        ? "bg-secondary text-foreground"
+                                                        : "hover:bg-secondary/50 text-muted-foreground"
+                                                )}
+                                            >
+                                                <div className="font-medium">{date}</div>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    {changelog.commit_count} commits
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Changelog content */}
+                                <div className="flex-1 bg-card border border-border/40 rounded-md p-4 overflow-auto">
+                                    {selectedChangelog ? (
+                                        <div className="prose prose-sm prose-invert max-w-none">
+                                            <pre className="whitespace-pre-wrap text-xs font-mono text-foreground p-0 m-0 bg-transparent">
+                                                {selectedChangelog.markdown}
+                                            </pre>
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-muted-foreground text-center py-8">
+                                            Select a changelog to view
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="settings" className="max-w-xl">
