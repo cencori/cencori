@@ -141,39 +141,47 @@ export default function ProjectDetailPage() {
                 const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; file?: string; line?: number }> = [
                     { type: "info", message: "Starting security scan...", time: "0.0s" },
                     { type: "success", message: "Connected to repository", time: "0.5s" },
-                    { type: "info", message: `Scanning ${scan.files_scanned} files...`, time: "1.0s" },
                 ];
 
-                const issuesByFile = new Map<string, ScanIssue[]>();
-                for (const issue of scan.issues || []) {
-                    const existing = issuesByFile.get(issue.file) || [];
-                    existing.push(issue);
-                    issuesByFile.set(issue.file, existing);
-                }
+                // Handle empty repository
+                if (scan.message && scan.files_scanned === 0) {
+                    logEntries.push({ type: "info", message: scan.message, time: "0.2s" });
+                } else {
+                    logEntries.push({ type: "info", message: `Scanning ${scan.files_scanned} files...`, time: "1.0s" });
 
-                let timeOffset = 1.5;
-                for (const [file, issues] of issuesByFile) {
-                    logEntries.push({
-                        type: "file",
-                        message: file,
-                        time: `${timeOffset.toFixed(1)}s`,
-                    });
-
-                    for (const issue of issues) {
-                        logEntries.push({
-                            type: "issue",
-                            message: `${issue.name}: ${issue.match}`,
-                            severity: issue.severity,
-                            line: issue.line,
-                        });
+                    const issuesByFile = new Map<string, ScanIssue[]>();
+                    for (const issue of scan.issues || []) {
+                        const existing = issuesByFile.get(issue.file) || [];
+                        existing.push(issue);
+                        issuesByFile.set(issue.file, existing);
                     }
-                    timeOffset += 0.1;
+
+                    let timeOffset = 1.5;
+                    for (const [file, issues] of issuesByFile) {
+                        logEntries.push({
+                            type: "file",
+                            message: file,
+                            time: `${timeOffset.toFixed(1)}s`,
+                        });
+
+                        for (const issue of issues) {
+                            logEntries.push({
+                                type: "issue",
+                                message: `${issue.name}: ${issue.match}`,
+                                severity: issue.severity,
+                                line: issue.line,
+                            });
+                        }
+                        timeOffset += 0.1;
+                    }
                 }
 
                 const totalTime = (scan.scan_duration_ms / 1000).toFixed(1);
                 logEntries.push({
                     type: "summary",
-                    message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`,
+                    message: scan.files_scanned === 0
+                        ? "Complete: Repository is empty"
+                        : `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`,
                     time: `${totalTime}s`,
                 });
 
@@ -275,7 +283,7 @@ export default function ProjectDetailPage() {
                     {isScanning ? (
                         <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Scanning...</>
                     ) : (
-                        <><Play className="h-3 w-3 mr-1.5" /> Run Scan</>
+                        <><Play className="h-3 w-3 mr-1.5" />Scan</>
                     )}
                 </Button>
             </div>

@@ -166,12 +166,61 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             const [owner, repo] = project.github_repo_full_name.split('/');
 
             // Get repository tree (all files)
-            const { data: treeData } = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-                owner,
-                repo,
-                tree_sha: 'HEAD',
-                recursive: '1',
-            });
+            let treeData;
+            try {
+                const response = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+                    owner,
+                    repo,
+                    tree_sha: 'HEAD',
+                    recursive: '1',
+                });
+                treeData = response.data;
+            } catch (treeError: unknown) {
+                // Handle empty repository (409 Conflict)
+                if (treeError && typeof treeError === 'object' && 'status' in treeError && treeError.status === 409) {
+                    console.log('[Scan] Repository is empty, no files to scan');
+
+                    // Update scan run with empty results
+                    await supabaseAdmin
+                        .from('scan_runs')
+                        .update({
+                            status: 'completed',
+                            score: 'A',
+                            files_scanned: 0,
+                            issues_found: 0,
+                            scan_duration_ms: Date.now() - startTime,
+                            secrets_count: 0,
+                            vulnerabilities_count: 0,
+                            results: { issues: [], message: 'Repository is empty - no files to scan' },
+                        })
+                        .eq('id', scanRun.id);
+
+                    // Update project
+                    await supabaseAdmin
+                        .from('scan_projects')
+                        .update({
+                            last_scan_at: new Date().toISOString(),
+                            last_scan_score: 'A',
+                            last_scan_issues: 0,
+                            last_scan_files: 0,
+                        })
+                        .eq('id', id);
+
+                    return NextResponse.json({
+                        scan: {
+                            id: scanRun.id,
+                            status: 'completed',
+                            score: 'A',
+                            files_scanned: 0,
+                            issues_found: 0,
+                            scan_duration_ms: Date.now() - startTime,
+                            issues: [],
+                            message: 'Repository is empty - no files to scan',
+                        }
+                    });
+                }
+                throw treeError;
+            }
 
             const allIssues: ScanIssue[] = [];
             let filesScanned = 0;
