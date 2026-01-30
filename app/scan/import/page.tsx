@@ -110,7 +110,7 @@ export default function ImportRepoPage() {
             const data = await response.json();
 
             if (response.ok) {
-                router.push(`/projects/${data.project.id}`);
+                router.push(`/scan/projects/${data.project.id}`);
             } else {
                 console.error('Import failed:', data.error);
                 setImportingRepoId(null);
@@ -169,7 +169,7 @@ export default function ImportRepoPage() {
 
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+                <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                     <ArrowLeft className="h-3 w-3" />
                     Back to projects
                 </Link>
@@ -209,7 +209,7 @@ export default function ImportRepoPage() {
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
-            <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+            <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                 <ArrowLeft className="h-3 w-3" />
                 Back to projects
             </Link>
