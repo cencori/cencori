@@ -184,9 +184,11 @@ export default function ImportRepoPage() {
                     </p>
                     {error?.includes('Unauthorized') ? (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
-                            <Link href="/sign-in?redirect=/scan/import">
+                            <a href={typeof window !== 'undefined' && window.location.hostname.includes('scan.')
+                                ? 'https://cencori.com/login?redirect=https://scan.cencori.com/import'
+                                : '/login?redirect=/scan/import'}>
                                 Sign In
-                            </Link>
+                            </a>
                         </Button>
                     ) : (
                         <Button onClick={handleConnectGitHub} size="sm" className="h-7 text-xs px-3">
