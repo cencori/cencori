@@ -8,7 +8,8 @@ import {
     getProjectsMetrics,
     getApiKeysMetrics,
     getUsersMetrics,
-    getBillingMetrics
+    getBillingMetrics,
+    getScanMetrics
 } from '@/internal/analytics/lib/queries';
 import type { TimePeriod } from '@/internal/analytics/lib/types';
 
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
     const period = (searchParams.get('period') || '7d') as TimePeriod;
 
     try {
-        const [aiGateway, security, organizations, projects, apiKeys, users, billing] = await Promise.all([
+        const [aiGateway, security, organizations, projects, apiKeys, users, billing, scan] = await Promise.all([
             getAIGatewayMetrics(period),
             getSecurityMetrics(period),
             getOrganizationsMetrics(period),
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
             getApiKeysMetrics(period),
             getUsersMetrics(period),
             getBillingMetrics(period),
+            getScanMetrics(period),
         ]);
 
         return NextResponse.json({
@@ -82,6 +84,7 @@ export async function GET(req: NextRequest) {
             apiKeys,
             users,
             billing,
+            scan,
             period,
             generatedAt: new Date().toISOString(),
         });

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings } from 'lucide-react';
+import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings, ScanSearch } from 'lucide-react';
 import { usePlatformMetrics } from '../hooks/useMetrics';
 import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
@@ -222,6 +222,62 @@ export function AdminDashboard() {
                                 }
                             />
                         </MetricsGrid>
+                    </MetricsSection>
+
+                    {/* Cencori Scan Section */}
+                    <MetricsSection
+                        title="Cencori Scan"
+                        description="CLI usage and adoption metrics"
+                    >
+                        <MetricsGrid columns={4}>
+                            <MetricsCard
+                                title="Total Scans"
+                                value={data.scan.totalScans}
+                                subtitle={`${data.scan.authenticatedScans} with API key`}
+                                subtitleColor="success"
+                                icon={<ScanSearch className="h-4 w-4" />}
+                            />
+                            <MetricsCard
+                                title="Conversion Rate"
+                                value={`${data.scan.conversionRate}%`}
+                                subtitle={`${data.scan.anonymousScans} anonymous`}
+                                subtitleColor={data.scan.conversionRate > 10 ? 'success' : 'warning'}
+                            />
+                            <MetricsCard
+                                title="Files Scanned"
+                                value={data.scan.totalFilesScanned.toLocaleString()}
+                                subtitle={`${data.scan.avgIssuesPerScan} avg issues/scan`}
+                            />
+                            <MetricsCard
+                                title="Issues Found"
+                                value={data.scan.totalIssuesFound.toLocaleString()}
+                            />
+                        </MetricsGrid>
+
+                        {/* Score & Platform Breakdown */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <BreakdownCard
+                                title="By Score"
+                                data={{
+                                    'A-Tier': data.scan.scoreBreakdown.A,
+                                    'B-Tier': data.scan.scoreBreakdown.B,
+                                    'C-Tier': data.scan.scoreBreakdown.C,
+                                    'D-Tier': data.scan.scoreBreakdown.D,
+                                    'F-Tier': data.scan.scoreBreakdown.F,
+                                }}
+                                total={data.scan.totalScans}
+                            />
+                            <BreakdownCard
+                                title="By Platform"
+                                data={{
+                                    'macOS': data.scan.platformBreakdown.darwin,
+                                    'Linux': data.scan.platformBreakdown.linux,
+                                    'Windows': data.scan.platformBreakdown.win32,
+                                    'Other': data.scan.platformBreakdown.other,
+                                }}
+                                total={data.scan.totalScans}
+                            />
+                        </div>
                     </MetricsSection>
                 </>
             ) : null}

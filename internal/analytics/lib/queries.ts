@@ -1,6 +1,6 @@
 // Platform Analytics Database Queries
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics } from './types';
+import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics } from './types';
 
 function getStartDate(period: TimePeriod): Date {
     const now = new Date();
@@ -286,4 +286,78 @@ export async function getBillingMetrics(period: TimePeriod): Promise<BillingMetr
     ).length;
 
     return { activeSubscriptions, mrr, byTier, churnedThisPeriod };
+}
+
+export async function getScanMetrics(period: TimePeriod): Promise<ScanMetrics> {
+    const supabase = createAdminClient();
+    const startDate = getStartDate(period);
+
+    const { data: telemetry, error } = await supabase
+        .from('scan_telemetry')
+        .select('*')
+        .gte('created_at', startDate.toISOString());
+
+    if (error || !telemetry) {
+        console.error('[Analytics] Error fetching scan telemetry:', error);
+        return {
+            totalScans: 0,
+            authenticatedScans: 0,
+            anonymousScans: 0,
+            conversionRate: 0,
+            totalFilesScanned: 0,
+            totalIssuesFound: 0,
+            avgIssuesPerScan: 0,
+            scoreBreakdown: { A: 0, B: 0, C: 0, D: 0, F: 0 },
+            issueBreakdown: { secrets: 0, pii: 0, routes: 0, config: 0, vulnerabilities: 0 },
+            platformBreakdown: { darwin: 0, linux: 0, win32: 0, other: 0 },
+        };
+    }
+
+    const totalScans = telemetry.length;
+    const authenticatedScans = telemetry.filter(t => t.has_api_key).length;
+    const anonymousScans = totalScans - authenticatedScans;
+    const conversionRate = totalScans > 0 ? (authenticatedScans / totalScans) * 100 : 0;
+
+    const totalFilesScanned = telemetry.reduce((sum, t) => sum + (t.files_scanned || 0), 0);
+    const totalIssuesFound = telemetry.reduce((sum, t) => sum + (t.issues_found || 0), 0);
+    const avgIssuesPerScan = totalScans > 0 ? totalIssuesFound / totalScans : 0;
+
+    // Score breakdown
+    const scoreBreakdown = {
+        A: telemetry.filter(t => t.score === 'A').length,
+        B: telemetry.filter(t => t.score === 'B').length,
+        C: telemetry.filter(t => t.score === 'C').length,
+        D: telemetry.filter(t => t.score === 'D').length,
+        F: telemetry.filter(t => t.score === 'F').length,
+    };
+
+    // Issue breakdown (aggregated)
+    const issueBreakdown = {
+        secrets: telemetry.reduce((sum, t) => sum + (t.secrets_count || 0), 0),
+        pii: telemetry.reduce((sum, t) => sum + (t.pii_count || 0), 0),
+        routes: telemetry.reduce((sum, t) => sum + (t.routes_count || 0), 0),
+        config: telemetry.reduce((sum, t) => sum + (t.config_count || 0), 0),
+        vulnerabilities: telemetry.reduce((sum, t) => sum + (t.vulnerabilities_count || 0), 0),
+    };
+
+    // Platform breakdown
+    const platformBreakdown = {
+        darwin: telemetry.filter(t => t.platform === 'darwin').length,
+        linux: telemetry.filter(t => t.platform === 'linux').length,
+        win32: telemetry.filter(t => t.platform === 'win32').length,
+        other: telemetry.filter(t => !['darwin', 'linux', 'win32'].includes(t.platform)).length,
+    };
+
+    return {
+        totalScans,
+        authenticatedScans,
+        anonymousScans,
+        conversionRate: Math.round(conversionRate * 10) / 10,
+        totalFilesScanned,
+        totalIssuesFound,
+        avgIssuesPerScan: Math.round(avgIssuesPerScan * 10) / 10,
+        scoreBreakdown,
+        issueBreakdown,
+        platformBreakdown,
+    };
 }
