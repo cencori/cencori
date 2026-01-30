@@ -14,7 +14,7 @@ import {
     generateFixes,
     applyFixes,
 } from './ai/index.js';
-import { sendTelemetry, buildTelemetryData } from './telemetry.js';
+import { sendTelemetry, buildTelemetryData, flushTelemetry } from './telemetry.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -401,7 +401,11 @@ async function main(): Promise<void> {
         .action(async (targetPath: string, options: { json?: boolean; quiet?: boolean; prompt?: boolean }) => {
             if (options.json) {
                 const result = await scan(targetPath);
+                // Send telemetry for JSON mode too
+                sendTelemetry(buildTelemetryData(result, VERSION, !!getApiKey()));
                 console.log(JSON.stringify(result, null, 2));
+                // Wait for telemetry to complete before exiting
+                await flushTelemetry();
                 process.exit(result.score === 'A' || result.score === 'B' ? 0 : 1);
                 return;
             }
@@ -416,7 +420,7 @@ async function main(): Promise<void> {
             try {
                 const result = await scan(targetPath);
 
-                // Send telemetry silently in background (fire and forget)
+                // Send telemetry silently in background
                 sendTelemetry(buildTelemetryData(result, VERSION, !!getApiKey()));
 
                 spinner.succeed(`Scanned ${result.filesScanned} files`);
@@ -424,6 +428,8 @@ async function main(): Promise<void> {
                 if (options.quiet) {
                     const style = scoreStyles[result.score];
                     console.log(`\n  Score: ${style.color.bold(result.score + '-Tier')}\n`);
+                    // Wait for telemetry to complete before exiting
+                    await flushTelemetry();
                     process.exit(result.score === 'A' || result.score === 'B' ? 0 : 1);
                     return;
                 }
@@ -440,10 +446,14 @@ async function main(): Promise<void> {
 
                 printFooter();
 
+                // Wait for telemetry to complete before exiting
+                await flushTelemetry();
                 process.exit(result.score === 'A' || result.score === 'B' ? 0 : 1);
             } catch (error) {
                 spinner.fail('Scan failed');
                 console.error(chalk.red(`\n  Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+                // Wait for any pending telemetry before exiting
+                await flushTelemetry();
                 process.exit(1);
             }
         });

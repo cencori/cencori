@@ -33,7 +33,12 @@ export async function POST(request: NextRequest) {
         if (!payload.event || !payload.version) {
             return NextResponse.json(
                 { error: 'Invalid payload' },
-                { status: 400 }
+                {
+                    status: 400,
+                    headers: {
+                        'Access-Control-Allow-Origin': '*',
+                    },
+                }
             );
         }
 
@@ -59,11 +64,25 @@ export async function POST(request: NextRequest) {
             // Don't return error to client - just log it
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json(
+            { success: true },
+            {
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                },
+            }
+        );
     } catch (error) {
         console.error('Telemetry error:', error);
         // Always return success - telemetry should never fail for the client
-        return NextResponse.json({ success: true });
+        return NextResponse.json(
+            { success: true },
+            {
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                },
+            }
+        );
     }
 }
 
