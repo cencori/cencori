@@ -283,7 +283,7 @@ export default function ProjectDetailPage() {
                     {isScanning ? (
                         <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Scanning...</>
                     ) : (
-                        <><Play className="h-3 w-3 mr-1.5" />Scan</>
+                        <><Play className="h-3 w-3 mr-1.5" />Run Scan</>
                     )}
                 </Button>
             </div>
@@ -301,7 +301,6 @@ export default function ProjectDetailPage() {
                     {(project.last_scan_issues > 0 || (currentScan?.issues_found || 0) > 0) && (
                         <div className="p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Zap className="h-4 w-4 text-emerald-400" />
                                 <div>
                                     <p className="text-[13px] font-medium text-emerald-300">Auto-fix available</p>
                                     <p className="text-xs text-muted-foreground">
