@@ -299,17 +299,17 @@ export default function ProjectDetailPage() {
                 <TabsContent value="scan" className="space-y-6">
                     {/* Auto-fix banner */}
                     {(project.last_scan_issues > 0 || (currentScan?.issues_found || 0) > 0) && (
-                        <div className="p-4 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+                        <div className="p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Zap className="h-4 w-4 text-purple-400" />
+                                <Zap className="h-4 w-4 text-emerald-400" />
                                 <div>
-                                    <p className="text-[13px] font-medium text-purple-300">Auto-fix available</p>
+                                    <p className="text-[13px] font-medium text-emerald-300">Auto-fix available</p>
                                     <p className="text-xs text-muted-foreground">
                                         {currentScan?.issues_found || project.last_scan_issues} issues can be automatically fixed
                                     </p>
                                 </div>
                             </div>
-                            <Button size="sm" className="h-7 text-xs px-3 bg-purple-500 hover:bg-purple-600">
+                            <Button size="sm" className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600">
                                 Create Fix PR
                             </Button>
                         </div>
