@@ -67,13 +67,10 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         const items: { label: string; href?: string }[] = [];
 
         if (pathname === '/scan' || pathname === '/scan/') {
-            items.push({ label: 'Projects' });
+            // No breadcrumbs on main page - "Scan" is the wordmark
         } else if (pathname === '/scan/import') {
-            items.push({ label: 'Projects', href: '/scan' });
             items.push({ label: 'Import' });
         } else if (projectId) {
-            items.push({ label: 'Projects', href: '/scan' });
-            // Just show the project ID or a short version - the actual name will show in the page
             items.push({ label: 'Project' });
         }
 
@@ -92,7 +89,8 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             {/* Navbar */}
             <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Link href="/scan" className="flex items-center">
+                    {/* Logo + Wordmark */}
+                    <Link href="/scan" className="flex items-center gap-2">
                         <Image
                             src="/logo white.svg"
                             alt="Cencori"
@@ -107,39 +105,37 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                             height={16}
                             className="dark:hidden block"
                         />
+                        <span className="text-xs font-medium text-foreground">Scan</span>
                     </Link>
 
-                    <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm" aria-hidden>
-                        /
-                    </span>
-
-                    {/* Breadcrumbs */}
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem>
-                                <BreadcrumbLink asChild className="text-xs font-medium text-foreground hover:text-foreground/80">
-                                    <Link href="/scan">Scan</Link>
-                                </BreadcrumbLink>
-                            </BreadcrumbItem>
-
-                            {breadcrumbItems.map((item, index) => (
-                                <span key={index} className="contents">
-                                    <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
-                                    <BreadcrumbItem>
-                                        {item.href ? (
-                                            <BreadcrumbLink asChild className="text-xs font-medium hover:text-foreground/80">
-                                                <Link href={item.href}>{item.label}</Link>
-                                            </BreadcrumbLink>
-                                        ) : (
-                                            <BreadcrumbPage className="text-xs font-medium">
-                                                {item.label}
-                                            </BreadcrumbPage>
-                                        )}
-                                    </BreadcrumbItem>
-                                </span>
-                            ))}
-                        </BreadcrumbList>
-                    </Breadcrumb>
+                    {/* Breadcrumbs (only show if there are items) */}
+                    {breadcrumbItems.length > 0 && (
+                        <>
+                            <span className="text-muted-foreground/50 select-none text-sm" aria-hidden>/</span>
+                            <Breadcrumb>
+                                <BreadcrumbList>
+                                    {breadcrumbItems.map((item, index) => (
+                                        <span key={index} className="contents">
+                                            {index > 0 && (
+                                                <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
+                                            )}
+                                            <BreadcrumbItem>
+                                                {item.href ? (
+                                                    <BreadcrumbLink asChild className="text-xs font-medium hover:text-foreground/80">
+                                                        <Link href={item.href}>{item.label}</Link>
+                                                    </BreadcrumbLink>
+                                                ) : (
+                                                    <BreadcrumbPage className="text-xs font-medium">
+                                                        {item.label}
+                                                    </BreadcrumbPage>
+                                                )}
+                                            </BreadcrumbItem>
+                                        </span>
+                                    ))}
+                                </BreadcrumbList>
+                            </Breadcrumb>
+                        </>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
