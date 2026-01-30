@@ -259,7 +259,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                                         System
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator className="my-1" />
-                                    <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard")}>
+                                    <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/organizations")}>
                                         <ExternalLink className="mr-2 h-3.5 w-3.5" />
                                         Main Dashboard
                                     </DropdownMenuItem>
