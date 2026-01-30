@@ -129,7 +129,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const stream = new ReadableStream({
         async start(controller) {
+            // Accumulate all logs for persistence
+            const allLogs: Array<{ type: string; time: number; message?: string; data?: unknown }> = [];
+
             const sendEvent = (event: { type: string; time: number; message?: string; data?: unknown }) => {
+                allLogs.push(event);
                 const data = JSON.stringify(event);
                 controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             };
@@ -192,31 +196,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     treeData = response.data;
                 } catch (treeError: unknown) {
                     if (treeError && typeof treeError === 'object' && 'status' in treeError && treeError.status === 409) {
-                        // Empty repository
-                        await supabaseAdmin
-                            .from('scan_runs')
-                            .update({
-                                status: 'completed',
-                                score: 'A',
-                                files_scanned: 0,
-                                issues_found: 0,
-                                scan_duration_ms: Date.now() - startTime,
-                                secrets_count: 0,
-                                vulnerabilities_count: 0,
-                                results: { issues: [], message: 'Repository is empty' },
-                            })
-                            .eq('id', scanRun.id);
-
-                        await supabaseAdmin
-                            .from('scan_projects')
-                            .update({
-                                last_scan_at: new Date().toISOString(),
-                                last_scan_score: 'A',
-                                last_scan_issues: 0,
-                                last_scan_files: 0,
-                            })
-                            .eq('id', id);
-
                         sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Repository is empty - no files to scan' });
                         sendEvent({
                             type: 'complete',
@@ -230,6 +209,33 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 issues: []
                             }
                         });
+
+                        // Save logs for empty repo
+                        await supabaseAdmin
+                            .from('scan_runs')
+                            .update({
+                                status: 'completed',
+                                score: 'A',
+                                files_scanned: 0,
+                                issues_found: 0,
+                                scan_duration_ms: Date.now() - startTime,
+                                secrets_count: 0,
+                                vulnerabilities_count: 0,
+                                results: { issues: [], message: 'Repository is empty' },
+                                logs: allLogs,
+                            })
+                            .eq('id', scanRun.id);
+
+                        await supabaseAdmin
+                            .from('scan_projects')
+                            .update({
+                                last_scan_at: new Date().toISOString(),
+                                last_scan_score: 'A',
+                                last_scan_issues: 0,
+                                last_scan_files: 0,
+                            })
+                            .eq('id', id);
+
                         controller.close();
                         return;
                     }
@@ -308,32 +314,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 const secretsCount = allIssues.filter(i => i.type === 'secret').length;
                 const vulnsCount = allIssues.filter(i => i.type === 'vulnerability').length;
 
-                // Save results
-                await supabaseAdmin
-                    .from('scan_runs')
-                    .update({
-                        status: 'completed',
-                        score,
-                        files_scanned: filesScanned,
-                        issues_found: allIssues.length,
-                        scan_duration_ms: scanDuration,
-                        secrets_count: secretsCount,
-                        vulnerabilities_count: vulnsCount,
-                        results: { issues: allIssues },
-                    })
-                    .eq('id', scanRun.id);
-
-                await supabaseAdmin
-                    .from('scan_projects')
-                    .update({
-                        last_scan_at: new Date().toISOString(),
-                        last_scan_score: score,
-                        last_scan_issues: allIssues.length,
-                        last_scan_files: filesScanned,
-                    })
-                    .eq('id', id);
-
-                // Send completion event
+                // Send completion event first (so it gets logged)
                 sendEvent({
                     type: 'complete',
                     time: scanDuration,
@@ -349,6 +330,32 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         issues: allIssues
                     }
                 });
+
+                // Save results with full logs
+                await supabaseAdmin
+                    .from('scan_runs')
+                    .update({
+                        status: 'completed',
+                        score,
+                        files_scanned: filesScanned,
+                        issues_found: allIssues.length,
+                        scan_duration_ms: scanDuration,
+                        secrets_count: secretsCount,
+                        vulnerabilities_count: vulnsCount,
+                        results: { issues: allIssues },
+                        logs: allLogs,
+                    })
+                    .eq('id', scanRun.id);
+
+                await supabaseAdmin
+                    .from('scan_projects')
+                    .update({
+                        last_scan_at: new Date().toISOString(),
+                        last_scan_score: score,
+                        last_scan_issues: allIssues.length,
+                        last_scan_files: filesScanned,
+                    })
+                    .eq('id', id);
 
                 controller.close();
 

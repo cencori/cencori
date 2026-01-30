@@ -21,7 +21,8 @@ import {
     Loader2,
     ArrowLeft,
     Trash2,
-    Copy
+    Copy,
+    Download
 } from "lucide-react";
 import Link from "next/link";
 
@@ -49,6 +50,7 @@ interface ScanIssue {
 
 interface ScanRun {
     id: string;
+    slug?: string;
     created_at: string;
     status: string;
     score: string | null;
@@ -56,6 +58,7 @@ interface ScanRun {
     issues_found: number;
     scan_duration_ms: number;
     results?: { issues: ScanIssue[] };
+    logs?: Array<{ type: string; time: number; message?: string; data?: unknown }>;
 }
 
 interface Changelog {
@@ -477,80 +480,243 @@ export default function ProjectDetailPage() {
                         </div>
                     )}
 
-                    {/* Scan log */}
-                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                        <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
-                            {currentScan && (
-                                <span className="text-[11px] text-muted-foreground">
-                                    {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
-                                </span>
-                            )}
-                        </div>
-                        <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
-                            {scanLog.length > 0 ? (
-                                scanLog.map((entry, index) => (
-                                    <div key={index} className="flex items-start gap-3 py-0.5">
-                                        {entry.type === "info" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                <span className="text-muted-foreground">{entry.message}</span>
-                                            </>
-                                        )}
-                                        {entry.type === "success" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
-                                                <span className="text-emerald-500">{entry.message}</span>
-                                            </>
-                                        )}
-                                        {entry.type === "error" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
-                                                <span className="text-red-500">{entry.message}</span>
-                                            </>
-                                        )}
-                                        {entry.type === "file" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
-                                                <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-                                                <span className="text-yellow-500">{entry.message}</span>
-                                            </>
-                                        )}
-                                        {entry.type === "issue" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
-                                                <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
-                                                <span className={cn("shrink-0", severityColors[entry.severity || "low"])}>
-                                                    [{(entry.severity || "low").toUpperCase()}]
-                                                </span>
-                                                <span className="text-muted-foreground">{entry.message}</span>
-                                                <span className="text-muted-foreground/50">line {entry.line}</span>
-                                            </>
-                                        )}
-                                        {entry.type === "summary" && (
-                                            <>
-                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                <span className="text-foreground font-medium">✓ {entry.message}</span>
-                                                {currentScan?.score && (
-                                                    <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0">
-                                                        <span className={cn("size-1 rounded-full", scoreColors[currentScan.score])} />
-                                                        {currentScan.score}
-                                                    </Badge>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-muted-foreground text-center py-8">
-                                    {project.last_scan_at
-                                        ? "Click 'Run Scan' to scan again"
-                                        : "No scans yet. Click 'Run Scan' to start."}
+                    <div className="flex gap-4">
+                        {/* Scan history sidebar */}
+                        {scans.length > 0 && (
+                            <div className="w-48 shrink-0 space-y-1">
+                                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                                    Scan History
                                 </div>
-                            )}
+                                {scans.map((scan) => {
+                                    const isSelected = currentScan?.id === scan.id;
+                                    const date = new Date(scan.created_at);
+                                    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    return (
+                                        <button
+                                            key={scan.id}
+                                            onClick={() => {
+                                                setCurrentScan(scan);
+                                                // Populate scan log from this scan's logs or results
+                                                if (scan.logs && scan.logs.length > 0) {
+                                                    setScanLog(scan.logs.map(log => ({
+                                                        type: log.type,
+                                                        message: log.message || '',
+                                                        time: `${(log.time / 1000).toFixed(1)}s`,
+                                                        severity: (log.data as { severity?: string })?.severity,
+                                                        line: (log.data as { line?: number })?.line,
+                                                    })));
+                                                } else if (scan.results?.issues) {
+                                                    // Fallback to results if logs not available
+                                                    const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
+                                                    const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
+                                                    const issuesByFile: Record<string, ScanIssue[]> = {};
+                                                    for (const issue of scan.results.issues) {
+                                                        if (!issuesByFile[issue.file]) issuesByFile[issue.file] = [];
+                                                        issuesByFile[issue.file].push(issue);
+                                                    }
+                                                    for (const [file, issues] of Object.entries(issuesByFile)) {
+                                                        logEntries.push({ type: "file", message: file, time: timeStr });
+                                                        for (const issue of issues) {
+                                                            logEntries.push({ type: "issue", message: `${issue.name}: ${issue.match}`, severity: issue.severity, line: issue.line });
+                                                        }
+                                                    }
+                                                    logEntries.push({ type: "summary", message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`, time: timeStr });
+                                                    setScanLog(logEntries);
+                                                }
+                                            }}
+                                            className={cn(
+                                                "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
+                                                isSelected
+                                                    ? "bg-secondary text-foreground"
+                                                    : "hover:bg-secondary/50 text-muted-foreground"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn("size-1.5 rounded-full", scoreColors[scan.score || ""] || "bg-gray-500")} />
+                                                <span className="font-medium">{dateStr}</span>
+                                                <span className="text-muted-foreground/50">{timeStr}</span>
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                                {scan.slug || `scan-${scan.id.slice(0, 8)}`}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Scan log */}
+                        <div className="flex-1 bg-card border border-border/40 rounded-md overflow-hidden">
+                            <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
+                                    {currentScan && (
+                                        <span className="text-[10px] font-mono text-muted-foreground/60">
+                                            {currentScan.slug || `scan-${currentScan.id.slice(0, 8)}`}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {currentScan && (
+                                        <>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 px-2 text-[10px]"
+                                                    onClick={() => {
+                                                        const data = {
+                                                            scanId: currentScan.id,
+                                                            slug: currentScan.slug,
+                                                            score: currentScan.score,
+                                                            filesScanned: currentScan.files_scanned,
+                                                            issuesFound: currentScan.issues_found,
+                                                            durationMs: currentScan.scan_duration_ms,
+                                                            createdAt: currentScan.created_at,
+                                                            logs: currentScan.logs || [],
+                                                            issues: currentScan.results?.issues || [],
+                                                        };
+                                                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `${currentScan.slug || 'scan'}.json`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                >
+                                                    <Download className="h-3 w-3 mr-1" />
+                                                    JSON
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 px-2 text-[10px]"
+                                                    onClick={() => {
+                                                        const lines = [
+                                                            `# Scan Report`,
+                                                            ``,
+                                                            `**ID:** ${currentScan.slug || currentScan.id}`,
+                                                            `**Date:** ${new Date(currentScan.created_at).toLocaleString()}`,
+                                                            `**Score:** ${currentScan.score}`,
+                                                            `**Files Scanned:** ${currentScan.files_scanned}`,
+                                                            `**Issues Found:** ${currentScan.issues_found}`,
+                                                            `**Duration:** ${(currentScan.scan_duration_ms / 1000).toFixed(1)}s`,
+                                                            ``,
+                                                        ];
+                                                        if (currentScan.results?.issues?.length) {
+                                                            lines.push(`## Issues`, ``);
+                                                            for (const issue of currentScan.results.issues) {
+                                                                lines.push(`- **[${issue.severity.toUpperCase()}]** ${issue.name} in \`${issue.file}\` (line ${issue.line}): ${issue.match}`);
+                                                            }
+                                                        } else {
+                                                            lines.push(`## No Issues Found ✓`);
+                                                        }
+                                                        const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `${currentScan.slug || 'scan'}.md`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                >
+                                                    <Download className="h-3 w-3 mr-1" />
+                                                    MD
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
+                                {scanLog.length > 0 ? (
+                                    scanLog.map((entry, index) => (
+                                        <div key={index} className="flex items-start gap-3 py-0.5">
+                                            {entry.type === "info" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <span className="text-muted-foreground">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "start" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <span className="text-blue-400">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "progress" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <span className="text-muted-foreground">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "success" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                                                    <span className="text-emerald-500">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "error" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
+                                                    <span className="text-red-500">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "file" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
+                                                    <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                                                    <span className="text-yellow-500">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "issue" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
+                                                    <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
+                                                    <span className={cn("shrink-0", severityColors[entry.severity || "low"])}>
+                                                        [{(entry.severity || "low").toUpperCase()}]
+                                                    </span>
+                                                    <span className="text-muted-foreground">{entry.message}</span>
+                                                    <span className="text-muted-foreground/50">line {entry.line}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "summary" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <span className="text-foreground font-medium">✓ {entry.message}</span>
+                                                    {currentScan?.score && (
+                                                        <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0">
+                                                            <span className={cn("size-1 rounded-full", scoreColors[currentScan.score])} />
+                                                            {currentScan.score}
+                                                        </Badge>
+                                                    )}
+                                                </>
+                                            )}
+                                            {entry.type === "complete" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                                                    <span className="text-foreground font-medium">{entry.message}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-muted-foreground text-center py-8">
+                                        {project.last_scan_at
+                                            ? "Click 'Run Scan' to scan again"
+                                            : "No scans yet. Click 'Run Scan' to start."}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </TabsContent>
