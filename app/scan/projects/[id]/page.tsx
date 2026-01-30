@@ -166,7 +166,53 @@ export default function ProjectDetailPage() {
                     setProject(data.project);
                     setScans(data.scans || []);
                     if (data.scans && data.scans.length > 0) {
-                        setCurrentScan(data.scans[0]);
+                        const lastScan = data.scans[0];
+                        setCurrentScan(lastScan);
+
+                        // Populate scan log from last scan's results
+                        if (lastScan.results?.issues && lastScan.results.issues.length > 0) {
+                            const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
+                            const timeStr = `${(lastScan.scan_duration_ms / 1000).toFixed(1)}s`;
+
+                            // Group issues by file
+                            const issuesByFile: Record<string, ScanIssue[]> = {};
+                            for (const issue of lastScan.results.issues) {
+                                if (!issuesByFile[issue.file]) {
+                                    issuesByFile[issue.file] = [];
+                                }
+                                issuesByFile[issue.file].push(issue);
+                            }
+
+                            // Add file and issue entries
+                            for (const [file, issues] of Object.entries(issuesByFile)) {
+                                logEntries.push({ type: "file", message: file, time: timeStr });
+                                for (const issue of issues) {
+                                    logEntries.push({
+                                        type: "issue",
+                                        message: `${issue.name}: ${issue.match}`,
+                                        severity: issue.severity,
+                                        line: issue.line,
+                                    });
+                                }
+                            }
+
+                            // Add summary
+                            logEntries.push({
+                                type: "summary",
+                                message: `Complete: ${lastScan.files_scanned} files scanned, ${lastScan.issues_found} issues found`,
+                                time: timeStr,
+                            });
+
+                            setScanLog(logEntries);
+                        } else if (lastScan.status === 'completed') {
+                            // No issues found, show success
+                            const timeStr = `${(lastScan.scan_duration_ms / 1000).toFixed(1)}s`;
+                            setScanLog([{
+                                type: "summary",
+                                message: `Complete: ${lastScan.files_scanned} files scanned, 0 issues found`,
+                                time: timeStr,
+                            }]);
+                        }
                     }
                 }
             } catch (err) {
