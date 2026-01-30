@@ -104,9 +104,19 @@ export async function middleware(request: NextRequest) {
             url.pathname = `/design${url.pathname}`;
             response = NextResponse.rewrite(url);
         }
+        // Handle scan subdomain
+        else if (domain === 'scan.cencori.com' || domain === 'scan.localhost') {
+            const url = request.nextUrl.clone();
+            url.pathname = `/scan${url.pathname}`;
+            response = NextResponse.rewrite(url);
+        }
     }
 
     // 3. Supabase Auth Session Refresh
+    // Determine cookie domain for cross-subdomain auth
+    const isProduction = domain.endsWith('.cencori.com') || domain === 'cencori.com';
+    const cookieDomain = isProduction ? '.cencori.com' : undefined;
+
     const supabase = createServerClient(
         supabaseUrl,
         supabaseKey,
@@ -116,7 +126,7 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     response = NextResponse.next({ request })
                     // Note: If we had a rewrite, re-calling NextResponse.next() here effectively cancels the rewrite.
                     // We need to apply cookies to the EXISTING response object if possible.
@@ -125,7 +135,10 @@ export async function middleware(request: NextRequest) {
                     // Actually, we can just mutate the response.cookies.
 
                     cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
+                        response.cookies.set(name, value, {
+                            ...options,
+                            domain: cookieDomain // Enable cross-subdomain auth
+                        })
                     )
                 },
             },
