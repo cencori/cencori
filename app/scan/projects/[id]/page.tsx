@@ -150,7 +150,13 @@ export default function ProjectDetailPage() {
         }
     };
 
-    // Fetch project data
+    // Changelog timeframe options
+    const [changelogTimeframe, setChangelogTimeframe] = useState<'24h' | '7d' | '30d'>('7d');
+    const timeframeLabels: Record<string, string> = {
+        '24h': '24 hours',
+        '7d': '7 days',
+        '30d': '30 days',
+    };
     useEffect(() => {
         const fetchProject = async () => {
             try {
@@ -191,12 +197,19 @@ export default function ProjectDetailPage() {
     const handleGenerateChangelog = async () => {
         if (!project) return;
 
+        // Map timeframe to since string
+        const sinceMap: Record<string, string> = {
+            '24h': '1 day ago',
+            '7d': '1 week ago',
+            '30d': '1 month ago',
+        };
+
         setIsGeneratingChangelog(true);
         try {
             const response = await fetch(`/api/scan/projects/${projectId}/changelog`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ since: '1 week ago' }),
+                body: JSON.stringify({ since: sinceMap[changelogTimeframe] }),
             });
 
             if (response.ok) {
@@ -502,18 +515,30 @@ export default function ProjectDetailPage() {
                             <h2 className="text-[13px] font-medium">Changelog</h2>
                             <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
                         </div>
-                        <Button
-                            size="sm"
-                            className="h-7 text-xs px-3"
-                            onClick={handleGenerateChangelog}
-                            disabled={isGeneratingChangelog}
-                        >
-                            {isGeneratingChangelog ? (
-                                <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
-                            ) : (
-                                "Generate Changelog"
-                            )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={changelogTimeframe}
+                                onChange={(e) => setChangelogTimeframe(e.target.value as '24h' | '7d' | '30d')}
+                                className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                                disabled={isGeneratingChangelog}
+                            >
+                                <option value="24h">Last 24 hours</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                            </select>
+                            <Button
+                                size="sm"
+                                className="h-7 text-xs px-3"
+                                onClick={handleGenerateChangelog}
+                                disabled={isGeneratingChangelog}
+                            >
+                                {isGeneratingChangelog ? (
+                                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
+                                ) : (
+                                    "Generate Changelog"
+                                )}
+                            </Button>
+                        </div>
                     </div>
 
                     {changelogs.length === 0 ? (
