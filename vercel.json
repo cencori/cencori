@@ -31,6 +31,16 @@
             "destination": "/api/providers"
         },
         {
+            "source": "/v1/telemetry/scan",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/v1/telemetry/scan"
+        },
+        {
             "source": "/:path*",
             "has": [
                 {

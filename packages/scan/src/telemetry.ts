@@ -3,7 +3,7 @@
  * Sends anonymous usage metrics - no code or sensitive data
  */
 
-const TELEMETRY_URL = 'https://cencori.com/api/v1/telemetry/scan';
+const TELEMETRY_URL = 'https://api.cencori.com/v1/telemetry/scan';
 
 export interface TelemetryData {
     event: 'scan_completed';
