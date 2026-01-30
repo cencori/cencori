@@ -15,11 +15,11 @@ That's it. Run it in any project directory to instantly scan for security issues
 
 ## Features
 
-- 🔍 **Pattern-based scanning** - Detects 50+ types of secrets, PII, and vulnerabilities
-- 🤖 **AI-powered auto-fix** - Automatically fixes issues with one command
-- ⚡ **Fast** - Scans thousands of files in seconds
-- 🎯 **Zero config** - Works out of the box
-- 📊 **Security scoring** - A through F tier grading
+- **Pattern-based scanning** - Detects 50+ types of secrets, PII, and vulnerabilities
+- **Cencori AI auto-fix** - Automatically fixes issues with one command
+- **Fast** - Scans thousands of files in seconds
+- **Zero config** - Works out of the box
+- **Security scoring** - A through F tier grading
 
 ## Installation
 
@@ -80,7 +80,7 @@ Your API key is saved to `~/.cencorirc` for future scans.
 
 ## What It Detects
 
-### 🔐 API Keys & Secrets
+### API Keys & Secrets
 
 | Provider | Pattern |
 |----------|---------|
@@ -94,21 +94,21 @@ Your API key is saved to `~/.cencorirc` for future scans.
 | Firebase | `firebase-adminsdk-...` |
 | And 20+ more... | |
 
-### 👤 PII (Personal Identifiable Information)
+### PII (Personal Identifiable Information)
 
 - Email addresses in code
 - Phone numbers
 - Social Security Numbers
 - Credit card numbers
 
-### 🛣️ Exposed Routes
+### Exposed Routes
 
 - Next.js API routes without authentication
 - Express routes without auth middleware
 - Sensitive files in `/public` folders
 - Dashboard/admin routes without protection
 
-### ⚠️ Security Vulnerabilities
+### Security Vulnerabilities
 
 - SQL injection patterns
 - XSS vulnerabilities (innerHTML, dangerouslySetInnerHTML)
@@ -125,6 +125,50 @@ Your API key is saved to `~/.cencorirc` for future scans.
 | **C-Tier** | Fair | Some concerns need attention |
 | **D-Tier** | Poor | Significant issues found |
 | **F-Tier** | Critical | Secrets or major vulnerabilities exposed |
+
+## Changelog Generation
+
+Generate AI-powered changelogs from your git commit history.
+
+```bash
+# Generate weekly changelog
+npx @cencori/scan changelog
+
+# Custom time range
+npx @cencori/scan changelog --since="2 weeks ago"
+
+# Output to file
+npx @cencori/scan changelog --output=CHANGELOG.md
+
+# JSON format
+npx @cencori/scan changelog --format=json
+```
+
+### Example Output
+
+```markdown
+## Changelog (Jan 23, 2026 - Jan 30, 2026)
+
+### Features
+
+- Added AI-powered changelog generation
+- New security scanning patterns for AWS secrets
+
+### Bug Fixes
+
+- Fixed telemetry not sending before process exit
+
+### Documentation
+
+- Updated README with new examples
+```
+
+### Pro Tier (with API key)
+
+Get human-readable, summarized changelogs with AI:
+- Converts developer commit messages to user-facing language
+- Intelligently groups related changes
+- Highlights breaking changes automatically
 
 ## Example Output
 
