@@ -295,7 +295,7 @@ export default function ProjectDetailPage() {
                     {isScanning ? (
                         <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Scanning...</>
                     ) : (
-                        <><Play className="h-3 w-3 mr-1.5" />Run Scan</>
+                        "Run Scan"
                     )}
                 </Button>
             </div>
@@ -411,7 +411,6 @@ export default function ProjectDetailPage() {
                             <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
                         </div>
                         <Button size="sm" className="h-7 text-xs px-3">
-                            <GitBranch className="h-3 w-3 mr-1.5" />
                             Generate Changelog
                         </Button>
                     </div>
