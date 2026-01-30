@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,9 @@ import {
     ChevronRight,
     Zap,
     Loader2,
-    ArrowLeft
+    ArrowLeft,
+    Trash2,
+    Copy
 } from "lucide-react";
 import Link from "next/link";
 
@@ -99,17 +101,54 @@ function formatTimeAgo(dateString: string | null): string {
 
 export default function ProjectDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const projectId = params.id as string;
 
     const [isLoading, setIsLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [isGeneratingChangelog, setIsGeneratingChangelog] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
     const [project, setProject] = useState<ScanProject | null>(null);
     const [scans, setScans] = useState<ScanRun[]>([]);
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
+
+    const handleCopyToClipboard = async (text: string, field: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedField(field);
+            setTimeout(() => setCopiedField(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
+
+    const handleDeleteProject = async () => {
+        if (!project) return;
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`/api/scan/projects/${projectId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                router.push('/scan');
+            } else {
+                const data = await response.json();
+                console.error('Failed to delete project:', data.error);
+            }
+        } catch (err) {
+            console.error('Error deleting project:', err);
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteConfirm(false);
+        }
+    };
 
     // Fetch project data
     useEffect(() => {
@@ -541,6 +580,79 @@ export default function ProjectDetailPage() {
                     <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
 
                     <div className="space-y-6">
+                        {/* Project Details */}
+                        <div className="bg-card border border-border/40 rounded-md p-4">
+                            <h3 className="text-xs font-medium mb-4">Project Details</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Project Name</label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono">
+                                            {project.github_repo_full_name}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.github_repo_full_name, 'name')}
+                                        >
+                                            {copiedField === 'name' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Project ID</label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-muted-foreground">
+                                            {project.id}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.id, 'id')}
+                                        >
+                                            {copiedField === 'id' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">GitHub URL</label>
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={project.github_repo_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-blue-400 hover:text-blue-300 hover:underline truncate"
+                                        >
+                                            {project.github_repo_url}
+                                        </a>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.github_repo_url, 'url')}
+                                        >
+                                            {copiedField === 'url' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notifications */}
                         <div className="bg-card border border-border/40 rounded-md p-4">
                             <h3 className="text-xs font-medium mb-4">Notifications</h3>
                             <div className="space-y-4">
@@ -568,6 +680,50 @@ export default function ProjectDetailPage() {
                         <Button size="sm" className="h-7 text-xs px-3">
                             Save Settings
                         </Button>
+
+                        {/* Danger Zone */}
+                        <div className="bg-red-500/5 border border-red-500/20 rounded-md p-4 mt-8">
+                            <h3 className="text-xs font-medium text-red-400 mb-2">Danger Zone</h3>
+                            <p className="text-[11px] text-muted-foreground mb-4">
+                                Deleting this project will permanently remove all scan history and changelogs. This action cannot be undone.
+                            </p>
+
+                            {!showDeleteConfirm ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs px-3 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                >
+                                    <Trash2 className="h-3 w-3 mr-1.5" />
+                                    Delete Project
+                                </Button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="h-7 text-xs px-3 bg-red-500 hover:bg-red-600 text-white"
+                                        onClick={handleDeleteProject}
+                                        disabled={isDeleting}
+                                    >
+                                        {isDeleting ? (
+                                            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Deleting...</>
+                                        ) : (
+                                            <>Confirm Delete</>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs px-3"
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        disabled={isDeleting}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </TabsContent>
             </Tabs>
