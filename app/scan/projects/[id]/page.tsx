@@ -123,84 +123,96 @@ export default function ProjectDetailPage() {
         if (!project) return;
 
         setIsScanning(true);
-        setScanLog([
-            { type: "info", message: "Starting security scan...", time: "0.0s" },
-            { type: "info", message: `Connecting to GitHub repository...`, time: "0.1s" },
-        ]);
+        setScanLog([]);
 
         try {
-            const response = await fetch(`/api/scan/projects/${projectId}/scan`, {
-                method: 'POST',
-            });
+            // Use SSE streaming endpoint
+            const eventSource = new EventSource(`/api/scan/projects/${projectId}/scan/stream`);
 
-            const data = await response.json();
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const timeStr = `${(data.time / 1000).toFixed(1)}s`;
 
-            if (response.ok && data.scan) {
-                const scan = data.scan;
-
-                const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; file?: string; line?: number }> = [
-                    { type: "info", message: "Starting security scan...", time: "0.0s" },
-                    { type: "success", message: "Connected to repository", time: "0.5s" },
-                ];
-
-                // Handle empty repository
-                if (scan.message && scan.files_scanned === 0) {
-                    logEntries.push({ type: "info", message: scan.message, time: "0.2s" });
-                } else {
-                    logEntries.push({ type: "info", message: `Scanning ${scan.files_scanned} files...`, time: "1.0s" });
-
-                    const issuesByFile = new Map<string, ScanIssue[]>();
-                    for (const issue of scan.issues || []) {
-                        const existing = issuesByFile.get(issue.file) || [];
-                        existing.push(issue);
-                        issuesByFile.set(issue.file, existing);
-                    }
-
-                    let timeOffset = 1.5;
-                    for (const [file, issues] of issuesByFile) {
-                        logEntries.push({
-                            type: "file",
-                            message: file,
-                            time: `${timeOffset.toFixed(1)}s`,
+                    if (data.type === 'start') {
+                        setScanLog([{ type: "info", message: data.message, time: timeStr }]);
+                    } else if (data.type === 'success') {
+                        setScanLog(prev => [...prev, { type: "success", message: data.message, time: timeStr }]);
+                    } else if (data.type === 'info') {
+                        setScanLog(prev => [...prev, { type: "info", message: data.message, time: timeStr }]);
+                    } else if (data.type === 'progress') {
+                        // Update last progress entry or add new one
+                        setScanLog(prev => {
+                            const lastIndex = prev.findIndex(l => l.type === 'progress');
+                            if (lastIndex >= 0) {
+                                const updated = [...prev];
+                                updated[lastIndex] = { type: "info", message: data.message, time: timeStr };
+                                return updated;
+                            }
+                            return [...prev, { type: "info", message: data.message, time: timeStr }];
                         });
-
-                        for (const issue of issues) {
-                            logEntries.push({
+                    } else if (data.type === 'issue') {
+                        // Add file and issues to log
+                        const issueData = data.data;
+                        setScanLog(prev => [
+                            ...prev,
+                            { type: "file", message: issueData.file, time: timeStr },
+                            ...issueData.issues.map((issue: ScanIssue) => ({
                                 type: "issue",
                                 message: `${issue.name}: ${issue.match}`,
                                 severity: issue.severity,
                                 line: issue.line,
+                            }))
+                        ]);
+                    } else if (data.type === 'complete') {
+                        const result = data.data;
+                        setScanLog(prev => [...prev, {
+                            type: "summary",
+                            message: `Complete: ${result.filesScanned} files scanned, ${result.issuesFound} issues found`,
+                            time: timeStr
+                        }]);
+
+                        // Update current scan with results
+                        setCurrentScan({
+                            id: result.scanId,
+                            status: 'completed',
+                            score: result.score,
+                            files_scanned: result.filesScanned,
+                            issues_found: result.issuesFound,
+                            scan_duration_ms: result.scanDurationMs,
+                            results: { issues: result.issues },
+                            created_at: new Date().toISOString(),
+                        });
+
+                        // Refresh project data
+                        fetch(`/api/scan/projects/${projectId}`)
+                            .then(res => res.json())
+                            .then(projectData => {
+                                setProject(projectData.project);
+                                setScans(projectData.scans || []);
                             });
-                        }
-                        timeOffset += 0.1;
+
+                        eventSource.close();
+                        setIsScanning(false);
+                    } else if (data.type === 'error') {
+                        setScanLog(prev => [...prev, { type: "error", message: data.message, time: timeStr }]);
+                        eventSource.close();
+                        setIsScanning(false);
                     }
+                } catch (parseErr) {
+                    console.error('Error parsing SSE event:', parseErr);
                 }
+            };
 
-                const totalTime = (scan.scan_duration_ms / 1000).toFixed(1);
-                logEntries.push({
-                    type: "summary",
-                    message: scan.files_scanned === 0
-                        ? "Complete: Repository is empty"
-                        : `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`,
-                    time: `${totalTime}s`,
-                });
+            eventSource.onerror = () => {
+                setScanLog(prev => [...prev, { type: "error", message: "Connection lost" }]);
+                eventSource.close();
+                setIsScanning(false);
+            };
 
-                setScanLog(logEntries);
-                setCurrentScan(scan);
-
-                const projectResponse = await fetch(`/api/scan/projects/${projectId}`);
-                if (projectResponse.ok) {
-                    const projectData = await projectResponse.json();
-                    setProject(projectData.project);
-                    setScans(projectData.scans || []);
-                }
-            } else {
-                setScanLog(prev => [...prev, { type: "error", message: data.error || "Scan failed" }]);
-            }
         } catch (err) {
             console.error('Scan error:', err);
             setScanLog(prev => [...prev, { type: "error", message: "Failed to run scan" }]);
-        } finally {
             setIsScanning(false);
         }
     };
