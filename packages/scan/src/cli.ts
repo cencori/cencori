@@ -15,10 +15,11 @@ import {
     applyFixes,
 } from './ai/index.js';
 import { sendTelemetry, buildTelemetryData, flushTelemetry } from './telemetry.js';
+import { generateChangelog } from './changelog/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.3.8';
+const VERSION = '0.4.1';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
@@ -454,6 +455,67 @@ async function main(): Promise<void> {
                 console.error(chalk.red(`\n  Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
                 // Wait for any pending telemetry before exiting
                 await flushTelemetry();
+                process.exit(1);
+            }
+        });
+
+    // Changelog command
+    program
+        .command('changelog')
+        .description('Generate AI-powered changelog from git commits')
+        .option('-s, --since <time>', 'Time range for commits', '1 week ago')
+        .option('-o, --output <file>', 'Output to file instead of stdout')
+        .option('-f, --format <format>', 'Output format (markdown or json)', 'markdown')
+        .action(async (options: { since: string; output?: string; format: 'markdown' | 'json' }) => {
+            printBanner();
+
+            const spinner = ora({
+                text: 'Reading git history...',
+                color: 'cyan',
+            }).start();
+
+            try {
+                const apiKey = getApiKey();
+                const result = await generateChangelog(options.since, apiKey || undefined);
+
+                if (result.commitCount === 0) {
+                    spinner.warn('No commits found in the specified period');
+                    console.log(chalk.yellow(`\n  Try a larger time range with --since "2 weeks ago"\n`));
+                    process.exit(0);
+                    return;
+                }
+
+                spinner.succeed(`Found ${result.commitCount} commits`);
+
+                if (options.format === 'json') {
+                    const output = JSON.stringify(result, null, 2);
+                    if (options.output) {
+                        fs.writeFileSync(options.output, output);
+                        console.log(chalk.green(`\n  ✔ Changelog saved to ${options.output}\n`));
+                    } else {
+                        console.log(output);
+                    }
+                } else {
+                    if (options.output) {
+                        fs.writeFileSync(options.output, result.markdown);
+                        console.log(chalk.green(`\n  ✔ Changelog saved to ${options.output}\n`));
+                    } else {
+                        console.log('\n' + result.markdown);
+                    }
+                }
+
+                // Upsell for Pro tier
+                if (!apiKey) {
+                    console.log(chalk.gray('  ─────────────────────────────────────────────'));
+                    console.log(chalk.cyan('\n   Want AI-enhanced changelogs?'));
+                    console.log(chalk.gray('     Get human-readable summaries with a Cencori API key'));
+                    console.log(chalk.gray('     Sign up free at https://cencori.com\n'));
+                }
+
+                process.exit(0);
+            } catch (error) {
+                spinner.fail('Changelog generation failed');
+                console.error(chalk.red(`\n  Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
                 process.exit(1);
             }
         });
