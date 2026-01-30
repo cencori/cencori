@@ -1,0 +1,58 @@
+{
+    "name": "@cencori/scan",
+    "version": "0.1.1",
+    "description": "Security scanner for AI apps. Detect hardcoded secrets, PII leaks, and exposed routes.",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "cencori-scan": "dist/cli.js"
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "keywords": [
+        "security",
+        "scanner",
+        "secrets",
+        "api-keys",
+        "pii",
+        "lovable",
+        "bolt",
+        "ai",
+        "cencori",
+        "vibe-check"
+    ],
+    "author": "Cencori",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cencori/cencori.git"
+    },
+    "homepage": "https://scan.cencori.com",
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "start": "node dist/cli.js",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "chalk": "^5.3.0",
+        "commander": "^12.0.0",
+        "glob": "^10.3.10",
+        "ora": "^8.0.1"
+    },
+    "devDependencies": {
+        "tsup": "^8.0.0",
+        "typescript": "^5.3.0",
+        "@types/node": "^20.0.0"
+    }
+}
