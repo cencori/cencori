@@ -28,9 +28,11 @@ export const Footer = () => {
                         <h4 className="text-[10px] font-medium uppercase tracking-wider mb-3">Product</h4>
                         <ul className="space-y-1.5">
                             <li><Link href="/ai-gateway" className="text-xs text-muted-foreground hover:text-foreground transition-colors">AI Gateway</Link></li>
+                            <li><Link href="/compute" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Compute</Link></li>
+                            <li><Link href="/workflow" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Workflow</Link></li>
+                            <li><Link href="/integration" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Integration</Link></li>
+                            <li><Link href="/storage" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Data Storage</Link></li>
                             <li><Link href="/edge" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Edge</Link></li>
-                            <li><Link href="/audit" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Audit Logs</Link></li>
-                            <li><Link href="/insights" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Analytics</Link></li>
                             <li><Link href="/enterprise" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Enterprise</Link></li>
                         </ul>
                     </div>
