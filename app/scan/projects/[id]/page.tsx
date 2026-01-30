@@ -281,23 +281,14 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="security" className="space-y-6">
-                <TabsList className="h-8 p-0.5 bg-secondary/50">
-                    <TabsTrigger value="security" className="h-7 text-xs px-3 gap-1.5">
-                        <Shield className="h-3 w-3" />
-                        Security
-                    </TabsTrigger>
-                    <TabsTrigger value="changelog" className="h-7 text-xs px-3 gap-1.5">
-                        <GitBranch className="h-3 w-3" />
-                        Changelog
-                    </TabsTrigger>
-                    <TabsTrigger value="settings" className="h-7 text-xs px-3 gap-1.5">
-                        <Settings className="h-3 w-3" />
-                        Settings
-                    </TabsTrigger>
+            <Tabs defaultValue="scan" className="space-y-6">
+                <TabsList>
+                    <TabsTrigger value="scan">Scan</TabsTrigger>
+                    <TabsTrigger value="changelog">Changelog</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="security" className="space-y-6">
+                <TabsContent value="scan" className="space-y-6">
                     {/* Auto-fix banner */}
                     {(project.last_scan_issues > 0 || (currentScan?.issues_found || 0) > 0) && (
                         <div className="p-4 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
