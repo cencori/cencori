@@ -18,7 +18,7 @@ import { sendTelemetry, buildTelemetryData, flushTelemetry } from './telemetry.j
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.3.4';
+const VERSION = '0.3.8';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
