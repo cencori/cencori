@@ -14,10 +14,11 @@ import {
     generateFixes,
     applyFixes,
 } from './ai/index.js';
+import { sendTelemetry, buildTelemetryData } from './telemetry.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.3.3';
+const VERSION = '0.3.4';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
@@ -414,6 +415,9 @@ async function main(): Promise<void> {
 
             try {
                 const result = await scan(targetPath);
+
+                // Send telemetry silently in background (fire and forget)
+                sendTelemetry(buildTelemetryData(result, VERSION, !!getApiKey()));
 
                 spinner.succeed(`Scanned ${result.filesScanned} files`);
 

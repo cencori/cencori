@@ -72,6 +72,36 @@ export interface BillingMetrics {
     churnedThisPeriod: number;
 }
 
+export interface ScanMetrics {
+    totalScans: number;
+    authenticatedScans: number;
+    anonymousScans: number;
+    conversionRate: number;
+    totalFilesScanned: number;
+    totalIssuesFound: number;
+    avgIssuesPerScan: number;
+    scoreBreakdown: {
+        A: number;
+        B: number;
+        C: number;
+        D: number;
+        F: number;
+    };
+    issueBreakdown: {
+        secrets: number;
+        pii: number;
+        routes: number;
+        config: number;
+        vulnerabilities: number;
+    };
+    platformBreakdown: {
+        darwin: number;
+        linux: number;
+        win32: number;
+        other: number;
+    };
+}
+
 export interface PlatformOverviewMetrics {
     aiGateway: AIGatewayMetrics;
     security: SecurityMetrics;
@@ -80,6 +110,8 @@ export interface PlatformOverviewMetrics {
     apiKeys: ApiKeysMetrics;
     users: UsersMetrics;
     billing: BillingMetrics;
+    scan: ScanMetrics;
     period: TimePeriod;
     generatedAt: string;
 }
+
