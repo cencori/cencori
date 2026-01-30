@@ -1,6 +1,6 @@
 {
     "name": "@cencori/scan",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "description": "Security scanner for AI apps. Detect hardcoded secrets, PII leaks, and exposed routes.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",

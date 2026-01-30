@@ -62,6 +62,12 @@ export const SECRET_PATTERNS: SecretPattern[] = [
         pattern: /sk_test_[0-9a-zA-Z]{24,}/g,
         severity: 'medium',
     },
+    {
+        name: 'Stripe Webhook Secret',
+        provider: 'Stripe',
+        pattern: /whsec_[a-zA-Z0-9]{24,}/g,
+        severity: 'critical',
+    },
     // AWS
     {
         name: 'AWS Access Key ID',
@@ -87,6 +93,12 @@ export const SECRET_PATTERNS: SecretPattern[] = [
         provider: 'GitHub',
         pattern: /gho_[a-zA-Z0-9]{36}/g,
         severity: 'critical',
+    },
+    {
+        name: 'GitHub Webhook Secret',
+        provider: 'GitHub',
+        pattern: /sha256=[a-fA-F0-9]{64}/g,
+        severity: 'high',
     },
     // Telegram
     {
@@ -170,12 +182,56 @@ export const SECRET_PATTERNS: SecretPattern[] = [
         pattern: /hf_[a-zA-Z0-9]{34}/g,
         severity: 'critical',
     },
-    // Cohere
+    // JWT Secrets
     {
-        name: 'Cohere API Key',
-        provider: 'Cohere',
-        pattern: /[a-zA-Z0-9]{40}/g, // Less specific, check context
-        severity: 'medium',
+        name: 'JWT Secret Assignment',
+        provider: 'Generic',
+        pattern: /JWT_SECRET\s*[:=]\s*["'][^"']{16,}["']/gi,
+        severity: 'critical',
+    },
+    {
+        name: 'Hardcoded JWT Sign',
+        provider: 'Generic',
+        pattern: /jwt\.(sign|verify)\s*\([^,]+,\s*["'][^"']{10,}["']/gi,
+        severity: 'critical',
+    },
+    // OAuth Secrets
+    {
+        name: 'OAuth Client Secret',
+        provider: 'Generic',
+        pattern: /client_secret\s*[:=]\s*["'][a-zA-Z0-9_-]{20,}["']/gi,
+        severity: 'critical',
+    },
+    {
+        name: 'Google Client Secret',
+        provider: 'Google',
+        pattern: /GOOGLE_CLIENT_SECRET\s*[:=]\s*["'][^"']+["']/gi,
+        severity: 'critical',
+    },
+    // Database Connection Strings
+    {
+        name: 'MongoDB Connection String',
+        provider: 'MongoDB',
+        pattern: /mongodb(\+srv)?:\/\/[^@\s]+@[^\s"']+/g,
+        severity: 'critical',
+    },
+    {
+        name: 'PostgreSQL Connection String',
+        provider: 'PostgreSQL',
+        pattern: /postgres(ql)?:\/\/[^\s"']+/g,
+        severity: 'critical',
+    },
+    {
+        name: 'MySQL Connection String',
+        provider: 'MySQL',
+        pattern: /mysql:\/\/[^\s"']+/g,
+        severity: 'critical',
+    },
+    {
+        name: 'Redis Connection String',
+        provider: 'Redis',
+        pattern: /redis:\/\/[^\s"']+/g,
+        severity: 'high',
     },
 ];
 
@@ -233,7 +289,7 @@ export interface RoutePattern {
 }
 
 export const ROUTE_PATTERNS: RoutePattern[] = [
-    // Next.js API routes without auth
+    // Next.js API routes
     {
         name: 'Next.js API Route (check for auth)',
         framework: 'Next.js',
@@ -248,6 +304,132 @@ export const ROUTE_PATTERNS: RoutePattern[] = [
         pattern: /app\.(get|post|put|delete|patch)\s*\(\s*["'`][^"'`]+["'`]\s*,\s*(?!.*auth)/gi,
         severity: 'medium',
         description: 'Express route - check if auth middleware is applied',
+    },
+    // Admin routes
+    {
+        name: 'Admin Route Exposed',
+        framework: 'Generic',
+        pattern: /["'`](\/admin|\/dashboard|\/internal|\/private)[^"'`]*["'`]/gi,
+        severity: 'high',
+        description: 'Sensitive route - ensure proper authentication',
+    },
+];
+
+/**
+ * Security vulnerability patterns
+ */
+export interface VulnerabilityPattern {
+    name: string;
+    category: string;
+    pattern: RegExp;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    description: string;
+}
+
+export const VULNERABILITY_PATTERNS: VulnerabilityPattern[] = [
+    // Hardcoded URLs
+    {
+        name: 'Localhost URL in Code',
+        category: 'hardcoded-url',
+        pattern: /https?:\/\/localhost[:\d]*/gi,
+        severity: 'medium',
+        description: 'Development URL - should use environment variables',
+    },
+    {
+        name: 'Staging/Dev URL in Code',
+        category: 'hardcoded-url',
+        pattern: /https?:\/\/(staging\.|dev\.|test\.)[^\s"']+/gi,
+        severity: 'medium',
+        description: 'Non-production URL in code',
+    },
+    // Debug artifacts (skip console.log - too many false positives for CLI tools)
+    {
+        name: 'Debug Flag Enabled',
+        category: 'debug',
+        pattern: /DEBUG\s*[:=]\s*(true|1|["']true["'])/gi,
+        severity: 'medium',
+        description: 'Debug mode enabled - disable in production',
+    },
+    {
+        name: 'Hardcoded Development Mode',
+        category: 'debug',
+        pattern: /NODE_ENV\s*[:=]\s*["']development["']/gi,
+        severity: 'medium',
+        description: 'Hardcoded development mode',
+    },
+    // CORS issues
+    {
+        name: 'CORS Wildcard Origin',
+        category: 'cors',
+        pattern: /Access-Control-Allow-Origin['":\s]+\*/g,
+        severity: 'high',
+        description: 'Allows requests from any origin - security risk',
+    },
+    {
+        name: 'Permissive CORS Config',
+        category: 'cors',
+        pattern: /cors\s*\(\s*\)/g,
+        severity: 'medium',
+        description: 'CORS with default (permissive) settings',
+    },
+    // SQL Injection
+    {
+        name: 'SQL String Concatenation',
+        category: 'injection',
+        pattern: /query\s*\(\s*[`'"].*\$\{.*\}/g,
+        severity: 'critical',
+        description: 'Potential SQL injection - use parameterized queries',
+    },
+    {
+        name: 'SQL String Addition',
+        category: 'injection',
+        pattern: /(SELECT|INSERT|UPDATE|DELETE).*["']\s*\+\s*\w+/gi,
+        severity: 'critical',
+        description: 'SQL built with string concatenation',
+    },
+    // XSS Vulnerabilities
+    {
+        name: 'React dangerouslySetInnerHTML',
+        category: 'xss',
+        pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html/g,
+        severity: 'high',
+        description: 'Renders raw HTML - ensure input is sanitized',
+    },
+    {
+        name: 'Direct innerHTML Assignment',
+        category: 'xss',
+        pattern: /\.innerHTML\s*=/g,
+        severity: 'high',
+        description: 'Direct HTML injection - use textContent instead',
+    },
+    {
+        name: 'Vue v-html Directive',
+        category: 'xss',
+        pattern: /v-html\s*=\s*["'][^"']+["']/g,
+        severity: 'high',
+        description: 'Vue raw HTML binding - ensure input is sanitized',
+    },
+    {
+        name: 'Document Write',
+        category: 'xss',
+        pattern: /document\.write\s*\(/g,
+        severity: 'high',
+        description: 'Deprecated and potentially dangerous',
+    },
+    // Eval and code execution
+    {
+        name: 'Eval Usage',
+        category: 'injection',
+        pattern: /\beval\s*\(/g,
+        severity: 'critical',
+        description: 'Code execution - major security risk',
+    },
+    {
+        name: 'Function Constructor',
+        category: 'injection',
+        pattern: /new\s+Function\s*\(/g,
+        severity: 'high',
+        description: 'Dynamic code execution risk',
     },
 ];
 
@@ -297,4 +479,6 @@ export const SCANNABLE_EXTENSIONS = [
     '.sh',
     '.bash',
     '.zsh',
+    '.vue',
+    '.svelte',
 ];
