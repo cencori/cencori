@@ -1,0 +1,42 @@
+# ZAP Scanning Rules Configuration
+# Format: rule_id	action	description
+# Actions: IGNORE, WARN, FAIL
+
+# Informational findings - Ignore
+10015	IGNORE	Incomplete or No Cache-control Header Set
+10027	IGNORE	Information Disclosure - Suspicious Comments
+10096	IGNORE	Timestamp Disclosure
+10109	IGNORE	Modern Web Application
+10049	IGNORE	Non-Storable Content
+
+# Low findings - Warn only
+10020	WARN	X-Frame-Options Header
+10021	WARN	X-Content-Type-Options Header
+10038	WARN	Content Security Policy (CSP) Header Not Set
+10098	WARN	Cross-Domain Misconfiguration
+
+# Medium+ findings - Fail the build
+10012	FAIL	Password Autocomplete in Browser
+10016	FAIL	Web Browser XSS Protection Not Enabled
+10017	FAIL	Cross-Domain JavaScript Source File Inclusion
+10024	FAIL	Information Disclosure - Sensitive Information in URL
+10025	FAIL	Information Disclosure - Sensitive Information in HTTP Referrer Header
+10054	FAIL	Cookie without SameSite Attribute
+10055	FAIL	CSP
+10202	FAIL	Absence of Anti-CSRF Tokens
+40003	FAIL	CRLF Injection
+40012	FAIL	Cross Site Scripting (Reflected)
+40014	FAIL	Cross Site Scripting (Persistent)
+40016	FAIL	Cross Site Scripting (Persistent) - Prime
+40017	FAIL	Cross Site Scripting (Persistent) - Spider
+90019	FAIL	Server Side Code Injection
+90020	FAIL	Remote OS Command Injection
+90021	FAIL	XPath Injection
+90023	FAIL	XML External Entity Attack
+90024	FAIL	Generic Padding Oracle
+90025	FAIL	Expression Language Injection
+90026	FAIL	SOAP Action Spoofing
+90028	FAIL	Insecure HTTP Method
+90029	FAIL	SOAP XML Injection
+90030	FAIL	WSDL File Detection
+90033	FAIL	Loosely Scoped Cookie
