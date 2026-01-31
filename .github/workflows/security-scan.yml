@@ -35,7 +35,7 @@ jobs:
         run: npm audit --json > npm-audit-report.json || true
       
       - name: Upload audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: npm-audit-report
           path: npm-audit-report.json
@@ -89,7 +89,7 @@ jobs:
       
       - name: Upload ZAP Report
         if: steps.vercel-preview.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zap-report
           path: report_html.html
