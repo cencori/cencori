@@ -23,7 +23,7 @@ function createBotResponse(url: string): Response {
     const baseUrl = 'https://cencori.com';
     let title = 'Cencori | The Infrastructure for AI Production';
     let description = 'Ship AI with built-in security, observability, and scale. One platform for everything.';
-    let ogImage = `${baseUrl}/og-image.jpg`;
+    const ogImage = `${baseUrl}/og-image.jpg`;
     let canonicalUrl = baseUrl;
 
     const pathname = new URL(url).pathname;

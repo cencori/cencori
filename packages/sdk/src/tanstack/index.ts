@@ -184,7 +184,7 @@ class CencoriTextAdapter implements TextAdapter<
         const decoder = new TextDecoder();
         let buffer = '';
         let content = '';
-        let promptTokens = 0;
+        const promptTokens = 0;
         let completionTokens = 0;
 
         try {

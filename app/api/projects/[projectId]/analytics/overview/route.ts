@@ -36,7 +36,7 @@ export async function GET(
                 startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
-        let apiKeysQuery = supabaseAdmin
+        const apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, key_prefix, environment')
             .eq('project_id', projectId)
