@@ -128,7 +128,7 @@ const SUSPICIOUS_COMBINATIONS = [
 /**
  * Check if the content appears to be from a legitimate agent tool interaction
  */
-function isAgentToolContext(text: string): boolean {
+export function isAgentToolContext(text: string): boolean {
     const lowerText = text.toLowerCase();
     let matchCount = 0;
 

@@ -62,6 +62,44 @@ function createBotResponse(url: string): Response {
     });
 }
 
+// Security headers for all responses
+const securityHeaders: Record<string, string> = {
+    // Prevent clickjacking
+    'X-Frame-Options': 'DENY',
+    // Prevent MIME type sniffing
+    'X-Content-Type-Options': 'nosniff',
+    // XSS Protection (legacy browsers)
+    'X-XSS-Protection': '1; mode=block',
+    // Control referrer information
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    // Restrict browser features
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    // Enforce HTTPS (HSTS) - 1 year with subdomains and preload
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+    // Content Security Policy - prevent XSS and data injection
+    'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://*.vercel-scripts.com",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://vercel.live wss://vercel.live",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ].join('; '),
+};
+
+/**
+ * Apply security headers to a response
+ */
+function applySecurityHeaders(response: NextResponse): NextResponse {
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+    });
+    return response;
+}
+
 export async function middleware(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || '';
     const hostname = request.headers.get('host') ?? '';
@@ -148,7 +186,8 @@ export async function middleware(request: NextRequest) {
     // Refresh auth token
     await supabase.auth.getUser();
 
-    return response;
+    // Apply security headers to all responses
+    return applySecurityHeaders(response);
 }
 
 export const config = {

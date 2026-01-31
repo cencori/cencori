@@ -1,0 +1,117 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sundays at midnight
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  # Dependency vulnerability scanning
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      
+      - name: Create audit report
+        run: npm audit --json > npm-audit-report.json || true
+      
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+
+  # CodeQL static analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # OWASP ZAP web application scan (runs against deployed preview)
+  zap-scan:
+    name: OWASP ZAP Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [npm-audit]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Wait for Vercel Preview
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+        id: vercel-preview
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 300
+          check_interval: 10
+        continue-on-error: true
+      
+      - name: OWASP ZAP Baseline Scan
+        if: steps.vercel-preview.outcome == 'success'
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ steps.vercel-preview.outputs.url }}
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+        continue-on-error: true
+      
+      - name: Upload ZAP Report
+        if: steps.vercel-preview.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report_html.html
+
+  # Security headers check
+  security-headers:
+    name: Security Headers Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Wait for Vercel Preview
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+        id: vercel-preview
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 300
+        continue-on-error: true
+      
+      - name: Check Security Headers
+        if: steps.vercel-preview.outcome == 'success'
+        run: |
+          echo "Checking security headers for ${{ steps.vercel-preview.outputs.url }}"
+          curl -sI "${{ steps.vercel-preview.outputs.url }}" | grep -iE "(strict-transport|content-security|x-frame|x-content-type|x-xss)" || echo "Some headers may be missing"
