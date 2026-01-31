@@ -250,7 +250,7 @@ export async function POST(
         });
 
         // Filter out merge commits and parse
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const commits: ParsedCommit[] = commitsData
             .filter((c: any) => !c.commit.message.startsWith('Merge'))
             .map((c: any) => ({

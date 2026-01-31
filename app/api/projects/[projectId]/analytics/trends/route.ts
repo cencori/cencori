@@ -43,7 +43,7 @@ export async function GET(
                 groupBy = 'day';
         }
 
-        let apiKeysQuery = supabaseAdmin
+        const apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, key_prefix, environment')
             .eq('project_id', projectId)

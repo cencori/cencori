@@ -50,7 +50,7 @@ export async function GET(
                 break;
         }
 
-        let apiKeysQuery = supabaseAdmin
+        const apiKeysQuery = supabaseAdmin
             .from('api_keys')
             .select('id, name, key_prefix, environment')
             .eq('project_id', projectId)

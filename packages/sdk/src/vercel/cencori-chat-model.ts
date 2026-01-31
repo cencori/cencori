@@ -317,7 +317,7 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
 
         const decoder = new TextDecoder();
         let buffer = '';
-        let inputTokens = 0;
+        const inputTokens = 0;
         let outputTokens = 0;
         const textPartId = 'text-0';
         let started = false;
