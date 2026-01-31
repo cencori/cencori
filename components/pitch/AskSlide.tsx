@@ -54,7 +54,7 @@ export function AskSlide() {
                         <p className="text-sm text-muted-foreground mb-2">We're raising</p>
                         <div className="flex items-baseline gap-2">
                             <span className="text-4xl md:text-5xl font-bold text-emerald-500">
-                                $500K
+                                $3M
                             </span>
                             <span className="text-sm text-muted-foreground">
                                 Pre-Seed Round
