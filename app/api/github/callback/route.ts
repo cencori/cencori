@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (isScanSource) {
       return NextResponse.redirect(buildRedirect('/scan/import?error=callback_failed'));
     }
-    return NextResponse.redirect(buildRedirect(orgSlug ? `/dashboard/organizations/${orgSlug}/projects?error=github_callback_failed` : '/dashboard'));
+    return NextResponse.redirect(buildRedirect(orgSlug ? `/dashboard/organizations/${orgSlug}/projects?error=github_callback_failed` : '/dashboard/organizations'));
   }
 
   // Get current user

@@ -143,8 +143,7 @@ export default function ScanDashboardPage() {
                 </div>
                 <Button asChild size="sm" className="h-7 text-xs px-3">
                     <Link href="/scan/import">
-                        <PlusIcon size={14} className="mr-1" />
-                        Import repository
+                        Import
                     </Link>
                 </Button>
             </div>
