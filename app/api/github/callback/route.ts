@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (setup_action === 'install') {
-    console.log(`GitHub App installed. Installation ID: ${installation_id}, Source: ${source || 'dashboard'}`);
+  if (setup_action === 'install' || setup_action === 'update') {
+    console.log(`GitHub App ${setup_action}. Installation ID: ${installation_id}, Source: ${source || 'dashboard'}`);
 
     try {
       const installationOctokit = await getInstallationOctokit(Number(installation_id));
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       const actualAccountType = 'type' in account ? (account.type as string).toLowerCase() : 'user';
       const actualAccountLogin = accountLogin.toLowerCase();
 
-      // Validate account type/login if expected
+      // Validate account type/login if expected (only for new installs, updates usually don't have this state)
       if (expectedAccountType && expectedAccountType !== actualAccountType) {
         console.error(`Account type mismatch: expected ${expectedAccountType}, got ${actualAccountType}`);
         if (isScanSource) {
@@ -158,8 +158,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(buildRedirect(`/dashboard/organizations/${orgSlug}/projects?error=installation_validation_failed`));
     }
 
-  } else if (setup_action === 'update') {
-    console.log(`GitHub App updated. Installation ID: ${installation_id}`);
   } else if (setup_action === 'request') {
     console.log(`GitHub App installation requested`);
   }
