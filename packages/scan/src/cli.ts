@@ -19,7 +19,7 @@ import { generateChangelog } from './changelog/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
@@ -440,12 +440,14 @@ async function main(): Promise<void> {
                 printSummary(result);
                 printRecommendations(result.issues);
 
-                // Interactive auto-fix prompt (unless --no-prompt)
-                if (options.prompt !== false && result.issues.length > 0) {
+                // Interactive auto-fix prompt (unless --no-prompt or non-interactive)
+                if (options.prompt !== false && result.issues.length > 0 && process.stdin.isTTY) {
                     await handleAutoFix(result, targetPath);
                 }
 
                 printFooter();
+                console.log(chalk.green('  ✔ Scan Complete'));
+                console.log();
 
                 // Wait for telemetry to complete before exiting
                 await flushTelemetry();
