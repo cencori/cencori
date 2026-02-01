@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (setup_action === 'install' || setup_action === 'update') {
-    console.log(`GitHub App ${setup_action}. Installation ID: ${installation_id}, Source: ${source || 'dashboard'}`);
+    console.log(`GitHub App ${setup_action}. Installation ID: ${installation_id}, Source: ${source || 'dashboard/organizations'}`);
 
     try {
       const installationOctokit = await getInstallationOctokit(Number(installation_id));
