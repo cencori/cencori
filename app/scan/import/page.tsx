@@ -232,7 +232,11 @@ export default function ImportRepoPage() {
                     />
                 </div>
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3" asChild>
-                    <a href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`} target="_blank" rel="noopener noreferrer">
+                    <a
+                        href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: "/scan/import", source: "scan" }))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
                         <ExternalLink className="h-3 w-3 mr-1.5" />
                         Manage GitHub App
                     </a>
