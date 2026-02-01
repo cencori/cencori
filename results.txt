@@ -1,0 +1,1535 @@
+
+  Cencori Scan
+  v0.4.1
+
+
+  ┌─────────────────────────────────────────────┐
+  │   Security Score: F-Tier                    │
+  └─────────────────────────────────────────────┘
+
+  Critical! Major security vulnerabilities found.
+
+  VULNERABILITIES (76)
+  ├─ playwright.config.ts:17  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ playwright.config.ts:32  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ VERCEL_CRON_SETUP.md:104  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ README.md:541  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ README.md:541  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ e2e/dashboard.spec.ts:11  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ e2e/auth.spec.ts:11  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ coverage/sorter.js:84  .innerHTML =
+  │  Direct HTML injection - use textContent instead
+  ├─ coverage/prettify.js:2  delete,false,import,new,operator,private,protected...
+  │  SQL built with string concatenation
+  ├─ coverage/prettify.js:2  .innerHTML=
+  │  Direct HTML injection - use textContent instead
+  ├─ coverage/block-navigation.js:10  Selector = ':not(' + missingCoverageClasses
+  │  SQL built with string concatenation
+  ├─ components/codeblock.tsx:114  dangerouslySetInnerHTML={{
+                __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ app/layout.tsx:219  dangerouslySetInnerHTML={{
+            __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ app/layout.tsx:225  dangerouslySetInnerHTML={{
+            __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ app/layout.tsx:231  dangerouslySetInnerHTML={{
+            __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ packages/scan/README.md:115  Access-Control-Allow-Origin: *
+  │  Allows requests from any origin - security risk
+  ├─ packages/scan/README.md:198  dangerouslySetInnerHTML={{ __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ e2e/fixtures/test-utils.ts:19  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ components/ui/chart.tsx:83  dangerouslySetInnerHTML={{
+        __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ components/landing/FAQ.tsx:79  dangerouslySetInnerHTML={{
+                    __h...
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ components/ai-elements/code-block.tsx:119  dangerouslySetInnerHTML={{ __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ components/ai-elements/code-block.tsx:124  dangerouslySetInnerHTML={{ __html
+  │  Renders raw HTML - ensure input is sanitized
+  ├─ packages/python-sdk/tests/conftest.py:104  https://test.cencori.com
+  │  Non-production URL in code
+  ├─ __tests__/integration/api/health.test.ts:12  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ app/docs/integrations/page.tsx:753  eval(
+  │  Code execution - major security risk
+  ├─ app/api/scan/analyze/route.ts:34  eval(
+  │  Code execution - major security risk
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:112  delete project: " + error
+  │  SQL built with string concatenation
+  ├─ app/api/v1/telemetry/scan/route.ts:39  Access-Control-Allow-Origin': '*
+  │  Allows requests from any origin - security risk
+  ├─ app/api/v1/telemetry/scan/route.ts:71  Access-Control-Allow-Origin': '*
+  │  Allows requests from any origin - security risk
+  ├─ app/api/v1/telemetry/scan/route.ts:82  Access-Control-Allow-Origin': '*
+  │  Allows requests from any origin - security risk
+  ├─ app/api/v1/telemetry/scan/route.ts:94  Access-Control-Allow-Origin': '*
+  │  Allows requests from any origin - security risk
+  ├─ app/api/organizations/[orgSlug]/invites/route.ts:104  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ app/api/internal/admins/invite/route.ts:84  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:1485  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:4029  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:4034  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:4081  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:4093  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/typing_extensions.py:4116  eval(
+  │  Code execution - major security risk
+  ├─ app/api/scan/projects/[id]/scan/route.ts:27  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpcore/_models.py:209  http://localhost:8080
+  │  Development URL - should use environment variables
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/skipping.py:91  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/skipping.py:118  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/pytester.py:295  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_argcomplete.py:52  DEBUG=1
+  │  Debug mode enabled - disable in production
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_argcomplete.py:60  DEBUG=1
+  │  Debug mode enabled - disable in production
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/edit/page.tsx:130  update project: " + updateError
+  │  SQL built with string concatenation
+  ├─ app/api/scan/projects/[id]/scan/stream/route.ts:27  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:2109  debug = True
+  │  Debug mode enabled - disable in production
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:343  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/easy_install.py:1137  insert(0, '-' + v
+  │  SQL built with string concatenation
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/formatters/__init__.py:91  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/_julia_builtins.py:150  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/_julia_builtins.py:361  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:2109  debug = True
+  │  Debug mode enabled - disable in production
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:343  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:2499  debug = True
+  │  Debug mode enabled - disable in production
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:523  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/packaging/licenses/__init__.py:100  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/mark/expression.py:281  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/mark/expression.py:330  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/mark/__init__.py:69  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_code/code.py:162  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_code/code.py:171  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_code/code.py:324  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/webencodings/__init__.py:45  http://dev.w3.org/csswg/css-values/#keywords>`_.
+  │  Non-production URL in code
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/poolmanager.py:448  http://localhost:3128
+  │  Development URL - should use environment variables
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py:147  .innerHTML =
+  │  Direct HTML injection - use textContent instead
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py:153  .innerHTML =
+  │  Direct HTML injection - use textContent instead
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py:163  .innerHTML =
+  │  Direct HTML injection - use textContent instead
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/_utils.py:33  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/_utils.py:36  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/_inputstream.py:32  eval(
+  │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/models/index.py:31  https://test.pypi.org/
+  │  Non-production URL in code
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/backports/asyncio/runner/runner.py:56  debug=True
+  │  Debug mode enabled - disable in production
+  └─ packages/python-sdk/venv/lib/python3.9/site-packages/backports/asyncio/runner/runner.py:60  debug=True
+     Debug mode enabled - disable in production
+
+  SECRETS (9)
+  ├─ public/llm.txt:495  api_****key"
+  ├─ public/llm.txt:506  api_****key"
+  ├─ e2e/auth.spec.ts:142  pass****ord'
+  ├─ app/docs/installation/page.tsx:472  api_****ere"
+  ├─ app/docs/concepts/agent-frameworks/page.tsx:223  api_****key"
+  ├─ app/docs/concepts/agent-frameworks/page.tsx:248  ApiK****key"
+  ├─ app/docs/concepts/agent-frameworks/page.tsx:274  api_****key"
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_urls.py:336  pass****ret"
+  └─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/network/auth.py:232  Pass****sk("
+
+  ROUTES (286)
+  ├─ public/llm.txt:58  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ public/llm.txt:116  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ public/llm.txt:297  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ components/signup-form.tsx:93  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/login-form.tsx:70  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/login-form.tsx:74  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/robots.ts:10  '/dashboard/'
+  │  Sensitive route - ensure proper authentication
+  ├─ app/page.tsx:75  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ internal/analytics/README.md:21  `/internal/analytics/`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/landing/Pricing.tsx:116  '/dashboard/organizations'
+  │  Sensitive route - ensure proper authentication
+  ├─ components/landing/Navbar.tsx:329  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/landing/Navbar.tsx:333  "/dashboard/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/landing/Navbar.tsx:355  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/ProvidersOverview.tsx:49  `/dashboard/organizations/${orgSlug}/providers`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/ProvidersOverview.tsx:84  `/dashboard/organizations/${orgSlug}/providers`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:65  `/dashboard/organizations/${org.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:72  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:100  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:108  `/dashboard/organizations/${orgSlug}/projects/${proj.slug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:115  `/dashboard/organizations/${orgSlug}/projects/new`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:248  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/MobileNav.tsx:252  "/dashboard/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CreditsWidget.tsx:102  `/dashboard/organizations/${orgSlug}/billing`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:223  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:230  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:237  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings?tab=api`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:244  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:251  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:258  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/security`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:265  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/settings`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:282  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:289  `/dashboard/organizations/${orgSlug}/projects/new`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:296  `/dashboard/organizations/${orgSlug}/projects/import/github`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:303  `/dashboard/organizations/${orgSlug}/analytics`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:310  `/dashboard/organizations/${orgSlug}/providers`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:317  `/dashboard/organizations/${orgSlug}/integrations`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:324  `/dashboard/organizations/${orgSlug}/teams`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:331  `/dashboard/organizations/${orgSlug}/billing`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:338  `/dashboard/organizations/${orgSlug}/settings`
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:354  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/dashboard/CommandPalette.tsx:361  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/academy/AcademyLayout.tsx:46  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/scan/layout.tsx:211  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/pricing/page.tsx:68  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/invite/page.tsx:146  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/invite/page.tsx:165  `/dashboard/organizations/${orgSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/invite/page.tsx:165  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:191  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:207  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:209  `/dashboard/organizations/${slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:256  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:275  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:277  `/dashboard/organizations/${orgSlug}/projects/${slug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:319  `/dashboard/organizations/${orgSlug}/projects/new`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:327  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:527  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/layout.tsx:531  "/dashboard/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ internal/analytics/pages/AdminDashboard.tsx:38  "/internal/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:324  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:328  "/dashboard/billing"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:332  "/dashboard/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:337  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:342  "/dashboard/team"
+  │  Sensitive route - ensure proper authentication
+  ├─ components/sections/navbar/default.tsx:346  "/dashboard/invite-user"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/solutions/vibe-coders/page.tsx:94  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/settings/page.tsx:96  "/internal/analytics"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/settings/page.tsx:106  "/internal/analytics"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/page.tsx:13  "/internal/kpi/login"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/page.tsx:19  "/internal/kpi/login"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/page.tsx:106  "/internal/kpi/growth"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/page.tsx:120  "/internal/kpi/engineering"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/invite/page.tsx:65  '/internal/analytics'
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/invite/page.tsx:75  `/internal/invite?token=${token}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/introduction/page.tsx:224  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/quick-start/page.tsx:197  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/quick-start/page.tsx:32  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/quick-start/page.tsx:102  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/installation/page.tsx:272  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/integrations/page.tsx:90  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/dashboard/organizations/page.tsx:47  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/page.tsx:117  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/page.tsx:159  "/dashboard/organizations/new"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/page.tsx:177  `/dashboard/organizations/${org.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/layout.tsx:10  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/layout.tsx:11  "/dashboard/settings"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/layout.tsx:12  "/dashboard/connected-accounts"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/layout.tsx:13  "/dashboard/security"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/layout.tsx:28  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/versions/route.ts:29  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/og/route.tsx:17  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/contact/route.ts:12  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/ask-ai/route.ts:21  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/(products)/workflow/page.tsx:120  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/storage/page.tsx:119  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/integration/page.tsx:121  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/edge/page.tsx:65  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/compute/page.tsx:120  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/ai-gateway/page.tsx:157  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/(products)/ai/page.tsx:128  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/signup/page.tsx:77  "/internal/kpi"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/signup/page.tsx:162  "/internal/kpi/login"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/login/page.tsx:45  "/internal/kpi"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/login/page.tsx:111  "/internal/kpi/signup"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/[role]/page.tsx:51  '/internal/kpi/login'
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/[role]/page.tsx:146  "/internal/kpi"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/[role]/page.tsx:164  "/internal/kpi"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/internal/kpi/[role]/page.tsx:243  "/internal/kpi"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/use-cases/vibe-coders/page.tsx:57  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/use-cases/vibe-coders/page.tsx:81  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/getting-started/first-request/page.tsx:26  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-openai/page.tsx:111  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-openai/page.tsx:328  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-anthropic/page.tsx:105  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-anthropic/page.tsx:346  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/concepts/streaming/page.tsx:129  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/concepts/streaming/page.tsx:227  app.post('/chat', 
+  │  Express route - check if auth middleware is applied
+  ├─ app/docs/concepts/security/page.tsx:273  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/concepts/projects/page.tsx:55  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/concepts/api-keys/page.tsx:93  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/concepts/agent-frameworks/page.tsx:57  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/concepts/agent-frameworks/page.tsx:335  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/new/page.tsx:103  `/dashboard/organizations/${createdOrg.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/new/page.tsx:224  `/dashboard/organizations/${orgData.slug}/billing?upgrade=true`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/new/page.tsx:228  `/dashboard/organizations/${orgData.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/new/page.tsx:244  `/dashboard/organizations/${createdOrg.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/new/page.tsx:357  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:80  `/dashboard/organizations/${organization?.slug}/projects/`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:142  `/dashboard/organizations/${organization.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:150  `/dashboard/organizations/${organization.slug}/billing`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:158  `/dashboard/organizations/${organization.slug}/usage`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:167  `/dashboard/organizations/${organization.slug}/integrations`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:175  `/dashboard/organizations/${organization.slug}/teams`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:183  `/dashboard/organizations/${organization.slug}/settings`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:207  `/dashboard/organizations/${organization.slug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:215  `/dashboard/organizations/${organization.slug}/billing`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:223  `/dashboard/organizations/${organization.slug}/usage`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:232  `/dashboard/organizations/${organization.slug}/integrations`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:240  `/dashboard/organizations/${organization.slug}/teams`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:248  `/dashboard/organizations/${organization.slug}/settings`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/api/chat/page.tsx:57  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/chat/page.tsx:167  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/chat/page.tsx:268  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/auth/page.tsx:31  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/settings/page.tsx:19  "/dashboard/profile"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/settings/page.tsx:30  "/dashboard/connected-accounts"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/(account)/settings/page.tsx:41  "/dashboard/security"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/v1/metrics/route.ts:72  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/user/profile/route.ts:7  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/user/profile/route.ts:52  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/user/profile/route.ts:124  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/user/avatar/route.ts:11  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/user/avatar/route.ts:91  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/route.ts:7  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/route.ts:38  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/changelog/route.ts:88  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/analyze/route.ts:143  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/providers/health/route.ts:141  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/pitch/export/route.ts:10  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/route.ts:20  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/health/providers/route.ts:16  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/email/budget-alert/route.ts:15  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/email/welcome/route.ts:6  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/github/user-installations/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/github/repositories/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/github/callback/route.ts:6  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/github/callback/route.ts:40  `/dashboard/organizations/${orgSlug}/projects?error=github_callback_failed`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:40  '/dashboard'
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:71  `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_type_mismatch&expected=${expectedAccountType}&actual=${actualAccountType}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:81  `/dashboard/organizations/${orgSlug}/projects/import/github?error=account_name_mismatch&expected=${expectedAccountLogin}&actual=${accountLogin}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:103  `/dashboard/organizations/${orgSlug}/projects?error=installation_failed`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:157  `/dashboard/organizations/${orgSlug}/projects?error=installation_validation_failed`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:172  `/dashboard/organizations/${orgSlug}/projects/import/github?success=github_connected`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/callback/route.ts:175  '/dashboard'
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/github/link-installation/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/cron/reset-usage/route.ts:4  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/cron/reset-usage/route.ts:49  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/billing/webhook/route.ts:58  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/billing/checkout/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/ai/chat/route.ts:310  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/ai/chat/route.ts:601  `/dashboard/projects/${project.id}/providers`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/teams/page.tsx:179  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/settings/page.tsx:151  "/dashboard/organizations"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:205  `/dashboard/organizations/${orgSlug}/projects/new`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:211  `/dashboard/organizations/${orgSlug}/projects/import/github`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:242  `/dashboard/organizations/${orgSlug}/projects/${project.slug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:285  `/dashboard/organizations/${orgSlug}/projects/new`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:288  `/dashboard/organizations/${orgSlug}/projects/import/github`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/academy/getting-started/(steps)/step-8/page.tsx:22  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/academy/getting-started/(steps)/step-7/page.tsx:72  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/academy/getting-started/(steps)/step-7/page.tsx:114  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/academy/getting-started/(steps)/step-6/page.tsx:58  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/academy/getting-started/(steps)/step-2/page.tsx:42  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/academy/getting-started/(steps)/complete/page.tsx:83  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/v1/telemetry/scan/route.ts:28  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/route.ts:11  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/route.ts:51  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/route.ts:95  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/github/repos/route.ts:7  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/webhooks/route.ts:12  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/webhooks/route.ts:47  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/settings/route.ts:22  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/settings/route.ts:106  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/rate-limits/route.ts:12  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/providers/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/providers/route.ts:49  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/provider-keys/route.ts:16  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/provider-keys/route.ts:71  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/logs/route.ts:14  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/export/route.ts:27  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-rules/route.ts:10  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-rules/route.ts:34  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/budget/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/budget/route.ts:29  export async function PUT(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/api-keys/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/api-keys/route.ts:58  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/ai-detect/route.ts:22  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/route.ts:49  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/invites/route.ts:8  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/invites/route.ts:173  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/credits/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/invites/[token]/accept/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/invites/[token]/accept/route.ts:107  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/metrics/overview/route.ts:35  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/invite/route.ts:24  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/verify/route.ts:6  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/accept/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/[id]/route.ts:25  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/dashboard/organizations/[orgSlug]/projects/new/page.tsx:164  `/dashboard/organizations/${orgSlug}/projects/${newSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/new/page.tsx:334  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/page.tsx:183  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/page.tsx:218  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/page.tsx:571  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/ProjectLayoutClient.tsx:229  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/scan/projects/[id]/scan/route.ts:119  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/changelog/route.ts:139  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/changelog/route.ts:179  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/scan/projects/[id]/changelog/route.ts:323  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/webhooks/[webhookId]/route.ts:11  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/webhooks/[webhookId]/route.ts:62  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/stats/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/settings/route.ts:20  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/settings/route.ts:75  export async function PUT(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/audit/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/incidents/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/providers/[providerId]/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/providers/[providerId]/route.ts:39  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/providers/[providerId]/route.ts:76  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/provider-keys/[provider]/route.ts:5  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/provider-keys/[provider]/route.ts:68  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/logs/stream/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/logs/export/route.ts:4  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/logs/[requestId]/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-rules/[ruleId]/route.ts:11  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-rules/[ruleId]/route.ts:34  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-rules/[ruleId]/route.ts:99  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/custom-providers/test/route.ts:13  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/api-keys/[keyId]/route.ts:4  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/api-keys/[keyId]/route.ts:58  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/analytics/trends/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/analytics/overview/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/analytics/geo/route.ts:50  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/analytics/failover/route.ts:8  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/ai/stats/route.ts:21  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/ai/logs/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:5  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:54  export async function DELETE(
+  │  API route handler - verify authentication is implemented
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:270  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:44  `/dashboard/organizations/${orgSlug}/projects?error=unauthorized`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:57  `/dashboard/organizations/${orgSlug}/projects/${existingProject.slug}?info=already_imported`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:114  `/dashboard/organizations/${orgSlug}/projects/import/github?error=import_failed&message=${encodeURIComponent(insertError.message)}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:118  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:119  `/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:121  `/dashboard/organizations/${orgSlug}/projects/${newProject.slug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/actions.ts:124  `/dashboard/organizations/${orgSlug}/projects/${newProject.slug}?success=imported`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/settings/page.tsx:488  `/dashboard/organizations/${orgSlug}/projects`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/settings/page.tsx:659  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/playground/page.tsx:179  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/edit/page.tsx:135  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/edit/page.tsx:223  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/ai/page.tsx:167  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/ai/logs`
+  │  Sensitive route - ensure proper authentication
+  ├─ app/api/scan/projects/[id]/scan/stream/route.ts:114  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/webhooks/[webhookId]/test/route.ts:10  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/incidents/[incidentId]/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/incidents/[incidentId]/route.ts:69  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  └─ app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/ai/logs/page.tsx:101  `/dashboard/organizations/${orgSlug}/projects/${projectSlug}/ai`
+     Sensitive route - ensure proper authentication
+
+  PII (755)
+  ├─ lib/utils.ts:9  012****789
+  ├─ lib/usage.ts:20  000****000
+  ├─ lib/usage.ts:20  000****000
+  ├─ coverage/prettify.js:2  012****789
+  ├─ coverage/prettify.js:2  ****
+  ├─ components/user-menu.tsx:43  k.k****com
+  ├─ components/signup-form.tsx:195  11.****113
+  ├─ components/signup-form.tsx:195  3.4****108
+  ├─ components/signup-form.tsx:195  3.1****.84
+  ├─ components/signup-form.tsx:195  5.9****.36
+  ├─ components/signup-form.tsx:195  315****825
+  ├─ components/login-form.tsx:156  11.****113
+  ├─ components/login-form.tsx:156  3.4****108
+  ├─ components/login-form.tsx:156  3.1****.84
+  ├─ components/login-form.tsx:156  5.9****.36
+  ├─ components/login-form.tsx:156  315****825
+  ├─ supabase/migrations/20260102_add_kpi_tables.sql:37  %@c****com
+  ├─ supabase/migrations/20260102_add_kpi_tables.sql:41  %@c****com
+  ├─ supabase/migrations/20260102_add_kpi_tables.sql:45  %@c****com
+  ├─ supabase/migrations/20260102_add_kpi_tables.sql:49  %@c****com
+  ├─ lib/safety/verify-security.ts:33  joh****org
+  ├─ lib/safety/verify-security.ts:35  joh****org
+  ├─ lib/safety/verify-security.ts:36  joh****org
+  ├─ lib/safety/verify-security.ts:37  joh****org
+  ├─ lib/safety/verify-security.ts:39  joh****org
+  ├─ database/migrations/security_incidents_table.sql:33  joh****org
+  ├─ database/migrations/008_cencori_admins.sql:87  omo****com
+  ├─ database/migrations/008_cencori_admins.sql:93  omo****com
+  ├─ components/pitch/AskSlide.tsx:110  bol****com
+  ├─ components/pitch/AskSlide.tsx:114  bol****com
+  ├─ components/landing/Footer.tsx:95  11.****111
+  ├─ components/landing/Footer.tsx:95  3.4****107
+  ├─ components/landing/Footer.tsx:95  3.1****.84
+  ├─ components/landing/Footer.tsx:95  5.9****372
+  ├─ components/landing/Footer.tsx:95  319****801
+  ├─ components/dashboard/CommandPalette.tsx:38  11.****113
+  ├─ components/dashboard/CommandPalette.tsx:38  3.4****108
+  ├─ components/dashboard/CommandPalette.tsx:38  3.1****.84
+  ├─ components/dashboard/CommandPalette.tsx:38  5.9****.36
+  ├─ components/dashboard/CommandPalette.tsx:38  315****825
+  ├─ components/dashboard/CommandPalette.tsx:89  3.2****075
+  ├─ components/icons/BrandIcons.tsx:173  8.5****546
+  ├─ components/icons/BeakerIcon.tsx:17  251****.05
+  ├─ components/landing/bento/RealTimeMetricsCard.tsx:96  ***
+  ├─ app/scan/import/page.tsx:22  188****.69
+  ├─ app/scan/import/page.tsx:22  1.2****394
+  ├─ app/scan/import/page.tsx:22  426****.17
+  ├─ app/scan/import/page.tsx:22  1.3****368
+  ├─ app/scan/import/page.tsx:22  1.5****527
+  ├─ app/scan/import/page.tsx:22  1.1****988
+  ├─ app/(marketing)/partners/page.tsx:16  par****com
+  ├─ app/(marketing)/contact/page.tsx:138  you****com
+  ├─ components/animate-ui/primitives/animate/github-stars.tsx:213  11.****113
+  ├─ components/animate-ui/primitives/animate/github-stars.tsx:213  3.4****108
+  ├─ components/animate-ui/primitives/animate/github-stars.tsx:213  3.1****.84
+  ├─ components/animate-ui/primitives/animate/github-stars.tsx:213  5.9****.36
+  ├─ components/animate-ui/primitives/animate/github-stars.tsx:213  315****825
+  ├─ app/internal/kpi/signup/page.tsx:121  you****com
+  ├─ app/internal/kpi/login/page.tsx:83  you****com
+  ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  11.****111
+  ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  3.4****107
+  ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  3.1****.84
+  ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  5.9****372
+  ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  319****801
+  ├─ app/api/internal/admins/route.ts:7  omo****com
+  ├─ app/api/email/budget-alert/route.ts:4  ale****com
+  ├─ app/api/email/welcome/route.ts:18  wel****com
+  ├─ app/(docs)/design/typography/page.tsx:97  012****789
+  ├─ app/(docs)/design/typography/page.tsx:109  012****789
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  11.****113
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.4****108
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.1****.84
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  5.9****.36
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  315****825
+  ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  11.****111
+  ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  3.4****107
+  ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  3.1****.84
+  ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  5.9****372
+  ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  319****801
+  ├─ app/academy/getting-started/(steps)/step-9/page.tsx:73  123****789
+  ├─ app/api/internal/metrics/overview/route.ts:18  omo****com
+  ├─ app/api/internal/admins/invite/route.ts:10  omo****com
+  ├─ app/api/internal/admins/verify/route.ts:4  omo****com
+  ├─ app/api/internal/admins/[id]/route.ts:6  omo****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/tomli/_parser.py:52  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/tomli/_parser.py:55  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/msvc.py:357  vsp****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/msvc.py:1425  1.0****0.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/msvc.py:1426  1.0****0.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/msvc.py:1429  1.0****0.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/respx/patterns.py:428  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/__init__.py:2982  *****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/packaging/specifiers.py:247  107****515
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/packaging/specifiers.py:340  1.2****3.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/packaging/__init__.py:12  don****.io
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:7  370****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:8  375****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:11  384****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:12  386****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:13  388****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:38  212****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:40  101****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:48  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:49  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:50  302****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:51  303****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:65  300****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:66  313****032
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:80  304****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:92  330****033
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3075  101****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3076  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3077  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3078  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3079  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3083  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3084  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3085  115****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3086  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3087  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3091  121****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3092  123****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3093  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3094  127****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3095  129****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3099  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3100  135****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3101  137****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3105  142****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3106  144****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3107  146****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3108  148****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3112  151****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3113  153****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3114  155****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3115  157****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3116  159****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3120  161****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3121  163****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3122  165****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3123  167****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3124  169****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3128  171****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3129  173****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3130  175****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3131  177****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3135  180****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3136  183****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3137  185****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3138  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3140  192****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3141  195****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3142  199****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3177  201****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3178  203****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3179  205****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3180  207****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3181  209****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3185  211****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3186  213****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3187  215****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3188  217****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3189  219****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3193  221****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3194  223****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3195  225****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3196  227****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3197  229****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3201  231****023
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3202  233****023
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3205  242****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3206  247****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3207  249****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3215  300****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3216  342****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3217  346****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3218  350****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3219  371****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3220  373****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3221  377****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3223  390****039
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3241  430****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3242  461****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3243  463****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3244  465****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3245  467****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3246  469****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3250  471****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3251  473****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3252  475****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3253  477****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3254  479****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3258  481****048
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3259  483****048
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3263  491****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3264  493****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3265  495****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3266  497****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3267  499****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3318  501****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3319  503****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3320  505****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3321  507****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3322  509****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3326  511****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3327  513****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3328  515****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3329  517****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3330  519****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3334  521****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3335  523****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3336  525****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3337  527****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3338  529****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3342  559****055
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3343  560****058
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3344  588****058
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3352  610****061
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3353  620****064
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3354  641****066
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3361  710****074
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3365  800****082
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3366  840****085
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3367  860****086
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3368  870****088
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3369  889****088
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3372  960****096
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3373  966****097
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3374  971****098
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3375  985****098
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3539  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3540  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3543  120****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3545  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3546  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3548  126****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3550  129****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3557  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3558  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3560  138****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3562  140****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3564  168****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3567  170****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3569  174****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3570  176****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3572  177****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3573  178****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3578  181****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3579  182****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3580  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3582  190****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3583  192****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3584  193****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3585  194****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3586  197****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3587  198****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3762  218****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3840  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3843  304****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3844  309****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:3848  310****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4018  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4020  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4023  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4024  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4026  102****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4029  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4031  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4032  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4033  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4036  104****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4039  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4040  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4041  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4046  106****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4047  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4048  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4049  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4050  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4051  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4053  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4056  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4057  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4060  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4061  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4062  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4096  110****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4097  110****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4102  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4103  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4104  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4105  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4106  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4107  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4111  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4112  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4114  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4115  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4121  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4122  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4124  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4126  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4127  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4129  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4131  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4132  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4134  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4135  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4136  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4139  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4146  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4147  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4149  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4152  115****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4155  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4156  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4157  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4158  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4161  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4163  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4164  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4165  118****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4168  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4170  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4171  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4172  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4174  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4212  120****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4213  124****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4215  130****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4216  134****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4217  134****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4218  144****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4219  161****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4220  168****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4241  170****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4242  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4297  300****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4298  313****032
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4303  375****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/idna/idnadata.py:4305  660****066
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_urls.py:20  jo@****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_urls.py:154  jo@****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_urls.py:336  jo@****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_urlparse.py:33  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_auth.py:230  rea****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/python.py:178  210****096
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/main.py:384  224****902
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  11.****113
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  3.4****108
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  3.1****.84
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  5.9****.36
+  ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  315****825
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:79  ptm****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:199  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:2639  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:4767  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5462  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5462  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5531  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5531  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5532  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5532  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:2287  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5422  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5432  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5472  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5479  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5491  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5498  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5717  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5727  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:848  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:853  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5462  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5462  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5531  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5531  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5532  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5532  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5579  255****255
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/upload_docs.py:128  756****674
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/launcher manifest.xml:3  1.0****0.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/formatters/terminal256.py:62  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/tnt.py:40  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/sql.py:89  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/scripting.py:723  aam****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/sas.py:23  jam****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/matlab.py:2744  ksc****edu
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/lisp.py:364  2.4****.19
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/lean.py:30  378****707
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/gdscript.py:7  djr****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/esoteric.py:235  bli****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/data.py:462  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/data.py:465  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/c_cpp.py:89  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/c_cpp.py:357  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/c_cpp.py:374  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/algebra.py:199  chr****.de
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/_scheme_builtins.py:12  3.0****130
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:79  ptm****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:199  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:2639  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:4767  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5462  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5462  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5531  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5531  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5532  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5532  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5741  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5741  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:2287  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5422  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5432  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5472  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5479  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5491  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5498  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5717  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5727  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:848  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:853  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5462  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5462  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5531  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5531  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5532  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5532  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5741  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5741  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/pyparsing.py:5579  255****255
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/appdirs.py:12  319****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/appdirs.py:12  120****201
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/six.py:31  ben****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:100  ptm****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:281  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:3126  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:5684  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6468  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6468  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6539  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6539  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6540  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6540  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7106  345****234
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7106  234****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:2692  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6428  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6438  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6480  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6487  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6499  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6506  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7082  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7092  ****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:1040  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:1047  111****333
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6468  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6468  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6539  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6539  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6540  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6540  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7106  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:7106  123****678
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pyparsing.py:6588  255****255
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/appdirs.py:12  319****123
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/appdirs.py:12  120****201
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/exceptions.py:354  123****345
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/exceptions.py:354  123****345
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/exceptions.py:354  123****345
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/exceptions.py:354  123****345
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/packaging/licenses/__init__.py:8  oss****dev
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_transports/wsgi.py:61  1.2****3.4
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/httpx/_transports/asgi.py:71  1.2****3.4
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/_pytest/_io/pprint.py:8  fdr****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/packaging/version.py:195  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/packaging/__about__.py:24  don****.io
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/packaging/version.py:195  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pkg_resources/_vendor/packaging/__about__.py:24  don****.io
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/fields.py:102  4.1****2.7
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/fields.py:104  4.1****2.7
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/__init__.py:22  and****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/progress/spinner.py:3  ver****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/progress/counter.py:3  ver****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/progress/bar.py:3  ver****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/progress/__init__.py:1  ver****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/pkg_resources/__init__.py:2987  *****
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/requests/utils.py:598  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/requests/utils.py:665  255****5.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/requests/__version__.py:11  me@****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/packaging/version.py:186  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/packaging/__about__.py:23  don****.io
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/msgpack/fallback.py:877  800****000
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:6  370****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:7  375****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:10  384****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:11  386****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:12  388****038
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:37  212****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:39  101****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:47  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:48  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:49  302****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:50  303****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:62  300****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:76  304****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:87  330****033
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:878  101****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:879  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:880  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:881  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:882  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:886  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:887  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:888  115****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:889  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:890  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:894  121****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:895  123****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:896  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:897  127****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:898  129****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:902  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:903  135****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:904  137****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:908  142****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:909  144****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:910  146****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:911  148****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:915  151****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:916  153****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:917  155****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:918  157****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:919  159****015
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:923  161****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:924  163****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:925  165****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:926  167****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:927  169****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:931  171****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:932  173****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:933  175****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:934  177****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:938  180****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:939  183****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:940  185****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:941  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:943  192****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:944  195****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:945  199****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:980  201****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:981  203****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:982  205****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:983  207****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:984  209****020
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:988  211****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:989  213****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:990  215****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:991  217****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:992  219****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:996  221****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:997  223****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:998  225****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:999  227****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1000  229****022
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1004  231****023
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1005  233****023
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1008  242****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1009  247****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1010  249****024
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1018  300****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1019  342****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1020  346****034
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1021  350****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1022  371****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1023  373****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1024  377****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1026  390****039
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1044  430****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1045  461****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1046  463****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1047  465****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1048  467****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1049  469****046
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1053  471****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1054  473****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1055  475****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1056  477****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1057  479****047
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1061  481****048
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1062  483****048
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1066  491****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1067  493****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1068  495****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1069  497****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1070  499****049
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1121  501****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1122  503****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1123  505****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1124  507****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1125  509****050
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1129  511****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1130  513****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1131  515****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1132  517****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1133  519****051
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1137  521****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1138  523****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1139  525****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1140  527****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1141  529****052
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1145  559****055
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1146  560****058
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1147  588****058
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1155  610****061
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1156  620****064
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1157  641****066
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1164  710****074
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1168  800****082
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1169  840****085
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1170  860****086
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1175  960****096
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1176  966****097
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1177  971****098
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1178  985****098
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1341  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1342  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1345  120****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1347  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1348  125****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1350  126****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1352  129****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1359  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1360  131****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1362  138****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1364  140****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1366  168****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1369  170****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1371  172****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1372  174****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1373  176****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1375  177****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1376  178****017
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1381  181****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1382  182****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1383  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1385  190****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1386  192****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1387  193****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1388  194****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1389  197****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1390  198****019
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1565  218****021
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1643  300****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1646  304****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1647  309****030
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1651  310****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1814  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1816  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1819  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1820  100****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1822  102****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1825  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1827  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1828  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1829  103****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1832  104****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1835  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1836  105****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1837  106****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1838  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1839  107****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1840  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1841  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1843  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1846  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1847  108****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1850  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1851  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1852  109****010
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1881  110****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1882  110****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1886  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1887  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1888  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1889  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1890  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1891  111****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1895  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1896  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1898  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1899  112****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1905  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1906  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1908  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1910  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1911  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1913  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1915  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1916  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1918  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1919  113****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1920  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1921  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1923  114****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1926  115****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1929  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1930  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1931  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1932  116****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1934  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1936  117****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1937  118****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1940  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1942  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1943  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1944  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1946  119****011
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1978  120****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1979  124****012
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1980  130****013
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1981  144****014
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1982  168****016
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:1999  170****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2000  188****018
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2037  300****031
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2044  375****037
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2046  660****066
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/version.py:5  dan****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/enums.py:4  dan****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/cachecontrol/__init__.py:6  eri****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/req/req_file.py:492  969****799
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/utils/temp_dir.py:207  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/utils/misc.py:264  373****559
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/utils/filesystem.py:127  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/network/session.py:63  127****0.0
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/backports/asyncio/runner/tasks.py:56  105****331
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/packages/six.py:31  ben****org
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:34  wil****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:504  214****647
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:506  214****647
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:148  pas****com
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:53  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:74  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/packages/ssl_match_hostname/_implementation.py:18  3.5****0.1
+  └─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/_securetransport/bindings.py:12  wil****net
+
+  ─────────────────────────────────────────────
+
+  Summary
+    Files scanned: 1646
+    Scan time: 2857ms
+
+     CRITICAL  34 issues
+       HIGH    229 issues
+     MEDIUM   792 issues
+       LOW     71 issues
+
+  Recommendations:
+    - Use environment variables for secrets
+    - Never commit API keys to version control
+    - Remove personal data from source code
+    - Sanitize user input before rendering HTML
+    - Use parameterized queries for SQL
+    - Configure CORS with specific allowed origins
+
+
+? Would you like Cencori to auto-fix these issues? (y/N)[58G
+[?25h
