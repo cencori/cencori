@@ -1,6 +1,6 @@
 
   Cencori Scan
-  v0.4.1
+  v0.4.2
 
 
   ┌─────────────────────────────────────────────┐
@@ -20,10 +20,6 @@
   │  Development URL - should use environment variables
   ├─ README.md:541  http://localhost:3000
   │  Development URL - should use environment variables
-  ├─ e2e/dashboard.spec.ts:11  http://localhost:3000
-  │  Development URL - should use environment variables
-  ├─ e2e/auth.spec.ts:11  http://localhost:3000
-  │  Development URL - should use environment variables
   ├─ coverage/sorter.js:84  .innerHTML =
   │  Direct HTML injection - use textContent instead
   ├─ coverage/prettify.js:2  delete,false,import,new,operator,private,protected...
@@ -32,6 +28,10 @@
   │  Direct HTML injection - use textContent instead
   ├─ coverage/block-navigation.js:10  Selector = ':not(' + missingCoverageClasses
   │  SQL built with string concatenation
+  ├─ e2e/dashboard.spec.ts:11  http://localhost:3000
+  │  Development URL - should use environment variables
+  ├─ e2e/auth.spec.ts:11  http://localhost:3000
+  │  Development URL - should use environment variables
   ├─ components/codeblock.tsx:114  dangerouslySetInnerHTML={{
                 __html
   │  Renders raw HTML - ensure input is sanitized
@@ -62,10 +62,10 @@
   │  Renders raw HTML - ensure input is sanitized
   ├─ packages/python-sdk/tests/conftest.py:104  https://test.cencori.com
   │  Non-production URL in code
-  ├─ __tests__/integration/api/health.test.ts:12  http://localhost:3000
-  │  Development URL - should use environment variables
   ├─ app/docs/integrations/page.tsx:753  eval(
   │  Code execution - major security risk
+  ├─ __tests__/integration/api/health.test.ts:12  http://localhost:3000
+  │  Development URL - should use environment variables
   ├─ app/api/scan/analyze/route.ts:34  eval(
   │  Code execution - major security risk
   ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:112  delete project: " + error
@@ -112,12 +112,12 @@
   │  SQL built with string concatenation
   ├─ app/api/scan/projects/[id]/scan/stream/route.ts:27  eval(
   │  Code execution - major security risk
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/easy_install.py:1137  insert(0, '-' + v
+  │  SQL built with string concatenation
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:2109  debug = True
   │  Debug mode enabled - disable in production
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:343  eval(
   │  Code execution - major security risk
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/easy_install.py:1137  insert(0, '-' + v
-  │  SQL built with string concatenation
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/formatters/__init__.py:91  eval(
   │  Code execution - major security risk
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/_julia_builtins.py:150  eval(
@@ -327,17 +327,17 @@
   │  Sensitive route - ensure proper authentication
   ├─ app/internal/invite/page.tsx:75  `/internal/invite?token=${token}`
   │  Sensitive route - ensure proper authentication
-  ├─ app/docs/introduction/page.tsx:224  "/dashboard"
-  │  Sensitive route - ensure proper authentication
   ├─ app/docs/quick-start/page.tsx:197  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/docs/quick-start/page.tsx:32  "/dashboard"
   │  Sensitive route - ensure proper authentication
   ├─ app/docs/quick-start/page.tsx:102  "/dashboard"
   │  Sensitive route - ensure proper authentication
-  ├─ app/docs/installation/page.tsx:272  export async function POST(
-  │  API route handler - verify authentication is implemented
+  ├─ app/docs/introduction/page.tsx:224  "/dashboard"
+  │  Sensitive route - ensure proper authentication
   ├─ app/docs/integrations/page.tsx:90  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/installation/page.tsx:272  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/dashboard/organizations/page.tsx:47  "/dashboard/organizations/new"
   │  Sensitive route - ensure proper authentication
@@ -401,13 +401,13 @@
   │  API route handler - verify authentication is implemented
   ├─ app/docs/getting-started/first-request/page.tsx:26  "/dashboard"
   │  Sensitive route - ensure proper authentication
-  ├─ app/docs/guides/migrate-openai/page.tsx:111  "/dashboard"
-  │  Sensitive route - ensure proper authentication
-  ├─ app/docs/guides/migrate-openai/page.tsx:328  "/dashboard"
-  │  Sensitive route - ensure proper authentication
   ├─ app/docs/guides/migrate-anthropic/page.tsx:105  "/dashboard"
   │  Sensitive route - ensure proper authentication
   ├─ app/docs/guides/migrate-anthropic/page.tsx:346  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-openai/page.tsx:111  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/guides/migrate-openai/page.tsx:328  "/dashboard"
   │  Sensitive route - ensure proper authentication
   ├─ app/docs/concepts/streaming/page.tsx:129  export async function POST(
   │  API route handler - verify authentication is implemented
@@ -422,6 +422,14 @@
   ├─ app/docs/concepts/agent-frameworks/page.tsx:57  "/dashboard"
   │  Sensitive route - ensure proper authentication
   ├─ app/docs/concepts/agent-frameworks/page.tsx:335  "/dashboard"
+  │  Sensitive route - ensure proper authentication
+  ├─ app/docs/api/chat/page.tsx:57  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/chat/page.tsx:167  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/chat/page.tsx:268  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/docs/api/auth/page.tsx:31  "/dashboard"
   │  Sensitive route - ensure proper authentication
   ├─ app/dashboard/organizations/new/page.tsx:103  `/dashboard/organizations/${createdOrg.slug}/projects`
   │  Sensitive route - ensure proper authentication
@@ -459,14 +467,6 @@
   │  Sensitive route - ensure proper authentication
   ├─ app/dashboard/organizations/[orgSlug]/OrganizationLayoutClient.tsx:248  `/dashboard/organizations/${organization.slug}/settings`
   │  Sensitive route - ensure proper authentication
-  ├─ app/docs/api/chat/page.tsx:57  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/docs/api/chat/page.tsx:167  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/docs/api/chat/page.tsx:268  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/docs/api/auth/page.tsx:31  "/dashboard"
-  │  Sensitive route - ensure proper authentication
   ├─ app/dashboard/(account)/settings/page.tsx:19  "/dashboard/profile"
   │  Sensitive route - ensure proper authentication
   ├─ app/dashboard/(account)/settings/page.tsx:30  "/dashboard/connected-accounts"
@@ -497,17 +497,15 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/pitch/export/route.ts:10  export async function GET(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/internal/admins/route.ts:20  export async function GET(
-  │  API route handler - verify authentication is implemented
   ├─ app/api/health/providers/route.ts:16  export async function GET(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/email/budget-alert/route.ts:15  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/email/welcome/route.ts:6  export async function POST(
+  ├─ app/api/internal/admins/route.ts:20  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/github/user-installations/route.ts:5  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/github/repositories/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/github/link-installation/route.ts:5  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/github/callback/route.ts:6  export async function GET(
   │  API route handler - verify authentication is implemented
@@ -527,8 +525,6 @@
   │  Sensitive route - ensure proper authentication
   ├─ app/api/github/callback/route.ts:175  '/dashboard'
   │  Sensitive route - ensure proper authentication
-  ├─ app/api/github/link-installation/route.ts:5  export async function POST(
-  │  API route handler - verify authentication is implemented
   ├─ app/api/cron/reset-usage/route.ts:4  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/cron/reset-usage/route.ts:49  export async function GET(
@@ -536,6 +532,10 @@
   ├─ app/api/billing/webhook/route.ts:58  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/billing/checkout/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/email/welcome/route.ts:6  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/email/budget-alert/route.ts:15  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/ai/chat/route.ts:310  export async function POST(
   │  API route handler - verify authentication is implemented
@@ -577,6 +577,20 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/scan/github/repos/route.ts:7  export async function GET(
   │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/invites/route.ts:8  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/invites/route.ts:173  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/invites/[token]/accept/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/invites/[token]/accept/route.ts:107  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/route.ts:49  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/credits/route.ts:5  export async function GET(
+  │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/webhooks/route.ts:12  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/webhooks/route.ts:47  export async function POST(
@@ -613,27 +627,13 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/ai-detect/route.ts:22  export async function POST(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/providers/route.ts:5  export async function GET(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/providers/route.ts:49  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/invites/route.ts:8  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/invites/route.ts:173  export async function GET(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/credits/route.ts:5  export async function GET(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/invites/[token]/accept/route.ts:5  export async function POST(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/invites/[token]/accept/route.ts:107  export async function GET(
-  │  API route handler - verify authentication is implemented
   ├─ app/api/internal/metrics/overview/route.ts:35  export async function GET(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/internal/admins/invite/route.ts:24  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/internal/admins/verify/route.ts:6  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/internal/admins/accept/route.ts:5  export async function POST(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/internal/admins/invite/route.ts:24  export async function POST(
   │  API route handler - verify authentication is implemented
   ├─ app/api/internal/admins/[id]/route.ts:25  export async function DELETE(
   │  API route handler - verify authentication is implemented
@@ -657,6 +657,10 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/scan/projects/[id]/changelog/route.ts:323  export async function DELETE(
   │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:5  export async function PATCH(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:54  export async function DELETE(
+  │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/webhooks/[webhookId]/route.ts:11  export async function PATCH(
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/webhooks/[webhookId]/route.ts:62  export async function DELETE(
@@ -667,9 +671,9 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/security/settings/route.ts:75  export async function PUT(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/projects/[projectId]/security/audit/route.ts:4  export async function GET(
-  │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/security/incidents/route.ts:4  export async function GET(
+  │  API route handler - verify authentication is implemented
+  ├─ app/api/projects/[projectId]/security/audit/route.ts:4  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/providers/[providerId]/route.ts:4  export async function GET(
   │  API route handler - verify authentication is implemented
@@ -701,19 +705,15 @@
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/analytics/trends/route.ts:4  export async function GET(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/projects/[projectId]/analytics/overview/route.ts:4  export async function GET(
-  │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/analytics/geo/route.ts:50  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/analytics/failover/route.ts:8  export async function GET(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/projects/[projectId]/ai/stats/route.ts:21  export async function GET(
+  ├─ app/api/projects/[projectId]/analytics/overview/route.ts:4  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/api/projects/[projectId]/ai/logs/route.ts:5  export async function GET(
   │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:5  export async function PATCH(
-  │  API route handler - verify authentication is implemented
-  ├─ app/api/organizations/[orgSlug]/providers/[providerId]/route.ts:54  export async function DELETE(
+  ├─ app/api/projects/[projectId]/ai/stats/route.ts:21  export async function GET(
   │  API route handler - verify authentication is implemented
   ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:270  `/dashboard/organizations/${orgSlug}/projects`
   │  Sensitive route - ensure proper authentication
@@ -785,6 +785,8 @@
   ├─ database/migrations/008_cencori_admins.sql:93  omo****com
   ├─ components/pitch/AskSlide.tsx:110  bol****com
   ├─ components/pitch/AskSlide.tsx:114  bol****com
+  ├─ components/icons/BrandIcons.tsx:173  8.5****546
+  ├─ components/icons/BeakerIcon.tsx:17  251****.05
   ├─ components/landing/Footer.tsx:95  11.****111
   ├─ components/landing/Footer.tsx:95  3.4****107
   ├─ components/landing/Footer.tsx:95  3.1****.84
@@ -796,8 +798,6 @@
   ├─ components/dashboard/CommandPalette.tsx:38  5.9****.36
   ├─ components/dashboard/CommandPalette.tsx:38  315****825
   ├─ components/dashboard/CommandPalette.tsx:89  3.2****075
-  ├─ components/icons/BrandIcons.tsx:173  8.5****546
-  ├─ components/icons/BeakerIcon.tsx:17  251****.05
   ├─ components/landing/bento/RealTimeMetricsCard.tsx:96  ***
   ├─ app/scan/import/page.tsx:22  188****.69
   ├─ app/scan/import/page.tsx:22  1.2****394
@@ -820,24 +820,24 @@
   ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  5.9****372
   ├─ app/dashboard/(account)/connected-accounts/page.tsx:11  319****801
   ├─ app/api/internal/admins/route.ts:7  omo****com
-  ├─ app/api/email/budget-alert/route.ts:4  ale****com
   ├─ app/api/email/welcome/route.ts:18  wel****com
+  ├─ app/api/email/budget-alert/route.ts:4  ale****com
   ├─ app/(docs)/design/typography/page.tsx:97  012****789
   ├─ app/(docs)/design/typography/page.tsx:109  012****789
-  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  11.****113
-  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.4****108
-  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.1****.84
-  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  5.9****.36
-  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  315****825
   ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  11.****111
   ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  3.4****107
   ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  3.1****.84
   ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  5.9****372
   ├─ app/dashboard/organizations/[orgSlug]/integrations/page.tsx:73  319****801
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  11.****113
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.4****108
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  3.1****.84
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  5.9****.36
+  ├─ app/dashboard/organizations/[orgSlug]/projects/page.tsx:214  315****825
   ├─ app/academy/getting-started/(steps)/step-9/page.tsx:73  123****789
   ├─ app/api/internal/metrics/overview/route.ts:18  omo****com
-  ├─ app/api/internal/admins/invite/route.ts:10  omo****com
   ├─ app/api/internal/admins/verify/route.ts:4  omo****com
+  ├─ app/api/internal/admins/invite/route.ts:10  omo****com
   ├─ app/api/internal/admins/[id]/route.ts:6  omo****com
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/tomli/_parser.py:52  012****789
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/tomli/_parser.py:55  012****789
@@ -1108,6 +1108,8 @@
   ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  3.1****.84
   ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  5.9****.36
   ├─ app/dashboard/organizations/[orgSlug]/projects/import/github/page.tsx:21  315****825
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/upload_docs.py:128  756****674
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/launcher manifest.xml:3  1.0****0.0
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:79  ptm****net
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:199  012****789
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:2639  012****789
@@ -1140,8 +1142,6 @@
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  123****678
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5741  123****678
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/_vendor/pyparsing.py:5579  255****255
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/upload_docs.py:128  756****674
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/setuptools/command/launcher manifest.xml:3  1.0****0.0
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/formatters/terminal256.py:62  ***
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/tnt.py:40  012****789
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pygments/lexers/sql.py:89  ****
@@ -1489,12 +1489,12 @@
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2037  300****031
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2044  375****037
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/idna/idnadata.py:2046  660****066
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/cachecontrol/__init__.py:6  eri****org
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/version.py:5  dan****com
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/jisfreq.py:40  ***
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/chardet/enums.py:4  dan****com
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/cachecontrol/__init__.py:6  eri****org
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/req/req_file.py:492  969****799
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/utils/temp_dir.py:207  012****789
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/utils/misc.py:264  373****559
@@ -1502,12 +1502,12 @@
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_internal/network/session.py:63  127****0.0
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/backports/asyncio/runner/tasks.py:56  105****331
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/packages/six.py:31  ben****org
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:34  wil****net
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:504  214****647
-  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:506  214****647
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:148  pas****com
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:53  012****789
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/util/url.py:74  012****789
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:34  wil****net
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:504  214****647
+  ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/securetransport.py:506  214****647
   ├─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/packages/ssl_match_hostname/_implementation.py:18  3.5****0.1
   └─ packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/urllib3/contrib/_securetransport/bindings.py:12  wil****net
 
@@ -1515,7 +1515,7 @@
 
   Summary
     Files scanned: 1646
-    Scan time: 2857ms
+    Scan time: 2877ms
 
      CRITICAL  34 issues
        HIGH    229 issues
@@ -1532,4 +1532,3 @@
 
 
 ? Would you like Cencori to auto-fix these issues? (y/N)[58G
-[?25h
