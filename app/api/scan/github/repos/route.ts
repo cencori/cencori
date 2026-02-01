@@ -41,7 +41,7 @@ export async function GET() {
             links?.forEach(l => installationIds.add(l.installation_id));
         }
 
-        // 2. Get installations where the GitHub account matches user's GitHub username
+        // 2a. Get installations where the GitHub account matches user's GitHub username
         if (githubUsername) {
             const { data: userInstallations } = await supabaseAdmin
                 .from('github_app_installations')
@@ -50,6 +50,14 @@ export async function GET() {
 
             userInstallations?.forEach(i => installationIds.add(i.installation_id));
         }
+
+        // 2b. Get installations explicitly linked to this user (installed by them)
+        const { data: linkedInstallations } = await supabaseAdmin
+            .from('github_app_installations')
+            .select('installation_id')
+            .eq('installed_by_user_id', user.id);
+
+        linkedInstallations?.forEach(i => installationIds.add(i.installation_id));
 
         if (installationIds.size === 0) {
             return NextResponse.json({

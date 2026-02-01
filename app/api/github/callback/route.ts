@@ -93,6 +93,7 @@ export async function GET(req: NextRequest) {
           github_account_login: accountLogin,
           github_account_id: account.id,
           github_account_name: 'name' in account ? account.name : accountLogin,
+          installed_by_user_id: user?.id || null,
         }, { onConflict: 'installation_id' });
 
       if (installationError) {
