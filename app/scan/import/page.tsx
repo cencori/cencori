@@ -8,12 +8,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     GitBranch,
     Search,
     Loader2,
     ArrowLeft,
     ExternalLink,
-    Check
+    Check,
+    PlusIcon
 } from "lucide-react";
 
 // GitHub Octocat icon
@@ -33,6 +41,13 @@ interface GitHubRepo {
     already_imported?: boolean;
 }
 
+interface GitHubInstallation {
+    id: number;
+    account_login: string;
+    account_avatar_url: string;
+    account_type: string;
+}
+
 const GITHUB_APP_SLUG = "cencori";
 
 export default function ImportRepoPage() {
@@ -41,6 +56,8 @@ export default function ImportRepoPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [repos, setRepos] = useState<GitHubRepo[]>([]);
+    const [installations, setInstallations] = useState<GitHubInstallation[]>([]);
+    const [selectedInstallationId, setSelectedInstallationId] = useState<number | null>(null);
     const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -64,10 +81,26 @@ export default function ImportRepoPage() {
                 if (data.repositories && data.repositories.length > 0) {
                     setIsConnected(true);
                     setRepos(data.repositories);
+                }
+
+                if (data.installations && data.installations.length > 0) {
+                    setInstallations(data.installations);
+                    // Select the first installation by default
+                    setSelectedInstallationId(data.installations[0].id);
                 } else {
-                    setIsConnected(false);
-                    if (data.message) {
-                        setError(data.message);
+                    // Fallback to deducing from repos if no installations array (backwards compat)
+                    // Logic omitted as backend is updated
+                }
+
+                if (!data.repositories || data.repositories.length === 0) {
+                    // Check if we have installations but empty repos
+                    if (data.installations && data.installations.length > 0) {
+                        setIsConnected(true);
+                    } else {
+                        setIsConnected(false);
+                        if (data.message) {
+                            setError(data.message);
+                        }
                     }
                 }
             } catch (err) {
@@ -121,12 +154,15 @@ export default function ImportRepoPage() {
         }
     };
 
-    const filteredRepos = searchTerm
-        ? repos.filter(repo =>
+    const filteredRepos = repos.filter(repo => {
+        const matchesSearch = !searchTerm ||
             repo.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            repo.description?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        : repos;
+            repo.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesInstallation = !selectedInstallationId || repo.installation_id === selectedInstallationId;
+
+        return matchesSearch && matchesInstallation;
+    });
 
     if (isLoading) {
         return (
@@ -221,26 +257,54 @@ export default function ImportRepoPage() {
 
             {/* Search and Actions */}
             <div className="flex items-center justify-between gap-4 mb-6">
-                <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <Input
-                        placeholder="Search repositories..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        autoComplete="off"
-                        className="w-48 sm:w-64 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
-                    />
+                <div className="flex items-center gap-3 flex-1">
+                    {/* Installation Selector */}
+                    {installations.length > 0 && (
+                        <Select
+                            value={selectedInstallationId?.toString()}
+                            onValueChange={(val) => setSelectedInstallationId(Number(val))}
+                        >
+                            <SelectTrigger className="w-[180px] h-7 text-xs">
+                                <SelectValue placeholder="Select Account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {installations.map((inst) => (
+                                    <SelectItem key={inst.id} value={inst.id.toString()} className="text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <img src={inst.account_avatar_url} alt={inst.account_login} className="w-4 h-4 rounded-full" />
+                                            <span>{inst.account_login}</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                                <div className="p-1 border-t mt-1">
+                                    <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs font-normal" asChild>
+                                        <a
+                                            href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: "/scan/import", source: "scan" }))}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <PlusIcon className="h-3 w-3 mr-2" />
+                                            Add GitHub Account
+                                        </a>
+                                    </Button>
+                                </div>
+                            </SelectContent>
+                        </Select>
+                    )}
+
+                    <div className="relative flex-1 max-w-sm">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                            placeholder="Search repositories..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            autoComplete="off"
+                            className="w-full h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
+                        />
+                    </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs px-3" asChild>
-                    <a
-                        href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: "/scan/import", source: "scan" }))}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <ExternalLink className="h-3 w-3 mr-1.5" />
-                        Manage GitHub App
-                    </a>
-                </Button>
+
+                {/* Manage App Link (optional, keeping clean) */}
             </div>
 
             {/* Repos Table */}

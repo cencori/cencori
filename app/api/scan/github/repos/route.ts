@@ -75,6 +75,9 @@ export async function GET() {
             installation_id: number;
         }> = [];
 
+        // Collect installation details map
+        const installationsMap = new Map<number, { id: number; account_login: string; account_avatar_url: string; account_type: string }>();
+
         for (const installationId of installationIds) {
             try {
                 const octokit = await getInstallationOctokit(installationId);
@@ -82,7 +85,28 @@ export async function GET() {
                     per_page: 100,
                 });
 
+                if (data.repositories.length > 0) {
+                    // Use the first repo's owner info to populate installation details
+                    const owner = data.repositories[0].owner;
+                    installationsMap.set(installationId, {
+                        id: installationId,
+                        account_login: owner.login,
+                        account_avatar_url: owner.avatar_url,
+                        account_type: owner.type,
+                    });
+                }
+
                 for (const repo of data.repositories) {
+                    // Update installation map if not set (e.g. if we want to be safe)
+                    if (!installationsMap.has(installationId)) {
+                        installationsMap.set(installationId, {
+                            id: installationId,
+                            account_login: repo.owner.login,
+                            account_avatar_url: repo.owner.avatar_url,
+                            account_type: repo.owner.type,
+                        });
+                    }
+
                     allRepos.push({
                         id: repo.id,
                         full_name: repo.full_name,
@@ -111,7 +135,9 @@ export async function GET() {
             already_imported: importedRepoIds.has(repo.id),
         }));
 
-        return NextResponse.json({ repositories });
+        const installations = Array.from(installationsMap.values());
+
+        return NextResponse.json({ repositories, installations });
     } catch (error) {
         console.error('[Scan GitHub] Unexpected error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
