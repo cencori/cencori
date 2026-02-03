@@ -136,6 +136,7 @@ export default function Navbar({
             title: "Resources", sublinks: [
                 { title: "Documentation", href: siteConfig.links.docs },
                 { title: "API Reference", href: "/docs/api" },
+                { title: "Academy", href: "/academy" },
                 { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
                 { title: "Guides & Tutorials", href: "/resources/guides" },
                 { title: "Changelog", href: siteConfig.links.company.changelog },
@@ -203,6 +204,7 @@ export default function Navbar({
         items: [
             { title: "Documentation", href: siteConfig.links.docs },
             { title: "API Reference", href: "/docs/api" },
+            { title: "Academy", href: "/academy" },
             { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
             { title: "Guides & Tutorials", href: "/resources/guides" },
         ],
