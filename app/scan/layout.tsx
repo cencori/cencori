@@ -30,6 +30,7 @@ import {
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useTheme } from "next-themes";
+import { useScanPath } from "./hooks/useScanPath";
 
 interface ScanLayoutProps {
     children: ReactNode;
@@ -44,6 +45,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const router = useRouter();
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
+    const { scanPath, isSubdomain } = useScanPath();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -59,16 +61,23 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         checkAuth();
     }, []);
 
-    // Extract current project from URL
-    const projectId = pathname.match(/\/scan\/projects\/([^/]+)/)?.[1];
+    // Extract current project from URL (works on both /scan/projects/X and /projects/X)
+    const projectId = pathname.match(/(?:\/scan)?\/projects\/([^/]+)/)?.[1];
 
     // Build breadcrumb items
     const getBreadcrumbItems = () => {
         const items: { label: string; href?: string }[] = [];
 
-        if (pathname === '/scan' || pathname === '/scan/') {
+        const isHome = isSubdomain
+            ? pathname === '/' || pathname === ''
+            : pathname === '/scan' || pathname === '/scan/';
+        const isImport = isSubdomain
+            ? pathname === '/import'
+            : pathname === '/scan/import';
+
+        if (isHome) {
             // No breadcrumbs on main page - "Scan" is the wordmark
-        } else if (pathname === '/scan/import') {
+        } else if (isImport) {
             items.push({ label: 'Import' });
         } else if (projectId) {
             items.push({ label: 'Project' });
@@ -90,7 +99,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {/* Logo + Wordmark */}
-                    <Link href="/scan" className="flex items-center gap-2">
+                    <Link href={scanPath("/")} className="flex items-center gap-2">
                         <Image
                             src="/logo white.svg"
                             alt="Cencori"
@@ -226,7 +235,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                         </DropdownMenu>
                     ) : (
                         <Button asChild size="sm" variant="outline" className="h-7 text-xs px-3">
-                            <Link href="/login?redirect=/scan">Sign In</Link>
+                            <Link href={isSubdomain ? "/login?redirect=/" : "/login?redirect=/scan"}>Sign In</Link>
                         </Button>
                     )}
                 </div>

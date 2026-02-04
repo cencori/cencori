@@ -111,16 +111,6 @@
             "destination": "/sign-in"
         },
         {
-            "source": "/scan/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "/scan/:path*"
-        },
-        {
             "source": "/docs/:path*",
             "has": [
                 {
@@ -169,6 +159,16 @@
                 }
             ],
             "destination": "/scan"
+        },
+        {
+            "source": "/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/scan/:path*"
         }
     ],
     "redirects": [

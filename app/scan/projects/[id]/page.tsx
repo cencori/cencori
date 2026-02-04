@@ -25,6 +25,7 @@ import {
     Download
 } from "lucide-react";
 import Link from "next/link";
+import { useScanPath } from "../../hooks/useScanPath";
 
 interface ScanProject {
     id: string;
@@ -105,6 +106,7 @@ function formatTimeAgo(dateString: string | null): string {
 export default function ProjectDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const { scanPath } = useScanPath();
     const projectId = params.id as string;
 
     const [isLoading, setIsLoading] = useState(true);
@@ -140,7 +142,7 @@ export default function ProjectDetailPage() {
             });
 
             if (response.ok) {
-                router.push('/scan');
+                router.push(scanPath("/"));
             } else {
                 const data = await response.json();
                 console.error('Failed to delete project:', data.error);
@@ -408,7 +410,7 @@ export default function ProjectDetailPage() {
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Back link */}
-            <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+            <Link href={scanPath("/")} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                 <ArrowLeft className="h-3 w-3" />
                 Back to projects
             </Link>
