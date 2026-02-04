@@ -19,7 +19,7 @@ import { generateChangelog } from './changelog/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.4.6';
+const VERSION = '0.4.8';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
