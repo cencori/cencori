@@ -230,7 +230,7 @@ export default function ImportRepoPage() {
                     {error?.includes('Unauthorized') ? (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
                             <a href={isSubdomain
-                                ? 'https://cencori.com/login?redirect=https://scan.cencori.com/import'
+                                ? '/login?redirect=/import'
                                 : '/login?redirect=/scan/import'}>
                                 Sign In
                             </a>

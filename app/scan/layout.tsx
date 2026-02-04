@@ -235,7 +235,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                         </DropdownMenu>
                     ) : (
                         <Button asChild size="sm" variant="outline" className="h-7 text-xs px-3">
-                            <Link href={isSubdomain ? "https://cencori.com/login?redirect=https://scan.cencori.com" : "/login?redirect=/scan"}>Sign In</Link>
+                            <Link href={isSubdomain ? "/login?redirect=/" : "/login?redirect=/scan"}>Sign In</Link>
                         </Button>
                     )}
                 </div>

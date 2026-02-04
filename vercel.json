@@ -81,6 +81,36 @@
             "destination": "/pitch"
         },
         {
+            "source": "/sign-up",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/sign-up"
+        },
+        {
+            "source": "/login",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/login"
+        },
+        {
+            "source": "/sign-in",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/sign-in"
+        },
+        {
             "source": "/docs/:path*",
             "has": [
                 {
@@ -131,14 +161,14 @@
             "destination": "/scan"
         },
         {
-            "source": "/:path*",
+            "source": "/((?!login|sign-in|sign-up|dashboard|docs|api|sso-callback|scan).*)",
             "has": [
                 {
                     "type": "host",
                     "value": "scan.cencori.com"
                 }
             ],
-            "destination": "/scan/:path*"
+            "destination": "/scan/:1"
         }
     ],
     "redirects": [
@@ -156,39 +186,6 @@
             "source": "/old-blog/:slug",
             "destination": "/new-blog/:slug",
             "permanent": true
-        },
-        {
-            "source": "/sign-in",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "https://cencori.com/sign-in",
-            "permanent": false
-        },
-        {
-            "source": "/login",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "https://cencori.com/login",
-            "permanent": false
-        },
-        {
-            "source": "/sign-up",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "https://cencori.com/sign-up",
-            "permanent": false
         }
     ],
     "crons": [
