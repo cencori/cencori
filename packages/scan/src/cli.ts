@@ -3,7 +3,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { confirm, password } from '@inquirer/prompts';
+import { confirm, password, select } from '@inquirer/prompts';
 import { scan, type ScanResult, type ScanIssue } from './scanner/index.js';
 import {
     getApiKey,
@@ -19,7 +19,7 @@ import { generateChangelog } from './changelog/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '0.4.2';
+const VERSION = '0.4.5';
 
 // Score colors
 const scoreStyles: Record<string, { color: typeof chalk.green }> = {
@@ -352,30 +352,168 @@ async function handleAutoFix(
         );
 
         fixSpinner.succeed(`Generated ${fixes.length} fixes`);
-
-        // Apply fixes
-        const applySpinner = ora({
-            text: 'Applying fixes...',
-            color: 'cyan',
-        }).start();
-
-        const appliedFixes = await applyFixes(fixes, fileContents);
-        const appliedCount = appliedFixes.filter(f => f.applied).length;
-
-        applySpinner.succeed(`Applied ${appliedCount}/${fixes.length} fixes`);
-
-        // Show what was fixed
         console.log();
-        console.log(`  ${chalk.bold('Applied fixes:')}`);
-        for (const fix of appliedFixes.filter(f => f.applied)) {
-            console.log(chalk.green(`    ✔ ${fix.issue.file}:${fix.issue.line}`));
-            console.log(chalk.gray(`      ${fix.explanation}`));
+
+        // Interactive fix review
+        const acceptedFixes: typeof fixes = [];
+        const skippedFixes: typeof fixes = [];
+        let applyAll = false;
+        let skipRest = false;
+
+        for (let i = 0; i < fixes.length; i++) {
+            const fix = fixes[i];
+
+            // If user chose to skip rest, add to skipped
+            if (skipRest) {
+                skippedFixes.push(fix);
+                continue;
+            }
+
+            // If user chose apply all, add to accepted
+            if (applyAll) {
+                acceptedFixes.push(fix);
+                continue;
+            }
+
+            // Show the fix
+            console.log(chalk.cyan(`  ─── Fix ${i + 1}/${fixes.length}: ${fix.issue.file}:${fix.issue.line} ───`));
+            console.log(chalk.gray(`  Issue: ${fix.issue.name} (${fix.issue.severity})`));
+            console.log();
+
+            // Show original code
+            const origLines = fix.originalCode.split('\n');
+            console.log(chalk.red('  - Original:'));
+            origLines.slice(0, 8).forEach(line => console.log(chalk.red(`    ${line}`)));
+            if (origLines.length > 8) {
+                console.log(chalk.gray(`    ... (${origLines.length - 8} more lines)`));
+            }
+            console.log();
+
+            // Show suggested fix
+            const fixLines = fix.fixedCode.split('\n');
+            console.log(chalk.green('  + Suggested fix:'));
+            fixLines.slice(0, 8).forEach(line => console.log(chalk.green(`    ${line}`)));
+            if (fixLines.length > 8) {
+                console.log(chalk.gray(`    ... (${fixLines.length - 8} more lines)`));
+            }
+            console.log();
+
+            console.log(chalk.gray(`  Explanation: ${fix.explanation}`));
+            console.log();
+
+            // Prompt for action
+            const action = await select({
+                message: 'Apply this fix?',
+                choices: [
+                    { name: 'Yes - apply this fix', value: 'y' },
+                    { name: 'No - skip this fix', value: 'n' },
+                    { name: 'All - apply all remaining fixes', value: 'a' },
+                    { name: 'Skip rest - save remaining to file', value: 's' },
+                    { name: 'Quit - stop reviewing', value: 'q' },
+                ],
+            });
+
+            if (action === 'y') {
+                acceptedFixes.push(fix);
+                console.log(chalk.green('  ✔ Fix accepted'));
+            } else if (action === 'n') {
+                skippedFixes.push(fix);
+                console.log(chalk.yellow('  ⊘ Fix skipped'));
+            } else if (action === 'a') {
+                applyAll = true;
+                acceptedFixes.push(fix);
+                // Add remaining fixes
+                for (let j = i + 1; j < fixes.length; j++) {
+                    acceptedFixes.push(fixes[j]);
+                }
+                console.log(chalk.green(`  ✔ Applying all ${fixes.length - i} remaining fixes`));
+                break;
+            } else if (action === 's') {
+                skipRest = true;
+                skippedFixes.push(fix);
+                // Add remaining to skipped
+                for (let j = i + 1; j < fixes.length; j++) {
+                    skippedFixes.push(fixes[j]);
+                }
+                console.log(chalk.yellow(`  ⊘ Skipping ${fixes.length - i} remaining fixes`));
+                break;
+            } else if (action === 'q') {
+                // Add current and remaining to skipped
+                skippedFixes.push(fix);
+                for (let j = i + 1; j < fixes.length; j++) {
+                    skippedFixes.push(fixes[j]);
+                }
+                console.log(chalk.gray('  Stopped reviewing'));
+                break;
+            }
+
+            console.log();
         }
 
-        const notApplied = appliedFixes.filter(f => !f.applied);
-        if (notApplied.length > 0) {
+        // Apply accepted fixes
+        if (acceptedFixes.length > 0) {
             console.log();
-            console.log(`  ${chalk.yellow(`${notApplied.length} issues require manual review`)}`);
+            const applySpinner = ora({
+                text: `Applying ${acceptedFixes.length} fixes...`,
+                color: 'cyan',
+            }).start();
+
+            let appliedCount = 0;
+            for (const fix of acceptedFixes) {
+                const content = fileContents.get(fix.issue.file);
+                if (!content) continue;
+
+                // Try to apply the fix
+                const newContent = content.replace(fix.originalCode, fix.fixedCode);
+                if (newContent !== content) {
+                    const filePath = path.resolve(targetPath, fix.issue.file);
+                    fs.writeFileSync(filePath, newContent, 'utf-8');
+                    fileContents.set(fix.issue.file, newContent); // Update for subsequent fixes
+                    appliedCount++;
+                }
+            }
+
+            applySpinner.succeed(`Applied ${appliedCount}/${acceptedFixes.length} fixes to your codebase`);
+        }
+
+        // Save skipped fixes to file
+        if (skippedFixes.length > 0) {
+            const fixesFile = '.cencori-fixes.json';
+            const fixesData = {
+                generated_at: new Date().toISOString(),
+                total_fixes: skippedFixes.length,
+                fixes: skippedFixes.map(f => ({
+                    file: f.issue.file,
+                    line: f.issue.line,
+                    issue_type: f.issue.type,
+                    issue_name: f.issue.name,
+                    severity: f.issue.severity,
+                    original_code: f.originalCode,
+                    suggested_fix: f.fixedCode,
+                    explanation: f.explanation,
+                })),
+            };
+
+            fs.writeFileSync(fixesFile, JSON.stringify(fixesData, null, 2));
+
+            console.log();
+            console.log(chalk.yellow(`  ${skippedFixes.length} skipped fixes saved to ${chalk.bold(fixesFile)}`));
+        }
+
+        // Summary
+        console.log();
+        console.log(chalk.gray('  ─────────────────────────────────────────────'));
+        console.log();
+        console.log(`  ${chalk.bold('Summary:')}`);
+        if (acceptedFixes.length > 0) {
+            console.log(chalk.green(`    ✔ ${acceptedFixes.length} fixes applied`));
+        }
+        if (skippedFixes.length > 0) {
+            console.log(chalk.yellow(`    ⊘ ${skippedFixes.length} fixes skipped (saved to .cencori-fixes.json)`));
+        }
+        if (acceptedFixes.length > 0) {
+            console.log();
+            console.log(chalk.cyan(`  Run ${chalk.bold('npx @cencori/scan')} again to verify your fixes!`));
         }
 
         console.log();
