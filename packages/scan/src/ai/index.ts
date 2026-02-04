@@ -225,17 +225,28 @@ export async function generateFixes(
                     'Authorization': `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
-                    model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                    model: 'gpt-4o-mini', // Use reliable model
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a security engineer. Generate secure code fixes. For secrets, use environment variables. For XSS, use sanitization. Respond in JSON: {"fixedCode": "the fixed code snippet", "explanation": "what was changed"}`,
+                            content: `You are a security engineer fixing code vulnerabilities. Generate secure code fixes.
+
+IMPORTANT: Respond ONLY with valid JSON in this exact format:
+{"fixedCode": "the complete fixed code snippet", "explanation": "brief explanation of what was changed"}
+
+Rules:
+- For hardcoded secrets: Replace with environment variables (process.env.VAR_NAME)
+- For XSS vulnerabilities: Add proper escaping/sanitization
+- For SQL injection: Use parameterized queries
+- For exposed routes: Add authentication middleware
+- Keep the same code structure, only fix the security issue`,
                         },
                         {
                             role: 'user',
                             content: `Fix this security issue:
 Type: ${issue.type}
 Name: ${issue.name}
+Severity: ${issue.severity}
 File: ${issue.file}:${issue.line}
 
 Code to fix:
@@ -243,37 +254,92 @@ Code to fix:
 ${codeSnippet}
 \`\`\`
 
-Generate a secure fix.`,
+Respond with JSON only.`,
                         },
                     ],
                     temperature: 0,
-                    max_tokens: 500,
+                    max_tokens: 1000,
                 }),
             });
 
             if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`[AI] API error for ${issue.file}:${issue.line}: ${response.status} - ${errorText}`);
+                results.push({
+                    issue,
+                    originalCode: codeSnippet,
+                    fixedCode: codeSnippet, // Same as original = no fix
+                    explanation: `API error: ${response.status}`,
+                    applied: false,
+                });
+                continue;
             }
 
             const data = await response.json() as {
                 choices: Array<{ message: { content: string } }>;
+                error?: { message: string };
             };
-            const content_response = data.choices[0]?.message?.content || '{}';
 
-            const parsed = JSON.parse(content_response);
-            results.push({
-                issue,
-                originalCode: codeSnippet,
-                fixedCode: parsed.fixedCode || codeSnippet,
-                explanation: parsed.explanation || 'No explanation provided',
-                applied: false,
-            });
-        } catch {
+            if (data.error) {
+                console.error(`[AI] API returned error: ${data.error.message}`);
+                results.push({
+                    issue,
+                    originalCode: codeSnippet,
+                    fixedCode: codeSnippet,
+                    explanation: `AI error: ${data.error.message}`,
+                    applied: false,
+                });
+                continue;
+            }
+
+            const content_response = data.choices[0]?.message?.content || '';
+
+            // Try to extract JSON from the response (handle markdown code blocks)
+            let jsonStr = content_response;
+            const jsonMatch = content_response.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (jsonMatch) {
+                jsonStr = jsonMatch[1].trim();
+            }
+
+            try {
+                const parsed = JSON.parse(jsonStr);
+                const fixedCode = parsed.fixedCode || parsed.fixed_code || '';
+
+                if (fixedCode && fixedCode !== codeSnippet) {
+                    results.push({
+                        issue,
+                        originalCode: codeSnippet,
+                        fixedCode: fixedCode,
+                        explanation: parsed.explanation || 'Security fix applied',
+                        applied: false,
+                    });
+                } else {
+                    // AI couldn't generate a different fix
+                    results.push({
+                        issue,
+                        originalCode: codeSnippet,
+                        fixedCode: codeSnippet,
+                        explanation: 'AI could not generate a fix for this issue',
+                        applied: false,
+                    });
+                }
+            } catch (parseError) {
+                console.error(`[AI] JSON parse error for ${issue.file}:${issue.line}:`, parseError);
+                results.push({
+                    issue,
+                    originalCode: codeSnippet,
+                    fixedCode: codeSnippet,
+                    explanation: 'Failed to parse AI response',
+                    applied: false,
+                });
+            }
+        } catch (error) {
+            console.error(`[AI] Request failed for ${issue.file}:${issue.line}:`, error);
             results.push({
                 issue,
                 originalCode: codeSnippet,
                 fixedCode: codeSnippet,
-                explanation: 'Unable to generate fix - manual review required',
+                explanation: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 applied: false,
             });
         }
