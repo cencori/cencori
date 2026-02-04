@@ -111,6 +111,56 @@
             "destination": "/sign-in"
         },
         {
+            "source": "/scan/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/scan/:path*"
+        },
+        {
+            "source": "/docs/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/docs/:path*"
+        },
+        {
+            "source": "/dashboard/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/dashboard/:path*"
+        },
+        {
+            "source": "/api/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/api/:path*"
+        },
+        {
+            "source": "/sso-callback/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/sso-callback/:path*"
+        },
+        {
             "source": "/",
             "has": [
                 {
@@ -119,16 +169,6 @@
                 }
             ],
             "destination": "/scan"
-        },
-        {
-            "source": "/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "/scan/:path*"
         }
     ],
     "redirects": [
