@@ -78,6 +78,34 @@ Your API key is saved to `~/.cencorirc` for future scans.
 
 **Get your free API key at [cencori.com/dashboard](https://cencori.com/dashboard)**
 
+### Interactive Auto-Fix
+
+When you choose to auto-fix, you can review each change before it's applied:
+
+```
+✔ Generated 5 fixes
+
+─── Fix 1/5: app/config.ts:12 ───
+Issue: Hardcoded API Key (high)
+
+- Original:
+    const API_KEY = "sk-abc123...";
+
++ Suggested fix:
+    const API_KEY = process.env.OPENAI_API_KEY;
+
+Explanation: Move secret to environment variable
+
+? Apply this fix?
+❯ Yes - apply this fix
+  No - skip this fix
+  All - apply all remaining fixes
+  Skip rest - save remaining to file
+  Quit - stop reviewing
+```
+
+Any skipped or failed fixes are automatically saved to `.cencori-fixes.json` for you to review later manually.
+
 ## What It Detects
 
 ### API Keys & Secrets
