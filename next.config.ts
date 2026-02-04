@@ -65,19 +65,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Rewrite api.cencori.com/* to /api/*
-  async rewrites() {
-    return {
-      beforeFiles: [
-        // api.cencori.com/v1/* → /api/v1/*
-        {
-          source: '/:path*',
-          has: [{ type: 'host', value: 'api.cencori.com' }],
-          destination: '/api/:path*',
-        },
-      ],
-    };
-  },
 };
 
 export default nextConfig;
