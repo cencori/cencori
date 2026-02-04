@@ -28,7 +28,7 @@
                     "value": "api.cencori.com"
                 }
             ],
-            "destination": "/api/providers"
+            "destination": "/api/v1/models"
         },
         {
             "source": "/v1/telemetry/scan",
