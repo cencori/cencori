@@ -81,14 +81,34 @@
             "destination": "/pitch"
         },
         {
-            "source": "/:path*",
+            "source": "/sign-up",
             "has": [
                 {
                     "type": "host",
                     "value": "scan.cencori.com"
                 }
             ],
-            "destination": "/scan/:path*"
+            "destination": "/sign-up"
+        },
+        {
+            "source": "/login",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/login"
+        },
+        {
+            "source": "/sign-in",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/sign-in"
         },
         {
             "source": "/",
@@ -99,6 +119,16 @@
                 }
             ],
             "destination": "/scan"
+        },
+        {
+            "source": "/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "scan.cencori.com"
+                }
+            ],
+            "destination": "/scan/:path*"
         }
     ],
     "redirects": [
