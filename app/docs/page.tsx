@@ -11,8 +11,9 @@ export default function DocsPage() {
                     Cencori Documentation
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                    Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.
+                    Cencori is the unified infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.
                 </p>
+
             </div>
 
             {/* The Problem We Solve */}
@@ -116,15 +117,39 @@ export default function DocsPage() {
                     </div>
                 </div>
 
+            </div>
+
+            {/* The 5 Primitives */}
+            <div className="space-y-6">
+                <h2 id="primitives" className="scroll-m-20 text-xl font-semibold tracking-tight">
+                    The 5 Primitives of AI Production
+                </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                    Every AI request flows through Cencori&apos;s policy engine, which checks for:
+                    Cencori is built around five core infrastructure primitives that provide the foundation for any production-grade AI application.
                 </p>
-                <ul className="space-y-1.5 text-sm ml-6 mt-2">
-                    <li className="list-disc">Security threats (prompt injection, jailbreaks)</li>
-                    <li className="list-disc">PII and sensitive data</li>
-                    <li className="list-disc">Rate limits and cost thresholds</li>
-                    <li className="list-disc">Compliance requirements</li>
-                </ul>
+
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+                    <div className="space-y-2 border-b pb-4">
+                        <h3 className="text-base font-semibold">1. AI Gateway</h3>
+                        <p className="text-sm text-muted-foreground">The secure entryway for all AI requests. Handles multi-provider routing, PII filtering, observability and cost tracking.</p>
+                    </div>
+                    <div className="space-y-2 border-b pb-4">
+                        <h3 className="text-base font-semibold">2. Compute</h3>
+                        <p className="text-sm text-muted-foreground">Serverless execution for AI logic and agents. Runs your vibe-coded functions in a secure sandbox at the edge.</p>
+                    </div>
+                    <div className="space-y-2 border-b pb-4">
+                        <h3 className="text-base font-semibold">3. Workflow</h3>
+                        <p className="text-sm text-muted-foreground">Visual orchestration for multi-step AI pipelines. Chain models, add logic, and implement safety circuit breakers.</p>
+                    </div>
+                    <div className="space-y-2 border-b pb-4">
+                        <h3 className="text-base font-semibold">4. Data Storage</h3>
+                        <p className="text-sm text-muted-foreground">AI-native memory for your applications. Sync vector embeddings, manage semantic caches, and maintain audit logs.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="text-base font-semibold">5. Integration</h3>
+                        <p className="text-sm text-muted-foreground">Universal connectivity for AI. Securely connect your agents to external tools, databases, and business APIs.</p>
+                    </div>
+                </div>
             </div>
 
             {/* Core Features */}

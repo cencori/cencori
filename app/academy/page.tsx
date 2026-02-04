@@ -53,9 +53,10 @@ export default function AcademyPage() {
                     Cencori Academy
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                    Learn to build production AI applications through hands-on tutorials.
-                    Each course guides you step-by-step with real code examples.
+                    Cencori is the unified infrastructure for AI production.
+                    Learn to build and ship production-grade AI through hands-on tutorials.
                 </p>
+
             </div>
 
             <div className="mb-12">

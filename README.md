@@ -2,29 +2,62 @@
 
 # Cencori
 
-**The Infrastructure for AI Production**
+**The unified infrastructure for AI production.**
 
 Ship AI with built-in security, observability, and scale. One platform for everything — from gateway to compute to workflows.
+
 
 ---
 
 ## Why Cencori?
 
-Building AI features is easy. Building them for production is hard:
+Building a demo is easy. Building a **production-grade AI business** is hard. 
 
-- **Provider lock-in** — Switching from OpenAI to Anthropic means rewriting code
-- **Security gaps** — PII leaks, prompt injection, no audit trail
-- **Cost surprises** — No visibility until the bill arrives
-- **Compliance burden** — SOC2, GDPR, HIPAA require months of work
+Most teams spend 80% of their time building "the boring stuff"—security, cost controls, orchestration, and reliable storage—instead of their core product. Cencori is the unified infrastructure that handles all of that for you.
 
-**Cencori solves all of this with one integration.**
+- **Stop Building Scaffolding** — Skip the 12-month build cycle for internal AI security and reliability layers.
+- **Unified Logic** — Route, execute, and store AI data through a single, secure infrastructure.
+- **Production-Ready by Default** — Built-in compliance, observability, and scale from your first request.
+- **Future-Proof Infrastructure** — Switch models, add compute, or chain workflows without rewriting your entire stack.
 
-- **One API** - Switch between OpenAI, Anthropic, and Google Gemini with a parameter change
-- **Security** - Automatic PII detection, prompt injection protection, content filtering
-- **Compliance** - Complete audit logs and safety scores for every request
-- **Cost Control** - Real-time cost tracking with per-project budgets
-- **Streaming** - Real-time AI responses with Server-Sent Events
-- **Observability** - Analytics dashboard with usage patterns and security incidents
+**Cencori is the "Production Button" for AI.**
+
+---
+
+## The 5 Primitives of AI Production
+
+Cencori provides the five foundational building blocks required to ship and scale AI.
+
+### 1. AI Gateway (The Entryway)
+The secure, unified API for all your AI models.
+- **Multi-Provider Support** — One API for OpenAI, Anthropic, Gemini, Llama, and more.
+- **Native Security** — Automatic PII detection, prompt injection protection, and content filtering.
+- **Streaming & SSE** — Real-time responses with built-in token counting and cost tracking.
+- **Global Observability** — Complete audit logs and analytics for every request.
+
+### 2. Compute (The Brain)
+Serverless execution for AI agents and logic.
+- **Secure Sandboxing** — Execute vibe-coded logic and agent steps in an isolated environment.
+- **Edge Inference** — Run lightweight models and functions closer to your users.
+- **Auto-Scaling** — Scale from prototype to millions of requests without managing servers.
+
+### 3. Workflow (The Nervous System)
+Visual orchestration for complex AI pipelines.
+- **Multi-Step Agents** — Chain multiple AI calls, logic steps, and human-in-the-loop approvals.
+- **Safety Circuit Breakers** — Prevent cascading failures and runaway loops in autonomous agents.
+- **State Management** — Native persistence for long-running AI processes.
+
+### 4. Data Storage (The Memory)
+AI-native storage for context and integrity.
+- **Vector Sync** — Seamlessly manage and query vector embeddings for RAG.
+- **Immutable Audit Logs** — Guaranteed traceability for compliance and behavioral analysis.
+- **Semantic Caching** — Reduce costs and latency by caching similar AI responses.
+
+### 5. Integration (The Hands)
+Connect your AI to the tools your business already uses.
+- **Business Connectors** — Native integration with Salesforce, Slack, GitHub, and internal databases.
+- **Credential Management** — Securely store and inject third-party API keys into your AI workflows.
+- **Event Triggers** — Start AI workflows based on external system events.
 
 ---
 
@@ -221,14 +254,13 @@ Every request goes through automatic safety filters:
 - **Content Safety** - Filters harmful keywords and prompt injection attempts
 - **Safety Scores** - Every request gets a safety score for compliance
 
-### **Real-time Analytics**
+### **Global Observability**
 
-Track everything in your dashboard:
-- Request counts by time period
-- Cost tracking per project and provider
-- Latency monitoring across providers
-- Error rates and filtering stats
-- Model usage breakdown
+Track everything across all primitives in your dashboard:
+- **Unified Analytics** — One view for Gateway, Compute, and Workflow performance.
+- **Cost Integrity** — Real-time tracking per project, provider, and primitive.
+- **Safety Monitoring** — Instant visibility into filtered requests and security events.
+- **Latency Heatmaps** — Monitor performance across the globe and between providers.
 
 ### **API Keys**
 
@@ -582,6 +614,7 @@ View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)
 
 **Phase 5 🚧 (In Progress)**
 - Cencori Scan web UI (scan.cencori.com)
+- **Unified 5-Primitive Suite** (Gateway, Compute, Workflow, Storage, Integration)
 - Advanced cost optimization
 - Payment integration for credit top-ups
 - Additional providers (Cohere, Together.ai, Groq)
