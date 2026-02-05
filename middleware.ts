@@ -144,13 +144,9 @@ export async function middleware(request: NextRequest) {
         }
         // Handle scan subdomain
         else if (domain === 'scan.cencori.com' || domain === 'scan.localhost') {
-            const isGlobalRoute = ['/login', '/sign-in', '/sign-up', '/dashboard', '/docs', '/api', '/sso-callback', '/scan'].some(path => pathname.startsWith(path));
-
-            if (!isGlobalRoute) {
-                const url = request.nextUrl.clone();
-                url.pathname = `/scan${url.pathname}`;
-                response = NextResponse.rewrite(url);
-            }
+            const url = request.nextUrl.clone();
+            url.pathname = `/scan${url.pathname}`;
+            response = NextResponse.rewrite(url);
         }
     }
 

@@ -119,7 +119,6 @@ export default function Navbar({
                 { title: "Integration", href: "/integration" },
                 { title: "Data Storage", href: "/storage" },
                 { title: "Edge", href: "/edge" },
-                { title: "Scan", href: "/scan" },
             ]
         },
         {
@@ -181,9 +180,6 @@ export default function Navbar({
             [
                 { title: "Data Storage", href: "/storage", description: "Vector database & RAG." },
                 { title: "Edge", href: "/edge", description: "Platform integrations & edge middleware." },
-            ],
-            [
-                { title: "Scan", href: "/scan", description: "Security scanning for your code." },
             ],
         ],
     };
