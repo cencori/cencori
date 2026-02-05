@@ -31,7 +31,6 @@ const GitHubIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 import Link from "next/link";
-import { useScanPath } from "../hooks/useScanPath";
 
 interface GitHubRepo {
     id: number;
@@ -53,7 +52,6 @@ const GITHUB_APP_SLUG = "cencori";
 
 export default function ImportRepoPage() {
     const router = useRouter();
-    const { scanPath, isSubdomain } = useScanPath();
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -118,7 +116,7 @@ export default function ImportRepoPage() {
 
     const handleConnectGitHub = () => {
         const state = JSON.stringify({
-            redirect: scanPath("/import"),
+            redirect: "/scan/import",
             source: "scan"
         });
         const url = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
@@ -145,7 +143,7 @@ export default function ImportRepoPage() {
             const data = await response.json();
 
             if (response.ok) {
-                router.push(scanPath(`/projects/${data.project.id}`));
+                router.push(`/scan/projects/${data.project.id}`);
             } else {
                 console.error('Import failed:', data.error);
                 setImportingRepoId(null);
@@ -201,13 +199,13 @@ export default function ImportRepoPage() {
 
         // If success, trigger a refetch
         if (success === 'github_connected' && !isLoading) {
-            window.location.href = scanPath('/import');
+            window.location.href = '/scan/import';
             return null;
         }
 
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Link href={scanPath("/")} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+                <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                     <ArrowLeft className="h-3 w-3" />
                     Back to projects
                 </Link>
@@ -229,8 +227,8 @@ export default function ImportRepoPage() {
                     </p>
                     {error?.includes('Unauthorized') ? (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
-                            <a href={isSubdomain
-                                ? '/login?redirect=/import'
+                            <a href={typeof window !== 'undefined' && window.location.hostname.includes('scan.')
+                                ? 'https://cencori.com/login?redirect=https://scan.cencori.com/import'
                                 : '/login?redirect=/scan/import'}>
                                 Sign In
                             </a>
@@ -247,7 +245,7 @@ export default function ImportRepoPage() {
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
-            <Link href={scanPath("/")} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+            <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                 <ArrowLeft className="h-3 w-3" />
                 Back to projects
             </Link>
@@ -281,7 +279,7 @@ export default function ImportRepoPage() {
                                 <div className="p-1 border-t mt-1">
                                     <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs font-normal" asChild>
                                         <a
-                                            href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: scanPath("/import"), source: "scan" }))}`}
+                                            href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: "/scan/import", source: "scan" }))}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >

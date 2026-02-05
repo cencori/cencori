@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PlusIcon, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useScanPath } from "./hooks/useScanPath";
 
 // Heroicons archive-box-arrow-down icon
 const ArchiveBoxArrowDownIcon = ({ className }: { className?: string }) => (
@@ -60,7 +59,6 @@ function formatTimeAgo(dateString: string | null): string {
 
 export default function ScanDashboardPage() {
     const router = useRouter();
-    const { scanPath } = useScanPath();
     const [projects, setProjects] = useState<ScanProject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -144,7 +142,7 @@ export default function ScanDashboardPage() {
                     />
                 </div>
                 <Button asChild size="sm" className="h-7 text-xs px-3">
-                    <Link href={scanPath("/import")}>
+                    <Link href="/scan/import">
                         Import
                     </Link>
                 </Button>
@@ -167,7 +165,7 @@ export default function ScanDashboardPage() {
                                 <TableRow
                                     key={project.id}
                                     className="cursor-pointer hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
-                                    onClick={() => router.push(scanPath(`/projects/${project.id}`))}
+                                    onClick={() => router.push(`/scan/projects/${project.id}`)}
                                 >
                                     <TableCell className="py-3 px-4">
                                         <div className="text-[13px] font-medium font-mono">{project.github_repo_full_name}</div>
@@ -214,7 +212,7 @@ export default function ScanDashboardPage() {
                     </p>
                     {!searchTerm && (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
-                            <Link href={scanPath("/import")}>Import repository</Link>
+                            <Link href="/scan/import">Import repository</Link>
                         </Button>
                     )}
                 </div>

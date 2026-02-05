@@ -103,9 +103,7 @@ describe('API Key Utilities', () => {
         });
 
         it('should reject null/undefined', () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             expect(validateApiKey(null as any)).toBe(false);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             expect(validateApiKey(undefined as any)).toBe(false);
         });
 
