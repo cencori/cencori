@@ -188,15 +188,22 @@ export default function Navbar({
 
     const solutionsDropdown: NavDropdown = {
         title: "Solutions",
-        type: "dropdown",
-        items: [
-            { title: "AI-first Startups", href: "/solutions/ai-startups", description: "Rapid safe launch and scaling." },
-            { title: "Platform & ISVs", href: "/solutions/platforms", description: "Integrate Cencori into workflows." },
-            { title: "Regulated Industries", href: "/solutions/regulated", description: "Fintech and healthcare compliance." },
-            { title: "Developer Teams", href: "/solutions/devtools", description: "Reduce developer risk." },
-            { title: "Protect Generated Apps", href: "/solutions/vibe-coded", description: "For Cursor, V0, Lovable." },
-            { title: "Data-science Sandboxes", href: "/solutions/model-ops", description: "Model Ops safety." },
-            { title: "Automation Safety", href: "/solutions/sandboxing", description: "Code execution safety." },
+        type: "mega",
+        columns: [
+            [
+                { title: "Vibe Coders", href: "/solutions/vibe-coders", description: "Generate secure apps with AI." },
+                { title: "Developers", href: "/solutions/developers", description: "Add AI to existing apps." },
+                { title: "AI Builders", href: "/solutions/ai-builders", description: "Full-stack AI infrastructure." },
+                { title: "No-Code", href: "/solutions/no-code", description: "Bubble, Zapier, & Make." },
+            ],
+            [
+                { title: "Startups", href: "/solutions/startups", description: "Ship fast, stay secure." },
+                { title: "Agencies", href: "/solutions/agencies", description: "Build for clients." },
+                { title: "Enterprise", href: "/solutions/enterprise", description: "Compliance & governance." },
+                { title: "Fintech", href: "/solutions/fintech", description: "Regulated industry focus." },
+                { title: "Healthcare", href: "/solutions/healthcare", description: "HIPAA & PHI protection." },
+                { title: "Hackathons", href: "/solutions/hackathons", description: "Free tier & instant setup." },
+            ]
         ],
     };
 
