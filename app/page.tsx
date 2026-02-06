@@ -100,14 +100,14 @@ export default function HomePage() {
       />
 
       <main>
-        <Hero />
+        <Hero isAuthenticated={isAuthenticated} />
         <SocialProof />
         <Features />
         <HowToSetup />
         <Integrations />
         <Pricing />
         <FAQ />
-        <CTA />
+        <CTA isAuthenticated={isAuthenticated} />
       </main>
 
       <Footer />

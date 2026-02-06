@@ -3,7 +3,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
-export const CTA = () => {
+interface CTAProps {
+    isAuthenticated?: boolean;
+}
+
+export const CTA = ({ isAuthenticated = false }: CTAProps) => {
     return (
         <section className="py-16 bg-background relative overflow-hidden">
             <div className="max-w-screen-xl mx-auto px-4 md:px-6 relative z-10">
@@ -26,9 +30,9 @@ export const CTA = () => {
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                            <Link href="/login">
+                            <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
                                 <Button size="sm" className="h-8 px-4 text-xs rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                                    Get Started Free
+                                    {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                                     <ArrowRight className="ml-1.5 w-3 h-3" />
                                 </Button>
                             </Link>

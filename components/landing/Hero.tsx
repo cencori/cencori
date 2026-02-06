@@ -4,7 +4,11 @@ import { ArrowRight, ChevronRight } from "lucide-react";
 import { TechnicalBorder } from "./TechnicalBorder";
 import { Button } from "@/components/ui/button";
 
-export const Hero = () => {
+interface HeroProps {
+    isAuthenticated?: boolean;
+}
+
+export const Hero = ({ isAuthenticated = false }: HeroProps) => {
     return (
         <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
             {/* Background Effects */}
@@ -33,9 +37,9 @@ export const Hero = () => {
 
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
-                    <Link href="/login">
+                    <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
                         <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                            Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
+                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"} <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                     </Link>
                     <Link href="/docs">
