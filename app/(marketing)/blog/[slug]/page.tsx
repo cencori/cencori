@@ -2,12 +2,13 @@ import { notFound } from "next/navigation";
 import { getPostBySlug, getAllPosts } from "@/lib/blog";
 import { parseMDX } from "@/lib/blog";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
+import { ShareButtons } from "@/components/blog/ShareButtons";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -38,9 +39,10 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     const authorName = post.authorDetails[0]?.name || "";
     const formattedDate = post.date ? new Date(post.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cencori.com";
     const ogImage = post.coverImage
-        ? post.coverImage
-        : `/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
+        ? `${baseUrl}${post.coverImage}`
+        : `${baseUrl}/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
 
     return {
         title: post.title,
@@ -69,6 +71,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     };
 }
 
+
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const { slug } = await params;
     const post = getPostBySlug(slug);
@@ -79,75 +82,143 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
     const content = await parseMDX(post.content);
 
+    // Get all posts for prev/next navigation
+    const allPosts = getAllPosts().filter(p => p.published);
+    const currentIndex = allPosts.findIndex(p => p.slug === slug);
+    const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
+    const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <Navbar />
 
             <main className="flex-1 pt-20">
-                <article className="container mx-auto px-4 max-w-2xl py-12">
-                    {/* Back Link */}
-                    <div className="mb-6">
-                        <Link
-                            href="/blog"
-                            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <ArrowLeft className="h-3 w-3" />
-                            Blog
-                        </Link>
-                    </div>
-
-                    {/* Header */}
-                    <header className="mb-8">
-                        {/* Tags */}
-                        {post.tags && post.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3">
-                                {post.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground"
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
+                <div className="container mx-auto px-4 max-w-4xl py-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-12">
+                        {/* Main Content */}
+                        <article>
+                            {/* Back Link */}
+                            <div className="mb-6">
+                                <Link
+                                    href="/blog"
+                                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline transition-colors"
+                                >
+                                    Blog
+                                </Link>
                             </div>
-                        )}
 
-                        {/* Title */}
-                        <h1 className="text-2xl font-bold mb-4 tracking-tight leading-tight">
-                            {post.title}
-                        </h1>
+                            {/* Header */}
+                            <header className="mb-8">
+                                {/* Title */}
+                                <h1 className="text-3xl font-bold mb-4 tracking-tight leading-tight">
+                                    {post.title}
+                                </h1>
 
-                        {/* Meta */}
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            {/* Author */}
-                            {post.authorDetails.map((author) => (
-                                <div key={author.slug} className="flex items-center gap-2">
-                                    {author.avatar && (
-                                        <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border/50">
-                                            <Image
-                                                src={author.avatar}
-                                                alt={author.name}
-                                                fill
-                                                className="object-cover"
-                                            />
-                                        </div>
-                                    )}
-                                    <span className="font-medium text-foreground">{author.name}</span>
+                                {/* Meta */}
+                                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
+                                    <span>{format(new Date(post.date), "dd MMMM yyyy")}</span>
+                                    <span className="text-muted-foreground/40">•</span>
+                                    <span>{post.readTime}</span>
                                 </div>
-                            ))}
 
-                            <span className="text-muted-foreground/40">·</span>
-                            <span>{format(new Date(post.date), "MMMM d, yyyy")}</span>
-                            <span className="text-muted-foreground/40">·</span>
-                            <span>{post.readTime}</span>
-                        </div>
-                    </header>
+                                {/* Author */}
+                                {post.authorDetails.map((author) => (
+                                    <div key={author.slug} className="flex items-center gap-3">
+                                        {author.avatar && (
+                                            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border/50">
+                                                <Image
+                                                    src={author.avatar}
+                                                    alt={author.name}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <span className="font-medium text-foreground block">{author.name}</span>
+                                            {author.role && (
+                                                <span className="text-xs text-muted-foreground">{author.role}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </header>
 
-                    {/* Content */}
-                    <div className="prose prose-zinc dark:prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-img:border prose-img:border-border/50 prose-p:text-muted-foreground prose-li:text-muted-foreground">
-                        {content}
+                            {/* Cover Image */}
+                            {post.coverImage && (
+                                <div className="relative w-full aspect-[2/1] rounded-lg overflow-hidden border border-border/50 mb-10 bg-muted/30">
+                                    <Image
+                                        src={post.coverImage}
+                                        alt={post.title}
+                                        fill
+                                        className="object-contain"
+                                        priority
+                                    />
+                                </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="prose prose-zinc dark:prose-invert max-w-none 
+                                prose-headings:font-semibold prose-headings:tracking-tight 
+                                prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4
+                                prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
+                                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:mb-6
+                                prose-li:text-muted-foreground prose-li:leading-relaxed
+                                prose-a:text-primary prose-a:no-underline hover:prose-a:underline 
+                                prose-img:rounded-lg prose-img:border prose-img:border-border/50
+                                prose-code:text-sm prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                                prose-pre:bg-[#0d0d0d] prose-pre:border prose-pre:border-border/50
+                                prose-strong:text-foreground prose-strong:font-semibold
+                                prose-ul:my-4 prose-ol:my-4
+                            ">
+                                {content}
+                            </div>
+
+                            {/* Navigation */}
+                            {(prevPost || nextPost) && (
+                                <div className="mt-16 pt-8 border-t border-border/50">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {prevPost && (
+                                            <Link
+                                                href={`/blog/${prevPost.slug}`}
+                                                className="group flex flex-col p-4 rounded-lg border border-border/50 hover:border-border transition-colors"
+                                            >
+                                                <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                                                    <ArrowLeft className="w-3 h-3" />
+                                                    Previous
+                                                </span>
+                                                <span className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-1">
+                                                    {prevPost.title}
+                                                </span>
+                                            </Link>
+                                        )}
+                                        {nextPost && (
+                                            <Link
+                                                href={`/blog/${nextPost.slug}`}
+                                                className="group flex flex-col p-4 rounded-lg border border-border/50 hover:border-border transition-colors sm:text-right sm:ml-auto"
+                                            >
+                                                <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1 sm:justify-end">
+                                                    Next
+                                                    <ArrowRight className="w-3 h-3" />
+                                                </span>
+                                                <span className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-1">
+                                                    {nextPost.title}
+                                                </span>
+                                            </Link>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </article>
+
+                        {/* Sidebar */}
+                        <aside className="hidden lg:block">
+                            <div className="sticky top-28">
+                                <ShareButtons title={post.title} slug={slug} />
+                            </div>
+                        </aside>
                     </div>
-                </article>
+                </div>
             </main>
 
             <Footer />
