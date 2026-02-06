@@ -38,12 +38,12 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
                     <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
-                        <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"} <ArrowRight className="ml-2 h-4 w-4" />
+                        <Button size="default" className="h-7 px-3 text-[11px] font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
+                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"} <ArrowRight className="ml-1.5 h-3 w-3" />
                         </Button>
                     </Link>
                     <Link href="/docs">
-                        <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
+                        <Button variant="outline" size="default" className="h-7 px-3 text-[11px] font-medium rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                             Documentation
                         </Button>
                     </Link>
