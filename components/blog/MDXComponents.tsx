@@ -76,7 +76,7 @@ export const MDXComponents = {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
                     {...props}
                 >
                     {children}
@@ -89,7 +89,7 @@ export const MDXComponents = {
             return (
                 <Link
                     href={href}
-                    className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
                     {...props}
                 >
                     {children}
@@ -100,7 +100,7 @@ export const MDXComponents = {
         // Fallback for links without href
         return (
             <a
-                className={cn("font-medium text-purple-600 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
                 {...props}
             >
                 {children}
@@ -115,13 +115,69 @@ export const MDXComponents = {
     code: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <code
             className={cn(
-                "relative rounded-md bg-muted/60 border border-border/40 px-[0.4rem] py-[0.25rem] font-mono text-[0.9em] font-medium text-purple-200 dark:text-purple-200",
+                "font-mono text-[0.85em] font-medium text-blue-300",
                 className
             )}
             {...props}
         />
     ),
+    // Table components
+    table: ({ className, ...props }: HTMLAttributes<HTMLTableElement>) => (
+        <div className="my-8 w-full overflow-x-auto">
+            <table
+                className={cn(
+                    "w-full border-collapse text-sm",
+                    className
+                )}
+                {...props}
+            />
+        </div>
+    ),
+    thead: ({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) => (
+        <thead className={cn("", className)} {...props} />
+    ),
+    tbody: ({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) => (
+        <tbody className={cn("", className)} {...props} />
+    ),
+    tr: ({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) => (
+        <tr
+            className={cn(
+                "border-b border-border/50 transition-colors",
+                className
+            )}
+            {...props}
+        />
+    ),
+    th: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
+        <th
+            className={cn(
+                "px-4 py-3 text-left font-semibold text-foreground/90 border-b border-border/70 bg-muted/20",
+                className
+            )}
+            {...props}
+        />
+    ),
+    td: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
+        <td
+            className={cn(
+                "px-4 py-3 text-foreground/80 align-top",
+                className
+            )}
+            {...props}
+        />
+    ),
+    // Horizontal rule - short centered separator
+    hr: ({ className, ...props }: HTMLAttributes<HTMLHRElement>) => (
+        <div className={cn("my-10 flex justify-center", className)} {...props}>
+            <span className="w-12 h-px bg-border/60" />
+        </div>
+    ),
+    // Strong/bold text
+    strong: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
+        <strong className={cn("font-semibold text-foreground", className)} {...props} />
+    ),
     Callout,
     Card,
     Cards,
 };
+

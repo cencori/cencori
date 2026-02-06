@@ -9,6 +9,8 @@ import type { Metadata } from "next";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { ShareButtons } from "@/components/blog/ShareButtons";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -89,7 +91,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
 
     return (
-        <div className="min-h-screen bg-background flex flex-col">
+        <div className={`min-h-screen bg-background flex flex-col ${GeistSans.variable} ${GeistMono.variable}`} style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}>
             <Navbar />
 
             <main className="flex-1 pt-20">
@@ -151,7 +153,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                         src={post.coverImage}
                                         alt={post.title}
                                         fill
-                                        className="object-contain"
+                                        className="object-cover"
                                         priority
                                     />
                                 </div>
@@ -176,7 +178,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
                             {/* Navigation */}
                             {(prevPost || nextPost) && (
-                                <div className="mt-16 pt-8 border-t border-border/50">
+                                <div className="mt-16 pt-8">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {prevPost && (
                                             <Link
