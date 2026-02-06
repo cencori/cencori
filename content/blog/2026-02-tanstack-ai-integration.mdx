@@ -1,0 +1,65 @@
+---
+title: "Cencori + TanStack AI"
+slug: "tanstack-ai-integration"
+date: "2026-02-05"
+excerpt: "Cencori is now an official adapter for TanStack AI. Use any AI provider with built-in security and observability."
+coverImage: "/blog/images/covers/tanstack.png"
+authors:
+  - bola
+tags: ["Announcement", "Integration", "TanStack"]
+published: true
+---
+
+We're excited to announce that **Cencori is now an official adapter for TanStack AI**.
+
+This means developers using TanStack AI can now access OpenAI, Anthropic, Google, xAI, and more—all through a single, unified integration with built-in security and observability.
+
+## Why This Matters
+
+[TanStack AI](https://tanstack.com/ai) is quickly becoming one of the go-to toolkits for building AI applications. It's framework-agnostic, lightweight, and designed for modern React and TypeScript workflows.
+
+With Cencori as an adapter, you get:
+
+- **Every major AI model** through one SDK
+- **Automatic PII detection and content filtering**
+- **Full request logging** with tokens, cost, and latency
+- **Provider failover** when APIs go down
+
+No need to manage multiple API keys or build your own safety layer—Cencori handles it.
+
+## Getting Started
+
+It's two packages:
+
+```bash
+npm install @cencori/ai-sdk @tanstack/ai
+```
+
+And a few lines of code:
+
+```typescript
+import { chat } from "@tanstack/ai";
+import { cencori } from "@cencori/ai-sdk/tanstack";
+
+for await (const chunk of chat({
+  adapter: cencori("gpt-4o"),
+  messages: [{ role: "user", content: "Hello!" }],
+})) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+Swap `gpt-4o` for `claude-3-5-sonnet` or `gemini-2.5-flash`—same code, different provider.
+
+## What's Next
+
+This is just the beginning. We're working on deeper integrations with more frameworks and platforms. If you're building with TanStack AI, we'd love to hear how it goes.
+
+**Check out the docs:** [TanStack AI Adapter Documentation](https://tanstack.com/ai/latest/docs/community-adapters/cencori)
+
+**Get your API key:** [cencori.com/dashboard](/dashboard)
+
+---
+
+*The Cencori Team*
+
