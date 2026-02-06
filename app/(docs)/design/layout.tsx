@@ -17,6 +17,7 @@ const navigationItems = [
     { name: "Colors", path: "/colors" },
     { name: "Spacing", path: "/spacing" },
     { name: "Components", path: "/components" },
+    { name: "Ghost Diagrams", path: "/ghost-diagrams" },
     { name: "Layouts", path: "/layouts" },
     { name: "Icons", path: "/icons" },
     { name: "Animation", path: "/animation" },

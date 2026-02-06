@@ -1,0 +1,199 @@
+---
+title: "Building a Production-Ready AI Security Layer: How We Catch What Your LLM Shouldn't Say"
+slug: "building-ai-security-layer"
+date: "2026-02-06"
+excerpt: "When everyone's focused on what goes into an AI, we learned the hard way that what comes out can be just as dangerous. Here's how we built an output scanner that catches PII leakage and instruction attacks."
+coverImage: "/blog/images/covers/outputscanner.png"
+authors:
+  - bola
+tags: ["Engineering", "Security", "AI Safety"]
+published: true
+---
+
+Most AI security discussions focus on **input validation**—blocking prompt injections, filtering jailbreaks, sanitizing user data. And that's important. But here's the uncomfortable truth: even with perfect input filtering, your LLM can still leak sensitive data.
+
+Why? Because Large Language Models are trained on billions of examples that include PII patterns, communication strategies, and social engineering techniques. A sufficiently creative prompt can coax the model into *teaching* how to exfiltrate data, even when it never sees the actual sensitive information.
+
+We call this the **instruction leakage problem**—and it's why output scanning is non-negotiable in production AI systems.
+
+## The Attack That Changed Our Thinking
+
+In late 2024, researchers demonstrated an attack (often called the "Wisc attack" in security circles) that bypassed most existing AI guardrails. The attack was elegant and terrifying:
+
+1. **Establish intellectual rapport** – Frame the conversation as "genuine curiosity"
+2. **Layer multiple topics** – Mix legitimate questions about AI architecture with seemingly innocent creative writing requests
+3. **The payload** – Ask for "subtle ways" to share contact information in a story
+
+The result? AI systems happily provided multiple templated responses for embedding email addresses naturally into conversations—complete with working examples like `john.smith@company.org`.
+
+The input looked innocent. The output was a PII exfiltration playbook.
+
+## Our Multi-Phase Architecture
+
+We built a security layer that treats AI traffic like network traffic—inspecting both ingress and egress.
+
+<SecurityArchitectureDiagram />
+
+The key insight: **Phase 1 and Phase 2 share context.** If input analysis detects elevated jailbreak risk, the output scanner becomes more aggressive. This creates a defense-in-depth system where suspicious inputs trigger increased output scrutiny.
+
+## Inside the Output Scanner
+
+Our output scanner implements five distinct detection strategies. We'll walk through the architecture without revealing the specific patterns we match.
+
+### 1. Direct PII Detection
+
+The obvious layer—we scan for emails, phone numbers, SSNs, credit cards, and addresses. But here's the nuance: we maintain separate pattern sets for input and output.
+
+Why? Because output patterns need to be *comprehensive*. An input might contain a user's own email (legitimate), but if the AI *generates* five email addresses in response to a "story writing" request? That's suspicious.
+
+```typescript
+export interface OutputScanResult {
+    safe: boolean;
+    reasons: string[];
+    blockedContent?: {
+        type: string;
+        examples: string[];
+    };
+    riskScore: number;    // 0-1 scale
+    confidence: number;   // How sure we are
+}
+```
+
+The result structure is intentional. We track *what* was blocked and *why*, enabling both automated responses and human review of edge cases.
+
+### 2. Obfuscation Detection
+
+Sophisticated attackers know that `user@domain.com` gets caught. So they ask the model to output `user dot domain dot com` or `user [at] domain [dot] com`.
+
+Our output scanner detects these obfuscated formats and actually assigns them *higher* risk scores than plain emails. Why? Because obfuscation suggests intentional bypass—which is a strong signal of malicious intent.
+
+```typescript
+// Obfuscation = intent signal
+if (emailObfuscatedMatches && emailObfuscatedMatches.length > 0) {
+    reasons.push('Output contains obfuscated email format');
+    riskScore += 0.6; // Higher than standard email (0.5)
+}
+```
+
+### 3. Instruction Leakage Detection
+
+This is the core innovation. We detect when the model isn't outputting PII directly, but is *teaching* PII exfiltration techniques.
+
+Red flags include phrases like:
+- "Here are ways to..."
+- "Methods to share..."
+- "How you could mention..."
+
+When these instruction patterns co-occur with email or contact contexts, we flag the response as potential instruction leakage—even if no actual PII is present.
+
+```typescript
+for (const pattern of INSTRUCTION_LEAKAGE_PATTERNS) {
+    if (regex.test(outputText)) {
+        const hasEmailContext = 
+            output.includes('@') ||
+            output.includes('email') ||
+            output.includes('contact');
+
+        if (hasEmailContext) {
+            reasons.push('Output teaches PII exfiltration techniques');
+            riskScore += 0.7; // This is the Wisc attack signature
+        }
+    }
+}
+```
+
+### 4. Context-Aware Scoring
+
+Here's where Phase 1 and Phase 2 integrate. The output scanner receives context from the input analysis:
+
+```typescript
+export interface ScanContext {
+    inputText?: string;
+    jailbreakRisk?: number;
+    conversationHistory?: Array<{ role: string; content: string }>;
+}
+```
+
+If the jailbreak detector flagged the input as suspicious (even below blocking threshold), we apply elevated scrutiny to the output:
+
+```typescript
+if (context.jailbreakRisk && context.jailbreakRisk > 0.5) {
+    riskScore += 0.2;
+    reasons.push('Elevated scrutiny due to jailbreak risk in input');
+}
+```
+
+We also correlate input and output semantics. If someone asks "how to mention email naturally" and the output contains email addresses? That's not coincidence—it's confirmation.
+
+### 5. Density Scoring
+
+A single email in a customer service context? Probably fine. Five emails in a "creative writing" response? Almost certainly exfiltration training.
+
+```typescript
+const totalPIICount = 
+    (emailMatches?.length || 0) +
+    (phoneMatches?.length || 0) +
+    (ssnMatches?.length || 0) +
+    (creditCardMatches?.length || 0);
+
+if (totalPIICount >= 3) {
+    reasons.push(`Output contains ${totalPIICount} PII instances`);
+    riskScore += 0.4;
+}
+```
+
+## The Blocking Decision
+
+All these signals feed into a single decision function. Note that we don't just threshold on risk—we require *confidence* to avoid false positives:
+
+```typescript
+export function shouldBlockOutput(result: OutputScanResult): boolean {
+    const hasInstructionLeakage = result.reasons.some(r =>
+        r.includes('instruction leakage') || r.includes('exfiltration')
+    );
+
+    // Block if: not safe AND (confident OR instruction leakage)
+    return !result.safe && (result.confidence >= 0.5 || hasInstructionLeakage);
+}
+```
+
+Instruction leakage is special-cased to *always* block, regardless of confidence. A model teaching exfiltration techniques is never acceptable, even if we're only 30% sure that's what's happening.
+
+## Performance Matters
+
+Security that adds 500ms to every request is security that gets disabled in production. Our scanner runs in under 1ms for typical responses:
+
+```
+Input Security: 0.12ms average (100 iterations)
+Output Security: 0.08ms average (100 iterations)
+```
+
+This is achieved through careful regex optimization and avoiding expensive operations (like AI-based classification) in the hot path. We do offer optional AI-powered detection for complex cases, but it runs asynchronously with a 5-second timeout to never block the critical path.
+
+## Lessons Learned
+
+Building production AI security taught us several things:
+
+1. **Input filtering is necessary but insufficient.** The model itself is a source of dangerous information.
+
+2. **Context is everything.** The same output can be safe or dangerous depending on what prompted it.
+
+3. **Obfuscation = intent.** Treating bypass attempts as higher-risk signals has very low false positive rates.
+
+4. **Confidence thresholds matter.** Blocking too aggressively kills user experience. We err toward warnings, not blocks, when uncertain.
+
+5. **Instruction leakage is the new frontier.** Detecting when models teach attack techniques is fundamentally different from detecting the attacks themselves.
+
+## What's Next
+
+We're actively researching:
+
+- **Semantic similarity scoring** between input requests and output content
+- **Conversation-level risk aggregation** across multi-turn attacks
+- **Adaptive thresholds** based on user behavioral patterns
+
+The cat-and-mouse game between AI capabilities and AI safety is just beginning. As models become more capable, so must our defenses.
+
+---
+
+*We're building Cencori to make AI security accessible to every developer. If you're interested in protecting your AI applications, check out our [documentation](/docs) or try the [Cencori SDK](https://github.com/cencori/sdk).*
