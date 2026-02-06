@@ -152,7 +152,37 @@ export default function DocsPage() {
                 </div>
             </div>
 
+            {/* Cencori Scan */}
+            <div className="space-y-4">
+                <h2 id="cencori-scan" className="scroll-m-20 text-xl font-semibold tracking-tight">
+                    Cencori Scan
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    Security scanner for AI apps. Detect hardcoded secrets, PII leaks, exposed routes, and vulnerabilities — with AI-powered auto-fix.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2 mt-4">
+                    <div className="border border-border/40 p-4 space-y-2">
+                        <h3 className="text-sm font-semibold">CLI Tool</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Run <code className="text-xs bg-muted px-1 py-0.5 rounded">npx @cencori/scan</code> in any project to instantly find 50+ types of security issues.
+                        </p>
+                    </div>
+                    <div className="border border-border/40 p-4 space-y-2">
+                        <h3 className="text-sm font-semibold">Web Dashboard</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Connect GitHub repos and scan automatically. View scan history, changelogs, and manage projects.
+                        </p>
+                    </div>
+                </div>
+
+                <Link href="/docs/security/scan" className="inline-flex items-center text-sm text-primary hover:underline mt-2">
+                    Learn more about Cencori Scan →
+                </Link>
+            </div>
+
             {/* Core Features */}
+
             <div className="space-y-4">
                 <h2 id="core-features" className="scroll-m-20 text-xl font-semibold tracking-tight">
                     Core Features

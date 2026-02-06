@@ -112,6 +112,50 @@ Every AI application requires these foundational building blocks. Cencori provid
 
 ---
 
+## Cencori Scan
+
+**Purpose**: Standalone security scanner for AI codebases.
+
+Unlike the 5 primitives (which are platform services), Cencori Scan is a developer tool that runs locally or via the web dashboard.
+
+| Component | Description |
+|-----------|-------------|
+| **CLI** (`@cencori/scan`) | NPM package for local scanning. Runs `npx @cencori/scan` in any directory. |
+| **Web Dashboard** (`/scan`) | GitHub-integrated scanner with persistent history and changelogs. |
+| **Detection Engine** | 50+ patterns for secrets, PII, routes, and vulnerabilities. |
+| **AI Auto-Fix** | LLM-powered fix generation via Cencori API. |
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Developer Codebase                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+            ┌──────────────┴──────────────┐
+            │                             │
+            ▼                             ▼
+┌─────────────────────┐       ┌─────────────────────┐
+│       CLI           │       │   Web Dashboard     │
+│  @cencori/scan      │       │   /scan routes      │
+└─────────┬───────────┘       └─────────┬───────────┘
+          │                             │
+          └──────────────┬──────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   Detection Engine  │
+              │   (Regex Patterns)  │
+              └─────────┬───────────┘
+                        │
+                        ▼
+              ┌─────────────────────┐
+              │   Cencori API       │
+              │   (AI Auto-Fix)     │
+              └─────────────────────┘
+```
+
+---
+
 ## Design Principles
 
 1.  **Unified by Default**: A single integration point handles routing, security, and observability.
