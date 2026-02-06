@@ -42,3 +42,21 @@ Cencori implements the following security measures by default:
 ## Bug Bounty
 
 We are evaluating a formal bug bounty program. In the meantime, responsible disclosures may be eligible for recognition and swag.
+
+---
+
+## Cencori Scan
+
+In addition to our platform security measures, we provide **Cencori Scan** — a proactive security scanner for your codebase.
+
+```bash
+npx @cencori/scan
+```
+
+**What it detects:**
+- Hardcoded secrets (50+ providers: OpenAI, Anthropic, AWS, Stripe, etc.)
+- PII exposure (emails, SSNs, phone numbers, credit cards)
+- Exposed routes and endpoints
+- SQL injection, XSS, and other vulnerabilities
+
+**Learn more:** [Cencori Scan Documentation](https://cencori.com/docs/security/scan)

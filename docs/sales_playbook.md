@@ -102,6 +102,7 @@ Cencori is not just a point solution — it's a platform. We're building the ful
 | Product | Status | What It Does |
 |---------|--------|--------------|
 | **AI Gateway** | ✅ Live | Multi-provider routing, security, observability, cost control |
+| **Cencori Scan** | ✅ Live | Security scanner for AI apps. CLI + Web Dashboard. Auto-fix with AI. |
 | **Compute** | 🔜 Coming | Serverless functions, GPU access, edge deployment |
 | **Workflows** | 🔜 Coming | Visual AI pipeline builder, orchestration, human-in-loop |
 | **Integration** | 🔜 Coming | SDKs, agent frameworks, platform connectors |

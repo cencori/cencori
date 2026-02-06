@@ -378,11 +378,11 @@ npx @cencori/scan --quiet --no-prompt`}
                         </span>
                     </Button>
                 </Link>
-                <Link href="/docs/security/pii-detection">
+                <Link href="/docs/security/scan/web-dashboard">
                     <Button variant="ghost" className="gap-2">
                         <span className="flex flex-col items-end">
                             <span className="text-xs text-muted-foreground">Next</span>
-                            <span className="text-sm font-medium">PII Detection</span>
+                            <span className="text-sm font-medium">Web Dashboard</span>
                         </span>
                         <ChevronRight className="h-4 w-4" />
                     </Button>

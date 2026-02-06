@@ -67,6 +67,7 @@ const sidebarItems = [
         title: "Security",
         items: [
             { title: "Cencori Scan", href: "/docs/security/scan" },
+            { title: "Web Dashboard", href: "/docs/security/scan/web-dashboard" },
             { title: "PII Detection", href: "/docs/security/pii-detection" },
             { title: "Prompt Injection", href: "/docs/security/prompt-injection" },
             { title: "Content Filtering", href: "/docs/security/content-filtering" },

@@ -129,6 +129,14 @@ except SafetyError as e:
 | Anthropic | `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` |
 | Google | `gemini-2.5-flash`, `gemini-2.0-flash` |
 
+## Related Tools
+
+**[@cencori/scan](https://www.npmjs.com/package/@cencori/scan)** — Security scanner for AI apps. Detects hardcoded secrets, PII, and vulnerabilities with AI-powered auto-fix.
+
+```bash
+npx @cencori/scan
+```
+
 ## License
 
 MIT © FohnAI
