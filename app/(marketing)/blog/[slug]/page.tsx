@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import Navbar from "@/components/landing/Navbar";
+import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 import { ShareButtons } from "@/components/blog/ShareButtons";
 import { GeistSans } from "geist/font/sans";
@@ -92,7 +92,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
     return (
         <div className={`min-h-screen bg-background flex flex-col ${GeistSans.variable} ${GeistMono.variable}`} style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}>
-            <Navbar />
+            <AuthNavbar />
 
             <main className="flex-1 pt-20">
                 <div className="container mx-auto px-4 max-w-4xl py-12">

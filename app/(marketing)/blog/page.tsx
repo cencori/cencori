@@ -1,6 +1,6 @@
 import { getAllPosts, getAllTags } from "@/lib/blog";
 import { BlogList } from "@/components/blog/BlogList";
-import Navbar from "@/components/landing/Navbar";
+import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 
 export default function BlogPage() {
@@ -9,7 +9,7 @@ export default function BlogPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Navbar />
+      <AuthNavbar />
 
       <main className="flex-1 pt-20">
         {/* Header */}
