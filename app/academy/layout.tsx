@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import Navbar from "@/components/landing/Navbar";
+import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export default function AcademyLayout({
 }) {
     return (
         <div className="flex min-h-screen flex-col">
-            <Navbar />
+            <AuthNavbar />
             <main className="flex-1 container mx-auto px-4 md:px-6 py-8 md:py-12">
                 {children}
             </main>
