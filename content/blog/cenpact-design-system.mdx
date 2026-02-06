@@ -29,3 +29,132 @@ We redesigned Cencori with a new design language we call **Cenpact** (Cencori + 
 - **Dynamic OG Images:** Auto-generated social preview cards with Cenpact styling
 
 The result is a UI that shows more information with less scrolling, without feeling cramped.
+
+---
+
+## Ghost Diagrams 👻
+
+Ghost Diagrams are Cenpact's signature style for technical illustrations—minimalist, theme-aware diagrams that blend seamlessly with any background.
+
+### What Makes a Ghost Diagram
+
+| Property | Implementation |
+|----------|----------------|
+| **Transparent backgrounds** | `bg-transparent` or `bg-current/[0.02]` for subtle fills |
+| **currentColor everywhere** | All strokes, fills, and text use `currentColor` with opacity |
+| **Thin borders** | `border-current/20` or thinner—never heavy strokes |
+| **Subtle opacity** | `/15`, `/20`, `/30`, `/40` for hierarchy, never solid colors |
+| **Inherits page font** | Uses `font-sans` to match blog typography |
+
+### The Core Technique
+
+Ghost Diagrams work in both light and dark mode because they use **`currentColor`** instead of fixed colors:
+
+```tsx
+// ✅ Ghost style - auto-adapts to theme
+<div className="border border-current/20 text-current/60" />
+
+// ❌ Fixed colors - breaks in light/dark mode
+<div className="border border-gray-700 text-gray-400" />
+```
+
+The `/XX` notation (e.g., `/20`) sets opacity. Combined with `currentColor`, elements "ghost" into the background.
+
+### Available Primitives
+
+Import from `@/components/ui/ghost-diagram`:
+
+| Component | Purpose |
+|-----------|---------|
+| `GhostContainer` | Root wrapper with max-width and spacing |
+| `GhostBox` | Transparent bordered container with optional label |
+| `GhostBoxTitle` | Title text inside a box |
+| `GhostBoxContent` | Body content inside a box |
+| `GhostGrid` | Grid of small labeled cells |
+| `GhostArrow` | Vertical arrow connector |
+| `GhostDashedLine` | Horizontal dashed line with arrows |
+| `GhostPlaceholder` | Fake text lines (skeleton UI) |
+| `GhostCaption` | Centered caption text |
+| `GhostLabel` | Uppercase tracking label |
+| `GhostIcon` | Small icon placeholder |
+
+### Example Usage
+
+```tsx
+import {
+  GhostContainer,
+  GhostBox,
+  GhostBoxTitle,
+  GhostGrid,
+  GhostArrow,
+  GhostCaption
+} from '@/components/ui/ghost-diagram';
+
+export function MyDiagram() {
+  return (
+    <GhostContainer maxWidth="lg">
+      <GhostBox label="Phase 1">
+        <GhostBoxTitle>Input Processing</GhostBoxTitle>
+        <GhostGrid items={['Validate', 'Parse', 'Transform']} />
+      </GhostBox>
+      <GhostArrow label="if valid" />
+      <GhostBox variant="success">
+        <GhostBoxTitle>Complete</GhostBoxTitle>
+      </GhostBox>
+      <GhostCaption>Data flow diagram</GhostCaption>
+    </GhostContainer>
+  );
+}
+```
+
+### Do's ✅
+
+- **Use opacity for hierarchy** — Primary elements at `/60`, secondary at `/40`, decorative at `/20`
+- **Keep it minimal** — If you can remove an element without losing meaning, remove it
+- **Use thin strokes** — `border` (1px) or `border-2` max, never thicker
+- **Let it breathe** — Generous padding inside boxes (`p-4` or `p-5`)
+- **Center-align diagrams** — Always use `mx-auto` on containers
+- **Add captions** — Every diagram should explain what it shows
+- **Use `select-none`** — Prevents accidental text selection
+
+### Don'ts ❌
+
+- **Don't use solid fills** — No `bg-gray-800` or `bg-white`—stay transparent
+- **Don't use fixed colors** — No `text-gray-500`—use `text-current/50`
+- **Don't add shadows** — Ghost diagrams are flat by design
+- **Don't use gradients** — Keep it simple, single-tone
+- **Don't overcrowd** — If it needs too many elements, split into multiple diagrams
+- **Don't use heavy fonts** — Stick to `font-medium` max, usually `font-normal`
+- **Don't add animations** — Ghost diagrams are static and calm
+
+### Opacity Reference
+
+| Use Case | Opacity | Example |
+|----------|---------|---------|
+| Primary text | `/80` - `/100` | Titles, important labels |
+| Secondary text | `/60` | Body content, descriptions |
+| Tertiary text | `/40` | Captions, annotations |
+| Decorative text | `/30` | Hints, very subtle labels |
+| Primary borders | `/30` | Main box outlines |
+| Secondary borders | `/20` | Nested elements |
+| Subtle borders | `/15` | Grid items, icons |
+| Background tint | `/[0.02]` - `/[0.03]` | Very subtle fills |
+
+### Variant Colors
+
+For semantic meaning, Ghost Diagrams support color variants:
+
+```tsx
+<GhostBox variant="default" />  // neutral - current color
+<GhostBox variant="muted" />    // subtle tinted background
+<GhostBox variant="success" />  // green tint - completion, success
+<GhostBox variant="warning" />  // yellow tint - caution
+<GhostBox variant="error" />    // red tint - failure, blocked
+```
+
+Even variants stay ghostly—they use `/30` border and `/[0.03]` background.
+
+---
+
+Ghost Diagrams bring technical concepts to life without visual noise. Use them in blogs, changelogs, docs, and anywhere you need to explain architecture or flow.
+

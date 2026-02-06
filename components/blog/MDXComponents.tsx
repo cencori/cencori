@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { HTMLAttributes, ComponentProps } from "react";
 import { Callout } from "@/components/blog/Callout";
 import { Card, Cards } from "@/components/blog/Cards";
+import { SecurityArchitectureDiagram } from "@/components/blog/SecurityArchitectureDiagram";
 import Link from "next/link";
 
 export const MDXComponents = {
@@ -179,5 +180,6 @@ export const MDXComponents = {
     Callout,
     Card,
     Cards,
+    SecurityArchitectureDiagram,
 };
 
