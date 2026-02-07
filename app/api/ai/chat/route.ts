@@ -104,7 +104,7 @@ async function getAndProcessCustomRules(
         }
 
         console.log('[CustomRules] Fetched', rules.length, 'rules for project:', projectId);
-        rules.forEach((r, i) => console.log(`  [${i}] ${r.name} (${r.match_type}/${r.action}): ${r.pattern.substring(0, 50)}...`));
+        rules.forEach((r: CustomDataRule, i: number) => console.log(`  [${i}] ${r.name} (${r.match_type}/${r.action}): ${r.pattern.substring(0, 50)}...`));
 
         const inputResult = await processCustomRules(inputText, rules);
         console.log('[CustomRules] Input processing result:', {
@@ -650,7 +650,7 @@ export async function POST(req: NextRequest) {
                                 yield { ...chunk, actualProvider, actualModel, usedFallback };
                             }
                             await recordSuccess(providerName);
-                            return; 
+                            return;
                         } catch (error) {
                             lastError = error instanceof Error ? error : new Error(String(error));
                             console.warn(`[Failover/Stream] Attempt ${attempt + 1}/${streamMaxRetries} failed for ${providerName}:`, lastError.message);
