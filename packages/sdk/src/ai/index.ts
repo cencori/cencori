@@ -240,7 +240,7 @@ export class AINamespace {
      * });
      */
     async embeddings(request: EmbeddingRequest): Promise<EmbeddingResponse> {
-        const response = await fetch(`${this.config.baseUrl}/api/v1/embeddings`, {
+        const response = await fetch(`${this.config.baseUrl}/api/ai/embeddings`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
