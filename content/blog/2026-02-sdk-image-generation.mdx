@@ -1,0 +1,178 @@
+---
+title: "SDK v1.0.2: Multi-Provider Image Generation & AI SDK Parity"
+slug: "sdk-v1-0-2-image-generation"
+date: "2026-02-07"
+excerpt: "Generate images with GPT Image 1.5 and Gemini, use function calling, get structured output, and analyze images - all through one unified API."
+coverImage: "/blog/images/covers/imagegen.png"
+authors:
+  - bola
+tags: ["Changelog", "Product", "SDK"]
+published: true
+---
+
+We just shipped **Cencori SDK v1.0.2** with full AI SDK feature parity. One API, multiple providers, complete security and logging.
+
+## What's New
+
+- **Image Generation** — GPT Image 1.5, DALL-E, Gemini, Imagen
+- **Image Input** — Vision/multimodal analysis
+- **Tool Usage** — Function calling with streaming
+- **Structured Output** — Type-safe JSON generation
+
+---
+
+## Image Generation
+
+Generate images using the best models from OpenAI and Google:
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+// OpenAI GPT Image 1.5 - Best text rendering
+const logo = await cencori.ai.generateImage({
+  model: 'gpt-image-1.5',
+  prompt: 'A minimalist logo for a startup called Cencori',
+  size: '1024x1024'
+});
+
+// Google Gemini - Fast photorealism  
+const photo = await cencori.ai.generateImage({
+  model: 'gemini-3-pro-image',
+  prompt: 'Modern office space with natural lighting'
+});
+
+console.log(logo.images[0].url);
+```
+
+### Supported Models
+
+**OpenAI** — `gpt-image-1.5`, `dall-e-3`, `dall-e-2` (text rendering, creative)
+
+**Google** — `gemini-3-pro-image`, `imagen-3` (photorealism, speed)
+
+---
+
+## Image Input (Vision)
+
+Analyze images using multimodal models:
+
+```typescript
+const analysis = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{
+    role: 'user',
+    content: [
+      { type: 'text', text: 'What is in this image?' },
+      { type: 'image_url', image_url: { url: 'https://example.com/photo.jpg' } }
+    ]
+  }]
+});
+```
+
+---
+
+## Tool Usage (Function Calling)
+
+Let AI models call your functions:
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the weather in Tokyo?' }],
+  tools: [{
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: 'Get current weather',
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city']
+      }
+    }
+  }]
+});
+
+if (response.toolCalls) {
+  const { name, arguments: args } = response.toolCalls[0].function;
+  // Execute function and continue conversation
+}
+```
+
+### Tool Streaming
+
+Stream tool calls in real-time:
+
+```typescript
+for await (const chunk of cencori.ai.chatStream({ model: 'gpt-4o', ... })) {
+  if (chunk.toolCalls) {
+    console.log('Tool call:', chunk.toolCalls);
+  }
+  if (chunk.finish_reason === 'tool_calls') {
+    // Execute tools
+  }
+}
+```
+
+---
+
+## Structured Output
+
+Generate type-safe JSON with schema validation:
+
+```typescript
+interface UserProfile {
+  name: string;
+  age: number;
+  interests: string[];
+}
+
+const result = await cencori.ai.generateObject<UserProfile>({
+  model: 'gpt-4o',
+  prompt: 'Generate a sample user profile',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      age: { type: 'number' },
+      interests: { type: 'array', items: { type: 'string' } }
+    },
+    required: ['name', 'age', 'interests']
+  }
+});
+
+console.log(result.object); 
+// { name: 'Alice', age: 28, interests: ['coding', 'music'] }
+```
+
+---
+
+## Why Cencori?
+
+Every request through the SDK is automatically:
+
+- **Logged** with full request/response audit trail
+- **Rate limited** per project and organization  
+- **BYOK enabled** - use your own API keys
+- **Security monitored** with PII detection and custom rules
+- **Multi-provider** - switch models without code changes
+
+---
+
+## Get Started
+
+```bash
+npm install cencori@1.0.2
+```
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+[View on npm](https://www.npmjs.com/package/cencori) · [Documentation](/docs/sdk)
