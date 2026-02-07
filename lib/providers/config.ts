@@ -8,7 +8,7 @@
 export interface AIModel {
     id: string;
     name: string;
-    type: 'chat' | 'reasoning' | 'code' | 'search' | 'embedding';
+    type: 'chat' | 'reasoning' | 'code' | 'search' | 'embedding' | 'image';
     contextWindow: number;
     description?: string;
 }
@@ -45,6 +45,10 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'o3-mini', name: 'o3 Mini', type: 'reasoning', contextWindow: 128000, description: 'Fast reasoning model' },
             { id: 'o1', name: 'o1', type: 'reasoning', contextWindow: 128000, description: 'Advanced reasoning model' },
             { id: 'o1-mini', name: 'o1 Mini', type: 'reasoning', contextWindow: 128000, description: 'Efficient reasoning' },
+            // Image Generation
+            { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: 'image', contextWindow: 0, description: 'Best text rendering' },
+            { id: 'dall-e-3', name: 'DALL-E 3', type: 'image', contextWindow: 0, description: 'High quality images' },
+            { id: 'dall-e-2', name: 'DALL-E 2', type: 'image', contextWindow: 0, description: 'Fast image generation' },
         ],
     },
     {
@@ -87,6 +91,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // Gemini 2.0 Series
             { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', type: 'chat', contextWindow: 1000000, description: 'Fast model' },
             { id: 'gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', type: 'reasoning', contextWindow: 1000000, description: 'Reasoning variant' },
+            // Image Generation
+            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: 'image', contextWindow: 0, description: 'Fast photorealism' },
+            { id: 'imagen-3', name: 'Imagen 3', type: 'image', contextWindow: 0, description: 'High quality images' },
         ],
     },
     {
@@ -289,6 +296,20 @@ export function getProvider(providerId: string): AIProviderConfig | undefined {
  */
 export function getModelsForProvider(providerId: string): AIModel[] {
     return getProvider(providerId)?.models || [];
+}
+
+/**
+ * Get chat/reasoning models for a provider (excludes image models)
+ */
+export function getChatModelsForProvider(providerId: string): AIModel[] {
+    return getModelsForProvider(providerId).filter(m => m.type !== 'image');
+}
+
+/**
+ * Get image generation models for a provider
+ */
+export function getImageModelsForProvider(providerId: string): AIModel[] {
+    return getModelsForProvider(providerId).filter(m => m.type === 'image');
 }
 
 /**
