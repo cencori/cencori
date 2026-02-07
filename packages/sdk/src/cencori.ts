@@ -30,6 +30,7 @@ import { AINamespace } from './ai';
 import { ComputeNamespace } from './compute';
 import { WorkflowNamespace } from './workflow';
 import { StorageNamespace } from './storage';
+import { MemoryClient } from './memory';
 import { fetchWithRetry } from './utils';
 import {
     CencoriError,
@@ -87,6 +88,15 @@ export class Cencori {
     readonly storage: StorageNamespace;
 
     /**
+     * Memory - Vector storage for RAG, conversation history, semantic search
+     * 
+     * @example
+     * await cencori.memory.store({ namespace: 'conversations', content: '...' });
+     * await cencori.memory.search({ namespace: 'conversations', query: '...' });
+     */
+    readonly memory: MemoryClient;
+
+    /**
      * Create a new Cencori client
      * 
      * @param config - Configuration options
@@ -120,6 +130,7 @@ export class Cencori {
         this.compute = new ComputeNamespace();
         this.workflow = new WorkflowNamespace();
         this.storage = new StorageNamespace();
+        this.memory = new MemoryClient(this.config);
     }
 
     /**
@@ -214,4 +225,5 @@ export type { AINamespace } from './ai';
 export type { ComputeNamespace } from './compute';
 export type { WorkflowNamespace } from './workflow';
 export type { StorageNamespace } from './storage';
+export type { MemoryClient } from './memory';
 

@@ -74,6 +74,7 @@ export { AINamespace, type StreamChunk } from './ai';
 export { ComputeNamespace } from './compute';
 export { WorkflowNamespace } from './workflow';
 export { StorageNamespace } from './storage';
+export { MemoryClient } from './memory';
 
 // Default export for convenience
 export { Cencori as default } from './cencori';

@@ -9,6 +9,7 @@ export default defineConfig({
         'compute/index': 'src/compute/index.ts',
         'workflow/index': 'src/workflow/index.ts',
         'storage/index': 'src/storage/index.ts',
+        'memory/index': 'src/memory/index.ts',
     },
     format: ['cjs', 'esm'],
     dts: true,
