@@ -1,13 +1,3 @@
-/**
- * Image Generation API Route
- * 
- * POST /api/ai/images/generate
- * 
- * Generates images using AI models:
- * - OpenAI: GPT Image 1.5, DALL-E 3, DALL-E 2
- * - Google: Gemini 3 Pro Image (Nano Banana Pro)
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
