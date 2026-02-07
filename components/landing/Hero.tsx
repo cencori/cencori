@@ -21,7 +21,6 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                     <Link href="/changelog" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
                         <span className="mr-2">Try AI Gateway for free.</span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
                 </div>
 
@@ -39,7 +38,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                 <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
                     <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
                         <Button size="default" className="h-7 px-3 text-[11px] font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"} <ArrowRight className="ml-1.5 h-3 w-3" />
+                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                         </Button>
                     </Link>
                     <Link href="/docs">
