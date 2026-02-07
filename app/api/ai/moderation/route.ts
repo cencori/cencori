@@ -1,12 +1,3 @@
-/**
- * Content Moderation API Route
- * 
- * POST /api/ai/moderation
- * 
- * Checks text for potentially harmful content using OpenAI's moderation API.
- * Can also use Cencori's built-in safety scanning.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
