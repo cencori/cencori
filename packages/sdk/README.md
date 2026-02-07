@@ -55,6 +55,72 @@ console.log(response.content);
 console.log(response.usage); // { promptTokens, completionTokens, totalTokens }
 ```
 
+### Multimodal (Image Input)
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{
+    role: 'user',
+    content: [
+      { type: 'text', text: 'What is in this image?' },
+      { type: 'image_url', image_url: { url: 'https://example.com/image.jpg' } }
+    ]
+  }]
+});
+```
+
+### Tool Usage (Function Calling)
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the weather in Tokyo?' }],
+  tools: [{
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: 'Get the current weather for a location',
+      parameters: {
+        type: 'object',
+        properties: { location: { type: 'string' } },
+        required: ['location']
+      }
+    }
+  }]
+});
+
+if (response.toolCalls) {
+  console.log(response.toolCalls); // [{ function: { name: 'get_weather', arguments: '{"location":"Tokyo"}' } }]
+}
+```
+
+### Structured Output (Object Generation)
+
+```typescript
+interface UserProfile {
+  name: string;
+  age: number;
+  interests: string[];
+}
+
+const response = await cencori.ai.generateObject<UserProfile>({
+  model: 'gpt-4o',
+  prompt: 'Generate a fictional user profile',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      age: { type: 'number' },
+      interests: { type: 'array', items: { type: 'string' } }
+    },
+    required: ['name', 'age', 'interests']
+  }
+});
+
+console.log(response.object); // { name: 'Alice', age: 28, interests: ['hiking'] }
+```
+
 ### Embeddings
 
 ```typescript
@@ -64,6 +130,19 @@ const response = await cencori.ai.embeddings({
 });
 
 console.log(response.embeddings[0]); // [0.1, 0.2, ...]
+```
+
+### Image Generation
+
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: 'A futuristic city at sunset with flying cars',
+  model: 'dall-e-3',
+  size: '1024x1024',
+  quality: 'hd'
+});
+
+console.log(response.images[0].url); // https://...
 ```
 
 ## Framework Integrations
