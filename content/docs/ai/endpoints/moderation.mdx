@@ -1,0 +1,115 @@
+---
+title: "Moderation Endpoint"
+description: "Content safety filtering and policy compliance."
+section: "AI Endpoints"
+order: 5
+---
+
+Check content for policy violations before or after AI generation.
+
+## Basic Request
+
+```typescript
+const response = await cencori.ai.moderation({
+  input: 'Text to check for policy violations'
+});
+
+if (response.flagged) {
+  console.log('Content flagged:', response.categories);
+}
+```
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `input` | string \| string[] | Yes | Text to moderate |
+| `model` | string | No | 'text-moderation-latest' |
+
+## Response
+
+```typescript
+{
+  id: 'modr-...',
+  model: 'text-moderation-latest',
+  results: [
+    {
+      flagged: false,
+      categories: {
+        hate: false,
+        'hate/threatening': false,
+        harassment: false,
+        'self-harm': false,
+        'self-harm/intent': false,
+        'self-harm/instructions': false,
+        sexual: false,
+        'sexual/minors': false,
+        violence: false,
+        'violence/graphic': false
+      },
+      categoryScores: {
+        hate: 0.00001,
+        harassment: 0.00002,
+        violence: 0.00003
+        // ...
+      }
+    }
+  ]
+}
+```
+
+## Categories
+
+| Category | Description |
+|----------|-------------|
+| hate | Hateful content |
+| harassment | Harassing content |
+| self-harm | Self-harm content |
+| sexual | Sexual content |
+| violence | Violent content |
+
+## HTTP API
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/moderation \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "Text to moderate"
+  }'
+```
+
+## Use Cases
+
+### Pre-Generation Filtering
+
+```typescript
+async function safeGenerate(userMessage: string) {
+  const modResult = await cencori.ai.moderation({ input: userMessage });
+  
+  if (modResult.results[0].flagged) {
+    return 'Sorry, I cannot process this request.';
+  }
+
+  return cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: userMessage }]
+  });
+}
+```
+
+### Post-Generation Filtering
+
+```typescript
+const response = await cencori.ai.chat({ ... });
+
+const modResult = await cencori.ai.moderation({
+  input: response.content
+});
+
+if (modResult.results[0].flagged) {
+  return 'Response filtered for policy compliance.';
+}
+
+return response.content;
+```

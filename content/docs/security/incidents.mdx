@@ -1,0 +1,130 @@
+---
+title: "Security Incidents"
+description: "Understand, monitor, and respond to security incidents detected by Cencori."
+section: "Security"
+order: 6
+---
+
+## What are Security Incidents?
+
+A security incident is any event where Cencori detects suspicious, malicious, or policy-violating activity in an AI request or response. All incidents are logged for review and compliance.
+
+## Incident Types
+
+| Type | Description | Default Action |
+|------|-------------|----------------|
+| **PII Detection** | Personal data found in prompt | Block |
+| **Prompt Injection** | Attempt to manipulate AI behavior | Block |
+| **Content Filter** | Harmful content detected | Block |
+| **Rate Limit** | Usage quota exceeded | Block |
+| **Suspicious Pattern** | Unusual usage detected | Log |
+
+## Severity Levels
+
+### <span className="text-yellow-500">Low</span>
+Minor policy violations or potential false positives. Review periodically.
+
+### <span className="text-orange-500">Medium</span>
+Clear policy violations but not urgent. Review weekly.
+
+### <span className="text-red-500">High</span>
+Serious violations like prompt injection attempts. Review immediately.
+
+### <span className="text-purple-500">Critical</span>
+Potential security breaches or coordinated attacks. Investigate urgently.
+
+## Viewing Incidents in Dashboard
+
+1. Navigate to your project dashboard
+2. Click "Security" in the sidebar
+3. View the incidents list with:
+   - Incident ID
+   - Type and severity
+   - Timestamp
+   - User/API key info
+4. Click any incident to view full details
+
+## Incident Details
+
+Each incident record contains:
+- **Incident ID:** Unique identifier for tracking
+- **Timestamp:** Exact time of detection
+- **Type:** PII, prompt injection, etc.
+- **Severity:** Low, medium, high, critical
+- **Request Context:** Model, user ID, project
+- **Detection Details:** What triggered the incident
+- **Action Taken:** Blocked, logged, or allowed
+- **Redacted Prompt:** The input (with PII removed)
+
+## Recommended Response Actions
+
+### For Low Severity:
+- Review monthly
+- Look for patterns
+- Adjust filter sensitivity if needed
+
+### For Medium Severity:
+- Review weekly
+- Educate users if accidental
+- Consider user warnings
+
+### For High/Critical Severity:
+- Investigate immediately
+- Identify the user/source
+- Consider account suspension
+- Review security policies
+
+## Incident Trends
+
+The Security dashboard shows trends over time:
+- Incidents per day/week/month
+- Breakdown by type
+- Severity distribution
+- Top users/API keys flagged
+- Geographic distribution (if available)
+
+## Accessing Incidents via API
+
+Fetch incidents programmatically for custom alerting:
+
+```typescript
+// GET /api/projects/{projectId}/incidents
+const response = await fetch(
+  'https://api.cencori.com/v1/projects/proj_123/incidents?severity=high',
+  {
+    headers: {
+      'Authorization': `Bearer ${CENCORI_API_KEY}`
+    }
+  }
+);
+
+const { incidents } = await response.json();
+
+incidents.forEach(incident => {
+  console.log(`[${incident.severity}] ${incident.type} at ${incident.timestamp}`);
+  
+  if (incident.severity === 'critical') {
+    // Send alert to Slack, PagerDuty, etc.
+    sendAlert(incident);
+  }
+});
+```
+
+## Compliance and Audit Trails
+
+Security incidents provide audit trails for compliance:
+- **SOC 2:** Demonstrate security monitoring and incident response
+- **GDPR:** Proof of data protection measures
+- **HIPAA:** PHI access logging
+- **ISO 27001:** Information security management
+
+Export incident logs for auditor review in CSV or JSON format.
+
+## Best Practices
+
+- Review high/critical incidents within 24 hours.
+- Set up email/Slack alerts for critical incidents.
+- Document your incident response process.
+- Train team members on recognizing attack patterns.
+- Export logs monthly for compliance records.
+- Use incident trends to improve security policies.

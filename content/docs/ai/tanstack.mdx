@@ -1,0 +1,93 @@
+---
+title: "TanStack AI"
+description: "Integration with TanStack AI for React, Vue, and Solid. Framework-agnostic adapter."
+section: "AI"
+order: 5
+---
+
+TanStack AI provides framework-agnostic primitives for building AI applications. Cencori integrates as a backend adapter.
+
+## Installation
+
+```bash
+npm install @tanstack/ai cencori
+```
+
+## Setup
+
+Create the Cencori adapter:
+
+```typescript
+import { createCencoriAdapter } from 'cencori/tanstack';
+
+const adapter = createCencoriAdapter({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+## Basic Usage
+
+```typescript
+import { generateText } from '@tanstack/ai';
+
+const result = await generateText({
+  adapter,
+  model: 'gpt-4o',
+  prompt: 'Write a haiku about coding',
+});
+
+console.log(result.text);
+```
+
+## Streaming
+
+```typescript
+import { streamText } from '@tanstack/ai';
+
+const stream = await streamText({
+  adapter,
+  model: 'claude-opus-4',
+  prompt: 'Explain machine learning',
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk);
+}
+```
+
+## React Integration
+
+```tsx
+import { useChat } from '@tanstack/ai/react';
+
+function ChatComponent() {
+  const { messages, input, setInput, send } = useChat({
+    adapter,
+    model: 'gpt-4o',
+  });
+
+  return (
+    <div>
+      {messages.map((m, i) => (
+        <div key={i}>{m.role}: {m.content}</div>
+      ))}
+      <input 
+        value={input} 
+        onChange={(e) => setInput(e.target.value)} 
+      />
+      <button onClick={() => send()}>Send</button>
+    </div>
+  );
+}
+```
+
+## Multi-Provider Support
+
+Switch between any supported provider:
+
+```typescript
+// Use different models with the same adapter
+await generateText({ adapter, model: 'gpt-4o', prompt: '...' });
+await generateText({ adapter, model: 'claude-opus-4', prompt: '...' });
+await generateText({ adapter, model: 'gemini-2.5-pro', prompt: '...' });
+```

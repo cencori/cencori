@@ -1,0 +1,100 @@
+---
+title: "Streaming"
+description: "Real-time token streaming for responsive AI interactions."
+section: "AI"
+order: 8
+---
+
+Streaming provides real-time responses, showing tokens as they're generated rather than waiting for the complete response.
+
+## SDK Streaming
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Tell me a story' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## HTTP Streaming
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/chat \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Tell me a story"}],
+    "stream": true
+  }'
+```
+
+## Stream Events
+
+| Event | Description |
+|-------|-------------|
+| `delta` | Text content chunk |
+| `tool_call` | Tool call request |
+| `usage` | Token usage stats |
+| `done` | Stream complete |
+
+```typescript
+for await (const chunk of stream) {
+  if (chunk.type === 'delta') {
+    console.log('Text:', chunk.delta);
+  } else if (chunk.type === 'tool_call') {
+    console.log('Tool:', chunk.toolCall);
+  } else if (chunk.type === 'usage') {
+    console.log('Usage:', chunk.usage);
+  }
+}
+```
+
+## Abort Streaming
+
+Cancel a stream mid-generation:
+
+```typescript
+const controller = new AbortController();
+
+const stream = cencori.ai.chatStream({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Write a very long essay' }],
+  signal: controller.signal
+});
+
+// Cancel after 2 seconds
+setTimeout(() => controller.abort(), 2000);
+```
+
+## React Integration
+
+```tsx
+'use client';
+
+function StreamingChat() {
+  const [content, setContent] = useState('');
+
+  async function handleSubmit() {
+    const stream = await fetch('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Hello' }),
+    });
+
+    const reader = stream.body?.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader!.read();
+      if (done) break;
+      setContent(prev => prev + decoder.decode(value));
+    }
+  }
+
+  return <div>{content}</div>;
+}
+```

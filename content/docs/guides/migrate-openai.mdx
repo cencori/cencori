@@ -1,0 +1,175 @@
+---
+title: "Migrating from OpenAI"
+description: "Step-by-step guide to migrate your application from OpenAI SDK to Cencori. Get security, logging, and multi-provider support with minimal code changes."
+section: "Guides"
+order: 2
+---
+
+## Why Migrate to Cencori?
+
+If you're currently using the OpenAI SDK directly, switching to Cencori gives you immediate access to:
+
+- **Built-in Security:** Automatic PII detection and prompt injection protection
+- **Complete Logging:** Every request logged with full metadata
+- **Multi-Provider Support:** Switch to Anthropic or Gemini without code changes
+- **Cost Tracking:** Real-time cost monitoring and analytics
+- **Rate Limiting:** Built-in protection against abuse
+
+## Before and After Comparison
+
+### Before (OpenAI SDK)
+
+```typescript
+// before.ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// No built-in security
+// No automatic logging
+// Locked to OpenAI
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### After (Cencori SDK)
+
+```typescript
+// after.ts
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+// Automatic security scanning
+// Request logging built-in
+// Multi-provider support
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+## Migration Steps
+
+### Step 1: Install Cencori SDK
+
+```bash
+npm uninstall openai
+npm install cencori
+```
+
+### Step 2: Get Your Cencori API Key
+Sign up at the [Cencori dashboard](/dashboard), create a project, and generate an API key.
+
+### Step 3: Update Your Code
+
+**Old (OpenAI):**
+```typescript
+import OpenAI from 'openai';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+```
+
+**New (Cencori):**
+```typescript
+import { Cencori } from 'cencori';
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+### Step 4: Update API Calls
+
+**Old:**
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: messages,
+});
+```
+
+**New:**
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: messages,
+});
+```
+
+## API Mapping Reference
+
+| OpenAI SDK | Cencori SDK |
+|------------|-------------|
+| `openai.chat.completions.create()` | `cencori.ai.chat()` |
+| `max_tokens` | `maxTokens` |
+| `stream: true` | `cencori.ai.chatStream()` |
+
+## Migrating Streaming Code
+
+### OpenAI Streaming
+```typescript
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: messages,
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+}
+```
+
+### Cencori Streaming
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'gpt-4o',
+  messages: messages,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+  
+  if (chunk.finish_reason) {
+    console.log('\nDone!');
+  }
+}
+```
+
+## Testing Your Migration
+
+1. Make a simple chat request and verify the response
+2. Check the Cencori dashboard for request logs
+3. Verify security incidents are being detected (if any)
+4. Test streaming if you use it
+5. Monitor costs in the analytics dashboard
+
+## Bonus: Features You Get for Free
+
+### Switch to Anthropic
+Just change the model parameter - no code changes needed:
+
+```typescript
+// Use Claude instead
+const response = await cencori.ai.chat({
+  model: 'claude-3-opus', // Just change this!
+  messages: messages,
+});
+```
+
+### Security Monitoring
+View security incidents in your dashboard - no configuration needed. Cencori automatically detects PII leaks, prompt injection, and harmful content.
+
+### Cost Breakdown
+See exact costs per request, per model, per provider in real-time. Compare costs across different models easily.
+
+## Next Steps
+- [Explore multi-provider support](/docs/concepts/multi-provider)
+- [Learn about security features](/docs/concepts/security)
+- [View your dashboard](/dashboard)

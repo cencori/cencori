@@ -1,0 +1,112 @@
+---
+title: "Cencori SDK"
+description: "The official Cencori SDK for Node.js and TypeScript. Simple, type-safe API for chat, images, embeddings, memory, and more."
+section: "AI"
+order: 3
+---
+
+## Installation
+
+```bash
+npm install cencori
+```
+
+## Initialization
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: 'csk_...',  // or process.env.CENCORI_API_KEY
+});
+```
+
+## Chat Completions
+
+```typescript
+// Basic chat
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Hello!' }
+  ]
+});
+
+console.log(response.content);
+console.log(response.usage); // { prompt_tokens, completion_tokens, total_tokens }
+```
+
+## Streaming
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'claude-opus-4',
+  messages: [{ role: 'user', content: 'Tell me a story' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## Image Generation
+
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: 'A futuristic city at sunset',
+  model: 'gpt-image-1.5',  // or 'dall-e-3', 'imagen-3'
+  size: '1024x1024',
+  quality: 'hd'
+});
+
+console.log(response.images[0].url);
+```
+
+## Embeddings
+
+```typescript
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: 'Hello world'
+});
+
+console.log(response.embeddings[0]); // [0.1, 0.2, ...]
+```
+
+## Memory (Context Store)
+
+```typescript
+// Store a memory
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days',
+  metadata: { category: 'policy' }
+});
+
+// Semantic search
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'what is our refund policy?',
+  limit: 5
+});
+
+// RAG helper
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Refund policy?' }],
+  namespace: 'docs'
+});
+```
+
+## Available Methods
+
+| Method | Description |
+|--------|-------------|
+| `cencori.ai.chat()` | Chat completions |
+| `cencori.ai.chatStream()` | Streaming chat |
+| `cencori.ai.generateImage()` | Image generation |
+| `cencori.ai.embeddings()` | Vector embeddings |
+| `cencori.ai.rag()` | RAG with memory search |
+| `cencori.memory.store()` | Store memory |
+| `cencori.memory.search()` | Semantic search |

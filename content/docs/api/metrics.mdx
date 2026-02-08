@@ -1,0 +1,162 @@
+---
+title: "Metrics API"
+description: "Programmatic access to your project analytics. Retrieve request counts, costs, latency percentiles, and usage breakdowns."
+section: "API Reference"
+order: 1
+---
+
+## Overview
+
+The Metrics API allows you to fetch analytics data for your project via a simple HTTP endpoint. Use it to build custom dashboards, set up external alerting, or integrate with your existing monitoring stack.
+
+- **Request metrics:** Total, success, error, and filtered counts
+- **Cost tracking:** Total spend and average cost per request
+- **Latency percentiles:** Average, P50, P90, and P99 latencies
+- **Usage breakdown:** By provider and model
+
+## Endpoint
+
+```bash
+GET https://api.cencori.com/api/v1/metrics
+```
+
+## Authentication
+
+Authenticate using your project's API key in the `Authorization` header:
+
+```bash
+curl -X GET "https://api.cencori.com/api/v1/metrics?period=24h" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Query Parameters
+
+### `period` (optional)
+The time period to aggregate metrics for. Default: `24h`
+
+| Value | Description |
+|-------|-------------|
+| `1h` | Last hour |
+| `24h` | Last 24 hours |
+| `7d` | Last 7 days |
+| `30d` | Last 30 days |
+| `mtd` | Month to date |
+
+## Response Format
+
+The API returns a JSON object with the following structure:
+
+```json
+{
+  "period": "24h",
+  "start_date": "2026-01-15T00:00:00.000Z",
+  "end_date": "2026-01-16T00:00:00.000Z",
+  "requests": {
+    "total": 1234,
+    "success": 1200,
+    "error": 24,
+    "filtered": 10,
+    "success_rate": 97.24
+  },
+  "cost": {
+    "total_usd": 12.3456,
+    "average_per_request_usd": 0.01
+  },
+  "tokens": {
+    "prompt": 156000,
+    "completion": 48000,
+    "total": 204000
+  },
+  "latency": {
+    "avg_ms": 234,
+    "p50_ms": 180,
+    "p90_ms": 420,
+    "p99_ms": 890
+  },
+  "providers": {
+    "openai": { "requests": 800, "cost_usd": 8.00 },
+    "anthropic": { "requests": 400, "cost_usd": 4.00 }
+  },
+  "models": {
+    "gpt-4o": { "requests": 500, "cost_usd": 5.00 },
+    "gpt-4o-mini": { "requests": 300, "cost_usd": 1.50 },
+    "claude-3-sonnet": { "requests": 400, "cost_usd": 4.00 }
+  }
+}
+```
+
+### Response Fields
+- **period:** The requested time period
+- **start_date / end_date:** ISO timestamps for the period boundaries
+- **requests:** Request counts and success rate
+- **cost:** Total and average cost in USD
+- **tokens:** Token usage breakdown
+- **latency:** Latency statistics in milliseconds
+- **providers:** Breakdown by AI provider
+- **models:** Breakdown by model
+
+## Examples
+
+### cURL
+```bash
+# Get last 24 hours metrics
+curl -X GET "https://api.cencori.com/api/v1/metrics?period=24h" \
+  -H "Authorization: Bearer sk_live_abc123"
+
+# Get month-to-date metrics
+curl -X GET "https://api.cencori.com/api/v1/metrics?period=mtd" \
+  -H "Authorization: Bearer sk_live_abc123"
+```
+
+### JavaScript / TypeScript
+```typescript
+async function getMetrics(period = '24h') {
+  const response = await fetch(
+    `https://api.cencori.com/api/v1/metrics?period=${period}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.CENCORI_API_KEY}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch metrics: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+```
+
+### Python
+```python
+import requests
+import os
+
+def get_metrics(period='24h'):
+    response = requests.get(
+        f'https://api.cencori.com/api/v1/metrics?period={period}',
+        headers={
+            'Authorization': f'Bearer {os.environ["CENCORI_API_KEY"]}'
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
+## Use Cases
+- **Custom dashboards:** Build internal dashboards with your preferred visualization tools
+- **Cost alerting:** Set up alerts when costs exceed thresholds
+- **Performance monitoring:** Track latency trends and identify degradation
+- **Billing integration:** Pull usage data for internal chargebacks
+- **SLA reporting:** Generate reports for success rates and uptime
+
+## Error Responses
+
+| Status | Description |
+|--------|-------------|
+| `401` | Missing or invalid API key |
+| `500` | Internal server error |
+
+## Rate Limits
+The Metrics API has a rate limit of **60 requests per minute** per API key. This is sufficient for most monitoring use cases. If you need higher limits, contact support.

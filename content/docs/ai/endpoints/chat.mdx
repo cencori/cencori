@@ -1,0 +1,85 @@
+---
+title: "Chat Endpoint"
+description: "Conversational AI with streaming, tool calling, and structured output."
+section: "AI Endpoints"
+order: 1
+---
+
+The chat endpoint provides conversational AI capabilities with support for streaming, tool calling, and multiple providers.
+
+## Basic Request
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Hello!' }
+  ]
+});
+
+console.log(response.content);
+```
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Model identifier |
+| `messages` | array | Yes | Conversation messages |
+| `temperature` | number | No | Randomness (0-2) |
+| `maxTokens` | number | No | Maximum output tokens |
+| `stream` | boolean | No | Enable streaming |
+| `tools` | array | No | Available functions |
+
+## Response
+
+```typescript
+{
+  id: 'chatcmpl-...',
+  content: 'Hello! How can I help you today?',
+  model: 'gpt-4o',
+  finishReason: 'stop',
+  usage: {
+    promptTokens: 15,
+    completionTokens: 10,
+    totalTokens: 25
+  },
+  toolCalls: null
+}
+```
+
+## Streaming
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'claude-opus-4',
+  messages: [{ role: 'user', content: 'Tell me a story' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## HTTP API
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/chat \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+## Supported Models
+
+| Provider | Models |
+|----------|--------|
+| OpenAI | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini |
+| Anthropic | claude-opus-4, claude-sonnet-4, claude-3-5-sonnet |
+| Google | gemini-2.5-pro, gemini-2.5-flash |
+| xAI | grok-2, grok-2-vision-1212 |
+| DeepSeek | deepseek-chat, deepseek-reasoner |

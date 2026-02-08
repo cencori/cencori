@@ -1,0 +1,121 @@
+---
+title: "Audit Logs"
+description: "Comprehensive logging of all AI requests and responses for compliance, debugging, and analytics."
+section: "Guides"
+order: 1
+---
+
+## What are Audit Logs?
+
+Audit logs are immutable records of every AI request processed through Cencori. They provide complete traceability for compliance, security investigations, and performance optimization.
+
+## What Gets Logged
+
+Cencori logs a comprehensive set of metadata for every interaction:
+
+### Request Information
+- Complete prompt text
+- Model and parameters (temperature, max_tokens)
+- API key used
+- User/session identifier
+- Timestamp (millisecond precision)
+- IP address
+
+### Response Information
+- AI-generated content
+- Token usage (input/output/total)
+- Cost calculation
+- Latency metrics
+- Provider used
+- Status code (success/error)
+
+### Security Metadata
+- PII detection results
+- Content filter flags
+- Prompt injection score
+- Security incidents linked
+
+## Log Retention
+
+Retention periods vary based on your plan:
+
+| Plan | Retention Period | Export Available |
+|------|------------------|------------------|
+| **Free** | 7 days | No |
+| **Pro** | 30 days | CSV |
+| **Enterprise** | 1 year+ | CSV, JSON, API |
+
+> [!NOTE]
+> After the retention period, logs are permanently deleted. Export important logs before they expire.
+
+## Viewing Logs in Dashboard
+
+1. Navigate to your project in the [dashboard](/dashboard)
+2. Click **"Logs"** in the sidebar
+3. Use filters to narrow results:
+    - Date range
+    - Model
+    - Status (success/error)
+    - API key
+    - Cost range
+4. Click any log entry to view full details
+
+## Searching Logs
+
+Search through logs using full-text search to:
+- Find specific keywords in prompts
+- Identify all requests from a specific user
+- Locate expensive queries (high token usage)
+- Debug failed requests by error message
+
+## Accessing via API
+
+You can fetch logs programmatically using our API:
+
+```typescript
+// fetch-logs.ts
+const response = await fetch(
+  'https://api.cencori.com/v1/projects/proj_123/logs?' +
+  'start_date=2024-01-01&model=gpt-4o&limit=100',
+  {
+    headers: {
+      'Authorization': `Bearer ${CENCORI_API_KEY}`
+    }
+  }
+);
+
+const { logs } = await response.json();
+
+logs.forEach(log => {
+  console.log(`[${log.timestamp}] ${log.model}: ${log.total_tokens} tokens, $${log.cost_usd}`);
+});
+```
+
+## Exporting Logs
+
+Export logs for archival or external analysis:
+
+### CSV Export (Pro+)
+Download as CSV for Excel/Google Sheets analysis. Includes all fields except full prompt text (for PII protection).
+
+### JSON Export (Enterprise)
+Complete log data including prompts and responses. Useful for data warehouses or custom analysis.
+
+### Scheduled Exports (Enterprise)
+Automatically export logs to S3, BigQuery, or Snowflake daily/weekly.
+
+## Compliance Use Cases
+
+- **SOC 2 Compliance:** Demonstrate access controls and monitoring. Auditors can review who accessed what AI models and when.
+- **GDPR Right of Access:** When users request their data, search logs by user ID to find all their AI interactions.
+- **HIPAA Audit Trails:** Track all access to protected health information (PHI) for compliance reporting.
+- **Forensic Investigation:** If a security incident occurs, trace the exact sequence of events using timestamps and request IDs.
+
+## Best Practices
+
+- Export logs monthly for long-term archival
+- Use search to identify expensive or slow queries
+- Review error logs weekly to catch issues early
+- Set up alerts for unusual patterns (cost spikes, error rate increases)
+- Document your log retention policy for compliance
+- Redact sensitive data before sharing logs with third parties

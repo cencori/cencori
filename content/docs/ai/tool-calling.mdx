@@ -1,0 +1,126 @@
+---
+title: "Tool Calling"
+description: "Let AI models call functions in your application."
+section: "AI"
+order: 9
+---
+
+Tool calling allows AI models to request function executions, enabling them to take actions and retrieve real-time information.
+
+## Basic Usage
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the weather in Tokyo?' }],
+  tools: [{
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: 'Get current weather for a location',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string', description: 'City name' },
+          units: { type: 'string', enum: ['celsius', 'fahrenheit'] }
+        },
+        required: ['location']
+      }
+    }
+  }]
+});
+
+if (response.toolCalls) {
+  for (const call of response.toolCalls) {
+    console.log(call.function.name);       // 'get_weather'
+    console.log(call.function.arguments);  // { location: 'Tokyo', units: 'celsius' }
+  }
+}
+```
+
+## Handling Tool Calls
+
+```typescript
+async function handleChat(userMessage: string) {
+  const messages = [{ role: 'user', content: userMessage }];
+  
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages,
+    tools: [weatherTool]
+  });
+
+  if (response.toolCalls) {
+    // Execute each tool call
+    const toolResults = await Promise.all(
+      response.toolCalls.map(async (call) => {
+        const result = await executeFunction(call);
+        return {
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(result)
+        };
+      })
+    );
+
+    // Continue conversation with results
+    const finalResponse = await cencori.ai.chat({
+      model: 'gpt-4o',
+      messages: [...messages, response.message, ...toolResults],
+      tools: [weatherTool]
+    });
+
+    return finalResponse.content;
+  }
+
+  return response.content;
+}
+```
+
+## Multiple Tools
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Book a flight to Tokyo and check the weather' }],
+  tools: [
+    {
+      type: 'function',
+      function: {
+        name: 'book_flight',
+        description: 'Book a flight',
+        parameters: {
+          type: 'object',
+          properties: {
+            destination: { type: 'string' },
+            date: { type: 'string' }
+          }
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        description: 'Get weather',
+        parameters: {
+          type: 'object',
+          properties: {
+            location: { type: 'string' }
+          }
+        }
+      }
+    }
+  ]
+});
+```
+
+## Provider Support
+
+| Provider | Tool Calling | Parallel Tools |
+|----------|--------------|----------------|
+| OpenAI | ✓ | ✓ |
+| Anthropic | ✓ | ✓ |
+| Google | ✓ | ✓ |
+| xAI | ✓ | - |
+| Mistral | ✓ | - |

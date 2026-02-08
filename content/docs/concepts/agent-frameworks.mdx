@@ -1,0 +1,204 @@
+---
+title: "Agent Frameworks"
+description: "Use Cencori with CrewAI, AutoGen, LangChain, and any OpenAI-compatible agent framework."
+section: "Core Concepts"
+order: 6
+---
+
+Cencori works with any AI agent framework out of the box. Just point your base URL to us and get full observability, failover, and security — automatically.
+
+## Why Use Cencori for Agents
+
+AI agents make many LLM calls autonomously. Without proper infrastructure, you lose visibility into what they're doing, can't control costs, and risk outages when providers fail.
+
+Cencori solves this by sitting between your agent and the LLM:
+- **Full observability:** See every request, token count, and cost
+- **Automatic failover:** If OpenAI is down, route to Anthropic
+- **Rate limiting:** Prevent runaway agents from burning your budget
+- **Security scanning:** Block prompt injection and unsafe outputs
+- **Multi-provider:** Use any model from any provider
+
+## How It Works
+
+Cencori exposes an OpenAI-compatible API. Agent frameworks like CrewAI, AutoGen, and LangChain already speak this protocol — they just need a different `base_url`.
+
+> [!IMPORTANT]
+> **Prerequisites**
+> Before using Cencori with agent frameworks, you must add your provider API keys (OpenAI, Anthropic, etc.) in your [Cencori project settings](/dashboard). Cencori routes requests to providers using your keys — we don't have our own models.
+
+> [!TIP]
+> **The Pattern**
+> Set `base_url` to `https://api.cencori.com/v1` and use your Cencori API key. Cencori handles auth, logging, and security, then forwards to your configured provider.
+
+## Supported Frameworks
+
+| Framework | Language | Config Method | Status |
+|-----------|----------|---------------|--------|
+| **CrewAI** | Python | `OPENAI_API_BASE` env var | Works |
+| **AutoGen** | Python | `base_url` in config | Works |
+| **LangChain** | Python/JS | `openai_api_base` | Works |
+| **OmniCoreAgent** | Python | `base_url` in model_config | Works |
+| **OpenAI SDK** | Any | `base_url` parameter | Works |
+
+## CrewAI
+
+CrewAI is a popular framework for building multi-agent systems. Configure it to use Cencori by setting environment variables:
+
+```bash
+# .env
+# Point CrewAI to Cencori
+OPENAI_API_KEY=your_cencori_api_key
+OPENAI_API_BASE=https://api.cencori.com/v1
+
+# Or for specific models
+OPENAI_MODEL_NAME=gpt-4o
+```
+
+```python
+# crew.py
+from crewai import Agent, Task, Crew
+
+# CrewAI will automatically use Cencori via the env vars
+researcher = Agent(
+    role='Research Analyst',
+    goal='Find insights about market trends',
+    verbose=True
+)
+
+task = Task(
+    description='Analyze Q4 2025 AI infrastructure trends',
+    agent=researcher
+)
+
+crew = Crew(agents=[researcher], tasks=[task])
+result = crew.kickoff()
+
+# All LLM calls are logged in your Cencori dashboard!
+```
+
+## AutoGen
+
+Microsoft's AutoGen framework supports custom endpoints through the config:
+
+```python
+# autogen_config.py
+from autogen import AssistantAgent, UserProxyAgent
+
+config_list = [{
+    "model": "gpt-4o",
+    "api_key": "your_cencori_api_key",
+    "base_url": "https://api.cencori.com/v1"
+}]
+
+assistant = AssistantAgent(
+    name="assistant",
+    llm_config={"config_list": config_list}
+)
+
+user_proxy = UserProxyAgent(
+    name="user_proxy",
+    human_input_mode="NEVER"
+)
+
+user_proxy.initiate_chat(
+    assistant,
+    message="Write a Python function to calculate fibonacci"
+)
+
+# Every agent interaction is tracked in Cencori
+```
+
+## LangChain
+
+LangChain supports custom base URLs in the ChatOpenAI class:
+
+### Python Example
+
+```python
+# langchain_agent.py
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain import hub
+
+# Point LangChain to Cencori
+llm = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+
+# Create your agent as usual
+prompt = hub.pull("hwchase17/react")
+agent = create_react_agent(llm, tools=[], prompt=prompt)
+executor = AgentExecutor(agent=agent, tools=[], verbose=True)
+
+result = executor.invoke({"input": "What is the capital of France?"})
+
+# Full observability through Cencori dashboard
+```
+
+### JavaScript/TypeScript Example
+
+```typescript
+// langchain_agent.ts
+import { ChatOpenAI } from "@langchain/openai";
+
+const llm = new ChatOpenAI({
+  modelName: "gpt-4o",
+  openAIApiKey: "your_cencori_api_key",
+  configuration: {
+    baseURL: "https://api.cencori.com/v1"
+  }
+});
+
+const response = await llm.invoke("Hello, how are you?");
+```
+
+## OpenAI SDK (Direct)
+
+Any code using the OpenAI SDK can be pointed to Cencori:
+
+```python
+# openai_direct.py
+from openai import OpenAI
+
+# Just change the base_url - that's it!
+client = OpenAI(
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)
+```
+
+## What You Get
+
+Once your agent is routing through Cencori, you automatically get:
+
+| Feature | Description |
+|---------|-------------|
+| **Full Observability** | Every LLM call logged with tokens, cost, latency, and full request/response. |
+| **Cost Tracking** | Real-time spend tracking per agent, per task, per user. |
+| **Automatic Failover** | If OpenAI is down, automatically route to Anthropic or Gemini. |
+| **Security Scanning** | Block prompt injection, PII leakage, and unsafe outputs. |
+
+## Troubleshooting
+
+### 401 Unauthorized
+Make sure you're using your Cencori API key, not your OpenAI key. Get your key from the [dashboard](/dashboard).
+
+### Model Not Found
+Ensure you have the provider key configured in your [project settings](/docs/concepts/multi-provider).
+
+### Streaming Issues
+Cencori fully supports streaming. Make sure your framework is configured to use `stream=True`.
+
+## Next Steps
+- [Configure security policies for agents](/docs/concepts/security)
+- [Set up rate limits to prevent runaway costs](/docs/concepts/rate-limiting)
+- [Configure automatic failover](/docs/concepts/failover)

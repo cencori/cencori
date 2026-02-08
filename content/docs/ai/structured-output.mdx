@@ -1,0 +1,119 @@
+---
+title: "Structured Output"
+description: "Get type-safe, validated JSON responses from AI models."
+section: "AI"
+order: 10
+---
+
+Structured output ensures AI responses conform to a specific schema, making it easy to parse and use in your application.
+
+## Basic Usage
+
+```typescript
+import { z } from 'zod';
+
+const ProductSchema = z.object({
+  name: z.string(),
+  price: z.number(),
+  category: z.enum(['electronics', 'clothing', 'food']),
+  inStock: z.boolean()
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Generate a product' }],
+  responseFormat: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'product',
+      schema: zodToJsonSchema(ProductSchema)
+    }
+  }
+});
+
+// Response is guaranteed to match schema
+const product = ProductSchema.parse(JSON.parse(response.content));
+console.log(product.name);   // Type-safe access
+console.log(product.price);  // Type: number
+```
+
+## JSON Mode
+
+Simple JSON output without schema validation:
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'List 3 products as JSON' }],
+  responseFormat: { type: 'json_object' }
+});
+
+const data = JSON.parse(response.content);
+```
+
+## Schema Examples
+
+### Array of Objects
+
+```typescript
+const OrdersSchema = z.object({
+  orders: z.array(z.object({
+    id: z.string(),
+    total: z.number(),
+    items: z.array(z.object({
+      name: z.string(),
+      quantity: z.number()
+    }))
+  }))
+});
+```
+
+### Nested Structure
+
+```typescript
+const ReportSchema = z.object({
+  title: z.string(),
+  summary: z.string(),
+  sections: z.array(z.object({
+    heading: z.string(),
+    content: z.string(),
+    subsections: z.array(z.object({
+      heading: z.string(),
+      content: z.string()
+    })).optional()
+  })),
+  metadata: z.object({
+    wordCount: z.number(),
+    readingTime: z.string()
+  })
+});
+```
+
+## Provider Support
+
+| Provider | JSON Mode | JSON Schema |
+|----------|-----------|-------------|
+| OpenAI | ✓ | ✓ |
+| Anthropic | ✓ | - |
+| Google | ✓ | - |
+
+## Error Handling
+
+```typescript
+try {
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: '...' }],
+    responseFormat: {
+      type: 'json_schema',
+      json_schema: { name: 'product', schema: productSchema }
+    }
+  });
+
+  const data = ProductSchema.parse(JSON.parse(response.content));
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.error('Schema validation failed:', error.errors);
+  }
+}
+```

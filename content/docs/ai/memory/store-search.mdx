@@ -1,0 +1,110 @@
+---
+title: "Store & Search"
+description: "Core memory operations for storing and retrieving content."
+section: "AI Memory"
+order: 3
+---
+
+Store and search are the core operations for working with AI Memory.
+
+## Store
+
+Store content with automatic embedding generation:
+
+```typescript
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days',
+  metadata: { category: 'policy' }
+});
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `namespace` | string | Yes | Storage namespace |
+| `content` | string | Yes | Text content |
+| `metadata` | object | No | Custom metadata |
+| `id` | string | No | Custom ID (auto-generated if omitted) |
+
+### Batch Store
+
+```typescript
+await cencori.memory.storeBatch({
+  namespace: 'docs',
+  items: [
+    { content: 'Policy 1...', metadata: { type: 'policy' } },
+    { content: 'Policy 2...', metadata: { type: 'policy' } },
+    { content: 'FAQ 1...', metadata: { type: 'faq' } }
+  ]
+});
+```
+
+## Search
+
+Find relevant content using natural language:
+
+```typescript
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'what is the refund policy?',
+  limit: 5
+});
+
+// Returns:
+// [
+//   { id: '...', content: 'Refund policy...', score: 0.95, metadata: {...} },
+//   { id: '...', content: 'Returns are...', score: 0.82, metadata: {...} }
+// ]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `namespace` | string | Yes | Search namespace |
+| `query` | string | Yes | Search query |
+| `limit` | number | No | Max results (default: 10) |
+| `filter` | object | No | Metadata filter |
+| `threshold` | number | No | Minimum score (0-1) |
+
+### Metadata Filtering
+
+```typescript
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'refund policy',
+  filter: {
+    category: 'policy',
+    version: '2024'
+  }
+});
+```
+
+## Update
+
+```typescript
+await cencori.memory.update({
+  namespace: 'docs',
+  id: 'memory-id',
+  content: 'Updated content...',
+  metadata: { updated: true }
+});
+```
+
+## Delete
+
+```typescript
+// Delete by ID
+await cencori.memory.delete({
+  namespace: 'docs',
+  id: 'memory-id'
+});
+
+// Delete by filter
+await cencori.memory.deleteByFilter({
+  namespace: 'docs',
+  filter: { category: 'deprecated' }
+});
+```

@@ -1,0 +1,154 @@
+---
+title: "Cost Optimization"
+description: "Practical strategies to reduce your AI costs while maintaining quality and performance."
+section: "Guides"
+order: 4
+---
+
+## Understanding AI Costs
+
+AI providers charge based on tokens (words/characters). Costs vary dramatically based on the following factors:
+
+- **Model Size:** GPT-4o costs ~10x more than GPT-3.5 Turbo.
+- **Input vs Output:** Output tokens often cost 2-3x more than input tokens.
+- **Context Window:** Longer conversations accumulate costs quickly as the entire history is sent with each message.
+
+## Strategy 1: Choose the Right Model
+
+Not every task needs the most powerful model. Matching the model to the task complexity is the single most effective way to save money.
+
+| Task Type | Recommended Model | Approx Cost/1M tokens |
+|-----------|-------------------|-----------------------|
+| Simple classification, tagging | GPT-3.5 Turbo / Gemini Flash | $0.50 - $1.50 |
+| Summarization, extraction | Claude 3 Haiku / Gemini Flash | $1.00 - $5.00 |
+| Complex reasoning, analysis | GPT-4o / Claude 3 Sonnet | $5.00 - $15.00 |
+| Critical decisions, legal work | GPT-4 Turbo / Claude 3 Opus | $15.00 - $30.00 |
+
+### Implementation Example: Task Routing
+
+```typescript
+// model-routing.ts
+function selectModel(taskType: string) {
+  switch (taskType) {
+    case 'sentiment':
+      return 'gpt-3.5-turbo'; // Cheap and fast
+    case 'summary':
+      return 'gemini-2.5-flash'; // High performance, low cost
+    case 'creative':
+      return 'claude-3-sonnet'; // Better balance for text
+    default:
+      return 'gpt-4o'; // Reliable general purpose
+  }
+}
+
+const response = await cencori.ai.chat({
+  model: selectModel(taskType),
+  messages: [{ role: 'user', content: prompt }],
+});
+```
+
+## Strategy 2: Minimize Token Usage
+
+### 1. Keep Prompts Concise
+Remove unnecessary instructions and examples from your system prompts.
+
+**❌ BAD: Verbose (120 tokens)**
+```text
+You are a helpful assistant. I would like you to please analyze 
+the following customer feedback and tell me if it's positive, 
+negative, or neutral. Here is the feedback: "${feedback}". 
+Please provide your analysis.
+```
+
+**✅ GOOD: Concise (15 tokens)**
+```text
+Classify sentiment (positive/negative/neutral): "${feedback}"
+```
+
+### 2. Limit Output Tokens
+Use `maxTokens` to prevents runaway costs from unexpectedly long responses.
+
+```typescript
+// Cap output at 150 tokens
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Summarize this article' }],
+  maxTokens: 150, 
+});
+```
+
+### 3. Truncate Long Inputs
+If you're processing large documents, truncate them to the most relevant sections before sending.
+
+## Strategy 3: Cache Repeated Queries
+If your users frequently ask the same questions or process the same data, implement caching to avoid redundant API calls.
+
+```typescript
+// simple-cache.ts
+const cache = new Map<string, string>();
+
+async function getCachedResponse(prompt: string) {
+  if (cache.has(prompt)) {
+    return cache.get(prompt);
+  }
+
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  cache.set(prompt, response.content);
+  return response.content;
+}
+```
+
+## Strategy 4: Batch Multiple Tasks
+Process multiple items in a single request to reduce overhead and stay under rate limits.
+
+```typescript
+// batching.ts
+// ✅ GOOD: 1 API call for multiple items
+const items = ['Item A', 'Item B', 'Item C'];
+const batch = items.map(item => `- ${item}`).join('\n');
+
+const response = await cencori.ai.chat({
+  model: 'gpt-3.5-turbo',
+  messages: [{
+    role: 'user',
+    content: `Classify each item (format: item: classification):\n${batch}`
+  }],
+});
+```
+
+## Strategy 5: Manage Conversation History
+For chatbots, don't send the entire history if only the last few messages are needed for context.
+
+```typescript
+// context-management.ts
+const MAX_HISTORY = 5;
+
+function getRecentMessages(allMessages: Message[]) {
+  return allMessages.slice(-MAX_HISTORY);
+}
+```
+
+## Strategy 6: Monitor Costs in Real-Time
+Cencori tracks costs automatically. Check your analytics dashboard to identify expensive models or usage patterns.
+
+```typescript
+// Every response includes real-time cost
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+
+console.log(`Cost: $${response.cost_usd}`);
+```
+
+## Quick Wins Checklist
+- [x] Use cheaper models (GPT-3.5/Gemini Flash) for classification
+- [x] Set `maxTokens` limits on every request
+- [x] Cache frequently asked questions
+- [x] Batch process multiple small items
+- [x] Truncate long document inputs
+- [x] Monitor daily trends in the Cencori dashboard

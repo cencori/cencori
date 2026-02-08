@@ -1,0 +1,122 @@
+---
+title: "Vercel AI SDK"
+description: "Drop-in integration with Vercel AI SDK. Works with streamText(), generateText(), and useChat()."
+section: "AI"
+order: 4
+---
+
+Cencori integrates seamlessly with Vercel AI SDK. Use the same familiar API with added security, multi-provider routing, and observability.
+
+## Installation
+
+```bash
+npm install ai cencori
+```
+
+## Setup
+
+Create the Cencori provider:
+
+```typescript
+import { createCencoriProvider } from 'cencori/vercel';
+
+const cencori = createCencoriProvider({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+## Text Generation
+
+```typescript
+import { generateText } from 'ai';
+
+const result = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Write a haiku about AI',
+});
+
+console.log(result.text);
+```
+
+## Streaming
+
+```typescript
+import { streamText } from 'ai';
+
+const result = await streamText({
+  model: cencori('claude-opus-4'),
+  prompt: 'Explain quantum computing',
+});
+
+for await (const textPart of result.textStream) {
+  process.stdout.write(textPart);
+}
+```
+
+## Chat (React)
+
+```typescript
+// app/api/chat/route.ts
+import { streamText } from 'ai';
+import { cencori } from '@/lib/cencori';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = await streamText({
+    model: cencori('gpt-4o'),
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+```tsx
+// app/page.tsx
+'use client';
+import { useChat } from 'ai/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+  return (
+    <div>
+      {messages.map(m => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+        </div>
+      ))}
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+      </form>
+    </div>
+  );
+}
+```
+
+## Switching Providers
+
+The power of Cencori is easy provider switching. Just change the model:
+
+```typescript
+// Use OpenAI
+const openai = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Hello',
+});
+
+// Use Anthropic
+const anthropic = await generateText({
+  model: cencori('claude-opus-4'),
+  prompt: 'Hello',
+});
+
+// Use Google
+const google = await generateText({
+  model: cencori('gemini-2.5-flash'),
+  prompt: 'Hello',
+});
+```
+
+All requests are logged, secured, and tracked automatically.

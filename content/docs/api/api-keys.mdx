@@ -1,0 +1,79 @@
+---
+title: "API Keys API"
+description: "Complete API reference for managing API keys programmatically."
+section: "API Reference"
+order: 6
+---
+
+## Overview
+
+The API Keys API allows you to create, list, and revoke API keys for your projects programmatically.
+
+Base URL: `https://api.cencori.com/api/v1`
+
+## List API Keys
+Get all API keys for a project.
+
+### Request
+```bash
+GET /projects/{projectId}/api-keys?environment={environment}
+Query: environment=production|test (optional)
+```
+
+### Response
+```json
+{
+  "keys": [
+    {
+      "id": "key_123",
+      "name": "Production Key",
+      "prefix": "cen_",
+      "environment": "production",
+      "last_used_at": "2024-01-15T12:30:00Z"
+    }
+  ]
+}
+```
+
+## Create API Key
+Generate a new API key for a project.
+
+### Request
+```bash
+POST /projects/{projectId}/api-keys
+Body: { "name": "Production Key", "environment": "production" }
+```
+
+> [!IMPORTANT]
+> The full API key is only shown once during creation. Store it securely!
+
+## Revoke API Key
+Permanently revoke an API key.
+
+### Request
+```bash
+DELETE /projects/{projectId}/api-keys/{keyId}
+```
+
+> [!NOTE]
+> Revoked keys stop working immediately. All requests using the revoked key will return 401 errors.
+
+## Get Usage Stats
+Retrieve usage statistics for a specific API key.
+
+### Request
+```bash
+GET /projects/{projectId}/api-keys/{keyId}/stats
+```
+
+## Error Responses
+- **400:** Missing required parameters
+- **401:** Invalid API key
+- **403:** No permission to manage keys
+- **404:** Project or key doesn't exist
+
+## Best Practices
+- Rotate keys regularly (every 90 days recommended).
+- Use separate keys for different environments.
+- Revoke unused keys immediately.
+- Never commit keys to version control.

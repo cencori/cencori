@@ -1,0 +1,88 @@
+---
+title: "Audio Endpoint"
+description: "Speech-to-text transcription and text-to-speech generation."
+section: "AI Endpoints"
+order: 4
+---
+
+Convert speech to text and text to speech using OpenAI's Whisper and TTS models.
+
+## Transcription (Speech-to-Text)
+
+```typescript
+const response = await cencori.ai.transcribe({
+  file: audioFile,  // File, Blob, or Buffer
+  model: 'whisper-1'
+});
+
+console.log(response.text);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file` | File | Yes | Audio file |
+| `model` | string | Yes | 'whisper-1' |
+| `language` | string | No | Source language |
+| `prompt` | string | No | Context hint |
+| `responseFormat` | string | No | 'json', 'text', 'srt', 'vtt' |
+
+## Text-to-Speech
+
+```typescript
+const response = await cencori.ai.speech({
+  input: 'Hello, welcome to Cencori',
+  model: 'tts-1',
+  voice: 'alloy'
+});
+
+// response.audio is an ArrayBuffer
+const blob = new Blob([response.audio], { type: 'audio/mpeg' });
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `input` | string | Yes | Text to speak |
+| `model` | string | Yes | 'tts-1' or 'tts-1-hd' |
+| `voice` | string | Yes | Voice selection |
+| `speed` | number | No | 0.25 to 4.0 |
+| `responseFormat` | string | No | 'mp3', 'opus', 'aac', 'flac' |
+
+## Available Voices
+
+| Voice | Description |
+|-------|-------------|
+| alloy | Neutral tone |
+| echo | Warm, conversational |
+| fable | Expressive, dramatic |
+| onyx | Deep, authoritative |
+| nova | Friendly, upbeat |
+| shimmer | Soft, calm |
+
+## HTTP API
+
+### Transcription
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/audio/transcriptions \
+  -H "Authorization: Bearer csk_..." \
+  -F file=@audio.mp3 \
+  -F model=whisper-1
+```
+
+### Speech
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/audio/speech \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "Hello world",
+    "model": "tts-1",
+    "voice": "alloy"
+  }' \
+  --output speech.mp3
+```

@@ -1,0 +1,88 @@
+---
+title: "Projects API"
+description: "Complete API reference for managing projects programmatically via REST endpoints."
+section: "API Reference"
+order: 5
+---
+
+## Overview
+
+The Projects API allows you to create, update, and manage projects programmatically. All endpoints require authentication via API key.
+
+Base URL: `https://api.cencori.com/api/v1`
+
+## List Projects
+Get all projects in your organization.
+
+### Request
+```bash
+GET /organizations/{orgSlug}/projects
+Headers: { "Authorization": "Bearer YOUR_API_KEY" }
+```
+
+### Response
+```json
+{
+  "projects": [
+    {
+      "id": "proj_123",
+      "name": "Production API",
+      "slug": "production-api",
+      "status": "active",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+## Create Project
+Create a new project in your organization.
+
+### Request
+```bash
+POST /organizations/{orgSlug}/projects
+Headers: { "Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json" }
+Body: { "name": "My New Project", "visibility": "public" }
+```
+
+### Parameters
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Project name |
+| `description` | string | No | Project description |
+| `visibility` | string | No | `public` or `private` |
+
+## Get Project
+Retrieve details for a specific project.
+
+### Request
+```bash
+GET /organizations/{orgSlug}/projects/{projectSlug}
+```
+
+## Update Project
+Update an existing project.
+
+### Request
+```bash
+PATCH /organizations/{orgSlug}/projects/{projectSlug}
+Body: { "name": "Updated Name" }
+```
+
+## Delete Project
+Permanently delete a project and all associated data.
+
+### Request
+```bash
+DELETE /organizations/{orgSlug}/projects/{projectSlug}
+```
+
+> [!WARNING]
+> This action is irreversible. All API keys, logs, and analytics for this project will be permanently deleted.
+
+## Error Responses
+- **400:** Missing or invalid parameters
+- **401:** Invalid API key
+- **403:** No permission to access project
+- **404:** Project doesn't exist
+- **409:** Project with same name exists

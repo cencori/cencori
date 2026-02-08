@@ -1,0 +1,83 @@
+---
+title: "AI Memory Overview"
+description: "Vector storage for RAG, conversation history, and semantic search."
+section: "AI Memory"
+order: 1
+---
+
+AI Memory provides vector storage for building RAG applications, conversation history, and semantic search.
+
+## Key Features
+
+- **Automatic Embeddings** - Content is embedded automatically when stored
+- **Semantic Search** - Find relevant content using natural language
+- **Namespaces** - Organize memories by project, user, or topic
+- **Metadata Filtering** - Filter search results by custom metadata
+- **RAG Helper** - Built-in retrieval-augmented generation
+
+## Quick Start
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: 'csk_...' });
+
+// Store a memory
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days',
+  metadata: { category: 'policy', version: '2024' }
+});
+
+// Search memories
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'what is the refund policy?',
+  limit: 5
+});
+
+console.log(results[0].content);
+```
+
+## Use Cases
+
+### Knowledge Base RAG
+
+```typescript
+// Store documentation
+await cencori.memory.store({
+  namespace: 'knowledge-base',
+  content: 'Product documentation content...',
+  metadata: { docId: 'doc-123', category: 'product' }
+});
+
+// Query with context
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'How do I reset my password?' }],
+  namespace: 'knowledge-base'
+});
+```
+
+### Conversation History
+
+```typescript
+// Store conversation
+await cencori.memory.store({
+  namespace: `user-${userId}`,
+  content: 'User asked about pricing...',
+  metadata: { sessionId, timestamp: Date.now() }
+});
+
+// Recall relevant context
+const context = await cencori.memory.search({
+  namespace: `user-${userId}`,
+  query: 'What did we discuss about pricing?'
+});
+```
+
+## Documentation
+
+- [Namespaces](/docs/ai/memory/namespaces) - Organize memories
+- [Store & Search](/docs/ai/memory/store-search) - Core operations
+- [RAG](/docs/ai/memory/rag) - Retrieval-augmented generation

@@ -1,0 +1,53 @@
+---
+title: "Web Dashboard"
+description: "Connect your GitHub repositories and run security scans directly from your browser. View scan history, generate changelogs, and manage projects."
+section: "Security"
+order: 2
+---
+
+## Getting Started
+
+1. **Sign in** to your Cencori account at [cencori.com/scan](/scan)
+2. **Connect GitHub** — Click "Import Project" and authorize the Cencori GitHub App
+3. **Select a repository** — Choose which repos to scan from your connected organizations
+4. **Run a scan** — Click "Scan Now" to analyze your codebase for security issues
+
+## Dashboard Features
+
+### Real-Time Scanning
+Watch scan results appear in real-time as files are analyzed. The dashboard uses Server-Sent Events (SSE) to stream results as they're discovered.
+
+### Scan History
+View all previous scans for a project. Compare security scores over time and track your progress toward a cleaner codebase.
+
+### Detailed Issue Reports
+Click on any issue to see the affected file, line number, and matched pattern. Filter by severity (critical, high, medium, low) or type (secrets, PII, routes, vulnerabilities).
+
+### Changelog Generation
+Generate AI-powered changelogs from your commit history. Select a date range and the dashboard will analyze your commits and produce a formatted changelog.
+
+### Project Settings
+Configure scan settings, set up notifications, and manage team access for each project.
+
+## GitHub Integration
+
+The Cencori GitHub App requires the following permissions:
+
+| Permission | Access | Purpose |
+|------------|--------|---------|
+| **Contents** | Read | Read file contents to scan for security issues |
+| **Metadata** | Read | List repositories and basic repo information |
+| **Commit statuses** | Read | Read commit history for changelog generation |
+
+You can revoke access at any time from your GitHub settings → Applications → Installed GitHub Apps.
+
+## Web Dashboard vs CLI
+
+| Feature | Web Dashboard | CLI |
+|---------|---------------|-----|
+| GitHub Integration | Built-in | — |
+| Scan History | Persistent | — |
+| Changelog Generation | UI | Command |
+| AI Auto-Fix | Coming | Available |
+| CI/CD Integration | — | JSON output |
+| Local Files | — (GitHub only) | Any directory |

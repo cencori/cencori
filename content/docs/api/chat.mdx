@@ -1,0 +1,169 @@
+---
+title: "Chat API"
+description: "Complete reference for the Cencori Chat Completions API. Create AI chat interactions with built-in security, logging, and multi-provider support."
+section: "API Reference"
+order: 2
+---
+
+## Overview
+
+The Chat API provides a unified interface to interact with multiple AI providers (OpenAI, Anthropic, Google) through a single endpoint. Every request is automatically secured, logged, and monitored.
+
+- **Unified Interface:** Same API for all providers (OpenAI, Anthropic, Google)
+- **Automatic Security:** Built-in threat detection and PII filtering
+- **Complete Logging:** Every request and response is logged
+- **Cost Tracking:** Token usage and costs calculated automatically
+
+## Basic Usage
+
+Create a chat completion with the Cencori SDK:
+
+```typescript
+import { cencori } from "@/lib/cencori";
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const response = await cencori.chat.completions.create({
+    model: "gpt-4o",
+    messages: messages,
+  });
+
+  return Response.json(response);
+}
+```
+
+## Request Parameters
+
+The `chat.completions.create()` method accepts the following parameters:
+
+### `model` (required)
+The AI model to use. Supported models include:
+- **OpenAI:** `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
+- **Anthropic:** `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`
+- **Google:** `gemini-1.5-pro`, `gemini-1.5-flash`
+
+### `messages` (required)
+An array of message objects representing the conversation history.
+
+```typescript
+messages: [
+  { role: "system", content: "You are a helpful assistant." },
+  { role: "user", content: "What is the capital of France?" }
+]
+```
+Valid roles: `system`, `user`, `assistant`
+
+### `temperature` (optional)
+Controls randomness in responses. Range: 0 to 2. Default: 1.
+- Lower values (0.0-0.3): More focused and deterministic
+- Higher values (1.5-2.0): More creative and random
+
+### `maxTokens` (optional)
+Maximum number of tokens to generate in the response.
+
+### `stream` (optional)
+If true, responses will be streamed back as they're generated. Default: `false`.
+
+### `user` (optional)
+A unique identifier for the end-user. Useful for monitoring, rate limiting, and abuse detection.
+
+## Response Format
+
+The API returns a structured response object:
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 13,
+    "completion_tokens": 7,
+    "total_tokens": 20
+  }
+}
+```
+
+### Response Fields
+- **id:** Unique identifier for this completion
+- **choices:** Array of completion choices
+- **choices[].message:** The generated message with role and content
+- **choices[].finish_reason:** Why generation stopped (`stop`, `length`, `content_filter`)
+- **usage:** Token counts for the request and response
+
+## Streaming Responses
+
+Stream responses in real-time for better user experience:
+
+```typescript
+const stream = await cencori.chat.completions.create({
+  model: "gpt-4o",
+  messages: messages,
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+## Multi-Provider Support
+
+Switch between AI providers by simply changing the model name:
+
+```typescript
+// OpenAI GPT-4o
+const openaiResponse = await cencori.chat.completions.create({
+  model: "gpt-4o",
+  messages: messages,
+});
+
+// Anthropic Claude
+const claudeResponse = await cencori.chat.completions.create({
+  model: "claude-3-opus",
+  messages: messages,
+});
+```
+
+> [!NOTE]
+> All responses have the same format regardless of provider!
+
+## Error Handling
+
+Handle various error scenarios gracefully:
+
+```typescript
+try {
+  const response = await cencori.chat.completions.create({
+    model: "gpt-4o",
+    messages: messages,
+  });
+} catch (error: any) {
+  if (error.status === 403 && error.code === "SECURITY_VIOLATION") {
+    // Request blocked by security (PII, injection, etc.)
+  }
+  
+  if (error.status === 429) {
+    // Rate limit exceeded
+  }
+}
+```
+
+## Best Practices
+- **Set maxTokens:** Prevent unexpectedly long responses and control costs.
+- **Include user IDs:** Enable per-user rate limiting and better analytics.
+- **Handle errors gracefully:** Implement retry logic for transient failures.
+- **Use streaming for chat UIs:** Provide better user experience.
+- **Cache responses:** Reduce costs for repeated queries when appropriate.

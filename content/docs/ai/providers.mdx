@@ -1,0 +1,110 @@
+---
+title: "Providers"
+description: "Supported AI providers and models: OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek, Meta, and more."
+section: "AI"
+order: 6
+---
+
+Cencori supports 14+ AI providers through a unified API. Use any model with a single integration.
+
+## Supported Providers
+
+| Provider | Chat | Images | Embeddings | Audio |
+|----------|------|--------|------------|-------|
+| OpenAI | ✓ | ✓ | ✓ | ✓ |
+| Anthropic | ✓ | - | - | - |
+| Google | ✓ | ✓ | ✓ | - |
+| xAI (Grok) | ✓ | - | - | - |
+| Mistral | ✓ | - | ✓ | - |
+| DeepSeek | ✓ | - | - | - |
+| Meta (Llama) | ✓ | - | - | - |
+| Cohere | - | - | ✓ | - |
+| Perplexity | ✓ | - | - | - |
+| Together AI | ✓ | - | - | - |
+| Groq | ✓ | - | - | - |
+| Fireworks | ✓ | - | - | - |
+| OpenRouter | ✓ | - | - | - |
+| Azure OpenAI | ✓ | ✓ | ✓ | ✓ |
+
+## Chat Models
+
+### OpenAI
+
+```typescript
+await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
+await cencori.ai.chat({ model: 'gpt-4o-mini', messages: [...] });
+await cencori.ai.chat({ model: 'gpt-4-turbo', messages: [...] });
+await cencori.ai.chat({ model: 'o1', messages: [...] });
+await cencori.ai.chat({ model: 'o1-mini', messages: [...] });
+```
+
+### Anthropic
+
+```typescript
+await cencori.ai.chat({ model: 'claude-opus-4', messages: [...] });
+await cencori.ai.chat({ model: 'claude-sonnet-4', messages: [...] });
+await cencori.ai.chat({ model: 'claude-3-5-sonnet', messages: [...] });
+await cencori.ai.chat({ model: 'claude-3-5-haiku', messages: [...] });
+```
+
+### Google
+
+```typescript
+await cencori.ai.chat({ model: 'gemini-2.5-pro', messages: [...] });
+await cencori.ai.chat({ model: 'gemini-2.5-flash', messages: [...] });
+await cencori.ai.chat({ model: 'gemini-2.0-flash', messages: [...] });
+```
+
+### xAI
+
+```typescript
+await cencori.ai.chat({ model: 'grok-2', messages: [...] });
+await cencori.ai.chat({ model: 'grok-2-vision-1212', messages: [...] });
+```
+
+### DeepSeek
+
+```typescript
+await cencori.ai.chat({ model: 'deepseek-chat', messages: [...] });
+await cencori.ai.chat({ model: 'deepseek-reasoner', messages: [...] });
+```
+
+## Image Models
+
+```typescript
+// OpenAI
+await cencori.ai.generateImage({ model: 'gpt-image-1.5', prompt: '...' });
+await cencori.ai.generateImage({ model: 'dall-e-3', prompt: '...' });
+
+// Google
+await cencori.ai.generateImage({ model: 'imagen-3', prompt: '...' });
+```
+
+## Embedding Models
+
+```typescript
+// OpenAI
+await cencori.ai.embeddings({ model: 'text-embedding-3-small', input: '...' });
+await cencori.ai.embeddings({ model: 'text-embedding-3-large', input: '...' });
+
+// Google
+await cencori.ai.embeddings({ model: 'text-embedding-004', input: '...' });
+
+// Cohere
+await cencori.ai.embeddings({ model: 'embed-english-v3.0', input: '...' });
+```
+
+## BYOK (Bring Your Own Keys)
+
+Use your own API keys for direct billing with providers:
+
+```typescript
+const cencori = new Cencori({
+  apiKey: 'csk_...',
+  providers: {
+    openai: { apiKey: 'sk-...' },
+    anthropic: { apiKey: 'sk-ant-...' },
+    google: { apiKey: 'AIza...' },
+  }
+});
+```

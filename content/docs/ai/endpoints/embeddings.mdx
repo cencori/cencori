@@ -1,0 +1,93 @@
+---
+title: "Embeddings Endpoint"
+description: "Generate vector embeddings for semantic search and RAG."
+section: "AI Endpoints"
+order: 3
+---
+
+Generate vector embeddings from text for semantic search, similarity matching, and RAG applications.
+
+## Basic Request
+
+```typescript
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: 'Hello world'
+});
+
+console.log(response.embeddings[0]); // [0.1, 0.2, ...]
+```
+
+## Batch Request
+
+```typescript
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: [
+    'First text to embed',
+    'Second text to embed',
+    'Third text to embed'
+  ]
+});
+
+// response.embeddings is an array of vectors
+console.log(response.embeddings.length); // 3
+```
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Model identifier |
+| `input` | string \| string[] | Yes | Text to embed |
+| `dimensions` | number | No | Output dimensions |
+| `encodingFormat` | string | No | 'float' or 'base64' |
+
+## Response
+
+```typescript
+{
+  embeddings: [
+    [0.1, 0.2, -0.3, ...],
+    [0.4, -0.1, 0.2, ...]
+  ],
+  model: 'text-embedding-3-small',
+  usage: {
+    promptTokens: 15,
+    totalTokens: 15
+  }
+}
+```
+
+## Model Comparison
+
+| Model | Provider | Dimensions | Best For |
+|-------|----------|------------|----------|
+| text-embedding-3-small | OpenAI | 1536 | General purpose |
+| text-embedding-3-large | OpenAI | 3072 | High accuracy |
+| text-embedding-004 | Google | 768 | Multilingual |
+| embed-english-v3.0 | Cohere | 1024 | English text |
+
+## HTTP API
+
+```bash
+curl -X POST https://api.cencori.com/api/ai/embeddings \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "Hello world"
+  }'
+```
+
+## Use with Memory
+
+Embeddings are automatically generated when storing memories:
+
+```typescript
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days'
+  // Embedding generated automatically
+});
+```
