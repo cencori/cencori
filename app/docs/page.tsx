@@ -132,6 +132,16 @@ export default function DocsPage() {
                     <div className="space-y-2 border-b pb-4">
                         <h3 className="text-base font-semibold">1. AI Gateway</h3>
                         <p className="text-sm text-muted-foreground">The secure entryway for all AI requests. Handles multi-provider routing, PII filtering, observability and cost tracking.</p>
+                        <ul className="space-y-1 text-sm text-muted-foreground ml-6 mt-2">
+                            <li className="list-disc"><strong>Chat:</strong> Streaming completions with 14+ providers</li>
+                            <li className="list-disc"><strong>Embeddings:</strong> Vector embeddings (OpenAI, Google, Cohere)</li>
+                            <li className="list-disc"><strong>Images:</strong> GPT Image 1.5, DALL-E 3, Gemini, Imagen 3</li>
+                            <li className="list-disc"><strong>Audio:</strong> Transcriptions (Whisper) and Text-to-Speech</li>
+                            <li className="list-disc"><strong>Moderation:</strong> Content safety classification</li>
+                        </ul>
+                        <Link href="/docs/gateway" className="inline-flex items-center text-sm text-primary hover:underline mt-2">
+                            AI Gateway documentation →
+                        </Link>
                     </div>
                     <div className="space-y-2 border-b pb-4">
                         <h3 className="text-base font-semibold">2. Compute</h3>
@@ -142,8 +152,14 @@ export default function DocsPage() {
                         <p className="text-sm text-muted-foreground">Visual orchestration for multi-step AI pipelines. Chain models, add logic, and implement safety circuit breakers.</p>
                     </div>
                     <div className="space-y-2 border-b pb-4">
-                        <h3 className="text-base font-semibold">4. Data Storage</h3>
-                        <p className="text-sm text-muted-foreground">AI-native memory for your applications. Sync vector embeddings, manage semantic caches, and maintain audit logs.</p>
+                        <h3 className="text-base font-semibold">4. AI Memory (Context Store)</h3>
+                        <p className="text-sm text-muted-foreground">Vector storage for RAG, conversation history, and semantic search with automatic embeddings.</p>
+                        <ul className="space-y-1 text-sm text-muted-foreground ml-6 mt-2">
+                            <li className="list-disc"><strong>Store:</strong> Save content with auto-generated embeddings</li>
+                            <li className="list-disc"><strong>Search:</strong> Semantic similarity search with metadata filters</li>
+                            <li className="list-disc"><strong>RAG:</strong> Built-in retrieval-augmented generation helper</li>
+                            <li className="list-disc"><strong>Dashboard:</strong> Visual namespace management and search testing</li>
+                        </ul>
                     </div>
                     <div className="space-y-2">
                         <h3 className="text-base font-semibold">5. Integration</h3>
@@ -234,6 +250,11 @@ export default function DocsPage() {
                         <p className="text-sm text-muted-foreground leading-relaxed mb-2">
                             Switch between AI providers without changing your application code. Cencori routes to all major providers with built-in failover.
                         </p>
+                        <ul className="space-y-1 text-sm ml-6 mb-4">
+                            <li className="list-disc"><strong>Chat:</strong> OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek, Meta (Llama), and more</li>
+                            <li className="list-disc"><strong>Embeddings:</strong> text-embedding-3-small, text-embedding-3-large</li>
+                            <li className="list-disc"><strong>Images:</strong> GPT Image 1.5, DALL-E 3, Gemini 3 Pro Image, Imagen 3</li>
+                        </ul>
                     </div>
                 </div>
             </div>

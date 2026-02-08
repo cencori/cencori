@@ -134,16 +134,24 @@ console.log(response.embeddings[0]); // [0.1, 0.2, ...]
 
 ### Image Generation
 
+Generate images from text prompts using multiple providers:
+
 ```typescript
 const response = await cencori.ai.generateImage({
   prompt: 'A futuristic city at sunset with flying cars',
-  model: 'dall-e-3',
+  model: 'gpt-image-1.5',  // Best text rendering, top ELO rating
   size: '1024x1024',
   quality: 'hd'
 });
 
 console.log(response.images[0].url); // https://...
 ```
+
+**Supported Models:**
+| Provider | Models | Description |
+|----------|--------|-------------|
+| **OpenAI** | `gpt-image-1.5`, `gpt-image-1`, `dall-e-3`, `dall-e-2` | Text rendering, creative |
+| **Google** | `gemini-3-pro-image`, `imagen-3` | High photorealism |
 
 ## Framework Integrations
 
@@ -205,15 +213,29 @@ await cencori.workflow.trigger('data-enrichment', {
 });
 ```
 
-### Storage
+### Memory (Context Store)
 
 ```typescript
-// 🚧 Coming Soon
-const results = await cencori.storage.vectors.search('query', { 
-  limit: 5 
+// Store a memory with auto-embedding
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days',
+  metadata: { category: 'policy' }
 });
 
-await cencori.storage.knowledge.query('What is our refund policy?');
+// Semantic search
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'what is the refund policy?',
+  limit: 5
+});
+
+// RAG helper
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is our refund policy?' }],
+  namespace: 'docs'
+});
 ```
 
 ## Why Cencori?
