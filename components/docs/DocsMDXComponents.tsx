@@ -18,7 +18,7 @@ export const DocsMDXComponents = {
         <h2
             id={id}
             className={cn(
-                "mt-12 scroll-m-20 border-b border-border/40 pb-2 text-2xl font-semibold tracking-tight first:mt-0",
+                "mt-8 scroll-m-20 border-b border-border/40 pb-1 text-2xl font-semibold tracking-tight first:mt-0",
                 className
             )}
             {...props}
@@ -28,7 +28,7 @@ export const DocsMDXComponents = {
         <h3
             id={id}
             className={cn(
-                "mt-8 scroll-m-20 text-xl font-semibold tracking-tight",
+                "mt-6 scroll-m-20 text-xl font-semibold tracking-tight",
                 className
             )}
             {...props}
@@ -38,7 +38,7 @@ export const DocsMDXComponents = {
         <h4
             id={id}
             className={cn(
-                "mt-6 scroll-m-20 text-lg font-semibold tracking-tight",
+                "mt-4 scroll-m-20 text-lg font-semibold tracking-tight",
                 className
             )}
             {...props}
@@ -51,10 +51,10 @@ export const DocsMDXComponents = {
         />
     ),
     ul: ({ className, ...props }: HTMLAttributes<HTMLUListElement>) => (
-        <ul className={cn("my-4 ml-6 list-disc space-y-2 text-muted-foreground", className)} {...props} />
+        <ul className={cn("my-3 ml-6 list-disc [&>li]:mt-1 text-muted-foreground", className)} {...props} />
     ),
     ol: ({ className, ...props }: HTMLAttributes<HTMLOListElement>) => (
-        <ol className={cn("my-4 ml-6 list-decimal space-y-2 text-muted-foreground", className)} {...props} />
+        <ol className={cn("my-3 ml-6 list-decimal [&>li]:mt-1 text-muted-foreground", className)} {...props} />
     ),
     li: ({ className, ...props }: HTMLAttributes<HTMLLIElement>) => (
         <li className={cn("leading-7", className)} {...props} />
@@ -62,7 +62,7 @@ export const DocsMDXComponents = {
     blockquote: ({ className, ...props }: HTMLAttributes<HTMLQuoteElement>) => (
         <blockquote
             className={cn(
-                "my-6 border-l-4 border-primary/40 pl-4 py-1 italic text-muted-foreground",
+                "my-4 border-l-4 border-primary/40 pl-4 py-1 italic text-muted-foreground",
                 className
             )}
             {...props}
@@ -121,7 +121,7 @@ export const DocsMDXComponents = {
         />
     ),
     table: ({ className, ...props }: HTMLAttributes<HTMLTableElement>) => (
-        <div className="my-6 w-full overflow-x-auto">
+        <div className="my-4 w-full overflow-x-auto">
             <table
                 className={cn("w-full text-sm", className)}
                 {...props}
@@ -156,7 +156,7 @@ export const DocsMDXComponents = {
         />
     ),
     hr: ({ className, ...props }: HTMLAttributes<HTMLHRElement>) => (
-        <hr className={cn("my-8 border-border/40", className)} {...props} />
+        <hr className={cn("my-6 border-border/40", className)} {...props} />
     ),
     strong: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <strong className={cn("font-semibold text-foreground", className)} {...props} />
