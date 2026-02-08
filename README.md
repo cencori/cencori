@@ -187,6 +187,33 @@ for chunk := range stream {
 
 **That's it!** Cencori handles security, logging, and cost tracking automatically.
 
+### 5. AI Memory (Context Store)
+
+Store and search memories for RAG applications:
+
+```typescript
+// Store a memory
+await cencori.memory.store({
+  namespace: 'docs',
+  content: 'Refund policy allows returns within 30 days',
+  metadata: { category: 'policy' }
+});
+
+// Semantic search
+const results = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'what is our refund policy?',
+  limit: 5
+});
+
+// RAG with context
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is our refund policy?' }],
+  namespace: 'docs'
+});
+```
+
 ---
 
 ## Vercel AI SDK Integration
@@ -229,6 +256,26 @@ Access multiple AI providers with one API:
 - **Custom Providers** - Bring your own OpenAI/Anthropic-compatible endpoints
 
 Switch models with a single parameter - no code changes needed.
+
+### **Multi-Provider Image Generation**
+
+Generate images from text prompts across providers:
+
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: "A futuristic city at sunset",
+  model: "gpt-image-1.5",  // or "dall-e-3", "gemini-3-pro-image"
+  size: "1024x1024",
+});
+
+console.log(response.images[0].url);
+```
+
+**Supported Models:**
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | GPT Image 1.5, GPT Image 1, DALL-E 3, DALL-E 2 |
+| **Google** | Gemini 3 Pro Image, Imagen 3 |
 
 ### **Real-Time Streaming**
 
@@ -355,6 +402,18 @@ AI design tools, coding assistants, chatbots, content generators?
 | **Meta** | Llama 4 Maverick, Llama 3.3 70B | ✅ |
 | **+ 7 more** | Groq, Cohere, Perplexity, Together, Qwen, OpenRouter, HuggingFace | ✅ |
 | **Custom** | Any OpenAI/Anthropic compatible | ✅ |
+
+### AI Gateway Endpoints
+
+| Endpoint | Description | Providers |
+|----------|-------------|-----------|
+| `/api/ai/chat` | Chat completions (streaming) | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek |
+| `/api/ai/embeddings` | Vector embeddings | OpenAI, Google, Cohere |
+| `/api/ai/images/generate` | Image generation | OpenAI (GPT Image 1.5, DALL-E), Google (Imagen) |
+| `/api/ai/audio/transcriptions` | Speech-to-text | OpenAI (Whisper) |
+| `/api/ai/audio/speech` | Text-to-speech | OpenAI (TTS-1, TTS-1-HD) |
+| `/api/ai/moderation` | Content moderation | OpenAI |
+| `/api/ai/completions` | Legacy completions | OpenAI |
 
 ---
 

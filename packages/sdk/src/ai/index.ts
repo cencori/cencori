@@ -402,5 +402,202 @@ export class AINamespace {
             provider: data.provider,
         };
     }
+
+    /**
+     * RAG (Retrieval-Augmented Generation) - Chat with automatic memory context
+     * 
+     * Searches your memory namespace for relevant context and includes it
+     * in the prompt automatically. Returns the AI response along with sources.
+     * 
+     * @example
+     * const response = await cencori.ai.rag({
+     *   model: 'gpt-4o',
+     *   messages: [{ role: 'user', content: 'What are our company policies?' }],
+     *   namespace: 'company-docs',
+     *   limit: 5, // number of memories to retrieve
+     * });
+     * console.log(response.message.content);
+     * console.log(response.sources); // retrieved context
+     */
+    async rag(request: RagRequest): Promise<RagResponse> {
+        const response = await fetch(`${this.config.baseUrl}/api/ai/rag`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify({
+                model: request.model,
+                messages: request.messages,
+                namespace: request.namespace,
+                temperature: request.temperature,
+                maxTokens: request.maxTokens,
+                limit: request.limit ?? 5,
+                threshold: request.threshold ?? 0.5,
+                include_sources: request.includeSources ?? true,
+                stream: false,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json() as RagApiResponse;
+
+        return {
+            message: {
+                role: 'assistant',
+                content: data.message.content,
+            },
+            model: data.model,
+            provider: data.provider,
+            usage: {
+                promptTokens: data.usage.prompt_tokens,
+                completionTokens: data.usage.completion_tokens,
+                totalTokens: data.usage.total_tokens,
+            },
+            sources: data.sources?.map(s => ({
+                content: s.content,
+                metadata: s.metadata,
+                similarity: s.similarity,
+            })),
+            latencyMs: data.latency_ms,
+        };
+    }
+
+    /**
+     * Stream RAG responses with automatic memory context
+     * 
+     * @example
+     * for await (const chunk of cencori.ai.ragStream({ model: 'gpt-4o', messages, namespace: 'docs' })) {
+     *   if (chunk.type === 'sources') console.log('Sources:', chunk.sources);
+     *   if (chunk.type === 'content') process.stdout.write(chunk.delta);
+     * }
+     */
+    async *ragStream(request: RagRequest): AsyncGenerator<RagStreamChunk, void, unknown> {
+        const response = await fetch(`${this.config.baseUrl}/api/ai/rag`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify({
+                model: request.model,
+                messages: request.messages,
+                namespace: request.namespace,
+                temperature: request.temperature,
+                maxTokens: request.maxTokens,
+                limit: request.limit ?? 5,
+                threshold: request.threshold ?? 0.5,
+                include_sources: request.includeSources ?? true,
+                stream: true,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+        }
+
+        if (!response.body) {
+            throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    if (!line.startsWith('data: ')) continue;
+
+                    const data = line.slice(6);
+
+                    if (data === '[DONE]') {
+                        return;
+                    }
+
+                    try {
+                        const chunk = JSON.parse(data) as RagStreamChunk;
+                        yield chunk;
+                    } catch {
+                        // Skip malformed JSON
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+    }
 }
 
+// RAG Types
+export interface RagRequest {
+    model: string;
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    namespace: string;
+    temperature?: number;
+    maxTokens?: number;
+    limit?: number;
+    threshold?: number;
+    includeSources?: boolean;
+}
+
+export interface RagResponse {
+    message: { role: string; content: string };
+    model: string;
+    provider: string;
+    usage: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+    };
+    sources?: Array<{
+        content: string;
+        metadata: Record<string, unknown>;
+        similarity: number;
+    }>;
+    latencyMs: number;
+}
+
+export interface RagStreamChunk {
+    type: 'sources' | 'content';
+    delta?: string;
+    finish_reason?: string;
+    sources?: Array<{
+        content: string;
+        metadata: Record<string, unknown>;
+        similarity: number;
+    }>;
+}
+
+interface RagApiResponse {
+    message: { role: string; content: string };
+    model: string;
+    provider: string;
+    usage: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+    };
+    sources?: Array<{
+        content: string;
+        metadata: Record<string, unknown>;
+        similarity: number;
+    }>;
+    latency_ms: number;
+}

@@ -451,6 +451,312 @@ await cencori.ai.chat({ model: "gemini-2.5-flash", messages });
 
 All responses have the same format regardless of provider!
 
+## Image Generation
+
+Generate images from text prompts using multiple AI providers with a unified API.
+
+### Supported Models
+
+| Provider | Model | Description |
+|----------|-------|-------------|
+| **OpenAI** | `gpt-image-1.5` | Best text rendering, top ELO rating |
+| **OpenAI** | `gpt-image-1` | ChatGPT image generation |
+| **OpenAI** | `dall-e-3` | High quality, creative |
+| **OpenAI** | `dall-e-2` | Fast, cost-effective |
+| **Google** | `gemini-3-pro-image` | High photorealism, fast |
+| **Google** | `imagen-3` | Google Imagen 3 |
+
+### Basic Usage
+
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: "A futuristic city at sunset with flying cars",
+  model: "gpt-image-1.5",  // or "dall-e-3", "gemini-3-pro-image"
+  size: "1024x1024",
+  quality: "hd"
+});
+
+console.log(response.images[0].url);  // URL to the generated image
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `prompt` | string | Yes | Text description of the image |
+| `model` | string | No | Image model (default: dall-e-3) |
+| `size` | string | No | Image size (1024x1024, 1792x1024, etc.) |
+| `n` | number | No | Number of images (1-4, varies by model) |
+| `quality` | string | No | 'standard' or 'hd' (DALL-E 3/GPT Image only) |
+| `style` | string | No | 'vivid' or 'natural' (DALL-E 3 only) |
+| `responseFormat` | string | No | 'url' or 'b64_json' |
+
+### Response Format
+
+```typescript
+{
+  images: [
+    {
+      url: "https://...",        // Image URL (if responseFormat='url')
+      b64Json: "...",            // Base64 data (if responseFormat='b64_json')
+      revisedPrompt: "..."       // Model's revised prompt
+    }
+  ],
+  model: "gpt-image-1.5",
+  provider: "openai"
+}
+```
+
+## Embeddings
+
+Generate vector embeddings for text using multiple providers.
+
+### Supported Models
+
+| Provider | Model | Dimensions | Description |
+|----------|-------|------------|-------------|
+| **OpenAI** | `text-embedding-3-large` | 3072 | Best quality |
+| **OpenAI** | `text-embedding-3-small` | 1536 | Fast and efficient |
+| **OpenAI** | `text-embedding-ada-002` | 1536 | Legacy model |
+| **Google** | `text-embedding-004` | 768 | Google embedding model |
+| **Cohere** | `embed-english-v3.0` | 1024 | English optimized |
+| **Cohere** | `embed-multilingual-v3.0` | 1024 | Multilingual support |
+
+### Usage
+
+```typescript
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: 'Hello world'
+});
+
+console.log(response.embeddings[0]); // [0.1, 0.2, ...]
+```
+
+### API Request
+
+```typescript
+POST /api/ai/embeddings
+Headers: { "CENCORI_API_KEY": "csk_..." }
+Body: {
+  "model": "text-embedding-3-small",
+  "input": "Hello world",
+  "dimensions": 1536  // optional, for variable dimension models
+}
+```
+
+## Audio
+
+Cencori supports audio transcription and text-to-speech.
+
+### Transcriptions
+
+Convert audio to text using Whisper models.
+
+```typescript
+POST /api/ai/audio/transcriptions
+Headers: { "CENCORI_API_KEY": "csk_..." }
+Body: FormData with 'file' (audio file) and optional 'model', 'language', 'prompt'
+```
+
+### Text-to-Speech
+
+Generate audio from text.
+
+```typescript
+POST /api/ai/audio/speech
+Headers: { "CENCORI_API_KEY": "csk_..." }
+Body: {
+  "input": "Hello, welcome to Cencori!",
+  "model": "tts-1",  // or "tts-1-hd"
+  "voice": "alloy"   // alloy, echo, fable, onyx, nova, shimmer
+}
+```
+
+## Moderation
+
+Detect harmful content in text before it reaches your application.
+
+### Supported Models
+
+| Model | Description |
+|-------|-------------|
+| `text-moderation-latest` | Latest moderation model |
+| `text-moderation-stable` | Stable moderation model |
+| `omni-moderation-latest` | Multimodal (text + images) |
+
+### Usage
+
+```typescript
+POST /api/ai/moderation
+Headers: { "CENCORI_API_KEY": "csk_..." }
+Body: {
+  "input": "Text to check for harmful content",
+  "model": "text-moderation-latest"
+}
+```
+
+### Categories Detected
+
+- hate, hate/threatening
+- harassment, harassment/threatening
+- self-harm, self-harm/intent, self-harm/instructions
+- sexual, sexual/minors
+- violence, violence/graphic
+
+### Response
+
+```typescript
+{
+  "id": "modr-...",
+  "model": "text-moderation-latest",
+  "results": [{
+    "flagged": false,
+    "categories": { "hate": false, "violence": false, ... },
+    "category_scores": { "hate": 0.001, "violence": 0.002, ... }
+  }]
+}
+```
+
+## AI Memory (Context Store)
+
+Vector storage for RAG, conversation history, and semantic search. Store and retrieve memories with automatic embedding generation.
+
+### Quick Start
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: 'csk_...' });
+
+// Store a memory
+await cencori.memory.store({
+  namespace: 'company-docs',
+  content: 'Our refund policy allows returns within 30 days',
+  metadata: { category: 'policy', source: 'handbook' }
+});
+
+// Semantic search
+const results = await cencori.memory.search({
+  namespace: 'company-docs',
+  query: 'what is our return policy?',
+  limit: 5
+});
+
+console.log(results.results[0].content);
+// "Our refund policy allows returns within 30 days"
+```
+
+### SDK Methods
+
+| Method | Description |
+|--------|-------------|
+| `memory.store(options)` | Store a memory with auto-embedding |
+| `memory.search(options)` | Semantic search across memories |
+| `memory.get(id)` | Get memory by ID |
+| `memory.delete(id)` | Delete a memory |
+| `memory.storeBatch(namespace, items)` | Store multiple memories |
+| `memory.createNamespace(options)` | Create a namespace |
+| `memory.listNamespaces()` | List all namespaces |
+
+### Store Memory
+
+```typescript
+await cencori.memory.store({
+  namespace: 'conversations',
+  content: 'User asked about pricing plans',
+  metadata: {
+    userId: 'user_123',
+    sessionId: 'sess_456',
+    timestamp: new Date().toISOString()
+  },
+  expiresAt: '2024-12-31T23:59:59Z' // optional TTL
+});
+```
+
+### Search Memories
+
+```typescript
+const results = await cencori.memory.search({
+  namespace: 'conversations',
+  query: 'what did we discuss about pricing?',
+  limit: 5,           // max results
+  threshold: 0.7,     // similarity threshold (0-1)
+  filter: {           // metadata filters
+    userId: 'user_123'
+  }
+});
+
+// Response format
+{
+  results: [
+    {
+      id: 'mem_...',
+      content: 'User asked about pricing plans',
+      metadata: { userId: 'user_123', ... },
+      similarity: 0.92,
+      createdAt: '2024-01-15T...'
+    }
+  ],
+  query: 'what did we discuss about pricing?',
+  namespace: 'conversations',
+  count: 1,
+  latencyMs: 45
+}
+```
+
+### RAG (Retrieval-Augmented Generation)
+
+Combine memory search with AI chat for context-aware responses:
+
+```typescript
+// Method 1: Use the RAG helper
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is our refund policy?' }],
+  namespace: 'company-docs',
+  limit: 5
+});
+
+console.log(response.message.content);
+console.log(response.sources); // retrieved memories
+
+// Method 2: Manual RAG
+const memories = await cencori.memory.search({
+  namespace: 'company-docs',
+  query: 'refund policy'
+});
+
+const context = memories.results.map(m => m.content).join('\n\n');
+
+const chat = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: `Use this context:\n${context}` },
+    { role: 'user', content: 'What is our refund policy?' }
+  ]
+});
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/memory/namespaces` | GET | List namespaces |
+| `/api/memory/namespaces` | POST | Create namespace |
+| `/api/memory/store` | POST | Store memory |
+| `/api/memory/search` | POST | Search memories |
+| `/api/memory/{id}` | GET | Get memory |
+| `/api/memory/{id}` | DELETE | Delete memory |
+
+### Dashboard
+
+Manage memories visually at `/dashboard/[org]/[project]/memory`:
+- Create and manage namespaces
+- Browse memories with pagination
+- Test semantic search
+- View memory metadata and similarity scores
+
 ## Agent Frameworks
 
 Cencori works with any OpenAI-compatible agent framework. Just point your `base_url` to Cencori:

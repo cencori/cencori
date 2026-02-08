@@ -1,0 +1,66 @@
+# Sample Documentation for Memory Testing
+
+## Introduction to Cencori
+
+Cencori is a comprehensive AI infrastructure platform designed for developers building production AI applications. It provides a unified API layer that connects your application to multiple LLM providers including OpenAI, Anthropic, and Google.
+
+## Key Features
+
+### AI Gateway
+The AI Gateway routes your requests to the best available model. It handles authentication, rate limiting, and automatic failover between providers. If one provider is down, your requests automatically route to an alternative.
+
+### AI Memory
+AI Memory is a vector database service that stores and retrieves information using semantic search. Unlike traditional keyword search, semantic search understands meaning. You can search for "What UI theme does the user prefer?" and find content like "User likes dark mode" even though they share no common words.
+
+### Content Moderation
+Built-in content moderation scans both inputs and outputs for harmful content. It supports custom rules for blocking, masking, or redacting sensitive information like PII, credentials, or proprietary data.
+
+### Usage Analytics
+Track every API call with detailed analytics. See which models cost the most, which queries are slowest, and how usage trends over time. Set up alerts for unusual patterns.
+
+## Getting Started
+
+1. Sign up at cencori.com
+2. Create an organization and project
+3. Generate an API key
+4. Install the SDK: npm install @cencori/sdk
+5. Initialize and start making requests
+
+## SDK Quick Reference
+
+```javascript
+import { Cencori } from '@cencori/sdk';
+
+const cencori = new Cencori({
+    apiKey: process.env.CENCORI_API_KEY
+});
+
+// Chat completion
+const response = await cencori.chat.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: "Hello!" }]
+});
+
+// Store memory
+await cencori.memory.store({
+    namespace: "user-prefs",
+    content: "User prefers dark mode"
+});
+
+// Search memory
+const results = await cencori.memory.search({
+    namespace: "user-prefs",
+    query: "What theme settings?"
+});
+```
+
+## Pricing
+
+Cencori offers three tiers:
+- Free: 100K tokens/month, 10K memories
+- Pro: 10M tokens/month, 100K memories, priority support
+- Enterprise: Unlimited, SLA, dedicated support, custom features
+
+## Contact
+
+For questions, reach out to support@cencori.com or visit our documentation at cencori.com/docs.
