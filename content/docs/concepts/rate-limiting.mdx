@@ -1,0 +1,185 @@
+---
+title: "Rate Limiting"
+description: "Understand Cencori's rate limiting system, how to handle limits, and best practices for high-volume applications."
+section: "Core Concepts"
+order: 5
+---
+
+## What is Rate Limiting?
+
+Rate limiting controls how many requests you can make in a given time period. This protects the platform from abuse and ensures fair usage for all users.
+
+Cencori enforces rate limits at multiple levels: per project, per user, and per organization.
+
+## Default Rate Limits
+
+| Tier | Requests/Minute | Requests/Day | Burst Limit |
+|------|-----------------|--------------|-------------|
+| **Free** | 10 | 1,000 | 20 |
+| **Starter** | 60 | 10,000 | 100 |
+| **Pro** | 300 | 50,000 | 500 |
+| **Enterprise** | Custom | Custom | Custom |
+
+> [!NOTE]
+> Burst limits allow short spikes above the per-minute limit, useful for handling traffic bursts.
+
+## Rate Limit Headers
+
+Every response includes headers showing your current rate limit status:
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-RateLimit-Limit` | Max requests per window | 60 |
+| `X-RateLimit-Remaining` | Requests left in window | 45 |
+| `X-RateLimit-Reset` | Unix timestamp when limit resets | 1701234567 |
+| `Retry-After` | Seconds to wait (when limited) | 45 |
+
+## Handling Rate Limit Errors
+
+When you exceed the rate limit, you'll receive a `429 Too Many Requests` error:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "status": 429,
+  "retryAfter": 45
+}
+```
+
+### Exponential Backoff Implementation
+
+```typescript
+async function makeRequestWithRetry(
+  messages: any[],
+  maxRetries = 3
+): Promise<any> {
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      const response = await cencori.ai.chat({
+        model: 'gpt-4o',
+        messages,
+      });
+      return response;
+    } catch (error: any) {
+      if (error.status === 429) {
+        retries++;
+        
+        if (retries >= maxRetries) {
+          throw error; // Max retries reached
+        }
+        
+        // Exponential backoff: 2^retries seconds
+        const waitTime = Math.pow(2, retries) * 1000;
+        console.log(`Rate limited, waiting ${waitTime}ms...`);
+        
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        throw error; // Not a rate limit error
+      }
+    }
+  }
+}
+```
+
+## Checking Rate Limits Before Requests
+
+```typescript
+async function makeSmartRequest(messages: any[]) {
+  const response = await fetch('https://api.cencori.com/v1/ai/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'CENCORI_API_KEY': process.env.CENCORI_API_KEY!,
+    },
+    body: JSON.stringify({ model: 'gpt-4o', messages }),
+  });
+
+  // Check rate limit headers
+  const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0');
+  const resetTime = parseInt(response.headers.get('X-RateLimit-Reset') || '0');
+
+  if (remaining < 5) {
+    console.warn(`Only ${remaining} requests remaining!`);
+    console.warn(`Resets at: ${new Date(resetTime * 1000).toISOString()}`);
+    // Maybe slow down or queue requests
+  }
+
+  return response.json();
+}
+```
+
+## Best Practices
+
+1. **Implement Exponential Backoff:** Always retry rate-limited requests with exponential backoff rather than aggressive retries.
+2. **Monitor Headers:** Track `X-RateLimit-Remaining` to know when you're approaching limits.
+3. **Use Request Queues:** Queue requests and process them at a controlled rate to stay under limits.
+4. **Cache Responses:** Cache identical requests to reduce API calls and stay under limits.
+5. **Distribute Load:** If hitting limits, consider using multiple projects or upgrading tier.
+
+## Request Queue Implementation
+
+```typescript
+class RequestQueue {
+  private queue: Array<() => Promise<any>> = [];
+  private processing = false;
+  private requestsPerMinute: number;
+  private delay: number;
+
+  constructor(requestsPerMinute: number) {
+    this.requestsPerMinute = requestsPerMinute;
+    this.delay = 60000 / requestsPerMinute; // Time between requests
+  }
+
+  async add<T>(requestFn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await requestFn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
+      if (!this.processing) {
+        this.process();
+      }
+    });
+  }
+
+  private async process() {
+    this.processing = true;
+    
+    while (this.queue.length > 0) {
+      const request = this.queue.shift();
+      if (request) {
+        await request();
+        await new Promise(resolve => setTimeout(resolve, this.delay));
+      }
+    }
+    
+    this.processing = false;
+  }
+}
+
+// Usage
+const queue = new RequestQueue(60); // 60 requests per minute
+
+const response = await queue.add(() =>
+  cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'Hello' }],
+  })
+);
+```
+
+## Upgrading Rate Limits
+
+If you consistently hit rate limits:
+- Upgrade your subscription tier in the dashboard
+- Contact sales for custom enterprise limits
+- Optimize your usage patterns
+- Implement caching and batching

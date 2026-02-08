@@ -1,0 +1,108 @@
+---
+title: "Organizations"
+description: "Learn how organizations work in Cencori, including user management, roles, and billing."
+section: "Core Concepts"
+order: 2
+---
+
+## What is an Organization?
+
+An organization is the top-level container in Cencori. It contains:
+- Multiple projects (your AI applications)
+- Team members with different roles
+- Billing and credit balance
+- Custom provider configurations
+- Shared security policies
+
+## Organization Structure
+
+```text
+Organization (Acme Corp)
+├── Projects
+├── Production API
+├── Staging API
+└── Development
+├── Team Members
+├── Owner (Full access)
+├── Admins (Manage projects, view billing)
+└── Members (Access projects)
+├── Custom Providers
+└── Billing
+```
+
+## Creating an Organization
+
+When you first sign up to Cencori, a personal organization is automatically created for you. You can create additional organizations for different teams or companies.
+
+### Steps to Create:
+1. Click your profile in the top-right corner
+2. Select "Create Organization"
+3. Enter organization name and description
+4. Click "Create"
+
+## User Roles
+
+| Role | Permissions |
+|------|-------------|
+| **Owner** | Full organization control, manage billing, delete org, manage all projects, invite/remove members |
+| **Admin** | Create/manage projects, view billing, invite members, manage custom providers. Cannot delete org |
+| **Member** | Access assigned projects, view logs, generate keys. Cannot view billing or manage team |
+
+## Inviting Team Members
+
+1. Go to your organization settings
+2. Click "Team" in the sidebar
+3. Click "Invite Member"
+4. Enter their email address
+5. Select their role (Admin or Member)
+6. Click "Send Invitation"
+
+The invited user will receive an email with an invitation link. They must accept the invitation to join your organization.
+
+## Switching Between Organizations
+
+If you're a member of multiple organizations:
+1. Click the organization name in the top-left corner
+2. Select from the dropdown list
+3. The dashboard will refresh with the new organization's data
+
+## Billing and Credits
+
+Each organization has its own:
+- Credit balance
+- Billing history
+- Payment methods
+- Usage reports
+
+Credits are not shared between organizations. If you create multiple organizations, you'll need to add credits to each one separately.
+
+## Organization Settings
+
+### General
+- Organization name
+- Description
+- Organization slug (URL identifier)
+
+### Team
+- View all members
+- Pending invitations
+- Manage roles
+- Remove members
+
+### Billing
+- Current balance
+- Add credits
+- Transaction history
+- Payment methods
+
+### Danger Zone
+- Delete organization (owner only)
+- Transfer ownership
+
+## Best Practices
+
+- Create separate organizations for completely different businesses or clients
+- Use projects within an organization to separate environments (dev, staging, prod)
+- Assign the minimum required role to team members (principle of least privilege)
+- Regularly review team members and remove those who no longer need access
+- Set up billing alerts to avoid unexpected charges

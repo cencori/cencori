@@ -1,0 +1,100 @@
+---
+title: "Failover"
+description: "Automatic retries, provider fallback, and circuit breaker for reliable AI requests."
+section: "AI"
+order: 7
+---
+
+Cencori provides automatic failover to keep your AI applications reliable, even when providers have outages.
+
+## How It Works
+
+When a request fails, Cencori automatically:
+
+1. **Retries** the same provider (with exponential backoff)
+2. **Falls back** to equivalent models on other providers
+3. **Opens circuit breaker** if a provider is consistently failing
+
+## Configuration
+
+```typescript
+const cencori = new Cencori({
+  apiKey: 'csk_...',
+  failover: {
+    enabled: true,
+    maxRetries: 3,
+    fallbackModels: {
+      'gpt-4o': ['claude-opus-4', 'gemini-2.5-pro'],
+      'claude-opus-4': ['gpt-4o', 'gemini-2.5-pro'],
+    }
+  }
+});
+```
+
+## Automatic Fallback
+
+When configured, a failed request to one provider automatically falls back:
+
+```typescript
+// If gpt-4o fails, automatically tries claude-opus-4
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+  failover: true
+});
+
+// Response includes which model was actually used
+console.log(response.model); // 'gpt-4o' or 'claude-opus-4'
+```
+
+## Manual Fallback Chain
+
+Specify explicit fallback order:
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+  fallbackModels: ['claude-opus-4', 'gemini-2.5-pro', 'grok-2']
+});
+```
+
+## Circuit Breaker
+
+The circuit breaker prevents cascading failures:
+
+| State | Behavior |
+|-------|----------|
+| Closed | Normal operation, requests go through |
+| Open | Provider is failing, skip and use fallback |
+| Half-Open | Testing if provider recovered |
+
+```typescript
+// Circuit breaker settings
+const cencori = new Cencori({
+  apiKey: 'csk_...',
+  circuitBreaker: {
+    failureThreshold: 5,     // Open after 5 failures
+    resetTimeout: 30000,     // Try again after 30s
+  }
+});
+```
+
+## Retry Behavior
+
+| Error Type | Retry? | Fallback? |
+|------------|--------|-----------|
+| Rate limit (429) | Yes (with backoff) | Yes |
+| Server error (500+) | Yes | Yes |
+| Timeout | Yes | Yes |
+| Auth error (401) | No | No |
+| Bad request (400) | No | No |
+
+## Monitoring
+
+Track failover events in the dashboard:
+
+- Total failovers per day
+- Fallback success rate
+- Provider reliability scores
+- Circuit breaker triggers

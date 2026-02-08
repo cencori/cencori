@@ -1,0 +1,208 @@
+---
+title: "Cencori Scan"
+description: "Security scanner for AI apps. Detect hardcoded secrets, PII leaks, exposed routes, and security vulnerabilities — with AI-powered auto-fix."
+section: "Security"
+order: 1
+---
+
+## Quick Start
+
+Run Cencori Scan in any project directory to instantly find security issues:
+
+```bash
+npx @cencori/scan
+```
+
+That's it. The scanner will analyze your codebase and report any security issues found.
+
+## Installation Options
+
+```bash
+# Run directly (recommended)
+npx @cencori/scan
+
+# Install globally
+npm install -g @cencori/scan
+
+# Or as a dev dependency
+npm install -D @cencori/scan
+```
+
+## What It Detects
+
+| Category | Examples |
+|----------|----------|
+| **API Keys & Secrets** | OpenAI, Anthropic, Google AI, Supabase, Stripe, AWS, GitHub, Firebase + 20 more |
+| **PII** | Email addresses, phone numbers, SSNs, credit cards |
+| **Exposed Routes** | Next.js/Express routes without authentication, sensitive files in /public |
+| **Vulnerabilities** | SQL injection, XSS (innerHTML, dangerouslySetInnerHTML), insecure CORS |
+| **Hardcoded Credentials** | Passwords, tokens, connection strings in code |
+
+## CLI Options
+
+```bash
+# Scan current directory
+npx @cencori/scan
+
+# Scan specific path
+npx @cencori/scan ./my-project
+
+# Output JSON (for CI/CD)
+npx @cencori/scan --json
+
+# Quiet mode (score only)
+npx @cencori/scan --quiet
+
+# Skip interactive prompts
+npx @cencori/scan --no-prompt
+```
+
+## Security Score
+
+After scanning, you'll receive a security score from A to F:
+
+| Score | Meaning |
+|-------|---------|
+| <span className="text-green-500 font-semibold">A-Tier</span> | Excellent - No security issues detected |
+| <span className="text-blue-500 font-semibold">B-Tier</span> | Good - Minor improvements recommended |
+| <span className="text-yellow-500 font-semibold">C-Tier</span> | Fair - Some concerns need attention |
+| <span className="text-orange-500 font-semibold">D-Tier</span> | Poor - Significant issues found |
+| <span className="text-red-500 font-semibold">F-Tier</span> | Critical - Secrets or major vulnerabilities exposed |
+
+## AI-Powered Auto-Fix (Pro)
+
+After scanning, you'll be prompted to auto-fix issues. Enter `y` and provide your Cencori API key:
+
+```text
+? Would you like Cencori to auto-fix these issues? (y/n)
+> y
+
+  Checking for API key...
+  No API key found.
+
+? Enter your Cencori API key: ************************
+  (Get one at https://cencori.com/dashboard)
+
+✔ API key saved to ~/.cencorirc
+✔ Analyzing with AI...
+✔ Filtered 3 false positives
+✔ Applied 8 fixes
+```
+
+The AI will:
+- Analyze each issue for false positives
+- Generate secure code fixes using Llama 4 Scout
+- Apply fixes automatically to your codebase
+
+Your API key is saved to `~/.cencorirc` for future scans.
+
+## Programmatic Usage
+
+You can also use Cencori Scan as a library in your Node.js applications:
+
+```typescript
+import { scan } from '@cencori/scan';
+
+const result = await scan('./my-project');
+
+console.log(result.score);        // 'A' | 'B' | 'C' | 'D' | 'F'
+console.log(result.issues);       // Array of detected issues
+console.log(result.filesScanned); // Number of files scanned
+console.log(result.scanDuration); // Time in milliseconds
+```
+
+### TypeScript Types
+
+```typescript
+interface ScanResult {
+  score: 'A' | 'B' | 'C' | 'D' | 'F';
+  tierDescription: string;
+  issues: ScanIssue[];
+  filesScanned: number;
+  scanDuration: number;
+  summary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+}
+
+interface ScanIssue {
+  type: 'secret' | 'pii' | 'route' | 'config' | 'vulnerability';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  name: string;
+  match: string;
+  file: string;
+  line: number;
+  description?: string;
+}
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Cencori Scan
+        run: npx @cencori/scan --json > scan-results.json
+        
+      - name: Check for failures
+        run: |
+          SCORE=$(jq -r '.score' scan-results.json)
+          if [[ "$SCORE" == "F" ]]; then
+            echo "Security scan failed with F-Tier score"
+            exit 1
+          fi
+          
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan
+          path: scan-results.json
+```
+
+### Pre-commit Hook
+
+Add to `.husky/pre-commit`:
+
+```bash
+#!/bin/sh
+npx @cencori/scan --quiet --no-prompt
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CENCORI_API_KEY` | API key for AI auto-fix features |
+
+### Config File
+
+API keys are saved to `~/.cencorirc`:
+
+```text
+api_key=your_cencori_api_key
+```
+
+## Privacy
+
+Cencori Scan collects anonymous usage metrics to improve the product:
+- Number of files scanned
+- Number of issues found
+- Security score
+- Platform (macOS/Linux/Windows)
+
+**No code, file paths, or sensitive data is ever transmitted.**

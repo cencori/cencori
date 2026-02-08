@@ -1,0 +1,75 @@
+---
+title: "Error Reference"
+description: "Complete reference for all error codes, HTTP status codes, and troubleshooting steps."
+section: "API Reference"
+order: 7
+---
+
+## Error Response Format
+
+All errors follow a consistent JSON format:
+
+```json
+{
+  "error": "Error message describing what went wrong",
+  "code": "ERROR_CODE",
+  "status": 400,
+  "details": {}
+}
+```
+
+## HTTP Status Codes
+
+| Status | Meaning | Typical Cause |
+|--------|---------|---------------|
+| `200` | OK | Request succeeded |
+| `400` | Bad Request | Invalid parameters or malformed request |
+| `401` | Unauthorized | Missing or invalid API key |
+| `403` | Forbidden | Security violation or credit exhaustion |
+| `404` | Not Found | Resource doesn't exist |
+| `429` | Too Many Requests | Rate limit exceeded |
+| `500` | Internal Error | Server-side error |
+| `503` | Service Unavailable | Provider is down or overloaded |
+
+## Common Error Codes
+
+### `INVALID_API_KEY` (401)
+The provided API key is invalid, expired, or revoked.
+- **Solution:** Verify the key is correct and active in the dashboard.
+
+### `SECURITY_VIOLATION` (403)
+Request blocked due to security filters (PII, injection, etc.).
+- **Solution:** Review the incident in the dashboard and sanitize input.
+
+### `RATE_LIMIT_EXCEEDED` (429)
+Too many requests in a short time period.
+- **Solution:** Implement exponential backoff or upgrade your plan.
+
+### `INSUFFICIENT_CREDITS` (403)
+Your organization has run out of credits.
+- **Solution:** Top up credits or enable auto-recharge.
+
+### `PROVIDER_ERROR` (503)
+The AI provider (OpenAI, Anthropic, etc.) is unavailable.
+- **Solution:** Retry after a delay or try a different model/provider.
+
+## Error Handling Example
+
+```typescript
+try {
+  const response = await cencori.ai.chat({ model: 'gpt-4o', messages });
+} catch (error: any) {
+  if (error.status === 429) {
+    const retryAfter = error.retryAfter || 60;
+    // Wait and retry...
+  }
+}
+```
+
+## Rate Limit Headers
+
+When rate limited, check these response headers:
+- `X-RateLimit-Limit`: Maximum requests per window
+- `X-RateLimit-Remaining`: Requests remaining
+- `X-RateLimit-Reset`: Unix timestamp when limit resets
+- `Retry-After`: Seconds to wait before retrying

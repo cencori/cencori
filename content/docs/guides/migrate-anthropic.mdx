@@ -1,0 +1,186 @@
+---
+title: "Migrating from Anthropic"
+description: "Step-by-step guide to migrate from Anthropic SDK to Cencori. Keep Claude while gaining security, logging, and multi-provider flexibility."
+section: "Guides"
+order: 3
+---
+
+## Why Migrate to Cencori?
+
+If you're already using Claude, switching to Cencori adds powerful infrastructure without sacrificing model quality:
+
+- **Keep using Claude:** Same models, same quality
+- **Add OpenAI & Gemini:** Switch providers without code changes
+- **Built-in Security:** Automatic PII and prompt injection detection
+- **Cost Tracking:** See exact costs per request
+- **Complete Logging:** Audit trail for compliance
+
+## Code Comparison
+
+### Before (Anthropic SDK)
+
+```typescript
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const response = await anthropic.messages.create({
+  model: 'claude-3-opus-20240229',
+  max_tokens: 1024,
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### After (Cencori SDK)
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+const response = await cencori.ai.chat({
+  model: 'claude-3-opus',
+  maxTokens: 1024,
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+## Migration Steps
+
+### Step 1: Install Cencori SDK
+```bash
+npm uninstall @anthropic-ai/sdk
+npm install cencori
+```
+
+### Step 2: Get Cencori API Key
+1. Sign up at the [Cencori dashboard](/dashboard)
+2. Create a project
+3. Generate an API key
+
+### Step 3: Add Your Anthropic Key to Cencori
+1. In Cencori dashboard, go to **Project Settings**
+2. Navigate to **"Provider Keys"**
+3. Add your Anthropic API key and Save
+
+> [!NOTE]
+> Cencori uses your Anthropic key to make requests on your behalf. You keep full control over your provider accounts.
+
+### Step 4: Update Your Code
+
+**Old:**
+```typescript
+import Anthropic from '@anthropic-ai/sdk';
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+```
+
+**New:**
+```typescript
+import { Cencori } from 'cencori';
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+## API Mapping Reference
+
+| Anthropic SDK | Cencori SDK |
+|---------------|-------------|
+| `anthropic.messages.create()` | `cencori.ai.chat()` |
+| `claude-3-opus-20240229` | `claude-3-opus` |
+| `max_tokens` | `maxTokens` |
+| `stream: true` | `cencori.ai.chatStream()` |
+
+## System Message Handling
+
+Anthropic SDK has a separate `system` parameter. Cencori handles this automatically via the messages array:
+
+**Anthropic Native:**
+```typescript
+await anthropic.messages.create({
+  model: 'claude-3-opus-20240229',
+  system: 'You are helpful',
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+```
+
+**Cencori (standard format):**
+```typescript
+await cencori.ai.chat({
+  model: 'claude-3-opus',
+  messages: [
+    { role: 'system', content: 'You are helpful' },
+    { role: 'user', content: 'Hello' }
+  ],
+});
+```
+
+> [!TIP]
+> Cencori automatically converts system messages to Anthropic's specific format when routing.
+
+## Migrating Streaming Code
+
+### Anthropic Streaming
+```typescript
+const stream = await anthropic.messages.create({
+  model: 'claude-3-opus-20240229',
+  messages: messages,
+  stream: true,
+});
+
+for await (const event of stream) {
+  if (event.type === 'content_block_delta') {
+    process.stdout.write(event.delta.text || '');
+  }
+}
+```
+
+### Cencori Streaming
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'claude-3-opus',
+  messages: messages,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+  if (chunk.finish_reason) {
+    console.log('\nDone!');
+  }
+}
+```
+
+## Bonus: Multi-Provider Freedom
+
+Now that you're on Cencori, switching to other providers is trivial:
+
+```typescript
+// Use Claude (same as before)
+const claudeResponse = await cencori.ai.chat({
+  model: 'claude-3-opus',
+  messages: messages,
+});
+
+// Try GPT-4o (just change model!)
+const gptResponse = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: messages, 
+});
+
+// Or Gemini 2.5 Flash
+const geminiResponse = await cencori.ai.chat({
+  model: 'gemini-2.5-flash',
+  messages: messages,
+});
+```
+
+## Next Steps
+- [Explore multi-provider support](/docs/concepts/multi-provider)
+- [Compare model pricing and capabilities](/docs/concepts/models)
+- [View your analytics dashboard](/dashboard)

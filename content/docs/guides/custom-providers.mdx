@@ -1,0 +1,87 @@
+---
+title: "Custom Providers"
+description: "Connect Cencori to your own AI models or proxy services while maintaining full security and observability."
+section: "Guides"
+order: 5
+---
+
+## What are Custom Providers?
+
+Custom providers allow you to add your own AI model endpoints to Cencori. This is useful if you:
+- Self-host open-source models (Llama, Mistral) via vLLM or Ollama
+- Use Azure OpenAI Service with your own enterprise deployment
+- Use a custom AI gateway or internal company proxy
+- Want unified observability across all your AI infrastructure
+
+## Supported API Formats
+
+Cencori acts as a proxy, so your custom endpoints must follow one of these protocols:
+- **OpenAI API format:** Compatible with vLLM, Ollama, Azure OpenAI, and LiteLLM.
+- **Anthropic API format:** Compatible with Claude-compatible gateways.
+
+## Adding a Custom Provider
+
+### Via Dashboard
+1. Go to your **Organization Settings** in the [dashboard](/dashboard)
+2. Click **"Custom Providers"** in the sidebar
+3. Click **"Add Custom Provider"**
+4. Fill in the provider details:
+    - **Name:** A friendly identifier (e.g., "Internal Llama-3")
+    - **Base URL:** Your endpoint (e.g., `https://ai.yourcompany.com/v1`)
+    - **API Key:** The auth key for your endpoint (encrypted at rest)
+    - **Format:** Choose OpenAI or Anthropic
+5. Click **"Test Connection"** to verify Cencori can reach your endpoint
+6. Click **"Add Provider"** to save
+
+## Usage Example: Azure OpenAI
+
+After adding your Azure deployment as a custom provider:
+
+```typescript
+// use-azure.ts
+const response = await cencori.ai.chat({
+  model: 'azure-gpt-4', // The name you gave your custom provider
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+## Usage Example: Self-Hosted Llama
+
+If you're running vLLM or Ollama on your own servers:
+
+```typescript
+// use-vllm.ts
+const response = await cencori.ai.chat({
+  model: 'llama-3-70b',
+  messages: [{ role: 'user', content: 'Explain quantum computing' }],
+});
+```
+
+## Security: API Key Storage
+
+When you add a custom provider, Cencori securely handles your keys:
+- **Encryption:** Keys are encrypted at rest in our database.
+- **Privacy:** Keys are never exposed in logs, client responses, or the dashbard after entry.
+- **Proxy Only:** Keys are only used to authenticate proxy requests from Cencori to your endpoint.
+
+## Benefits of Custom Providers
+
+### Unified Observability
+View usage, costs, and performance metrics for all providers—public and internal—in a single dashboard.
+
+### Security Everywhere
+Cencori's security features (PII detection, prompt injection protection, content filtering) work automatically with custom providers.
+
+### Seamless Migration
+Switch between public models and your own internal models by just changing the `model` parameter in your code.
+
+## Troubleshooting
+
+### Connection Test Failed
+- Verify the **Base URL** is correct and publicly accessible (or whitelisted for Cencori's IPs).
+- Check that the API key is valid for that specific endpoint.
+- Ensure the endpoint matches the selected format (OpenAI/Anthropic).
+
+### Model Not Found
+- Ensure the model name in your Cencori request matches the name defined in the custom provider or the deployment name (for Azure).
+- Check your endpoint logs to see if the request is reaching your infrastructure.

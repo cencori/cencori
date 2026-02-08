@@ -1,0 +1,64 @@
+---
+title: "AI Overview"
+description: "Build production-ready AI applications with a unified API, multi-provider routing, built-in security, and complete observability."
+section: "AI"
+order: 1
+---
+
+Cencori acts as a transparent proxy layer between your application and AI providers. Instead of calling OpenAI, Anthropic, or Google directly, you route requests through Cencori.
+
+## How It Works
+
+Your Application → **Cencori** → AI Models
+
+By routing through Cencori, you get:
+
+- **Multi-Provider Routing** - Switch between OpenAI, Anthropic, Google with a single parameter
+- **Automatic Security** - PII detection, prompt injection protection, content filtering
+- **Complete Observability** - Every request logged with full prompts, responses, and costs
+- **Failover & Reliability** - Automatic retries and provider fallback
+- **Cost Tracking** - Real-time usage and spend per project
+
+## Documentation
+
+| Section | Description |
+|---------|-------------|
+| [AI Gateway](/docs/ai/gateway) | The secure proxy layer for all AI requests |
+| [Cencori SDK](/docs/ai/sdk) | Official SDK for Node.js and TypeScript |
+| [Vercel AI SDK](/docs/ai/vercel-sdk) | Integration with Vercel AI SDK |
+| [TanStack AI](/docs/ai/tanstack) | Framework-agnostic adapter |
+| [Providers](/docs/ai/providers) | Supported providers and models |
+| [Failover](/docs/ai/failover) | Automatic retries and provider fallback |
+
+## Endpoints
+
+| Endpoint | Description | Providers |
+|----------|-------------|-----------|
+| [Chat](/docs/ai/endpoints/chat) | Conversational AI with streaming | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek |
+| [Images](/docs/ai/endpoints/images) | Image generation from text | OpenAI (GPT Image, DALL-E), Google (Imagen) |
+| [Embeddings](/docs/ai/endpoints/embeddings) | Vector embeddings for RAG | OpenAI, Google, Cohere |
+| [Audio](/docs/ai/endpoints/audio) | Speech-to-text and text-to-speech | OpenAI (Whisper, TTS) |
+| [Moderation](/docs/ai/endpoints/moderation) | Content safety filtering | OpenAI |
+
+## AI Memory
+
+Vector storage for RAG, conversation history, and semantic search. Store content with automatic embedding generation and retrieve it with natural language queries.
+
+- [Memory Overview](/docs/ai/memory) - Getting started with AI Memory
+- [RAG](/docs/ai/memory/rag) - Retrieval-augmented generation
+
+## Quick Start
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: 'csk_...' });
+
+// Chat with any model
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',  // or 'claude-opus-4', 'gemini-2.5-flash'
+  messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+console.log(response.content);
+```

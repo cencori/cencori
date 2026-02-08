@@ -1,0 +1,92 @@
+---
+title: "Namespaces"
+description: "Organize memories by project, user, or topic."
+section: "AI Memory"
+order: 2
+---
+
+Namespaces organize memories into logical groups, enabling multi-tenant applications and fine-grained access control.
+
+## Creating Namespaces
+
+Namespaces are created automatically when you store the first memory:
+
+```typescript
+await cencori.memory.store({
+  namespace: 'project-alpha',  // Created if doesn't exist
+  content: 'Documentation content...'
+});
+```
+
+## Naming Conventions
+
+| Pattern | Use Case |
+|---------|----------|
+| `user-{userId}` | Per-user memories |
+| `project-{projectId}` | Project documentation |
+| `session-{sessionId}` | Conversation sessions |
+| `org-{orgId}-docs` | Organization knowledge |
+
+## Listing Namespaces
+
+```typescript
+const namespaces = await cencori.memory.listNamespaces();
+
+// Returns:
+// [
+//   { name: 'user-123', count: 45, lastUpdated: '2024-01-15' },
+//   { name: 'project-alpha', count: 120, lastUpdated: '2024-01-14' }
+// ]
+```
+
+## Namespace Operations
+
+### Clear Namespace
+
+```typescript
+// Delete all memories in a namespace
+await cencori.memory.clearNamespace('old-project');
+```
+
+### Delete Namespace
+
+```typescript
+// Completely remove namespace
+await cencori.memory.deleteNamespace('deprecated-docs');
+```
+
+## Multi-Tenant Example
+
+```typescript
+// Store per-customer documentation
+async function storeCustomerDoc(customerId: string, content: string) {
+  await cencori.memory.store({
+    namespace: `customer-${customerId}`,
+    content,
+    metadata: { type: 'documentation' }
+  });
+}
+
+// Search only within customer's namespace
+async function searchCustomerDocs(customerId: string, query: string) {
+  return cencori.memory.search({
+    namespace: `customer-${customerId}`,
+    query,
+    limit: 10
+  });
+}
+```
+
+## Access Control
+
+Namespaces are scoped to projects. Each API key can only access namespaces within its project.
+
+```typescript
+// API key for Project A can only access Project A namespaces
+const cencoriA = new Cencori({ apiKey: 'csk_project_a_...' });
+await cencoriA.memory.store({ namespace: 'docs', ... }); // ✓
+
+// Cannot access Project B namespaces
+const cencoriB = new Cencori({ apiKey: 'csk_project_b_...' });
+await cencoriB.memory.search({ namespace: 'docs', ... }); // Different 'docs'
+```

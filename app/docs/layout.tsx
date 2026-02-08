@@ -2,6 +2,8 @@ import { Metadata } from "next";
 import { DocsLayout } from "@/components/docs/DocsLayout";
 import { DocsNavbar } from "@/components/docs/DocsNavbar";
 import { Footer } from "@/components/landing/Footer";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 
 export const metadata: Metadata = {
     title: "Documentation",
@@ -21,9 +23,13 @@ export const metadata: Metadata = {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex min-h-screen flex-col">
+        <div
+            className={`flex min-h-screen flex-col ${GeistSans.variable} ${GeistMono.variable}`}
+            style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}
+        >
             <DocsNavbar />
             <DocsLayout>{children}</DocsLayout>
+            <Footer />
         </div>
     );
 }

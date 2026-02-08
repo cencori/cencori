@@ -1,0 +1,78 @@
+---
+title: "Installation"
+description: "Install the Cencori SDK in your project."
+section: "Getting Started"
+order: 3
+---
+
+Install the Cencori SDK in your Node.js or TypeScript project.
+
+## npm
+
+```bash
+npm install cencori
+```
+
+## yarn
+
+```bash
+yarn add cencori
+```
+
+## pnpm
+
+```bash
+pnpm add cencori
+```
+
+## Requirements
+
+- Node.js 18+
+- TypeScript 5+ (optional, but recommended)
+
+## Configuration
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+  // Optional configuration
+  baseUrl: 'https://api.cencori.com',  // Default
+  timeout: 30000,                       // 30 seconds
+  retries: 3                            // Retry failed requests
+});
+```
+
+## Environment Variables
+
+```bash
+# .env
+CENCORI_API_KEY=csk_live_...
+```
+
+The SDK automatically reads `CENCORI_API_KEY` if no apiKey is provided:
+
+```typescript
+// Uses CENCORI_API_KEY from environment
+const cencori = new Cencori();
+```
+
+## TypeScript Support
+
+The SDK is written in TypeScript and includes full type definitions:
+
+```typescript
+import { Cencori, ChatRequest, ChatResponse } from 'cencori';
+
+const request: ChatRequest = {
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello' }]
+};
+
+const response: ChatResponse = await cencori.ai.chat(request);
+```
+
+## Next Steps
+
+See [Making Your First Request](/docs/getting-started/first-request) to start using the SDK.

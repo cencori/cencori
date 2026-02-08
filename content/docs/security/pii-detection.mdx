@@ -1,0 +1,142 @@
+---
+title: "PII Detection"
+description: "Automatically detect and protect personally identifiable information (PII) in AI requests and responses."
+section: "Security"
+order: 3
+---
+
+## What is PII?
+
+Personally Identifiable Information (PII) is any data that can identify a specific individual. Sending PII to third-party AI providers can:
+- Violate GDPR, HIPAA, or other privacy regulations
+- Expose sensitive customer data
+- Result in data breaches and legal liability
+- Damage customer trust
+
+## What Cencori Detects
+
+| PII Type | Examples | Pattern |
+|----------|----------|---------|
+| **Email Addresses** | john@example.com | Regex + validation |
+| **Phone Numbers** | +1-555-123-4567 | Multiple formats |
+| **Social Security Numbers** | 123-45-6789 | US SSN format |
+| **Credit Card Numbers** | 4532-1234-5678-9010 | Luhn algorithm |
+| **IP Addresses** | 192.168.1.1 | IPv4/IPv6 |
+| **Postal Addresses** | 123 Main St, NY 10001 | Address patterns |
+| **Government IDs** | Passport numbers, licenses | Country-specific |
+
+## How PII Detection Works
+
+1. **Request Received**: Your application sends a request through Cencori.
+2. **PII Scan**: Cencori scans the prompt for PII using regex and ML models.
+3. **Detection Found**: If PII is detected, request is flagged as a security incident.
+4. **Action Taken**: Block request or redact PII based on your policy.
+
+## Automatic Blocking
+
+By default, Cencori blocks requests containing PII and returns an error:
+
+```json
+{
+  "error": "Request blocked due to PII detection",
+  "code": "PII_DETECTED",
+  "status": 403,
+  "details": {
+    "patterns_detected": ["EMAIL", "PHONE_NUMBER"],
+    "incident_id": "inc_abc123"
+  }
+}
+```
+
+The request never reaches the AI provider, protecting your users' data.
+
+## Handling PII Detection in Your Code
+
+```typescript
+try {
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ 
+      role: 'user', 
+      content: userInput // May contain PII
+    }],
+  });
+  
+  return response.content;
+} catch (error: any) {
+  if (error.code === 'PII_DETECTED') {
+    // Handle PII detection gracefully
+    return {
+      error: 'Your message contains sensitive information. Please remove personal details.',
+      pii_types: error.details.patterns_detected
+    };
+  }
+  
+  throw error;
+}
+```
+
+## Redaction Mode (Coming Soon)
+
+Instead of blocking, you can enable automatic redaction. Cencori will replace PII with placeholders:
+
+```text
+Original:
+"My email is john@example.com and my phone is 555-1234"
+
+Redacted:
+"My email is [EMAIL_REDACTED] and my phone is [PHONE_REDACTED]"
+```
+
+This allows the request to proceed while protecting sensitive data.
+
+## Viewing PII Incidents in Dashboard
+
+All PII detection events are logged as security incidents. To view:
+
+1. Navigate to your project dashboard
+2. Click "Security" in the sidebar
+3. Filter by "PII Detection" incident type
+4. View details including:
+   - Which PII types were detected
+   - Timestamp and user info
+   - The triggering request (PII redacted)
+
+## Custom Patterns (Enterprise)
+
+Enterprise customers can add custom PII patterns specific to their business:
+- Employee IDs (e.g., EMP-12345)
+- Internal project codes
+- Customer reference numbers
+- Industry-specific identifiers (medical record numbers, account IDs)
+
+Contact sales to configure custom patterns for your organization.
+
+## Handling False Positives
+
+Sometimes legitimate content is flagged as PII:
+
+> [!TIP]
+> **Example: Fictional Data**
+> "Create a sample user profile with email test@example.com" might be flagged, even though it's fictional.
+
+> [!NOTE]
+> **Solution: Whitelist Domains**
+> Configure Cencori to allow specific domains or patterns in your project settings.
+
+## Best Practices
+
+- Enable PII detection for all production projects
+- Educate users to avoid sharing personal information in prompts
+- Review PII incidents weekly to identify patterns
+- Use redaction mode for non-critical PII (e.g., names in support tickets)
+- Block mode for strict compliance (healthcare, finance)
+- Monitor false positive rates and adjust sensitivity
+
+## Compliance Benefits
+
+PII detection helps you comply with:
+- **GDPR:** Prevent unauthorized processing of personal data
+- **HIPAA:** Protect patient health information
+- **SOC 2:** Demonstrate data protection controls
+- **CCPA:** California Consumer Privacy Act compliance

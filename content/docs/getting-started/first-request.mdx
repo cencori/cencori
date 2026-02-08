@@ -1,0 +1,85 @@
+---
+title: "Making Your First Request"
+description: "Send your first AI request through Cencori."
+section: "Getting Started"
+order: 4
+---
+
+Learn how to send your first AI request through Cencori.
+
+## Prerequisites
+
+- Cencori account with API key
+- Node.js 18+ installed
+- SDK installed (`npm install cencori`)
+
+## Basic Chat Request
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: 'csk_live_...'
+});
+
+async function main() {
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'What is the capital of France?' }
+    ]
+  });
+
+  console.log(response.content);
+  // "The capital of France is Paris."
+
+  console.log(response.usage);
+  // { promptTokens: 20, completionTokens: 10, totalTokens: 30 }
+}
+
+main();
+```
+
+## Streaming Response
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Tell me a joke' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## Using Different Providers
+
+Switch providers by changing the model:
+
+```typescript
+// OpenAI
+await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
+
+// Anthropic
+await cencori.ai.chat({ model: 'claude-opus-4', messages: [...] });
+
+// Google
+await cencori.ai.chat({ model: 'gemini-2.5-flash', messages: [...] });
+```
+
+## View in Dashboard
+
+After making requests, view them in your [dashboard](/dashboard):
+
+1. Navigate to the Logs tab
+2. See full request/response details
+3. Check token usage and costs
+4. View security scan results
+
+## Next Steps
+
+- [AI Gateway](/docs/ai/gateway) - Multi-provider routing
+- [Streaming](/docs/ai/streaming) - Real-time responses
+- [Tool Calling](/docs/ai/tool-calling) - Let AI call functions

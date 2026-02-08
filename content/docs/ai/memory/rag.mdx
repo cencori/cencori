@@ -1,0 +1,108 @@
+---
+title: "RAG"
+description: "Retrieval-Augmented Generation for context-aware AI responses."
+section: "AI Memory"
+order: 4
+---
+
+RAG (Retrieval-Augmented Generation) combines memory search with AI generation for context-aware responses.
+
+## How It Works
+
+1. User sends a query
+2. Relevant memories are retrieved
+3. Context is injected into the prompt
+4. AI generates a grounded response
+
+## Basic Usage
+
+```typescript
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the refund policy?' }],
+  namespace: 'docs'
+});
+
+console.log(response.content);
+// "Based on your documentation, the refund policy allows returns within 30 days..."
+
+console.log(response.sources);
+// [{ id: '...', content: '...', score: 0.95 }]
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Chat model |
+| `messages` | array | Yes | Conversation |
+| `namespace` | string | Yes | Memory namespace |
+| `limit` | number | No | Max context items (default: 5) |
+| `threshold` | number | No | Min relevance score |
+| `filter` | object | No | Metadata filter |
+
+## Custom System Prompt
+
+```typescript
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the refund policy?' }],
+  namespace: 'docs',
+  systemPrompt: `You are a helpful customer support agent. 
+    Answer questions based on the provided context. 
+    If you don't know, say so.`
+});
+```
+
+## With Metadata Filter
+
+```typescript
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'How do I get a refund?' }],
+  namespace: 'docs',
+  filter: {
+    category: 'refunds',
+    language: 'en'
+  }
+});
+```
+
+## Manual RAG
+
+For more control, implement RAG manually:
+
+```typescript
+// 1. Search for relevant context
+const context = await cencori.memory.search({
+  namespace: 'docs',
+  query: 'refund policy',
+  limit: 5
+});
+
+// 2. Build context string
+const contextText = context
+  .map(r => r.content)
+  .join('\n\n');
+
+// 3. Generate with context
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    {
+      role: 'system',
+      content: `Answer based on this context:\n\n${contextText}`
+    },
+    { role: 'user', content: 'What is the refund policy?' }
+  ]
+});
+```
+
+## Best Practices
+
+| Practice | Description |
+|----------|-------------|
+| Chunk content | Split long documents into smaller pieces |
+| Include metadata | Add source, date, category for filtering |
+| Set threshold | Filter low-relevance results |
+| Use citations | Show users where answers came from |

@@ -1,0 +1,50 @@
+---
+title: "Introduction"
+description: "Welcome to Cencori - the AI infrastructure platform for production applications."
+section: "Getting Started"
+order: 1
+---
+
+Cencori is the infrastructure layer for AI applications. We provide security, multi-provider routing, and comprehensive observability - so you can focus on building your product.
+
+## What is Cencori?
+
+Cencori sits between your application and AI providers (OpenAI, Anthropic, Google, etc.), adding:
+
+- **Security** - Real-time protection against prompt injection, PII leakage, and jailbreaks
+- **Multi-Provider Routing** - One API for all providers with automatic failover
+- **Observability** - Full logging, analytics, and cost tracking for every AI request
+
+## Quick Example
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: 'csk_...' });
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'user', content: 'Hello!' }
+  ]
+});
+
+console.log(response.content);
+```
+
+## Core Features
+
+| Feature | Description |
+|---------|-------------|
+| AI Gateway | Unified API for 14+ AI providers |
+| Security Layer | Real-time threat detection |
+| Analytics | Usage, costs, and performance metrics |
+| Failover | Automatic provider switching |
+
+## Getting Started
+
+1. [Create an account](/signup) and get your API key
+2. Install the SDK: `npm install cencori`
+3. Make your first request
+
+Ready to dive in? Check out the [Quick Start](/docs/quick-start) guide.

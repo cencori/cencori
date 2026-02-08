@@ -1,0 +1,139 @@
+---
+title: "API Keys"
+description: "Learn how to create, manage, and secure API keys for authenticating requests to Cencori."
+section: "Core Concepts"
+order: 3
+---
+
+## What are API Keys?
+
+API keys authenticate your application when making requests to Cencori. Each key is tied to a specific project and can be configured for different use cases.
+
+## Key Types
+
+Cencori offers two types of API keys for different security requirements:
+
+### Secret Keys
+Format: `csk_...` or `csk_test_...`
+- For **server-side use only**
+- Full access to all features
+- Never expose in browser or client code
+- Use in Node.js, Python, or server routes
+
+### Publishable Keys
+Format: `cpk_...` or `cpk_test_...`
+- Safe for **browser and client-side use**
+- Requires domain whitelisting
+- Only works from allowed domains
+- Use for web apps, mobile apps, SPAs
+
+> [!NOTE]
+> **Legacy Keys**
+> Format: `cen_...` or `cen_test_...`
+> Existing keys created before key types are fully functional are treated as secret keys. No migration required.
+
+## Creating API Keys
+
+1. Go to your [project settings](/dashboard)
+2. Navigate to the "API" tab
+3. Click "New secret key" or "New publishable key"
+4. Enter a name for the key
+5. For publishable keys: add allowed domains (e.g., `localhost`, `*.myapp.com`)
+6. Copy the key immediately - it won't be shown again!
+
+> [!IMPORTANT]
+> API keys are only displayed once. Store them securely in environment variables.
+
+## Using API Keys
+
+### Server-Side (Secret Key)
+
+```typescript
+// app.ts
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY, // csk_xxx
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### Browser (Publishable Key)
+
+```typescript
+// browser.ts
+import { Cencori } from 'cencori';
+
+// Safe to use in browser - only works from allowed domains
+const cencori = new Cencori({
+  apiKey: 'cpk_xxx', // Publishable key
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+```
+
+### REST API
+
+```bash
+curl -X POST https://api.cencori.com/v1/ai/chat \
+  -H "Content-Type: application/json" \
+  -H "CENCORI_API_KEY: csk_xxx" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+## Domain Whitelisting
+
+Publishable keys require domain whitelisting for security. Requests from non-whitelisted domains return `403 Forbidden`.
+
+### Supported Patterns
+- `localhost` - Local development
+- `myapp.com` - Exact domain
+- `*.myapp.com` - All subdomains
+
+## Security Best Practices
+
+### ✅ Do
+- Use **secret keys** for server-side code
+- Use **publishable keys** with domain restrictions for browsers
+- Store secrets in environment variables
+- Use different keys for development and production
+- Rotate keys regularly (every 90 days)
+- Revoke unused or compromised keys immediately
+
+### ❌ Don't
+- Expose secret keys (`csk_`) in client code
+- Commit keys to version control (git)
+- Share keys between environments
+- Hard-code keys in your application
+
+## Environment Variables
+
+```bash
+# .env (Node.js)
+# Server-side (secret key)
+CENCORI_API_KEY=csk_xxx
+
+# Test environment
+CENCORI_TEST_API_KEY=csk_test_xxx
+
+# Browser (publishable key - can be public)
+NEXT_PUBLIC_CENCORI_PUBLISHABLE_KEY=cpk_xxx
+```
+
+## Key Rotation
+
+1. Generate a new API key
+2. Update your environment variables
+3. Deploy the updated configuration
+4. Verify the new key works
+5. Revoke the old key

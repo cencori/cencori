@@ -1,0 +1,85 @@
+---
+title: "Analytics Overview"
+description: "Track usage, costs, performance, and security metrics across all your AI integrations."
+section: "Guides"
+order: 6
+---
+
+## What Analytics Does Cencori Provide?
+
+Cencori's analytics dashboard gives you complete visibility into your AI infrastructure:
+
+- **Request Volume:** Track total requests and trends over time.
+- **Cost Analysis:** Detailed breakdown of spend by model and provider.
+- **Performance:** Monitor latency and success rates.
+- **Security:** Track and visualize security incidents (PII, injections).
+- **User Insights:** Analyze usage patterns by user ID or API key.
+
+## Key Metrics
+
+| Metric | Description | Goal |
+|--------|-------------|------|
+| **Total Requests** | Number of AI requests processed. | Monitor growth |
+| **Success Rate** | Percentage of successful vs error responses. | > 99% |
+| **Total Cost** | Cumulative spend (Provider + Markup). | Stay within budget |
+| **Avg Latency** | Time from request to response. | < 2s for UI tasks |
+| **Security Incidents** | Count of blocked or flagged requests. | Minimize threats |
+
+## Charts and Visualizations
+
+### Requests Over Time
+Identify peak usage periods and long-term growth trends with our interactive line charts.
+
+### Cost Breakdown
+Pie and bar charts show you exactly where your budget is going. Compare costs across OpenAI, Anthropic, and Gemini models.
+
+### Model Distribution
+See which models are most popular in your application to help with model consolidation or migration decisions.
+
+### Security Threat Map
+Monitor the distribution of security incidents over time to identify coordinated prompt injection attacks or PII leakage trends.
+
+## Filtering and Segmentation
+
+Slice your data to find exactly what you're looking for:
+- **Time Range:** Filter by last 24h, 7 days, 30 days, or custom ranges.
+- **Model/Provider:** Compare performance and cost across different vendors.
+- **API Key:** Track usage per developer, environment (staging/prod), or application.
+- **User ID:** (Optional) If you pass user IDs, you can analyze behavior per user.
+
+## Common Use Cases
+
+### Performance Debugging
+Find slow requests by filtering for high latency. Identify if specific models or provider regions are causing bottlenecks.
+
+### Capacity Planning
+Use request trends to forecast future usage and ensure your organization has enough credits.
+
+### Security Auditing
+Review spikes in security incidents to determine if they correlate with new deployments or external traffic shifts.
+
+## Accessing Analytics via API
+
+Fetch metrics programmatically for your own internal dashboards:
+
+```typescript
+// fetch-analytics.ts
+const response = await fetch(
+  'https://api.cencori.com/v1/projects/proj_123/analytics?' +
+  'metric=requests&groupBy=model&start=2024-01-01',
+  {
+    headers: {
+      'Authorization': `Bearer ${CENCORI_API_KEY}`
+    }
+  }
+);
+
+const { data } = await response.json();
+// data: [{ model: 'gpt-4o', value: 1250 }, { model: 'claude-3-opus', value: 450 }]
+```
+
+## Best Practices
+- **Review weekly:** Set a recurring task to check your cost and success rate trends.
+- **Set Alerts:** Configure low-balance and cost-threshold alerts to avoid surprises.
+- **Track versions:** Use different API keys for different versions of your app to compare their efficiency.
+- **Share reports:** Export analytics views to share with your security or finance teams.

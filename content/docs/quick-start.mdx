@@ -1,0 +1,60 @@
+---
+title: "Quick Start"
+description: "Get up and running with Cencori in under 5 minutes."
+section: "Getting Started"
+order: 2
+---
+
+Get your first AI request running in under 5 minutes.
+
+## 1. Create an Account
+
+Sign up at [cencori.com/signup](/signup) and create your first project.
+
+## 2. Get Your API Key
+
+Navigate to your project settings and copy your API key.
+
+```
+csk_live_...
+```
+
+## 3. Install the SDK
+
+```bash
+npm install cencori
+```
+
+## 4. Make Your First Request
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: 'csk_live_...'
+});
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+console.log(response.content);
+```
+
+## 5. View in Dashboard
+
+All requests are logged in your dashboard with:
+- Full prompt and response
+- Token usage and costs
+- Latency metrics
+- Security scan results
+
+## Next Steps
+
+| Topic | Description |
+|-------|-------------|
+| [AI Gateway](/docs/ai/gateway) | Learn about multi-provider routing |
+| [Cencori SDK](/docs/ai/sdk) | Explore SDK methods |
+| [Security](/docs/security/scan) | Configure security rules |
+| [Memory](/docs/ai/memory) | Build RAG applications |

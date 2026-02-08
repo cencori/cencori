@@ -1,0 +1,153 @@
+---
+title: "Credits System"
+description: "Learn how Cencori's prepaid credits system works, including pricing, billing, and cost tracking."
+section: "Core Concepts"
+order: 4
+---
+
+## How Credits Work
+
+Cencori uses a prepaid credits system instead of monthly subscriptions. You purchase credits upfront and they're deducted as you use AI models.
+
+1 credit = $1 USD. When you make a request, the cost is calculated and deducted from your organization's balance.
+
+## Why Credits?
+
+- **No Waste:** Only pay for what you use
+- **No Subscriptions:** No monthly fees or commitments
+- **Predictable Costs:** Know exactly what each request costs
+- **Flexible Budgets:** Top up as needed
+- **Transparent Pricing:** See provider cost + markup
+
+## Pricing Model
+
+Each request cost = Provider Cost + Cencori Markup
+
+### Example Calculation
+**Request:** GPT-4o, 1,000 input tokens, 500 output tokens
+
+**Provider Cost (OpenAI):**
+- Input: 1,000 tokens × $5.00 / 1M = $0.005
+- Output: 500 tokens × $15.00 / 1M = $0.0075
+- Total Provider: $0.0125
+
+**Cencori Markup:** 20% = $0.0025
+
+**Total Cost:** $0.015 (0.015 credits)
+
+> [!NOTE]
+> **Transparency**
+> Your dashboard shows exact provider cost and Cencori markup for every request.
+
+## Checking Your Balance
+
+### In Dashboard
+1. Go to your organization dashboard
+2. Check the credits widget in the header
+3. View transaction history for details
+
+### Via API
+
+```typescript
+// get-balance.ts
+const response = await fetch(
+  'https://api.cencori.com/v1/organizations/your-org/credits',
+  {
+    headers: {
+      'CENCORI_API_KEY': process.env.CENCORI_API_KEY,
+    },
+  }
+);
+
+const { balance, currency } = await response.json();
+console.log(`Balance: ${balance} ${currency}`); // Balance: 50.25 USD
+```
+
+## Low Balance Alerts
+
+Cencori automatically alerts you when credits run low:
+
+| Threshold | Alert | Action |
+|-----------|-------|--------|
+| **$10 remaining** | ⚠️ Warning notification | Plan to top up soon |
+| **$5 remaining** | 🚨 Urgent notification | Top up immediately |
+| **$0 remaining** | ❌ Service suspended | Requests blocked until top-up |
+
+## Adding Credits
+
+1. Go to your organization dashboard
+2. Click "Add Credits" or "Top Up"
+3. Choose amount (minimum $10)
+4. Complete payment via Stripe
+5. Credits added immediately
+
+> [!TIP]
+> **Auto-Recharge (Coming Soon)**
+> Automatically top up your balance when it drops below a specific threshold.
+
+## Cost Tracking
+
+Every request shows detailed cost breakdown:
+
+```json
+{
+  "id": "req_123",
+  "model": "gpt-4o",
+  "provider": "openai",
+  "usage": {
+    "prompt_tokens": 1000,
+    "completion_tokens": 500,
+    "total_tokens": 1500
+  },
+  "cost": {
+    "provider_cost_usd": 0.0125,
+    "cencori_markup_usd": 0.0025,
+    "total_cost_usd": 0.015
+  }
+}
+```
+
+View aggregated costs in your analytics dashboard:
+- Total cost per day/week/month
+- Cost by provider
+- Cost by model
+- Cost by project
+- Cost trends over time
+
+## Optimizing Costs
+
+### Use Cheaper Models
+Gemini 2.5 Flash costs ~$0.50/1M tokens vs GPT-4o at ~$15/1M. Use cheaper models for simple tasks.
+
+### Set Token Limits
+Use `maxTokens` to prevent unexpectedly long responses.
+
+### Cache Responses
+For repeated queries, cache responses to avoid redundant API calls.
+
+### Monitor Usage
+Check analytics regularly to identify expensive patterns and optimize.
+
+## Transaction History
+
+View all credit transactions in your dashboard:
+- Credit purchases (top-ups)
+- Credit usage (requests)
+- Refunds (if any)
+- Timestamps and descriptions
+
+Export transaction history for accounting:
+- CSV export
+- PDF invoices
+- Date range filtering
+
+## Free Tier
+
+Cencori offers a free tier with limited features:
+
+| Feature | Free Tier | Paid Tier |
+|---------|-----------|-----------|
+| **Available Models** | Gemini only | All models |
+| **Credits** | Free (limited) | Pay-as-you-go |
+| **Analytics** | Basic | Full |
+| **Custom Providers** | ❌ | ✅ |

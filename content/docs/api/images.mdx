@@ -1,0 +1,65 @@
+---
+title: "Image Generation"
+description: "Generate images from text prompts using multiple AI providers with a unified API."
+section: "API Reference"
+order: 4
+---
+
+## Supported Models
+
+| Provider | Model | Description |
+|----------|-------|-------------|
+| OpenAI | `dall-e-3` | High quality, creative, best text rendering |
+| OpenAI | `dall-e-2` | Fast, cost-effective |
+| Google | `imagen-3` | High photorealism, fast |
+
+## Usage
+
+### SDK
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: "A futuristic city at sunset with flying cars",
+  model: "dall-e-3",
+  size: "1024x1024",
+  quality: "hd"
+});
+
+console.log(response.images[0].url);
+```
+
+### API Request
+```bash
+POST https://api.cencori.com/api/v1/ai/images/generate
+Headers: { "Authorization": "Bearer YOUR_API_KEY" }
+Body: {
+  "prompt": "A futuristic city at sunset",
+  "model": "dall-e-3",
+  "size": "1024x1024"
+}
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `prompt` | string | Yes | Text description of the image |
+| `model` | string | No | Image model (default: `dall-e-3`) |
+| `size` | string | No | `1024x1024`, `1792x1024`, `1024x1792` |
+| `n` | number | No | Number of images (1-4) |
+| `quality` | string | No | `standard` or `hd` |
+| `style` | string | No | `vivid` or `natural` (DALL-E 3) |
+
+## Response
+
+```json
+{
+  "images": [
+    {
+      "url": "https://...",
+      "revisedPrompt": "A futuristic cityscape..."
+    }
+  ],
+  "model": "dall-e-3",
+  "provider": "openai"
+}
+```
