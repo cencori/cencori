@@ -56,8 +56,8 @@ console.log(response.images[0].url);
 ## HTTP API
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/images/generate \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/images/generate \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A futuristic city at sunset",

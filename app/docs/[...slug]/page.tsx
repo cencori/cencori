@@ -68,15 +68,26 @@ export default async function DocPage({ params }: DocPageProps) {
     const content = await parseMDX(doc.content);
     const { prev, next } = getDocNavigation(slugPath);
 
+    const lastUpdated = doc.lastUpdated
+        ? new Date(doc.lastUpdated).toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        })
+        : null;
+
     return (
-        <div className="max-w-4xl">
+        <div className="max-w-[880px]">
             {/* Main Content */}
-            <article className="px-4 py-12 lg:py-0">
-                <div className="space-y-2 mb-8">
-                    <p className="text-sm text-muted-foreground">{doc.section}</p>
-                    <h1 className="text-3xl font-bold tracking-tight">{doc.title}</h1>
+            <article className="px-4 py-10 lg:py-0">
+                <div className="space-y-3 mb-8">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{doc.section}</p>
+                    <h1 className="text-4xl font-bold tracking-tight border-b border-border/40 pb-3">{doc.title}</h1>
+                    {lastUpdated && (
+                        <p className="text-xs text-muted-foreground">Last updated {lastUpdated}</p>
+                    )}
                     {doc.description && (
-                        <p className="text-muted-foreground">{doc.description}</p>
+                        <p className="text-base text-muted-foreground">{doc.description}</p>
                     )}
                 </div>
 
@@ -115,4 +126,3 @@ export default async function DocPage({ params }: DocPageProps) {
         </div>
     );
 }
-

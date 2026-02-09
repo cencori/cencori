@@ -33,7 +33,7 @@ Cencori is **the infrastructure for AI production**. We provide a complete platf
 
 ## The Platform Vision
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                               CENCORI                                   │
 ├─────────────┬─────────────┬─────────────┬─────────────┬─────────────────┤
@@ -134,7 +134,7 @@ Instead of stitching together point solutions, developers get one platform purpo
 
 ## The Stack
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           YOUR APPLICATION                              │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -183,7 +183,7 @@ When positioning Cencori, lead with the platform vision:
 
 AI Gateway is the **first product** in the Cencori platform. It's a secure proxy layer between your application and AI providers.
 
-```
+```text
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Your App      │────▶│  AI Gateway     │────▶│  AI Provider    │
 │                 │     │                 │     │ (OpenAI, etc.)  │

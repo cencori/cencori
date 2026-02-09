@@ -39,9 +39,18 @@ The `chat.completions.create()` method accepts the following parameters:
 
 ### `model` (required)
 The AI model to use. Supported models include:
-- **OpenAI:** `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
-- **Anthropic:** `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`
-- **Google:** `gemini-1.5-pro`, `gemini-1.5-flash`
+- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`
+- **Anthropic:** `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`, `claude-3-opus-latest`, `claude-3-haiku-20240307`
+- **Google:** `gemini-2.0-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`
+- **xAI:** `grok-2`, `grok-beta`
+- **DeepSeek:** `deepseek-chat`, `deepseek-reasoner`
+- **Groq:** `llama-3.1-8b-instant`, `llama-3.1-70b-versatile`
+- **Mistral:** `mistral-large-latest`, `mistral-small-latest`
+- **Together:** `meta-llama/Llama-3-8b-chat-hf`, `meta-llama/Llama-3-70b-chat-hf`
+- **Perplexity:** `llama-3.1-sonar-small-128k-online`, `llama-3.1-sonar-large-128k-online`
+- **OpenRouter:** `meta-llama/llama-3.1-8b-instruct`
+- **Qwen:** `qwen-turbo`, `qwen-plus`
+- **Cohere:** `command-r`, `command-r-plus`
 
 ### `messages` (required)
 An array of message objects representing the conversation history.

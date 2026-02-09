@@ -24,8 +24,8 @@ const cencori = new Cencori({
     enabled: true,
     maxRetries: 3,
     fallbackModels: {
-      'gpt-4o': ['claude-opus-4', 'gemini-2.5-pro'],
-      'claude-opus-4': ['gpt-4o', 'gemini-2.5-pro'],
+      'gpt-4o': ['claude-3-opus-latest', 'gemini-1.5-pro'],
+      'claude-3-opus-latest': ['gpt-4o', 'gemini-1.5-pro'],
     }
   }
 });
@@ -36,7 +36,7 @@ const cencori = new Cencori({
 When configured, a failed request to one provider automatically falls back:
 
 ```typescript
-// If gpt-4o fails, automatically tries claude-opus-4
+// If gpt-4o fails, automatically tries claude-3-opus-latest
 const response = await cencori.ai.chat({
   model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Hello!' }],
@@ -44,7 +44,7 @@ const response = await cencori.ai.chat({
 });
 
 // Response includes which model was actually used
-console.log(response.model); // 'gpt-4o' or 'claude-opus-4'
+console.log(response.model); // 'gpt-4o' or 'claude-3-opus-latest'
 ```
 
 ## Manual Fallback Chain
@@ -55,7 +55,7 @@ Specify explicit fallback order:
 const response = await cencori.ai.chat({
   model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Hello!' }],
-  fallbackModels: ['claude-opus-4', 'gemini-2.5-pro', 'grok-2']
+  fallbackModels: ['claude-3-opus-latest', 'gemini-1.5-pro', 'grok-2']
 });
 ```
 

@@ -60,13 +60,12 @@ Review spikes in security incidents to determine if they correlate with new depl
 
 ## Accessing Analytics via API
 
-Fetch metrics programmatically for your own internal dashboards:
+Fetch metrics programmatically for your own internal dashboards using the Metrics API (`/api/v1/metrics`):
 
 ```typescript
 // fetch-analytics.ts
 const response = await fetch(
-  'https://api.cencori.com/v1/projects/proj_123/analytics?' +
-  'metric=requests&groupBy=model&start=2024-01-01',
+  'https://cencori.com/api/v1/metrics?period=24h',
   {
     headers: {
       'Authorization': `Bearer ${CENCORI_API_KEY}`
@@ -75,7 +74,7 @@ const response = await fetch(
 );
 
 const { data } = await response.json();
-// data: [{ model: 'gpt-4o', value: 1250 }, { model: 'claude-3-opus', value: 450 }]
+// data includes request counts, cost, latency, and breakdowns by provider/model
 ```
 
 ## Best Practices

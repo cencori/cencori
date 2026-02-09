@@ -29,8 +29,8 @@ console.log(response.images[0].url);
 
 ### API Request
 ```bash
-POST https://api.cencori.com/api/v1/ai/images/generate
-Headers: { "Authorization": "Bearer YOUR_API_KEY" }
+POST https://cencori.com/api/ai/images/generate
+Headers: { "CENCORI_API_KEY": "YOUR_API_KEY" }
 Body: {
   "prompt": "A futuristic city at sunset",
   "model": "dall-e-3",

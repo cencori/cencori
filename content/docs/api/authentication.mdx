@@ -32,17 +32,25 @@ export const cencori = new Cencori({
 });
 ```
 
-### Direct HTTP Requests
-If you're making direct HTTP requests, include your API key in the `Authorization` header:
+### Direct HTTP Requests (AI & Memory)
+If you're making direct HTTP requests to the AI or Memory endpoints, include your API key in the `CENCORI_API_KEY` header:
 
 ```bash
-curl https://api.cencori.com/api/v1/chat \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
+```
+
+### Direct HTTP Requests (REST /api/v1)
+For REST endpoints under `/api/v1`, use the `Authorization` header:
+
+```bash
+curl https://cencori.com/api/v1/metrics?period=24h \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ## Environment Variables
@@ -58,9 +66,9 @@ Make sure to add `.env` to your `.gitignore` file.
 ## Required Headers
 
 When making direct API requests, include these headers:
-- **Authorization:** `Bearer YOUR_API_KEY` (required)
+- **AI & Memory endpoints:** `CENCORI_API_KEY: YOUR_API_KEY` (preferred). `Authorization: Bearer YOUR_API_KEY` is also accepted.
+- **REST endpoints (`/api/v1/*`):** `Authorization: Bearer YOUR_API_KEY` (required)
 - **Content-Type:** `application/json` (required for POST)
-- **X-Environment:** `production` or `test` (optional, defaults to production)
 
 ## Authentication Errors
 

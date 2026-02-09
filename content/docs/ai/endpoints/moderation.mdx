@@ -71,8 +71,8 @@ if (response.flagged) {
 ## HTTP API
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/moderation \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/moderation \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "input": "Text to moderate"

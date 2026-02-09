@@ -136,6 +136,15 @@
   }
 }
 
+/* Docs code blocks: match page background */
+.cencori-codeblock,
+.cencori-codeblock pre,
+.cencori-codeblock code,
+.cencori-codeblock [data-theme],
+.cencori-codeblock [data-language] {
+  background: transparent !important;
+}
+
 @keyframes appear {
   from {
     opacity: 0;

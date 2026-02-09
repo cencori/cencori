@@ -67,8 +67,8 @@ const blob = new Blob([response.audio], { type: 'audio/mpeg' });
 ### Transcription
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/audio/transcriptions \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/audio/transcriptions \
+  -H "CENCORI_API_KEY: csk_..." \
   -F file=@audio.mp3 \
   -F model=whisper-1
 ```
@@ -76,8 +76,8 @@ curl -X POST https://api.cencori.com/api/ai/audio/transcriptions \
 ### Speech
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/audio/speech \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/audio/speech \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "input": "Hello world",

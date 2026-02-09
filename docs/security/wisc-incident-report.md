@@ -108,7 +108,7 @@ return aiResponse; // ❌ Never scanned!
 ### Verification
 
 ✅ **Tested with actual Wisc attack:**
-```
+```text
 Input Risk Score: 0.82 → BLOCKED
 Output Risk Score: 0.85 → BLOCKED
 ```

@@ -71,8 +71,8 @@ console.log(response.embeddings.length); // 3
 ## HTTP API
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/embeddings \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/embeddings \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "text-embedding-3-small",
