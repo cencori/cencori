@@ -88,8 +88,8 @@ if (response.toolCalls) {
 If you prefer making direct HTTP requests:
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/chat \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -100,8 +100,8 @@ curl -X POST https://api.cencori.com/api/ai/chat \
 
 ## Authentication
 
-Every request requires either:
-- **Bearer Token:** `Authorization: Bearer csk_...`
-- **Project Key:** `X-Cencori-Project-Key: cpk_...`
+Every request requires an API key:
+- **Preferred:** `CENCORI_API_KEY: csk_...`
+- **Also accepted:** `Authorization: Bearer csk_...`
 
 API keys are scoped to projects. Create and manage them in the [dashboard](/dashboard).

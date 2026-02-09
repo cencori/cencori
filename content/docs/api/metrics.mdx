@@ -17,7 +17,7 @@ The Metrics API allows you to fetch analytics data for your project via a simple
 ## Endpoint
 
 ```bash
-GET https://api.cencori.com/api/v1/metrics
+GET https://cencori.com/api/v1/metrics
 ```
 
 ## Authentication
@@ -25,7 +25,7 @@ GET https://api.cencori.com/api/v1/metrics
 Authenticate using your project's API key in the `Authorization` header:
 
 ```bash
-curl -X GET "https://api.cencori.com/api/v1/metrics?period=24h" \
+curl -X GET "https://cencori.com/api/v1/metrics?period=24h" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -100,11 +100,11 @@ The API returns a JSON object with the following structure:
 ### cURL
 ```bash
 # Get last 24 hours metrics
-curl -X GET "https://api.cencori.com/api/v1/metrics?period=24h" \
+curl -X GET "https://cencori.com/api/v1/metrics?period=24h" \
   -H "Authorization: Bearer sk_live_abc123"
 
 # Get month-to-date metrics
-curl -X GET "https://api.cencori.com/api/v1/metrics?period=mtd" \
+curl -X GET "https://cencori.com/api/v1/metrics?period=mtd" \
   -H "Authorization: Bearer sk_live_abc123"
 ```
 
@@ -112,7 +112,7 @@ curl -X GET "https://api.cencori.com/api/v1/metrics?period=mtd" \
 ```typescript
 async function getMetrics(period = '24h') {
   const response = await fetch(
-    `https://api.cencori.com/api/v1/metrics?period=${period}`,
+    `https://cencori.com/api/v1/metrics?period=${period}`,
     {
       headers: {
         'Authorization': `Bearer ${process.env.CENCORI_API_KEY}`,
@@ -135,7 +135,7 @@ import os
 
 def get_metrics(period='24h'):
     response = requests.get(
-        f'https://api.cencori.com/api/v1/metrics?period={period}',
+        f'https://cencori.com/api/v1/metrics?period={period}',
         headers={
             'Authorization': f'Bearer {os.environ["CENCORI_API_KEY"]}'
         }

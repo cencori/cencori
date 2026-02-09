@@ -1,6 +1,7 @@
-import { CodeBlock, Pre } from "@/components/codeblock";
+import { CodeBlock } from "@/components/codeblock";
 import { cn } from "@/lib/utils";
 import { HTMLAttributes, ComponentProps } from "react";
+import type { ReactNode } from "react";
 import { Callout } from "@/components/blog/Callout";
 import { Card, Cards } from "@/components/blog/Cards";
 import { SecurityArchitectureDiagram } from "@/components/blog/SecurityArchitectureDiagram";
@@ -108,11 +109,16 @@ export const MDXComponents = {
             </a>
         );
     },
-    pre: ({ ref: _ref, ...props }: ComponentProps<'pre'>) => (
-        <CodeBlock className="not-prose">
-            <Pre>{props.children}</Pre>
-        </CodeBlock>
-    ),
+    pre: ({ ref: _ref, ...props }: ComponentProps<'pre'>) => {
+        const codeElement = props.children as { props?: { className?: string; children?: unknown } };
+        const className = codeElement?.props?.className ?? '';
+        const code = codeElement?.props?.children ?? props.children;
+        return (
+            <div className="not-prose my-6">
+                <CodeBlock className={className}>{code as ReactNode}</CodeBlock>
+            </div>
+        );
+    },
     code: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <code
             className={cn(
@@ -182,4 +188,3 @@ export const MDXComponents = {
     Cards,
     SecurityArchitectureDiagram,
 };
-

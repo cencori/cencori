@@ -1,14 +1,15 @@
 import { cn } from "@/lib/utils";
 import { HTMLAttributes, ComponentProps } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { CodeBlock, Pre } from "@/components/codeblock";
+import { CodeBlock } from "@/components/codeblock";
 
 // Docs-specific MDX components with styling matching the blog
 export const DocsMDXComponents = {
     h1: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
         <h1
             className={cn(
-                "mt-2 scroll-m-20 text-3xl font-bold tracking-tight",
+                "mt-2 scroll-m-20 text-4xl font-bold tracking-tight",
                 className
             )}
             {...props}
@@ -18,7 +19,7 @@ export const DocsMDXComponents = {
         <h2
             id={id}
             className={cn(
-                "mt-8 scroll-m-20 border-b border-border/40 pb-1 text-2xl font-semibold tracking-tight first:mt-0",
+                "mt-10 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0",
                 className
             )}
             {...props}
@@ -28,7 +29,7 @@ export const DocsMDXComponents = {
         <h3
             id={id}
             className={cn(
-                "mt-6 scroll-m-20 text-xl font-semibold tracking-tight",
+                "mt-8 scroll-m-20 text-xl font-semibold tracking-tight",
                 className
             )}
             {...props}
@@ -46,15 +47,15 @@ export const DocsMDXComponents = {
     ),
     p: ({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) => (
         <p
-            className={cn("leading-7 [&:not(:first-child)]:mt-4 text-muted-foreground", className)}
+            className={cn("leading-7 [&:not(:first-child)]:mt-4 text-[0.95rem] text-muted-foreground", className)}
             {...props}
         />
     ),
     ul: ({ className, ...props }: HTMLAttributes<HTMLUListElement>) => (
-        <ul className={cn("my-3 ml-6 list-disc [&>li]:mt-1 text-muted-foreground", className)} {...props} />
+        <ul className={cn("my-3 ml-5 list-disc [&>li]:mt-1 text-[0.95rem] text-muted-foreground", className)} {...props} />
     ),
     ol: ({ className, ...props }: HTMLAttributes<HTMLOListElement>) => (
-        <ol className={cn("my-3 ml-6 list-decimal [&>li]:mt-1 text-muted-foreground", className)} {...props} />
+        <ol className={cn("my-3 ml-5 list-decimal [&>li]:mt-1 text-[0.95rem] text-muted-foreground", className)} {...props} />
     ),
     li: ({ className, ...props }: HTMLAttributes<HTMLLIElement>) => (
         <li className={cn("leading-7", className)} {...props} />
@@ -106,11 +107,16 @@ export const DocsMDXComponents = {
             </a>
         );
     },
-    pre: ({ ref: _ref, ...props }: ComponentProps<'pre'>) => (
-        <CodeBlock className="not-prose my-4">
-            <Pre>{props.children}</Pre>
-        </CodeBlock>
-    ),
+    pre: ({ ref: _ref, ...props }: ComponentProps<'pre'>) => {
+        const codeElement = props.children as { props?: { className?: string; children?: unknown } };
+        const className = codeElement?.props?.className ?? '';
+        const code = codeElement?.props?.children ?? props.children;
+        return (
+            <div className="not-prose my-4">
+                <CodeBlock className={className}>{code as ReactNode}</CodeBlock>
+            </div>
+        );
+    },
     code: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <code
             className={cn(
@@ -121,7 +127,7 @@ export const DocsMDXComponents = {
         />
     ),
     table: ({ className, ...props }: HTMLAttributes<HTMLTableElement>) => (
-        <div className="my-4 w-full overflow-x-auto">
+        <div className="my-5 w-full overflow-x-auto rounded-md border border-border/40">
             <table
                 className={cn("w-full text-sm", className)}
                 {...props}
@@ -136,14 +142,14 @@ export const DocsMDXComponents = {
     ),
     tr: ({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) => (
         <tr
-            className={cn("border-b border-border/50", className)}
+            className={cn("border-b border-border/50 transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted", className)}
             {...props}
         />
     ),
     th: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
         <th
             className={cn(
-                "px-4 py-2 text-left font-semibold text-foreground",
+                "border-r border-border/40 px-4 py-2 text-left font-semibold [&[align=center]]:text-center [&[align=right]]:text-right bg-muted/40 last:border-r-0",
                 className
             )}
             {...props}
@@ -151,7 +157,7 @@ export const DocsMDXComponents = {
     ),
     td: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
         <td
-            className={cn("px-4 py-2 text-muted-foreground", className)}
+            className={cn("border-r border-border/40 px-4 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right last:border-r-0", className)}
             {...props}
         />
     ),

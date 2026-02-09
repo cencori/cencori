@@ -70,24 +70,25 @@ Search through logs using full-text search to:
 
 ## Accessing via API
 
-You can fetch logs programmatically using our API:
+You can fetch logs programmatically. The dashboard uses a project-scoped endpoint:
 
 ```typescript
 // fetch-logs.ts
 const response = await fetch(
-  'https://api.cencori.com/v1/projects/proj_123/logs?' +
-  'start_date=2024-01-01&model=gpt-4o&limit=100',
+  'https://cencori.com/api/projects/proj_123/logs?' +
+  'time_range=24h&model=gpt-4o&per_page=100',
   {
     headers: {
-      'Authorization': `Bearer ${CENCORI_API_KEY}`
+      // Uses your authenticated dashboard session
+      // (this endpoint is not part of the public API)
     }
   }
 );
 
-const { logs } = await response.json();
+const { requests } = await response.json();
 
-logs.forEach(log => {
-  console.log(`[${log.timestamp}] ${log.model}: ${log.total_tokens} tokens, $${log.cost_usd}`);
+requests.forEach(log => {
+  console.log(`[${log.created_at}] ${log.model}: ${log.total_tokens} tokens, $${log.cost_usd}`);
 });
 ```
 

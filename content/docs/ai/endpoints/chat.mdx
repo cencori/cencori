@@ -53,7 +53,7 @@ console.log(response.content);
 
 ```typescript
 const stream = cencori.ai.chatStream({
-  model: 'claude-opus-4',
+  model: 'claude-3-5-sonnet-latest',
   messages: [{ role: 'user', content: 'Tell me a story' }]
 });
 
@@ -65,8 +65,8 @@ for await (const chunk of stream) {
 ## HTTP API
 
 ```bash
-curl -X POST https://api.cencori.com/api/ai/chat \
-  -H "Authorization: Bearer csk_..." \
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -78,8 +78,15 @@ curl -X POST https://api.cencori.com/api/ai/chat \
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini |
-| Anthropic | claude-opus-4, claude-sonnet-4, claude-3-5-sonnet |
-| Google | gemini-2.5-pro, gemini-2.5-flash |
-| xAI | grok-2, grok-2-vision-1212 |
+| OpenAI | gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo |
+| Anthropic | claude-3-5-sonnet-latest, claude-3-5-haiku-latest, claude-3-opus-latest, claude-3-haiku-20240307 |
+| Google | gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash |
+| xAI | grok-2, grok-beta |
 | DeepSeek | deepseek-chat, deepseek-reasoner |
+| Groq | llama-3.1-8b-instant, llama-3.1-70b-versatile |
+| Mistral | mistral-large-latest, mistral-small-latest |
+| Together | meta-llama/Llama-3-8b-chat-hf, meta-llama/Llama-3-70b-chat-hf |
+| Perplexity | llama-3.1-sonar-small-128k-online, llama-3.1-sonar-large-128k-online |
+| OpenRouter | meta-llama/llama-3.1-8b-instruct |
+| Qwen | qwen-turbo, qwen-plus |
+| Cohere | command-r, command-r-plus |
