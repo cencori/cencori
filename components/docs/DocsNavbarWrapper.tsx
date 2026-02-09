@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import Navbar from "@/components/landing/Navbar";
 import { useDocsContext } from "./DocsContext";
 import { Logo } from "@/components/logo";
@@ -69,7 +70,7 @@ export function DocsNavbarWrapper() {
         };
         checkUser();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
             if (session) {
                 setIsAuthenticated(true);
                 const { user } = session;
