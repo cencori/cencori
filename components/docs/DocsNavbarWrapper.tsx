@@ -182,7 +182,10 @@ export function DocsNavbarWrapper() {
                 userProfile={isAuthenticated ? userProfile : undefined}
                 searchSlot={searchSlot}
                 containerClassName="container"
-                className={isAskAIOpen ? "md:right-[400px] transition-[right] duration-300 ease-in-out" : "right-0 transition-[right] duration-300 ease-in-out"}
+
+                className={isAskAIOpen ? "md:right-[400px]" : "right-0"}
+                layout
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
             />
             <DocsMobileNav onOpenSearch={() => setSearchOpen(true)} />
             <DocsSearchModal open={searchOpen} onOpenChange={setSearchOpen} />
