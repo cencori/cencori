@@ -1,0 +1,48 @@
+---
+title: "Bring Your Own Key (BYOK)"
+description: "Connect your own provider API keys to bypass Cencori's usage-based pricing."
+section: "Platform"
+order: 5
+---
+
+**Bring Your Own Key (BYOK)** allows you to use your existing API keys (OpenAI, Anthropic, Google, etc.) within Cencori. This gives you full control over billing, rate limits, and model access while leveraging Cencori's observability and gateway features.
+
+## Why Use BYOK?
+
+| Feature | Managed Keys (Standard) | BYOK (Custom Keys) |
+| :--- | :--- | :--- |
+| **Billing** | Single invoice from Cencori | Direct billing from Provider |
+| **Pricing** | Provider Cost + Cencori Markup | Provider Cost (0% Markup) |
+| **Rate Limits** | Shared Cencori limits | Your personal provider limits |
+| **Model Access** | Standard supported models | Access to betas/finetunes |
+| **Setup** | Instant (use Credits) | Requires configuration |
+
+> [!TIP]
+> BYOK is ideal for high-volume users who have negotiated rates with providers or need to use specific fine-tuned models.
+
+## Configuring BYOK
+
+You can configure keys at the **Project** level via the dashboard.
+
+### Web Dashboard
+
+1. Navigate to your **Project**.
+2. Click **Providers** in the sidebar.
+3. Select a provider from the list (e.g., **OpenAI**).
+4. In the dialog:
+   - Enter your **API Key** (e.g., `sk-...`).
+   - Select a **Default Model** (e.g., `gpt-4o`).
+   - Toggle **Set as project default** if you want this provider to handle all unspecified requests.
+5. Click **Save**.
+
+Once enabled, the provider badge will show **"Enabled"**, and all requests for that provider will be routed using your credentials.
+
+## Hybrid Usage
+
+You can mix and match Managed Keys and BYOK.
+- Use **Managed Keys** for experimental providers (e.g., trying out Gemini).
+- Use **BYOK** for your primary production provider (e.g., OpenAI) to optimize costs.
+
+## Security
+
+Your keys are encrypted at rest using AES-256 encryption. They are strictly used for making requests to the respective provider and are never logged or exposed via the API.

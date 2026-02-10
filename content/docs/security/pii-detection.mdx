@@ -1,40 +1,37 @@
 ---
 title: "PII Detection"
-description: "Automatically detect and protect personally identifiable information (PII) in AI requests and responses."
+description: "Detect and redact Personally Identifiable Information (PII) in real-time. Configure custom rules and redaction strategies."
 section: "Security"
-order: 3
+order: 2
 ---
 
-## What is PII?
+Cencori Scan automatically detects sensitive data in both **prompts** (uploaded to AI) and **responses** (returned to users).
 
-Personally Identifiable Information (PII) is any data that can identify a specific individual. Sending PII to third-party AI providers can:
-- Violate GDPR, HIPAA, or other privacy regulations
-- Expose sensitive customer data
-- Result in data breaches and legal liability
-- Damage customer trust
+## Supported Entities
 
-## What Cencori Detects
+We currently detect 25+ types of PII and secrets with high-precision models.
 
-| PII Type | Examples | Pattern |
-|----------|----------|---------|
-| **Email Addresses** | john@example.com | Regex + validation |
-| **Phone Numbers** | +1-555-123-4567 | Multiple formats |
-| **Social Security Numbers** | 123-45-6789 | US SSN format |
-| **Credit Card Numbers** | 4532-1234-5678-9010 | Luhn algorithm |
-| **IP Addresses** | 192.168.1.1 | IPv4/IPv6 |
-| **Postal Addresses** | 123 Main St, NY 10001 | Address patterns |
-| **Government IDs** | Passport numbers, licenses | Country-specific |
+| Category | Entities |
+|----------|----------|
+| **Financial** | Credit Card Numbers, IBAN, Swift Codes, Bitcoin Addresses |
+| **Personal** | Email, Phone Number, SSN (US), Passport Numbers, IP Addresses |
+| **Secrets** | OpenAI Keys, AWS Keys, Slack Tokens, Private Keys (PEM) |
+| **Network** | MAC Addresses, IPv4, IPv6 |
 
-## How PII Detection Works
+## Redaction Modes
 
-1. **Request Received**: Your application sends a request through Cencori.
-2. **PII Scan**: Cencori scans the prompt for PII using regex and ML models.
-3. **Detection Found**: If PII is detected, request is flagged as a security incident.
-4. **Action Taken**: Block request or redact PII based on your policy.
+You can configure how Cencori handles detected PII via the Dashboard or `cencorirc`.
 
-## Automatic Blocking
+| Mode | Behavior | Example Output |
+|------|----------|----------------|
+| **Mask** | Partially hides the data (default). | `user@example.com` -> `u***@example.com` |
+| **Redact** | Replaces with a placeholder type. | `user@example.com` -> `<EMAIL_ADDRESS>` |
+| **Block** | Rejects the request entirely. | `CENCORI_403: PII Detected` |
+| **Off** | Logs the detection but allows pass-through. | `user@example.com` |
 
-By default, Cencori blocks requests containing PII and returns an error:
+## Configuration
+
+To configure PII rules programmatically (e.g., for Cencori Scan CLI):
 
 ```json
 {
@@ -44,10 +41,17 @@ By default, Cencori blocks requests containing PII and returns an error:
   "details": {
     "patterns_detected": ["EMAIL", "PHONE_NUMBER"],
     "incident_id": "inc_abc123"
+    
+// .cencorirc
+{
+  "pii": {
+    "email": "mask",
+    "credit_card": "block",
+    "ssn": "redact",
+    "phone": "off"
   }
 }
 ```
-
 The request never reaches the AI provider, protecting your users' data.
 
 ## Handling PII Detection in Your Code
@@ -140,3 +144,23 @@ PII detection helps you comply with:
 - **HIPAA:** Protect patient health information
 - **SOC 2:** Demonstrate data protection controls
 - **CCPA:** California Consumer Privacy Act compliance
+## Custom Regex Rules
+
+You can add custom detectors for business-specific data (e.g., User IDs, Order Numbers).
+
+```json
+// .cencorirc
+{
+  "custom_rules": [
+    {
+      "name": "internal_order_id",
+      "regex": "ORD-\\d{6}",
+      "action": "redact"
+    }
+  ]
+}
+```
+
+## False Positives
+
+If legitimate data is being flagged, you can whitelist specific values or contexts in the Dashboard > Security > Whitelist.

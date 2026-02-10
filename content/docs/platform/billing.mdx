@@ -1,0 +1,51 @@
+---
+title: "Billing & Usage"
+description: "Understanding subscription tiers, token pricing, and spend management."
+section: "Platform"
+order: 2
+---
+
+Cencori offers a transparent pricing model combining a fixed platform subscription with usage-based AI costs.
+
+## Subscription Tiers
+
+Choose the plan that fits your team size and scaling needs.
+
+| Feature | Free | Pro ($49/mo) | Team ($149/mo) |
+| :--- | :--- | :--- | :--- |
+| **Requests** | 1,000 / mo | 50,000 / mo | 250,000 / mo |
+| **Projects** | 1 | Unlimited | Unlimited |
+| **Support** | Community | Priority (24h) | Priority (4h) |
+| **Members** | 1 | 1 | 10 |
+| **Log Retention**| 3 days | 30 days | 90 days |
+
+> [!TIP]
+> **Enterprise** plans are available for unlimited requests, custom SLAs, and dedicated support. [Contact Sales](/contact) for details.
+
+## Token Pricing
+
+Cencori simplifies billing by consolidating all AI provider costs into a single invoice. We pass through model costs with a small markup to cover infrastructure reliability, unified logging, and security scanning.
+
+### Markup Rates
+
+- **OpenAI**: +50% (e.g., GPT-4o input: ~$3.75/1M tokens)
+- **Anthropic**: +50%
+- **Google Vertex**: +0% (Native pricing)
+- **Custom Providers**: +0%
+
+> [!NOTE]
+> Markups cover the cost of the **Universal Proxy**, **PII Scanning**, **Prompt Injection Protection**, and **Compliance Logging** which run on every request.
+
+## Spend Management
+
+Prevent unexpected bills with our built-in budget controls.
+
+### Monthly Budget
+Set a soft limit to receive email alerts when your spending reaches **50%**, **80%**, and **100%** of your threshold.
+
+### Hard Spend Cap
+Set a hard limit (e.g., $500/mo). Once reached, Cencori will **block all AI requests** until the next billing cycle or until you increase the cap.
+
+1. Go to **Settings > Billing**.
+2. Enable **Enforce spend cap**.
+3. Enter your maximum monthly amount.

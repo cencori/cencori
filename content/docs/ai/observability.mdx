@@ -1,0 +1,51 @@
+---
+title: "Observability"
+description: "Gain complete visibility into your AI traffic. Analyze logs, traces, costs, and performance metrics."
+section: "AI Gateway"
+order: 1
+---
+
+Cencori provides a complete observability stack out-of-the-box, eliminating the need for external tools like LangSmith or Helicone for most use cases.
+
+## Request Logs
+
+Every request sent through the gateway is logged with granular detail.
+
+- **Inputs/Outputs**: Full prompt and completion text.
+- **Metadata**: Latency, TTFT (Time to First Token), Provider, Model.
+- **Cost**: Calculated based on provider pricing (automatically updated).
+- **Status**: Success, Failure, or Content Verification flags.
+
+To view logs, navigate to **Dashboard > Logs**. You can filter by:
+- `status` (e.g., `error`, `success`)
+- `model` (e.g., `gpt-4o`)
+- `metadata.user_id`
+
+## Traces
+
+For complex workflows (Agents, RAG), Cencori stitches individual requests into a **Trace**.
+
+- **Root Span**: The initial user request.
+- **Child Spans**: Tool calls, embedding generation, or retrieval steps.
+- **Visualization**: A Gantt-chart view of the entire chain execution.
+
+To enable tracing, simpy pass a `trace_id` header or use the `parent_id` parameter in our SDKs (auto-handled by LangChain integration).
+
+## Cost Tracking & Analytics
+
+The **Dashboard > Analytics** tab provides high-level insights:
+
+- **Total Spend**: Daily/Monthly breakdown.
+- **Volume**: Request count and token throughput.
+- **Latency P95/P99**: Identify slow providers or regions.
+- **Error Rate**: Monitor stability.
+
+## Data Export (Enterprise)
+
+You can export your raw log data to your own data warehouse.
+
+- **S3 Bucket**: JSONL files delivered hourly.
+- **Datadog**: Real-time log streaming.
+- **BigQuery / Snowflake**: Direct sync.
+
+Contact sales to enable Data Export.

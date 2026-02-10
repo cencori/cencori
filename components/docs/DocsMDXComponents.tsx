@@ -47,15 +47,15 @@ export const DocsMDXComponents = {
     ),
     p: ({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) => (
         <p
-            className={cn("leading-7 [&:not(:first-child)]:mt-4 text-[0.95rem] text-muted-foreground", className)}
+            className={cn("leading-7 [&:not(:first-child)]:mt-4 text-[0.95rem] text-foreground", className)}
             {...props}
         />
     ),
     ul: ({ className, ...props }: HTMLAttributes<HTMLUListElement>) => (
-        <ul className={cn("my-3 ml-5 list-disc [&>li]:mt-1 text-[0.95rem] text-muted-foreground", className)} {...props} />
+        <ul className={cn("my-3 ml-5 list-disc [&>li]:mt-1 text-[0.95rem] text-foreground", className)} {...props} />
     ),
     ol: ({ className, ...props }: HTMLAttributes<HTMLOListElement>) => (
-        <ol className={cn("my-3 ml-5 list-decimal [&>li]:mt-1 text-[0.95rem] text-muted-foreground", className)} {...props} />
+        <ol className={cn("my-3 ml-5 list-decimal [&>li]:mt-1 text-[0.95rem] text-foreground", className)} {...props} />
     ),
     li: ({ className, ...props }: HTMLAttributes<HTMLLIElement>) => (
         <li className={cn("leading-7", className)} {...props} />

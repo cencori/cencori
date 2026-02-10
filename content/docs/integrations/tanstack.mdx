@@ -1,0 +1,80 @@
+---
+title: "TanStack AI"
+description: "Integrate Cencori with TanStack Query and TanStack Start."
+section: "Integrations"
+order: 6
+---
+
+Cencori works perfectly with the TanStack ecosystem, allowing you to build AI applications with full control over data fetching and caching.
+
+## TanStack Query (React Query)
+
+You can use `useMutation` to handle streaming AI responses while maintaining fine-grained control over the request lifecycle.
+
+```tsx
+import { useMutation } from '@tanstack/react-query';
+
+function AIComponent() {
+  const mutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const response = await fetch('https://cencori.com/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CENCORI_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: prompt }],
+          stream: true
+        })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.body;
+    },
+    onSuccess: async (stream) => {
+        if (!stream) return;
+        // Handle stream reading here
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        // ...
+    }
+  });
+
+  return (
+    <button onClick={() => mutation.mutate("Hello world")}>
+      Generate
+    </button>
+  );
+}
+```
+
+## TanStack Start
+
+For server-side usage in TanStack Start, you can use Cencori as your fetcher.
+
+```typescript
+// app/routes/api/ai.ts
+import { createAPIFileRoute } from '@tanstack/start/api'
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+    apiKey: process.env.CENCORI_API_KEY
+});
+
+export const Route = createAPIFileRoute('/api/ai')({
+  POST: async ({ request }) => {
+    const { message } = await request.json();
+    
+    const stream = await cencori.ai.chatStream({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: message }]
+    });
+
+    return new Response(stream, {
+        headers: { 'Content-Type': 'text/event-stream' }
+    });
+  },
+})
+```

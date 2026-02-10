@@ -1,7 +1,7 @@
 ---
 title: "API Keys"
-description: "Learn how to create, manage, and secure API keys for authenticating requests to Cencori."
-section: "Core Concepts"
+description: "Manage authentication access with Publishable and Secret keys."
+section: "Platform"
 order: 3
 ---
 
@@ -16,7 +16,7 @@ Cencori offers two types of API keys for different security requirements:
 ### Secret Keys
 Format: `csk_...` or `csk_test_...`
 - For **server-side use only**
-- Full access to all features
+- Full access to all features (including admin functions)
 - Never expose in browser or client code
 - Use in Node.js, Python, or server routes
 
@@ -32,17 +32,28 @@ Format: `cpk_...` or `cpk_test_...`
 > Format: `cen_...` or `cen_test_...`
 > Existing keys created before key types are fully functional are treated as secret keys. No migration required.
 
-## Creating API Keys
+## Managing Keys
 
-1. Go to your [project settings](/dashboard)
-2. Navigate to the "API" tab
-3. Click "New secret key" or "New publishable key"
-4. Enter a name for the key
-5. For publishable keys: add allowed domains (e.g., `localhost`, `*.myapp.com`)
+You can manage keys in the **Settings > API** tab of your project dashboard.
+
+### Creating API Keys
+
+1. Go to your [project settings](/dashboard/organizations).
+2. Navigate to the **"API"** tab.
+3. Click **"New secret key"** or **"New publishable key"**.
+4. Enter a name for the key (e.g., "Production Web App", "Backend Server").
+5. For publishable keys: add allowed domains (e.g., `localhost`, `*.myapp.com`).
 6. Copy the key immediately - it won't be shown again!
 
 > [!IMPORTANT]
 > API keys are only displayed once. Store them securely in environment variables.
+
+### Revoking a Key
+If a key is compromised or no longer needed, you can revoke it immediately:
+1. Find the key in the list.
+2. Click the **Context Menu (...)**.
+3. Select **Revoke key**.
+4. The key will stop working immediately and requests using it will fail with `401 Unauthorized`.
 
 ## Using API Keys
 
@@ -70,7 +81,7 @@ import { Cencori } from 'cencori';
 
 // Safe to use in browser - only works from allowed domains
 const cencori = new Cencori({
-  apiKey: 'cpk_xxx', // Publishable key
+  apiKey: process.env.NEXT_PUBLIC_CENCORI_PUBLISHABLE_KEY, // cpk_xxx
 });
 
 const response = await cencori.ai.chat({
@@ -96,13 +107,13 @@ curl -X POST https://cencori.com/api/ai/chat \
 Publishable keys require domain whitelisting for security. Requests from non-whitelisted domains return `403 Forbidden`.
 
 ### Supported Patterns
-- `localhost` - Local development
-- `myapp.com` - Exact domain
-- `*.myapp.com` - All subdomains
+- `localhost`: Local development on any port.
+- `myapp.com`: Exact domain match.
+- `*.myapp.com`: All subdomains (e.g., `app.myapp.com`, `staging.myapp.com`).
 
 ## Security Best Practices
 
-### ✅ Do
+### Do
 - Use **secret keys** for server-side code
 - Use **publishable keys** with domain restrictions for browsers
 - Store secrets in environment variables
@@ -110,7 +121,7 @@ Publishable keys require domain whitelisting for security. Requests from non-whi
 - Rotate keys regularly (every 90 days)
 - Revoke unused or compromised keys immediately
 
-### ❌ Don't
+### Don't
 - Expose secret keys (`csk_`) in client code
 - Commit keys to version control (git)
 - Share keys between environments

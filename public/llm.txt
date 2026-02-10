@@ -5,12 +5,86 @@
 ## What is Cencori?
 
 Cencori is the unified AI infrastructure for production applications. Instead of integrating with OpenAI, Anthropic, and Google separately, you integrate once with Cencori and get:
-- **One SDK** for all providers (OpenAI, Anthropic, Google)
-- **Automatic security** - PII detection, prompt injection protection, content filtering
-- **Complete observability** - audit logs, analytics, cost tracking
+- **Unified SDK Support**: 3 Official SDKs + Native Proxy support for 10+ AI libraries
+- **Automatic security** - PII detection (25+ entities), prompt injection protection, content filtering
+- **Complete observability** - audit logs, traces, analytics, cost tracking
 - **Multi-provider flexibility** - switch models with one parameter
 
-## Quick Start
+## Core Architecture (CIP)
+
+Cencori acts as a **Cloud Intelligence Provider**, not just a proxy.
+- **Global Edge Network**: deployed across 35+ regions for <10ms latency.
+- **Zero Cold Starts**: Warm execution environments for all requests.
+- **Data Residency**: Logs stored in US-East (N. Virginia) by default; EU options available.
+- **Stateful Intelligence**: Maintains context (Memory) and Security (Scan) before provider processing.
+
+## Gateway Features
+
+- **Smart Routing**: Route to "lowest cost" or "fastest" provider dynamically.
+- **Failover**: Automatically retry on 429/503 errors.
+- **Caching**: Semantic & Exact Match caching to reduce costs by 30-60%.
+- **Observability**: Full request logging and trace visualization.
+
+## Memory & RAG
+
+- **Vector Database**: Built-in (no Pinecone needed). Uses `text-embedding-3-small` (1536 dims).
+- **Auto-Indexing**: <500ms latency from store to search availability.
+- **Advanced Filtering**: Support for `$eq`, `$in`, `$gt`, `$lt` operators on metadata.
+- **Hybrid Search**: Combine semantic search with keyword matching (BM25).
+- **TTL**: Auto-expire memories (e.g., session history).
+
+## Security Features (Scan)
+
+- **PII Detection**: Detects SSN, Credit Cards, Secrets, Emails. Modes: `mask`, `redact`, `block`.
+- **Prompt Injection**: Uses Heuristics + VectorDB + Llama Guard (Zero-Trust).
+- **Content Filtering**: Unified thresholds (0.0-1.0) for Hate, Violence, Sexual content.
+
+## SDK Configuration
+
+- **Timeouts**: Default read timeout is 60s. Increase this for `o1` or `claude-opus`.
+- **Retries**: Default 2 retries with exponential backoff (max delay 60s).
+- **Edge Runtime**: Official Node.js SDK is fully compatible with Vercel Edge & Cloudflare Workers.
+- **Telemetry**: SDK collects anonymous latency & OS version. Disable with `CENCORI_TELEMETRY=0`.
+
+## Supported SDKs & Integrations
+
+Cencori provides multiple ways to integrate, ranging from official dedicated libraries to complete drop-in compatibility for existing AI SDKs.
+
+### 1. Official Cencori SDKs (3)
+The most feature-complete way to integrate, supporting all Cencori primitives (Chat, Images, Memory, Security).
+- **TypeScript/Node.js**: `npm install cencori`
+- **Python**: `pip install cencori`
+- **Go**: `go get github.com/cencori/cencori-go`
+
+### 2. Framework Adapters
+Optimized providers for popular AI development frameworks.
+- **Vercel AI SDK**: `@cencori/ai-sdk`
+- **TanStack AI**: `@cencori/ai-sdk/tanstack`
+- **LangChain**: Works via the `ChatOpenAI` or `ChatAnthropic` adapters.
+
+### 3. Native Proxy Support (Zero-Config)
+Cencori is 100% compatible with existing AI SDKs. Just point the `base_url` to `https://cencori.com/v1`.
+
+**PHP (openai-php/client):**
+```php
+$client = OpenAI::factory()
+    ->withBaseUri('https://cencori.com/v1')
+    ->withApiKey('csk_...')
+    ->make();
+```
+
+**Ruby (ruby-openai):**
+```ruby
+client = OpenAI::Client.new(
+    access_token: "csk_...",
+    uri_base: "https://cencori.com/v1"
+)
+```
+
+- **OpenAI SDK** (All languages: Python, Node, Java, .NET)
+- **Anthropic SDK** (All languages)
+- **Mistral SDK**
+- **CrewAI / AutoGen / LangGraph**
 
 ### 1. Install the SDK
 
@@ -1025,6 +1099,32 @@ Cencori supports two types of API keys:
 - Existing keys created before key types
 - Treated as secret keys
 - Still fully functional
+
+## Pricing & Limits
+- **Free**: 1k requests/mo, 1 project.
+- **Pro**: 50k requests/mo, unlimited projects.
+- **Team**: 250k requests/mo, 10 members.
+- **Token Markup**: 50% on OpenAI/Anthropic, 0% on Google. Covers security & logging costs.
+
+## Integrations
+
+### Vercel AI SDK
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+export const cencori = createOpenAI({
+  baseURL: 'https://cencori.com/api/v1',
+  apiKey: process.env.CENCORI_API_KEY
+});
+```
+
+### LangChain
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+const chat = new ChatOpenAI({
+  openAIApiKey: process.env.CENCORI_API_KEY,
+  configuration: { baseURL: "https://cencori.com/api/v1" },
+});
+```
 
 ## Dashboard
 

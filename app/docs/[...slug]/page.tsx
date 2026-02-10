@@ -77,52 +77,49 @@ export default async function DocPage({ params }: DocPageProps) {
         : null;
 
     return (
-        <div className="max-w-[880px]">
-            {/* Main Content */}
-            <article className="px-4 py-10 lg:py-0">
-                <div className="space-y-3 mb-8">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{doc.section}</p>
-                    <h1 className="text-4xl font-bold tracking-tight border-b border-border/40 pb-3">{doc.title}</h1>
-                    {lastUpdated && (
-                        <p className="text-xs text-muted-foreground">Last updated {lastUpdated}</p>
-                    )}
-                    {doc.description && (
-                        <p className="text-base text-muted-foreground">{doc.description}</p>
-                    )}
-                </div>
-
-                <div className="prose prose-zinc dark:prose-invert max-w-none">
-                    {content}
-                </div>
-
-                {/* Navigation */}
-                {(prev || next) && (
-                    <div className="flex justify-between items-center pt-8 mt-12 border-t border-border/40">
-                        {prev ? (
-                            <Link href={`/docs/${prev.slug}`}>
-                                <Button variant="ghost" className="gap-2">
-                                    <ChevronLeft className="h-4 w-4" />
-                                    <span className="flex flex-col items-start">
-                                        <span className="text-xs text-muted-foreground">Previous</span>
-                                        <span className="text-sm font-medium">{prev.title}</span>
-                                    </span>
-                                </Button>
-                            </Link>
-                        ) : <div />}
-                        {next && (
-                            <Link href={`/docs/${next.slug}`}>
-                                <Button variant="ghost" className="gap-2">
-                                    <span className="flex flex-col items-end">
-                                        <span className="text-xs text-muted-foreground">Next</span>
-                                        <span className="text-sm font-medium">{next.title}</span>
-                                    </span>
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
+        <article className="px-4 py-10 lg:py-0 w-full">
+            <div className="space-y-3 mb-8">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{doc.section}</p>
+                <h1 className="text-4xl font-bold tracking-tight border-b border-border/40 pb-3">{doc.title}</h1>
+                {lastUpdated && (
+                    <p className="text-xs text-muted-foreground">Last updated {lastUpdated}</p>
                 )}
-            </article>
-        </div>
+                {doc.description && (
+                    <p className="text-base text-muted-foreground">{doc.description}</p>
+                )}
+            </div>
+
+            <div className="prose prose-zinc dark:prose-invert max-w-none">
+                {content}
+            </div>
+
+            {/* Navigation */}
+            {(prev || next) && (
+                <div className="flex justify-between items-center pt-8 mt-12 border-t border-border/40">
+                    {prev ? (
+                        <Link href={`/docs/${prev.slug}`}>
+                            <Button variant="ghost" className="gap-2">
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="flex flex-col items-start">
+                                    <span className="text-xs text-muted-foreground">Previous</span>
+                                    <span className="text-sm font-medium">{prev.title}</span>
+                                </span>
+                            </Button>
+                        </Link>
+                    ) : <div />}
+                    {next && (
+                        <Link href={`/docs/${next.slug}`}>
+                            <Button variant="ghost" className="gap-2">
+                                <span className="flex flex-col items-end">
+                                    <span className="text-xs text-muted-foreground">Next</span>
+                                    <span className="text-sm font-medium">{next.title}</span>
+                                </span>
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                    )}
+                </div>
+            )}
+        </article>
     );
 }

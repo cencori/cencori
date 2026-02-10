@@ -1,0 +1,106 @@
+---
+title: "Universal Proxy"
+description: "Use Cencori with any AI SDK (C#, PHP, Ruby, Java, etc.) by simply changing the Base URL."
+section: "AI"
+order: 4
+---
+
+Cencori acts as a drop-in replacement for OpenAI. Any SDK that supports a custom `baseUrl` (or `base_url`) works instantly with Cencori.
+
+## The Magic Configuration
+
+For any OpenAI-compatible library, make two changes:
+1.  **API Key**: Use your Cencori Project Key (`csk_...`).
+2.  **Base URL**: Set to `https://cencori.com/v1`.
+
+That's it. You now get logs, security scanning, and multi-provider routing for free.
+
+## C# (.NET) / Azure OpenAI SDK
+
+Use the official `Azure.AI.OpenAI` or `OpenAI` package.
+
+```csharp
+using Azure.AI.OpenAI;
+using OpenAI;
+
+// 1. Configure the client
+var client = new OpenAIClient(
+    new Uri("https://cencori.com/v1"),
+    new AzureKeyCredential("csk_live_...")
+);
+
+// 2. Make a request (standard OpenAI API)
+var chatCompletionsOptions = new ChatCompletionsOptions()
+{
+    DeploymentName = "gpt-4o", // or "claude-3-5-sonnet"
+    Messages =
+    {
+        new ChatRequestSystemMessage("You are a helpful assistant."),
+        new ChatRequestUserMessage("Hello from C#"),
+    }
+};
+
+Response<ChatCompletions> response = await client.GetChatCompletionsAsync(chatCompletionsOptions);
+Console.WriteLine(response.Value.Choices[0].Message.Content);
+```
+
+## PHP (openai-php/client)
+
+Compatible with the popular `openai-php/client` library.
+
+```php
+$client = OpenAI::factory()
+    ->withBaseUri('https://cencori.com/v1')
+    ->withApiKey('csk_live_...')
+    ->make();
+
+$result = $client->chat()->create([
+    'model' => 'gpt-4o',
+    'messages' => [
+        ['role' => 'user', 'content' => 'Hello from PHP!'],
+    ],
+]);
+
+echo $result->choices[0]->message->content;
+```
+
+## Ruby (ruby-openai)
+
+Compatible with the `ruby-openai` gem.
+
+```ruby
+client = OpenAI::Client.new(
+    access_token: "csk_live_...",
+    uri_base: "https://cencori.com/v1",
+    request_timeout: 240 # Optional
+)
+
+response = client.chat(
+    parameters: {
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Hello from Ruby!"}]
+    }
+)
+
+puts response.dig("choices", 0, "message", "content")
+```
+
+## Java (theokanning/openai-java)
+
+```java
+OpenAiService service = new OpenAiService("csk_live_...", Duration.ofSeconds(30), "https://cencori.com/v1/");
+
+ChatCompletionRequest completionRequest = ChatCompletionRequest.builder()
+        .messages(List.of(new ChatMessage("user", "Hello from Java!")))
+        .model("gpt-4o")
+        .build();
+
+service.createChatCompletion(completionRequest).getChoices().forEach(System.out::println);
+```
+
+## Other Languages
+
+If your language isn't listed, the pattern is always the same:
+1.  Find the `base_url` or `api_base` parameter in your SDK initialization.
+2.  Set it to `https://cencori.com/v1`.
+3.  Pass your Cencori key as the API Key.

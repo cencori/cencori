@@ -1,0 +1,104 @@
+---
+title: "Vercel AI SDK"
+description: "Build AI-powered user interfaces with the Vercel AI SDK and Cencori."
+section: "Integrations"
+order: 1
+---
+
+The [Vercel AI SDK](https://sdk.vercel.ai/docs) is the standard for building AI UIs in React, Vue, Svelte, and more. Cencori acts as a drop-in replacement for OpenAI in the SDK, giving you observability, caching, and security automatically.
+
+## Configuration
+
+Since Cencori is API-compatible with OpenAI, you can use the standard `createOpenAI` provider.
+
+### 1. Install Dependencies
+
+```bash
+npm install ai @ai-sdk/openai
+```
+
+### 2. Configure the Provider
+
+Point the `baseURL` to Cencori's gateway and use your Cencori API key.
+
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+
+export const cencori = createOpenAI({
+  baseURL: 'https://cencori.com/api/v1',
+  apiKey: process.env.CENCORI_API_KEY, // csk_...
+});
+```
+
+## Usage
+
+### Server Action (Streaming)
+
+```typescript
+'use server';
+
+import { streamText } from 'ai';
+import { cencori } from '@/lib/ai';
+
+export async function continueConversation(history: Message[]) {
+  const result = await streamText({
+    model: cencori('gpt-4o'), // Use Cencori provider
+    messages: history,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+### useChat (Client)
+
+```tsx
+'use client';
+
+import { useChat } from 'ai/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+  return (
+    <div>
+      {messages.map(m => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+        </div>
+      ))}
+ 
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+      </form>
+    </div>
+  );
+}
+```
+
+## TanStack Start / React Query
+
+You can also use Cencori with `@tanstack/react-query` for streaming capabilities outside of Next.js.
+
+```typescript
+import { useMutation } from '@tanstack/react-query';
+
+const mutation = useMutation({
+  mutationFn: async (prompt) => {
+    const response = await fetch('https://cencori.com/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CENCORI_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        stream: true
+      })
+    });
+    
+    // Handle stream...
+  }
+});
+```

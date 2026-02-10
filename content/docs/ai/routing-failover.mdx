@@ -1,0 +1,62 @@
+---
+title: "Routing & Failover"
+description: "Configure smart routing rules, automatic failover, and load balancing for high-availability AI."
+section: "AI Gateway"
+order: 2
+---
+
+Cencori's **Routing Engine** allows you to decouple your application logic from specific providers.
+
+## Smart Routing Strategy
+
+You can configure routing rules in the **Dashboard > Gateway > Policies**.
+
+- **Lowest Cost**: Routes to the cheapest provider that meets the model capabilities (e.g., `gpt-4o` vs `claude-3-5-sonnet`).
+- **Lowest Latency**: Routes to the provider with the fastest current response time.
+- **Performance**: Routes based on historical quality scores (user feedback).
+
+## Automatic Failover
+
+## Web Dashboard Configuration
+
+You can configure project-wide failover settings directly in the dashboard:
+
+1.  Go to **Settings > Providers**.
+2.  Scroll to the **Fallback Configuration** section.
+3.  Toggle **Enable automatic fallback**.
+4.  Select a **Fallback Provider** (e.g., if OpenAI fails, switch to Anthropic).
+5.  Set **Max Retries** (default is 3 attempts before switching).
+
+> [!TIP]
+> This helps prevent downtime during minor provider outages without changing your code.
+
+## Advanced Policy Configuration
+
+For more complex logic, you can define routing policies via the Gateway API:
+
+**Example Configuration:**
+
+```json
+// Policy: "Reliability First"
+{
+  "primary": "openai/gpt-4o",
+  "fallbacks": [
+    "anthropic/claude-3-5-sonnet",
+    "google/gemini-1.5-pro",
+    "mistral/large"
+  ],
+  "conditions": {
+    "on_status": [429, 500, 503, 502]
+  }
+}
+```
+
+When OpenAI returns a `503 Service Unavailable`, Cencori instantly rewrites the request and sends it to Anthropic.
+
+## Load Balancing
+
+Distribute traffic across multiple API keys organization-wide to avoid hitting rate limits on a single account.
+
+- **Round Robin**: Cycles through keys evenly.
+- **Weighted**: Assign more traffic to higher-tier accounts.
+- **Rate Limit Aware**: Automatically shifts traffic away from keys nearing their limit.

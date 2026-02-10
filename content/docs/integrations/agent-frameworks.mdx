@@ -1,0 +1,89 @@
+---
+title: "Agent Frameworks"
+description: "Power multi-agent systems like CrewAI and AutoGen with Cencori."
+section: "Integrations"
+order: 3
+---
+
+Agent frameworks often require powerful models (like GPT-4) but can quickly rack up costs and hit rate limits. Cencori solves this by providing caching, rate limiting, and failover for your agent swarms.
+
+## CrewAI
+
+Configure CrewAI agents to route through Cencori by setting the `OPENAI_API_BASE` environment variable.
+
+### Configuration
+
+```python
+import os
+from crewai import Agent, Task, Crew
+
+# 1. Point to Cencori
+os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_KEY"] = "csk_..."
+os.environ["OPENAI_MODEL_NAME"] = "gpt-4o"
+
+# 2. Define Agents
+researcher = Agent(
+  role='Researcher',
+  goal='Discover new AI trends',
+  backstory="You are a senior analyst.",
+  verbose=True
+)
+
+# 3. Create Crew
+crew = Crew(
+  agents=[researcher],
+  tasks=[...],
+  verbose=2
+)
+```
+
+## AutoGen
+
+Microsoft AutoGen uses a config list to manage models. You can point this to Cencori.
+
+### OAI_CONFIG_LIST
+
+```json
+[
+    {
+        "model": "gpt-4o",
+        "api_key": "csk_...",
+        "base_url": "https://cencori.com/api/v1"
+    },
+    {
+        "model": "claude-3-5-sonnet",
+        "api_key": "csk_...",
+        "base_url": "https://cencori.com/api/v1"
+    }
+]
+```
+
+### Python Setup
+
+```python
+import autogen
+
+config_list = autogen.config_list_from_json(
+    "OAI_CONFIG_LIST"
+)
+
+assistant = autogen.AssistantAgent(
+    name="assistant",
+    llm_config={"config_list": config_list}
+)
+
+user_proxy = autogen.UserProxyAgent(
+    name="user_proxy",
+    human_input_mode="TERMINATE"
+)
+
+user_proxy.initiate_chat(
+    assistant,
+    message="Planning a trip to Tokyo."
+)
+```
+
+> [!NOTE]
+> **Unified Billing**
+> Even if your agents use different models (GPT-4 vs Claude), Cencori unifies the billing into a single invoice.

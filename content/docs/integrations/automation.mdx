@@ -1,0 +1,54 @@
+---
+title: "Automation Tools"
+description: "Connect Cencori to Zapier, Make.com, and n8n for no-code AI workflows."
+section: "Integrations"
+order: 5
+---
+
+You can integrate Cencori into your automation workflows using standard HTTP requests. This allows you to add secure, governed AI to any business process.
+
+## Zapier / Make.com
+
+Use the **"Webhook"** or **"HTTP Request"** action to call Cencori.
+
+### Configuration
+
+1. **Method**: `POST`
+2. **URL**: `https://cencori.com/api/v1/chat/completions`
+3. **Headers**:
+   - `Content-Type`: `application/json`
+   - `Authorization`: `Bearer csk_...`
+4. **Body (JSON)**:
+   ```json
+   {
+     "model": "gpt-4o",
+     "messages": [
+       {"role": "system", "content": "You are a helpful assistant."},
+       {"role": "user", "content": "{{trigger_data_field}}"}
+     ]
+   }
+   ```
+
+## n8n Integration
+
+n8n is a powerful open-source workflow automation tool. You can use the **HTTP Request** node.
+
+### HTTP Request Node Setup
+
+- **Authentication**: Generic Credential Type -> Header Auth
+  - Name: `Authorization`
+  - Value: `Bearer csk_...`
+- **method**: `POST`
+- **url**: `https://cencori.com/api/v1/chat/completions`
+- **Body Parameters**:
+  - `model`: `gpt-4o`
+  - `messages`: `expression`
+    ```javascript
+    [
+      { "role": "user", "content": $json.input_text }
+    ]
+    ```
+
+> [!TIP]
+> **Why use Cencori for automation?**
+> Instead of managing individual OpenAI/Anthropic keys in every Zap, use a single Cencori key. This gives you **centralized logs** of all your automation AI usage.

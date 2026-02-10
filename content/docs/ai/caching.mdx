@@ -1,0 +1,49 @@
+---
+title: "Caching"
+description: "Reduce costs and latency by caching AI responses. Supports Semantic and Exact Match caching."
+section: "AI Gateway"
+order: 3
+---
+
+Reviewing common queries can reduce AI costs by **30-60%** and improve latency by **95%**.
+
+## Caching Strategies
+
+### 1. Simple Cache (Exact Match)
+Returns a cached response only if the prompt matches *exactly* (character-for-character).
+- **Best for**: Deterministic tasks, classifiers, or high-volume identical queries.
+- **Cost**: Free.
+
+### 2. Semantic Cache (Smart)
+Uses embeddings to find prompts that are *semantically similar*, even if phrased differently.
+- **Example**: "What is the capital of France?" matches "Tell me France's capital".
+- **Similarity Threshold**: Adjustable from `0.0` (loose) to `1.0` (strict). Default is `0.95`.
+
+## Configuration
+
+Enable caching via the SDK or headers.
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [...],
+  cache: {
+    mode: 'semantic', // or 'simple'
+    ttl: 3600 // Time-to-live in seconds (1 hour)
+  }
+});
+```
+
+## Cache Invalidation
+
+You can manually purge cache entries via the API or Dashboard.
+
+```bash
+# Purge all cache for a specific project
+curl -X DELETE https://api.cencori.com/v1/cache \
+  -H "Authorization: Bearer csk_..."
+```
+
+## Analytics
+
+Monitor your **Cache Hit Rate** in the Dashboard to optimize your TTL and thresholds settings.
