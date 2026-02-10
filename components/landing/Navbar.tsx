@@ -136,10 +136,53 @@ export default function Navbar({
     name = siteConfig.name,
     homeUrl = siteConfig.url,
     mobileNavItems = [
-        // ... default items
+        {
+            title: "Products", sublinks: [
+                { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
+                { title: "Compute", href: "/compute" },
+                { title: "Workflow", href: "/workflow" },
+                { title: "Integration", href: "/integration" },
+                { title: "Data Storage", href: "/storage" },
+                { title: "Edge", href: "/edge" },
+                { title: "Scan", href: "/scan" },
+            ]
+        },
+        {
+            title: "Solutions", sublinks: [
+                { title: "AI-first Startups", href: "/solutions/ai-startups" },
+                { title: "Platform & ISVs", href: "/solutions/platforms" },
+                { title: "Regulated Industries", href: "/solutions/regulated" },
+                { title: "Developer Teams", href: "/solutions/devtools" },
+                { title: "Protect Generated Apps", href: "/solutions/vibe-coded" },
+                { title: "Data-science Sandboxes", href: "/solutions/model-ops" },
+                { title: "Automation Safety", href: "/solutions/sandboxing" },
+            ]
+        },
+        {
+            title: "Resources", sublinks: [
+                { title: "Documentation", href: siteConfig.links.docs },
+                { title: "API Reference", href: "/docs/api" },
+                { title: "Academy", href: "/academy" },
+                { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
+                { title: "Guides & Tutorials", href: "/resources/guides" },
+                { title: "Changelog", href: siteConfig.links.company.changelog },
+                { title: "Use Cases / Case Studies", href: siteConfig.links.company.customers },
+                { title: "Security & Compliance", href: "/security" },
+                { title: "Status & Incidents", href: "/status" },
+            ]
+        },
+        { title: "Pricing", href: "/pricing" },
+        { title: "Documentation", href: siteConfig.links.docs },
+        { title: "Blog", href: siteConfig.links.company.blog },
     ],
     actions = [
-        // ... default actions
+        { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
+        {
+            text: "Get Started",
+            href: siteConfig.links.getStartedUrl,
+            isButton: true,
+            variant: "default",
+        },
     ],
     className,
     isAuthenticated = false,
