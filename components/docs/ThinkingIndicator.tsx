@@ -47,7 +47,7 @@ export function ThinkingIndicator({ finished = false }: { finished?: boolean }) 
                     {currentStep < steps.length ? steps[currentStep] : "Complete"}
                 </span>
                 {currentStep < steps.length && (
-                    <span className="animate-pulse">_</span>
+                    <span className="animate-pulse"></span>
                 )}
             </button>
 

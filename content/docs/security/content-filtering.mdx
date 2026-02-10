@@ -1,113 +1,61 @@
 ---
 title: "Content Filtering"
-description: "Automatically filter harmful, inappropriate, or policy-violating content in AI requests and responses."
+description: "Filter harmful output from AI models. Configure thresholds for hate, violence, and self-harm."
 section: "Security"
-order: 5
+order: 4
 ---
 
-## What is Content Filtering?
+Content Filtering ensures your application doesn't generate toxic, harmful, or brand-damaging content. Cencori unifies moderation across all providers.
 
-Content filtering prevents your AI application from processing or generating harmful content, including:
-- Hate speech and discrimination
-- Violence and graphic content
-- Sexual or adult content
-- Self-harm and dangerous activities
-- Illegal activities
+## Categories
 
-## Filter Categories
+We map provider-specific safety settings to a unified schema:
 
-| Category | Description | Examples |
-|----------|-------------|----------|
-| **Hate Speech** | Attacks based on identity | Racial slurs, religious attacks |
-| **Violence** | Graphic or threatening content | Violent threats, gore |
-| **Sexual Content** | Adult or explicit material | NSFW imagery, explicit text |
-| **Self-Harm** | Dangerous behavior encouragement | Suicide methods, self-injury |
-| **Illegal Activity** | Instructions for crimes | Drug manufacturing, theft |
-| **Profanity** | Offensive language | Curse words, slurs |
+| Category | Definition |
+|----------|------------|
+| **Hate** | Content that expresses, incites, or promotes hate based on identity. |
+| **Violence** | Content that depicts death, violence, or physical injury. |
+| **Self-Harm** | Content that encourages self-mutilation or suicide. |
+| **Sexual** | Content meant to arouse sexual excitement or depicts sexual violence. |
 
-## How Content Filtering Works
+## Thresholds
 
-1. **Input Scanning**: Before sending to the AI provider, Cencori scans the user's prompt for harmful content.
-2. **Classification**: ML models categorize content and assign severity scores (low, medium, high, critical).
-3. **Policy Enforcement**: Based on your configured policy, the request is either blocked, flagged, or allowed with warnings.
-4. **Output Monitoring**: AI responses are also scanned. If harmful content is generated, it's blocked before reaching the user.
+You can tune the sensitivity for each category. Scores range from `0.0` (Safe) to `1.0` (Harmful).
 
-## Filtering Policy Modes
+- **Low (0.8)**: Only blocks extreme content.
+- **Medium (0.5)**: Default. Blocks clear violations.
+- **High (0.2)**: Strict. Blocks ambiguous content.
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| **Strict** | Block all harmful content | Public apps, children's apps |
-| **Moderate** | Block high/critical only | General purpose apps |
-| **Permissive** | Log only, don't block | Internal tools, research |
-| **Custom** | Define your own rules | Enterprise use cases |
+## Webhooks & Alerts
 
-## When Content is Blocked
+Receive real-time notifications when your application generates flagged content.
+
+1.  Go to **Dashboard > Settings > Webhooks**.
+2.  Add an endpoint URL (e.g., your Slack webhook or pagerduty).
+3.  Subscribe to `security.content_flagged`.
+
+**Payload Example:**
 
 ```json
 {
-  "error": "Content violation detected",
-  "code": "CONTENT_FILTER_VIOLATION",
-  "status": 403,
-  "details": {
-    "categories": ["violence", "illegal_activity"],
-    "severity": "high",
-    "incident_id": "inc_filter_123"
+  "event": "security.content_flagged",
+  "project_id": "proj_123",
+  "timestamp": "2024-03-20T10:00:00Z",
+  "data": {
+    "prompt": "...",
+    "category": "violence",
+    "score": 0.95,
+    "user_id": "user_456"
   }
 }
 ```
 
-## Handling Content Filter Violations in Code
+## Moderation Endpoint
+
+You can also use the standalone Moderation API to check text without generating a response:
 
 ```typescript
-try {
-  const response = await cencori.ai.chat({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: userInput }],
-  });
-  
-  return response.content;
-} catch (error: any) {
-  if (error.code === 'CONTENT_FILTER_VIOLATION') {
-    // Log the incident
-    console.warn('Content filter triggered:', error.details);
-    
-    // Return user-friendly message
-    return {
-      error: 'Your message violates our content policy. Please rephrase.',
-      categories: error.details.categories,
-      severity: error.details.severity
-    };
-  }
-  
-  throw error;
-}
+const result = await cencori.ai.moderation({
+  input: "Text to check"
+});
 ```
-
-## Custom Filtering Rules (Enterprise)
-
-Enterprise customers can define custom rules:
-- Industry-specific terms (e.g., medical terminology that's acceptable in healthcare)
-- Company-specific blocklists
-- Domain-specific allowlists
-- Regional language variations
-
-## Monitoring Filter Activity
-
-View all content filter incidents in your dashboard:
-
-1. Navigate to project dashboard
-2. Click "Security" sidebar
-3. Filter by "Content Filter Violation"
-4. View breakdown by:
-   - Category (violence, hate speech, etc.)
-   - Severity level
-   - Trends over time
-
-## Best Practices
-
-- Start with Moderate mode and adjust based on your app's audience.
-- Show clear error messages to users explaining policy violations.
-- Review filter incidents weekly to identify abuse patterns.
-- For creative writing apps, consider Permissive mode with output filtering.
-- Test edge cases with your specific content.
-- Combine with prompt injection protection for comprehensive security.

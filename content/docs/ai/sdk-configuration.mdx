@@ -1,0 +1,94 @@
+---
+title: "SDK Configuration"
+description: "Advanced SDK configuration: Timeouts, Retries, Edge Runtime, and Telemetry."
+section: "AI"
+order: 5
+---
+
+## Timeouts
+
+By default, the Cencori SDKs have a **60-second** read timeout. You should increase this for long-running chain-of-thought models (like `o1` or `claude-opus`).
+
+### TypeScript
+
+```typescript
+const cencori = new Cencori({
+  apiKey: '...',
+  timeout: 300000 // 5 minutes (in ms)
+});
+```
+
+### Python
+
+```python
+client = Cencori(
+    timeout=300.0 # 5 minutes (in seconds)
+)
+```
+
+### Go
+
+```go
+client := cencori.NewClient(
+    option.WithHTTPClient(&http.Client{
+        Timeout: 5 * time.Minute,
+    }),
+)
+```
+
+## Retries
+
+The SDKs automatically retry failed requests (status 408, 409, 429, 5xx) with exponential backoff.
+
+- **Default Retries**: 2
+- **Max Delay**: 60 seconds
+
+To customize:
+
+```typescript
+const cencori = new Cencori({
+  maxRetries: 5 // Retry up to 5 times
+});
+```
+
+## Edge Compatibility (Vercel / Cloudflare)
+
+The Cencori TypeScript SDK (`npm install cencori`) is fully compatible with Edge Runtimes.
+
+- **Zero dependencies** on Node.js-only APIs (like `fs` or `net`).
+- Uses the standard `fetch` API.
+- Works in **Cloudflare Workers**, **Vercel Edge Functions**, and **Deno**.
+
+```typescript
+// pages/api/edge.ts
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req) {
+  // Works natively in Edge
+  const response = await cencori.ai.chat(...) 
+  return new Response(...)
+}
+```
+
+## Telemetry & Privacy
+
+The Cencori SDK collects minimal, **anonymous** metadata to help us improve performance and debug issues.
+
+**We Collect:**
+- SDK Version (e.g., `1.2.0`)
+- Language & Runtime Version (e.g., `Node v18.16.0`, `Python 3.11`)
+- Platform OS (e.g., `darwin`, `linux`)
+- Latency (Client-side measured duration)
+
+**We Do NOT Collect:**
+- Environment variables (other than `CENCORI_API_KEY`)
+- File system paths
+- IP Addresses (these are visible to the gateway, but not collected by the SDK logic itself)
+
+To opt-out of telemetry headers:
+
+```bash
+export CENCORI_TELEMETRY=0
+```

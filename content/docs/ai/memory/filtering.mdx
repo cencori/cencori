@@ -1,0 +1,71 @@
+---
+title: "Filtering & Search"
+description: "Advanced search capabilities, metadata filtering, and hybrid search."
+section: "AI Memory"
+order: 6
+---
+
+Refine your RAG retrieval with powerful filtering and search controls.
+
+## Metadata Filters
+
+Cencori supports MongoDB-style query operators for filtering memories based on their metadata.
+
+### Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `$eq` | Equal to | `{ category: 'news' }` |
+| `$ne` | Not equal to | `{ status: { $ne: 'archived' } }` |
+| `$in` | In array | `{ tags: { $in: ['ai', 'ml'] } }` |
+| `$nin` | Not in array | `{ id: { $nin: [1, 2] } }` |
+| `$gt` / `$gte` | Greater than | `{ year: { $gte: 2023 } }` |
+| `$lt` / `$lte` | Less than | `{ price: { $lt: 50 } }` |
+| `$and` | Logical AND | `{ $and: [...] }` |
+| `$or` | Logical OR | `{ $or: [...] }` |
+
+### Example
+
+```typescript
+const start = await cencori.memory.search({
+  namespace: 'products',
+  query: 'gaming laptop',
+  filter: {
+    category: 'electronics',
+    price: { $lt: 2000 },
+    inStock: true,
+    tags: { $in: ['gaming', 'performance'] }
+  }
+});
+```
+
+## Hybrid Search
+
+By default, Cencori uses **Semantic Search** (Cosine Similarity). You can enable **Hybrid Search** to combine vector similarity with keyword matching (BM25). 
+
+This is effective for searching specific identifiers like User IDs, error codes, or product names that semantic search might miss.
+
+```typescript
+const result = await cencori.memory.search({
+  namespace: 'logs',
+  query: 'Error 503 on database',
+  searchMode: 'hybrid', // Default is 'semantic'
+  alpha: 0.7 // Weight for semantic vs keyword (0.0 = keyword only, 1.0 = semantic only)
+});
+```
+
+## Similarity Threshold
+
+The `threshold` parameter (0.0 to 1.0) controls how relevant a memory must be to be returned.
+
+- **0.75+**: High relevance (direct answers).
+- **0.50-0.75**: Moderate relevance (related context).
+- **&lt;0.50**: Low relevance (broad topic match).
+
+```typescript
+// Strict search
+await cencori.memory.search({
+  query: 'pricing',
+  threshold: 0.8 // Only return high-confidence matches
+});
+```

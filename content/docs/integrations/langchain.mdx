@@ -1,0 +1,82 @@
+---
+title: "LangChain & LangGraph"
+description: "Integrate Cencori with LangChain and build stateful agents with LangGraph."
+section: "Integrations"
+order: 2
+---
+
+Cencori is fully compatible with LangChain's OpenAI providers in both Node.js and Python.
+
+## LangChain JS
+
+```bash
+npm install @langchain/openai
+```
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+const chat = new ChatOpenAI({
+  openAIApiKey: process.env.CENCORI_API_KEY, // csk_...
+  configuration: {
+    baseURL: "https://cencori.com/api/v1",
+  },
+  modelName: "gpt-4o",
+});
+
+const response = await chat.invoke("Hello from Cencori!");
+console.log(response.content);
+```
+
+## LangChain Python
+
+```bash
+pip install langchain-openai
+```
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    api_key="csk_...",
+    base_url="https://cencori.com/api/v1",
+    model="gpt-4o"
+)
+
+response = llm.invoke("Hello from Python!")
+print(response.content)
+```
+
+## LangGraph (Stateful Agents)
+
+You can use Cencori as the LLM backbone for complex LangGraph agents.
+
+```typescript
+import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+
+// 1. Initialize Cencori LLM
+const llm = new ChatOpenAI({
+  openAIApiKey: process.env.CENCORI_API_KEY,
+  configuration: { baseURL: "https://cencori.com/api/v1" },
+  modelName: "gpt-4o",
+});
+
+// 2. Define the graph
+const graph = new StateGraph(MessagesAnnotation)
+  .addNode("agent", async (state) => {
+    const response = await llm.invoke(state.messages);
+    return { messages: [response] };
+  })
+  .addEdge("__start__", "agent")
+  .compile();
+
+// 3. Run the agent
+const result = await graph.invoke({
+  messages: [{ role: "user", content: "Build me a roadmap." }]
+});
+```
+
+> [!TIP]
+> **Why use Cencori with LangGraph?**
+> Cencori's **Memory** feature can persist agent state across sessions without needing a separate vector database.

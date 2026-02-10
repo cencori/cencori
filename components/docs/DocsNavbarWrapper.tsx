@@ -46,7 +46,7 @@ function DocsSearchTrigger({ onClick }: { onClick: () => void }) {
 }
 
 export function DocsNavbarWrapper() {
-    const { isAskAIOpen, setAskAIOpen } = useDocsContext();
+    const { isAskAIOpen, setAskAIOpen, setUserProfile: setContextUserProfile } = useDocsContext();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userProfile, setUserProfile] = useState<UserProfile>({ name: null, avatar: null });
     const [searchOpen, setSearchOpen] = useState(false);
@@ -61,11 +61,15 @@ export function DocsNavbarWrapper() {
                     const meta = user.user_metadata ?? {};
                     const avatar = meta.avatar_url ?? meta.picture ?? null;
                     const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
+                    const profile = { name: name as string | null, avatar: avatar as string | null };
+                    setUserProfile(profile);
+                    setContextUserProfile(profile);
                 }
             } else {
                 setIsAuthenticated(false);
+                setIsAuthenticated(false);
                 setUserProfile({ name: null, avatar: null });
+                setContextUserProfile(null);
             }
         };
         checkUser();
@@ -78,11 +82,15 @@ export function DocsNavbarWrapper() {
                     const meta = user.user_metadata ?? {};
                     const avatar = meta.avatar_url ?? meta.picture ?? null;
                     const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
+                    const profile = { name: name as string | null, avatar: avatar as string | null };
+                    setUserProfile(profile);
+                    setContextUserProfile(profile);
                 }
             } else {
                 setIsAuthenticated(false);
+                setIsAuthenticated(false);
                 setUserProfile({ name: null, avatar: null });
+                setContextUserProfile(null);
             }
         });
 
@@ -111,6 +119,14 @@ export function DocsNavbarWrapper() {
             avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
         },
     ];
+
+    // Expose toggle to window for other components (like TOC) to use
+    useEffect(() => {
+        (window as any).setAskAIOpen = setAskAIOpen;
+        return () => {
+            delete (window as any).setAskAIOpen;
+        };
+    }, [setAskAIOpen]);
 
     // Search and Ask AI slot
     const searchSlot = (

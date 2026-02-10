@@ -1,0 +1,110 @@
+---
+title: "Projects"
+description: "Organize your AI applications with isolated environments, team access, and robust configuration."
+section: "Platform"
+order: 1
+---
+
+Projects are the top-level containers for your AI integration. They map one-to-one with your applications (e.g., "Customer Support Bot", "Marketing Copy Generator"). Each project has its own API keys, security policies, rate limits, and usage analytics. This allows you to keep different applications or environments completely separate.
+
+- **Isolation:** Each project has its own API keys and configuration
+- **Organization:** Group related AI features into a single project
+- **Analytics:** Track usage and costs per project
+- **Collaboration:** Invite team members to specific projects
+
+## Creating a Project
+
+1. Go to your **Organization Dashboard**.
+2. Click **New Project**.
+3. Enter a name and select a region (US-East by default).
+
+> [!TIP]
+> We recommend creating separate projects for **Development** and **Production** environments to ensure isolation.
+
+## Environments
+
+For a typical CI/CD workflow, we recommend this project structure:
+
+1. **my-app-dev**: Connect to your `localhost` or staging environment. Use **Publishable Keys** with `localhost:3000` allowed.
+2. **my-app-prod**: Connect to your production deployment. Use strict **Allowed Domains** and stricter **Spend Caps**.
+
+### Test vs Production Keys
+- **Production keys** (`cen_...`) - use these in live applications.
+- **Test keys** (`cen_test_...`) - use these during development. Test keys have lower rate limits and don't incur charges.
+
+### Environment Configuration
+
+```bash
+# .env.development
+CENCORI_API_KEY=cen_test_abc123xyz456
+```
+
+```bash
+# .env.production
+CENCORI_API_KEY=cen_prod_xyz789abc123
+```
+
+## Project Settings
+
+### General
+- **Name**: Update project identifier.
+- **Region**: View data residency location.
+- **Delete Project**: Permanently remove all data and logs.
+
+### AI Configuration
+Set project-wide defaults for your AI integration:
+- **Default Provider**: The fallback provider (e.g., OpenAI) if none is specified in the SDK.
+- **Rate Limits**: Set custom RPM (Requests Per Minute) protection.
+- **Spend Cap**: Enforce a hard limit on monthly spending.
+
+### Security Policies
+Configure project-wide security settings:
+- **PII Filtering**: Enable/disable automatic redaction.
+- **Content Moderation**: Set thresholds for hate/violence categories.
+- **Custom Rules**: Whitelist/blacklist specific prompt patterns.
+
+### Integrations
+Connect your project to external tools:
+- **Slack notifications** for security incidents.
+- **Webhook endpoints** for real-time events.
+- **Data warehouse exports** (Snowflake, BigQuery).
+
+## Team Collaboration
+
+Invite team members to your organization to grant them access to all projects within it.
+
+1. Go to **Organization Settings > Members**.
+2. Click **Invite Member**.
+3. Enter email and assign role:
+
+| Role | Description |
+| :--- | :--- |
+| **Owner** | Full access, including project deletion and billing. |
+| **Admin** | Can manage settings, keys, and team members. |
+| **Developer** | Can view logs and analytics, generate API keys. |
+| **Viewer** | Read-only access to logs and analytics. |
+
+## API Key Management
+
+API keys authenticate your application with Cencori. Each project can have multiple API keys for different purposes.
+
+### Generating API Keys
+1. Navigate to **Settings > API Keys**.
+2. Click **Generate New Key**.
+3. Give your key a descriptive name (e.g., "Production Web Server").
+4. Copy the key immediately - it won't be shown again.
+
+### Key Rotation
+For enhanced security, rotate your API keys regularly:
+1. Generate a new API key in the dashboard.
+2. Update your application to use the new key.
+3. Deploy the changes.
+4. Verify the new key is working.
+5. Revoke the old key.
+
+## Deleting Projects
+
+If you no longer need a project, you can delete it from the project settings.
+
+> [!CAUTION]
+> Project deletion is permanent and cannot be undone. This will revoke all API keys, delete all logs/analytics, and remove team access.

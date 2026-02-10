@@ -1,0 +1,105 @@
+---
+title: "Go SDK"
+description: "Official Go client for Cencori. Idiomatic Go with context support, strong typing, and efficient streaming."
+section: "AI"
+order: 2.2
+---
+
+## Installation
+
+```bash
+go get github.com/cencori/cencori-go
+```
+
+## Basic Usage
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/cencori/cencori-go"
+	"github.com/cencori/cencori-go/option"
+)
+
+func main() {
+	client := cencori.NewClient(
+		option.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+	)
+
+	resp, err := client.Chat.Completions.New(context.TODO(), cencori.ChatCompletionNewParams{
+		Model: cencori.F(cencori.ChatModelGPT4o),
+		Messages: cencori.F([]cencori.ChatCompletionMessageParam{
+			cencori.UserMessage("Hello from Go!"),
+		}),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(resp.Choices[0].Message.Content)
+}
+```
+
+## Context & Cancellation
+
+The Go SDK relies heavily on `context.Context` for cancellation and timeouts.
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+// If the API takes > 5s, this will error with context.DeadlineExceeded
+resp, err := client.Chat.Completions.New(ctx, params)
+if err != nil {
+    // Handle error
+}
+```
+
+## Error Handling
+
+Errors are typed and allow you to inspect the status code.
+
+```go
+if err != nil {
+    var apierr *cencori.Error
+    if errors.As(err, &apierr) {
+        fmt.Printf("Error: %s\n", apierr.Message)
+        fmt.Printf("Status: %d\n", apierr.StatusCode) // e.g. 429
+    }
+}
+```
+
+## Streaming
+
+The SDK uses an iterator pattern for streaming.
+
+```go
+stream := client.Chat.Completions.NewStreaming(context.TODO(), params)
+
+for stream.Next() {
+    chunk := stream.Current()
+    fmt.Print(chunk.Choices[0].Delta.Content)
+}
+
+if err := stream.Err(); err != nil {
+    // Handle stream error
+}
+```
+
+## Configuration
+
+You can customize the underlying HTTP client or base URL.
+
+```go
+client := cencori.NewClient(
+    option.WithBaseURL("https://cencori.com/v1"),
+    option.WithMaxRetries(3),
+    option.WithHTTPClient(&http.Client{
+        Timeout: 30 * time.Second,
+    }),
+)
+```

@@ -1,0 +1,60 @@
+---
+title: "Vector Store"
+description: "Understanding the underlying vector engine, embeddings, and data lifecycle."
+section: "AI Memory"
+order: 5
+---
+
+Cencori manages a high-performance vector database under the hood, so you don't have to manage Pinecone or Weaviate instances.
+
+## Embeddings
+
+We automatically generate embeddings for all stored content using **OpenAI's `text-embedding-3-small`** model.
+
+- **Dimensions**: 1536
+- **Max Tokens**: 8191 per chunk
+- **Language**: Multilingual support
+
+> [!NOTE]
+> We automatically chunk long text fields. You can control chunk size in the `store` options (default: 1000 tokens).
+
+## Time To Live (TTL)
+
+You can set memories to auto-expire after a certain duration. This is useful for:
+- Session history (expire after 24h)
+- Cached context (expire after 7 days)
+- Temporary user data
+
+```typescript
+await cencori.memory.store({
+  namespace: 'session-123',
+  content: 'User is interested in pricing',
+  ttl: 86400 // Expire in 24 hours (seconds)
+});
+```
+
+## Indexing Latency
+
+Cencori indexes new memories in **&lt;500ms**. This "near real-time" availability means you can store a memory and search for it almost immediately in the next turn of conversation.
+
+## Import / Export
+
+### Importing Data
+To migrate data from another vector store, format your data as a JSONL file and use our CLI import tool:
+
+```bash
+cencori memory import ./data.jsonl --namespace=docs
+```
+
+**JSONL Format:**
+```json
+{"content": "...", "metadata": {"key": "value"}}
+{"content": "...", "metadata": {"key": "value"}}
+```
+
+### Exporting Data
+You can export a snapshot of any namespace for backup or analysis.
+
+```bash
+cencori memory export --namespace=docs > backup.jsonl
+```

@@ -2,14 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const DOCS_DIR = path.join(process.cwd(), "content", "docs");
 
-function getMdxFiles(dir: string, basePath = ""): string[] {
-    if (!fs.existsSync(dir)) {
-        return [];
+// Cache the docs in memory to avoid reading disk on every request
+// In a serverless env this might be re-executed, but it's fast enough.
+let cachedAllDocs: string | null = null;
+
+function getAllDocsContent(): string {
+    if (cachedAllDocs) return cachedAllDocs;
+
+    const files = getMdxFiles(DOCS_DIR);
+    let allContent = "";
+
+    for (const file of files) {
+        const filePath = path.join(DOCS_DIR, file);
+        const fileContents = fs.readFileSync(filePath, "utf-8");
+        const { data, content } = matter(fileContents);
+        const slug = filePathToSlug(file);
+        const title = data.title || slug;
+
+        // Clean content slightly to save tokens
+        const cleanContent = content
+            // Remove excessive newlines
+            .replace(/\n{3,}/g, "\n\n")
+            // Remove import statements (usually not needed for context)
+            .replace(/^import\s+.*;/gm, "")
+            .trim();
+
+        allContent += `\n\n--- DOCUMENT START: ${title} (Slug: /docs/${slug}) ---\n${cleanContent}\n--- DOCUMENT END ---\n`;
     }
+
+    cachedAllDocs = allContent;
+    return allContent;
+}
+
+function getMdxFiles(dir: string, basePath = ""): string[] {
+    if (!fs.existsSync(dir)) return [];
     const files: string[] = [];
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -32,139 +62,115 @@ function filePathToSlug(filePath: string): string {
         .replace(/^\//, "");
 }
 
-// Simple keyword search for relevant docs
-function searchDocs(query: string, limit = 5): { title: string; content: string; slug: string }[] {
+function getCurrentPageDoc(currentPage: string): { title: string; content: string; slug: string } | null {
+    if (!currentPage) return null;
+
+    // Clean the path to get a pure slug
+    const currentSlug = currentPage
+        .split("/docs/")
+        .pop()
+        ?.split(/[?#]/)[0]
+        ?.replace(/\/$/, "")
+        ?.replace(/^\//, "") || "";
+
+    if (!currentSlug) return null;
+
     const files = getMdxFiles(DOCS_DIR);
-    const lowerQuery = query.toLowerCase();
-    const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2);
+    const currentFile = files.find(f => filePathToSlug(f) === currentSlug);
 
-    // If query is very generic, return more results
-    const isGeneric = queryWords.length < 2 || ["overview", "introduction", "help", "cencori"].some(w => lowerQuery.includes(w));
-    const effectiveLimit = isGeneric ? 8 : limit;
-
-    const scored = files.map((file) => {
-        const filePath = path.join(DOCS_DIR, file);
-        const fileContents = fs.readFileSync(filePath, "utf-8");
+    if (currentFile) {
+        const fileContents = fs.readFileSync(path.join(DOCS_DIR, currentFile), "utf-8");
         const { data, content } = matter(fileContents);
-        const slug = filePathToSlug(file);
-
-        // Clean content for scoring
-        const cleanContent = content
-            .replace(/<[^>]+>/g, " ")
-            .replace(/```[\s\S]*?```/g, " ")
-            .replace(/`[^`]+`/g, " ")
-            .toLowerCase();
-
-        const title = (data.title || slug).toLowerCase();
-
-        // Score based on matches
-        let score = 0;
-
-        // Boost for title matches
-        if (title.includes(lowerQuery)) score += 50;
-
-        for (const word of queryWords) {
-            if (title.includes(word)) score += 20;
-            const matches = (cleanContent.match(new RegExp(word, "g")) || []).length;
-            score += Math.min(matches, 10);
-        }
-
-        // Boost "Introduction" or "Getting Started" for generic queries
-        if (isGeneric && (slug.includes("introduction") || slug.includes("quick-start"))) {
-            score += 30;
-        }
-
         return {
-            title: data.title || slug,
-            content: content.slice(0, 3000), // Increase limit to 3000 chars per doc
-            slug,
-            score,
+            title: data.title || currentSlug,
+            content: content,
+            slug: currentSlug
         };
-    });
-
-    return scored
-        .filter(d => d.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, effectiveLimit)
-        .map(({ title, content, slug }) => ({ title, content, slug }));
+    }
+    return null;
 }
 
-const SYSTEM_PROMPT = `You are Cencori AI, an expert on the Cencori platform. You help users understand its features, API, and SDK.
+const SYSTEM_PROMPT = `You are Cencori AI, the expert platform engineering assistant for Cencori.
+You have access to the ENTIRE documentation of the platform.
 
-When answering:
-- Be concise but thorough.
-- Use markdown for code blocks and lists.
-- Answer based ONLY on the provided documentation context.
-- If the context doesn't contain the answer, say so politely.
+Your goal is to be helpful, concise, and natural. Talk like a senior engineer who knows the platform inside out.
 
-Relevant documentation will be provided below.`;
+Guidelines:
+1. **Context Awareness**: The user is currently viewing a specific page. If they ask "what is this?" or "how do I use this?", refer to the "CURRENT PAGE CONTEXT" first.
+2. **Holistic Knowledge**: You know everything about Cencori (Gateway, Memory, Security, SDKs), every single thing. Connect concepts where appropriate.
+3. **Code First**: When asked how to do something, provide TypeScript/Python code snippets immediately.
+4. **Natural Tone**: Don't say "According to the documentation...". Just answer directly. Say "You can use..." instead of "The documentation states that...".
+5. **Accuracy**: Only invent code if it's a logical combination of existing features. Do not hallucinate APIs not present in the docs.
+
+If the user asks about something not in the docs, politely explain that it might not be supported yet or suggest a workaround using existing features.`;
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { messages, currentPage } = body;
+        const { messages, currentPage, userName } = body;
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return NextResponse.json({ error: "Messages are required" }, { status: 400 });
         }
 
-        const lastUserMessage = messages.filter((m: { role: string }) => m.role === "user").pop();
-        if (!lastUserMessage) {
-            return NextResponse.json({ error: "No user message found" }, { status: 400 });
+        const allDocs = getAllDocsContent();
+        const currentPageDoc = getCurrentPageDoc(currentPage);
+
+        let contextPrompt = "";
+
+        if (currentPageDoc) {
+            contextPrompt += `\n=== 📍 CURRENT PAGE CONTEXT (User is reading this right now) ===\n`;
+            contextPrompt += `Title: ${currentPageDoc.title}\n`;
+            contextPrompt += `Slug: ${currentPageDoc.slug}\n`;
+            contextPrompt += `Content:\n${currentPageDoc.content}\n`;
+            contextPrompt += `=== END CURRENT PAGE ===\n\n`;
         }
 
-        // Search for relevant docs
-        const relevantDocs = searchDocs(lastUserMessage.content, 6); // Fetch top 6 docs
+        contextPrompt += `=== 📚 FULL PLATFORM DOCUMENTATION ===\n${allDocs}\n=== END DOCUMENTATION ===\n`;
 
-        let context = "";
-        if (relevantDocs.length > 0) {
-            context = "\n\n=== RELEVANT DOCUMENTATION ===\n";
-            for (const doc of relevantDocs) {
-                context += `\n--- PAGE: ${doc.title} (/docs/${doc.slug}) ---\n${doc.content}\n`;
-            }
-            context += "\n=== END DOCUMENTATION ===\n";
-        }
-
-        // Add current page context if provided
-        if (currentPage) {
-            context += `\n\nThe user is currently viewing: ${currentPage}`;
-        }
-
-        // Initialize OpenAI client with Groq base URL
-        const openai = new OpenAI({
-            apiKey: process.env.GROQ_API_KEY,
-            baseURL: "https://api.groq.com/openai/v1",
+        // Initialize Gemini
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: SYSTEM_PROMPT
         });
 
-        // Create streaming response
+        // Add context to the last message or as a preamble
+        const lastMessage = messages[messages.length - 1];
+
+        let userContext = "";
+        if (userName) {
+            userContext = `\nUSER CONTEXT: The user's name is "${userName}". You can use their name naturally (e.g. "Hi ${userName}", "Sure ${userName}") but don't overdo it. Make them feel personally welcomed. DO not mention their name all the time, but know their name. you can mention their name once or twice max through out the interaction, but not 3 times or 4 times.`;
+        }
+
+        const userPrompt = `Reference Documentation:\n${contextPrompt}${userContext}\n\nUser Question: ${lastMessage.content}`;
+
+        // Create chat history properly (excluding the modified last message)
+        const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }]
+        }));
+
+        const chat = model.startChat({
+            history: history,
+            generationConfig: {
+                maxOutputTokens: 2000,
+                temperature: 0.5,
+            }
+        });
+
+        const result = await chat.sendMessageStream(userPrompt);
         const encoder = new TextEncoder();
 
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    const chatMessages = [
-                        { role: "system" as const, content: SYSTEM_PROMPT + context },
-                        ...messages.map((m: { role: string; content: string }) => ({
-                            role: m.role as "user" | "assistant",
-                            content: m.content,
-                        })),
-                    ];
-
-                    const response = await openai.chat.completions.create({
-                        model: "llama-3.3-70b-versatile",
-                        messages: chatMessages,
-                        stream: true,
-                        max_tokens: 1000,
-                        temperature: 0.7,
-                    });
-
-                    for await (const chunk of response) {
-                        const content = chunk.choices[0]?.delta?.content;
-                        if (content) {
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+                    for await (const chunk of result.stream) {
+                        const chunkText = chunk.text();
+                        if (chunkText) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunkText })}\n\n`));
                         }
                     }
-
                     controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                     controller.close();
                 } catch (error) {
