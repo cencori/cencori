@@ -12,7 +12,7 @@ const Icons: Record<string, any> = {
 
 function CencoriLogo({ className }: { className?: string }) {
     return (
-        <svg viewBox="0 0 21924 21924" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <svg viewBox="0 0 21924 21924" fill="none" xmlns="http://www.w3.org/2000/svg" className={cn("text-black dark:text-white", className)}>
             <g clipPath="url(#clip0_cencori)">
                 <circle cx="7744" r="7744" fill="currentColor" />
                 <circle cy="14180" r="7744" fill="currentColor" />
