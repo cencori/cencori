@@ -1,0 +1,66 @@
+---
+title: "Agentic Engineering"
+description: "How to use Cencori as the infrastructure layer for AI Agents, IDEs, and Generators."
+section: "Agentic Engineering"
+order: 1
+---
+
+**Agentic Engineering** is the practice of using autonomous AI agents—like Cursor, Windsurf, or Replit Agent—to build software.
+
+While these agents are incredible at generating UI code and basic logic, they often struggle with:
+- **State & Memory** (RAG, Vector DBs)
+- **Security** (PII, Prompt Injection)
+- **Observability** (Logs, Traces)
+- **complex Backend Infrastructure**
+
+Cencori provides the **Infrastructure Layer** for Agentic Engineers. Instead of prompting an agent to "write a vector database from scratch" (which is error-prone), you simply tell it to "use the Cencori SDK."
+
+## The Workflow
+
+The core workflow for an Agentic Engineer is:
+
+1.  **Feed Context**: Give your Agent the `llm.txt` context.
+2.  **Install SDK**: Have the Agent install `@cencori/sdk`.
+3.  **Generate**: Ask the Agent to build features using Cencori for memory and security.
+
+### 1. Feed Context (`llm.txt`)
+
+Every Cencori project publishes an `llm.txt` file at `https://cencori.com/llm.txt`. This single file contains the compressed "knowledge" of how to use our platform.
+
+**For Desktop IDEs (Cursor, VS Code):**
+Add `https://cencori.com/llm.txt` to your `@Docs` or "External Documentation" section.
+
+**For Web Generators (v0, Lovable):**
+Paste the content of `llm.txt` into your initial prompt or "Project Knowledge" section.
+
+### 2. Install SDK
+
+```bash
+npm install @cencori/sdk
+```
+
+### 3. Generate
+
+Instead of solving infrastructure problems yourself, delegate them to Cencori:
+
+**Bad Prompt:**
+> "Build a chat app. Use Pinecone for memory and OpenAI for chat. Check for PII using regex."
+
+**Good Agentic Prompt:**
+> "Build a chat app. Use the Cencori SDK for `memory` and `chat`. Ensure `pii_detection` is enabled in the config."
+
+## Supported Environments
+
+We have dedicated guides for the most popular Agentic tools:
+
+### Desktop IDEs
+*   [**Cursor**](/docs/agentic-engineering/desktop/cursor): The AI-first code editor.
+*   [**Antigravity**](/docs/agentic-engineering/desktop/antigravity): Google's agent-first platform.
+*   [**Windsurf**](/docs/agentic-engineering/desktop/windsurf): The "Flow State" editor.
+*   [**VS Code**](/docs/agentic-engineering/desktop/vs-code): GitHub Copilot & standard extensions.
+
+### Web Generators (Vibe Coding)
+*   [**Lovable**](/docs/agentic-engineering/web/lovable): Full-stack app builder.
+*   [**v0**](/docs/agentic-engineering/web/v0): React/Tailwind UI generator.
+*   [**Bolt**](/docs/agentic-engineering/web/bolt): Browser-based full-stack dev.
+*   [**Replit**](/docs/agentic-engineering/web/replit): Cloud IDE & Agent.

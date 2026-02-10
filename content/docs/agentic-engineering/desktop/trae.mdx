@@ -1,0 +1,25 @@
+---
+title: "Trae"
+description: "Integrating Cencori with ByteDance's Trae IDE via MCP."
+section: "Desktop IDEs"
+order: 6
+---
+
+**Trae** ([trae.ai](https://trae.ai)) is an adaptive AI IDE that supports the **Model Context Protocol (MCP)**. This makes it uniquely powerful for integrating with Cencori's data layer.
+
+## MCP Integration (Coming Soon)
+
+We are building a native **Cencori MCP Server**. This will allow Trae to:
+1.  **Read Memories**: Trae will be able to search your Cencori Vector Store directly to find relevant context for your code.
+2.  **Log Events**: Trae can push build errors and "thinking" steps to Cencori Observability.
+
+## Standard Setup
+
+Until the MCP server is public, you can use Trae's **"Builder Mode"**.
+
+1.  **Context**: Trae is excellent at ingesting URLs.
+2.  Chat: "I want to use the Cencori SDK. Please read https://cencori.com/llm.txt"
+3.  Trae will index the file and be able to scaffold Cencori backends instantly.
+
+## Why Trae?
+Trae's "SOLO Mode" is designed to build entire apps from scratch. By giving it Cencori as the "Backend Infrastructure", you prevent Trae from writing fragile, unmaintainable backend code.

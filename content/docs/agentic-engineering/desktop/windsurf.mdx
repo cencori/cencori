@@ -1,0 +1,32 @@
+---
+title: "Windsurf"
+description: "Using Cencori with Windsurf's Flow State and Cascade."
+section: "Desktop IDEs"
+order: 3
+---
+
+Windsurf ([codeium.com/windsurf](https://codeium.com/windsurf)) (by Codeium) focuses on keeping you in the "Flow" with its deeply integrated **Cascade** agent.
+
+## Cascade Setup
+
+Cascade maintains deep awareness of your codebase. To teach it Cencori:
+
+1.  Open the **Cascade** chat.
+2.  Type: `@https://cencori.com/llm.txt`
+3.  Cascade will ingest the documentation context.
+
+## Flows
+
+You can create a "Flow" for implementing AI features:
+
+1.  **Prompt**: "Scaffold a Cencori-powered backend."
+2.  **Cascade Actions**:
+    *   Generates `lib/cencori.ts` (Client initialization).
+    *   Creates `.env` file for `CENCORI_API_KEY`.
+    *   Sets up an API route for chat.
+
+## Visualizing with Windsurf
+Because Windsurf understands your whole project, you can ask it:
+> "Check my `app/api/chat/route.ts` and verify if I am correctly handling the Cencori `tool-calling` response."
+
+Cascade will verify your implementation against the `llm.txt` patterns it ingested.

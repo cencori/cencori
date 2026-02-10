@@ -1,0 +1,24 @@
+---
+title: "Bolt"
+description: "Building production-grade AI apps in the browser with Bolt.new and Cencori."
+section: "Web Generators"
+order: 3
+---
+
+**Bolt.new** ([bolt.new](https://bolt.new)) (by StackBlitz) runs a full Node.js environment in the browser. This means it can actually **run** the Cencori SDK directly.
+
+## Workflow
+
+1.  **Initial Prompt**:
+    > "Scaffold a new Next.js app. Install `@cencori/sdk`. I want to build a customer support bot."
+
+2.  **Configuration**:
+    Bolt will ask for your generic "API Keys".
+    *   Add `CENCORI_API_KEY` to your `.env.local` in the Bolt editor.
+    *   (You don't need OpenAI/Anthropic keys if using Cencori Proxy!)
+
+3.  **Refining**:
+    > "The bot is hallucinating. Please add a RAG step using `cencori.memory` to retrieve the `FAQ.md` file content before generating an answer."
+
+## Why Bolt + Cencori?
+Bolt allows you to verify the backend logic *live*. You can see the logs in the Bolt terminal and check the Cencori Dashboard simultaneously to debug "Vibe" issues.

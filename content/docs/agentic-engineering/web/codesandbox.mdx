@@ -1,0 +1,38 @@
+---
+title: "CodeSandbox"
+description: "Securely running AI-generated code with CodeSandbox and Cencori."
+section: "Web Generators"
+order: 5
+---
+
+**CodeSandbox** ([codesandbox.io](https://codesandbox.io)) (now part of Together AI context) provides secure **MicroVMs** that can run code in milliseconds.
+
+## The Safe Agent Pattern
+
+When building autonomous agents, you often need them to *execute* code to verify it.
+Running generic AI code on your own server is dangerous.
+
+**The Solution:**
+1.  **Agent Logic**: Runs on your server (powered by Cencori SDK for intelligence).
+2.  **Code Execution**: Sent to CodeSandbox MicroVM.
+
+### Example Workflow
+
+```typescript
+import { cencori } from './lib/cencori';
+import { Sandbox } from '@codesandbox/sdk';
+
+// 1. Generate Code with Cencori
+const response = await cencori.ai.chat({
+  messages: [{ role: 'user', content: 'Write a Python script to calculate pi.' }]
+});
+const code = extractCode(response.content);
+
+// 2. Execute Safely in CodeSandbox
+const sandbox = await Sandbox.create();
+const result = await sandbox.run(code);
+
+console.log("Execution Result:", result.logs);
+```
+
+This stack (Cencori + CodeSandbox) is the gold standard for building safe, capable Coding Agents.

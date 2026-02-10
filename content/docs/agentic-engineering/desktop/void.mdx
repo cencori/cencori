@@ -1,0 +1,23 @@
+---
+title: "Void"
+description: "Privacy-first AI development with Void and Cencori PII Protection."
+section: "Desktop IDEs"
+order: 8
+---
+
+**Void** ([voideditor.com](https://voideditor.com)) is a privacy-first fork of VS Code. It gives you full control over your data.
+
+## Ultimate Privacy Stack
+
+Combine **Void** (Client Control) with **Cencori** (Data Protection).
+
+1.  **Void**: Ensures no telemetry is sent to Microsoft/Code editors. Allows you to see the *exact* prompt being sent.
+2.  **Cencori**: Sanitizes the data *before* it hits the LLM provider.
+
+### Workflow
+
+1.  **Configure Void**: Set Cencori as your custom OpenAI provider.
+2.  **Enable Redaction**: In Cencori Dashboard, set PII Mode to `redact` or `mask`.
+3.  **Code**: When you ask Void to "Refactor this file containing user emails", Cencori will strip the emails before OpenAI ever sees them.
+
+This allows you to use powerful Cloud Models (GPT-4) on sensitive codebases without leaking data.

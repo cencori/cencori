@@ -14,7 +14,22 @@ interface DocsSidebarProps {
     className?: string;
 }
 
-const sidebarItems = [
+interface SidebarLink {
+    title: string;
+    href: string;
+}
+
+interface SidebarGroup {
+    title: string;
+    items: (SidebarLink | SidebarNestedGroup)[];
+}
+
+interface SidebarNestedGroup {
+    title: string;
+    items: SidebarLink[];
+}
+
+const sidebarItems: SidebarGroup[] = [
     {
         title: "Getting Started",
         items: [
@@ -104,6 +119,36 @@ const sidebarItems = [
         ],
     },
     {
+        title: "Agentic Engineering",
+        items: [
+            { title: "Overview", href: "/docs/agentic-engineering/index" },
+            {
+                title: "Desktop IDEs",
+                items: [
+                    { title: "Cursor", href: "/docs/agentic-engineering/desktop/cursor" },
+                    { title: "Antigravity", href: "/docs/agentic-engineering/desktop/antigravity" },
+                    { title: "Windsurf", href: "/docs/agentic-engineering/desktop/windsurf" },
+                    { title: "VS Code", href: "/docs/agentic-engineering/desktop/vs-code" },
+                    { title: "Continue", href: "/docs/agentic-engineering/desktop/continue" },
+                    { title: "Trae", href: "/docs/agentic-engineering/desktop/trae" },
+                    { title: "PearAI", href: "/docs/agentic-engineering/desktop/pearai" },
+                    { title: "Void", href: "/docs/agentic-engineering/desktop/void" },
+                    { title: "Melty", href: "/docs/agentic-engineering/desktop/melty" },
+                ]
+            },
+            {
+                title: "Web Generators",
+                items: [
+                    { title: "Lovable", href: "/docs/agentic-engineering/web/lovable" },
+                    { title: "v0", href: "/docs/agentic-engineering/web/v0" },
+                    { title: "Bolt", href: "/docs/agentic-engineering/web/bolt" },
+                    { title: "Replit", href: "/docs/agentic-engineering/web/replit" },
+                    { title: "CodeSandbox", href: "/docs/agentic-engineering/web/codesandbox" },
+                ]
+            }
+        ],
+    },
+    {
         title: "Guides",
         items: [
             { title: "Migrating from OpenAI", href: "/docs/guides/migrate-openai" },
@@ -126,13 +171,48 @@ const sidebarItems = [
     },
 ];
 
+// Helper to check if a group has the active link
+function isGroupActive(items: (SidebarLink | SidebarNestedGroup)[], pathname: string): boolean {
+    return items.some(item => {
+        if ('href' in item && item.href === pathname) return true;
+        if ('items' in item) return item.items.some(subItem => subItem.href === pathname);
+        return false;
+    });
+}
+
+function SidebarLinkItem({ item, pathname }: { item: SidebarLink, pathname: string }) {
+    const isActive = pathname === item.href;
+    return (
+        <li className="relative">
+            <Link
+                href={item.href}
+                className={cn(
+                    "group flex items-center gap-2 py-1.5 pl-4 pr-3 text-[13px] transition-all relative",
+                    isActive
+                        ? "text-foreground font-medium bg-muted/50 rounded-md"
+                        : "text-muted-foreground hover:text-foreground"
+                )}
+            >
+                {isActive && (
+                    <div className="absolute left-[-1px] top-0 bottom-0 w-[2px] bg-foreground rounded-full z-10" />
+                )}
+                {item.title}
+            </Link>
+        </li>
+    );
+}
+
 export function DocsSidebar({ className }: DocsSidebarProps) {
     const pathname = usePathname();
 
-    // Find the section that contains the current active link to open it by default
-    const activeSection = sidebarItems.find(group =>
-        group.items.some(item => pathname === item.href)
-    )?.title || "Getting Started";
+    const activeSection = sidebarItems.find(group => isGroupActive(group.items, pathname))?.title || "Getting Started";
+
+    // Find active nested group
+    const activeNestedGroups = sidebarItems
+        .flatMap(group => group.items)
+        .filter((item): item is SidebarNestedGroup => 'items' in item)
+        .filter(nested => nested.items.some(sub => sub.href === pathname))
+        .map(nested => nested.title);
 
     return (
         <aside className={cn("w-64 shrink-0 hidden md:block border-r border-border/40 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto bg-background/50 backdrop-blur-sm", className)}>
@@ -146,26 +226,28 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                             <AccordionContent className="pb-1 mt-1">
                                 <ul className="relative ml-3.5 border-l border-border/60">
                                     {group.items.map((item, itemIndex) => {
-                                        const isActive = pathname === item.href;
-                                        return (
-                                            <li key={itemIndex} className="relative">
-                                                <Link
-                                                    href={item.href}
-                                                    className={cn(
-                                                        "group flex items-center gap-2 py-1.5 pl-4 pr-3 text-[13px] transition-all relative",
-                                                        isActive
-                                                            ? "text-foreground font-medium bg-muted/50 rounded-md"
-                                                            : "text-muted-foreground hover:text-foreground"
-                                                    )}
-                                                >
-                                                    {/* The vertical active indicator line */}
-                                                    {isActive && (
-                                                        <div className="absolute left-[-1px] top-0 bottom-0 w-[2px] bg-foreground rounded-full z-10" />
-                                                    )}
-                                                    {item.title}
-                                                </Link>
-                                            </li>
-                                        );
+                                        if ('items' in item) {
+                                            // Nested Group (Accordion inside specific item list)
+                                            return (
+                                                <li key={itemIndex} className="relative">
+                                                    <Accordion type="multiple" defaultValue={activeNestedGroups}>
+                                                        <AccordionItem value={item.title} className="border-none">
+                                                            <AccordionTrigger className="py-1.5 pl-4 pr-3 text-[13px] hover:no-underline text-muted-foreground hover:text-foreground font-normal [&[data-state=open]]:text-foreground">
+                                                                {item.title}
+                                                            </AccordionTrigger>
+                                                            <AccordionContent className="pb-1">
+                                                                <ul className="relative ml-3.5 border-l border-border/60">
+                                                                    {item.items.map((subItem, subIndex) => (
+                                                                        <SidebarLinkItem key={subIndex} item={subItem} pathname={pathname} />
+                                                                    ))}
+                                                                </ul>
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                    </Accordion>
+                                                </li>
+                                            );
+                                        }
+                                        return <SidebarLinkItem key={itemIndex} item={item} pathname={pathname} />;
                                     })}
                                 </ul>
                             </AccordionContent>

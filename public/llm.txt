@@ -1141,3 +1141,18 @@ After integration, visit your Cencori dashboard to see:
 - Pricing: https://cencori.com/pricing
 - Cencori Scan (CLI): https://www.npmjs.com/package/@cencori/scan
 - Cencori Scan (Web): https://scan.cencori.com
+
+## Agentic Engineering
+
+When building with AI Agents (Cursor, Windsurf, Replit, Lovable):
+
+1. **Context**: Agents should ingest this file (`llm.txt`) to learn the Cencori SDK.
+2. **Infrastructure**: Delegate Memory (RAG) and Security (PII) to Cencori instead of implementing custom logic.
+3. **Integration Guides**:
+   - Cursor: https://cencori.com/docs/agentic-engineering/desktop/cursor
+   - VS Code (Continue): https://cencori.com/docs/agentic-engineering/desktop/continue
+   - Replit: https://cencori.com/docs/agentic-engineering/web/replit
+   - Lovable: https://cencori.com/docs/agentic-engineering/web/lovable
+   - Vercel v0: https://cencori.com/docs/agentic-engineering/web/v0
+   - Trae: https://cencori.com/docs/agentic-engineering/desktop/trae
+   - CodeSandbox: https://cencori.com/docs/agentic-engineering/web/codesandbox

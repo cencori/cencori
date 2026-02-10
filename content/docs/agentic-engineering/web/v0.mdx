@@ -1,0 +1,26 @@
+---
+title: "v0"
+description: "Combining Vercel v0's UI generation with Cencori's backend logic."
+section: "Web Generators"
+order: 2
+---
+
+Vercel's **v0** ([v0.dev](https://v0.dev)) generates beautiful React/Tailwind UI. Cencori provides the brains behind the beauty.
+
+## The "Headless" Pattern
+
+v0 excels at the **Frontend**. Use Cencori for the **Headless AI Backend**.
+
+1.  **Generate UI with v0**:
+    > "Create a chat interface with a sidebar for history and a settings modal for selecting the AI model."
+
+2.  **Connect to Cencori**:
+    In your codebase (Next.js/React), creating the API route is complex for a UI generator.
+    
+    Instead, just tell v0:
+    > "The backend API is located at `/api/chat`. It uses the Cencori SDK. Please wire up the `useChat` hook to send messages to this endpoint."
+
+## Handling Streaming
+v0 apps often use `ai/react` (Vercel AI SDK). Cencori is fully compatible!
+
+> "My backend uses `cencori.chat.completions.create({ stream: true })`. Please ensure the frontend handles the streaming response correctly."

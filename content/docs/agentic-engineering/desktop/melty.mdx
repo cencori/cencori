@@ -1,0 +1,23 @@
+---
+title: "Melty"
+description: "Using Cencori Memory with Melty's Git-based workflow."
+section: "Desktop IDEs"
+order: 9
+---
+
+**Melty** ([melty.sh](https://melty.sh)) is a "Chat-first" editor where every message is a Git commit.
+
+## Persisting the "Why"
+
+Melty captures the *code changes* perfectly in Git.
+Cencori can capture the *reasoning* in Memory.
+
+### Integration Idea
+
+When you use Melty, you can instruct it to log its decisions to Cencori:
+
+> "Refactor the auth system. 
+> 1. Commit the changes as you go.
+> 2. For every major decision, call `cencori.memory.add()` with the rationale, so future agents understand WHY we made this change."
+
+This creates a **Semantic History** alongside your **Git History**.

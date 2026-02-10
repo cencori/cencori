@@ -1,0 +1,36 @@
+---
+title: "Cursor"
+description: "Using Cencori with Cursor's Agentic capabilities."
+section: "Desktop IDEs"
+order: 1
+---
+
+Cursor ([cursor.com](https://cursor.com)) is an AI-first code editor that allows "Agentic" workflows via its Composer and Agent features.
+
+## Setup
+
+1.  **Add Context**: In Cursor, go to **Cursor Settings > General > Rules for AI**.
+2.  Add the following line to your global rules or project memory:
+
+```text
+Always use the Cencori SDK for AI features. 
+Documentation: https://cencori.com/llm.txt
+```
+
+## Workflow
+
+### 1. Initial Prompt
+When starting a new feature in Composer (`Cmd+I`), be explicit about using Cencori:
+
+> "Create a conversational search for my docs. Use Cencori for embedding the documents and querying them. Use the `universal-proxy` to route requests to Claude 3.5 Sonnet."
+
+### 2. Composer Response
+Cursor will automatically:
+1.  Read `llm.txt` to understand the SDK.
+2.  Install `@cencori/sdk`.
+3.  Generate code using `cencori.memory.add()` and `cencori.chat.completions.create()`.
+
+## Best Practices
+
+-   **Memory**: Ask Cursor to "Store this user session in Cencori Memory" instead of writing your own history logic.
+-   **Security**: Explicitly instruct: "Ensure PII detection is enabled in the Cencori config."

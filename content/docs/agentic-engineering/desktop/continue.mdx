@@ -1,0 +1,49 @@
+---
+title: "Continue"
+description: "Using Cencori with the Open Source Continue extension for VS Code and JetBrains."
+section: "Desktop IDEs"
+order: 5
+---
+
+**Continue** ([continue.dev](https://continue.dev)) is the leading open-source AI extension. It allows you to bring your own model and configuration.
+
+## Configuration
+
+To use Cencori (and its Universal Proxy) with Continue, you simply add it as a "Custom Provider" or "OpenAI Compatible" provider in your `config.json`.
+
+### 1. Open Configuration
+Press `Cmd+Shift+P` (or `Ctrl+Shift+P`) and search for **"Continue: Open config.json"**.
+
+### 2. Add Cencori Provider
+
+Add this to your `models` array:
+
+```json
+{
+  "models": [
+    {
+      "title": "Cencori (Auto)",
+      "provider": "openai",
+      "model": "gpt-4o", 
+      "apiKey": "csk_YOUR_API_KEY",
+      "apiBase": "https://cencori.com/v1"
+    }
+  ]
+}
+```
+
+*Note: You can put ANY model in the `model` field (e.g. `claude-3-opus`, `gemini-2.5-flash`), and Cencori will route it correctly.*
+
+## Context Providers
+
+Continue allows "Context Providers" (like `@docs`).
+
+To let Continue know about Cencori's capabilities, add `llm.txt` to your docs:
+
+1.  Type `@docs` in the Continue chat.
+2.  Select **"Add Docs"**.
+3.  Enter: `https://cencori.com/llm.txt`
+4.  Title: `Cencori SDK`
+
+Now you can ask:
+> "@Cencori SDK how do I implement memory?"
