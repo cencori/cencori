@@ -137,6 +137,7 @@ export function getAllTags(): string[] {
 
 import { MDXComponents } from '@/components/blog/MDXComponents';
 import rehypePrettyCode from 'rehype-pretty-code';
+import remarkGfm from 'remark-gfm';
 
 /**
  * Parse and render MDX content
@@ -147,6 +148,7 @@ export async function parseMDX(content: string) {
         options: {
             parseFrontmatter: false,
             mdxOptions: {
+                remarkPlugins: [remarkGfm],
                 rehypePlugins: [
                     [
                         rehypePrettyCode,
