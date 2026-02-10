@@ -6,8 +6,27 @@ import { Check, X, AlertTriangle, Globe, Database, Brain, Zap, Flame, Layout, Se
 
 // Icon mapping for MDX string props
 const Icons: Record<string, any> = {
-    Globe, Database, Brain, Zap, Flame, Layout, Server, Shield
+    Globe, Database, Brain, Zap, Flame, Layout, Server, Shield,
+    Cencori: CencoriLogo
 };
+
+function CencoriLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 21924 21924" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+            <g clipPath="url(#clip0_cencori)">
+                <circle cx="7744" r="7744" fill="currentColor" />
+                <circle cy="14180" r="7744" fill="currentColor" />
+                <circle cx="21924" cy="7744" r="7744" fill="currentColor" />
+                <circle cx="14180" cy="21924" r="7744" fill="currentColor" />
+            </g>
+            <defs>
+                <clipPath id="clip0_cencori">
+                    <rect width="21924" height="21924" rx="594" fill="white" />
+                </clipPath>
+            </defs>
+        </svg>
+    );
+}
 
 function Card({ href, title, icon, children, className }: { href?: string; title: string; icon?: string; children?: ReactNode; className?: string }) {
     const Icon = icon ? Icons[icon] : null;
