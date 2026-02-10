@@ -1,0 +1,28 @@
+---
+title: "Workflows Overview"
+description: "Turn passive AI into active, autonomous systems."
+section: "Workflows"
+order: 1
+---
+
+## The Problem
+
+Building autonomous agents requires infrastructure:
+*   Event Buses (Kafka/Redis)
+*   Background Workers (Celery/Bull)
+*   State Management (Postgres/Redis)
+*   Retries & Dead Letter Queues
+
+This is "Plumbing" that distracts you from your product.
+
+## The Solution
+
+Cencori acts as the **Serverless Operating System** for your agents. 
+
+You define **Triggers** (Events) and **Actions** (Logic). We handle the rest.
+
+### Key Capabilities
+
+1.  **Async Processing**: Don't block the user's chat while your agent "thinks" or calls external tools.
+2.  **Long-Running Jobs**: Workflows can run for minutes or hours (e.g. "Research this topic deeply").
+3.  **Human-in-the-Loop**: Pause a workflow and wait for approval via API or Dashboard.

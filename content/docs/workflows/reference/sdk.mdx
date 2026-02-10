@@ -1,0 +1,67 @@
+---
+title: "SDK Reference"
+description: "API Reference for the `cencori.workflows` namespace."
+section: "Workflows"
+order: 12
+---
+
+This page documents the `cencori.workflows` client SDK.
+
+## `trigger(workflowId, payload)`
+
+Manually trigger a workflow execution.
+
+**Parameters:**
+*   `workflowId` (string): The ID of the workflow to run.
+*   `payload` (object): JSON data to pass to the workflow Trigger.
+
+**Returns:**
+*   `executionId` (string): The ID of the started execution.
+
+```typescript
+const { executionId } = await cencori.workflows.trigger('onboarding', { userId: '123' });
+```
+
+## `get(executionId)`
+
+Retrieve the current status and state of a workflow execution.
+
+**Returns:**
+*   `status`: `'RUNNING' | 'COMPLETED' | 'FAILED' | 'PAUSED'`
+*   `state`: The current step data.
+*   `result`: The final output (if completed).
+
+```typescript
+const status = await cencori.workflows.get('exec_abc123');
+```
+
+## `sendEvent(eventId, payload)`
+
+Send an event to a running workflow that is waiting (via `.waitFor()`).
+
+**Parameters:**
+*   `eventId` (string): The ID the workflow is waiting for.
+*   `payload` (object): Data to resolve the promise with.
+
+```typescript
+await cencori.workflows.sendEvent('approval_request_123', { approved: true });
+```
+
+## `cancel(executionId)`
+
+Forcefully stop a running workflow.
+
+```typescript
+await cencori.workflows.cancel('exec_bad_loop');
+```
+
+## `list(options)`
+
+List workflow executions, optionally filtering by status or date.
+
+```typescript
+const failedWorkflows = await cencori.workflows.list({
+  status: 'FAILED',
+  limit: 10
+});
+```

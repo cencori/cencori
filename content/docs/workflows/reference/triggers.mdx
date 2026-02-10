@@ -1,0 +1,84 @@
+---
+title: "Triggers Reference"
+description: "Complete guide to Workflow Triggers and Event Sources."
+section: "Workflows"
+order: 10
+---
+
+Triggers determine **when** a workflow starts.
+
+## Chat Triggers
+
+Fired during interactions with the Cencori Chat API.
+
+### `chat.message`
+Fires when a user sends a message.
+*   **Payload**: `{ messageId, content, userId, conversationId }`
+*   **Use Case**: Adaptive Memory, Sentiment Analysis, Moderation.
+
+### `chat.session.start`
+Fires when a new conversation thread is created.
+*   **Use Case**: Initializing state, loading user profile.
+
+---
+
+## System Triggers
+
+### `schedule.cron`
+Fires on a time-based schedule.
+*   **Config**: `cron: "0 9 * * *"` (Every day at 9am).
+*   **Use Case**: Daily Reports, Data Sync, Email Drip Campaigns.
+
+```typescript
+cencori.triggers.cron("daily-report", "0 9 * * *", async () => {
+  // ...
+});
+```
+
+### `webhook`
+Exposes a public URL that triggers the workflow when hit.
+*   **URL**: `https://api.cencori.com/v1/hooks/{workflowId}`
+*   **Use Case**: Integrating with Stripe, Typeform, Slack, or GitHub.
+
+---
+
+## Database Triggers (Postgres/SQL)
+
+Requires the Cencori Database Connector.
+
+### `db.{table}.insert`
+Fires when a new row is added.
+*   **Payload**: The new row data.
+*   **Use Case**: Data Enrichment on signup.
+
+### `db.{table}.update`
+Fires when a row is modified.
+*   **Payload**: `{ old, new, changes }`
+*   **Use Case**: Syncing data to external systems.
+
+---
+
+## File Triggers
+
+### `file.uploaded`
+Fires when a file is uploaded to Cencori Storage.
+*   **Payload**: `{ fileId, mimeType, size, url }`
+*   **Use Case**: RAG Ingestion, OCR, Image Analysis.
+
+---
+
+## Custom Triggers
+
+You can fire your own events from your application code using the SDK.
+
+**Send Event:**
+```typescript
+await cencori.events.send('my.custom.event', { foo: 'bar' });
+```
+
+**Listen:**
+```typescript
+cencori.on('my.custom.event', async (event) => {
+  console.log(event.payload.foo); // 'bar'
+});
+```

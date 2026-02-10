@@ -1,0 +1,65 @@
+---
+title: "Adaptive Memory"
+description: "Building self-evolving, efficient memory with Cencori Workflows."
+section: "Workflows"
+order: 3
+---
+
+**Adaptive Memory** is a pattern for creating AI that "learns" about the user over time without needing expensive RAG for every query.
+
+## The Strategy
+
+Instead of treating memory as a "Search Engine" (searching for keywords), we treat it as a **LIVING PROFILE**.
+
+1.  **Observe**: Watch every interaction.
+2.  **Reflect**: Update the profile based on new information.
+3.  **Inject**: Put the *entire* profile into the system prompt.
+
+This mimics Human Memory: you don't "search a database" to remember your best friend's name. You just *know* it because it's part of your mental context.
+
+## Implementation
+
+We can build this using a simple **Cencori Workflow**.
+
+### 1. The Trigger: `chat.message`
+
+We use an async trigger so the user gets a fast response, while the "Memory Formation" happens in the background.
+
+```typescript
+cencori.on('chat.message', async (event) => {
+  await cencori.workflows.trigger('adaptive-memory-update', event);
+});
+```
+
+### 2. The Observer Step
+
+The workflow asks a "Reasoning Model" (like DeepSeek R1 or GPT-4o) to analyze the chat.
+
+> **Prompt:** "Extract deep observations about the user from this conversation. Focus on beliefs, goals, and recurring patterns. Output a JSON list of `NewObservations`."
+
+### 3. The Reflector Step
+
+This is the magic. We don't just append. We **Evolve**.
+
+We load the *current* Profile and the *new* Observations, and ask the Reflector Agent to merge them.
+
+> **Prompt:** "Here is the Current Profile and New Observations. Update the Profile. Resolve conflicts. Delete outdated facts. Compress into a dense, narrative format."
+
+### 4. Persist State
+
+We save the new "Dense Profile" to `cencori.memory.kv` (Key-Value Store) under `user_profile:{id}`.
+
+## The Result
+
+Next time the user chats:
+
+```typescript
+const profile = await cencori.memory.kv.get(`user_profile:${userId}`);
+
+const systemPrompt = `
+You are a helpful AI.
+User Context: ${profile}
+`;
+```
+
+This achieves **High-Performance Long-Context Recall** because the "Profile" is a highly compressed, high-density representation of the user's entire history.

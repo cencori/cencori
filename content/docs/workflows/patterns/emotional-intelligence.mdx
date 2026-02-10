@@ -1,0 +1,72 @@
+---
+title: "Emotional Intelligence"
+description: "Route and respond based on user sentiment and tone."
+section: "Workflows"
+order: 8
+---
+
+Standard support bots treat an angry user the same as a happy one. This is a recipe for churn.
+**Emotional Intelligence Workflows** analyze the *sentiment* of a message before deciding *how* to handle it.
+
+## The Strategy
+
+We insert a lightweight **Sentiment Analysis Step** at the very beginning of the pipeline.
+
+*   **Happy/Neutral**: Route to standard AI Agent.
+*   **Frustrated**: Switch AI to "Empathetic Mode" (more apologetic, concise).
+*   **Angry/Crisis**: **Bypass AI entirely** and alert a Human Manager immediately.
+
+## Implementation
+
+### 1. The Sentiment Step
+
+This runs on every incoming message. We use a fast, cheap model (like `gpt-4o-mini` or even a local BERT model) for this check.
+
+```typescript
+const sentiment = await cencori.ai.classify(message.content, {
+  labels: ["positive", "neutral", "frustrated", "angry"],
+  description: "Detect the emotional tone of the user."
+});
+```
+
+### 2. The Routing Logic (Switch Statement)
+
+Your workflow branches based on the result.
+
+```typescript
+switch (sentiment) {
+  case "angry":
+    // ALARM: Immediate Escalation
+    await tools.slack.alert(`🚨 ANGRY USER: ${user.email}`);
+    await cencori.workflows.transferToHuman();
+    break;
+
+  case "frustrated":
+    // Mode Switch: High Empathy
+    await agent.updateSystemPrompt("You are deeply apologetic. Focus on solving the issue quickly.");
+    await agent.reply(message);
+    break;
+
+  default:
+    // Standard AI
+    await agent.reply(message);
+}
+```
+
+### 3. Long-Term Tracking
+
+You can also track this over time in **Adaptive Memory**.
+
+*   If a user is consistently "Frustrated" over 3 days, trigger a `churn.risk` event.
+*   If a user shifts from "Neutral" to "Positive", trigger an `upsell.opportunity` event.
+
+## Code Example: The "Cool Down" Loop
+
+A sophisticated pattern is the "Cool Down" loop.
+
+1.  User is Angry.
+2.  AI acknowledges deeply: *"I completely understand why you are upset. That sounds incredibly frustrating."*
+3.  AI asks specifically: *"To fix this right now, I need to know X."*
+4.  **Re-evaluate Sentiment** on next reply.
+5.  If User cools down -> Resume standard help.
+6.  If User stays Angry -> Escalate.

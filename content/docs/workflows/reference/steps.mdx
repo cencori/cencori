@@ -1,0 +1,88 @@
+---
+title: "Steps Reference"
+description: "Detailed API for Workflow Steps, Logic, and Flow Control."
+section: "Workflows"
+order: 11
+---
+
+Steps are the atomic units of execution within a workflow.
+
+## `steps.run(id, func)`
+
+The most basic step. Executes an arbitrary async function.
+*   **Automatic Retries**: If it throws, Cencori retries (default 3x) with backoff.
+*   **Timeout**: Default 60s (configurable).
+
+```typescript
+const result = await cencori.steps.run('my-step', async () => {
+  return await db.query('SELECT 1');
+});
+```
+
+## `ai.generate(config)`
+
+A specialized step for LLM inference.
+*   **Model Agnostic**: Switch between GPT-4, Claude, Llama easily.
+*   **Structured Output**: Enforce JSON schemas (Zod).
+
+```typescript
+const analysis = await cencori.ai.generate({
+  model: "claude-3-5-sonnet",
+  prompt: "Analyze this...",
+  schema: AnalysisSchema // Optional Zod schema
+});
+```
+
+## `workflows.waitFor(eventId, options)`
+
+Pauses the workflow until an external event occurs.
+*   **Timeout**: Required (e.g., '24h').
+*   **Idempotency**: Safe to call multiple times.
+
+```typescript
+const event = await cencori.workflows.waitFor('approval', { timeout: '1d' });
+```
+
+## `steps.sleep(duration)`
+
+Pauses execution for a set time using `setTimeout` logic but persistent (survives server restarts).
+
+```typescript
+await cencori.steps.sleep('1h'); // Sleep for 1 hour
+```
+
+## Flow Control
+
+Since Workflows are just Typescript (or Python), you use standard language features for logic.
+
+**Branching (`if/else`):**
+```typescript
+if (user.isVip) {
+  await steps.run('vip-path', ...);
+} else {
+  await steps.run('standard-path', ...);
+}
+```
+
+**Loops (`for/while`):**
+```typescript
+for (const item of items) {
+  await steps.run(`process-${item.id}`, async () => {
+    await process(item);
+  });
+}
+```
+
+## Error Handling
+
+Use `try/catch` to handle step failures gracefully.
+
+```typescript
+try {
+  await cencori.steps.run('risky-step', ...);
+} catch (err) {
+  await cencori.steps.run('compensation-step', async () => {
+    // Rollback or alert
+  });
+}
+```

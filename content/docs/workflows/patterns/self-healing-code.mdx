@@ -1,0 +1,89 @@
+---
+title: "Self-Healing Code"
+description: "Agents that detect runtime errors and propose fixes automatically."
+section: "Workflows"
+order: 9
+---
+
+The ultimate automation is code that fixes itself. 
+**Self-Healing Workflows** listen for crash reports, analyze the stack trace, and generate a Git Patch to fix the bug.
+
+## The Architecture
+
+1.  **Monitor**: Cencori hooks into your error logs (Sentry/Datadog or raw logs).
+2.  **Analyze**: An "Engineer Agent" reads the stack trace and the relevant source code files.
+3.  **Reproduce**: (Optional) The agent writes a failing test case.
+4.  **Fix**: The agent modifies the code to pass the test.
+5.  **PR**: The agent opens a Pull Request for human review.
+
+## Implementation
+
+### 1. The Trigger: `error.exception`
+
+```typescript
+cencori.on('error.exception', async (errorEvent) => {
+  // Filter for high-confidence errors (e.g. TypeErrors, NullPointers)
+  if (isFixable(errorEvent)) {
+    await cencori.workflows.trigger('auto-fixer', errorEvent);
+  }
+});
+```
+
+### 2. The Analysis Step
+
+The agent needs access to the codebase (via GitHub API or local clone).
+
+```typescript
+const stackTrace = errorEvent.trace;
+const culpritFile = parseStackTrace(stackTrace).file;
+
+// Read the code
+const code = await tools.github.getFile(culpritFile);
+
+// Ask LLM to diagnose
+const diagnosis = await cencori.ai.generate({
+  system: "You are a Senior Debugger.",
+  prompt: `
+    Error: ${errorEvent.message}
+    Trace: ${stackTrace}
+    Code:
+    ${code}
+    
+    Explain why this is happening and propose a code fix.
+  `
+});
+```
+
+### 3. The Patch Generation
+
+We ask the LLM to output a Unified Diff or the new file content.
+
+```typescript
+const patch = await cencori.ai.generateCode({
+  prompt: "Generate the fixed code block.",
+  context: diagnosis
+});
+```
+
+### 4. Opening a PR
+
+We never commit to main automatically (unless you are very brave). We open a PR.
+
+```typescript
+await tools.github.createBranch(`fix/error-${errorEvent.id}`);
+
+await tools.github.commit({
+  message: `fix: auto-heal for ${errorEvent.message}`,
+  files: [{ path: culpritFile, content: patch }]
+});
+
+await tools.github.createPR({
+  title: `[Auto-Fix] ${errorEvent.message}`,
+  body: `I detected a crash. Here is the analysis:\n\n${diagnosis}\n\nReview this fix.`
+});
+```
+
+## Safety Rails 🚧
+
+*   **Rate Limits**: Don't let the agent open 100 PRs if the server is looping.
+*   **Sandboxing**: Ideally, run the "Reproduce" step in a sandboxed environment (like the **CodeSandbox** integration) to verify the fix *acts* the way it should before opening the PR.
