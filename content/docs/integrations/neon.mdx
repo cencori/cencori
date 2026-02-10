@@ -1,0 +1,80 @@
+---
+title: "Neon"
+description: "Serverless Postgres for your Data, Cencori for your Intelligence."
+section: "Integrations"
+order: 3
+---
+
+**Neon** gives you Serverless Postgres with branching. **Cencori** gives you Serverless AI with memory.
+
+This combination is powerful because it allows you to separate **Structured Data** (Neon) from **Unstructured Memory** (Cencori).
+
+## The Architecture
+
+1.  **Neon**: Stores Users, Orders, Products, and Transactional Data.
+2.  **Cencori**: Stores Embeddings, Chat History, User Preferences, and Observations.
+
+## Connecting from Vercel / Node.js
+
+You don't connect Neon directly to Cencori. Instead, your application queries both.
+
+```typescript
+import { neon } from '@neondatabase/serverless';
+import { Cencori } from 'cencori';
+
+const sql = neon(process.env.DATABASE_URL);
+const cencori = new Cencori();
+
+async function handleRequest(query: string) {
+    // 1. Get structured context from Neon
+    const products = await sql`SELECT name, price FROM products WHERE stock > 0`;
+
+    // 2. Get unstructured context from Cencori (RAG)
+    const knowledge = await cencori.memory.search(query);
+
+    // 3. Synthesize answer
+    const response = await cencori.chat.create({
+        model: "gpt-4o",
+        messages: [
+            { role: "system", content: `You are a sales assistant.` },
+            { role: "system", content: `Available Products: ${JSON.stringify(products)}` },
+            { role: "system", content: `Relevant Policy: ${JSON.stringify(knowledge)}` },
+            { role: "user", content: query }
+        ]
+    });
+
+    return response;
+}
+```
+
+## Tool Calling (SQL Agent)
+
+You can give Cencori the ability to query Neon directly using Tools.
+
+> **Warning**: Always use read-only credentials or strict input validation when giving an LLM access to SQL.
+
+```typescript
+const tools = [
+  {
+    type: "function",
+    function: {
+      name: "search_users",
+      description: "Search for a user by email",
+      parameters: {
+        type: "object",
+        properties: {
+          email: { type: "string" }
+        },
+        required: ["email"]
+      }
+    }
+  }
+];
+
+// ... inside your chat loop
+if (toolCall.name === 'search_users') {
+    const { email } = JSON.parse(toolCall.arguments);
+    const user = await sql`SELECT * FROM users WHERE email = ${email}`;
+    // ... return user to LLM
+}
+```

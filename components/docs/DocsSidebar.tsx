@@ -35,10 +35,12 @@ const sidebarItems: SidebarGroup[] = [
         items: [
             { title: "Introduction", href: "/docs/introduction" },
             { title: "Quick Start", href: "/docs/quick-start" },
+            { title: "The Modern AI Stack", href: "/docs/getting-started/stack" },
             { title: "Installation", href: "/docs/installation" },
             { title: "Making Your First Request", href: "/docs/getting-started/first-request" },
         ],
     },
+    // ... (lines 42-140 omitted for brevity in instruction, but I will only replace the relevant chunks if I can, or use multi_replace if needed. Actually, since I can't skip lines in replacement content easily without including them, I will do two separate replaces or one big one if they are close. They are far apart (lines 33-40 and 141-149). I should use multi_replace_file_content.)
     {
         title: "AI",
         items: [
@@ -75,6 +77,7 @@ const sidebarItems: SidebarGroup[] = [
         title: "Platform",
         items: [
             { title: "Architecture", href: "/docs/platform/core-architecture" },
+            { title: "Comparisons", href: "/docs/platform/comparisons" },
             { title: "Projects", href: "/docs/platform/projects" },
             { title: "Billing & Usage", href: "/docs/platform/billing" },
             { title: "Bring Your Own Key", href: "/docs/platform/byok" },
@@ -140,10 +143,12 @@ const sidebarItems: SidebarGroup[] = [
         title: "Integrations",
         items: [
             { title: "Vercel AI SDK", href: "/docs/integrations/vercel-ai-sdk" },
+            { title: "Supabase", href: "/docs/integrations/supabase" },
+            { title: "Firebase", href: "/docs/integrations/firebase" },
+            { title: "Neon", href: "/docs/integrations/neon" },
             { title: "TanStack AI", href: "/docs/integrations/tanstack" },
             { title: "LangChain", href: "/docs/integrations/langchain" },
             { title: "Agent Frameworks", href: "/docs/integrations/agent-frameworks" },
-            { title: "Backend & DB", href: "/docs/integrations/backend" },
             { title: "Automation", href: "/docs/integrations/automation" },
         ],
     },

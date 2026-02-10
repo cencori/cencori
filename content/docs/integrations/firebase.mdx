@@ -1,0 +1,82 @@
+---
+title: "Firebase"
+description: "Serverless AI with Firebase Cloud Functions and Firestore."
+section: "Integrations"
+order: 2
+---
+
+**Firebase** is the classic serverless backend. **Cencori** adds the AI layer that Firebase lacks.
+
+## Cloud Functions (v2)
+
+The most common pattern is to wrap Cencori calls in a compiled Cloud Function to keep your API key secure.
+
+```typescript
+// functions/src/index.ts
+import { onRequest } from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
+import { Cencori } from "cencori";
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+export const chat = onRequest(async (request, response) => {
+  // 1. App Check / Auth Validation
+  // ... verify token ...
+
+  // 2. Execute AI logic
+  try {
+    const result = await cencori.chat.create({
+        model: "gpt-4o",
+        messages: request.body.messages,
+        exclude_pii: true // Enable Cencori Security
+    });
+
+    response.json(result);
+  } catch (error) {
+    logger.error("AI Error", error);
+    response.status(500).send("AI Inference Failed");
+  }
+});
+```
+
+## Firestore Triggers
+
+You can create "background agents" that react to database changes.
+
+**Example**: A user writes a note, and Cencori automatically tags it.
+
+```typescript
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
+
+export const tagNote = onDocumentCreated("notes/{noteId}", async (event) => {
+  const note = event.data?.data();
+  if (!note) return;
+
+  // Ask Cencori to generate tags
+  const tags = await cencori.utils.tag({
+    content: note.text,
+    categories: ["Work", "Personal", "Code", "Ideas"]
+  });
+
+  // Write tags back to Firestore
+  return event.data.ref.set({ tags }, { merge: true });
+});
+```
+
+## Security Rules
+
+Since Cencori handles the AI logic, you can keep your security rules simple.
+
+```javascript
+// firestore.rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /notes/{note} {
+      // Only allow users to read/write their own notes
+      allow read, write: if request.auth.uid == resource.data.userId;
+    }
+  }
+}
+```

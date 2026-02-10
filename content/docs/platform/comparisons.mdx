@@ -1,27 +1,17 @@
 ---
-title: "The AI Infrastructure"
-slug: "ai-infrastructure-landscape"
-date: "2026-02-09"
-published: true
-description: "A deep dive into how Cencori compares to OpenRouter, LangChain, Vercel AI SDK, and the emerging stack."
-image: "/blog/images/covers/ainfra.png"
-author: "The Cencori Team"
-tags: ["Product", "Strategy", "Comparisons"]
+title: "Comparisons"
+description: "How Cencori compares to OpenRouter, LangChain, and Vercel AI SDK."
+section: "Platform"
+order: 10
 ---
 
-As the AI ecosystem explodes, it's becoming harder to understand where each tool fits. We get asked daily: *"Are you like OpenRouter?*" *"Do I use you with LangChain?"* *"How is this different from Vercel AI SDK?"*
+A common question is: *"How is Cencori different from X?"*
 
-The short answer: **Cencori acts as the unified Infrastructure Layer.**
-
-We are not just a model router (though we do that). We are not just a frontend library (though we power them). We are the cloud platform that sits between your application code and the raw model providers, handling the "Day 2" problems of security, memory, and orchestration.
-
-Here is exactly how we compare to the major players in the space.
+The short answer: **Cencori is the Infrastructure Layer**. We are not just a model router, and we are not just a JS library. We are the cloud platform that powers your AI application.
 
 ## vs OpenRouter
 
 **OpenRouter** is a pipe. **Cencori** is a platform.
-
-OpenRouter is fantastic if you just need raw access to a model API. But once you move to production, you need more than just token routing. You need to redact PII, store user memories, and manage agent state.
 
 | Feature | OpenRouter | Cencori |
 | :--- | :--- | :--- |
@@ -32,13 +22,11 @@ OpenRouter is fantastic if you just need raw access to a model API. But once you
 | **Memory** | <X /> No | <Check /> Adaptive Memory (Vector Store) |
 | **Workflows** | <X /> No | <Check /> Agent Orchestration |
 
-**Verdict**: Use OpenRouter for prototyping. Use Cencori for production applications that require security and state.
+**Summary**: Use OpenRouter if you just need access to a specific model. Use Cencori if you are building a production application that needs security, memory, and reliability.
 
 ## vs LangChain / LangGraph
 
-**LangChain** is a library you host. **Cencori** is a serverless backend.
-
-LangChain provides the *logic* for agents, but you still have to deploy it. You are responsible for the servers, the Redis instances for memory, and the observability stack. Cencori provides these as managed services.
+**LangChain** is a library you have to host. **Cencori** is a serverless backend.
 
 | Feature | LangChain | Cencori |
 | :--- | :--- | :--- |
@@ -53,13 +41,11 @@ LangChain provides the *logic* for agents, but you still have to deploy it. You 
 | **Retries** | You code it | Built-in (Exponential Backoff) |
 | **Observability** | LangSmith (Separate) | Integrated Dashboard |
 
-**Verdict**: You can use them together! Write your graph logic in LangChain, but offload the heavy lifting (memory, execution, tracing) to Cencori.
+**Summary**: You can actually **use LangChain with Cencori**. Use LangChain for the graph logic, and let Cencori handle the LLM execution, memory storage, and observability.
 
 ## vs Vercel AI SDK
 
 **Vercel AI SDK** is the Frontend. **Cencori** is the Backend.
-
-Vercel has built the standard for *frontend* AI integration—hooks like `useChat` and `useCompletion` are best-in-class for React. Cencori is the engine that powers them from the backend.
 
 | Feature | Vercel AI SDK | Cencori |
 | :--- | :--- | :--- |
@@ -72,13 +58,22 @@ Vercel has built the standard for *frontend* AI integration—hooks like `useCha
 | **Role** | Frontend Library | Backend Engine |
 | **Focus** | UI State & Streaming | Intelligence & Security |
 
-**Better Together**: We strongly recommend using the Vercel AI SDK for your UI, and plugging Cencori in as the provider. It's the perfect stack.
+**Better Together**:
+```typescript
+import { cencori } from '@cencori/ai-sdk';
+import { streamText } from 'ai';
+
+// Vercel handles the Streaming & UI
+const result = await streamText({
+  // Cencori handles the Intelligence, Security, & Observability
+  model: cencori('gpt-4o'),
+  messages
+});
+```
 
 ## vs Vercel AI Gateway
 
-**Vercel AI Gateway** focuses on network. **Cencori** focuses on intelligence.
-
-Vercel's gateway is excellent for caching and rate-limiting at the edge. Cencori acts as an *application* gateway, understanding the content of the requests (to redact info or update memory).
+**Vercel AI Gateway** focuses on caching and rate limiting. **Cencori** focuses on **Intelligence**.
 
 | Feature | Vercel AI Gateway | Cencori |
 | :--- | :--- | :--- |
@@ -91,13 +86,11 @@ Vercel's gateway is excellent for caching and rate-limiting at the edge. Cencori
 | **Primary Goal** | Caching & Rate Limiting | Agent Orchestration |
 | **Intelligence** | Passive (Network Layer) | Active (Application Layer) |
 
-**Verdict**: Cencori is an **Active** intelligence layer; Vercel is a **Passive** network layer.
+**Summary**: Cencori is an **Active** intelligence layer, whereas Vercel AI Gateway is a **Passive** network layer.
 
 ## vs LiteLLM
 
-**LiteLLM** is a library. **Cencori** is a managed service.
-
-LiteLLM is a great Python library for normalizing APIs. Cencori does this too, but adds the infrastructure layer (logging, users, security) on top.
+**LiteLLM** is a Python library/proxy. **Cencori** is a managed cloud platform.
 
 | Feature | LiteLLM | Cencori |
 | :--- | :--- | :--- |
@@ -109,13 +102,11 @@ LiteLLM is a great Python library for normalizing APIs. Cencori does this too, b
 | **Workflows** | <X /> No | <Check /> Agent Orchestration |
 | **Hosting** | Self-hosted | Serverless Cloud |
 
-**Verdict**: Use LiteLLM if you want to manage your own proxy server. Use Cencori if you want a managed platform.
+**Summary**: LiteLLM is great for standardizing APIs if you want to manage your own proxy. Cencori provides the same standardization but adds managed infrastructure, security, and memory.
 
 ## vs Portkey / Helicone
 
-**Portkey & Helicone** are for Observability. **Cencori** is for Intelligence.
-
-These tools are excellent "rear-view mirrors"—they tell you exactly what happened. Cencori handles observability too, but primarily focuses on *doing* things (running agents, redacting data, retrieving memory).
+**Portkey & Helicone** are primarily **Observability Gateways**. **Cencori** is an **Intelligence Platform**.
 
 | Feature | Portkey / Helicone | Cencori |
 | :--- | :--- | :--- |
@@ -127,13 +118,11 @@ These tools are excellent "rear-view mirrors"—they tell you exactly what happe
 | **Workflows** | <X /> No | <Check /> Agent Orchestration |
 | **Primary Goal** | Logging & Analytics | Building Agents |
 
-**Verdict**: If you just need logs, Portkey/Helicone are great. If you need Memory and Agents, you need Cencori.
+**Summary**: Portkey and Helicone tell you *what happened* (Logging). Cencori helps you *make it happen* (Agents, Memory, Security).
 
 ## vs Mastra
 
-**Mastra** is a framework. **Cencori** is the infrastructure.
-
-Similar to Mastra, Cencori provides tools for building agents. However, Mastra is a framework you run yourself (like Next.js), whereas Cencori is the cloud platform backing it (like Vercel).
+**Mastra** is a TypeScript framework. **Cencori** is the infrastructure that powers it.
 
 | Feature | Mastra | Cencori |
 | :--- | :--- | :--- |
@@ -146,15 +135,4 @@ Similar to Mastra, Cencori provides tools for building agents. However, Mastra i
 | **Hosting** | Self-hosted | Serverless Cloud |
 | **State** | Postgres (Manual) | Built-in Persistence |
 
-**Verdict**: Mastra is a promising framework. Cencori is the platform to run it on (or replace the backend parts entirely).
-
----
-
-## Conclusion
-
-The AI stack is settling into three layers:
-1.  **Frontend/Frameworks** (Vercel AI SDK, LangChain, Mastra)
-2.  **Infrastructure/Intelligence** (Cencori)
-3.  **Models** (OpenAI, Anthropic)
-
-Cencori is laser-focused on that middle layer: making it safe, easy, and reliable to run intelligent workloads in production.
+**Summary**: Mastra is like "Next.js for Agents" (the framework). Cencori is the "Vercel for Agents" (the platform). You can use them together, or let Cencori handle the backend complexity entirely.
