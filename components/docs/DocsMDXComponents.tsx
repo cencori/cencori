@@ -7,7 +7,10 @@ import { Check, X, AlertTriangle, Globe, Database, Brain, Zap, Flame, Layout, Se
 // Icon mapping for MDX string props
 const Icons: Record<string, any> = {
     Globe, Database, Brain, Zap, Flame, Layout, Server, Shield,
-    Cencori: CencoriLogo
+    Cencori: CencoriLogo,
+    Vercel: VercelLogo,
+    Supabase: SupabaseLogo,
+    Nextjs: NextjsLogo
 };
 
 function CencoriLogo({ className }: { className?: string }) {
@@ -24,6 +27,31 @@ function CencoriLogo({ className }: { className?: string }) {
                     <rect width="21924" height="21924" rx="594" fill="white" />
                 </clipPath>
             </defs>
+        </svg>
+    );
+}
+
+function VercelLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 128 128" className={cn("fill-current text-black dark:text-white", className)}>
+            <path d="M64.002 8.576 128 119.424H0Zm0 0" />
+        </svg>
+    );
+}
+
+function NextjsLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 128 128" className={cn("fill-current text-black dark:text-white", className)}>
+            <path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64 64-28.7 64-64S99.3 0 64 0zm29.6 97.4-44.4-56.8v56.8h-8.5V38.4h11.9l43 54.8c-2.4 1.7-4.9 3.1-7.5 4.2h5.5V38.4h8.5v59.1c-2.6 1-5.3 1.9-8.1 2.5l-0.4-2.6z" />
+        </svg>
+    );
+}
+
+function SupabaseLogo({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 128 128" className={className}>
+            <path fill="#3ecf8e" d="M53.484 2.128c3.267-4.117 9.905-1.862 9.977 3.396l.508 76.907H12.902c-9.365 0-14.587-10.817-8.764-18.149z" />
+            <path fill="#249361" d="M102.24 186.21c-3.267 4.117-9.904 1.862-9.977-3.397l-1.156-76.906h51.715c9.365 0 14.587 10.817 8.763 18.149z" transform="translate(-27.722 -60.338)" />
         </svg>
     );
 }
