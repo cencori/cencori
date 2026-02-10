@@ -1,5 +1,8 @@
 import { MetadataRoute } from 'next';
 
+import { getAllDocs } from '@/lib/docs';
+import { getAllPosts } from '@/lib/blog';
+
 export default function sitemap(): MetadataRoute.Sitemap {
     const baseUrl = 'https://cencori.com';
     const currentDate = new Date().toISOString();
@@ -49,18 +52,33 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${baseUrl}/terms`, priority: 0.3, changeFrequency: 'yearly' as const },
     ];
 
+    // Dynamic Documentation Pages
+    const allDocs = getAllDocs();
+    const docPages = allDocs.map((doc) => ({
+        url: `${baseUrl}/docs/${doc.slug}`,
+        lastModified: doc.lastUpdated || currentDate,
+        priority: 0.8,
+        changeFrequency: 'weekly' as const,
+    }));
+
+    // Dynamic Blog Posts
+    const allPosts = getAllPosts();
+    const blogPages = allPosts.map((post) => ({
+        url: `${baseUrl}/blog/${post.slug}`,
+        lastModified: post.date || currentDate,
+        priority: 0.7,
+        changeFrequency: 'monthly' as const,
+    }));
+
     const allPages = [
-        ...corePages,
-        ...productPages,
-        ...companyPages,
-        ...authPages,
-        ...legalPages,
+        ...corePages.map(page => ({ ...page, lastModified: currentDate })),
+        ...productPages.map(page => ({ ...page, lastModified: currentDate })),
+        ...companyPages.map(page => ({ ...page, lastModified: currentDate })),
+        ...authPages.map(page => ({ ...page, lastModified: currentDate })),
+        ...legalPages.map(page => ({ ...page, lastModified: currentDate })),
+        ...docPages,
+        ...blogPages,
     ];
 
-    return allPages.map((page) => ({
-        url: page.url,
-        lastModified: currentDate,
-        changeFrequency: page.changeFrequency,
-        priority: page.priority,
-    }));
+    return allPages;
 }
