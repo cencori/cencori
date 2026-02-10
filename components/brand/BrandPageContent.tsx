@@ -83,7 +83,7 @@ export default function BrandPageContent() {
     ];
 
     return (
-        <div className="min-h-screen bg-black text-foreground selection:bg-purple-500/30 selection:text-purple-200 font-sans">
+        <div className="min-h-screen bg-background text-foreground selection:bg-purple-500/30 selection:text-purple-200 font-sans">
             <Navbar
                 logo={<Logo variant="mark" className="h-4" />}
                 name="cencori"
@@ -97,7 +97,7 @@ export default function BrandPageContent() {
 
                 {/* Announcement Badge */}
                 <div className="mb-8 animate-appear flex flex-col items-center">
-                    <div className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
+                    <div className="inline-flex items-center rounded-full border border-border bg-muted/50 px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                         <span className="flex h-2 w-2 rounded-full bg-purple-500 mr-2 animate-pulse" />
                         <span className="mr-2">Official Assets</span>
                     </div>
@@ -109,7 +109,7 @@ export default function BrandPageContent() {
                 </h1>
 
                 {/* Subheadline */}
-                <p className="text-lg md:text-xl text-muted-foreground/80 max-w-xl text-center mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
+                <p className="text-lg md:text-xl text-muted-foreground max-w-xl text-center mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
                     Download official Cencori logos and marks. Please use these according to our guidelines to maintain consistency.
                 </p>
 
@@ -131,16 +131,16 @@ export default function BrandPageContent() {
                 <div className="mt-20 w-full grid gap-20 px-4">
                     {/* Logomark Section */}
                     <section className="space-y-8">
-                        <div className="flex flex-col items-center text-center gap-4 border-b border-white/10 pb-6">
+                        <div className="flex flex-col items-center text-center gap-4 border-b border-border pb-6">
                             <div>
-                                <h2 className="text-3xl font-semibold tracking-tight text-white mb-2">Logomark</h2>
-                                <p className="text-zinc-400">The standalone symbol. Use for avatars, icons, or constrained spaces.</p>
+                                <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-2">Logomark</h2>
+                                <p className="text-muted-foreground">The standalone symbol. Use for avatars, icons, or constrained spaces.</p>
                             </div>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-6">
                             {/* Dark Mode Variant (White Logo) */}
-                            <div className="group rounded-3xl border border-white/10 bg-zinc-900/40 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10">
+                            <div className="group rounded-3xl border border-border bg-card text-card-foreground overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                                 <div className="aspect-[4/3] relative flex items-center justify-center bg-[#050505] bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px]">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                     <div className="relative w-32 h-32 transition-transform duration-500 group-hover:scale-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
@@ -157,12 +157,12 @@ export default function BrandPageContent() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-white/5 bg-zinc-900/60 backdrop-blur-xl flex items-center justify-between">
+                                <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-medium text-white">White Logomark</h3>
-                                        <p className="text-xs text-zinc-500 font-mono mt-1">SVG / PNG</p>
+                                        <h3 className="font-medium text-foreground">White Logomark</h3>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white" asChild>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/logo white.svg" download>
                                             <Download className="h-4 w-4" />
                                         </a>
@@ -171,7 +171,7 @@ export default function BrandPageContent() {
                             </div>
 
                             {/* Light Mode Variant (Black Logo) */}
-                            <div className="group rounded-3xl border border-white/10 bg-zinc-900/40 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10">
+                            <div className="group rounded-3xl border border-border bg-card text-card-foreground overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                                 <div className="aspect-[4/3] relative flex items-center justify-center bg-white relative">
                                     <div className="relative w-32 h-32 transition-transform duration-500 group-hover:scale-110 drop-shadow-xl">
                                         <Image
@@ -187,12 +187,12 @@ export default function BrandPageContent() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-white/5 bg-zinc-900/60 backdrop-blur-xl flex items-center justify-between">
+                                <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-medium text-white">Black Logomark</h3>
-                                        <p className="text-xs text-zinc-500 font-mono mt-1">SVG / PNG</p>
+                                        <h3 className="font-medium text-foreground">Black Logomark</h3>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white" asChild>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/logo black.svg" download>
                                             <Download className="h-4 w-4" />
                                         </a>
@@ -204,16 +204,16 @@ export default function BrandPageContent() {
 
                     {/* Wordmark Section */}
                     <section className="space-y-8">
-                        <div className="flex flex-col items-center text-center gap-4 border-b border-white/10 pb-6">
+                        <div className="flex flex-col items-center text-center gap-4 border-b border-border pb-6">
                             <div>
-                                <h2 className="text-3xl font-semibold tracking-tight text-white mb-2">Wordmark</h2>
-                                <p className="text-zinc-400">The full brand name. Use for headers, partnerships, and primary branding.</p>
+                                <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-2">Wordmark</h2>
+                                <p className="text-muted-foreground">The full brand name. Use for headers, partnerships, and primary branding.</p>
                             </div>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-6">
                             {/* Dark Mode Variant (White Wordmark) */}
-                            <div className="group rounded-3xl border border-white/10 bg-zinc-900/40 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10">
+                            <div className="group rounded-3xl border border-border bg-card text-card-foreground overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                                 <div className="aspect-[2/1] relative flex items-center justify-center bg-[#050505] bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px]">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                     <div className="relative w-56 h-16 transition-transform duration-500 group-hover:scale-105 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
@@ -230,12 +230,12 @@ export default function BrandPageContent() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-white/10 bg-zinc-900/60 backdrop-blur-xl flex items-center justify-between">
+                                <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-medium text-white">White Wordmark</h3>
-                                        <p className="text-xs text-zinc-500 font-mono mt-1">SVG / PNG</p>
+                                        <h3 className="font-medium text-foreground">White Wordmark</h3>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white" asChild>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/wordmark white.svg" download>
                                             <Download className="h-4 w-4" />
                                         </a>
@@ -244,7 +244,7 @@ export default function BrandPageContent() {
                             </div>
 
                             {/* Light Mode Variant (Black Wordmark) */}
-                            <div className="group rounded-3xl border border-white/10 bg-zinc-900/40 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/10">
+                            <div className="group rounded-3xl border border-border bg-card text-card-foreground overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
                                 <div className="aspect-[2/1] relative flex items-center justify-center bg-white">
                                     <div className="relative w-56 h-16 transition-transform duration-500 group-hover:scale-105 drop-shadow-xl">
                                         <Image
@@ -260,12 +260,12 @@ export default function BrandPageContent() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-white/5 bg-zinc-900/60 backdrop-blur-xl flex items-center justify-between">
+                                <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-medium text-white">Black Wordmark</h3>
-                                        <p className="text-xs text-zinc-500 font-mono mt-1">SVG / PNG</p>
+                                        <h3 className="font-medium text-foreground">Black Wordmark</h3>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white" asChild>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/wordmark black.svg" download>
                                             <Download className="h-4 w-4" />
                                         </a>
