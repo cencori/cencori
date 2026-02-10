@@ -1,0 +1,77 @@
+---
+title: "The Modern AI Stack"
+description: "The Blueprint for building scalable, production-ready AI applications."
+section: "Getting Started"
+order: 3
+---
+
+When building a modern AI application, you need three foundational layers. We call this the **"VSC Stack"** (Vercel, Supabase/Neon, Cencori) — or effectively: **Frontend, Database, Intelligence**.
+
+<Cards>
+  <Card title="Framework" icon="Layout">
+    **Next.js**
+    <br/>
+    The React framework. Handles UI, routing, and streaming responses.
+  </Card>
+  <Card title="Deployment" icon="Globe">
+    **Vercel**
+    <br/>
+    The global edge network. Handles caching, serving, and scaling.
+  </Card>
+  <Card title="Database" icon="Database">
+    **Supabase**
+    <br/>
+    The source of truth. Handles auth, structured data (SQL), and relational integrity.
+  </Card>
+  <Card title="Intelligence" icon="Brain">
+    **Cencori**
+    <br/>
+    The cognitive engine. Handles LLM orchestration, vector memory, security, and agents.
+  </Card>
+</Cards>
+
+## Why separate "Intelligence" from "Database"?
+
+A common mistake is trying to stuff embeddings and AI logic into your primary database (e.g., using `pgvector` for everything).
+
+While powerful, this mixes concerns:
+1.  **Bloat**: Vectors are heavy. Mixing them with transactional data slows down backups and migrations.
+2.  **Complexity**: Managing vector indexes (HNSW/IVFFlat) requires specialized tuning.
+3.  **Security**: AI prompts need different security rules (PII redaction) than SQL rows.
+
+**Cencori acts as the specialized "AI Database"**, sitting alongside your Postgres "App Database".
+
+## The Reference Architecture
+
+Here is how the data flows in a production system:
+
+1.  **User** sends a request via **Next.js**.
+2.  **Auth** is validated via **Supabase/Clerk**.
+3.  **Structured Data** (e.g., User Profile) is fetched from **Neon/Postgres**.
+4.  **Unstructured Context** (e.g., Past Conversations, RAG) is fetched from **Cencori**.
+5.  **LLM Inference** is orchestrated by **Cencori** (routing to OpenAI/Anthropic).
+6.  **Response** is streamed back to the **User**.
+
+## Capabilities Matrix
+
+| Feature | Provider | Why? |
+| :--- | :--- | :--- |
+| **Rendering** | Vercel | Best-in-class React framework & Edge Network. |
+| **Users & Auth** | Supabase | Robust RLS (Row Level Security) & easy Auth helpers. |
+| **Transactions** | Neon | Serverless branching matching Vercel's preview deployments. |
+| **Memory/RAG** | Cencori | Managed Vector Store tailored for high-speed retrieval. |
+| **Security** | Cencori | Dedicated PII Redaction & Prompt Injection firewall. |
+| **Observability** | Cencori | AI-specific traces (what token caused the error?). |
+
+## Start Building
+
+Choose your backend integration to get started:
+
+<CardGroup cols={2}>
+  <Card title="Supabase Guide" icon="Zap" href="/docs/integrations/supabase">
+    Connect Auth & Database
+  </Card>
+  <Card title="Firebase Guide" icon="Flame" href="/docs/integrations/firebase">
+    Cloud Functions & Firestore
+  </Card>
+</CardGroup>
