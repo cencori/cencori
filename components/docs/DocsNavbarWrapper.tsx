@@ -171,8 +171,8 @@ export function DocsNavbarWrapper() {
             <Navbar
                 logo={
                     <div className="flex items-center gap-2">
-                        <Logo variant="mark" className="h-4" />
-                        <span className="hidden md:inline font-bold">cencori</span>
+                        <Logo variant="mark" className="h-6" />
+
                     </div>
                 }
                 name=""

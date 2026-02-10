@@ -132,7 +132,7 @@ interface NavbarProps extends React.HTMLAttributes<HTMLElement> {
 // ... [Keep helper functions and components]
 
 export default function Navbar({
-    logo = <Logo variant="mark" className="h-5 w-5" />,
+    logo = <Logo variant="mark" className="h-6 w-auto" />,
     name = siteConfig.name,
     homeUrl = siteConfig.url,
     mobileNavItems = [
@@ -227,7 +227,6 @@ export default function Navbar({
                             className="flex items-center gap-1.5 text-sm font-semibold tracking-tight"
                         >
                             {logo}
-                            {name}
                         </Link>
 
                         <NavigationMenu className="hidden md:flex">
