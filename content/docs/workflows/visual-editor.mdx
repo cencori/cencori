@@ -1,0 +1,54 @@
+---
+title: "Visual Editor"
+description: "Build usage flows with a Drag-and-Drop Canvas (Coming Soon)."
+section: "Workflows"
+order: 14
+---
+
+Cencori Workflows are **Code-First**, but we are building a **Visual-First** interface to complement the SDK.
+
+> **Status**: In Development (Available Q3 2026)
+
+## Bidirectional Sync
+
+Most low-code tools force you to choose: *Clicking* or *Coding*.
+Cencori's Visual Editor is different. It is **Bidirectionally Synced** with your codebase.
+
+1.  **Code to Canvas**: We parse your `cencori.workflows.define()` code and visualize the graph.
+2.  **Canvas to Code**: Dragging a new "Step" on the canvas generates the TypeScript code in your repo.
+
+## The "Bridge" Workflow
+
+This enables a powerful new workflow for teams:
+
+1.  **PM/BizOps (No-Code)**: Build a "Draft" workflow in the Visual Dashboard. Drag steps, write prompts, define logic.
+2.  **Export**: Cencori generates a clean TypeScript file (e.g., `workflows/onboarding.ts`).
+3.  **Engineer (Pro-Code)**: Reviews the code, adds complex integrations or type checks, and commits to Git.
+
+**No-Code for Prototyping, Pro-Code for Production.**
+
+## The Canvas Experience
+
+### 1. Visualization
+Debug complex flows by seeing the execution path visually.
+*   **Green Path**: Success.
+*   **Red Path**: Error/Retries.
+*   **Yellow Path**: Waiting for Human.
+
+### 2. Live Debugging
+Click on any step in the visual graph to see:
+*   Input/Output JSON.
+*   Console Logs.
+*   LLM Prompts & Completions.
+*   Retry History.
+
+### 3. Rapid Prototyping
+Drag and drop triggers and actions to sketch a workflow, then export the code to your IDE to refine the logic.
+
+## Why Code-First Matters?
+
+Visual tools hit a ceiling. Code does not.
+By keeping the "Source of Truth" as TypeScript code, you get:
+*   **Version Control**: Git history for your workflows.
+*   **Code Review**: PRs for logic changes.
+*   **Type Safety**: TypeScript validation for step inputs.

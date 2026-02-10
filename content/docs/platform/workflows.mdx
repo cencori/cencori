@@ -1,0 +1,93 @@
+---
+title: "Workflows (Beta)"
+description: "Turn passive AI into active, autonomous systems with Cencori Workflows."
+section: "Platform"
+order: 9
+---
+
+## The Core Concept
+
+Cencori isn't just a database; it's the **Central Nervous System** for your AI agents. Workflows define how your agents react to the world.
+
+A Workflow consists of 3 pillars:
+
+1.  **Trigger**: The "Sense" (e.g., `user.signup`, `chat.message`, `daily.cron`).
+2.  **Think**: The "Brain" (LLM processing, RAG lookup, Logic).
+3.  **Action**: The "Hand" (Update Database, Send Email, Call Tool).
+
+---
+
+## Architecture
+
+Cencori acts as the **Serverless Event Bus**. You don't need to manage queues, workers, or retries.
+
+```mermaid
+graph LR
+    A[Event: user.signup] -->|Trigger| B[Cencori Workflow Engine]
+    B -->|Step 1| C[Research Company (LLM)]
+    C -->|Step 2| D[Draft Email (LLM)]
+    D -->|Step 3| E[Send Email (Tool)]
+```
+
+---
+
+## Strategy: The "Observational Memory" Pattern 🧠
+
+One of the most powerful uses of Workflows is building **Self-Evolving Memory**.
+
+Standard RAG (Vector Search) is great for retrieving old facts. But it misses the "Gist" of a user. **Observational Memory** solves this by continuously summarizing the user's life into a "Dense Profile".
+
+### How to Build it with Cencori
+
+You don't need a complex multi-agent system. You just need **One Workflow**.
+
+#### 1. The Trigger
+Listen for every message the user sends.
+
+```typescript
+// On every chat message...
+cencori.on('chat.message', async (event) => {
+  // Fire and forget (don't block the user)
+  await cencori.workflows.trigger('update-observational-memory', event);
+});
+```
+
+#### 2. The Workflow (Observer Loop)
+
+This runs in the background, invisible to the user.
+
+1.  **Observe**: Ask an LLM to extract "Facts" from the last message.
+    > *"Did the user mention a preference, a goal, or a new relationship?"*
+2.  **Reflect**: Checks if this new fact contradicts or updates an old fact.
+3.  **Persist**: Updates the `observational_profile` in Cencori Memory (Key-Value Store).
+
+#### 3. The Result
+
+When the user chats next time, you inject the **Profile** into the System Prompt.
+
+```typescript
+const profile = await cencori.memory.get('observational_profile', userId);
+
+const systemPrompt = `
+You are a helpful assistant.
+Core User Profile:
+${profile}
+`;
+```
+
+### Why Cencori?
+*   **Infrastructure-less**: You don't need to run a "Reflector Server". We run the background jobs.
+*   **Hybrid Memory**: Combine **Observational** (The "Who") with **Vector** (The "What").
+*   **Privacy Built-in**: All data flowing through the workflow is automatically scanned for PII by Cencori Security.
+
+---
+
+## Roadmap
+
+**Workflows** is currently in **Private Beta**. We are rolling out:
+
+*   **SDK Triggers**: Define workflows in code (`cencori.ts`).
+*   **Visual Builder**: Drag-and-drop workflow editor.
+*   **Human-in-the-Loop**: Pause a workflow and wait for human approval (e.g. "Approve this email").
+
+[Request Early Access](/waitlist)

@@ -1,0 +1,41 @@
+---
+title: "Core Concepts"
+description: "Understanding Triggers, Steps, and Activity State."
+section: "Workflows"
+order: 2
+---
+
+A Workflow is composed of three main building blocks.
+
+## 1. Triggers
+
+A Trigger is what starts a workflow execution.
+
+*   `chat.message`: Fires whenever a user sends a message.
+*   `user.created`: Fires on new user signup.
+*   `schedule.cron`: Fires on a schedule (e.g. "Every Day at 9am").
+*   `webhook`: Fires when an external service hits your Cencori Webhook URL.
+
+## 2. Steps
+
+Steps are the individual units of work.
+
+*   **LLM Step**: Call a model to generate text or structured data.
+*   **Tool Step**: Execute code or call an API.
+*   **Wait Step**: Pause execution for a duration or until an event.
+
+## 3. State
+
+State is the memory of the workflow execution. It persists across steps.
+
+```typescript
+// State example
+{
+  "user_id": "user_123",
+  "plan": ["research", "draft", "email"],
+  "current_step": 1,
+  "draft_content": "..."
+}
+```
+
+If a step fails, Cencori retries it with the **same state**. This ensures reliability.

@@ -1,0 +1,114 @@
+---
+title: "Email Automation"
+description: "Research leads and send hyper-personalized outreach automatically."
+section: "Workflows"
+order: 5
+---
+
+One of the most valuable uses of Cencori Workflows is automating **Outbound Communication**. 
+
+Instead of sending generic "Welcome" emails, you can use an Agent to:
+1.  **Research** the user's company (via Google/LinkedIn).
+2.  **Analyze** their GitHub profile.
+3.  **Draft** a truly personalized email referencing their specific work.
+4.  **Send** it (or draft it for approval).
+
+## The Workflow Architecture
+
+```mermaid
+graph TD
+    A[Event: user.signup] --> B[Workflow Trigger]
+    B --> C[Step 1: Enrich Data]
+    C --> D[Step 2: Research Interest]
+    D --> E[Step 3: Draft Content]
+    E --> F[Step 4: Send (or Wait for Approval)]
+```
+
+## Implementation
+
+### 1. The Trigger: `user.signup`
+
+We listen for a signup event. This assumes you are sending this event to Cencori from your backend.
+
+```typescript
+// backend/auth.ts
+await cencori.events.send('user.signup', {
+  userId: user.id,
+  email: user.email,
+  domain: user.email.split('@')[1]
+});
+```
+
+### 2. The Research Step
+
+The workflow first calls an enrichment tool (like Clearbit or a generic web search) to understand who the user is.
+
+```typescript
+// workflow.ts
+cencori.on('user.signup', async (event) => {
+  const { domain } = event.payload;
+
+  // Step 1: Research the Company
+  const companyContext = await cencori.steps.run('research-company', async () => {
+    // You can use a tool here, or just ask the LLM to search web
+    return await tools.webSearch(`What does ${domain} do? What is their tech stack?`);
+  });
+  
+  // Step 2: Research the User (if GitHub handle is known)
+  // ...
+});
+```
+
+### 3. The Drafting Step
+
+Now we use the **Reasoning** capabilities of the LLM to write the email. We inject the `companyContext` we just gathered.
+
+```typescript
+// Step 3: Draft the Email
+const emailDraft = await cencori.ai.generate({
+  model: "gpt-4o",
+  system: "You are a senior SDR. Write a short, punchy welcome email.",
+  prompt: `
+    User Domain: ${domain}
+    Company Research: ${JSON.stringify(companyContext)}
+    
+    Write a welcome email that mentions how our product (an AI Dev Tool) specifically helps THEIR company based on the research.
+    Keep it under 150 words. No fluff.
+  `
+});
+```
+
+### 4. The Action Strategy
+
+You have two choices here:
+
+**Option A: Fire and Forget**
+Send the email immediately using an integration (Resend, SendGrid).
+
+```typescript
+await tools.resend.emails.send({
+  to: event.payload.email,
+  subject: "Welcome to Cencori",
+  text: emailDraft.text
+});
+```
+
+**Option B: Human-in-the-Loop (Recommended)**
+Save the draft to your database or Slack, and wait for a human to click "Approve".
+
+```typescript
+await tools.slack.send({
+  channel: "#approvals",
+  text: `New Draft for ${event.payload.email}:\n\n${emailDraft.text}`,
+  actions: [{ type: "button", text: "Approve", value: "approve_email" }]
+});
+
+// The workflow pauses here until the button is clicked!
+await cencori.workflows.waitFor('approve_email');
+```
+
+## Why this works better
+
+*   **Higher Conversion**: "I saw you use Next.js" performs 10x better than "Welcome to our tool".
+*   **Scalable**: You can process 10,000 signups a day without hiring 100 SDRs.
+*   **Safe**: The "Human-in-the-Loop" pattern ensures no hallucinations are sent to VIPs.

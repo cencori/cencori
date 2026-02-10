@@ -1,0 +1,85 @@
+---
+title: "Data Enrichment"
+description: "Automatically enrich database records with AI research."
+section: "Workflows"
+order: 7
+---
+
+Your database is full of "thin" records: just an email, or just a company name. 
+**Data Enrichment Workflows** use AI to flesh out these records into full profiles.
+
+## The Strategy
+
+Instead of paying for expensive enrichment APIs (which often have stale data), use an **AI Agent** equipped with a Web Browser tool. It can visit the company's *actual* website, read their *current* pricing page, and find their *exact* value proposition.
+
+## Implementation
+
+### 1. The Trigger: `db.row_created`
+
+Listen for new rows in your primary table (e.g. `Leads` or `Companies`).
+
+```typescript
+cencori.on('db.companies.insert', async (row) => {
+  await cencori.workflows.trigger('enrich-company', {
+    companyId: row.id,
+    domain: row.domain
+  });
+});
+```
+
+### 2. The Browser Agent
+
+We define a workflow that spawns a **Browser Agent**.
+
+```typescript
+const enrichment = await cencori.steps.run('browse-site', async () => {
+    // 1. Visit the site
+    const page = await browser.goto(`https://${domain}`);
+    
+    // 2. Scrape key pages
+    const pricing = await page.goto('/pricing').msg;
+    const about = await page.goto('/about').msg;
+    
+    // 3. Synthesize
+    return { pricing, about };
+});
+```
+
+### 3. The Extraction Step (Structured Output)
+
+Now we feed the raw HTML/Text into an LLM and force it to output a specific JSON schema.
+
+```typescript
+const schema = z.object({
+  industry: z.string(),
+  pricing_model: z.enum(['SaaS', 'Usage', 'Enterprise']),
+  competitors: z.array(z.string()),
+  summary: z.string()
+});
+
+const structuredData = await cencori.ai.generateObject({
+  model: "gpt-4o",
+  schema: schema,
+  prompt: `Analyze this content: ${enrichment}`
+});
+```
+
+### 4. The Action: Update Database
+
+Finally, write the clean data back to your database.
+
+```typescript
+await db.updateTable('companies')
+  .set(structuredData)
+  .where('id', '=', companyId)
+  .execute();
+```
+
+## Advanced: "Watcher" Workflows
+
+You can also run this periodically.
+
+*   **Trigger**: `schedule.monthly`
+*   **Action**: Visit the pricing page again.
+*   **Logic**: Did the price change?
+*   **Notification**: Alert the sales team: *"Competitor X just raised their prices!"*

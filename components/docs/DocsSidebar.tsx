@@ -108,6 +108,35 @@ const sidebarItems: SidebarGroup[] = [
         ],
     },
     {
+        title: "Workflows (Beta)",
+        items: [
+            { title: "Overview", href: "/docs/workflows" },
+            { title: "Concepts", href: "/docs/workflows/concepts" },
+            { title: "Visual Editor", href: "/docs/workflows/visual-editor" },
+            {
+                title: "Patterns",
+                items: [
+                    { title: "Adaptive Memory", href: "/docs/workflows/patterns/adaptive-memory" },
+                    { title: "RAG Ingestion", href: "/docs/workflows/patterns/rag-ingestion" },
+                    { title: "Email Automation", href: "/docs/workflows/patterns/email-automation" },
+                    { title: "Human-in-the-Loop", href: "/docs/workflows/patterns/human-in-the-loop" },
+                    { title: "Data Enrichment", href: "/docs/workflows/patterns/data-enrichment" },
+                    { title: "Emotional Intelligence", href: "/docs/workflows/patterns/emotional-intelligence" },
+                    { title: "Self-Healing Code", href: "/docs/workflows/patterns/self-healing-code" },
+                ]
+            },
+            {
+                title: "Reference",
+                items: [
+                    { title: "Triggers", href: "/docs/workflows/reference/triggers" },
+                    { title: "Steps", href: "/docs/workflows/reference/steps" },
+                    { title: "SDK API", href: "/docs/workflows/reference/sdk" },
+                    { title: "State Management", href: "/docs/workflows/concepts/state-management" },
+                ]
+            }
+        ],
+    },
+    {
         title: "Integrations",
         items: [
             { title: "Vercel AI SDK", href: "/docs/integrations/vercel-ai-sdk" },

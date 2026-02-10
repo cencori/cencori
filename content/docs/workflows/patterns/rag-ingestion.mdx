@@ -1,0 +1,67 @@
+---
+title: "RAG Ingestion"
+description: "Automatically index documents into Cencori Vector Memory."
+section: "Workflows"
+order: 4
+---
+
+In Cencori, **Vector Memory** (RAG) is distinct from **Adaptive Memory** (Observational).
+
+*   **Adaptive Memory**: "Who the user is" (Short/Medium Context).
+*   **Vector Memory**: "What the user knows" (Long Context / Documents).
+
+You can use **Workflows** to build automated ingestion pipelines.
+
+## The Strategy
+
+Instead of manually uploading files, you can listen for `file.uploaded` events and automatically process them.
+
+1.  **Trigger**: `file.uploaded` (or a custom webhook).
+2.  **Process**: Extract text (PDF/DOCX to Markdown).
+3.  **Chunk**: Split into semantic chunks.
+4.  **Embed**: Generate vectors (Cencori handles this).
+5.  **Persist**: Save to `cencori.memory.vector`.
+
+## Implementation
+
+### 1. The Trigger
+
+```typescript
+cencori.on('file.uploaded', async (event) => {
+  await cencori.workflows.trigger('rag-ingestion', event);
+});
+```
+
+### 2. The Extraction Step
+
+Use a tool (like `unstructured` or `pdf-parse`) to get clean text.
+
+```typescript
+// Pseudocode for Workflow Step
+const text = await tools.extractText(event.file.url);
+```
+
+### 3. The Injection Step
+
+Push the text into Cencori's Vector Store.
+
+```typescript
+await cencori.memory.vector.add({
+  content: text,
+  metadata: {
+    source: event.file.name,
+    user_id: event.user.id
+  }
+});
+```
+
+## The Result
+
+Now, any file the user uploads is instantly searchable by your agent.
+
+```typescript
+// Retrieve context
+const context = await cencori.memory.vector.search(userQuery);
+```
+
+This pipeline ensures your RAG knowledge base is always in sync with your files.

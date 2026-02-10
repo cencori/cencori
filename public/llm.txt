@@ -1156,3 +1156,49 @@ When building with AI Agents (Cursor, Windsurf, Replit, Lovable):
    - Vercel v0: https://cencori.com/docs/agentic-engineering/web/v0
    - Trae: https://cencori.com/docs/agentic-engineering/desktop/trae
    - CodeSandbox: https://cencori.com/docs/agentic-engineering/web/codesandbox
+## Workflows (Agents & Pipelines)
+
+Cencori Workflows allow you to build autonomous agents and background pipelines that react to events.
+
+### Concepts
+- **Triggers**: Events that start a workflow (`chat.message`, `schedule.cron`, `user.signup`).
+- **Steps**: Atomic units of work (`steps.run`, `ai.generate`,`workflows.waitFor`).
+- **State**: Persistent data that survives retries and pauses.
+- **Visual Editor**: Bidirectional sync between Code and Canvas (Coming Soon).
+
+### Quick Start
+```typescript
+// Define a workflow
+cencori.workflows.define('daily-digest', async (ctx) => {
+  // 1. Fetch data
+  const news = await cencori.steps.run('fetch-news', () => fetchNews());
+  
+  // 2. Summarize with AI
+  const summary = await cencori.ai.generate({
+    model: 'gpt-4o',
+    prompt: `Summarize this: ${news}`
+  });
+  
+  // 3. Email users
+  await cencori.steps.run('send-email', () => sendEmail(summary));
+});
+
+// Trigger it
+await cencori.workflows.trigger('daily-digest');
+```
+
+### Key Patterns
+1.  **Adaptive Memory**: Build a "Living Profile" of users by observing chat history in the background.
+    - `cencori.on('chat.message', ...)` -> Extract Facts -> Update Profile.
+2.  **RAG Ingestion**: Automatically chunk and embed files when uploaded.
+    - `cencori.on('file.uploaded', ...)` -> Extract Text -> Vector Store.
+3.  **Human-in-the-Loop**: Pause execution to wait for human approval.
+    - `await cencori.workflows.waitFor('approval', { timeout: '24h' })`
+4.  **Self-Healing Code**: Detect errors, analyze stack traces with AI, and propose fixes.
+
+### Reference
+- `cencori.workflows.trigger(id, payload)`: Start a workflow.
+- `cencori.workflows.waitFor(eventId)`: Pause and wait.
+- `cencori.steps.run(id, fn)`: Execute code with retries.
+- `cencori.ai.generate(config)`: LLM inference query.
+
