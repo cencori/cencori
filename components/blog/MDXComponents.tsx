@@ -6,6 +6,7 @@ import { Callout } from "@/components/blog/Callout";
 import { Card, Cards } from "@/components/blog/Cards";
 import { SecurityArchitectureDiagram } from "@/components/blog/SecurityArchitectureDiagram";
 import Link from "next/link";
+import { Check, X, AlertTriangle } from "lucide-react";
 
 export const MDXComponents = {
     h1: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
@@ -182,6 +183,15 @@ export const MDXComponents = {
     // Strong/bold text
     strong: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <strong className={cn("font-semibold text-foreground", className)} {...props} />
+    ),
+    Check: ({ className, ...props }: ComponentProps<typeof Check>) => (
+        <Check className={cn("w-4 h-4 text-green-500 inline-block align-middle", className)} {...props} />
+    ),
+    X: ({ className, ...props }: ComponentProps<typeof X>) => (
+        <X className={cn("w-4 h-4 text-red-500 inline-block align-middle", className)} {...props} />
+    ),
+    AlertTriangle: ({ className, ...props }: ComponentProps<typeof AlertTriangle>) => (
+        <AlertTriangle className={cn("w-4 h-4 text-amber-500 inline-block align-middle", className)} {...props} />
     ),
     Callout,
     Card,

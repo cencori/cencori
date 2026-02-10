@@ -1,0 +1,98 @@
+---
+title: "Supabase"
+description: "Build a full-stack AI app with Supabase (Auth + DB) and Cencori (Intelligence)."
+section: "Integrations"
+order: 1
+---
+
+**Supabase** provides the database and authentication. **Cencori** provides the memory and agent orchestration. Together, they form a complete open-source equivalent to Firebase + OpenAI.
+
+## Why use them together?
+
+*   **Unified Auth**: Cencori respects Supabase Auth RLS policies.
+*   **Vector Sync**: Automatically sync Supabase table rows to Cencori's Vector Store.
+*   **Edge Speed**: Call Cencori from Supabase Edge Functions with zero cold starts.
+
+## 1. Setup
+
+Get your connection details:
+
+```bash
+# .env.local
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+CENCORI_API_KEY=cn_...
+```
+
+## 2. Edge Functions (Deno)
+
+Run Cencori logic directly on the edge. This is perfect for high-performance AI chat endpoints.
+
+```typescript
+// supabase/functions/chat/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
+serve(async (req) => {
+  // 1. Get User from Supabase Auth
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return new Response('Unauthorized', { status: 401 })
+
+  // 2. Call Cencori API (Native Fetch)
+  const response = await fetch('https://cencori.com/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${Deno.env.get('CENCORI_API_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: await req.json(),
+    }),
+  })
+
+  // 3. Return stream
+  return new Response(response.body, {
+    headers: { 'Content-Type': 'text/event-stream' }
+  })
+})
+```
+
+## 3. Database Triggers (Vector Store)
+
+Automatically embed and index data when you insert it into Supabase.
+
+1.  Enable `pg_net` extension in Supabase.
+2.  Create a trigger to call Cencori.
+
+```sql
+/**
+ * TRIGGER: Sync documents to Cencori Vector Store
+ */
+create trigger on_document_created
+  after insert on public.documents
+  for each row execute function
+  supabase_functions.http_request(
+    'https://cencori.com/api/v1/memory',
+    'POST',
+    jsonb_build_object(
+      'content', new.content,
+      'metadata', jsonb_build_object('id', new.id)
+    )
+  );
+```
+
+Now, whenever you add a row to `documents`, Cencori automatically embeds it and makes it searchable via semantic search.
+
+## 4. Auth & User Identity
+
+Pass the Supabase User ID to Cencori to isolate memory per user.
+
+```typescript
+// Client-side (Next.js)
+const { data: { user } } = await supabase.auth.getUser();
+
+await cencori.chat.create({
+  messages: [...],
+  user: user.id // <--- Links memory to this specific user
+});
+```

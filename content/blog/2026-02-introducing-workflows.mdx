@@ -1,0 +1,52 @@
+---
+title: "Introducing Cencori Workflows: The OS for Autonomous Agents"
+date: "2026-02-10"
+description: "Build, orchestrate, and observe AI agents with Adaptive Memory and a new Visual Editor."
+author: "The Cencori Team"
+tags: ["Product", "Agents", "Workflows"]
+---
+
+Today, we are launching **Cencori Workflows**, a complete toolchain for building autonomous AI agents.
+
+For the past year, "Agents" have been a buzzword. Demos look great, but production is a nightmare of race conditions, infinite loops, and lost state.
+
+We built Workflows to solve this. It is the **Serverless Operating System** for your AI agents.
+
+## 1. Adaptive Memory: The "Living Profile"
+
+The biggest problem with agents is context. RAG is too static; Chat History is too noisy.
+
+**Adaptive Memory** changes the game. Instead of just searching documents, your agent **observes** user interactions in the background and updates a structured profile in real-time.
+
+```typescript
+// It just works in the background
+cencori.on('chat.message', async (event) => {
+  const profile = await cencori.memory.adaptive.update(event.userId, event.text);
+  console.log('User Profile Updated:', profile);
+});
+```
+
+## 2. The Visual Editor (Coming Soon)
+
+We believe in **Code-First**, but not "Code-Only."
+Our new Visual Editor bidirectionally syncs with your TypeScript code. PMs can prototype flows on the canvas, and engineers get clean, type-safe code to review.
+
+## 3. Production-Grade Reliability
+
+Cencori Workflows isn't just a library. It's a distributed system.
+*   **Durable Execution**: If your step fails, we retry it with exponential backoff.
+*   **State Persistence**: We save the state after every step.
+*   **Human-in-the-Loop**: Pause a workflow for days to wait for approval.
+
+## Comparisions
+
+How do we fit in?
+*   **vs LangChain**: We are the cloud backend. You don't manage servers.
+*   **vs Vercel AI SDK**: We power the intelligence. Use Vercel for the UI.
+
+## Try it Today
+
+Workflows are available in Public Beta starting today.
+`npm install cencori@latest`
+
+[Read the Documentation](/docs/workflows)
