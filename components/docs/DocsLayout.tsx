@@ -26,7 +26,7 @@ export function DocsLayout({ children, className }: DocsLayoutProps) {
             )}>
             <DocsSidebar />
             <main className={cn("relative py-6 lg:gap-8 lg:py-6", className)}>
-                <div className="mx-auto mt-18 w-full min-w-0">
+                <div className="mx-auto lg:mt-18 sm:mt-10 w-full min-w-0">
                     {children}
                 </div>
             </main>
