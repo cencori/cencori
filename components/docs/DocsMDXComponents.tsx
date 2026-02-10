@@ -42,7 +42,7 @@ function VercelLogo({ className }: { className?: string }) {
 function NextjsLogo({ className }: { className?: string }) {
     return (
         <svg viewBox="0 0 128 128" className={cn("fill-current text-black dark:text-white", className)}>
-            <path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64 64-28.7 64-64S99.3 0 64 0zm29.6 97.4-44.4-56.8v56.8h-8.5V38.4h11.9l43 54.8c-2.4 1.7-4.9 3.1-7.5 4.2h5.5V38.4h8.5v59.1c-2.6 1-5.3 1.9-8.1 2.5l-0.4-2.6z" />
+            <path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64c11.2 0 21.7-2.9 30.8-7.9L48.8 55.3v36.6h-7.5V41.5h9.9l49.7 61.2C117.2 92.4 128 79 128 64c0-35.3-28.7-64-64-64zm18.3 41.5c2.3 0 4.2 1.9 4.2 4.2v39.5l-4.2-5.2V41.5z" />
         </svg>
     );
 }
