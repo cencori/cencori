@@ -1,0 +1,29 @@
+---
+title: "Lovable"
+description: "Using Cencori to add backend superpowers to Lovable apps."
+section: "Web Generators"
+order: 1
+---
+
+**Lovable** ([lovable.dev](https://lovable.dev)) is incredible at building full-stack web apps from natural language. By adding Cencori, you give those apps **Memory** and **Security**.
+
+## Integration Strategy
+
+Lovable often uses Supabase for the database. Cencori fits perfectly alongside it as the AI Logic Layer.
+
+### Step 1: Add Context
+In your Lovable project chat, instruct the AI:
+
+> "I want to add advanced AI features. Please use the Cencori SDK (@cencori/sdk) for memory and chat completion. Refer to the documentation at https://cencori.com/llm.txt"
+
+### Step 2: Implement Features
+
+**Memory:**
+> "When a user sends a message, store it in Cencori Memory using `cencori.memory.add()`. Before answering, retrieve context with `cencori.memory.retrieve()`."
+
+**Security:**
+> "Ensure that all user inputs are passed through Cencori's PII detection. If PII is found, redact it before sending to the model."
+
+## Benefits
+-   **No Vector DB Setup**: Lovable doesn't need to configure pgvector; Cencori handles it.
+-   **Observability**: You can see every AI request your Lovable app makes in the Cencori Dashboard.

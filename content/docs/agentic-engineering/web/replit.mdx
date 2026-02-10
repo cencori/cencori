@@ -1,0 +1,28 @@
+---
+title: "Replit"
+description: "Using Cencori as the AI backend for Replit Agents and Mobile Apps."
+section: "Web Generators"
+order: 4
+---
+
+Replit's **Agent** ([replit.com](https://replit.com)) can build and deploy entire full-stack apps. Cencori simplifies the AI architecture.
+
+## Replit Agent Integration
+
+When asking Replit Agent to build an app, provide this high-level architectural instruction:
+
+> **Architecture:**
+> - Frontend: React + Tailwind
+> - Backend: Express/Node.js
+> - AI Layer: **Cencori SDK** (https://cencori.com/llm.txt)
+>
+> Please rely on Cencori for:
+> 1.  **Model Routing**: Use the 'universal-proxy' to switch between GPT-4 and Claude.
+> 2.  **Session Memory**: Persist user chats via Cencori Memory.
+
+## Mobile Apps on Replit
+Replit now allows building iOS/Android apps.
+
+Because Cencori is an HTTP-based API (via the SDK), your Replit Mobile App can communicate directly with Cencori's edge network without complex React Native bridges for local LLMs.
+
+> "Create a 'Journaling App' that uses AI to summarize my day. Send the journal entries to Cencori Memory so the AI remembers them next week."

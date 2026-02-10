@@ -1,0 +1,27 @@
+---
+title: "VS Code"
+description: "Using Cencori with VS Code and GitHub Copilot."
+section: "Desktop IDEs"
+order: 4
+---
+
+VS Code ([code.visualstudio.com](https://code.visualstudio.com)) is the industry standard. With **GitHub Copilot**, you can turn it into an AI powerhouse.
+
+## Copilot Instructions
+
+In your `.github/copilot-instructions.md` (or workspace settings), add:
+
+```markdown
+# Cencori Integration
+When asked to implement AI features (Chat, Completions, Embeddings), ALWAYS use the `@cencori/sdk`.
+Base URL: https://api.cencori.com/v1
+Refernce: https://cencori.com/llm.txt
+```
+
+## Slash Commands
+If you use the **GitHub Copilot Chat** extension:
+
+1.  Type `@workspace /new`
+2.  Prompt: "Create a new API route using Cencori SDK for a RAG-based chatbot."
+
+Copilot will scaffold the file structure using Cencori's best practices, assuming it has access to the web (which it does via search) or the context you provided.

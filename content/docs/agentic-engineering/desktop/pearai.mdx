@@ -1,0 +1,27 @@
+---
+title: "PearAI"
+description: "Using Cencori with PearAI for unified model routing."
+section: "Desktop IDEs"
+order: 7
+---
+
+**PearAI** ([trypear.ai](https://trypear.ai)) is an Open Source fork of VS Code that focuses on "Model Routing"—automatically picking the best model for the task.
+
+## The "Double Router" Pattern
+
+PearAI routes on the **Client** (Choosing the model).
+Cencori routes on the **Server** (Choosing the provider).
+
+This is a powerful combination:
+1.  **PearAI** decides: "I need a *Reasoning* model for this complex refactor." -> Selects `deepseek-reasoner`.
+2.  **Cencori** receives the request for `deepseek-reasoner`.
+3.  **Cencori** routes it: "DeepSeek API is down, failing over to `fireworks-ai/deepseek-v3`."
+
+You get the smart UX of PearAI with the reliability/failover of Cencori.
+
+## Setup
+
+In PearAI settings:
+1.  Look for **"OpenAI Compatible Endpoint"**.
+2.  Base URL: `https://cencori.com/v1`
+3.  API Key: `csk_...`
