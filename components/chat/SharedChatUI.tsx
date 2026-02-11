@@ -1,11 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Copy, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { toast } from "sonner";
+import Navbar from "@/components/landing/Navbar";
+import { Logo } from "@/components/logo";
+import { siteConfig } from "@/config/site";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 interface Message {
     role: "user" | "assistant";
@@ -18,59 +22,106 @@ interface SharedChatUIProps {
     createdAt?: string;
 }
 
-const CencoriLogo = ({ className }: { className?: string }) => (
-    <div className={`relative ${className}`} style={{ width: '1em', height: '1em' }}>
-        <Image
-            src="/logo black.svg"
-            alt="Cencori Logo"
-            fill
-            className="dark:hidden object-contain"
-        />
-        <Image
-            src="/logo white.svg"
-            alt="Cencori Logo"
-            fill
-            className="hidden dark:block object-contain"
-        />
-    </div>
-);
-
 export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null }>({ name: null, avatar: null });
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data, error } = await supabase.auth.getSession();
+            if (data?.session) {
+                setIsAuthenticated(true);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const meta = user.user_metadata ?? {};
+                    const avatar = meta.avatar_url ?? meta.picture ?? null;
+                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
+                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
+                }
+            } else {
+                setIsAuthenticated(false);
+                setUserProfile({ name: null, avatar: null });
+            }
+        };
+        checkUser();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: any | null) => {
+            if (session) {
+                setIsAuthenticated(true);
+                const { user } = session;
+                if (user) {
+                    const meta = user.user_metadata ?? {};
+                    const avatar = meta.avatar_url ?? meta.picture ?? null;
+                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
+                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
+                }
+            } else {
+                setIsAuthenticated(false);
+                setUserProfile({ name: null, avatar: null });
+            }
+        });
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, []);
+
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(window.location.href);
         toast.success("Link copied to clipboard");
     };
 
+    const unauthenticatedActions = [
+        { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
+        {
+            text: "Get Started",
+            href: siteConfig.links.getStartedUrl,
+            isButton: true,
+            variant: "default",
+        },
+    ];
+
+    const authenticatedActions = [
+        {
+            text: "Dashboard",
+            href: "/dashboard/organizations",
+            isButton: true,
+            variant: "default",
+        },
+        {
+            text: userProfile.name || "User",
+            href: "#",
+            isButton: false,
+            isAvatar: true,
+            avatarSrc: userProfile.avatar,
+            avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
+        },
+    ];
+
     return (
         <div className="min-h-screen bg-background flex flex-col items-center">
-            {/* Header */}
-            <header className="w-full border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-md z-10">
-                <div className="container max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity">
-                        <CencoriLogo className="w-6 h-6" />
-                        <span>Cencori</span>
-                    </Link>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={handleCopyUrl} className="gap-2">
-                            <Share className="h-4 w-4" />
-                            Share
-                        </Button>
-                        <Button asChild size="sm">
-                            <Link href="/">Try Cencori</Link>
-                        </Button>
-                    </div>
-                </div>
-            </header>
+            <Navbar
+                logo={<Logo variant="mark" className="h-4" />}
+                name="cencori"
+                homeUrl="/"
+                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
+                isAuthenticated={isAuthenticated}
+                userProfile={isAuthenticated ? userProfile : undefined}
+            />
 
             {/* Chat Content */}
-            <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8">
+            <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20">
                 <div className="text-center space-y-2 mb-8">
                     <h1 className="text-2xl font-bold">{title || "AI Conversation"}</h1>
-                    {createdAt && (
-                        <p className="text-sm text-muted-foreground">
-                            Shared on {new Date(createdAt).toLocaleDateString()}
-                        </p>
-                    )}
+                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                        {createdAt && (
+                            <span>Shared on {new Date(createdAt).toLocaleDateString()}</span>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={handleCopyUrl} className="h-auto px-2 py-1 gap-1.5 text-xs">
+                            <Share className="h-3.5 w-3.5" />
+                            Share Link
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-6">
