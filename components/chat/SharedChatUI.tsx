@@ -323,30 +323,9 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                     </div>
 
                     <div className="text-center mt-3">
-    useEffect(() => {
-                            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, streamingContent]);
-
-    const sendMessage = async (content: string) => {
-        if (!content.trim() || isLoading) return;
-
-                        const userMessage: Message = {
-                            role: "user",
-                        content: content.trim(),
-        };
-
-                        // Update local state immediately
-                        // Note: In a real app we might want to emit this to the parent or update the DB
-                        // For now, we just update the local UI state for this session
-                        const newMessages = [...messages, userMessage];
-
-        // We need to cast the previous messages to match the expected format if they differ
-        // but here they share the same structure: {role, content}
-
-        // However, we need to update the prop-derived state.
-        // Since props are immutable, we should copy them to local state first.
-        // See below for the state initialization change.
-    };
+                        <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                            Powered by Cencori AI
+                        </Link>
 
                     </div>
                 </div>
