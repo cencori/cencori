@@ -103,19 +103,15 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
             <Navbar
                 logo={<Logo variant="mark" className="h-4" />}
                 name="cencori"
+                homeUrl="/"
+                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
+                isAuthenticated={isAuthenticated}
+                userProfile={isAuthenticated ? userProfile : undefined}
+            />
+
+            {/* Chat Content */}
             <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">
-                <div className="text-center space-y-2 mb-8">
-                    <h1 className="text-2xl font-bold">{title || "AI Conversation"}</h1>
-                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                        {createdAt && (
-                            <span>Shared on {new Date(createdAt).toLocaleDateString()}</span>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={handleCopyUrl} className="h-auto px-2 py-1 gap-1.5 text-xs">
-                            <Share className="h-3.5 w-3.5" />
-                            Share Link
-                        </Button>
-                    </div>
-                </div>
+
 
                 <div className="space-y-6">
                     {messages.map((message, i) => (
