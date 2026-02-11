@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
         page: "",
     };
 
+    const fontData = await fetch(
+        new URL("https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Black.ttf", import.meta.url)
+    ).then((res) => res.arrayBuffer());
+
     return new ImageResponse(
         (
             <div
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
                     padding: "80px",
                     background: "#000000",
                     color: "#ffffff",
-                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    fontFamily: '"Montserrat", sans-serif',
                     position: "relative",
                 }}
             >
@@ -79,6 +83,7 @@ export async function GET(request: NextRequest) {
                             maxWidth: "1000px",
                             // Ensure strict bottom alignment if flex doesn't behave perfectly in OG engine
                             marginTop: "auto",
+                            fontFamily: '"Montserrat", sans-serif',
                         }}
                     >
                         {title}
@@ -89,6 +94,14 @@ export async function GET(request: NextRequest) {
         {
             width: 1200,
             height: 630,
+            fonts: [
+                {
+                    name: "Montserrat",
+                    data: fontData,
+                    style: "normal",
+                    weight: 900,
+                },
+            ],
         }
     );
 }
