@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
     try {
@@ -10,13 +11,28 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
         }
 
-        const supabase = await createServerClient();
+        // 1. Try to identify the user for attribution (optional)
+        let userId: string | null = null;
+        try {
+            const supabase = await createServerClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) userId = user.id;
+        } catch (err) {
+            console.warn("Failed to get user session:", err);
+            // Continue as anonymous
+        }
 
-        // Try to get current user, but don't require it (handled by RLS policies if we allow anon)
-        // But our RLS "Users can insert their own chats" requires auth.uid() = user_id
-        // And "Anyone can insert chats" is what I added.
-        // Let's get the user ID if available.
-        const { data: { user } } = await supabase.auth.getUser();
+        // 2. Use Service Role for insertion (Bypass RLS for robust public sharing)
+        const adminAuthClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                },
+            }
+        );
 
         // Derive a title
         const firstUserMessage = messages.find((m: any) => m.role === "user");
@@ -26,20 +42,20 @@ export async function POST(req: NextRequest) {
             if (firstUserMessage.content.length > 50) title += "...";
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await adminAuthClient
             .from("shared_chats")
             .insert({
                 content: messages,
                 title: title,
-                user_id: user?.id || null,
-                // formatted content or raw? raw JSON is fine.
+                user_id: userId,
             })
             .select("id")
             .single();
 
         if (error) {
             console.error("Error inserting shared chat:", error);
-            return NextResponse.json({ error: "Failed to save chat" }, { status: 500 });
+            // Return actual error in dev/debug, generic in prod usually, but beneficial for user now
+            return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         const url = `${new URL(req.url).origin}/chat/${data.id}`;
@@ -47,6 +63,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ id: data.id, url });
     } catch (error) {
         console.error("Error in share API:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
     }
 }
