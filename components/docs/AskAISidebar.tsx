@@ -277,26 +277,10 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
 
             toast.dismiss(loadingToast);
 
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        url: url,
-                    });
-                } catch (err) {
-                    // Ignore abort errors
-                    if ((err as Error).name !== 'AbortError') {
-                        await navigator.clipboard.writeText(url);
-                        toast.success("Link copied to clipboard", {
-                            description: "Share this link to show your conversation.",
-                        });
-                    }
-                }
-            } else {
-                await navigator.clipboard.writeText(url);
-                toast.success("Link copied to clipboard", {
-                    description: "Share this link to show your conversation.",
-                });
-            }
+            await navigator.clipboard.writeText(url);
+            toast.success("Link copied to clipboard", {
+                description: "Share this link to show your conversation.",
+            });
         } catch (err) {
             toast.dismiss(loadingToast);
             toast.error("Failed to share conversation", {
