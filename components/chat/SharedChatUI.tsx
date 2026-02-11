@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Share } from "lucide-react";
+import { Copy, Share, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { toast } from "sonner";
@@ -110,7 +110,7 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
             />
 
             {/* Chat Content */}
-            <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20">
+            <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">
                 <div className="text-center space-y-2 mb-8">
                     <h1 className="text-2xl font-bold">{title || "AI Conversation"}</h1>
                     <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
@@ -127,18 +127,13 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                 <div className="space-y-6">
                     {messages.map((message, i) => (
                         <div key={i} className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}>
-                            <div className="flex items-center gap-2 mb-1 px-1">
-                                <span className="text-xs font-medium text-muted-foreground uppercase">
-                                    {message.role === "user" ? "User" : "AI"}
-                                </span>
-                            </div>
 
                             {message.role === "user" ? (
-                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
+                                    <p className="text-sm">{message.content}</p>
                                 </div>
                             ) : (
-                                <div className="w-full max-w-none bg-muted/30 border border-border/50 rounded-2xl rounded-tl-sm px-6 py-4">
+                                <div className="w-full max-w-none space-y-2">
                                     <div className="prose prose-sm dark:prose-invert max-w-none">
                                         <MarkdownRenderer content={message.content} />
                                     </div>
@@ -149,18 +144,29 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                 </div>
             </main>
 
-            {/* Simple Footer */}
-            <footer className="w-full py-8 border-t border-border/40 mt-auto">
-                <div className="container max-w-3xl mx-auto px-4 text-center space-y-4">
-                    <h3 className="text-lg font-semibold">Build better software with Cencori</h3>
-                    <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-                        Cencori helps developers build, deploy, and scale AI applications with ease.
-                    </p>
-                    <Button asChild size="lg" className="mt-4">
-                        <Link href="/">Get Started for Free</Link>
-                    </Button>
+            {/* Simulated Input Area (Fixed Bottom) */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t border-border/40 pb-8">
+                <div className="max-w-3xl mx-auto">
+                    <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 group cursor-text" onClick={() => (window.location.href = '/')}>
+                        <div className="flex-1 py-2 text-sm text-muted-foreground">
+                            Ask a question...
+                        </div>
+                        <div className="flex-shrink-0">
+                            <Button
+                                size="icon"
+                                className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
+                            >
+                                <ArrowUp className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="text-center mt-3">
+                        <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                            Powered by Cencori AI
+                        </Link>
+                    </div>
                 </div>
-            </footer>
+            </div>
         </div>
     );
 }
