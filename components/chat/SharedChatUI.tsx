@@ -281,10 +281,10 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                 </div>
             </main>
 
-            {/* Simulated Input Area (Fixed Bottom) */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t border-border/40 pb-8">
+            {/* Simple Input Area (Fixed Bottom) */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm pb-8">
                 <div className="max-w-3xl mx-auto">
-                    <div className="relative flex items-center gap-2 rounded-fullre border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
+                    <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
