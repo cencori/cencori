@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/landing/Navbar";
 import { Logo } from "@/components/logo";
 import { siteConfig } from "@/config/site";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface Message {
@@ -101,6 +101,115 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
         },
     ];
 
+
+    // Initialize local state with props, but allow updates
+    const [localMessages, setLocalMessages] = useState<Message[]>(messages);
+    const [isLoading, setIsLoading] = useState(false);
+    const [streamingContent, setStreamingContent] = useState("");
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [localMessages, streamingContent]);
+
+    const sendMessage = async (content: string) => {
+        if (!content.trim() || isLoading) return;
+
+        const userMessage: Message = {
+            role: "user",
+            content: content.trim(),
+        };
+
+        setLocalMessages((prev) => [...prev, userMessage]);
+        setInput("");
+        setIsLoading(true);
+        setStreamingContent("");
+
+        abortControllerRef.current = new AbortController();
+
+        try {
+            const response = await fetch("/api/docs/ai", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: [...localMessages, userMessage],
+                    currentPage: "Shared Chat", // Context for the AI
+                    userName: userProfile?.name,
+                }),
+                signal: abortControllerRef.current.signal,
+            });
+
+            if (!response.ok) throw new Error("Failed to get response");
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No response body");
+
+            const decoder = new TextDecoder();
+            let fullContent = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n");
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const data = line.slice(6);
+                        if (data === "[DONE]") continue;
+
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.content) {
+                                fullContent += parsed.content;
+                                setStreamingContent(fullContent);
+                            }
+                        } catch {
+                        }
+                    }
+                }
+            }
+
+            const assistantMessage: Message = {
+                role: "assistant",
+                content: fullContent,
+            };
+            setLocalMessages((prev) => [...prev, assistantMessage]);
+            setStreamingContent("");
+        } catch (error) {
+            if ((error as Error).name !== "AbortError") {
+                console.error("Chat error:", error);
+                const errorMessage: Message = {
+                    role: "assistant",
+                    content: "Sorry, I encountered an error. Please try again.",
+                };
+                setLocalMessages((prev) => [...prev, errorMessage]);
+            }
+            setStreamingContent("");
+        } finally {
+            setIsLoading(false);
+            abortControllerRef.current = null;
+        }
+    };
+
+    // Check for initial message query param
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const initialMessage = searchParams.get('initialMessage');
+        if (initialMessage) {
+            // Remove the param from URL without reload
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+
+            // Send the message
+            sendMessage(initialMessage);
+        }
+    }, []);
+
+    // ... existing render logic ...
+
     return (
         <div className="min-h-screen bg-background flex flex-col items-center">
             <Navbar
@@ -114,10 +223,21 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
 
             {/* Chat Content */}
             <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">
-
+                <div className="text-center space-y-2 mb-8">
+                    <h1 className="text-2xl font-bold">{title || "AI Conversation"}</h1>
+                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                        {createdAt && (
+                            <span>Shared on {new Date(createdAt).toLocaleDateString()}</span>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={handleCopyUrl} className="h-auto px-2 py-1 gap-1.5 text-xs">
+                            <Share className="h-3.5 w-3.5" />
+                            Share Link
+                        </Button>
+                    </div>
+                </div>
 
                 <div className="space-y-6">
-                    {messages.map((message, i) => (
+                    {localMessages.map((message, i) => (
                         <div key={i} className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}>
 
                             {message.role === "user" ? (
@@ -153,6 +273,22 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                             )}
                         </div>
                     ))}
+
+                    {/* Streaming Message */}
+                    {streamingContent && (
+                        <div className="flex flex-col items-start space-y-2">
+                            <div className="mb-2">
+                                <ThinkingIndicator finished={false} />
+                            </div>
+                            <div className="w-full max-w-none">
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                    <MarkdownRenderer content={streamingContent} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div ref={messagesEndRef} />
                 </div>
             </main>
 
@@ -166,9 +302,7 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" && !e.shiftKey) {
                                     e.preventDefault();
-                                    if (input.trim()) {
-                                        window.location.href = `/?initialMessage=${encodeURIComponent(input)}`;
-                                    }
+                                    sendMessage(input);
                                 }
                             }}
                             placeholder="Ask a question..."
@@ -180,22 +314,40 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                             <Button
                                 size="icon"
                                 className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
-                                onClick={() => {
-                                    if (input.trim()) {
-                                        window.location.href = `/?initialMessage=${encodeURIComponent(input)}`;
-                                    } else {
-                                        window.location.href = '/';
-                                    }
-                                }}
+                                onClick={() => sendMessage(input)}
+                                disabled={!input.trim() || isLoading}
                             >
                                 <ArrowUp className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
+
                     <div className="text-center mt-3">
-                        <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-                            Powered by Cencori AI
-                        </Link>
+    useEffect(() => {
+                            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, streamingContent]);
+
+    const sendMessage = async (content: string) => {
+        if (!content.trim() || isLoading) return;
+
+                        const userMessage: Message = {
+                            role: "user",
+                        content: content.trim(),
+        };
+
+                        // Update local state immediately
+                        // Note: In a real app we might want to emit this to the parent or update the DB
+                        // For now, we just update the local UI state for this session
+                        const newMessages = [...messages, userMessage];
+
+        // We need to cast the previous messages to match the expected format if they differ
+        // but here they share the same structure: {role, content}
+
+        // However, we need to update the prop-derived state.
+        // Since props are immutable, we should copy them to local state first.
+        // See below for the state initialization change.
+    };
+
                     </div>
                 </div>
             </div>
