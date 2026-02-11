@@ -26,6 +26,8 @@ interface SharedChatUIProps {
 export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null }>({ name: null, avatar: null });
+    const [input, setInput] = useState("");
+
 
     useEffect(() => {
         const checkUser = async () => {
@@ -157,14 +159,34 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
             {/* Simulated Input Area (Fixed Bottom) */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t border-border/40 pb-8">
                 <div className="max-w-3xl mx-auto">
-                    <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 group cursor-text" onClick={() => (window.location.href = '/')}>
-                        <div className="flex-1 py-2 text-sm text-muted-foreground">
-                            Ask a question...
-                        </div>
+                    <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
+                        <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (input.trim()) {
+                                        window.location.href = `/?initialMessage=${encodeURIComponent(input)}`;
+                                    }
+                                }
+                            }}
+                            placeholder="Ask a question..."
+                            rows={1}
+                            className="flex-1 resize-none bg-transparent py-2 text-sm placeholder:text-muted-foreground focus:outline-none max-h-32"
+                            style={{ minHeight: "24px" }}
+                        />
                         <div className="flex-shrink-0">
                             <Button
                                 size="icon"
                                 className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
+                                onClick={() => {
+                                    if (input.trim()) {
+                                        window.location.href = `/?initialMessage=${encodeURIComponent(input)}`;
+                                    } else {
+                                        window.location.href = '/';
+                                    }
+                                }}
                             >
                                 <ArrowUp className="h-4 w-4" />
                             </Button>
