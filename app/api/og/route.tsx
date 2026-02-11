@@ -5,9 +5,9 @@ import { join } from "path";
 
 export const runtime = "nodejs";
 
-const logoPath = join(process.cwd(), "public", "cdark.png");
+const logoPath = join(process.cwd(), "public", "logo white.svg");
 const logoData = readFileSync(logoPath);
-const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
+const logoBase64 = `data:image/svg+xml;base64,${logoData.toString("base64")}`;
 
 const BACKGROUND = "#0d0d0d";
 const FOREGROUND = "#fafafa";
@@ -38,166 +38,57 @@ export async function GET(request: NextRequest) {
                     flexDirection: "column",
                     width: "100%",
                     height: "100%",
-                    padding: "60px",
-                    background: BACKGROUND,
-                    color: FOREGROUND,
+                    padding: "80px",
+                    background: "#000000",
+                    color: "#ffffff",
                     fontFamily: "system-ui, -apple-system, sans-serif",
+                    position: "relative",
                 }}
             >
+                {/* Logo Top-Left */}
                 <div
                     style={{
                         display: "flex",
-                        justifyContent: "space-between",
                         alignItems: "center",
-                        marginBottom: "auto",
+                        gap: "16px",
+                        position: "absolute",
+                        top: "80px",
+                        left: "80px",
                     }}
                 >
-                    {typeLabels[type] && (
-                        <div
-                            style={{
-                                display: "flex",
-                                fontSize: "18px",
-                                fontWeight: 500,
-                                color: MUTED,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.1em",
-                            }}
-                        >
-                            {typeLabels[type]}
-                        </div>
-                    )}
-
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                        }}
-                    >
-                        <img
-                            src={logoBase64}
-                            alt="Cencori"
-                            width={24}
-                            height={24}
-                        />
-                        <span
-                            style={{
-                                fontSize: "24px",
-                                fontWeight: 600,
-                                color: PRIMARY,
-                            }}
-                        >
-                            Cencori
-                        </span>
-                    </div>
+                    <img
+                        src={logoBase64}
+                        alt="Cencori"
+                        width={42}
+                        height={42}
+                    />
                 </div>
 
+                {/* Title Bottom-Left */}
                 <div
                     style={{
                         display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
+                        alignItems: "flex-end",
                         flex: 1,
+                        paddingTop: "160px", // Push content down
                     }}
                 >
-                    <div
+                    <h1
                         style={{
-                            display: "flex",
-                            fontSize: title.length > 50 ? "48px" : "56px",
-                            fontWeight: 700,
-                            lineHeight: 1.2,
-                            letterSpacing: "-0.02em",
-                            color: PRIMARY,
-                            maxWidth: "900px",
-                        }}
-                    >
-                        {title}
-                    </div>
-
-                    {subtitle && (
-                        <div
-                            style={{
-                                display: "flex",
-                                fontSize: "24px",
-                                fontWeight: 400,
-                                color: MUTED,
-                                marginTop: "24px",
-                                maxWidth: "800px",
-                            }}
-                        >
-                            {subtitle}
-                        </div>
-                    )}
-                </div>
-
-                {(author || date) && (
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "16px",
+                            fontSize: "64px",
+                            fontWeight: 900,
+                            lineHeight: 1.1,
+                            letterSpacing: "-0.03em",
+                            color: "#ffffff",
+                            margin: 0,
+                            maxWidth: "1000px",
+                            // Ensure strict bottom alignment if flex doesn't behave perfectly in OG engine
                             marginTop: "auto",
                         }}
                     >
-                        {author && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "12px",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        width: "48px",
-                                        height: "48px",
-                                        background: "#27272a",
-                                        borderRadius: "50%",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "20px",
-                                        fontWeight: 600,
-                                        color: MUTED,
-                                    }}
-                                >
-                                    {author.charAt(0).toUpperCase()}
-                                </div>
-                                <span
-                                    style={{
-                                        fontSize: "20px",
-                                        fontWeight: 500,
-                                        color: FOREGROUND,
-                                    }}
-                                >
-                                    {author}
-                                </span>
-                            </div>
-                        )}
-
-                        {author && date && (
-                            <span
-                                style={{
-                                    fontSize: "20px",
-                                    color: MUTED,
-                                }}
-                            >
-                                ·
-                            </span>
-                        )}
-
-                        {date && (
-                            <span
-                                style={{
-                                    fontSize: "20px",
-                                    color: MUTED,
-                                }}
-                            >
-                                {date}
-                            </span>
-                        )}
-                    </div>
-                )}
+                        {title}
+                    </h1>
+                </div>
             </div>
         ),
         {

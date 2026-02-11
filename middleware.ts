@@ -2,65 +2,9 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 
-// Social media bot user agents
-const SOCIAL_BOTS = [
-    'Twitterbot',
-    'facebookexternalhit',
-    'LinkedInBot',
-    'Slackbot',
-    'Discordbot',
-    'TelegramBot',
-    'WhatsApp',
-    'Applebot',
-    'Pinterestbot',
-];
-
 // Supabase config
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
-
-function createBotResponse(url: string): Response {
-    const baseUrl = 'https://cencori.com';
-    let title = 'Cencori | The Infrastructure for AI Production';
-    let description = 'Ship AI with built-in security, observability, and scale. One platform for everything.';
-    const ogImage = `${baseUrl}/og-image.jpg`;
-    let canonicalUrl = baseUrl;
-
-    const pathname = new URL(url).pathname;
-
-    if (pathname.startsWith('/ai')) {
-        title = 'AI Gateway | Cencori';
-        description = 'The inline proxy between your applications and LLMs. Inspect, redact, sanitize, or block content in real-time.';
-        canonicalUrl = `${baseUrl}/ai`;
-    } else if (pathname.startsWith('/pricing')) {
-        title = 'Pricing | Cencori';
-        canonicalUrl = `${baseUrl}/pricing`;
-    } else if (pathname.startsWith('/docs')) {
-        title = 'Documentation | Cencori';
-        canonicalUrl = `${baseUrl}/docs`;
-    }
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <meta name="description" content="${description}">
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
-  <meta property="og:image" content="${ogImage}">
-  <meta property="og:url" content="${canonicalUrl}">
-  <meta name="twitter:card" content="summary_large_image">
-  <link rel="canonical" href="${canonicalUrl}">
-</head>
-<body></body>
-</html>`;
-
-    return new Response(html, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
-}
 
 // Security headers for all responses
 const securityHeaders: Record<string, string> = {
@@ -101,23 +45,8 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 }
 
 export async function middleware(request: NextRequest) {
-    const userAgent = request.headers.get('user-agent') || '';
     const hostname = request.headers.get('host') ?? '';
     const domain = hostname.split(':')[0];
-
-    // 1. Bot Check (Early Return)
-    const isBot = SOCIAL_BOTS.some(bot => userAgent.includes(bot));
-    if (isBot) {
-        const pathname = request.nextUrl.pathname;
-        const isMarketingPage = pathname === '/' ||
-            pathname.startsWith('/ai') ||
-            pathname.startsWith('/pricing') ||
-            pathname.startsWith('/docs') ||
-            pathname.startsWith('/blog') ||
-            pathname.startsWith('/changelog');
-
-        if (isMarketingPage) return createBotResponse(request.url);
-    }
 
     // 2. Determine Response (Rewrite vs Next)
     let response = NextResponse.next({
