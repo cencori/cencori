@@ -183,7 +183,7 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                 console.error("Chat error:", error);
                 const errorMessage: Message = {
                     role: "assistant",
-                    content: "Sorry, I encountered an error. Please try again.",
+                    content: "Sorry, I encountered an error. Please try again soon.",
                 };
                 setLocalMessages((prev) => [...prev, errorMessage]);
             }
@@ -264,16 +264,18 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                     ))}
 
                     {/* Streaming Message */}
-                    {streamingContent && (
+                    {(isLoading || streamingContent) && (
                         <div className="flex flex-col items-start space-y-2">
                             <div className="mb-2">
                                 <ThinkingIndicator finished={false} />
                             </div>
-                            <div className="w-full max-w-none">
-                                <div className="prose prose-sm dark:prose-invert max-w-none">
-                                    <MarkdownRenderer content={streamingContent} />
+                            {streamingContent && (
+                                <div className="w-full max-w-none">
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                        <MarkdownRenderer content={streamingContent} />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
 
