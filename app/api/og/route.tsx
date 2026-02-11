@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
         page: "",
     };
 
-    // Load Geist Black font
+    // Load Geist Black font (bundled)
     const fontData = await fetch(
-        new URL("https://cdn.jsdelivr.net/npm/geist@1.5.1/dist/fonts/geist-sans/Geist-Black.ttf", import.meta.url)
+        new URL("./Geist-Black.ttf", import.meta.url)
     ).then((res) => res.arrayBuffer());
 
     return new ImageResponse(
