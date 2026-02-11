@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
 
         // Create chat history properly
         const previousMessages = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
-            role: m.role as OpenAI.Chat.ChatCompletionRole,
+            role: m.role as "system" | "user" | "assistant",
             content: m.content
         }));
 
