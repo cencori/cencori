@@ -146,12 +146,12 @@ export async function POST(request: NextRequest) {
 
         // Create chat history properly
         const previousMessages = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
-            role: m.role,
+            role: m.role as OpenAI.Chat.ChatCompletionRole,
             content: m.content
         }));
 
         const completion = await openai.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: "openai/gpt-oss-120b",
             messages: [
                 { role: "system", content: SYSTEM_PROMPT },
                 ...previousMessages,
