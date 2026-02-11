@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CookieConsent } from "@/components/CookieConsent";
 import { Analytics } from "@vercel/analytics/react";
+import { Toaster } from "@/components/ui/sonner";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -238,6 +239,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Include the Navbar here */}
           {children}
           <CookieConsent />
+          <Toaster />
         </ThemeProvider>
         <Analytics />
       </body>
