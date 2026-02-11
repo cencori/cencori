@@ -103,13 +103,6 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
             <Navbar
                 logo={<Logo variant="mark" className="h-4" />}
                 name="cencori"
-                homeUrl="/"
-                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
-                isAuthenticated={isAuthenticated}
-                userProfile={isAuthenticated ? userProfile : undefined}
-            />
-
-            {/* Chat Content */}
             <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">
                 <div className="text-center space-y-2 mb-8">
                     <h1 className="text-2xl font-bold">{title || "AI Conversation"}</h1>
