@@ -4,10 +4,11 @@ import Image from "next/image";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { X, Send, ThumbsUp, ThumbsDown, Copy, RotateCcw, StopCircle, MessageCircle, Plus, ArrowUp, File } from "lucide-react";
+import { X, Send, ThumbsUp, ThumbsDown, Copy, RotateCcw, StopCircle, MessageCircle, Plus, ArrowUp, File, Share } from "lucide-react";
 import { useDocsContext } from "./DocsContext";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 
@@ -449,6 +450,51 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
         setAttachedPage(null);
     };
 
+    const getConversationText = () => {
+        return messages.map(m => {
+            const role = m.role === "user" ? "User" : "AI";
+            return `${role}: ${m.content}`;
+        }).join("\n\n");
+    };
+
+    const copyConversation = async () => {
+        const text = getConversationText();
+        if (!text) return;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success("Conversation copied", {
+                description: "The conversation transcript has been copied to your clipboard.",
+            });
+        } catch (err) {
+            toast.error("Failed to copy", {
+                description: "There was an error copying to clipboard.",
+            });
+        }
+    };
+
+    const shareConversation = async () => {
+        const text = getConversationText();
+        if (!text) return;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: "Cencori AI Conversation",
+                    text: text,
+                });
+            } catch (err) {
+                // Ignore abort errors
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('Error sharing:', err);
+                }
+            }
+        } else {
+            // Fallback to copy
+            copyConversation();
+        }
+    };
+
     return (
         <AnimatePresence>
             {open && (
@@ -467,6 +513,26 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                         <div className="flex items-center gap-1">
                             {(messages.length > 0 || attachedPage) && (
                                 <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={copyConversation}>
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" align="end">
+                                            <p>Copy conversation</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={shareConversation}>
+                                                <Share className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" align="end">
+                                            <p>Share conversation</p>
+                                        </TooltipContent>
+                                    </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500 transition-colors" onClick={clearChat}>
