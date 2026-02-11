@@ -25,8 +25,9 @@ export async function GET(request: NextRequest) {
         page: "",
     };
 
+    // Load Geist Black font
     const fontData = await fetch(
-        new URL("https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Black.ttf", import.meta.url)
+        new URL("https://cdn.jsdelivr.net/npm/geist@1.5.1/dist/fonts/geist-sans/Geist-Black.ttf", import.meta.url)
     ).then((res) => res.arrayBuffer());
 
     return new ImageResponse(
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
                     padding: "80px",
                     background: "#000000",
                     color: "#ffffff",
-                    fontFamily: '"Montserrat", sans-serif',
+                    fontFamily: '"Geist", sans-serif',
                     position: "relative",
                 }}
             >
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
                             maxWidth: "1000px",
                             // Ensure strict bottom alignment if flex doesn't behave perfectly in OG engine
                             marginTop: "auto",
-                            fontFamily: '"Montserrat", sans-serif',
+                            fontFamily: '"Geist", sans-serif',
                         }}
                     >
                         {title}
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
             height: 630,
             fonts: [
                 {
-                    name: "Montserrat",
+                    name: "Geist",
                     data: fontData,
                     style: "normal",
                     weight: 900,
