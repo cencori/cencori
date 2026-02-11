@@ -280,8 +280,6 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
             if (navigator.share) {
                 try {
                     await navigator.share({
-                        title: "Cencori AI Conversation",
-                        text: "Check out this conversation with Cencori AI",
                         url: url,
                     });
                 } catch (err) {
