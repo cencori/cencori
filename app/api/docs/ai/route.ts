@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 const DOCS_DIR = path.join(process.cwd(), "content", "docs");
 
@@ -128,11 +128,10 @@ export async function POST(request: NextRequest) {
 
         contextPrompt += `=== 📚 FULL PLATFORM DOCUMENTATION ===\n${allDocs}\n=== END DOCUMENTATION ===\n`;
 
-        // Initialize Gemini
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
-            systemInstruction: SYSTEM_PROMPT
+        // Initialize OpenAI (Groq)
+        const openai = new OpenAI({
+            baseURL: "https://api.groq.com/openai/v1",
+            apiKey: process.env.GROQ_API_KEY,
         });
 
         // Add context to the last message or as a preamble
@@ -145,30 +144,33 @@ export async function POST(request: NextRequest) {
 
         const userPrompt = `Reference Documentation:\n${contextPrompt}${userContext}\n\nUser Question: ${lastMessage.content}`;
 
-        // Create chat history properly (excluding the modified last message)
-        const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
-            role: m.role === "assistant" ? "model" : "user",
-            parts: [{ text: m.content }]
+        // Create chat history properly
+        const previousMessages = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content
         }));
 
-        const chat = model.startChat({
-            history: history,
-            generationConfig: {
-                maxOutputTokens: 2000,
-                temperature: 0.5,
-            }
+        const completion = await openai.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...previousMessages,
+                { role: "user", content: userPrompt }
+            ],
+            stream: true,
+            temperature: 0.5,
+            max_tokens: 2000,
         });
 
-        const result = await chat.sendMessageStream(userPrompt);
         const encoder = new TextEncoder();
 
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    for await (const chunk of result.stream) {
-                        const chunkText = chunk.text();
-                        if (chunkText) {
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunkText })}\n\n`));
+                    for await (const chunk of completion) {
+                        const content = chunk.choices[0]?.delta?.content || "";
+                        if (content) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                         }
                     }
                     controller.enqueue(encoder.encode("data: [DONE]\n\n"));
