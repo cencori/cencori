@@ -1,13 +1,8 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
-import { readFileSync } from "fs";
-import { join } from "path";
-
-export const runtime = "nodejs";
-
-const logoPath = join(process.cwd(), "public", "logo white.svg");
-const logoData = readFileSync(logoPath);
-const logoBase64 = `data:image/svg+xml;base64,${logoData.toString("base64")}`;
+// SVG of the Cencori logo (inline to avoid fs issues in production)
+const logoSvg = `<svg width="21924" height="21924" viewBox="0 0 21924 21924" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_190_39)"><circle cx="7744" r="7744" fill="white"/><circle cy="14180" r="7744" fill="white"/><circle cx="21924" cy="7744" r="7744" fill="white"/><circle cx="14180" cy="21924" r="7744" fill="white"/></g><defs><clipPath id="clip0_190_39"><rect width="21924" height="21924" rx="594" fill="white"/></clipPath></defs></svg>`;
+const logoBase64 = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}`;
 
 const BACKGROUND = "#0d0d0d";
 const FOREGROUND = "#fafafa";
