@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Share, ArrowUp } from "lucide-react";
+import { Copy, Share, ArrowUp, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
 import { toast } from "sonner";
 import Navbar from "@/components/landing/Navbar";
 import { Logo } from "@/components/logo";
@@ -123,8 +124,28 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                                 </div>
                             ) : (
                                 <div className="w-full max-w-none space-y-2">
+                                    <div className="mb-2">
+                                        <ThinkingIndicator finished={true} />
+                                    </div>
                                     <div className="prose prose-sm dark:prose-invert max-w-none">
                                         <MarkdownRenderer content={message.content} />
+                                    </div>
+                                    <div className="flex items-center gap-1 pt-2">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Helpful">
+                                            <ThumbsUp className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Not helpful">
+                                            <ThumbsDown className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => {
+                                            navigator.clipboard.writeText(message.content);
+                                            toast.success("Message copied");
+                                        }} title="Copy">
+                                            <Copy className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Regenerate">
+                                            <RotateCcw className="h-3 w-3" />
+                                        </Button>
                                     </div>
                                 </div>
                             )}
