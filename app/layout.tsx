@@ -105,14 +105,6 @@ export const metadata: Metadata = {
     siteName: "Cencori",
     title: "Cencori | The Infrastructure for AI Production",
     description: "Ship AI with built-in security, observability, and scale — all in one platform.",
-    images: [
-      {
-        url: "https://cencori.com/api/og?title=AI%20Infrastructure%20for%20Production&subtitle=Ship%20AI%20with%20built-in%20security%2C%20observability%2C%20and%20scale",
-        width: 1200,
-        height: 630,
-        alt: "Cencori - The Infrastructure for AI Production",
-      },
-    ],
   },
 
   // Twitter/X Card
@@ -122,7 +114,6 @@ export const metadata: Metadata = {
     creator: "@cencori",
     title: "Cencori | The Infrastructure for AI Production",
     description: "Ship AI with built-in security, observability, and scale — all in one platform.",
-    images: ["https://cencori.com/api/og?title=AI%20Infrastructure%20for%20Production&subtitle=Ship%20AI%20with%20built-in%20security%2C%20observability%2C%20and%20scale"],
   },
 
   // Canonical and alternates
