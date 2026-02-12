@@ -1,0 +1,31 @@
+---
+title: "Models"
+description: "Browse all supported AI models available through Cencori, including their providers, types, and context windows."
+section: "AI"
+order: 7
+---
+
+## Overview
+
+Cencori provides unified access to over 80+ state-of-the-art AI models from leading providers like OpenAI, Anthropic, Google, Mistral, and more.
+
+You can use any of these models with the same API format, simply by changing the `model` parameter.
+
+## Model Catalog
+---
+<ModelCatalog />
+
+## Usage
+
+To use a model, pass its ID to any of the AI SDK methods:
+
+```typescript
+import { cencori } from '@/lib/cencori'
+
+const result = await cencori.ai.chat({
+  model: 'gpt-4o', // Use the ID from the catalog above
+  messages: [
+    { role: 'user', content: 'Hello!' }
+  ]
+})
+```

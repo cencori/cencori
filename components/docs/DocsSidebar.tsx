@@ -57,6 +57,7 @@ const sidebarItems: SidebarGroup[] = [
             { title: "Vercel AI SDK", href: "/docs/ai/vercel-sdk" },
             { title: "TanStack AI", href: "/docs/ai/tanstack" },
             { title: "Providers", href: "/docs/ai/providers" },
+            { title: "Models", href: "/docs/ai/models" },
             { title: "Failover", href: "/docs/ai/failover" },
             { title: "Streaming", href: "/docs/ai/streaming" },
             { title: "Tool Calling", href: "/docs/ai/tool-calling" },
