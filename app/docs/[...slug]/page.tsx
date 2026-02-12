@@ -31,8 +31,6 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
         };
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cencori.com";
-
     return {
         title: doc.title,
         description: doc.description,
@@ -42,7 +40,7 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
             type: "article",
             images: [
                 {
-                    url: `${baseUrl}/api/og?title=${encodeURIComponent(doc.title)}&subtitle=${encodeURIComponent(doc.section)}&type=docs`,
+                    url: `/api/og?title=${encodeURIComponent(doc.title)}&subtitle=${encodeURIComponent(doc.section)}&type=docs`,
                     width: 1200,
                     height: 630,
                 },
