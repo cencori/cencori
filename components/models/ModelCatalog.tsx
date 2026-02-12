@@ -185,12 +185,12 @@ export function ModelCatalog() {
                 </div>
 
                 {/* Filter toggles */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                     {/* Provider dropdown */}
                     <select
                         value={providerFilter}
                         onChange={(e) => setProviderFilter(e.target.value)}
-                        className="h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer"
+                        className="flex-1 sm:flex-none h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer w-full sm:w-auto"
                     >
                         <option value="all">All Providers</option>
                         {SUPPORTED_PROVIDERS.map((p) => (
@@ -202,7 +202,7 @@ export function ModelCatalog() {
                     <select
                         value={typeFilter}
                         onChange={(e) => setTypeFilter(e.target.value)}
-                        className="h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer"
+                        className="flex-1 sm:flex-none h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer w-full sm:w-auto"
                     >
                         <option value="all">All Types</option>
                         {types.map((t) => (
@@ -221,11 +221,11 @@ export function ModelCatalog() {
             {/* ── Table ── */}
             <div className="border border-border/40 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[640px]">
                         <thead>
                             <tr className="border-b border-border/40 bg-muted/30">
                                 <th
-                                    className="text-left px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                                    className="text-left px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none sticky left-0 z-10 bg-muted/95 backdrop-blur-sm after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border/30 w-[180px] sm:w-auto"
                                     onClick={() => toggleSort("name")}
                                 >
                                     <div className="flex items-center gap-1">
@@ -277,15 +277,15 @@ export function ModelCatalog() {
                                         key={`${model.providerId}-${model.id}`}
                                         className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                                     >
-                                        {/* Model name */}
-                                        <td className="px-4 py-3">
+                                        {/* Model name - sticky */}
+                                        <td className="px-4 py-3 sticky left-0 z-10 bg-background after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border/20 w-[180px] sm:w-auto overflow-hidden">
                                             <div className="flex items-center gap-2.5">
                                                 <div className="shrink-0 w-5 h-5 flex items-center justify-center">
                                                     <ProviderIcon providerId={model.providerId} size={16} />
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium text-foreground">{model.name}</div>
-                                                    <div className="text-[11px] text-muted-foreground/60 font-mono">{model.id}</div>
+                                                <div className="min-w-0">
+                                                    <div className="font-medium text-foreground truncate">{model.name}</div>
+                                                    <div className="text-[11px] text-muted-foreground/60 font-mono truncate">{model.id}</div>
                                                 </div>
                                             </div>
                                         </td>
