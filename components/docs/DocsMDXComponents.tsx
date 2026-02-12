@@ -3,6 +3,11 @@ import { HTMLAttributes, ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { CodeBlock } from "@/components/codeblock";
 import { Check, X, AlertTriangle, Globe, Database, Brain, Zap, Flame, Layout, Server, Shield } from "lucide-react";
+import {
+    GhostContainer, GhostBox, GhostBoxTitle, GhostBoxContent,
+    GhostGrid, GhostArrow, GhostDashedLine, GhostPlaceholder,
+    GhostCaption, GhostLabel, GhostIcon
+} from "@/components/ui/ghost-diagram";
 
 // Icon mapping for MDX string props
 const Icons: Record<string, any> = {
@@ -280,4 +285,15 @@ export const DocsMDXComponents = {
     Card,
     Cards: CardGroup,
     CardGroup,
+    GhostContainer,
+    GhostBox,
+    GhostBoxTitle,
+    GhostBoxContent,
+    GhostGrid,
+    GhostArrow,
+    GhostDashedLine,
+    GhostPlaceholder,
+    GhostCaption,
+    GhostLabel,
+    GhostIcon,
 };
