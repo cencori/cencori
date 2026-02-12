@@ -37,6 +37,8 @@
   ],
   "exclude": [
     "node_modules",
-    "packages"
+    "packages",
+    "ai-sdk-fork",
+    "examples"
   ]
 }
