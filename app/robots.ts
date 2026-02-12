@@ -5,7 +5,10 @@ export default function robots(): MetadataRoute.Robots {
         rules: [
             {
                 userAgent: '*',
-                allow: '/',
+                allow: [
+                    '/',
+                    '/api/og',       // Allow social crawlers to fetch OG images
+                ],
                 disallow: [
                     '/dashboard/',      // Don't index authenticated app
                     '/api/',            // Don't index API routes
