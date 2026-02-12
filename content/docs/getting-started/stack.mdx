@@ -45,12 +45,50 @@ While powerful, this mixes concerns:
 
 Here is how the data flows in a production system:
 
-1.  **User** sends a request via **Next.js**.
-2.  **Auth** is validated via **Supabase/Clerk**.
-3.  **Structured Data** (e.g., User Profile) is fetched from **Neon/Postgres**.
-4.  **Unstructured Context** (e.g., Past Conversations, RAG) is fetched from **Cencori**.
-5.  **LLM Inference** is orchestrated by **Cencori** (routing to OpenAI/Anthropic).
-6.  **Response** is streamed back to the **User**.
+<GhostContainer maxWidth="xl">
+
+<GhostLabel>User Request</GhostLabel>
+<GhostBox label="Step 1" className="border border-current/20">
+  <GhostBoxTitle>Next.js Frontend</GhostBoxTitle>
+  <GhostBoxContent>User sends a request via React / Next.js UI</GhostBoxContent>
+</GhostBox>
+
+<GhostArrow />
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  <GhostBox label="Step 2" className="border border-current/20">
+    <GhostBoxTitle>Auth — Supabase / Clerk</GhostBoxTitle>
+    <GhostBoxContent>Session validated, user identity confirmed</GhostBoxContent>
+  </GhostBox>
+  <GhostBox label="Step 3" className="border border-current/20">
+    <GhostBoxTitle>Database — Neon / Postgres</GhostBoxTitle>
+    <GhostBoxContent>Structured data fetched (user profile, preferences)</GhostBoxContent>
+  </GhostBox>
+</div>
+
+<GhostArrow label="context passed" />
+
+<GhostBox label="Steps 4–5" variant="muted" className="border border-current/20">
+  <GhostBoxTitle>Cencori — Intelligence Layer</GhostBoxTitle>
+  <GhostGrid items={["Vector Memory / RAG", "Security Scan", "LLM Routing", "Cost Tracking", "Audit Logging", "Failover"]} columns={3} />
+</GhostBox>
+
+<GhostArrow label="routed" />
+
+<GhostBox label="Providers" className="border border-current/20">
+  <GhostGrid items={["OpenAI", "Anthropic", "Google", "Mistral", "DeepSeek", "xAI"]} columns={3} />
+</GhostBox>
+
+<GhostArrow label="streamed" />
+
+<GhostBox label="Step 6" className="border border-current/20">
+  <GhostBoxTitle>Response</GhostBoxTitle>
+  <GhostBoxContent>Streamed back to the user in real-time</GhostBoxContent>
+</GhostBox>
+
+<GhostCaption>The VSC Stack — Vercel (Frontend) + Supabase (Database) + Cencori (Intelligence)</GhostCaption>
+
+</GhostContainer>
 
 ## Capabilities Matrix
 
