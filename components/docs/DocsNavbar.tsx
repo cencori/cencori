@@ -45,7 +45,7 @@ const sidebarItems = [
             { title: "Organizations", href: "/docs/concepts/organizations" },
             { title: "API Keys", href: "/docs/concepts/api-keys" },
             { title: "Multi-Provider", href: "/docs/concepts/multi-provider" },
-            { title: "Models", href: "/docs/concepts/models" },
+            { title: "Models", href: "/docs/ai/models" },
             { title: "Streaming", href: "/docs/concepts/streaming" },
             { title: "Credits System", href: "/docs/concepts/credits" },
             { title: "Rate Limiting", href: "/docs/concepts/rate-limiting" },
@@ -92,7 +92,7 @@ export function DocsNavbar() {
     const pathname = usePathname();
 
     return (
-        <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur border-b border-border/40">
+        <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur border-border/40">
             <div className="container mx-auto px-4 md:px-6">
                 <div className="flex h-14 items-center justify-between gap-4">
                     {/* Logo */}
@@ -145,7 +145,7 @@ export function DocsNavbar() {
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="left" className="w-full p-0">
+                            <SheetContent side="left" className="!w-full !max-w-none !sm:max-w-none p-0">
                                 <div className="flex flex-col h-full">
                                     <div className="px-6 py-6 border-b border-border/40">
                                         <Link href="/docs" className="flex items-center gap-3" onClick={() => setOpen(false)}>

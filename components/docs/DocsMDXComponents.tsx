@@ -8,6 +8,7 @@ import {
     GhostGrid, GhostArrow, GhostDashedLine, GhostPlaceholder,
     GhostCaption, GhostLabel, GhostIcon
 } from "@/components/ui/ghost-diagram";
+import { ModelCatalog } from "@/components/models/ModelCatalog";
 
 // Icon mapping for MDX string props
 const Icons: Record<string, any> = {
@@ -296,4 +297,5 @@ export const DocsMDXComponents = {
     GhostCaption,
     GhostLabel,
     GhostIcon,
+    ModelCatalog,
 };
