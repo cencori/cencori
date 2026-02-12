@@ -88,7 +88,7 @@ const keywords = [
 export const metadata: Metadata = {
   metadataBase: new URL('https://cencori.com'),
   title: {
-    default: "Cencori | The Infrastructure for AI Production",
+    default: "Cencori | The Infrastructure for AI Production.",
     template: "%s - Cencori",
   },
   description: "Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
@@ -105,6 +105,14 @@ export const metadata: Metadata = {
     siteName: "Cencori",
     title: "Cencori | The Infrastructure for AI Production",
     description: "Ship AI with built-in security, observability, and scale — all in one platform.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Cencori — The Infrastructure for AI Production",
+      },
+    ],
   },
 
   // Twitter/X Card
@@ -114,6 +122,7 @@ export const metadata: Metadata = {
     creator: "@cencori",
     title: "Cencori | The Infrastructure for AI Production",
     description: "Ship AI with built-in security, observability, and scale — all in one platform.",
+    images: ["/og.png"],
   },
 
   // Canonical and alternates
