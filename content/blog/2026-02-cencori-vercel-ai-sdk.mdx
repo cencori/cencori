@@ -1,0 +1,757 @@
+---
+title: "Cencori + Vercel AI SDK"
+slug: "cencori-vercel-ai-sdk"
+date: "2026-02-12"
+published: true
+description: "Cencori is now an official Vercel AI SDK community provider. Route any model through Cencori's security and observability layer with a single import."
+coverImage: "/blog/images/covers/vercel.png"
+author: "Bola Banjo"
+tags: ["Product", "Integration", "Vercel AI SDK", "Announcement"]
+---
+
+We're thrilled to announce that **Cencori is now an official community provider in the Vercel AI SDK ecosystem.**
+
+Our PR was merged into the Vercel AI SDK repository, and Cencori is now listed alongside providers like Replicate, Fireworks, and Voyage AI on the [official providers page](https://ai-sdk.dev/providers/community-providers/cencori).
+
+This means any developer already using the Vercel AI SDK can now route their AI requests through Cencori's infrastructure — gaining built-in security, observability, and multi-provider routing — with just a single import change.
+
+```bash
+pnpm add cencori
+```
+
+That's it. No architecture changes, no separate dashboards, no new APIs to learn.
+
+---
+
+## Why This Matters
+
+The Vercel AI SDK has become the standard for building AI-powered applications in the JavaScript ecosystem. Its elegant abstractions — `generateText`, `streamText`, `useChat` — make it trivially easy to integrate AI into Next.js, React, Svelte, and Node.js applications.
+
+But the Vercel AI SDK is focused on the **frontend and developer experience**. It gives you beautiful hooks and streaming primitives. What it doesn't give you is:
+
+- **Security** — PII detection, prompt injection protection, content filtering
+- **Observability** — Audit logs, cost tracking, request analytics
+- **Multi-provider routing** — Automatic failover, provider-agnostic model access
+- **Compliance** — Full request/response logging for regulated industries
+
+That's where Cencori comes in. We sit between the AI SDK and the model providers, adding an infrastructure layer that handles the production concerns the SDK was never designed to solve.
+
+**Think of it this way:**
+- The Vercel AI SDK is the **steering wheel** — it's how you drive.
+- Cencori is the **engine and safety system** — it's what makes the car production-ready.
+
+Now they work together natively.
+
+---
+
+## The Quick Start
+
+If you're already using the Vercel AI SDK, adding Cencori takes about 30 seconds. Here's the before and after.
+
+### Before: Direct Provider
+
+```typescript
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const { text } = await generateText({
+  model: openai('gpt-4o'),
+  prompt: 'Summarize this quarterly report...',
+});
+```
+
+This works fine for prototyping. But in production, you have no visibility into what's happening. No logging, no security scanning, no cost tracking. If OpenAI goes down, your app goes down.
+
+### After: Through Cencori
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText } from 'ai';
+
+const { text } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Summarize this quarterly report...',
+});
+```
+
+**That's the entire change.** Replace `openai(...)` with `cencori(...)`. The rest of your code stays exactly the same.
+
+But now, behind the scenes:
+1. The request passes through Cencori's security filters (PII detection, prompt injection protection)
+2. The request is logged with full payload, token usage, and cost
+3. If OpenAI is down, Cencori can automatically failover to a backup provider
+4. You get a complete audit trail in your Cencori dashboard
+
+Same code. Same API. Massively more production-ready.
+
+---
+
+## Setup Guide
+
+Let's walk through the full setup from scratch.
+
+### 1. Install the Package
+
+```bash
+# Using pnpm (recommended)
+pnpm add cencori ai
+
+# Using npm
+npm install cencori ai
+
+# Using yarn
+yarn add cencori ai
+```
+
+The `cencori` package includes the Vercel AI SDK provider at `cencori/vercel`. No additional adapter packages needed.
+
+### 2. Get Your API Key
+
+Sign up at [cencori.com](https://cencori.com) and create a project. Your API key will be available in the project dashboard under **API Keys**.
+
+### 3. Set Your Environment Variable
+
+```bash
+# .env.local
+CENCORI_API_KEY=your_api_key_here
+```
+
+The Cencori provider automatically reads from the `CENCORI_API_KEY` environment variable, so you don't need to pass it explicitly in your code:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+
+// Automatically uses CENCORI_API_KEY from environment
+const model = cencori('gpt-4o');
+```
+
+If you need to pass the key explicitly (e.g., in a multi-tenant setup):
+
+```typescript
+import { createCencori } from 'cencori/vercel';
+
+const cencori = createCencori({
+  apiKey: process.env.MY_CUSTOM_KEY,
+});
+```
+
+### 4. Start Using It
+
+That's it. You're ready to use any model through Cencori.
+
+---
+
+## Access Any Model with One Provider
+
+One of the most powerful aspects of the Cencori integration is **multi-provider access through a single import**. Instead of installing and configuring separate provider packages for each model, you access everything through `cencori(...)`:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText } from 'ai';
+
+// OpenAI
+const { text: gptResponse } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Explain quantum computing.',
+});
+
+// Anthropic
+const { text: claudeResponse } = await generateText({
+  model: cencori('claude-3-5-sonnet'),
+  prompt: 'Explain quantum computing.',
+});
+
+// Google Gemini
+const { text: geminiResponse } = await generateText({
+  model: cencori('gemini-2.5-flash'),
+  prompt: 'Explain quantum computing.',
+});
+
+// Mistral
+const { text: mistralResponse } = await generateText({
+  model: cencori('mistral-large'),
+  prompt: 'Explain quantum computing.',
+});
+
+// DeepSeek
+const { text: deepseekResponse } = await generateText({
+  model: cencori('deepseek-v3.2'),
+  prompt: 'Explain quantum computing.',
+});
+
+// xAI Grok
+const { text: grokResponse } = await generateText({
+  model: cencori('grok-4'),
+  prompt: 'Explain quantum computing.',
+});
+
+// Meta Llama
+const { text: llamaResponse } = await generateText({
+  model: cencori('llama-3-70b'),
+  prompt: 'Explain quantum computing.',
+});
+```
+
+**15+ providers, one API key, one import.** No more juggling `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, etc. No more managing separate API keys for each provider. Cencori handles all of it.
+
+This is especially powerful for:
+- **A/B testing models** — swap `cencori('gpt-4o')` for `cencori('claude-3-5-sonnet')` and compare results
+- **Cost optimization** — route cheaper queries to faster, cheaper models
+- **Resilience** — if one provider goes down, switch to another with a single string change
+
+---
+
+## Full Examples
+
+Let's go deeper with real-world examples that demonstrate the full power of Cencori + Vercel AI SDK.
+
+### Text Generation
+
+The simplest use case — generate a single text response:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText } from 'ai';
+
+async function summarize(document: string) {
+  const { text, usage } = await generateText({
+    model: cencori('gpt-4o'),
+    system: 'You are a professional document summarizer. Be concise and accurate.',
+    prompt: `Summarize the following document:\n\n${document}`,
+    maxTokens: 500,
+  });
+
+  console.log('Summary:', text);
+  console.log('Tokens used:', usage?.totalTokens);
+  
+  return text;
+}
+```
+
+Every call is automatically logged in your Cencori dashboard with the full prompt, response, token count, cost, and latency.
+
+### Streaming
+
+For real-time, token-by-token streaming — perfect for chat UIs:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { streamText } from 'ai';
+
+async function streamStory() {
+  const result = streamText({
+    model: cencori('claude-3-5-sonnet'),
+    system: 'You are a creative fiction writer.',
+    prompt: 'Write a short story about an AI that learns to paint.',
+    maxTokens: 2000,
+  });
+
+  // Stream tokens as they arrive
+  for await (const chunk of result.textStream) {
+    process.stdout.write(chunk);
+  }
+
+  // Get final usage after stream completes
+  const finalResult = await result;
+  console.log('\n\nTokens:', finalResult.usage?.totalTokens);
+}
+```
+
+Cencori streams tokens through with near-zero latency overhead. The security scanning happens asynchronously — it doesn't block the stream.
+
+### Tool Calling / Function Calling
+
+Cencori fully supports the Vercel AI SDK's tool calling API. Define tools with Zod schemas, and the model will call them as needed:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText, tool } from 'ai';
+import { z } from 'zod';
+
+const { text, toolCalls, toolResults } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'What is the weather in San Francisco and New York?',
+  tools: {
+    getWeather: tool({
+      description: 'Get the current weather for a city',
+      parameters: z.object({
+        city: z.string().describe('The city name'),
+        unit: z.enum(['celsius', 'fahrenheit']).default('fahrenheit'),
+      }),
+      execute: async ({ city, unit }) => {
+        // In production, call a real weather API
+        const data = await fetch(
+          `https://api.weather.com/v1/current?city=${city}&unit=${unit}`
+        );
+        return data.json();
+      },
+    }),
+    getTimezone: tool({
+      description: 'Get the timezone for a city',
+      parameters: z.object({
+        city: z.string().describe('The city name'),
+      }),
+      execute: async ({ city }) => {
+        return { timezone: 'America/New_York', offset: -5 };
+      },
+    }),
+  },
+  maxSteps: 5, // Allow multiple tool calls
+});
+
+console.log('Final response:', text);
+console.log('Tools called:', toolCalls?.length);
+```
+
+Every tool call and its result is captured in Cencori's audit log, giving you full visibility into the agent's decision-making process.
+
+### Structured Output with Zod Schemas
+
+Extract structured data from unstructured text:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateObject } from 'ai';
+import { z } from 'zod';
+
+const { object: contact } = await generateObject({
+  model: cencori('gpt-4o'),
+  schema: z.object({
+    name: z.string(),
+    email: z.string().email(),
+    company: z.string(),
+    role: z.string(),
+    sentiment: z.enum(['positive', 'neutral', 'negative']),
+    summary: z.string().max(200),
+  }),
+  prompt: `Extract contact information from this email:
+  
+  Hi, I'm Sarah Chen, VP of Engineering at TechCorp. I love what you're building 
+  with Cencori — the security features are exactly what we need for our healthcare 
+  AI platform. Can we schedule a demo? My email is sarah@techcorp.com.`,
+});
+
+console.log(contact);
+// {
+//   name: "Sarah Chen",
+//   email: "sarah@techcorp.com",
+//   company: "TechCorp",
+//   role: "VP of Engineering",
+//   sentiment: "positive",
+//   summary: "Interested in Cencori's security features for healthcare AI platform. Requesting a demo."
+// }
+```
+
+Cencori's PII detection works alongside structured output — if the extracted data contains sensitive information, it's flagged in your security dashboard.
+
+---
+
+## Building a Full-Stack Chat App
+
+Here's the most common use case: a Next.js chat application powered by Cencori and the Vercel AI SDK.
+
+### Backend: API Route
+
+```typescript
+// app/api/chat/route.ts
+import { cencori } from 'cencori/vercel';
+import { streamText } from 'ai';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: cencori('gemini-2.5-flash'),
+    system: `You are a helpful AI assistant for our platform. 
+             Be concise, friendly, and accurate.
+             If unsure, say so rather than making things up.`,
+    messages,
+    maxTokens: 1000,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+### Frontend: Chat Component
+
+```tsx
+// components/Chat.tsx
+'use client';
+
+import { useChat } from '@ai-sdk/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: '/api/chat',
+  });
+
+  return (
+    <div className="flex flex-col h-screen max-w-2xl mx-auto p-4">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <div
+              className={`rounded-2xl px-4 py-2 max-w-[80%] ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+              }`}
+            >
+              {message.content}
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 rounded-2xl px-4 py-2">
+              <span className="animate-pulse">Thinking...</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="flex gap-2 pt-4 border-t">
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Type a message..."
+          className="flex-1 rounded-xl border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="rounded-xl bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+That's a complete, production-ready chat app. Every message exchange is automatically:
+- **Scanned** for PII and prompt injection attempts
+- **Logged** with full token usage and cost
+- **Tracked** in your analytics dashboard
+- **Protected** by content filtering policies
+
+You get all of this without writing a single line of security or logging code.
+
+---
+
+## What You Get Out of the Box
+
+When you route through Cencori, every single AI request is enriched with production-grade features. Here's what happens behind the scenes for every `generateText`, `streamText`, or `useChat` call:
+
+### 1. Security Scanning
+
+Every request and response passes through Cencori's security layer:
+
+- **PII Detection** — Automatically detects and can redact personally identifiable information (names, emails, phone numbers, SSNs, credit cards) in both prompts and responses
+- **Prompt Injection Protection** — Detects and blocks attempts to manipulate your AI through malicious prompts
+- **Content Filtering** — Configurable policies to block harmful, violent, or inappropriate content
+- **Custom Data Rules** — Define your own rules to block, mask, or redact specific sensitive patterns
+
+```typescript
+// This request contains PII — Cencori catches it automatically
+const { text } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Summarize this customer record: John Smith, SSN 123-45-6789, john@email.com',
+});
+
+// In your Cencori dashboard, you'll see:
+// PII Detected: SSN, Email, Full Name
+// Action: Logged as security incident
+```
+
+You can configure the security behavior per project:
+- **Log only** — detect and log PII but don't modify the request
+- **Redact** — automatically replace PII with placeholders before sending to the model
+- **Block** — reject the entire request if PII is detected
+
+### 2. Complete Audit Logs
+
+Every request generates a detailed audit log entry:
+
+```json
+{
+  "requestId": "req_abc123",
+  "timestamp": "2026-02-12T10:30:00Z",
+  "model": "gpt-4o",
+  "provider": "openai",
+  "tokens": {
+    "prompt": 150,
+    "completion": 320,
+    "total": 470
+  },
+  "cost": {
+    "amount": 0.0047,
+    "currency": "USD"
+  },
+  "latency": 1243,
+  "security": {
+    "piiDetected": false,
+    "injectionScore": 0.02,
+    "contentFlags": []
+  },
+  "status": "success"
+}
+```
+
+These logs are searchable, filterable, and exportable from the Cencori dashboard. Perfect for compliance audits, debugging production issues, and understanding usage patterns.
+
+### 3. Real-Time Cost Tracking
+
+Know exactly what your AI is costing you, in real-time:
+
+- **Per-request costs** — see the exact cost of every API call
+- **Per-model breakdowns** — understand which models are driving your bill
+- **Per-project budgets** — set spending limits and get alerts
+- **Historical trends** — track cost over time, identify optimization opportunities
+
+No more surprises on your OpenAI bill. Cencori gives you full cost visibility across all providers.
+
+### 4. Multi-Provider Failover
+
+Configure automatic failover so your app stays up even when providers go down:
+
+```typescript
+import { createCencori } from 'cencori/vercel';
+
+const cencori = createCencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+// If GPT-4o is down, Cencori can automatically route to Claude
+const { text } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Analyze this data...',
+});
+```
+
+Failover is configured in the Cencori dashboard — no code changes needed. You define the priority order and fallback models, and Cencori handles the rest.
+
+### 5. Analytics Dashboard
+
+Your Cencori dashboard gives you a bird's eye view of your entire AI infrastructure:
+
+- **Request volume** — total requests, success rates, error rates
+- **Latency percentiles** — p50, p95, p99 response times
+- **Token usage** — daily/weekly/monthly token consumption by model
+- **Cost trends** — spending patterns and projections
+- **Security incidents** — PII detections, blocked requests, content flags
+- **Model comparison** — side-by-side performance metrics across providers
+
+### 6. Bring Your Own Keys (BYOK)
+
+Already have API keys with OpenAI, Anthropic, or other providers? Bring them:
+
+```typescript
+// In your Cencori dashboard, add your provider keys under Settings > Providers
+// Then use them through Cencori to get security + observability on your own keys
+const { text } = await generateText({
+  model: cencori('gpt-4o'), // Uses YOUR OpenAI key, but with Cencori's layer
+  prompt: 'Analyze this report...',
+});
+```
+
+Your keys, your rate limits, your billing relationship with the provider — plus Cencori's security and observability layer on top.
+
+---
+
+## Advanced Configuration
+
+### Custom Provider Instance
+
+For more control, use `createCencori` to configure a custom provider:
+
+```typescript
+import { createCencori } from 'cencori/vercel';
+
+const cencori = createCencori({
+  apiKey: process.env.CENCORI_API_KEY,
+  baseUrl: 'https://cencori.com',
+  headers: {
+    'X-Project-ID': 'my-project',
+  },
+});
+
+// Use it exactly like the default export
+const { text } = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Hello, world!',
+});
+```
+
+### Model-Specific Options
+
+Pass provider-specific options when you need fine-grained control:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText } from 'ai';
+
+const { text } = await generateText({
+  model: cencori('gpt-4o', {
+    // Provider-specific options
+    temperature: 0.7,
+    topP: 0.9,
+    frequencyPenalty: 0.5,
+  }),
+  prompt: 'Write a creative tagline for an AI company.',
+});
+```
+
+### Multi-Step Agents
+
+Build sophisticated agents that call tools across multiple steps:
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText, tool } from 'ai';
+import { z } from 'zod';
+
+const { text, steps } = await generateText({
+  model: cencori('claude-3-5-sonnet'),
+  system: `You are a research assistant. Use the provided tools to 
+           gather information, then synthesize a comprehensive answer.`,
+  prompt: 'Compare the market cap and recent performance of Apple vs Microsoft.',
+  tools: {
+    searchWeb: tool({
+      description: 'Search the web for current information',
+      parameters: z.object({
+        query: z.string().describe('Search query'),
+      }),
+      execute: async ({ query }) => {
+        // Your search implementation
+        const results = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        return results.json();
+      },
+    }),
+    getStockData: tool({
+      description: 'Get current stock data for a company',
+      parameters: z.object({
+        ticker: z.string().describe('Stock ticker symbol'),
+      }),
+      execute: async ({ ticker }) => {
+        // Your stock data implementation
+        const data = await fetch(`/api/stocks/${ticker}`);
+        return data.json();
+      },
+    }),
+  },
+  maxSteps: 10,
+});
+
+console.log('Final analysis:', text);
+console.log('Steps taken:', steps.length);
+```
+
+Every step of the agent's reasoning process — every tool call, every intermediate result — is captured in Cencori's audit log. This gives you complete traceability for debugging and compliance.
+
+---
+
+## When to Use Cencori vs Direct Providers
+
+Here's a simple decision framework:
+
+| Scenario | Use Direct Provider | Use Cencori |
+| :--- | :---: | :---: |
+| **Quick prototype / hackathon** | ✅ | |
+| **Production application** | | ✅ |
+| **Need audit logs / compliance** | | ✅ |
+| **Multiple model providers** | | ✅ |
+| **Handling user data (PII)** | | ✅ |
+| **Cost tracking matters** | | ✅ |
+| **Single model, personal project** | ✅ | |
+| **Enterprise / B2B SaaS** | | ✅ |
+| **Healthcare / Finance / Legal** | | ✅ |
+
+The mental model is simple: **if your code is going to production, route through Cencori.** The security and observability you get is worth the 30 seconds of setup.
+
+---
+
+## Migration Guide
+
+Already have an existing Vercel AI SDK project? Here's how to migrate in under 5 minutes.
+
+### Step 1: Install Cencori
+
+```bash
+pnpm add cencori
+```
+
+### Step 2: Replace Provider Imports
+
+Find and replace your provider imports:
+
+```diff
+- import { openai } from '@ai-sdk/openai';
+- import { anthropic } from '@ai-sdk/anthropic';
+- import { google } from '@ai-sdk/google';
++ import { cencori } from 'cencori/vercel';
+```
+
+### Step 3: Replace Model References
+
+```diff
+- model: openai('gpt-4o'),
++ model: cencori('gpt-4o'),
+
+- model: anthropic('claude-3-5-sonnet'),
++ model: cencori('claude-3-5-sonnet'),
+
+- model: google('gemini-2.5-flash'),
++ model: cencori('gemini-2.5-flash'),
+```
+
+### Step 4: Set Your API Key
+
+```bash
+echo "CENCORI_API_KEY=your_key_here" >> .env.local
+```
+
+### Step 5: Remove Old Provider Packages (Optional)
+
+```bash
+pnpm remove @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
+```
+
+That's the entire migration. Your existing `generateText`, `streamText`, `useChat`, and tool calling code all works exactly the same — now with security and observability baked in.
+
+---
+
+## What's Next
+
+This is just the beginning of the Cencori + Vercel AI SDK integration. Here's what we're working on:
+
+- **Cencori Memory + AI SDK** — Persistent conversation memory that works across sessions, powered by Cencori's vector store
+- **Agent Workflows** — Multi-step, multi-model orchestration with built-in state management
+- **Edge Runtime Support** — Run Cencori at the edge for even lower latency
+- **React Server Components** — First-class RSC integration for server-side AI rendering
+
+We're building the infrastructure layer that makes AI production-ready. The Vercel AI SDK gives you the best developer experience for building AI apps. Together, they're the full stack.
+
+---
+
+## Get Started
+
+1. **Sign up** at [cencori.com](https://cencori.com)
+2. **Install** the package: `pnpm add cencori ai`
+3. **Read the docs** at [cencori.com/docs](https://cencori.com/docs)
+4. **See the official listing** at [ai-sdk.dev/providers/community-providers/cencori](https://ai-sdk.dev/providers/community-providers/cencori)
+
+We'd love to hear what you build. Tag us on [Twitter/X](https://x.com/caboraai) or open an issue on [GitHub](https://github.com/cencori).
+
+---
+
+*Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.*
