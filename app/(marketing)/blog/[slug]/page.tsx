@@ -41,10 +41,9 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     const authorName = post.authorDetails[0]?.name || "";
     const formattedDate = post.date ? new Date(post.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cencori.com";
     const ogImage = post.coverImage
-        ? `${baseUrl}${post.coverImage}`
-        : `${baseUrl}/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
+        ? post.coverImage
+        : `/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
 
     return {
         title: post.title,
