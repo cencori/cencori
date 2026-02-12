@@ -1,33 +1,38 @@
 import { ImageResponse } from "next/og";
-import { NextRequest } from "next/server";
-// SVG of the Cencori logo (inline to avoid fs issues in production)
+import { getAllDocs } from "@/lib/docs";
+
+export const runtime = "edge";
+
+export const alt = "Cencori Documentation";
+export const size = {
+    width: 1200,
+    height: 630,
+};
+
+export const contentType = "image/png";
+
+// SVG of the Cencori logo (inline)
 const logoSvg = `<svg width="21924" height="21924" viewBox="0 0 21924 21924" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_190_39)"><circle cx="7744" r="7744" fill="white"/><circle cy="14180" r="7744" fill="white"/><circle cx="21924" cy="7744" r="7744" fill="white"/><circle cx="14180" cy="21924" r="7744" fill="white"/></g><defs><clipPath id="clip0_190_39"><rect width="21924" height="21924" rx="594" fill="white"/></clipPath></defs></svg>`;
 const logoBase64 = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}`;
 
-const BACKGROUND = "#0d0d0d";
-const FOREGROUND = "#fafafa";
-const MUTED = "#a1a1aa";
-const PRIMARY = "#ffffff";
+export default async function Image({ params }: { params: { slug: string[] } }) {
+    const { slug } = await params;
+    const slugString = slug.join("/");
+    const docs = getAllDocs();
+    const doc = docs.find((d) => d.slug === slugString);
+    const title = doc ? doc.title : "Documentation";
 
-export async function GET(request: NextRequest) {
-    const url = new URL(request.url);
+    // Relative path from app/docs/[...slug] -> ../../../Geist-Black.ttf
+    // Same depth as blog roughly (docs/[...slug] is effectively 2 levels deep from app root in file structure logic usually, 
+    // but spread segment might behave differently. Let's assume standard file placement)
+    // app/docs/[...slug]/opengraph-image.tsx
+    // Level 1: [...slug]
+    // Level 2: docs
+    // Level 3: app
+    // So ../../../Geist-Black.ttf should work.
 
-    const title = url.searchParams.get("title") || "Cencori";
-    const subtitle = url.searchParams.get("subtitle") || "";
-    const type = url.searchParams.get("type") || "page";
-    const author = url.searchParams.get("author") || "";
-    const date = url.searchParams.get("date") || "";
-
-    const typeLabels: Record<string, string> = {
-        blog: "Blog",
-        changelog: "Changelog",
-        docs: "Documentation",
-        page: "",
-    };
-
-    // Load Geist Black font (bundled)
     const fontData = await fetch(
-        new URL("./Geist-Black.ttf", import.meta.url)
+        new URL("../../../Geist-Black.ttf", import.meta.url)
     ).then((res) => res.arrayBuffer());
 
     return new ImageResponse(
@@ -70,7 +75,7 @@ export async function GET(request: NextRequest) {
                         display: "flex",
                         alignItems: "flex-end",
                         flex: 1,
-                        paddingTop: "160px", // Push content down
+                        paddingTop: "160px",
                     }}
                 >
                     <h1
@@ -82,8 +87,8 @@ export async function GET(request: NextRequest) {
                             color: "#ffffff",
                             margin: 0,
                             maxWidth: "1000px",
-                            // Ensure strict bottom alignment if flex doesn't behave perfectly in OG engine
                             marginTop: "auto",
+                            marginBottom: "0",
                             fontFamily: '"Geist", sans-serif',
                         }}
                     >
@@ -93,8 +98,7 @@ export async function GET(request: NextRequest) {
             </div>
         ),
         {
-            width: 1200,
-            height: 630,
+            ...size,
             fonts: [
                 {
                     name: "Geist",
