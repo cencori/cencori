@@ -53,9 +53,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        if (!['mask', 'redact', 'block'].includes(action)) {
+        if (!['mask', 'redact', 'block', 'tokenize'].includes(action)) {
             return NextResponse.json(
-                { error: 'Invalid action. Must be: mask, redact, or block' },
+                { error: 'Invalid action. Must be: mask, redact, block, or tokenize' },
                 { status: 400 }
             );
         }

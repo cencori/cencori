@@ -57,9 +57,9 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             );
         }
 
-        if (updates.action && !['mask', 'redact', 'block'].includes(updates.action as string)) {
+        if (updates.action && !['mask', 'redact', 'block', 'tokenize'].includes(updates.action as string)) {
             return NextResponse.json(
-                { error: 'Invalid action. Must be: mask, redact, or block' },
+                { error: 'Invalid action. Must be: mask, redact, block, or tokenize' },
                 { status: 400 }
             );
         }
