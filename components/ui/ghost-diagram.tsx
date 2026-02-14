@@ -74,7 +74,7 @@ interface GhostGridProps {
     className?: string;
 }
 
-export function GhostGrid({ items, columns = 3, className }: GhostGridProps) {
+export function GhostGrid({ items = [], columns = 3, className }: GhostGridProps) {
     const gridCols = {
         2: 'grid-cols-2',
         3: 'grid-cols-3',
