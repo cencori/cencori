@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Callout } from "@/components/blog/Callout";
 import { Card, Cards } from "@/components/blog/Cards";
 import { SecurityArchitectureDiagram } from "@/components/blog/SecurityArchitectureDiagram";
+import { TokenizationFlowDiagram } from "@/components/blog/TokenizationFlowDiagram";
 import Link from "next/link";
 import { Check, X, AlertTriangle } from "lucide-react";
 
@@ -197,4 +198,5 @@ export const MDXComponents = {
     Card,
     Cards,
     SecurityArchitectureDiagram,
+    TokenizationFlowDiagram,
 };

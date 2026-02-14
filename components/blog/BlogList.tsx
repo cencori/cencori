@@ -20,7 +20,7 @@ export function BlogList({ posts, tags }: BlogListProps) {
     const filteredPosts = useMemo(() => {
         return posts.filter((post) => {
             const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+                (post.excerpt?.toLowerCase() || "").includes(searchQuery.toLowerCase());
             const matchesTag = !selectedTag || post.tags.includes(selectedTag);
             return matchesSearch && matchesTag;
         });

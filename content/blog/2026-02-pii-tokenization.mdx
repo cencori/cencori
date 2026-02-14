@@ -1,0 +1,143 @@
+---
+title: "Tokenization: How We Let AI Use Context Without Seeing Your Data"
+slug: "pii-tokenization"
+date: "2026-02-14"
+excerpt: "Masking PII breaks AI context. Blocking it kills the feature entirely. We built a third option: tokenize sensitive data into named placeholders, let the LLM reason about them, then restore the real values only for the end user."
+coverImage: "/blog/images/covers/tokenization.png"
+authors:
+  - bola
+tags: ["Engineering", "Security", "AI Safety", "Privacy"]
+published: true
+---
+
+There's a fundamental tension in AI security: the more you protect user data, the dumber your AI becomes.
+
+**Mask** an email address and the model sees `te****om`. It can't draft a personalized email. It can't look up an account. It doesn't even know it's looking at an email address anymore.
+
+**Block** the request entirely and your user gets nothing. A security feature that prevents your product from working isn't a feature—it's a bug.
+
+We needed a third option.
+
+## The Problem: Context vs. Privacy
+
+Here's the real-world scenario that forced our hand. A user types:
+
+> "My email is sarah@acme.com. Can you draft an introduction email to our new client?"
+
+With masking, the LLM receives `My email is sa*****om`. It doesn't know it's an email. It can't reference it in the draft. The response is generic and useless.
+
+With blocking, the user gets an error message. Also useless.
+
+What we actually want is for the LLM to understand: *"There's an email address here, and I should reference it in my draft"*—without ever seeing `sarah@acme.com`.
+
+## The Solution: Named Tokenization
+
+We built a new data rule action called **Tokenize**. Here's what happens:
+
+
+<TokenizationFlowDiagram />
+
+Placeholder names are derived from the rule name—a rule called "Email Addresses" generates `[EMAIL_1]`, `[EMAIL_2]`, etc. A rule called "Phone Numbers" generates `[PHONE_NUMBER_1]`. This gives the LLM explicit *type* information, so it understands what it's working with and can reference it naturally in its response.
+
+The token map lives entirely in memory for the duration of the request. No database table, no cache, no persistence. When the response completes, the map is garbage collected and the real PII exists only in the user's browser.
+
+The result: **the database never sees real PII**. Both request and response payloads are logged with placeholders intact. If your logs are ever compromised, there's nothing to leak.
+
+
+## The Conversation History Gap
+
+While building tokenization, we discovered a deeper issue: **our data rules only processed the last user message**.
+
+In a multi-turn conversation, the client sends the full chat history with each request. Message 1 might contain `sarah@acme.com`. Message 3 references it. But only message 3 was being processed through data rules—messages 1 and 2 were sent to the LLM raw.
+
+This meant PII from earlier turns leaked through conversation history, regardless of what rules were configured.
+
+We fixed this by processing **every user message** through data rules before sending the conversation to the LLM. Each message gets independently tokenized, and the token maps merge so the same email always maps to the same placeholder across the entire conversation:
+
+```
+Message 1: "My email is [EMAIL_1]"           // sarah@acme.com → [EMAIL_1]
+Message 3: "Send to [EMAIL_1] and [EMAIL_2]"  // john@co.org → [EMAIL_2]
+```
+
+Consistency matters. If `sarah@acme.com` becomes `[EMAIL_1]` in message 1 and `[EMAIL_3]` in message 4, the LLM loses thread continuity. Our deduplication ensures the same value always maps to the same placeholder within a request.
+
+## How It Works Under the Hood
+
+The tokenization system lives in two layers:
+
+### The Token Map (Per-Request, In-Memory)
+
+```typescript
+// Temporary map that exists only for this request
+const tokenMap = new Map<string, string>();
+// [EMAIL_1] → sarah@acme.com
+// [EMAIL_2] → john@company.org
+```
+
+This map is **never persisted**. It lives in memory for the duration of the API request and is garbage collected when the response completes. There's no database table of PII-to-token mappings. No cache. No persistence.
+
+### The Type Label System
+
+Placeholder names are derived from the rule name, not arbitrary:
+
+| Rule Name | Placeholder Pattern |
+|-----------|-------------------|
+| Email Addresses | `[EMAIL_ADDRESS_1]` |
+| Phone Numbers | `[PHONE_NUMBER_1]` |
+| Credit Cards | `[CREDIT_CARD_1]` |
+| SSN | `[SSN_1]` |
+
+This is deliberate. When the LLM sees `[EMAIL_ADDRESS_1]`, it understands the semantic type. It knows to format it appropriately in context. Compare that to `[TOKEN_7a3f]`—the model would have no idea what it represents.
+
+### Stream De-tokenization
+
+For streaming responses (where chunks arrive token-by-token), each chunk is de-tokenized before being sent to the client:
+
+```typescript
+const deTokenizedDelta = requestTokenMap
+    ? deTokenize(chunk.delta, requestTokenMap)
+    : chunk.delta;
+```
+
+This ensures the user sees the real PII in real-time as the response streams in, while the accumulated content for logging retains the tokenized version.
+
+## Tokenize vs. Mask vs. Redact vs. Block
+
+Here's when to use each action:
+
+| Action | What Happens | LLM Sees | User Sees | Use When |
+|--------|-------------|----------|-----------|----------|
+| **Tokenize** | Replace with `[TYPE_N]` | `[EMAIL_1]` | Real email | LLM needs context to work with the data |
+| **Mask** | Partial replacement | `sa****om` | `sa****om` | Slight obfuscation is sufficient |
+| **Redact** | Full replacement | `[REDACTED]` | `[REDACTED]` | Data must be completely hidden |
+| **Block** | Reject request | Nothing | Error | Data must never be processed |
+
+**Tokenize** is the sweet spot for most production use cases. It's the only action that preserves both privacy *and* functionality.
+
+## Setting It Up
+
+In the Cencori dashboard, creating a tokenization rule takes 30 seconds:
+
+1. Go to **Security → Data Rules**
+2. Click **Create Rule**
+3. Set **Match Type** to `Regex` and enter your email pattern
+4. Set **Action** to `Tokenize`
+5. Save
+
+That's it. Every email in every message—including conversation history—will be tokenized before reaching the LLM and restored before reaching your user.
+
+## What's Next
+
+Tokenization opens up interesting possibilities:
+
+- **Cross-session token consistency** – Same user's email gets the same placeholder across conversations, enabling the LLM to build long-term context without ever learning the real address
+- **Selective de-tokenization** – Only restore PII for certain response types (e.g., de-tokenize in emails but not in analytics summaries)
+- **Token-aware fine-tuning** – Train models to work natively with tokenized data, potentially improving response quality with placeholders
+
+The fundamental insight is this: **AI doesn't need to see your data to reason about it.** It just needs to know what *type* of data it's working with and where it appears in context.
+
+That's what tokenization provides—and it's the foundation for building AI features that are both powerful and private.
+
+---
+
+*PII tokenization is available today in Cencori for all plans. Check out our [documentation](/docs) to get started, or explore the [Cencori SDK](https://github.com/cencori/sdk) to integrate it into your application.*
