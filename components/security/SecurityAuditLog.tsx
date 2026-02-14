@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FileText, Key, Shield, Settings, Webhook, AlertTriangle, UserX as X } from 'lucide-react';
-import { ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon, WrenchScrewdriverIcon, ArrowPathRoundedSquareIcon } from '@heroicons/react/24/outline';
 
 interface SecurityAuditLogProps {
     projectId: string;
@@ -47,6 +47,7 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
     data_rule_block: <NoSymbolIcon className="h-3 w-3" />,
     data_rule_mask: <EyeSlashIcon className="h-3 w-3" />,
     data_rule_redact: <ShieldCheckIcon className="h-3 w-3" />,
+    data_rule_tokenize: <ArrowPathRoundedSquareIcon className="h-3 w-3" />,
     // Other
     input: <WrenchScrewdriverIcon className="h-3 w-3" />,
 };
@@ -75,6 +76,7 @@ const EVENT_LABELS: Record<string, string> = {
     data_rule_block: 'Data Rule Blocked',
     data_rule_mask: 'Data Masked',
     data_rule_redact: 'Data Redacted',
+    data_rule_tokenize: 'Data Tokenized',
 };
 
 function useAuditLog(projectId: string, page: number, eventType: string, timeRange: string) {

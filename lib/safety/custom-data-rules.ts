@@ -15,7 +15,7 @@ export interface CustomDataRule {
     match_type: 'keywords' | 'regex' | 'json_path' | 'ai_detect';
     pattern: string;
     case_sensitive: boolean;
-    action: 'mask' | 'redact' | 'block';
+    action: 'mask' | 'redact' | 'block' | 'tokenize';
     is_active: boolean;
     priority: number;
 }
@@ -31,6 +31,7 @@ export interface ProcessedContent {
     wasProcessed: boolean;
     matchedRules: MatchResult[];
     shouldBlock: boolean;
+    tokenMap?: Map<string, string>;
 }
 
 /**
@@ -224,6 +225,73 @@ export function applyRedact(text: string, snippets: string[]): string {
 }
 
 /**
+ * Apply tokenization - replace matched snippets with named placeholders like [EMAIL_1]
+ * Returns the modified text and a map of placeholder -> real value
+ */
+export function applyTokenize(
+    text: string,
+    snippets: string[],
+    ruleName: string,
+    existingMap?: Map<string, string>
+): { text: string; tokenMap: Map<string, string> } {
+    const tokenMap = existingMap ? new Map(existingMap) : new Map<string, string>();
+    let result = text;
+
+    // Generate a type label from the rule name, e.g. "Email Addresses" -> "EMAIL"
+    const typeLabel = ruleName
+        .toUpperCase()
+        .replace(/[^A-Z0-9\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/S$/, ''); // Remove trailing S for plural -> singular
+
+    // Find existing count for this type label
+    let counter = 0;
+    for (const key of tokenMap.keys()) {
+        if (key.startsWith(`[${typeLabel}_`)) {
+            counter++;
+        }
+    }
+
+    // Deduplicate snippets to avoid double-tokenizing the same value
+    const uniqueSnippets = [...new Set(snippets)];
+
+    for (const snippet of uniqueSnippets) {
+        // Check if this snippet was already tokenized (same value -> same placeholder)
+        let existingPlaceholder: string | undefined;
+        for (const [placeholder, value] of tokenMap.entries()) {
+            if (value === snippet) {
+                existingPlaceholder = placeholder;
+                break;
+            }
+        }
+
+        if (existingPlaceholder) {
+            // Reuse existing placeholder for the same value
+            result = result.split(snippet).join(existingPlaceholder);
+        } else {
+            counter++;
+            const placeholder = `[${typeLabel}_${counter}]`;
+            tokenMap.set(placeholder, snippet);
+            result = result.split(snippet).join(placeholder);
+        }
+    }
+
+    return { text: result, tokenMap };
+}
+
+/**
+ * De-tokenize text - replace placeholders back with real values
+ */
+export function deTokenize(text: string, tokenMap: Map<string, string>): string {
+    let result = text;
+    for (const [placeholder, realValue] of tokenMap.entries()) {
+        result = result.split(placeholder).join(realValue);
+    }
+    return result;
+}
+
+/**
  * Process all rules against text content
  */
 export async function processCustomRules(
@@ -234,6 +302,7 @@ export async function processCustomRules(
     let processedText = text;
     const matchedRules: MatchResult[] = [];
     let shouldBlock = false;
+    let tokenMap: Map<string, string> | undefined;
 
     // Sort by priority (higher first)
     const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
@@ -269,7 +338,7 @@ export async function processCustomRules(
         }
 
         if (matchResult.matched) {
-            console.log(`[CustomRules] ✅ MATCHED: ${rule.name} (${rule.match_type}), snippets:`, matchResult.snippets);
+            console.log(`[CustomRules] MATCHED: ${rule.name} (${rule.match_type}), snippets:`, matchResult.snippets);
             matchedRules.push({ ...matchResult, rule });
 
             // Apply action
@@ -283,9 +352,15 @@ export async function processCustomRules(
                 case 'redact':
                     processedText = applyRedact(processedText, matchResult.snippets);
                     break;
+                case 'tokenize': {
+                    const tokenResult = applyTokenize(processedText, matchResult.snippets, rule.name, tokenMap);
+                    processedText = tokenResult.text;
+                    tokenMap = tokenResult.tokenMap;
+                    break;
+                }
             }
         } else {
-            console.log(`[CustomRules] ❌ No match: ${rule.name} (${rule.match_type})`);
+            console.log(`[CustomRules] No match: ${rule.name} (${rule.match_type})`);
         }
     }
 
@@ -294,6 +369,7 @@ export async function processCustomRules(
         wasProcessed: matchedRules.length > 0,
         matchedRules,
         shouldBlock,
+        tokenMap,
     };
 }
 
