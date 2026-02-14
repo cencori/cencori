@@ -88,6 +88,7 @@ export function getAllPosts(includeUnpublished = false): BlogPost[] {
 
             return {
                 ...frontmatter,
+                excerpt: frontmatter.excerpt || "",
                 content,
                 readTime: stats.text,
                 authorDetails,
