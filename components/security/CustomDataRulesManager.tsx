@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     PlusIcon, TrashIcon, PencilIcon,
     Bars3BottomLeftIcon, CodeBracketIcon, CommandLineIcon, CpuChipIcon,
-    ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon,
+    ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon, ArrowPathRoundedSquareIcon,
     DocumentTextIcon, ChevronDownIcon, UserGroupIcon, HeartIcon,
     CurrencyDollarIcon, ScaleIcon, GlobeAltIcon
 } from "@heroicons/react/24/outline";
@@ -50,7 +50,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type MatchType = 'keywords' | 'regex' | 'json_path' | 'ai_detect';
-type ActionType = 'mask' | 'redact' | 'block';
+type ActionType = 'mask' | 'redact' | 'block' | 'tokenize';
 
 interface CustomDataRule {
     id: string;
@@ -107,6 +107,12 @@ const MATCH_TYPE_INFO = {
 };
 
 const ACTION_INFO = {
+    tokenize: {
+        icon: ArrowPathRoundedSquareIcon,
+        label: 'Tokenize',
+        description: 'Replace with placeholders, restore in response',
+        color: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
+    },
     mask: {
         icon: EyeSlashIcon,
         label: 'Mask',

@@ -179,7 +179,7 @@ export async function GET(
 
             if (status && status !== 'all') {
                 if (status === 'filtered') {
-                    incidentsQuery = incidentsQuery.in('incident_type', ['content_filter', 'jailbreak', 'prompt_injection', 'pii_input', 'data_rule_mask', 'data_rule_redact']);
+                    incidentsQuery = incidentsQuery.in('incident_type', ['content_filter', 'jailbreak', 'prompt_injection', 'pii_input', 'data_rule_mask', 'data_rule_redact', 'data_rule_tokenize']);
                 } else if (status === 'blocked_output' || status === 'blocked') {
                     incidentsQuery = incidentsQuery.in('incident_type', ['output_leakage', 'pii_output', 'data_rule_block']);
                 } else if (status === 'rate_limited') {

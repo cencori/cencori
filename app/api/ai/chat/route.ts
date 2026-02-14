@@ -13,7 +13,7 @@ import {
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage, ToolCall } from '@/lib/providers/base';
 import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
-import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact } from '@/lib/safety/custom-data-rules';
+import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact, applyTokenize, deTokenize } from '@/lib/safety/custom-data-rules';
 import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
@@ -545,15 +545,16 @@ export async function POST(req: NextRequest) {
 
         if (customRulesResult.inputResult.wasProcessed && customRulesResult.inputResult.matchedRules.length > 0) {
             const processedRules = customRulesResult.inputResult.matchedRules
-                .filter(r => r.rule.action === 'mask' || r.rule.action === 'redact');
+                .filter(r => r.rule.action === 'mask' || r.rule.action === 'redact' || r.rule.action === 'tokenize');
 
             for (const match of processedRules) {
+                const actionLabel = match.rule.action === 'tokenize' ? 'tokenized' : `${match.rule.action}ed`;
                 const { error: incidentError } = await supabase.from('security_incidents').insert({
                     project_id: project.id,
                     incident_type: `data_rule_${match.rule.action}`,
                     severity: 'medium',
                     risk_score: 0.5,
-                    description: `Data ${match.rule.action}ed by rule: ${match.rule.name}`,
+                    description: `Data ${actionLabel} by rule: ${match.rule.name}`,
                     input_text: inputText.substring(0, 500),
                     blocked_at: 'input',
                     detection_method: 'custom_data_rule',
@@ -565,19 +566,30 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Track token map for de-tokenization of LLM response
+        let requestTokenMap: Map<string, string> | undefined = customRulesResult.inputResult.tokenMap;
+
         if (customRulesResult.inputResult.wasProcessed && !customRulesResult.inputResult.shouldBlock) {
-            const lastUserIndex = unifiedMessages.map(m => m.role).lastIndexOf('user');
-            if (lastUserIndex !== -1) {
-                const processedContent = customRulesResult.inputResult.content;
-                unifiedMessages[lastUserIndex] = {
-                    ...unifiedMessages[lastUserIndex],
-                    content: processedContent
-                };
-                console.log('[CustomRules] Applied mask/redact to input:', {
-                    original: inputText.substring(0, 100),
-                    processed: processedContent.substring(0, 100)
-                });
+            // Apply data rules to ALL user messages in conversation history, not just the last one
+            for (let i = 0; i < unifiedMessages.length; i++) {
+                if (unifiedMessages[i].role === 'user') {
+                    const msgResult = await processCustomRules(unifiedMessages[i].content, customRulesResult.rules);
+                    unifiedMessages[i] = {
+                        ...unifiedMessages[i],
+                        content: msgResult.content
+                    };
+                    // Merge any token maps from history messages
+                    if (msgResult.tokenMap) {
+                        if (!requestTokenMap) {
+                            requestTokenMap = new Map();
+                        }
+                        for (const [key, value] of msgResult.tokenMap.entries()) {
+                            requestTokenMap.set(key, value);
+                        }
+                    }
+                }
             }
+            console.log('[CustomRules] Applied data rules to all user messages in conversation');
         }
 
         const requestedModel = model || 'gemini-2.0-flash';
@@ -791,8 +803,13 @@ export async function POST(req: NextRequest) {
                             }
 
                             // Include fallback info in first chunk if fallback was used
+                            // De-tokenize the chunk before sending to user
+                            const deTokenizedDelta = requestTokenMap
+                                ? deTokenize(chunk.delta, requestTokenMap)
+                                : chunk.delta;
+
                             const chunkData: Record<string, unknown> = {
-                                delta: chunk.delta,
+                                delta: deTokenizedDelta,
                                 finish_reason: chunk.finishReason
                             };
                             if (streamUsedFallback && fullContent === chunk.delta) {
@@ -832,11 +849,13 @@ export async function POST(req: NextRequest) {
                                     if (customRulesResult.inputResult.wasProcessed) {
                                         streamLoggedMessages = messages.map((msg: { role: string; content: string }) => ({
                                             ...msg,
-                                            content: customRulesResult.inputResult.matchedRules.reduce((content: string, match: { rule: { action: string }; snippets: string[] }) => {
+                                            content: customRulesResult.inputResult.matchedRules.reduce((content: string, match: { rule: { action: string; name: string }; snippets: string[] }) => {
                                                 if (match.rule.action === 'mask') {
                                                     return applyMask(content, match.snippets);
                                                 } else if (match.rule.action === 'redact') {
                                                     return applyRedact(content, match.snippets);
+                                                } else if (match.rule.action === 'tokenize') {
+                                                    return applyTokenize(content, match.snippets, match.rule.name).text;
                                                 }
                                                 return content;
                                             }, msg.content)
@@ -1083,6 +1102,8 @@ export async function POST(req: NextRequest) {
                             return applyMask(content, match.snippets);
                         } else if (match.rule.action === 'redact') {
                             return applyRedact(content, match.snippets);
+                        } else if (match.rule.action === 'tokenize') {
+                            return applyTokenize(content, match.snippets, match.rule.name).text;
                         }
                         return content;
                     }, msg.content)
@@ -1128,8 +1149,13 @@ export async function POST(req: NextRequest) {
         checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
             console.error('[Budget] Failed to check budget alerts:', err);
         });
+        // De-tokenize response before returning to user
+        const finalContent = requestTokenMap
+            ? deTokenize(response.content, requestTokenMap)
+            : response.content;
+
         return NextResponse.json({
-            content: response.content,
+            content: finalContent,
             model: actualModel,
             provider: actualProvider,
             usage: {
