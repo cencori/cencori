@@ -69,12 +69,17 @@ export function GhostBoxContent({ children, className }: { children: ReactNode; 
  * <GhostGrid items={['Content Filter', 'Jailbreak Detect', 'Intent Analysis']} />
  */
 interface GhostGridProps {
-    items: string[];
+    items: string[] | string;
     columns?: 2 | 3 | 4;
     className?: string;
 }
 
 export function GhostGrid({ items = [], columns = 3, className }: GhostGridProps) {
+    // Determine items to render (supports both array and string)
+    const gridItems = Array.isArray(items)
+        ? items
+        : (typeof items === 'string' ? items.split(',').map(s => s.trim()) : []);
+
     const gridCols = {
         2: 'grid-cols-2',
         3: 'grid-cols-3',
@@ -83,7 +88,7 @@ export function GhostGrid({ items = [], columns = 3, className }: GhostGridProps
 
     return (
         <div className={cn('grid gap-2 text-xs text-current/60', gridCols[columns], className)}>
-            {items.map((item, i) => (
+            {gridItems.map((item, i) => (
                 <div key={i} className="border border-current/15 rounded px-2 py-1.5 text-center">
                     {item}
                 </div>
