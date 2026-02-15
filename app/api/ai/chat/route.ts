@@ -348,6 +348,8 @@ export async function POST(req: NextRequest) {
         projects!inner(
           id,
           organization_id,
+          default_model,
+          default_provider,
           organizations!inner(
             id,
             subscription_tier,
@@ -386,6 +388,8 @@ export async function POST(req: NextRequest) {
         const project = keyData.projects as unknown as {
             id: string;
             organization_id: string;
+            default_model: string | null;
+            default_provider: string | null;
             organizations: {
                 id: string;
                 subscription_tier: string;
@@ -592,7 +596,7 @@ export async function POST(req: NextRequest) {
             console.log('[CustomRules] Applied data rules to all user messages in conversation');
         }
 
-        const requestedModel = model || 'gemini-2.0-flash';
+        const requestedModel = model || project.default_model || 'gemini-2.0-flash';
         const providerName = router.detectProvider(requestedModel);
         const normalizedModel = router.normalizeModelName(requestedModel);
         const byokInitialized = await initializeBYOKProviders(
