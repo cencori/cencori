@@ -8,10 +8,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import crypto from 'crypto';
 import OpenAI from 'openai';
 import { decryptApiKey } from '@/lib/encryption';
+import { getPricingFromDB } from '@/lib/providers/pricing';
+import { checkInputSecurity } from '@/lib/safety/multi-layer-check';
+import { getProjectSecurityConfig } from '@/lib/safety/utils';
+import {
+    validateGatewayRequest,
+    addGatewayHeaders,
+    handleCorsPreFlight,
+    logGatewayRequest,
+    incrementUsage,
+    GatewayContext,
+} from '@/lib/gateway-middleware';
 
 interface CompletionRequest {
     model?: string;
@@ -26,40 +35,19 @@ interface CompletionRequest {
     echo?: boolean;
 }
 
-interface CompletionChoice {
-    text: string;
-    index: number;
-    finish_reason: string | null;
-}
-
-interface CompletionResponse {
-    id: string;
-    object: 'text_completion';
-    created: number;
-    model: string;
-    choices: CompletionChoice[];
-    usage: {
-        prompt_tokens: number;
-        completion_tokens: number;
-        total_tokens: number;
-    };
+export async function OPTIONS() {
+    return handleCorsPreFlight();
 }
 
 export async function POST(req: NextRequest) {
-    const startTime = Date.now();
-    const requestId = crypto.randomUUID();
+    // ── Gateway validation (auth, rate limit, spend cap, domain) ──
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) {
+        return validation.response;
+    }
+    const ctx = validation.context;
 
     try {
-        // Get API key from header
-        const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
-
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'unauthorized', message: 'Missing API key' },
-                { status: 401 }
-            );
-        }
-
         // Parse request body
         const body: CompletionRequest = await req.json();
         const {
@@ -76,59 +64,75 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!prompt) {
-            return NextResponse.json(
-                { error: 'bad_request', message: 'Prompt is required' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json(
+                    { error: 'bad_request', message: 'Prompt is required' },
+                    { status: 400 }
+                ),
+                { requestId: ctx.requestId }
             );
         }
 
-        // Initialize Supabase client
-        const supabase = createAdminClient();
+        // ── Input security scanning ──
+        const promptText = Array.isArray(prompt) ? prompt.join('\n') : prompt;
+        try {
+            const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId);
+            const inputSecurity = checkInputSecurity(promptText, [{ role: 'user', content: promptText }], securityConfig);
 
-        // Validate API key and get project
-        const { data: keyData, error: keyError } = await supabase
-            .from('api_keys')
-            .select('id, project_id, key_type, is_active, projects(id, organization_id, name)')
-            .eq('key_hash', crypto.createHash('sha256').update(apiKey).digest('hex'))
-            .single();
-
-        if (keyError || !keyData || !keyData.is_active) {
-            return NextResponse.json(
-                { error: 'unauthorized', message: 'Invalid or inactive API key' },
-                { status: 401 }
-            );
+            if (!inputSecurity.safe) {
+                await logGatewayRequest(ctx, {
+                    endpoint: 'completions',
+                    model,
+                    provider: 'openai',
+                    status: 'blocked',
+                    errorMessage: `Input blocked: ${inputSecurity.reasons.join(', ')}`,
+                });
+                return addGatewayHeaders(
+                    NextResponse.json(
+                        {
+                            error: 'content_filtered',
+                            message: 'Input was blocked by security policy',
+                            reasons: inputSecurity.reasons,
+                        },
+                        { status: 403 }
+                    ),
+                    { requestId: ctx.requestId }
+                );
+            }
+        } catch (e) {
+            console.warn('[Completions] Security check failed, continuing:', e);
         }
 
-        const projectId = keyData.project_id;
-        const projectData = keyData.projects as unknown as { id: string; organization_id: string; name: string };
-
-        // Get OpenAI API key (BYOK or default)
+        // ── Get OpenAI API key (BYOK or default) ──
         let openaiKey: string | null = null;
 
-        const { data: providerKey } = await supabase
+        const { data: providerKey } = await ctx.supabase
             .from('provider_keys')
             .select('encrypted_key, is_active')
-            .eq('project_id', projectId)
+            .eq('project_id', ctx.projectId)
             .eq('provider', 'openai')
             .eq('is_active', true)
             .single();
 
         if (providerKey?.encrypted_key) {
-            openaiKey = decryptApiKey(providerKey.encrypted_key, projectData.organization_id);
+            openaiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
         } else {
             openaiKey = process.env.OPENAI_API_KEY ?? null;
         }
 
         if (!openaiKey) {
-            return NextResponse.json(
-                { error: 'provider_not_configured', message: 'No OpenAI API key configured' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json(
+                    { error: 'provider_not_configured', message: 'No OpenAI API key configured' },
+                    { status: 400 }
+                ),
+                { requestId: ctx.requestId }
             );
         }
 
         const client = new OpenAI({ apiKey: openaiKey });
 
-        // Non-streaming response
+        // ── Non-streaming response ──
         if (!stream) {
             const response = await client.completions.create({
                 model,
@@ -142,39 +146,47 @@ export async function POST(req: NextRequest) {
                 echo,
             });
 
-            const latencyMs = Date.now() - startTime;
+            // Calculate cost
+            const promptTokens = response.usage?.prompt_tokens ?? 0;
+            const completionTokens = response.usage?.completion_tokens ?? 0;
+            const totalTokens = response.usage?.total_tokens ?? 0;
+            const pricing = await getPricingFromDB('openai', model);
+            const providerCost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
+            const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-            // Log the request
-            await supabase.from('ai_requests').insert({
-                id: requestId,
-                project_id: projectId,
-                organization_id: projectData.organization_id,
+            await logGatewayRequest(ctx, {
                 endpoint: 'completions',
                 model: response.model,
                 provider: 'openai',
-                input_tokens: response.usage?.prompt_tokens ?? 0,
-                output_tokens: response.usage?.completion_tokens ?? 0,
-                total_tokens: response.usage?.total_tokens ?? 0,
-                latency_ms: latencyMs,
                 status: 'success',
-                created_at: new Date().toISOString(),
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                costUsd: cencoriCharge,
+                providerCostUsd: providerCost,
+                cencoriChargeUsd: cencoriCharge,
+                markupPercentage: pricing.cencoriMarkupPercentage,
             });
+            await incrementUsage(ctx);
 
-            return NextResponse.json({
-                id: response.id,
-                object: 'text_completion',
-                created: response.created,
-                model: response.model,
-                choices: response.choices.map((choice, idx) => ({
-                    text: choice.text,
-                    index: idx,
-                    finish_reason: choice.finish_reason,
-                })),
-                usage: response.usage,
-            });
+            return addGatewayHeaders(
+                NextResponse.json({
+                    id: response.id,
+                    object: 'text_completion',
+                    created: response.created,
+                    model: response.model,
+                    choices: response.choices.map((choice, idx) => ({
+                        text: choice.text,
+                        index: idx,
+                        finish_reason: choice.finish_reason,
+                    })),
+                    usage: response.usage,
+                }),
+                { requestId: ctx.requestId }
+            );
         }
 
-        // Streaming response
+        // ── Streaming response ──
         const streamResponse = await client.completions.create({
             model,
             prompt,
@@ -189,7 +201,7 @@ export async function POST(req: NextRequest) {
 
         const encoder = new TextEncoder();
         let completionText = '';
-        let promptTokens = 0;
+        const streamCtx = ctx; // capture for closure
 
         const readableStream = new ReadableStream({
             async start(controller) {
@@ -216,24 +228,27 @@ export async function POST(req: NextRequest) {
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
 
-                    // Estimate tokens and log
-                    const estimatedPromptTokens = Math.ceil((Array.isArray(prompt) ? prompt.join('') : prompt).length / 4);
+                    // Estimate tokens and log with cost
+                    const estimatedPromptTokens = Math.ceil(promptText.length / 4);
                     const estimatedCompletionTokens = Math.ceil(completionText.length / 4);
+                    const pricing = await getPricingFromDB('openai', model);
+                    const providerCost = (estimatedPromptTokens / 1000) * pricing.inputPer1KTokens + (estimatedCompletionTokens / 1000) * pricing.outputPer1KTokens;
+                    const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-                    await supabase.from('ai_requests').insert({
-                        id: requestId,
-                        project_id: projectId,
-                        organization_id: projectData.organization_id,
+                    await logGatewayRequest(streamCtx, {
                         endpoint: 'completions',
                         model,
                         provider: 'openai',
-                        input_tokens: estimatedPromptTokens,
-                        output_tokens: estimatedCompletionTokens,
-                        total_tokens: estimatedPromptTokens + estimatedCompletionTokens,
-                        latency_ms: Date.now() - startTime,
                         status: 'success',
-                        created_at: new Date().toISOString(),
+                        promptTokens: estimatedPromptTokens,
+                        completionTokens: estimatedCompletionTokens,
+                        totalTokens: estimatedPromptTokens + estimatedCompletionTokens,
+                        costUsd: cencoriCharge,
+                        providerCostUsd: providerCost,
+                        cencoriChargeUsd: cencoriCharge,
+                        markupPercentage: pricing.cencoriMarkupPercentage,
                     });
+                    await incrementUsage(streamCtx);
 
                 } catch (error) {
                     console.error('Stream error:', error);
@@ -242,22 +257,35 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        return new Response(readableStream, {
+        const response = new Response(readableStream, {
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
+                'X-Request-Id': ctx.requestId,
             },
         });
 
+        return response;
+
     } catch (error) {
         console.error('Completions API error:', error);
-
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        return NextResponse.json(
-            { error: 'internal_error', message: errorMessage },
-            { status: 500 }
+        await logGatewayRequest(ctx, {
+            endpoint: 'completions',
+            model: 'unknown',
+            provider: 'openai',
+            status: 'error',
+            errorMessage,
+        });
+
+        return addGatewayHeaders(
+            NextResponse.json(
+                { error: 'internal_error', message: errorMessage },
+                { status: 500 }
+            ),
+            { requestId: ctx.requestId }
         );
     }
 }

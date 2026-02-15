@@ -21,58 +21,18 @@ import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableErr
 import { triggerFallbackWebhook, triggerSecurityWebhook } from '@/lib/webhooks';
 import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
 import { checkSpendCap, checkAndSendBudgetAlerts } from '@/lib/budgets';
+import { getProjectSecurityConfig } from '@/lib/safety/utils';
+import { handleCorsPreFlight, addGatewayHeaders } from '@/lib/gateway-middleware';
+import { checkRateLimit } from '@/lib/rate-limit';
+
 
 const router = new ProviderRouter();
-async function getProjectSecurityConfig(
-    supabase: ReturnType<typeof createAdminClient>,
-    projectId: string
-): Promise<ProjectSecurityConfig> {
-    try {
-        const { data: settings } = await supabase
-            .from('security_settings')
-            .select('*')
-            .eq('project_id', projectId)
-            .single();
 
-        if (!settings) {
-            return {
-                inputThreshold: 0.5,
-                outputThreshold: 0.6,
-                jailbreakThreshold: 0.7,
-                enableOutputScanning: true,
-                enableJailbreakDetection: true,
-                enableObfuscatedPII: true,
-                enableIntentAnalysis: true,
-            };
-        }
-
-        const safetyThreshold = settings.safety_threshold ?? 0.7;
-        const inputThreshold = 1 - safetyThreshold;
-        const outputThreshold = Math.max(0.1, inputThreshold - 0.1);
-        const jailbreakThreshold = Math.max(0.2, inputThreshold);
-
-        return {
-            inputThreshold,
-            outputThreshold,
-            jailbreakThreshold,
-            enableOutputScanning: true,
-            enableJailbreakDetection: settings.filter_jailbreaks ?? true,
-            enableObfuscatedPII: settings.filter_pii ?? true,
-            enableIntentAnalysis: settings.filter_prompt_injection ?? true,
-        };
-    } catch (error) {
-        console.warn('[Security] Failed to fetch security settings:', error);
-        return {
-            inputThreshold: 0.5,
-            outputThreshold: 0.6,
-            jailbreakThreshold: 0.7,
-            enableOutputScanning: true,
-            enableJailbreakDetection: true,
-            enableObfuscatedPII: true,
-            enableIntentAnalysis: true,
-        };
-    }
+export async function OPTIONS() {
+    return handleCorsPreFlight();
 }
+
+
 
 async function getAndProcessCustomRules(
     supabase: ReturnType<typeof createAdminClient>,
