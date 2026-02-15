@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import crypto from 'crypto';
 import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import { decryptApiKey } from '@/lib/encryption';
+import {
+    validateGatewayRequest,
+    addGatewayHeaders,
+    handleCorsPreFlight,
+    logGatewayRequest,
+    incrementUsage,
+} from '@/lib/gateway-middleware';
 
 // Supported image generation providers
 type ImageProvider = 'openai' | 'google';
@@ -32,12 +37,10 @@ interface ImageGenerationResponse {
 
 // Supported models with metadata
 const IMAGE_MODELS = {
-    // OpenAI models
     'gpt-image-1.5': { provider: 'openai' as const, apiModel: 'gpt-image-1.5', description: 'Best text rendering, top ELO rating' },
     'gpt-image-1': { provider: 'openai' as const, apiModel: 'gpt-image-1', description: 'ChatGPT image generation' },
     'dall-e-3': { provider: 'openai' as const, apiModel: 'dall-e-3', description: 'High quality, creative' },
     'dall-e-2': { provider: 'openai' as const, apiModel: 'dall-e-2', description: 'Fast, cost-effective' },
-    // Google models
     'gemini-3-pro-image': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'High photorealism, fast' },
     'nano-banana-pro': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'Alias for Gemini 3 Pro Image' },
     'imagen-3': { provider: 'google' as const, apiModel: 'imagen-3.0-generate-002', description: 'Google Imagen 3' },
@@ -45,227 +48,117 @@ const IMAGE_MODELS = {
 
 type SupportedModel = keyof typeof IMAGE_MODELS;
 
-// Model to provider mapping
 function getProviderForModel(model: string): ImageProvider {
     const modelLower = model.toLowerCase().replace(/\s+/g, '-');
-
-    // Check exact match first
-    if (modelLower in IMAGE_MODELS) {
-        return IMAGE_MODELS[modelLower as SupportedModel].provider;
-    }
-
-    // Fuzzy matching
-    if (modelLower.includes('gemini') || modelLower.includes('imagen') || modelLower.includes('nano-banana')) {
-        return 'google';
-    }
-    if (modelLower.includes('dall-e') || modelLower.includes('dalle') || modelLower.includes('gpt-image')) {
-        return 'openai';
-    }
-
-    // Default to OpenAI
+    if (modelLower in IMAGE_MODELS) return IMAGE_MODELS[modelLower as SupportedModel].provider;
+    if (modelLower.includes('gemini') || modelLower.includes('imagen') || modelLower.includes('nano-banana')) return 'google';
+    if (modelLower.includes('dall-e') || modelLower.includes('dalle') || modelLower.includes('gpt-image')) return 'openai';
     return 'openai';
 }
 
-// Normalize model name to API model
 function normalizeModelName(model: string): { normalized: string; apiModel: string } {
     const modelLower = model.toLowerCase().replace(/\s+/g, '-');
-
-    // Check exact match
     if (modelLower in IMAGE_MODELS) {
         const config = IMAGE_MODELS[modelLower as SupportedModel];
         return { normalized: modelLower, apiModel: config.apiModel };
     }
-
-    // Fuzzy matching for OpenAI
-    if (modelLower === 'dalle-3' || modelLower === 'dalle3') {
-        return { normalized: 'dall-e-3', apiModel: 'dall-e-3' };
-    }
-    if (modelLower === 'dalle-2' || modelLower === 'dalle2') {
-        return { normalized: 'dall-e-2', apiModel: 'dall-e-2' };
-    }
-    if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('1.5')) {
-        return { normalized: 'gpt-image-1.5', apiModel: 'gpt-image-1.5' };
-    }
-    if (modelLower.includes('gpt') && modelLower.includes('image')) {
-        return { normalized: 'gpt-image-1', apiModel: 'gpt-image-1' };
-    }
-
-    // Fuzzy matching for Google
-    if (modelLower.includes('gemini') && modelLower.includes('image')) {
-        return { normalized: 'gemini-3-pro-image', apiModel: 'gemini-2.0-flash-preview-image-generation' };
-    }
-    if (modelLower.includes('nano') || modelLower.includes('banana')) {
-        return { normalized: 'nano-banana-pro', apiModel: 'gemini-2.0-flash-preview-image-generation' };
-    }
-    if (modelLower.includes('imagen')) {
-        return { normalized: 'imagen-3', apiModel: 'imagen-3.0-generate-002' };
-    }
-
-    // Default
+    if (modelLower === 'dalle-3' || modelLower === 'dalle3') return { normalized: 'dall-e-3', apiModel: 'dall-e-3' };
+    if (modelLower === 'dalle-2' || modelLower === 'dalle2') return { normalized: 'dall-e-2', apiModel: 'dall-e-2' };
+    if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('1.5')) return { normalized: 'gpt-image-1.5', apiModel: 'gpt-image-1.5' };
+    if (modelLower.includes('gpt') && modelLower.includes('image')) return { normalized: 'gpt-image-1', apiModel: 'gpt-image-1' };
+    if (modelLower.includes('gemini') && modelLower.includes('image')) return { normalized: 'gemini-3-pro-image', apiModel: 'gemini-2.0-flash-preview-image-generation' };
+    if (modelLower.includes('nano') || modelLower.includes('banana')) return { normalized: 'nano-banana-pro', apiModel: 'gemini-2.0-flash-preview-image-generation' };
+    if (modelLower.includes('imagen')) return { normalized: 'imagen-3', apiModel: 'imagen-3.0-generate-002' };
     return { normalized: model, apiModel: model };
 }
 
-// Generate images using OpenAI
-async function generateWithOpenAI(
-    client: OpenAI,
-    request: ImageGenerationRequest,
-    apiModel: string
-): Promise<ImageGenerationResponse> {
-    // GPT Image 1.5 and GPT Image 1 use a different endpoint pattern
+async function generateWithOpenAI(client: OpenAI, request: ImageGenerationRequest, apiModel: string): Promise<ImageGenerationResponse> {
     const isGptImage = apiModel.startsWith('gpt-image');
-
     const response = await client.images.generate({
         model: apiModel,
         prompt: request.prompt,
-        n: isGptImage ? 1 : (request.n ?? 1), // GPT Image models only support n=1
-        size: request.size ?? '1024x1024',
-        quality: (apiModel === 'dall-e-3' || isGptImage) ? (request.quality ?? 'standard') : undefined,
-        style: apiModel === 'dall-e-3' ? (request.style ?? 'vivid') : undefined,
-        response_format: request.responseFormat ?? 'url',
+        n: isGptImage ? 1 : (request.n ?? 1),
+        size: request.size || '1024x1024',
+        quality: isGptImage ? undefined : request.quality,
+        style: isGptImage ? undefined : request.style,
+        response_format: isGptImage ? 'b64_json' : (request.responseFormat || 'url'),
     });
-
     return {
-        images: (response.data ?? []).map(img => ({
-            url: img.url,
-            b64_json: img.b64_json,
-            revisedPrompt: img.revised_prompt,
+        images: (response.data ?? []).map(item => ({
+            url: item.url,
+            b64_json: item.b64_json,
+            revisedPrompt: item.revised_prompt,
         })),
         model: apiModel,
         provider: 'openai',
     };
 }
 
-// Generate images using Google Gemini
-async function generateWithGoogle(
-    apiKey: string,
-    request: ImageGenerationRequest,
-    apiModel: string
-): Promise<ImageGenerationResponse> {
+async function generateWithGoogle(apiKey: string, request: ImageGenerationRequest, apiModel: string): Promise<ImageGenerationResponse> {
     const genAI = new GoogleGenAI({ apiKey });
-
-    // Use the Gemini image generation API
-    const response = await genAI.models.generateImages({
+    const aspectRatio = getSizeAsAspectRatio(request.size);
+    const response = await genAI.models.generateContent({
         model: apiModel,
-        prompt: request.prompt,
+        contents: request.prompt,
         config: {
-            numberOfImages: request.n ?? 1,
-            aspectRatio: getSizeAsAspectRatio(request.size),
+            responseModalities: ['TEXT', 'IMAGE'],
+            ...(apiModel.includes('imagen') ? {} : {}),
         },
     });
-
     const images: GeneratedImage[] = [];
-
-    if (response.generatedImages) {
-        for (const img of response.generatedImages) {
-            if (img.image?.imageBytes) {
-                images.push({
-                    b64_json: img.image.imageBytes,
-                });
+    if (response.candidates) {
+        for (const candidate of response.candidates) {
+            if (candidate.content?.parts) {
+                for (const part of candidate.content.parts) {
+                    if (part.inlineData) {
+                        images.push({ b64_json: part.inlineData.data });
+                    }
+                }
             }
         }
     }
-
-    return {
-        images,
-        model: apiModel,
-        provider: 'google',
-    };
+    return { images, model: apiModel, provider: 'google' };
 }
 
-// Convert size to aspect ratio for Google
 function getSizeAsAspectRatio(size?: string): '1:1' | '16:9' | '9:16' | '4:3' | '3:4' {
     switch (size) {
-        case '1024x1792':
-        case '1024x1536':
-            return '9:16';
-        case '1792x1024':
-        case '1536x1024':
-            return '16:9';
-        default:
-            return '1:1';
+        case '1024x1792': case '1024x1536': return '9:16';
+        case '1792x1024': case '1536x1024': return '16:9';
+        default: return '1:1';
     }
 }
 
+// Fixed image pricing (per image)
+const IMAGE_PRICING: Record<string, number> = {
+    'dall-e-3': 0.04,      // $0.04/image standard 1024x1024
+    'dall-e-2': 0.02,      // $0.02/image 1024x1024
+    'gpt-image-1': 0.04,
+    'gpt-image-1.5': 0.06,
+    'gemini-3-pro-image': 0.02,
+    'nano-banana-pro': 0.02,
+    'imagen-3': 0.03,
+};
+
+export async function OPTIONS() {
+    return handleCorsPreFlight();
+}
+
 export async function POST(req: NextRequest) {
-    const startTime = Date.now();
-    const supabase = createAdminClient();
+    // ── Gateway validation ──
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) {
+        return validation.response;
+    }
+    const ctx = validation.context;
 
     try {
-        // Authenticate
-        const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
-
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'Missing CENCORI_API_KEY header' },
-                { status: 401 }
-            );
-        }
-
-        const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
-
-        const { data: keyData, error: keyError } = await supabase
-            .from('api_keys')
-            .select(`
-                id,
-                project_id,
-                projects!inner(
-                    id,
-                    organization_id,
-                    organizations!inner(
-                        id,
-                        subscription_tier,
-                        monthly_requests_used,
-                        monthly_request_limit
-                    )
-                )
-            `)
-            .eq('key_hash', keyHash)
-            .is('revoked_at', null)
-            .single();
-
-        if (keyError || !keyData) {
-            return NextResponse.json(
-                { error: 'Invalid API key' },
-                { status: 401 }
-            );
-        }
-
-        const project = keyData.projects as unknown as {
-            id: string;
-            organization_id: string;
-            organizations: {
-                id: string;
-                subscription_tier: string;
-                monthly_requests_used: number;
-                monthly_request_limit: number;
-            };
-        };
-
-        const organization = project.organizations;
-        const organizationId = organization.id;
-
-        // Check rate limits
-        const currentUsage = organization.monthly_requests_used || 0;
-        const limit = organization.monthly_request_limit || 1000;
-
-        if (currentUsage >= limit) {
-            return NextResponse.json(
-                {
-                    error: 'Monthly request limit reached',
-                    current_tier: organization.subscription_tier,
-                },
-                { status: 429 }
-            );
-        }
-
-        // Parse request body
         const body = await req.json() as ImageGenerationRequest;
         const { prompt, model: requestedModel } = body;
 
         if (!prompt) {
-            return NextResponse.json(
-                { error: 'Missing required field: prompt' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json({ error: 'Missing required field: prompt' }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
 
@@ -275,94 +168,96 @@ export async function POST(req: NextRequest) {
         // Get API key for provider (BYOK or default)
         let providerApiKey: string | undefined;
 
-        // Try BYOK first
-        const { data: providerKey } = await supabase
+        const { data: providerKey } = await ctx.supabase
             .from('provider_keys')
             .select('encrypted_key, is_active')
-            .eq('project_id', project.id)
+            .eq('project_id', ctx.projectId)
             .eq('provider', provider)
             .single();
 
         if (providerKey?.is_active && providerKey.encrypted_key) {
-            providerApiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
+            providerApiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
         } else {
-            // Fall back to environment variable
-            if (provider === 'openai') {
-                providerApiKey = process.env.OPENAI_API_KEY;
-            } else if (provider === 'google') {
-                providerApiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-            }
+            if (provider === 'openai') providerApiKey = process.env.OPENAI_API_KEY;
+            else if (provider === 'google') providerApiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
         }
 
         if (!providerApiKey) {
-            return NextResponse.json(
-                {
+            return addGatewayHeaders(
+                NextResponse.json({
                     error: `No API key configured for ${provider}`,
                     message: `Please add your ${provider} API key in project settings.`,
                     supportedModels: Object.entries(IMAGE_MODELS)
                         .filter(([, config]) => config.provider === provider)
                         .map(([name, config]) => ({ name, description: config.description })),
-                },
-                { status: 400 }
+                }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
 
         // Generate images
         let result: ImageGenerationResponse;
-
         if (provider === 'openai') {
             const client = new OpenAI({ apiKey: providerApiKey });
             result = await generateWithOpenAI(client, body, apiModel);
         } else if (provider === 'google') {
             result = await generateWithGoogle(providerApiKey, body, apiModel);
         } else {
-            return NextResponse.json(
-                { error: `Unsupported provider: ${provider}` },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
 
-        // Log the request
-        const latencyMs = Date.now() - startTime;
+        // Cost tracking (fixed per-image pricing)
+        const numImages = result.images.length || 1;
+        const pricePerImage = IMAGE_PRICING[model] || 0.04;
+        const providerCost = numImages * pricePerImage;
+        const cencoriCharge = providerCost * 1.2; // 20% markup
 
-        await supabase.from('ai_requests').insert({
-            project_id: project.id,
-            api_key_id: keyData.id,
+        await logGatewayRequest(ctx, {
+            endpoint: 'images/generate',
             model,
             provider,
-            request_type: 'image_generation',
-            input_text: prompt.substring(0, 1000),
-            latency_ms: latencyMs,
             status: 'success',
+            costUsd: cencoriCharge,
+            providerCostUsd: providerCost,
+            cencoriChargeUsd: cencoriCharge,
+            markupPercentage: 20,
+            metadata: { prompt: prompt.substring(0, 1000), numImages },
         });
+        await incrementUsage(ctx);
 
-        // Increment usage
-        await supabase.rpc('increment_monthly_usage', {
-            org_id: organizationId,
-        });
-
-        return NextResponse.json(result);
+        return addGatewayHeaders(
+            NextResponse.json(result),
+            { requestId: ctx.requestId }
+        );
 
     } catch (error) {
         console.error('[ImageGeneration] Error:', error);
-
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        return NextResponse.json(
-            { error: 'Image generation failed', message: errorMessage },
-            { status: 500 }
+        await logGatewayRequest(ctx, {
+            endpoint: 'images/generate',
+            model: 'unknown',
+            provider: 'unknown',
+            status: 'error',
+            errorMessage,
+        });
+
+        return addGatewayHeaders(
+            NextResponse.json({ error: 'Image generation failed', message: errorMessage }, { status: 500 }),
+            { requestId: ctx.requestId }
         );
     }
 }
 
-// GET endpoint to list supported models
 export async function GET() {
     const models = Object.entries(IMAGE_MODELS).map(([name, config]) => ({
         name,
         provider: config.provider,
         description: config.description,
     }));
-
     return NextResponse.json({
         models,
         providers: ['openai', 'google'],

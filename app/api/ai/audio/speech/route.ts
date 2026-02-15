@@ -8,10 +8,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import crypto from 'crypto';
 import OpenAI from 'openai';
 import { decryptApiKey } from '@/lib/encryption';
+import {
+    validateGatewayRequest,
+    addGatewayHeaders,
+    handleCorsPreFlight,
+    logGatewayRequest,
+    incrementUsage,
+} from '@/lib/gateway-middleware';
 
 type Voice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type ResponseFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
@@ -24,22 +29,25 @@ interface SpeechRequest {
     speed?: number;
 }
 
+// TTS pricing: per 1M characters
+const TTS_PRICING: Record<string, number> = {
+    'tts-1': 15.00,     // $15/1M chars
+    'tts-1-hd': 30.00,  // $30/1M chars
+};
+
+export async function OPTIONS() {
+    return handleCorsPreFlight();
+}
+
 export async function POST(req: NextRequest) {
-    const startTime = Date.now();
-    const requestId = crypto.randomUUID();
+    // ── Gateway validation ──
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) {
+        return validation.response;
+    }
+    const ctx = validation.context;
 
     try {
-        // Get API key from header
-        const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
-
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'unauthorized', message: 'Missing API key' },
-                { status: 401 }
-            );
-        }
-
-        // Parse request body
         const body: SpeechRequest = await req.json();
         const {
             input,
@@ -50,66 +58,45 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!input) {
-            return NextResponse.json(
-                { error: 'bad_request', message: 'Input text is required' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json({ error: 'bad_request', message: 'Input text is required' }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
 
         if (input.length > 4096) {
-            return NextResponse.json(
-                { error: 'bad_request', message: 'Input text exceeds maximum length of 4096 characters' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json({ error: 'bad_request', message: 'Input text exceeds maximum length of 4096 characters' }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
-
-        // Initialize Supabase client
-        const supabase = createAdminClient();
-
-        // Validate API key and get project
-        const { data: keyData, error: keyError } = await supabase
-            .from('api_keys')
-            .select('id, project_id, key_type, is_active, projects(id, organization_id, name)')
-            .eq('key_hash', crypto.createHash('sha256').update(apiKey).digest('hex'))
-            .single();
-
-        if (keyError || !keyData || !keyData.is_active) {
-            return NextResponse.json(
-                { error: 'unauthorized', message: 'Invalid or inactive API key' },
-                { status: 401 }
-            );
-        }
-
-        const projectId = keyData.project_id;
-        const projectData = keyData.projects as unknown as { id: string; organization_id: string; name: string };
 
         // Get OpenAI API key (BYOK or default)
         let openaiKey: string | null = null;
 
-        const { data: providerKey } = await supabase
+        const { data: providerKey } = await ctx.supabase
             .from('provider_keys')
             .select('encrypted_key, is_active')
-            .eq('project_id', projectId)
+            .eq('project_id', ctx.projectId)
             .eq('provider', 'openai')
             .eq('is_active', true)
             .single();
 
         if (providerKey?.encrypted_key) {
-            openaiKey = decryptApiKey(providerKey.encrypted_key, projectData.organization_id);
+            openaiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
         } else {
             openaiKey = process.env.OPENAI_API_KEY ?? null;
         }
 
         if (!openaiKey) {
-            return NextResponse.json(
-                { error: 'provider_not_configured', message: 'No OpenAI API key configured' },
-                { status: 400 }
+            return addGatewayHeaders(
+                NextResponse.json({ error: 'provider_not_configured', message: 'No OpenAI API key configured' }, { status: 400 }),
+                { requestId: ctx.requestId }
             );
         }
 
         const client = new OpenAI({ apiKey: openaiKey });
 
-        // Generate speech
         const response = await client.audio.speech.create({
             model,
             input,
@@ -118,29 +105,29 @@ export async function POST(req: NextRequest) {
             speed,
         });
 
-        const latencyMs = Date.now() - startTime;
+        // Cost tracking (per-character pricing)
+        const charCount = input.length;
+        const pricePerMillion = TTS_PRICING[model] || 15.0;
+        const providerCost = (charCount / 1_000_000) * pricePerMillion;
+        const cencoriCharge = providerCost * 1.2;
 
-        // Log the request (estimate tokens from input length)
-        const estimatedTokens = Math.ceil(input.length / 4);
-        await supabase.from('ai_requests').insert({
-            id: requestId,
-            project_id: projectId,
-            organization_id: projectData.organization_id,
+        await logGatewayRequest(ctx, {
             endpoint: 'audio/speech',
             model,
             provider: 'openai',
-            input_tokens: estimatedTokens,
-            output_tokens: 0,
-            total_tokens: estimatedTokens,
-            latency_ms: latencyMs,
             status: 'success',
-            created_at: new Date().toISOString(),
+            promptTokens: Math.ceil(charCount / 4),
+            totalTokens: Math.ceil(charCount / 4),
+            costUsd: cencoriCharge,
+            providerCostUsd: providerCost,
+            cencoriChargeUsd: cencoriCharge,
+            markupPercentage: 20,
         });
+        await incrementUsage(ctx);
 
-        // Get the audio data as buffer
+        // Get the audio data
         const audioBuffer = await response.arrayBuffer();
 
-        // Determine content type based on format
         const contentTypes: Record<ResponseFormat, string> = {
             mp3: 'audio/mpeg',
             opus: 'audio/opus',
@@ -154,22 +141,29 @@ export async function POST(req: NextRequest) {
             headers: {
                 'Content-Type': contentTypes[response_format],
                 'Content-Length': audioBuffer.byteLength.toString(),
+                'X-Request-Id': ctx.requestId,
             },
         });
 
     } catch (error) {
         console.error('Speech API error:', error);
-
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        return NextResponse.json(
-            { error: 'internal_error', message: errorMessage },
-            { status: 500 }
+        await logGatewayRequest(ctx, {
+            endpoint: 'audio/speech',
+            model: 'tts-1',
+            provider: 'openai',
+            status: 'error',
+            errorMessage,
+        });
+
+        return addGatewayHeaders(
+            NextResponse.json({ error: 'internal_error', message: errorMessage }, { status: 500 }),
+            { requestId: ctx.requestId }
         );
     }
 }
 
-// GET endpoint to list available voices
 export async function GET() {
     return NextResponse.json({
         models: ['tts-1', 'tts-1-hd'],
