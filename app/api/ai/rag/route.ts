@@ -193,6 +193,8 @@ export async function POST(req: NextRequest) {
                 projects!inner(
                     id,
                     organization_id,
+                    default_model,
+                    default_provider,
                     organizations!inner(id, subscription_tier)
                 )
             `)
@@ -207,13 +209,15 @@ export async function POST(req: NextRequest) {
         const project = keyData.projects as unknown as {
             id: string;
             organization_id: string;
+            default_model: string | null;
+            default_provider: string | null;
             organizations: { id: string; subscription_tier: string };
         };
 
         const body = await req.json();
         const {
             messages,
-            model = 'gemini-2.0-flash',
+            model,
             namespace,
             temperature,
             maxTokens,
@@ -231,6 +235,9 @@ export async function POST(req: NextRequest) {
         if (!namespace) {
             return NextResponse.json({ error: 'namespace is required' }, { status: 400 });
         }
+
+        // Use project's configured default model, falling back to gemini-2.0-flash
+        const resolvedModel = model || project.default_model || 'gemini-2.0-flash';
 
         // Get last user message for retrieval
         const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user');
@@ -278,8 +285,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Initialize provider
-        const providerName = router.detectProvider(model);
-        const normalizedModel = router.normalizeModelName(model);
+        const providerName = router.detectProvider(resolvedModel);
+        const normalizedModel = router.normalizeModelName(resolvedModel);
 
         const byokInitialized = await initializeBYOKProviders(
             supabase,
@@ -302,7 +309,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const provider = router.getProviderForModel(model);
+        const provider = router.getProviderForModel(resolvedModel);
 
         const chatRequest = {
             messages: unifiedMessages,
