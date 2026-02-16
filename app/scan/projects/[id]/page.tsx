@@ -25,6 +25,7 @@ import {
     Download
 } from "lucide-react";
 import Link from "next/link";
+import { FixPreviewSheet } from "@/components/scan/FixPreviewSheet";
 
 interface ScanProject {
     id: string;
@@ -118,6 +119,7 @@ export default function ProjectDetailPage() {
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
+    const [fixSheetOpen, setFixSheetOpen] = useState(false);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
@@ -474,11 +476,22 @@ export default function ProjectDetailPage() {
                                     </p>
                                 </div>
                             </div>
-                            <Button size="sm" className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600">
+                            <Button
+                                size="sm"
+                                className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                onClick={() => setFixSheetOpen(true)}
+                            >
                                 Create Fix PR
                             </Button>
                         </div>
                     )}
+
+                    <FixPreviewSheet
+                        open={fixSheetOpen}
+                        onOpenChange={setFixSheetOpen}
+                        projectId={projectId}
+                        scanRunId={currentScan?.id || scans[0]?.id || null}
+                    />
 
                     <div className="flex gap-4">
                         {/* Scan history sidebar */}
