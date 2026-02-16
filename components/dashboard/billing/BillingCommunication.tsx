@@ -24,47 +24,63 @@ export function BillingCommunication({ orgSlug, email, address }: BillingCommuni
     return (
         <>
             <div className="rounded-md border border-border/40 bg-card overflow-hidden">
-                <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Billing Records
-                    </p>
+                <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-medium tracking-tight">Billing Records</h3>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                            Your contact details and invoice address.
+                        </p>
+                    </div>
                     <Button
-                        className="h-6 px-3 bg-foreground text-background hover:bg-foreground/90 transition-colors text-[10px] font-medium uppercase rounded shadow-none"
+                        variant="outline"
+                        className="h-7 text-xs"
                         onClick={() => setIsEditSidebarOpen(true)}
                     >
                         Edit Details
                     </Button>
                 </div>
-                <div className="p-4 space-y-4">
-                    <div className="space-y-1.5">
-                        <div className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest">Notification Email</div>
-                        <div className="flex items-center gap-2 bg-secondary/10 border border-border/40 rounded px-2.5 py-1.5">
-                            <span className="text-[11px] font-medium truncate">{email}</span>
+
+                <div className="p-6 grid gap-8 md:grid-cols-2">
+                    <div className="space-y-3">
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/80">Notification Email</div>
+                        <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-secondary/30 flex items-center justify-center text-muted-foreground">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                            </div>
+                            <span className="text-sm font-medium">{email}</span>
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <div className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest">Billing Address</div>
-                        <div className="text-[11px] text-muted-foreground leading-relaxed font-normal">
-                            <p className="font-medium text-foreground">{address.name}</p>
-                            <p>{address.line1}</p>
-                            {address.line2 && <p>{address.line2}</p>}
-                            <p>{address.city}, {address.state} {address.zip}</p>
-                            <p className="text-muted-foreground">{address.country}</p>
-                            {address.taxId && <p className="mt-1 text-xs">Tax ID: {address.taxId}</p>}
+                    <div className="space-y-3">
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/80">Billing Address</div>
+                        <div className="flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-full bg-secondary/30 flex items-center justify-center text-muted-foreground mt-0.5 shrink-0">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                            </div>
+                            <div className="text-sm leading-relaxed">
+                                <p className="font-semibold text-foreground mb-1">{address.name}</p>
+                                <div className="text-muted-foreground space-y-0.5">
+                                    <p>{address.line1}</p>
+                                    {address.line2 && <p>{address.line2}</p>}
+                                    <p>{address.city}, {address.state} {address.zip}</p>
+                                    <p>{address.country}</p>
+                                    {address.taxId && (
+                                        <div className="mt-2 pt-2 border-t border-border/40 inline-flex items-center gap-1.5 text-xs font-mono">
+                                            <span className="text-[9px] uppercase tracking-wider opacity-70">Tax ID</span>
+                                            <span>{address.taxId}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <Button className="w-full h-7 bg-foreground text-background hover:bg-foreground/90 transition-colors text-[10px] font-medium uppercase rounded shadow-none">
-                        Tax Information
-                    </Button>
                 </div>
             </div>
 
             <BillingEditSidebar
                 isOpen={isEditSidebarOpen}
                 onClose={() => setIsEditSidebarOpen(false)}
-                initialData={address}
+                initialData={{ ...address, email }}
                 orgSlug={orgSlug}
             />
         </>

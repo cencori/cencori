@@ -214,7 +214,7 @@ export default function BillingPage({ params }: PageProps) {
                 )}
             </AnimatePresence>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
                 <UsageOverview
                     monthlyRequestsUsed={org.monthly_requests_used}
                     monthlyRequestLimit={org.monthly_request_limit}

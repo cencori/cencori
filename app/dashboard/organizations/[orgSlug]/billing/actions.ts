@@ -104,6 +104,7 @@ export async function updateBillingDetails(orgSlug: string, formData: FormData) 
     }
 
     const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
     const line1 = formData.get('line1') as string;
     const line2 = formData.get('line2') as string;
     const city = formData.get('city') as string;
@@ -116,6 +117,7 @@ export async function updateBillingDetails(orgSlug: string, formData: FormData) 
         .from('organizations')
         .update({
             name,
+            billing_email: email,
             billing_address_line1: line1,
             billing_address_line2: line2,
             billing_city: city,

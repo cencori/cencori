@@ -16,6 +16,7 @@ interface BillingEditSidebarProps {
     onClose: () => void;
     initialData: {
         name: string;
+        email: string;
         line1: string;
         line2?: string;
         city: string;
@@ -88,6 +89,20 @@ export function BillingEditSidebar({ isOpen, onClose, initialData, orgSlug }: Bi
                                         name="name"
                                         defaultValue={initialData.name}
                                         placeholder="Organization name"
+                                        className="h-9 bg-secondary/5 border-border/40 focus:border-border/80 transition-colors"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="org-email" className="text-[11px] font-medium uppercase tracking-widest text-foreground/70">
+                                        Notification Email
+                                    </Label>
+                                    <Input
+                                        id="org-email"
+                                        name="email"
+                                        type="email"
+                                        defaultValue={initialData.email}
+                                        placeholder="billing@example.com"
                                         className="h-9 bg-secondary/5 border-border/40 focus:border-border/80 transition-colors"
                                     />
                                 </div>

@@ -19,8 +19,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function checkOrg() {
     const { data, error } = await supabase
         .from('organizations')
-        .select('slug, polar_customer_id, email') // fetching email too just in case
-        .eq('slug', 'cencori')
+        .select('slug, polar_customer_id, billing_email')
+        .limit(1)
         .single();
 
     if (error) {

@@ -67,10 +67,10 @@ async function run() {
     } else {
         console.log('Polar Customer ID exists. Verifying portal link generation...');
         try {
-            const session = await polar.customerPortal.sessions.create({
+            const session = await polar.customerSessions.create({
                 customerId: targetOrg.polar_customer_id
             });
-            console.log('Portal Link Generated successfully:', session.url);
+            console.log('Portal Link Generated successfully:', session.customerPortalUrl);
         } catch (err) {
             console.error('Failed to generate portal link:', err);
         }
