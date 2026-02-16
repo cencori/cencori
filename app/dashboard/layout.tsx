@@ -254,7 +254,6 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                         </SelectGroup>
                         <SelectSeparator className="my-1" />
                         <Link href="/dashboard/organizations/new" className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5 text-xs outline-hidden select-none hover:bg-accent rounded-sm transition-colors">
-                          <PlusCircle className="h-3 w-3" />
                           New Organization
                         </Link>
                       </SelectContent>
