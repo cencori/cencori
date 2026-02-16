@@ -45,7 +45,7 @@ export function PlanDetails({ tier, status, currentPeriodEnd, price }: PlanProps
                         <div>
                             <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mb-1">Renewal Date</div>
                             <div className="text-xs font-medium">
-                                {currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Lifetime access'}
+                                {currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (tier === 'free' ? 'Lifetime access' : 'Monthly renewal')}
                             </div>
                         </div>
 
