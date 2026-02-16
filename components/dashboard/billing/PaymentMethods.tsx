@@ -27,63 +27,91 @@ export function PaymentMethods({ methods, portalUrl }: PaymentMethodsProps) {
 
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Payment Methods
-                </p>
+            <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-medium tracking-tight">Payment Methods</h3>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                        Manage your credit cards and billing preferences.
+                    </p>
+                </div>
                 <Button
-                    className="h-6 px-3 bg-foreground text-background hover:bg-foreground/90 transition-colors text-[10px] font-medium uppercase rounded shadow-none"
+                    variant="outline"
+                    className="h-7 text-xs"
                     onClick={() => setIsAddSidebarOpen(true)}
                 >
-                    ADD
+                    <Plus size={12} className="mr-1.5" />
+                    Add Method
                 </Button>
             </div>
-            <div className="divide-y divide-border/10">
-                {methods.map((method) => (
-                    <div key={method.id} className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className="h-7 w-10 rounded border border-border/40 bg-secondary/10 flex items-center justify-center text-[8px] font-medium uppercase tracking-tighter text-muted-foreground/60">
-                                {method.brand}
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <p className="text-[11px] font-medium tabular-nums tracking-wider">
-                                        •••• {method.last4}
-                                    </p>
+
+            <div className="p-0">
+                <table className="w-full text-left text-xs">
+                    <thead>
+                        <tr className="border-b border-border/40 bg-muted/30">
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider w-[20%]">Brand</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider">Number</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider">Expiry</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 w-[50px]"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                        {methods.map((method) => (
+                            <tr key={method.id} className="group hover:bg-muted/20 transition-colors">
+                                <td className="px-6 py-4 font-medium uppercase text-muted-foreground text-[10px] tracking-wider">
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard size={14} />
+                                        {method.brand}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 font-mono text-muted-foreground">
+                                    •••• {method.last4}
+                                </td>
+                                <td className="px-6 py-4 tabular-nums">
+                                    {method.expMonth.toString().padStart(2, '0')} / {method.expYear}
+                                </td>
+                                <td className="px-6 py-4">
                                     {method.isDefault && (
-                                        <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-border/50 text-muted-foreground/40 uppercase tracking-tighter">
+                                        <Badge variant="secondary" className="text-[9px] h-4 rounded-sm px-1.5 font-normal text-muted-foreground">
                                             Default
                                         </Badge>
                                     )}
-                                </div>
-                                <p className="text-[9px] text-muted-foreground font-medium tabular-nums">
-                                    Exp: {method.expMonth}/{method.expYear}
-                                </p>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/60 hover:text-red-500/60">
-                            <Trash2 size={12} />
-                        </Button>
-                    </div>
-                ))}
-                {methods.length === 0 && (
-                    <div className="p-8 text-center">
-                        <p className="text-[11px] text-muted-foreground font-medium">No payment methods stored.</p>
-                    </div>
-                )}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
+                                        <Trash2 size={12} />
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                        {methods.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                            <CreditCard size={14} className="opacity-50" />
+                                        </div>
+                                        <p>No payment methods on file.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
-            <div className="px-4 py-2 border-t border-border/20">
+
+            <div className="px-6 py-3 border-t border-border/40 bg-muted/10">
                 {portalUrl ? (
                     <Button
                         variant="link"
-                        className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest hover:text-foreground hover:no-underline transition-colors"
+                        className="h-auto p-0 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                         onClick={() => window.open(portalUrl, '_blank')}
                     >
-                        Secure Payment Portal
+                        Open Secure Payment Portal →
                     </Button>
                 ) : (
-                    <Button variant="link" className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest hover:text-foreground hover:no-underline transition-colors" disabled>
-                        Secure Payment Portal
+                    <Button variant="link" className="h-auto p-0 text-[10px] text-muted-foreground opacity-50 cursor-not-allowed" disabled>
+                        Secure Payment Portal Unavailable
                     </Button>
                 )}
             </div>

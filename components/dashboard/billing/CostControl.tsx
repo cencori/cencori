@@ -22,64 +22,74 @@ interface CostControlProps {
 export function CostControl({ projects }: CostControlProps) {
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
                 <div>
-                    <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Cost Control
-                    </h3>
-                    <p className="text-[10px] mt-0.5 text-muted-foreground font-medium">
-                        Set budgets and hard caps per project.
+                    <h3 className="text-sm font-medium tracking-tight">Cost Control</h3>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                        Configure budgets and spending limits for each project.
                     </p>
                 </div>
-                <Button className="h-7 px-3 bg-foreground text-background hover:bg-foreground/90 transition-colors text-[10px] font-medium uppercase rounded shadow-none">
-                    CONFIGURE ALERTS
+                <Button variant="outline" className="h-7 text-xs">
+                    Configure Alerts
                 </Button>
             </div>
-            <div className="divide-y divide-border/10">
-                {projects.map((project) => (
-                    <div key={project.id} className="p-4 flex items-center justify-between gap-6 hover:bg-secondary/20 transition-colors">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                                <h4 className="text-xs font-medium truncate">{project.name}</h4>
-                                {project.enforceSpendCap && (
-                                    <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-destructive/30 text-destructive/60 font-mono">
-                                        HARD CAP
-                                    </Badge>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-medium">
-                                <span className="flex items-center gap-1">
-                                    Budget: <span className="text-foreground font-medium tabular-nums">${project.monthlyBudget || 0}</span>
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    Spend: <span className="text-foreground font-medium tabular-nums">${project.currentSpend}</span>
-                                </span>
-                            </div>
-                        </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="text-right sr-only sm:not-sr-only">
-                                <div className="text-[10px] font-medium tracking-tight tabular-nums">
-                                    {project.spendCap ? `$${project.spendCap}` : 'No Cap'}
-                                </div>
-                                <div className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter">
-                                    Limit
-                                </div>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/40 hover:text-foreground">
-                                <ChevronRight size={14} />
-                            </Button>
-                        </div>
-                    </div>
-                ))}
+            <div className="p-0">
+                <table className="w-full text-left text-xs">
+                    <thead>
+                        <tr className="border-b border-border/40 bg-muted/30">
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider w-[40%]">Project</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider text-right">Budget</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider text-right">Spend</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground uppercase tracking-wider text-right">Limit</th>
+                            <th className="px-6 py-3 w-[50px]"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                        {projects.map((project) => (
+                            <tr key={project.id} className="group hover:bg-muted/20 transition-colors">
+                                <td className="px-6 py-4 font-medium">
+                                    <div className="flex items-center gap-2">
+                                        <span>{project.name}</span>
+                                        {project.enforceSpendCap && (
+                                            <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-destructive/30 text-destructive/80 font-mono tracking-tight">
+                                                HARD CAP
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground">
+                                    ${project.monthlyBudget?.toLocaleString() || '0'}
+                                </td>
+                                <td className="px-6 py-4 text-right tabular-nums font-medium">
+                                    ${project.currentSpend.toLocaleString()}
+                                </td>
+                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground">
+                                    {project.spendCap ? `$${project.spendCap.toLocaleString()}` : 'Unlimited'}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <ChevronRight size={14} className="text-muted-foreground" />
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                        {projects.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">
+                                    No projects found.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
-            <div className="px-4 py-2.5 bg-secondary/5 border-t border-border/20 flex justify-between items-center">
-                <p className="text-[9px] text-muted-foreground font-medium flex items-center gap-1.5 uppercase tracking-wide">
+
+            <div className="px-6 py-3 border-t border-border/40 bg-muted/10 flex justify-between items-center">
+                <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
                     Updates may take up to 15 minutes.
                 </p>
-                <Button variant="link" className="h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-wider hover:no-underline hover:text-foreground">
-                    Detailed View →
-                </Button>
             </div>
         </div>
     );
