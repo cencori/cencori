@@ -2,13 +2,25 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useQuery } from '@tanstack/react-query';
+// Import UI components
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
-import { Check, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react';
+import { getInvoices, getCustomerPortalUrl } from './actions';
+import { CheckCircle, CreditCard, LayoutDashboard, Settings, Info, ArrowUpRight } from 'lucide-react';
+import { motion, AnimatePresence } from "framer-motion";
+
+// Import modular components
+import { UsageOverview } from "@/components/dashboard/billing/UsageOverview";
+import { PlanDetails } from "@/components/dashboard/billing/PlanDetails";
+import { CostControl } from "@/components/dashboard/billing/CostControl";
+import { CreditBalance } from "@/components/dashboard/billing/CreditBalance";
+import { InvoiceHistory } from "@/components/dashboard/billing/InvoiceHistory";
+import { BillingCommunication } from "@/components/dashboard/billing/BillingCommunication";
+import { PaymentMethods } from "@/components/dashboard/billing/PaymentMethods";
 
 interface Organization {
     id: string;
@@ -18,21 +30,36 @@ interface Organization {
     monthly_requests_used: number;
     monthly_request_limit: number;
     subscription_current_period_end: string | null;
+    credits_balance: number;
+    billing_email: string;
+    billing_address_line1: string | null;
+    billing_address_line2: string | null;
+    billing_city: string | null;
+    billing_state: string | null;
+    billing_zip: string | null;
+    billing_country: string | null;
+    billing_tax_id: string | null;
 }
 
-type Tier = 'free' | 'pro' | 'team' | 'enterprise';
+interface ProjectData {
+    id: string;
+    name: string;
+    monthly_budget: number | null;
+    spend_cap: number | null;
+    enforce_spend_cap: boolean;
+}
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
 }
 
-function useOrgBilling(orgSlug: string) {
-    return useQuery({
+function useBillingData(orgSlug: string) {
+    const orgQuery = useQuery({
         queryKey: ["orgBilling", orgSlug],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('organizations')
-                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, monthly_request_limit, subscription_current_period_end')
+                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, monthly_request_limit, subscription_current_period_end, credits_balance, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id')
                 .eq('slug', orgSlug)
                 .single();
 
@@ -41,70 +68,91 @@ function useOrgBilling(orgSlug: string) {
         },
         staleTime: 30 * 1000,
     });
+
+    const projectsQuery = useQuery({
+        queryKey: ["orgProjectsBilling", orgQuery.data?.id],
+        enabled: !!orgQuery.data?.id,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('projects')
+                .select('id, name, monthly_budget, spend_cap, enforce_spend_cap')
+                .eq('organization_id', orgQuery.data!.id);
+
+            if (error) throw error;
+            return data as ProjectData[];
+        },
+    });
+
+    const creditsQuery = useQuery({
+        queryKey: ["orgCredits", orgQuery.data?.id],
+        enabled: !!orgQuery.data?.id,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('credit_transactions')
+                .select('*')
+                .eq('organization_id', orgQuery.data!.id)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (error) return [];
+            return data;
+        },
+    });
+
+    const invoicesQuery = useQuery({
+        queryKey: ["orgInvoices", orgSlug],
+        queryFn: () => getInvoices(orgSlug)
+    });
+
+    const portalUrlQuery = useQuery({
+        queryKey: ["orgPortalUrl", orgSlug],
+        queryFn: () => getCustomerPortalUrl(orgSlug)
+    });
+
+    return {
+        org: orgQuery.data,
+        projects: projectsQuery.data || [],
+        transactions: creditsQuery.data || [],
+        invoices: invoicesQuery.data || [],
+        portalUrl: portalUrlQuery.data,
+        isLoading: orgQuery.isLoading || projectsQuery.isLoading,
+        error: orgQuery.error || projectsQuery.error
+    };
 }
 
 export default function BillingPage({ params }: PageProps) {
     const { orgSlug } = use(params);
     const searchParams = useSearchParams();
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-    const [autoCheckoutTriggered, setAutoCheckoutTriggered] = useState(false);
 
     useEffect(() => {
         if (searchParams.get('success') === 'true') {
             setShowSuccessMessage(true);
-            setTimeout(() => {
+            const timer = setTimeout(() => {
+                setShowSuccessMessage(false);
                 window.history.replaceState({}, '', window.location.pathname);
-            }, 100);
+            }, 5000);
+            return () => clearTimeout(timer);
         }
     }, [searchParams]);
 
-    const { data: org, isLoading, error } = useOrgBilling(orgSlug);
-
-    const handleUpgrade = async (tier: 'pro' | 'team', cycle: 'monthly' | 'annual') => {
-        if (!org) return;
-
-        try {
-            const response = await fetch('/api/billing/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tier, cycle, orgId: org.id }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok || !data.checkoutUrl) {
-                alert(`Failed to start checkout: ${data.error || 'Unknown error'}`);
-                return;
-            }
-
-            window.location.href = data.checkoutUrl;
-        } catch (error) {
-            alert('Failed to start checkout. Please try again.');
-        }
-    };
-
-    useEffect(() => {
-        if (
-            org &&
-            !autoCheckoutTriggered &&
-            searchParams.get('upgrade') === 'true' &&
-            (org.subscription_tier === 'pro' || org.subscription_tier === 'team') &&
-            org.subscription_status !== 'active'
-        ) {
-            setAutoCheckoutTriggered(true);
-            setTimeout(() => {
-                handleUpgrade(org.subscription_tier as 'pro' | 'team', 'monthly');
-            }, 500);
-        }
-    }, [org, autoCheckoutTriggered, searchParams]);
+    const { org, projects, transactions, invoices, portalUrl, isLoading, error } = useBillingData(orgSlug);
 
     if (isLoading) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Skeleton className="h-5 w-24 mb-6" />
-                <Skeleton className="h-24 mb-6" />
-                <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-72" />)}
+            <div className="w-full max-w-5xl mx-auto px-6 py-8 space-y-6 animate-pulse text-current/[0.1]">
+                <div className="space-y-4">
+                    <Skeleton className="h-6 w-32 rounded bg-current/10" />
+                    <Skeleton className="h-4 w-48 rounded bg-current/5" />
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                    <Skeleton className="h-32 rounded-lg bg-current/5" />
+                    <Skeleton className="h-32 rounded-lg bg-current/5" />
+                    <Skeleton className="h-32 rounded-lg bg-current/5" />
+                </div>
+                <div className="grid gap-6 lg:grid-cols-3">
+                    <Skeleton className="h-96 lg:col-span-2 rounded-lg bg-current/5" />
+                    <Skeleton className="h-96 rounded-lg bg-current/5" />
                 </div>
             </div>
         );
@@ -112,193 +160,118 @@ export default function BillingPage({ params }: PageProps) {
 
     if (error || !org) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <div className="text-center py-16 flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <CreditCard className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium">Organization not found</p>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/[0.03] text-destructive/60">
+                    <CreditCard className="h-8 w-8" />
                 </div>
+                <h2 className="text-lg font-bold tracking-tight">Billing Offline</h2>
+                <p className="text-xs text-current/40 max-w-[240px] text-center font-medium">
+                    We were unable to synchronize with our financial backend. Please check your connection.
+                </p>
+                <Button variant="outline" className="h-8 px-4 text-xs font-bold border-current/20" onClick={() => window.location.reload()}>RETRY SYNC</Button>
             </div>
         );
     }
 
-    const percentage = Math.min((org.monthly_requests_used / org.monthly_request_limit) * 100, 100);
-    const isNearLimit = percentage >= 80;
-    const isAtLimit = percentage >= 100;
+    // Mapping for project budget format
+    const formattedProjects = projects.map(p => ({
+        id: p.id,
+        name: p.name,
+        monthlyBudget: p.monthly_budget,
+        spendCap: p.spend_cap,
+        enforceSpendCap: p.enforce_spend_cap,
+        currentSpend: 0
+    }));
 
-    const tiers: Array<{
-        name: Tier;
-        displayName: string;
-        price: { monthly: number | string; annual: number | string };
-        limit: string;
-        features: string[];
-        highlighted?: boolean;
-    }> = [
-            {
-                name: 'free',
-                displayName: 'Free',
-                price: { monthly: 0, annual: 0 },
-                limit: '1,000',
-                features: ['1,000 requests/month', '1 project', 'Basic security', 'Community support'],
-            },
-            {
-                name: 'pro',
-                displayName: 'Pro',
-                price: { monthly: 49, annual: 490 },
-                limit: '50,000',
-                features: ['50,000 requests/month', 'Unlimited projects', 'All security features', 'Priority support', 'Analytics', 'Webhooks'],
-                highlighted: true,
-            },
-            {
-                name: 'team',
-                displayName: 'Team',
-                price: { monthly: 149, annual: 1490 },
-                limit: '250,000',
-                features: ['250,000 requests/month', 'Everything in Pro', '10 team members', '4hr support', 'API access', '90-day logs'],
-            },
-            {
-                name: 'enterprise',
-                displayName: 'Enterprise',
-                price: { monthly: 'Custom', annual: 'Custom' },
-                limit: 'Unlimited',
-                features: ['Unlimited requests', 'Everything in Team', 'Unlimited members', 'Dedicated support', 'SLA', 'Custom integrations'],
-            },
-        ];
+    // Mapping for credits format
+    const formattedTransactions = transactions.map((t: any) => ({
+        id: t.id,
+        amount: t.amount,
+        type: t.transaction_type,
+        description: t.description,
+        createdAt: t.created_at
+    }));
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
-            <div className="mb-6">
+        <div className="w-full max-w-5xl mx-auto px-6 py-8 pb-32">
+            <div className="mb-8">
                 <h1 className="text-base font-medium">Billing</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">Manage your subscription and monitor usage</p>
             </div>
-
-            {showSuccessMessage && (
-                <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                    <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                        <span className="font-medium">Subscription updated!</span> Your new plan is now active.
-                    </p>
-                </div>
-            )}
-
-            <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h3 className="text-xs font-medium">Current Usage</h3>
-                        <p className="text-[10px] text-muted-foreground">
-                            {org.monthly_requests_used.toLocaleString()} / {org.monthly_request_limit.toLocaleString()} requests
-                        </p>
-                    </div>
-                    <Badge variant={isAtLimit ? 'destructive' : 'outline'} className="text-[10px] h-5 uppercase">
-                        {org.subscription_tier}
-                    </Badge>
-                </div>
-                <Progress value={percentage} className="h-2 mb-2" />
-                <div className="text-[10px] text-muted-foreground">
-                    {isAtLimit ? (
-                        <span className="flex items-center gap-1 text-red-500">
-                            <AlertTriangle className="h-3 w-3" />
-                            Limit reached. Upgrade to continue.
-                        </span>
-                    ) : isNearLimit ? (
-                        <span className="text-amber-500">{Math.round(100 - percentage)}% remaining</span>
-                    ) : (
-                        <span>{Math.round(percentage)}% used • Resets monthly</span>
-                    )}
-                </div>
-            </div>
-
-            {org.subscription_tier !== 'free' && org.subscription_current_period_end && (
-                <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
-                    <h3 className="text-xs font-medium mb-2">Subscription</h3>
-                    <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Status</span>
-                            <Badge variant={org.subscription_status === 'active' ? 'outline' : 'secondary'} className="text-[10px] h-5 gap-1">
-                                <span className={`size-1.5 rounded-full ${org.subscription_status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
-                                {org.subscription_status}
-                            </Badge>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Renews</span>
-                            <span>{new Date(org.subscription_current_period_end).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div>
-                <h2 className="text-sm font-medium mb-4">Available Plans</h2>
-                <div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
-                    {tiers.map((tier) => {
-                        const isCurrent = org.subscription_tier === tier.name;
-                        const canUpgrade = !isCurrent && org.subscription_tier !== 'enterprise';
-
-                        return (
-                            <div
-                                key={tier.name}
-                                className={`rounded-md border bg-card p-4 relative ${isCurrent ? 'border-primary bg-primary/5' : 'border-border/40'
-                                    } ${tier.highlighted && !isCurrent ? 'border-primary/50' : ''}`}
-                            >
-                                {isCurrent && (
-                                    <Badge className="absolute -top-2 left-3 text-[9px] h-4 px-1.5">Current</Badge>
-                                )}
-                                {tier.highlighted && !isCurrent && (
-                                    <Badge variant="secondary" className="absolute -top-2 left-3 text-[9px] h-4 px-1.5">Popular</Badge>
-                                )}
-
-                                <div className="mb-3 pt-1">
-                                    <h3 className="text-sm font-medium">{tier.displayName}</h3>
-                                    <p className="text-[10px] text-muted-foreground">{tier.limit} requests/month</p>
-                                </div>
-
-                                <div className="mb-4">
-                                    {typeof tier.price.monthly === 'number' ? (
-                                        <>
-                                            <span className="text-2xl font-semibold font-mono">${tier.price.monthly}</span>
-                                            <span className="text-xs text-muted-foreground">/mo</span>
-                                        </>
-                                    ) : (
-                                        <span className="text-lg font-semibold">{tier.price.monthly}</span>
-                                    )}
-                                </div>
-
-                                <div className="space-y-1.5 mb-4">
-                                    {tier.features.map((feature, i) => (
-                                        <div key={i} className="flex items-start gap-1.5 text-[11px]">
-                                            <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
-                                            <span>{feature}</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="space-y-2">
-                                    {isCurrent ? (
-                                        <Button className="w-full h-7 text-xs" disabled>Current Plan</Button>
-                                    ) : tier.name === 'enterprise' ? (
-                                        <Button className="w-full h-7 text-xs" variant="outline" onClick={() => window.location.href = '/contact'}>
-                                            Contact Sales
-                                        </Button>
-                                    ) : canUpgrade && tier.name !== 'free' ? (
-                                        <>
-                                            <Button className="w-full h-7 text-xs" onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'monthly')}>
-                                                ${tier.price.monthly}/mo
-                                            </Button>
-                                            <Button className="w-full h-7 text-xs" variant="outline" onClick={() => handleUpgrade(tier.name as 'pro' | 'team', 'annual')}>
-                                                ${tier.price.annual}/yr
-                                                <Badge variant="secondary" className="ml-1.5 text-[9px] h-4 px-1">-17%</Badge>
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <Button className="w-full h-7 text-xs" variant="outline" disabled>
-                                            {tier.name === 'free' ? 'Free Forever' : 'N/A'}
-                                        </Button>
-                                    )}
-                                </div>
+            <AnimatePresence>
+                {showSuccessMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="mb-6"
+                    >
+                        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded border border-emerald-500/20 bg-emerald-500/[0.03] text-emerald-600 dark:text-emerald-400">
+                            <div className="text-[10px] font-bold uppercase tracking-wider">
+                                Transaction verified — Subscription updated
                             </div>
-                        );
-                    })}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <div className="space-y-6">
+                <UsageOverview
+                    monthlyRequestsUsed={org.monthly_requests_used}
+                    monthlyRequestLimit={org.monthly_request_limit}
+                    projectCount={projects.length}
+                    projectLimit={org.subscription_tier === 'free' ? 1 : 999999}
+                    tier={org.subscription_tier}
+                />
+
+                <PlanDetails
+                    tier={org.subscription_tier}
+                    status={org.subscription_status}
+                    currentPeriodEnd={org.subscription_current_period_end}
+                    price={org.subscription_tier === 'pro' ? 49 : org.subscription_tier === 'team' ? 149 : 0}
+                />
+
+                <CreditBalance
+                    balance={org.credits_balance || 0}
+                    transactions={formattedTransactions}
+                />
+
+                <PaymentMethods
+                    methods={[]}
+                    portalUrl={portalUrl}
+                />
+
+                <CostControl projects={formattedProjects} />
+
+                <InvoiceHistory invoices={invoices as any} />
+
+                <BillingCommunication
+                    orgSlug={orgSlug}
+                    email={org.billing_email || ''}
+                    address={{
+                        name: org.name,
+                        line1: org.billing_address_line1 || '',
+                        line2: org.billing_address_line2 || '',
+                        city: org.billing_city || '',
+                        state: org.billing_state || '',
+                        zip: org.billing_zip || '',
+                        country: org.billing_country || '',
+                        taxId: org.billing_tax_id || ''
+                    }}
+                />
+
+                <div className="rounded-md border border-dashed border-border/40 bg-card/50 p-4">
+                    <div className="flex items-start gap-3">
+                        <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                            <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Support</h4>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
+                                For enterprise contracts or custom invoicing, please reach out to our team.
+                            </p>
+                            <Button variant="link" className="h-auto p-0 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:no-underline transition-colors uppercase tracking-wider">
+                                Contact Support →
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

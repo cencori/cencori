@@ -115,7 +115,6 @@ export default function OrganizationsPage() {
         </p>
         <Button asChild size="sm" className="h-7 text-xs px-3">
           <Link href="/dashboard/organizations/new">
-            <PlusIcon size={12} className="mr-1" />
             Create Organization
           </Link>
         </Button>
@@ -157,7 +156,6 @@ export default function OrganizationsPage() {
         </div>
         <Button asChild size="sm" className="h-7 text-xs px-3">
           <Link href="/dashboard/organizations/new">
-            <PlusIcon size={12} className="mr-1" />
             New organization
           </Link>
         </Button>
