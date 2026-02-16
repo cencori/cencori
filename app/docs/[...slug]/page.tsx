@@ -50,6 +50,7 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
             card: "summary_large_image",
             title: `${doc.title} | Cencori Docs`,
             description: doc.description,
+            images: [`/api/og?title=${encodeURIComponent(doc.title)}&subtitle=${encodeURIComponent(doc.section)}&type=docs`],
         },
     };
 }
