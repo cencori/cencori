@@ -1,0 +1,88 @@
+---
+title: "Moving From Database to Redis"
+slug: "scaling-ai-gateway-redis"
+date: "2026-02-17"
+excerpt: "As AI traffic grows, database-backed rate limiting becomes a bottleneck. Here's how we migrated to Redis for sub-millisecond enforcement and implemented semantic caching to cut costs by 60%."
+coverImage: "/blog/images/covers/redis.png"
+authors:
+  - balla
+tags: ["Engineering", "Performance", "Redis", "Infrastructure"]
+published: true
+---
+
+Building an AI Gateway is easy when you have 10 users. It gets interesting when you have 10,000.
+
+At Cencori, we recently hit a distinct inflection point where our Postgres-backed rate limiter started competing for resources with core application logic. Every API request triggered a database read/write transaction just to check if the user was allowed to make that request.
+
+Latency crept up. Database CPU spiked. It was time to decouple control plane logic from our data layer.
+
+Here is how we re-architected the Cencori AI Gateway for scale using **Upstash Redis**.
+
+## The Problem with Database Rate Limiting
+
+Our initial implementation was simple:
+
+```typescript
+// The old way (Postgres)
+const { count } = await supabase
+  .from('requests')
+  .select('*', { count: 'exact' })
+  .eq('user_id', userId)
+  .gte('created_at', oneMinuteAgo);
+
+if (count > limit) throw new Error('Rate limit exceeded');
+```
+
+This works perfectly for low volume. But at scale, "count all rows from last minute" becomes an expensive query. Worse, it's strictly consistent, meaning the database locks rows, creating contention.
+
+We needed something **fast**, **atomic**, and **ephemeral**.
+
+## Enter Redis-Based Token Buckets
+
+We migrated to a [Sliding Window](https://redis.io/commands/incr/) approach using Redis. Instead of counting rows, we use atomic counters with automatic expiration.
+
+```typescript
+// The new way (Redis)
+const key = `rate_limit:${projectId}`;
+const requests = await redis.incr(key);
+
+if (requests === 1) {
+  await redis.expire(key, 60); // Window resets in 60s
+}
+
+if (requests > limit) throw new Error('Rate limit exceeded');
+```
+
+### The result?
+- **Latency**: Reduced from ~15ms to < 1ms per check.
+- **Database Load**: Zero. The auth/rate-limit layer no longer touches Postgres.
+- **Precision**: Atomic `INCR` operations guarantee exact enforcement even with high concurrency.
+
+## Semantic Caching: The "Free" Speed Upgrade
+
+Once we had Redis in place, adding **Semantic Caching** was the next logical step.
+
+LLM APIs are expensive and slow. Generating 500 tokens can take seconds. But users often ask the same questions repeatedly—especially in testing, support bots, or standardized classifications.
+
+We implemented a caching layer that hashes the request inputs:
+`SHA256(ProjectID + Model + Prompt + Temperature)`
+
+### How it works
+1. **Ingress**: Gateway computes the hash.
+2. **Lookup**: Checks Redis for that hash.
+3. **Hit**: Returns the cached JSON immediately.
+4. **Miss**: Calls the AI Provider (OpenAI/Gemini), then saves the result to Redis asynchronously.
+
+### Impact
+We verified this in our production environment using Gemini 2.5 Flash:
+
+| Metric | Cache Miss (Fresh) | Cache Hit | Improvement |
+| :--- | :--- | :--- | :--- |
+| **Latency** | ~10,800ms | ~3,800ms | **2.8x Faster** |
+| **Cost** | $0.0002 | $0.0000 | **100% Savings** |
+
+## Conclusion
+
+By moving transient state (rate limits) and repeatable compute (caching) to the edge with Redis, we've significantly increased the headroom of the Cencori Gateway.
+
+Infrastructure is effectively "invisible" until it breaks. These changes ensure Cencori stays invisible, fast, and reliable as you scale from MVP to IPO.
