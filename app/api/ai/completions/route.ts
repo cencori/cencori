@@ -24,17 +24,11 @@ import {
     OpenAICompatibleProvider,
     CohereProvider,
     isOpenAICompatible,
-    UnifiedChatResponse,
-    StreamChunk,
 } from '@/lib/providers';
 import { decryptApiKey } from '@/lib/encryption';
 import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import { getProjectSecurityConfig } from '@/lib/safety/utils';
-import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
-import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
-import { triggerFallbackWebhook, triggerSecurityWebhook } from '@/lib/webhooks';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getCache, saveCache, computeCacheKey } from '@/lib/cache';
+import { getCache, saveCache, computeCacheKey, getSemanticCache, saveSemanticCache } from '@/lib/cache';
 
 // Initialize Router
 const router = new ProviderRouter();
@@ -60,13 +54,12 @@ function initializeDefaultProviders() {
     if (!router.hasProvider('cohere') && process.env.COHERE_API_KEY) {
         try { router.registerProvider('cohere', new CohereProvider(process.env.COHERE_API_KEY)); } catch (e) { console.warn('Cohere init failed', e); }
     }
-    // ... maps for other OpenAI compatible providers if needed
 }
 
 async function initializeBYOKProviders(
     ctx: GatewayContext,
     targetProvider: string
-): Promise<boolean> {
+): Promise<string | null> {
     try {
         const { data: providerKey, error } = await ctx.supabase
             .from('provider_keys')
@@ -77,16 +70,16 @@ async function initializeBYOKProviders(
 
         if (!error && providerKey && providerKey.is_active) {
             const apiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
-            if (targetProvider === 'google') { router.registerProvider(targetProvider, new GeminiProvider(apiKey)); return true; }
-            if (targetProvider === 'openai') { router.registerProvider(targetProvider, new OpenAIProvider(apiKey)); return true; }
-            if (targetProvider === 'anthropic') { router.registerProvider(targetProvider, new AnthropicProvider(apiKey)); return true; }
-            if (isOpenAICompatible(targetProvider)) { router.registerProvider(targetProvider, new OpenAICompatibleProvider(targetProvider, apiKey)); return true; }
-            if (targetProvider === 'cohere') { router.registerProvider(targetProvider, new CohereProvider(apiKey)); return true; }
+            if (targetProvider === 'google') { router.registerProvider(targetProvider, new GeminiProvider(apiKey)); return apiKey; }
+            if (targetProvider === 'openai') { router.registerProvider(targetProvider, new OpenAIProvider(apiKey)); return apiKey; }
+            if (targetProvider === 'anthropic') { router.registerProvider(targetProvider, new AnthropicProvider(apiKey)); return apiKey; }
+            if (isOpenAICompatible(targetProvider)) { router.registerProvider(targetProvider, new OpenAICompatibleProvider(targetProvider, apiKey)); return apiKey; }
+            if (targetProvider === 'cohere') { router.registerProvider(targetProvider, new CohereProvider(apiKey)); return apiKey; }
         }
-        return router.hasProvider(targetProvider);
+        return null;
     } catch (e) {
         console.warn(`BYOK init failed for ${targetProvider}`, e);
-        return router.hasProvider(targetProvider);
+        return null;
     }
 }
 
@@ -109,9 +102,6 @@ export async function POST(req: NextRequest) {
             top_p,
             n = 1,
             stream = false,
-            stop,
-            suffix,
-            echo,
         } = body;
 
         // Default to a chat model if none provided
@@ -139,14 +129,13 @@ export async function POST(req: NextRequest) {
                 status: 'blocked',
                 errorMessage: `Input blocked: ${inputSecurity.reasons.join(', ')}`,
             });
-            // Log security incident (omitted for brevity, assume similar to chat/route logic or use shared helper if planned)
             return addGatewayHeaders(
                 NextResponse.json({ error: 'content_filtered', message: 'Input blocked by security policy', reasons: inputSecurity.reasons }, { status: 403 }),
                 { requestId: ctx.requestId }
             );
         }
 
-        // ── Caching Check ──
+        // ── Caching Check (Exact Match) ──
         const cacheKey = computeCacheKey({
             projectId: ctx.projectId,
             model: normalizedModel,
@@ -157,13 +146,13 @@ export async function POST(req: NextRequest) {
 
         // Only cache if not streaming (streaming cache is harder)
         if (!stream) {
+            // 1. Exact Match (L1 - Fast)
             const cachedResponse = await getCache(cacheKey);
             if (cachedResponse) {
-                // Return cached response
                 const res = NextResponse.json({
                     ...cachedResponse,
-                    id: `cached-${cachedResponse.id}`, // mark as cached ID
-                    created: Math.floor(Date.now() / 1000), // update timestamp
+                    id: `cached-${cachedResponse.id}`,
+                    created: Math.floor(Date.now() / 1000),
                 });
                 res.headers.set('X-Cencori-Cache', 'HIT');
                 return addGatewayHeaders(res, { requestId: ctx.requestId });
@@ -175,13 +164,35 @@ export async function POST(req: NextRequest) {
 
         // Initialize Default & BYOK
         initializeDefaultProviders();
-        await initializeBYOKProviders(ctx, providerName);
+        const byokKey = await initializeBYOKProviders(ctx, providerName);
+
+        const effectiveApiKey = byokKey || (providerName === 'google' ? process.env.GEMINI_API_KEY : undefined);
 
         if (!router.hasProvider(providerName)) {
             return addGatewayHeaders(
                 NextResponse.json({ error: `Provider ${providerName} not configured` }, { status: 400 }),
                 { requestId: ctx.requestId }
             );
+        }
+
+        // ── Caching Check (Semantic) ──
+        let semanticEmbedding: number[] | null = null;
+
+        if (!stream && providerName === 'google' && effectiveApiKey) {
+            // 2. Semantic Match (L2 - Smart) - uses Vector DB
+            // Only enabled for Google-backed requests for now as we use Gemini Embeddings
+            const { response: cachedRes, embedding } = await getSemanticCache(prompt, effectiveApiKey);
+            semanticEmbedding = embedding; // Store for later save if needed
+
+            if (cachedRes) {
+                const res = NextResponse.json({
+                    ...cachedRes,
+                    id: `semantic-${cachedRes.id}`,
+                    created: Math.floor(Date.now() / 1000),
+                });
+                res.headers.set('X-Cencori-Cache', 'SEMANTIC-HIT');
+                return addGatewayHeaders(res, { requestId: ctx.requestId });
+            }
         }
 
         const provider = router.getProviderForModel(requestedModel);
@@ -300,7 +311,17 @@ export async function POST(req: NextRequest) {
 
             // Save to Cache (Async)
             if (!stream) {
+                // Save Exact Match (L1)
                 saveCache(cacheKey, jsonResponse).catch(e => console.error('Cache save error', e));
+
+                // Save Semantic Match (L2) - Only if Google provider and key available
+                if (providerName === 'google' && effectiveApiKey) {
+                    // Pass the reusable embedding if available
+                    // Convert null (from failed embedding gen) to undefined for the function call if needed, 
+                    // though function signature handles optional.
+                    const embedToSave = semanticEmbedding || undefined;
+                    saveSemanticCache(prompt, jsonResponse, effectiveApiKey, embedToSave).catch(e => console.error('Semantic cache save error', e));
+                }
             }
 
             const finalRes = NextResponse.json(jsonResponse);

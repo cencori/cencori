@@ -16,15 +16,23 @@ Cencori implements **Semantic Caching** for AI completions. When enabled, the ga
 3.  **Consistency**: Identical inputs yield identical outputs, ensuring stability for testing and deterministic workflows.
 
 ## How it Works
-
-The cache key is generated using a SHA-256 hash of the following parameters:
--   `Project ID`
--   `Model` (e.g., `gpt-4o`, `ucla-v3`)
--   `Prompt` (exact text)
--   `Temperature`
--   `Max Tokens`
-
-Any change to these parameters results in a new cache key (Cache MISS).
+ 
+ Cencori uses a **two-layer** caching architecture:
+ 
+ ### 1. Exact Match (Redis)
+ First, we check for an exact character-for-character match using a SHA-256 hash. This is extremely fast (< 5ms) and handles identical repeats (e.g., retries).
+ 
+ - **Key**: `SHA256(Project + Model + Prompt + Params)`
+ - **Storage**: Redis (Upstash)
+ 
+ ### 2. Semantic Match (Vector DB)
+ If the exact match fails, we perform a **semantic search**.
+ 
+ 1.  The prompt is converted into a **vector embedding** (using Gemini/OpenAI embedding models).
+ 2.  We query our **Supabase Vector** database for previous prompts with high cosine similarity (default threshold: `0.95`).
+ 3.  If a match is found, the cached response is returned.
+ 
+ This allows "What is the capital of France?" to match a cached result for "Tell me Paris' location", saving cost and time.
 
 > [!NOTE]
 > Currently, caching is enabled for all **non-streaming** requests by default. Streaming requests bypass the cache.
