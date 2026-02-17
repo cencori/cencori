@@ -18,11 +18,11 @@ export function CodeBlock({ children, className, filename, ...props }: DocsCodeB
 
   return (
     <figure
-      className="cencori-codeblock relative my-4 rounded-xl border border-white/10 text-white/90"
+      className="cencori-codeblock relative my-4 rounded-xl border border-border/40 bg-muted/30 dark:bg-white/5 text-foreground"
       aria-label={props['aria-label'] ?? filename ?? 'Code'}
     >
       {(filename || language) && (
-        <figcaption className="flex items-center justify-between px-4 py-2 text-xs text-white/60 border-b border-white/10">
+        <figcaption className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-b border-border/40">
           <span className="truncate">{filename ?? 'Code'}</span>
           <span className="ml-3 uppercase tracking-wide">{language}</span>
         </figcaption>

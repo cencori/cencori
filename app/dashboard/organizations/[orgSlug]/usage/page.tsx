@@ -187,7 +187,7 @@ export default function UsagePage({ params }: PageProps) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <Skeleton className="h-5 w-24 mb-6" />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                     {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
                 </div>
                 <Skeleton className="h-64 mb-6" />
@@ -225,21 +225,20 @@ export default function UsagePage({ params }: PageProps) {
         .slice(0, 5);
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="w-full max-w-5xl mx-auto px-6 py-8 space-y-8">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-base font-medium">Usage</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">Monitor your AI usage and consumption</p>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex bg-muted/50 p-0.5 rounded-lg border border-border/40">
                     {['24h', '7d', '30d'].map((range) => (
                         <button
                             key={range}
                             onClick={() => setTimeRange(range)}
-                            className={`px-2.5 py-1 text-xs rounded-md transition-colors ${timeRange === range
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                            className={`px-3 py-1 text-[10px] font-medium rounded-md transition-all ${timeRange === range
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
                                 }`}
                         >
                             {range}
@@ -249,168 +248,142 @@ export default function UsagePage({ params }: PageProps) {
             </div>
 
             {/* Monthly Quota */}
-            <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
-                <div className="flex items-center justify-between mb-2">
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
                     <div>
-                        <h3 className="text-xs font-medium">Monthly Quota</h3>
-                        <p className="text-[10px] text-muted-foreground">
-                            {org.monthly_requests_used.toLocaleString()} / {org.monthly_request_limit.toLocaleString()} requests
+                        <h3 className="text-sm font-medium tracking-tight">Monthly Quota</h3>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                            {org.monthly_requests_used.toLocaleString()} / {org.monthly_request_limit.toLocaleString()} requests used
                         </p>
                     </div>
-                    <Badge variant={isAtLimit ? 'destructive' : 'outline'} className="text-[10px] h-5 uppercase">
-                        {org.subscription_tier}
+                    <Badge variant="outline" className="text-[10px] h-5 gap-1.5 px-2.5 font-normal uppercase tracking-wider">
+                        <span className={`size-1.5 rounded-full ${isAtLimit ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                        {org.subscription_tier} Plan
                     </Badge>
                 </div>
-                <Progress value={percentage} className="h-2 mb-2" />
-                <div className="text-[10px] text-muted-foreground">
-                    {isAtLimit ? (
-                        <span className="flex items-center gap-1 text-red-500">
-                            <AlertTriangle className="h-3 w-3" />
-                            Limit reached. Upgrade to continue.
-                        </span>
-                    ) : isNearLimit ? (
-                        <span className="text-amber-500">{Math.round(100 - percentage)}% remaining</span>
-                    ) : (
-                        <span>{Math.round(percentage)}% used • Resets monthly</span>
-                    )}
+                <div className="p-6">
+                    <Progress value={percentage} className="h-2 mb-3" />
+                    <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Reset happens on the 1st of every month</span>
+                        {isAtLimit ? (
+                            <span className="flex items-center gap-1.5 text-red-500 font-medium">
+                                <AlertTriangle className="h-3 w-3" />
+                                Limit reached
+                            </span>
+                        ) : (
+                            <span className={isNearLimit ? "text-amber-500 font-medium" : "text-muted-foreground"}>
+                                {Math.round(100 - percentage)}% remaining
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-md bg-blue-500/10 flex items-center justify-center">
-                            <Activity className="h-3.5 w-3.5 text-blue-500" />
-                        </div>
-                        <span className="text-xs text-muted-foreground">Requests</span>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border border-border/40 bg-card p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Activity className="h-4 w-4 text-blue-500" />
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Requests</span>
                     </div>
-                    <p className="text-2xl font-semibold font-mono">{(stats?.total_requests || 0).toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Last {timeRange}</p>
+                    <p className="text-2xl font-semibold font-mono tracking-tight">{(stats?.total_requests || 0).toLocaleString()}</p>
                 </div>
 
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-md bg-purple-500/10 flex items-center justify-center">
-                            <Zap className="h-3.5 w-3.5 text-purple-500" />
-                        </div>
-                        <span className="text-xs text-muted-foreground">Tokens</span>
+                <div className="rounded-md border border-border/40 bg-card p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Zap className="h-4 w-4 text-purple-500" />
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tokens</span>
                     </div>
-                    <p className="text-2xl font-semibold font-mono">
+                    <p className="text-2xl font-semibold font-mono tracking-tight">
                         {stats?.total_tokens && stats.total_tokens >= 1000000
                             ? `${(stats.total_tokens / 1000000).toFixed(1)}M`
                             : stats?.total_tokens && stats.total_tokens >= 1000
                                 ? `${(stats.total_tokens / 1000).toFixed(1)}K`
                                 : (stats?.total_tokens || 0).toLocaleString()}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Total consumed</p>
                 </div>
 
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-md bg-emerald-500/10 flex items-center justify-center">
-                            <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
-                        </div>
-                        <span className="text-xs text-muted-foreground">Cost</span>
+                <div className="rounded-md border border-border/40 bg-card p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <DollarSign className="h-4 w-4 text-emerald-500" />
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Cost</span>
                     </div>
-                    <p className="text-2xl font-semibold font-mono">${(stats?.total_cost || 0).toFixed(2)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">AI spending</p>
+                    <p className="text-2xl font-semibold font-mono tracking-tight">${(stats?.total_cost || 0).toFixed(2)}</p>
                 </div>
 
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-md bg-amber-500/10 flex items-center justify-center">
-                            <Clock className="h-3.5 w-3.5 text-amber-500" />
-                        </div>
-                        <span className="text-xs text-muted-foreground">Avg Latency</span>
+                <div className="rounded-md border border-border/40 bg-card p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Clock className="h-4 w-4 text-amber-500" />
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Latency</span>
                     </div>
-                    <p className="text-2xl font-semibold font-mono">{stats?.avg_latency || 0}ms</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Response time</p>
+                    <p className="text-2xl font-semibold font-mono tracking-tight">{stats?.avg_latency || 0}ms</p>
                 </div>
             </div>
 
-            {/* Success Rate Banner */}
-            {stats && stats.total_requests > 0 && (
-                <div className="rounded-md border border-border/40 bg-card p-4 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center">
-                                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                            </div>
-                            <div>
-                                <h3 className="text-xs font-medium">Success Rate</h3>
-                                <p className="text-[10px] text-muted-foreground">API reliability</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-2xl font-semibold font-mono text-emerald-500">
-                                {stats.success_rate.toFixed(1)}%
-                            </p>
-                        </div>
+            {/* Breakdowns */}
+            <div className="grid gap-8 md:grid-cols-2">
+                {/* Model Usage Table */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border/40">
+                        <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Top Models</h3>
+                    </div>
+                    <div className="p-0">
+                        {topModels.length === 0 ? (
+                            <div className="p-8 text-center text-xs text-muted-foreground">No data available</div>
+                        ) : (
+                            <table className="w-full text-left text-xs">
+                                <tbody className="divide-y divide-border/20">
+                                    {topModels.map(([model, count]) => {
+                                        const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
+                                        return (
+                                            <tr key={model} className="group hover:bg-muted/20 transition-colors">
+                                                <td className="px-6 py-3 font-medium">{model}</td>
+                                                <td className="px-6 py-3 text-right tabular-nums text-muted-foreground">
+                                                    {count.toLocaleString()}
+                                                    <span className="ml-2 text-[10px] opacity-70">({pct.toFixed(0)}%)</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
-            )}
 
-            {/* Breakdowns */}
-            <div className="grid gap-4 md:grid-cols-2">
-                {/* Model Usage */}
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <h3 className="text-xs font-medium mb-3">Top Models</h3>
-                    {topModels.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-4 text-center">No data</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {topModels.map(([model, count]) => {
-                                const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
-                                return (
-                                    <div key={model}>
-                                        <div className="flex items-center justify-between text-xs mb-1">
-                                            <span className="truncate max-w-[150px]">{model}</span>
-                                            <span className="font-mono text-muted-foreground">{count.toLocaleString()}</span>
-                                        </div>
-                                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary rounded-full transition-all"
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Provider Usage */}
-                <div className="rounded-md border border-border/40 bg-card p-4">
-                    <h3 className="text-xs font-medium mb-3">By Provider</h3>
-                    {topProviders.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-4 text-center">No data</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {topProviders.map(([provider, count]) => {
-                                const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
-                                const colorClass = PROVIDER_COLORS[provider.toLowerCase()] || 'bg-gray-500';
-                                return (
-                                    <div key={provider}>
-                                        <div className="flex items-center justify-between text-xs mb-1">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className={`w-2 h-2 rounded-full ${colorClass}`} />
-                                                <span className="capitalize">{provider}</span>
-                                            </div>
-                                            <span className="font-mono text-muted-foreground">{pct.toFixed(0)}%</span>
-                                        </div>
-                                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all ${colorClass}`}
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                {/* Provider Usage Table */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border/40">
+                        <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">By Provider</h3>
+                    </div>
+                    <div className="p-0">
+                        {topProviders.length === 0 ? (
+                            <div className="p-8 text-center text-xs text-muted-foreground">No data available</div>
+                        ) : (
+                            <table className="w-full text-left text-xs">
+                                <tbody className="divide-y divide-border/20">
+                                    {topProviders.map(([provider, count]) => {
+                                        const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
+                                        const colorClass = PROVIDER_COLORS[provider.toLowerCase()] || 'bg-gray-500';
+                                        return (
+                                            <tr key={provider} className="group hover:bg-muted/20 transition-colors">
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`size-1.5 rounded-full ${colorClass}`} />
+                                                        <span className="font-medium capitalize">{provider}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3 text-right tabular-nums text-muted-foreground">
+                                                    {count.toLocaleString()}
+                                                    <span className="ml-2 text-[10px] opacity-70">({pct.toFixed(0)}%)</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
