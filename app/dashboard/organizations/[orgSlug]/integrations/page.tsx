@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Terminal, Blocks } from "lucide-react";
 import { Microsoft, GoogleCloud, Cloudflare } from "@lobehub/icons";
+import { N8nLogo, ZapierLogo, MakeLogo } from "@/components/icons/BrandIcons";
 import Link from "next/link";
 
 const sdks = [
@@ -28,6 +29,30 @@ const sdks = [
         installCmd: "go get github.com/cencori/cencori-go",
         docsUrl: "/docs/installation",
         status: "coming-soon" as const,
+    },
+];
+
+const automation = [
+    {
+        name: "n8n",
+        description: "Official node for low-code workflow automation",
+        icon: <N8nLogo className="w-5 h-5" />,
+        docsUrl: "/docs/integrations/automation#n8n",
+        status: "stable" as const,
+    },
+    {
+        name: "Zapier",
+        description: "Connect to 5,000+ apps without code",
+        icon: <ZapierLogo className="w-5 h-5" />,
+        docsUrl: "/docs/integrations/automation#zapier-and-make",
+        status: "stable" as const,
+    },
+    {
+        name: "Make",
+        description: "Visual platform for complex workflows",
+        icon: <MakeLogo className="w-5 h-5" />,
+        docsUrl: "/docs/integrations/automation#zapier-and-make",
+        status: "stable" as const,
     },
 ];
 
@@ -180,6 +205,31 @@ export default function IntegrationsPage() {
                             <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2 -ml-2" asChild>
                                 <Link href={fw.docsUrl}>
                                     View Docs <ExternalLink className="h-3 w-3 ml-1" />
+                                </Link>
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <section className="mb-8">
+                <h2 className="text-[13px] font-medium mb-4">Automation & Workflows</h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {automation.map((platform) => (
+                        <div key={platform.name} className="bg-card border border-border/40 rounded-md p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded bg-muted/50 flex items-center justify-center">
+                                        {platform.icon}
+                                    </div>
+                                    <span className="text-[13px] font-medium">{platform.name}</span>
+                                </div>
+                                <StatusBadge status={platform.status} />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2 mb-3">{platform.description}</p>
+                            <Button variant="outline" size="sm" className="h-6 text-[11px] px-2 w-full" asChild>
+                                <Link href={platform.docsUrl}>
+                                    Connect <ExternalLink className="h-3 w-3 ml-1" />
                                 </Link>
                             </Button>
                         </div>
