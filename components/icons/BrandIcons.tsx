@@ -283,3 +283,32 @@ export function GoogleCloudLogo({ className, ...props }: IconProps) {
         </svg>
     );
 }
+
+// n8n Logo
+export function N8nLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 128 128" className={className} {...props}>
+            <path fill="#FF6D5A" d="M64 5.901l57.142 32.991v65.982L64 137.865 6.858 104.874V38.892L64 5.901z" opacity="0" />
+            <path d="M66.44 60.66V33.88h-9.88v29.08c0 9.14 3.76 13.56 12.06 13.56h5.36v-8.76h-2.58c-4.14 0-4.96-1.74-4.96-6.14V60.66zM46.74 38.64h-3.32c-4.14 0-4.96 1.74-4.96 6.14v31.78H28.58V33.88h14.82v8.12c2.28-6.16 6.5-9 14-9h5.36v8.76h-4c-8.3-.02-12.02 4.4-12.02 13.54v21.26h-9.88V38.64h-.12zM80.72 76.56h3.32c4.14 0 4.96-1.74 4.96-6.14V38.64h9.88v37.92H84.06v-8.12c-2.28 6.16-6.5 9-14 9H64.7v-8.76h4c8.3.02 12.02-4.4 12.02-13.54V38.64h9.88v21.26c0 10.32 4.7 13.62 12.64 12.44l-1.38-8.52c-2.74.42-3.72-.56-3.72-3.92V38.64h9.88v24.64c0 12.16-5.46 19.38-19.46 17.06l1.32-8.54c5.18.52 7.02-1.9 7.02-6.54v-8.7z" fill="#FF6D5A" />
+        </svg>
+    );
+}
+
+// Zapier Logo
+export function ZapierLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 128 128" className={className} {...props}>
+            <path fill="#FF4F00" d="M30.4,64 L67.2,64 L67.2,27.2 L97.6,64 L60.8,64 L60.8,100.8 L30.4,64 Z" />
+        </svg>
+    );
+}
+
+// Make (Integromat) Logo
+export function MakeLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 128 128" className={className} {...props}>
+            <circle cx="64" cy="64" r="64" fill="#6f00e6" />
+            <path fill="#fff" d="M35.5 45.5h16.2v37H35.5zM76.3 45.5h16.2v37H76.3zM55.9 82.5V59.4l8.1 11.2 8.1-11.2v23.1h13.2V45.5h-10.8L64 59.9 53.5 45.5H42.7v37h13.2z" />
+        </svg>
+    );
+}

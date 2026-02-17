@@ -7,47 +7,98 @@ order: 5
 
 You can integrate Cencori into your automation workflows using standard HTTP requests. This allows you to add secure, governed AI to any business process.
 
-## Zapier / Make.com
+## n8n
 
-Use the **"Webhook"** or **"HTTP Request"** action to call Cencori.
+n8n is a powerful open-source workflow automation tool. You can use the **HTTP Request** node to connect to Cencori.
 
-### Configuration
+### Step-by-Step Guide
 
-1. **Method**: `POST`
-2. **URL**: `https://cencori.com/api/v1/chat/completions`
-3. **Headers**:
-   - `Content-Type`: `application/json`
-   - `Authorization`: `Bearer csk_...`
-4. **Body (JSON)**:
-   ```json
-   {
-     "model": "gpt-4o",
-     "messages": [
-       {"role": "system", "content": "You are a helpful assistant."},
-       {"role": "user", "content": "{{trigger_data_field}}"}
-     ]
-   }
-   ```
-
-## n8n Integration
-
-n8n is a powerful open-source workflow automation tool. You can use the **HTTP Request** node.
-
-### HTTP Request Node Setup
-
-- **Authentication**: Generic Credential Type -> Header Auth
-  - Name: `Authorization`
-  - Value: `Bearer csk_...`
-- **method**: `POST`
-- **url**: `https://cencori.com/api/v1/chat/completions`
-- **Body Parameters**:
-  - `model`: `gpt-4o`
-  - `messages`: `expression`
-    ```javascript
-    [
-      { "role": "user", "content": $json.input_text }
-    ]
+1.  Add an **HTTP Request** node to your workflow.
+2.  In the node settings, configure the following:
+    -   **Method**: Select `POST`.
+    -   **URL**: Enter `https://cencori.com/api/v1/chat/completions`.
+    -   **Authentication**: Select `Generic Credential Type`.
+    -   **Generic Credential Type**: Select `Header Auth`.
+3.  Create a new Credential:
+    -   **Name**: `Authorization`
+    -   **Value**: `Bearer csk_your_api_key_here` (replace with your actual API key).
+4.  Under **Body Parameters**, set:
+    -   **Send Body**: Toggle to `On`.
+    -   **Body Content Type**: Select `JSON`.
+    -   **Specify Body**: Select `Using JSON`.
+5.  Paste the following JSON into the **Body** field:
+    ```json
+    {
+      "model": "gpt-4o",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello world"
+        }
+      ]
+    }
     ```
+    *(Tip: You can use expressions to insert dynamic data from previous nodes into the "content" field.)*
+
+## Make (formerly Integromat)
+
+Use the native **HTTP** app to make requests to Cencori.
+
+### Step-by-Step Guide
+
+1.  Add a new module and search for **HTTP**.
+2.  Select the **Make a request** action.
+3.  Configure the module as follows:
+    -   **URL**: `https://cencori.com/api/v1/chat/completions`
+    -   **Method**: `POST`
+    -   **Headers**: Add a new header:
+        -   **Name**: `Authorization`
+        -   **Value**: `Bearer csk_your_api_key_here`
+    -   **Body type**: `Raw`
+    -   **Content type**: `JSON (application/json)`
+4.  In the **Request content** field, enter your JSON payload:
+    ```json
+    {
+      "model": "gpt-4o",
+      "messages": [
+        {
+          "role": "user",
+          "content": "{{1.text}}" 
+        }
+      ]
+    }
+    ```
+    *(Note: Replace `{{1.text}}` with the actual data pill from your trigger module.)*
+5.  Check **Parse response** to automatically handle the JSON output.
+
+## Zapier
+
+Use the **Webhooks by Zapier** action to connect Cencori to thousands of apps.
+
+### Step-by-Step Guide
+
+1.  Add a step to your Zap and search for **Webhooks by Zapier**.
+2.  Select **Custom Request** as the event.
+3.  Configure the action:
+    -   **Method**: `POST`
+    -   **URL**: `https://cencori.com/api/v1/chat/completions`
+    -   **Data Pass-Through?**: `No`
+    -   **Data**:
+        ```json
+        {
+          "model": "gpt-4o",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Summarize this: {{step_1_output}}"
+            }
+          ]
+        }
+        ```
+    -   **Headers**:
+        -   `Content-Type`: `application/json`
+        -   `Authorization`: `Bearer csk_your_api_key_here`
+4.  Test the step to see the AI response.
 
 > [!TIP]
 > **Why use Cencori for automation?**
