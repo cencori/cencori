@@ -2,7 +2,7 @@
 title: "Moving From Database to Redis"
 slug: "scaling-ai-gateway-redis"
 date: "2026-02-17"
-excerpt: "As AI traffic grows, database-backed rate limiting becomes a bottleneck. Here's how we migrated to Redis for sub-millisecond enforcement and implemented semantic caching to cut costs by 60%."
+excerpt: "As AI traffic grows, database-backed rate limiting becomes a bottleneck. Here's how we migrated to Redis for sub-millisecond enforcement."
 coverImage: "/blog/images/covers/redis.png"
 authors:
   - balla
@@ -58,31 +58,8 @@ if (requests > limit) throw new Error('Rate limit exceeded');
 - **Database Load**: Zero. The auth/rate-limit layer no longer touches Postgres.
 - **Precision**: Atomic `INCR` operations guarantee exact enforcement even with high concurrency.
 
-## Semantic Caching: The "Free" Speed Upgrade
-
-Once we had Redis in place, adding **Semantic Caching** was the next logical step.
-
-LLM APIs are expensive and slow. Generating 500 tokens can take seconds. But users often ask the same questions repeatedly—especially in testing, support bots, or standardized classifications.
-
-We implemented a caching layer that hashes the request inputs:
-`SHA256(ProjectID + Model + Prompt + Temperature)`
-
-### How it works
-1. **Ingress**: Gateway computes the hash.
-2. **Lookup**: Checks Redis for that hash.
-3. **Hit**: Returns the cached JSON immediately.
-4. **Miss**: Calls the AI Provider (OpenAI/Gemini), then saves the result to Redis asynchronously.
-
-### Impact
-We verified this in our production environment using Gemini 2.5 Flash:
-
-| Metric | Cache Miss (Fresh) | Cache Hit | Improvement |
-| :--- | :--- | :--- | :--- |
-| **Latency** | ~10,800ms | ~3,800ms | **2.8x Faster** |
-| **Cost** | $0.0002 | $0.0000 | **100% Savings** |
-
 ## Conclusion
 
-By moving transient state (rate limits) and repeatable compute (caching) to the edge with Redis, we've significantly increased the headroom of the Cencori Gateway.
+By moving transient rate-limit state to the edge with Redis, we've significantly increased the headroom of the Cencori Gateway.
 
 Infrastructure is effectively "invisible" until it breaks. These changes ensure Cencori stays invisible, fast, and reliable as you scale from MVP to IPO.
