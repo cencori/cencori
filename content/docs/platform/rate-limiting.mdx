@@ -1,7 +1,7 @@
 ---
 title: "Rate Limiting"
 description: "Understand Cencori's rate limiting system, how to handle limits, and best practices for high-volume applications."
-section: "Core Concepts"
+section: "platform"
 order: 5
 ---
 
@@ -22,6 +22,13 @@ Cencori enforces rate limits at multiple levels: per project, per user, and per 
 
 > [!NOTE]
 > Burst limits allow short spikes above the per-minute limit, useful for handling traffic bursts.
+
+## Architecture & Performance
+
+Cencori uses a high-performance **Redis-backed Sliding Window** algorithm for rate limiting.
+- **Microsecond Overhead:** Checks are performed at the edge with < 1ms latency.
+- **Global Consistency:** Limits are enforced globally across all regions.
+- **Fairness:** The sliding window ensures that users cannot "game" the system by dumping requests at the boundary of a minute.
 
 ## Rate Limit Headers
 

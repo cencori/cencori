@@ -44,7 +44,7 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
 
     const { data, error } = await supabase
         .from('ai_requests')
-        .select('cost')
+        .select('cencori_charge_usd')
         .eq('project_id', projectId)
         .gte('created_at', start.toISOString())
         .lt('created_at', end.toISOString());
@@ -54,7 +54,7 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
         return 0;
     }
 
-    return data?.reduce((sum, req) => sum + (req.cost || 0), 0) || 0;
+    return data?.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0) || 0;
 }
 
 /**

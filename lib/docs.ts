@@ -152,6 +152,7 @@ export function getDocsNavigation(): NavSection[] {
     const result: NavSection[] = [];
     const sectionOrder = [
         'Getting Started',
+        'platform',
         'AI',
         'AI Endpoints',
         'AI Memory',
@@ -244,6 +245,7 @@ export function getDocNavigation(currentSlug: string): { prev: Doc | null; next:
         if (a.section !== b.section) {
             const sectionOrder = [
                 'Getting Started',
+                'platform',
                 'AI',
                 'AI Endpoints',
                 'AI Memory',

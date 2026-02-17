@@ -86,6 +86,7 @@ const sidebarItems: SidebarGroup[] = [
             { title: "Organizations", href: "/docs/platform/organizations" },
             { title: "Credits System", href: "/docs/platform/credits" },
             { title: "Rate Limiting", href: "/docs/platform/rate-limiting" },
+            { title: "Semantic Caching", href: "/docs/platform/semantic-caching" },
             { title: "Agent Frameworks", href: "/docs/platform/agent-frameworks" },
         ],
     },
