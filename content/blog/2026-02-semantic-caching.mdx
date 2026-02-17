@@ -15,28 +15,33 @@ LLM APIs are expensive and slow. Generating 500 tokens can take seconds. But use
 To solve this, we built **Semantic Caching** directly into the Cencori AI Gateway.
 
 ## How it works
-
-We implemented a caching layer that hashes the request inputs using SHA-256:
-`SHA256(ProjectID + Model + Prompt + Temperature)`
-
-1.  **Ingress**: Gateway computes the hash.
-2.  **Lookup**: Checks Redis for that hash.
-3.  **Hit**: Returns the cached JSON immediately.
-4.  **Miss**: Calls the AI Provider (OpenAI/Gemini), then saves the result to Redis asynchronously.
-
-## Impact
-
-We verified this in our production environment using Gemini 2.5 Flash:
-
-| Metric | Cache Miss (Fresh) | Cache Hit | Improvement |
-| :--- | :--- | :--- | :--- |
-| **Latency** | ~10,800ms | ~3,800ms | **2.8x Faster** |
-| **Cost** | $0.0002 | $0.0000 | **100% Savings** |
-
-## Why "Semantic"?
-
-While a traditional cache matches exact URLs, semantic caching for AI needs to be smarter. We hash the *intent* modifiers (Project ID, Temperature) along with the *content* (Prompt, Model).
-
-This ensures that a request with `temperature: 0` (deterministic) hits the same cache key, but `temperature: 1` steers clear if needed? Actually, we cache based on exact parameter matching to be safe.
-
-By caching at the edge, we turn expensive API calls into cheap database lookups.
+ 
+ We implemented a **multi-layered** caching strategy:
+ 
+ ### Layer 1: Exact Match (Redis)
+ For identical requests, we compute a SHA-256 hash of inputs. This is instant (< 2ms) and handles high-volume repeats.
+ 
+ ### Layer 2: Semantic Match (Supabase Vector)
+ If the exact match misses, we generate an **embedding** (vector representation) of the prompt using Google Gemini. We then query our **Supabase** database using `pgvector` to find semantically similar previous queries.
+ 
+ 1.  **Ingress**: Gateway checks Redis (L1).
+ 2.  **Vector Search**: If L1 misses, generate embedding & search Supabase (L2).
+ 3.  **Hit**: If similarity > 0.95, return the cached JSON.
+ 4.  **Miss**: Call the AI Provider, then save the result to both Redis and Supabase.
+ 
+ ## Impact
+ 
+ We verified this in our production environment using Gemini 2.5 Flash:
+ 
+ | Metric | Cache Miss (Fresh) | Semantic Hit | Improvement |
+ | :--- | :--- | :--- | :--- |
+ | **Latency** | ~10,800ms | ~400ms | **27x Faster** |
+ | **Cost** | $0.0002 | $0.0000 | **100% Savings** |
+ 
+ ## Why "Semantic"?
+ 
+ Traditional caching is fragile. Changing "What is the capital of France?" to "Tell me the capital city of France" breaks exact hashing.
+ 
+ By using **Vector Embeddings**, Cencori understands that these two prompts have the same *intent*. We verify similarity using cosine distance, allowing us to serve cached answers even when users phrase questions differently.
+ 
+ By caching at the edge with Redis and deeply with Supabase, we turn expensive API calls into cheap database lookups.
