@@ -1,0 +1,42 @@
+---
+title: "Semantic Caching"
+slug: "semantic-caching-ai-gateway"
+date: "2026-02-17"
+excerpt: "LLM APIs are expensive and slow. We implemented a semantic caching layer in the Cencori AI Gateway to make repeatable requests instant and free."
+coverImage: "/blog/images/covers/caching.png"
+authors:
+  - balla
+tags: ["Engineering", "Performance", "Caching", "Cost"]
+published: true
+---
+
+LLM APIs are expensive and slow. Generating 500 tokens can take seconds. But users often ask the same questions repeatedly—especially in testing, support bots, or standardized classifications.
+
+To solve this, we built **Semantic Caching** directly into the Cencori AI Gateway.
+
+## How it works
+
+We implemented a caching layer that hashes the request inputs using SHA-256:
+`SHA256(ProjectID + Model + Prompt + Temperature)`
+
+1.  **Ingress**: Gateway computes the hash.
+2.  **Lookup**: Checks Redis for that hash.
+3.  **Hit**: Returns the cached JSON immediately.
+4.  **Miss**: Calls the AI Provider (OpenAI/Gemini), then saves the result to Redis asynchronously.
+
+## Impact
+
+We verified this in our production environment using Gemini 2.5 Flash:
+
+| Metric | Cache Miss (Fresh) | Cache Hit | Improvement |
+| :--- | :--- | :--- | :--- |
+| **Latency** | ~10,800ms | ~3,800ms | **2.8x Faster** |
+| **Cost** | $0.0002 | $0.0000 | **100% Savings** |
+
+## Why "Semantic"?
+
+While a traditional cache matches exact URLs, semantic caching for AI needs to be smarter. We hash the *intent* modifiers (Project ID, Temperature) along with the *content* (Prompt, Model).
+
+This ensures that a request with `temperature: 0` (deterministic) hits the same cache key, but `temperature: 1` steers clear if needed? Actually, we cache based on exact parameter matching to be safe.
+
+By caching at the edge, we turn expensive API calls into cheap database lookups.
