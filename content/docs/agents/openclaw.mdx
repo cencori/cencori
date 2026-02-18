@@ -65,17 +65,61 @@ Navigate to **Agents → Agent Marketplace** in your project dashboard and click
 
 Go to the agent's **Configuration** tab and click **Generate Key**. Copy the key—you'll only see it once.
 
-### 3. Connect Your Machine
+### 3. Install OpenClaw
 
-Run the following command in your terminal:
+Install the OpenClaw agent on your machine:
 
 ```bash
-npx openclaw connect --key=cake_your_key_here
+curl -sSL https://openclaw.ai/install.sh | bash
 ```
 
-This connects your local machine to the Cencori Brain. The agent will appear as **"Online"** in the dashboard.
+> [!NOTE]
+> Works on macOS, Windows & Linux. Supports npm (`npm i -g openclaw`) and Docker installs too — see [openclaw.ai](https://openclaw.ai) for details.
 
-### 4. Monitor & Control
+### 4. Connect to Cencori
+
+Set these environment variables so OpenClaw uses Cencori as its backend:
+
+```bash
+export OPENAI_BASE_URL=https://cencori.com/api/v1
+export OPENAI_API_KEY=cake_your_key_here
+# Optional: override auto-detection for multi-agent setups
+export CENCORI_AGENT_ID=your_agent_id
+```
+
+Then start the agent:
+
+```bash
+openclaw onboard
+```
+
+Cencori acts as the **remote brain** — OpenClaw sends requests here instead of directly to OpenAI or Google. The dashboard shows your agent as **"Online"** once the first request arrives.
+
+> [!IMPORTANT]
+> `CENCORI_AGENT_ID` is optional for standard OpenAI-compatible clients (including OpenClaw).  
+> Cencori derives the agent from the API key automatically. Set `CENCORI_AGENT_ID` only when you want to force routing to a specific agent.
+
+### Alternative: OpenClaw `models.providers` config
+
+If you prefer OpenClaw's provider config (`~/.openclaw/openclaw.json`) instead of environment variables, configure Cencori like this:
+
+```json
+{
+  "models": {
+    "providers": {
+      "cencori": {
+        "baseUrl": "https://cencori.com/api/v1",
+        "apiKey": "cake_your_key_here",
+        "api": "openai-completions"
+      }
+    }
+  }
+}
+```
+
+This works without an `X-Agent-ID` header. Cencori resolves the agent from the API key automatically.
+
+### 5. Monitor & Control
 
 Switch to the **Live Feed** tab to watch the agent's activity in real-time. If **Shadow Mode** is enabled, you'll be prompted to approve or reject risky actions before they execute.
 
@@ -129,6 +173,7 @@ Each intercepted action appears in the Live Feed with **Approve** / **Reject** b
 | Mechanism | Detail |
 |---|---|
 | **API Key Auth** | All requests authenticated with `cake_` prefixed keys |
+| **Agent Resolution** | Agent is auto-resolved from API key; `X-Agent-ID` / `CENCORI_AGENT_ID` is optional |
 | **Key Hashing** | Raw keys are never stored; only SHA-256 hashes |
 | **Shadow Mode** | Human-in-the-loop approval for risky operations |
 | **RLS Policies** | Database-level access control per organization |
@@ -139,6 +184,7 @@ Each intercepted action appears in the Live Feed with **Approve** / **Reject** b
 - Verify your API key is correct and not expired
 - Check that your machine can reach `https://cencori.com/api/v1/`
 - Regenerate the key from Configuration if needed
+- If using `CENCORI_AGENT_ID`, confirm it matches the agent shown in the Configuration tab
 
 ### Agent not picking up new model
 - The agent syncs config on each heartbeat (every 30 seconds)

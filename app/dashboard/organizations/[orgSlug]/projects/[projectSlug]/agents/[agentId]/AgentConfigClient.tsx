@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
     Power,
     Eye,
@@ -11,8 +12,6 @@ import {
     Trash2,
     ShieldCheck,
     ShieldAlert,
-    Save,
-    Terminal,
     Loader2,
     ArrowLeft
 } from "lucide-react";
@@ -23,8 +22,7 @@ import {
     Card,
     CardContent,
     CardHeader,
-    CardTitle,
-    CardDescription
+    CardTitle
 } from "@/components/ui/card";
 import {
     Tabs,
@@ -59,8 +57,9 @@ import {
 
 import { OpenClawLogo, AutoGPTLogo, N8nLogo, CrewAILogo, PythonLogo, CustomAgentLogo } from "@/components/icons/BrandIcons";
 import AgentLiveFeed from "./AgentLiveFeed";
-import { generateAgentKey, updateAgentConfig, deleteAgent } from "./actions";
+import { generateAgentKey, getAgentTelemetry, type AgentTelemetry, updateAgentConfig, updateAgentName, deleteAgent } from "./actions";
 import { SUPPORTED_PROVIDERS } from "@/lib/providers/config";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AgentConfigClientProps {
     agent: {
@@ -78,6 +77,35 @@ interface AgentConfigClientProps {
     projectSlug: string;
 }
 
+function Sparkline({ values, className }: { values: number[]; className?: string }) {
+    if (values.length === 0) {
+        return <div className="h-8 w-full rounded bg-muted/30" />;
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const points = values
+        .map((v, i) => {
+            const x = (i / Math.max(values.length - 1, 1)) * 100;
+            const y = 100 - ((v - min) / range) * 100;
+            return `${x},${y}`;
+        })
+        .join(" ");
+
+    return (
+        <svg viewBox="0 0 100 100" className={`h-8 w-full ${className || ""}`} preserveAspectRatio="none" aria-hidden="true">
+            <polyline
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={points}
+            />
+        </svg>
+    );
+}
+
 export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, projectSlug }: AgentConfigClientProps) {
     const [isPending, startTransition] = useTransition();
 
@@ -90,6 +118,13 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const [apiKey, setApiKey] = useState(initialKey);
     const [keyVisible, setKeyVisible] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
+    const [telemetry, setTelemetry] = useState<AgentTelemetry | null>(null);
+    const [telemetryLoading, setTelemetryLoading] = useState(true);
+    const telemetryKeyIdsRef = useRef<Set<string>>(new Set());
+    const telemetryRefreshLockRef = useRef(false);
+    const [agentName, setAgentName] = useState(agent.name);
+    const [editingName, setEditingName] = useState(false);
+    const [pendingAgentName, setPendingAgentName] = useState(agent.name);
 
     // Persist changes when toggles change
     const handleToggleActive = (val: boolean) => {
@@ -139,7 +174,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                 setApiKey(newKey);
                 setKeyVisible(true);
                 toast.success("New Agent Key Generated");
-            } catch (e) {
+            } catch {
                 toast.error("Failed to generate key");
             }
         });
@@ -149,9 +184,33 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
         try {
             await deleteAgent(agent.id, orgSlug, projectSlug);
             toast.success("Agent deleted");
-        } catch (e) {
+        } catch {
             toast.error("Failed to delete agent");
         }
+    };
+
+    const handleSaveAgentName = () => {
+        const nextName = pendingAgentName.trim();
+        if (!nextName) {
+            toast.error("Agent name cannot be empty");
+            return;
+        }
+        if (nextName === agentName) {
+            setEditingName(false);
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                await updateAgentName(agent.id, window.location.pathname, nextName);
+                setAgentName(nextName);
+                setPendingAgentName(nextName);
+                setEditingName(false);
+                toast.success("Agent name updated");
+            } catch {
+                toast.error("Failed to update agent name");
+            }
+        });
     };
 
     // Helper to get Blueprint Icon
@@ -167,9 +226,125 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     };
 
     const isMaskedKey = apiKey === "cake_*****************";
-    const connectCommand = isMaskedKey
-        ? `npx openclaw connect --key=<YOUR_KEY>`
-        : `npx openclaw connect --key=${apiKey || "<YOUR_KEY>"}`;
+    const keyDisplay = isMaskedKey ? '<YOUR_KEY>' : (apiKey || '<YOUR_KEY>');
+
+    const getConnectCommand = (blueprint: string) => {
+        const envVars = `# Step 2: Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${keyDisplay}\nexport CENCORI_AGENT_ID=${agent.id}`;
+        switch (blueprint) {
+            case 'openclaw':
+                return `# Step 1: Install OpenClaw\ncurl -sSL https://openclaw.ai/install.sh | bash\n\n${envVars}\n\n# Step 3: Run\nopenclaw onboard`;
+            case 'n8n':
+                return `# Step 1: Install n8n\nnpx n8n\n\n${envVars}`;
+            case 'autogpt':
+                return `# Step 1: Install AutoGPT\npip install autogpt\n\n${envVars}\n\n# Step 3: Run\nautogpt run`;
+            case 'crewai':
+                return `# Step 1: Install CrewAI\npip install crewai\n\n${envVars}`;
+            case 'python-interpreter':
+                return `# Step 1: Install dependencies\npip install openai\n\n${envVars}`;
+            default:
+                return `${envVars}`;
+        }
+    };
+
+    const connectCommand = getConnectCommand(agent.blueprint);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadTelemetry = async () => {
+            if (telemetryRefreshLockRef.current) return;
+            telemetryRefreshLockRef.current = true;
+            try {
+                const data = await getAgentTelemetry(agent.id);
+                if (!cancelled) {
+                    setTelemetry(data);
+                    telemetryKeyIdsRef.current = new Set(data.apiKeyIds);
+                    setTelemetryLoading(false);
+                }
+            } catch {
+                if (!cancelled) {
+                    setTelemetryLoading(false);
+                }
+            } finally {
+                telemetryRefreshLockRef.current = false;
+            }
+        };
+
+        loadTelemetry();
+        const timer = setInterval(loadTelemetry, 30000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [agent.id]);
+
+    useEffect(() => {
+        const channel = supabase
+            .channel(`agent-telemetry-${agent.id}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "ai_requests",
+                    filter: `project_id=eq.${agent.project_id}`,
+                },
+                async (payload: { new: { api_key_id?: string } }) => {
+                    const apiKeyId = payload.new.api_key_id;
+                    if (!apiKeyId) return;
+                    if (!telemetryKeyIdsRef.current.has(apiKeyId)) return;
+                    if (telemetryRefreshLockRef.current) return;
+                    try {
+                        telemetryRefreshLockRef.current = true;
+                        const data = await getAgentTelemetry(agent.id);
+                        setTelemetry(data);
+                        telemetryKeyIdsRef.current = new Set(data.apiKeyIds);
+                        setTelemetryLoading(false);
+                    } finally {
+                        telemetryRefreshLockRef.current = false;
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [agent.id, agent.project_id]);
+
+    const telemetryCards = [
+        {
+            label: "Req/s",
+            value: telemetry ? telemetry.reqPerSec.toFixed(2) : "0.00",
+            points: telemetry?.points.map((p) => p.reqPerSec) || [],
+            color: "text-cyan-400",
+        },
+        {
+            label: "P95 latency",
+            value: telemetry ? `${telemetry.p95LatencyMs} ms` : "0 ms",
+            points: telemetry?.points.map((p) => p.p95LatencyMs) || [],
+            color: "text-amber-400",
+        },
+        {
+            label: "Error rate",
+            value: telemetry ? `${telemetry.errorRatePct.toFixed(1)}%` : "0.0%",
+            points: telemetry?.points.map((p) => p.errorRatePct) || [],
+            color: "text-rose-400",
+        },
+        {
+            label: "Tokens/min",
+            value: telemetry ? Math.round(telemetry.tokensPerMin).toLocaleString() : "0",
+            points: telemetry?.points.map((p) => p.tokensPerMin) || [],
+            color: "text-emerald-400",
+        },
+        {
+            label: "Cost today",
+            value: telemetry ? `$${telemetry.costTodayUsd.toFixed(4)}` : "$0.0000",
+            points: telemetry?.points.map((p) => p.costUsd) || [],
+            color: "text-violet-400",
+        },
+    ];
 
     return (
         <div className="w-full max-w-6xl mx-auto px-6 py-8 space-y-6">
@@ -193,7 +368,63 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     </div>
                     <div className="space-y-0.5">
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            {agent.name}
+                            {editingName ? (
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        value={pendingAgentName}
+                                        onChange={(e) => setPendingAgentName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                handleSaveAgentName();
+                                            }
+                                            if (e.key === "Escape") {
+                                                e.preventDefault();
+                                                setPendingAgentName(agentName);
+                                                setEditingName(false);
+                                            }
+                                        }}
+                                        className="h-8 w-56 text-sm"
+                                        autoFocus
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={handleSaveAgentName}
+                                        disabled={isPending}
+                                        aria-label="Save agent name"
+                                    >
+                                        <CheckIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => {
+                                            setPendingAgentName(agentName);
+                                            setEditingName(false);
+                                        }}
+                                        disabled={isPending}
+                                        aria-label="Cancel editing agent name"
+                                    >
+                                        <XMarkIcon className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                        onClick={() => setEditingName(true)}
+                                        aria-label="Edit agent name"
+                                    >
+                                        <PencilSquareIcon className="h-4 w-4" />
+                                    </Button>
+                                    <span>{agentName}</span>
+                                </div>
+                            )}
                             <Badge
                                 variant="outline"
                                 className={`h-5 px-1.5 text-[10px] border ${isActive
@@ -230,78 +461,96 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 space-y-6">
-                            <AgentLiveFeed agentId={agent.id} />
-                        </div>
-                        <div className="space-y-6 pt-8">
-                            {/* Connection Status Card */}
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm font-medium">Connection Status</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-muted-foreground">Status</span>
-                                        {/* TODO: Hook this up to real agent_sessions table */}
-                                        <div className="flex items-center gap-1.5 text-amber-500">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                            </span>
-                                            <span>Waiting for connection...</span>
-                                        </div>
-                                    </div>
-
-                                    {!apiKey ? (
-                                        <div className="rounded bg-muted/50 p-3 text-[10px] text-muted-foreground">
-                                            ⚠️ No API Key generated. Go to Configuration to generate one.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Connect Terminal</Label>
-                                            <div className="relative rounded-md bg-zinc-950 p-3 font-mono text-[10px] text-zinc-100 border border-zinc-800">
-                                                <div className="absolute right-2 top-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-4 w-4 text-zinc-400 hover:text-white"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(connectCommand);
-                                                            toast.success("Command copied");
-                                                        }}
-                                                    >
-                                                        <Copy className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
-                                                <div className="pr-6 break-all">
-                                                    <span className="text-green-500">$</span> {connectCommand}
-                                                </div>
-                                            </div>
-                                            {isMaskedKey && (
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    Running with existing key. Regenerate if you lost it.
-                                                </p>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+                            {telemetryCards.map((card) => (
+                                <Card key={card.label}>
+                                    <CardContent className="p-3 space-y-2">
+                                        <div className="flex items-baseline justify-between">
+                                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{card.label}</span>
+                                            {telemetryLoading && (
+                                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                                             )}
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                        <div className="text-sm font-semibold">{card.value}</div>
+                                        <Sparkline values={card.points} className={card.color} />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
 
-                            {/* Shadow Mode Toggle */}
-                            <div className={`rounded-lg border bg-card p-4 transition-colors ${shadowMode ? "border-primary/30 bg-primary/5" : "border-border/60"}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        {shadowMode ? <ShieldCheck className="w-4 h-4 text-primary" /> : <ShieldAlert className="w-4 h-4 text-muted-foreground" />}
-                                        <span className="text-sm font-medium">Shadow Mode</span>
+                        <AgentLiveFeed agentId={agent.id} />
+
+                        {/* Connection Status Card */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-medium">Connection Status</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Status</span>
+                                    <div className={`flex items-center gap-1.5 ${isActive ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                                        <span className="relative flex h-2 w-2">
+                                            {isActive && (
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            )}
+                                            <span className={`relative inline-flex rounded-full h-2 w-2 ${isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`}></span>
+                                        </span>
+                                        <span>{isActive ? "Online" : "Inactive"}</span>
                                     </div>
-                                    <Switch checked={shadowMode} onCheckedChange={handleToggleShadow} disabled={isPending} />
                                 </div>
-                                <p className="text-[10px] text-muted-foreground">
-                                    {shadowMode
-                                        ? "Agent requires approval for risky actions."
-                                        : "Agent runs fully autonomously (Risky)."}
-                                </p>
+
+                                {!apiKey ? (
+                                    <div className="rounded bg-muted/50 p-3 text-[10px] text-muted-foreground">
+                                        ⚠️ No API Key generated. Go to Configuration to generate one.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Connect Terminal</Label>
+                                        <div className="relative rounded-md bg-zinc-950 p-3 font-mono text-[10px] text-zinc-100 border border-zinc-800">
+                                            <div className="absolute right-2 top-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 text-zinc-400 hover:text-white"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(connectCommand);
+                                                        toast.success("Command copied");
+                                                    }}
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                            <div className="pr-6 break-all space-y-1">
+                                                {connectCommand.split('\n').map((line, i) => (
+                                                    <div key={i}><span className="text-green-500">$</span> {line}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {isMaskedKey && (
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Running with existing key. Regenerate if you lost it.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Shadow Mode Toggle */}
+                        <div className={`rounded-lg border bg-card p-4 transition-colors ${shadowMode ? "border-primary/30 bg-primary/5" : "border-border/60"}`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    {shadowMode ? <ShieldCheck className="w-4 h-4 text-primary" /> : <ShieldAlert className="w-4 h-4 text-muted-foreground" />}
+                                    <span className="text-sm font-medium">Shadow Mode</span>
+                                </div>
+                                <Switch checked={shadowMode} onCheckedChange={handleToggleShadow} disabled={isPending} />
                             </div>
+                            <p className="text-[10px] text-muted-foreground">
+                                {shadowMode
+                                    ? "Agent requires approval for risky actions."
+                                    : "Agent runs fully autonomously (Risky)."}
+                            </p>
                         </div>
                     </div>
                 </TabsContent>
@@ -312,12 +561,12 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     <section className="space-y-3">
                         <div className="space-y-0.5">
                             <h2 className="text-sm font-medium">Identity & Credentials</h2>
-                            <p className="text-xs text-muted-foreground">Manage the agent's unique identity key.</p>
+                            <p className="text-xs text-muted-foreground">Manage the key and routing identity used by this agent runtime.</p>
                         </div>
-                        <div className="rounded-lg border border-border/60 bg-card p-4 space-y-4">
-                            <div className="space-y-2">
+                        <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                            <div className="px-4 py-3 border-b border-border/40 space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <Label className="text-xs">Agent Key</Label>
+                                    <Label className="text-xs font-medium">Agent Key</Label>
                                     {!apiKey && (
                                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleGenerateKey} disabled={isPending}>
                                             Generate Key
@@ -379,11 +628,35 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                         No key generated yet
                                     </div>
                                 )}
-
                                 <p className="text-[10px] text-muted-foreground">
                                     {isMaskedKey
                                         ? "Key is active but hidden for security. Regenerate if you need a new one."
                                         : "Use this key to authenticate your local OpenClaw instance."}
+                                </p>
+                            </div>
+
+                            <div className="px-4 py-3 space-y-2 bg-muted/10">
+                                <Label className="text-xs font-medium">CENCORI_AGENT_ID</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={agent.id}
+                                        readOnly
+                                        className="font-mono text-xs h-9"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-9 w-9 p-0"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(agent.id);
+                                            toast.success("Agent ID copied");
+                                        }}
+                                    >
+                                        <Copy className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Optional override for multi-agent routing. Usually auto-resolved from API key.
                                 </p>
                             </div>
                         </div>
@@ -395,9 +668,9 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                             <h2 className="text-sm font-medium">Model Configuration</h2>
                             <p className="text-xs text-muted-foreground">Select the underlying model for this agent.</p>
                         </div>
-                        <div className="rounded-lg border border-border/60 bg-card p-4 space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs">Model ID</Label>
+                        <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                            <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                                <Label className="text-xs font-medium">Model ID</Label>
                                 <Select value={selectedModel} onValueChange={setSelectedModel}>
                                     <SelectTrigger className="h-9 text-xs">
                                         <SelectValue placeholder="Select model" />
@@ -418,11 +691,12 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="flex justify-end pt-2">
+                            <div className="flex justify-end px-4 py-2 bg-muted/20">
                                 <Button
                                     size="sm"
                                     onClick={handleSaveModel}
                                     disabled={isPending}
+                                    className="h-8 text-xs"
                                 >
                                     {isPending && savingAction === 'model' && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
                                     Save Configuration
@@ -435,9 +709,12 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     <section className="space-y-3">
                         <div className="space-y-0.5">
                             <h2 className="text-sm font-medium">System Prompt</h2>
-                            <p className="text-xs text-muted-foreground">Define the agent's persona and instructions.</p>
+                            <p className="text-xs text-muted-foreground">Define the agent&apos;s persona and instructions.</p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                            <div className="px-4 py-2 border-b border-border/40 bg-muted/10">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Runtime instruction layer</p>
+                            </div>
                             <Textarea
                                 className="min-h-[200px] font-mono text-xs border-0 focus-visible:ring-0 resize-none p-4"
                                 placeholder="You are a helpful assistant..."
@@ -449,6 +726,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     size="sm"
                                     onClick={handleSavePrompt}
                                     disabled={isPending}
+                                    className="h-8 text-xs"
                                 >
                                     {isPending && savingAction === 'prompt' && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
                                     Save Prompt
@@ -458,9 +736,10 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     </section>
 
                     {/* 4. Danger Zone */}
-                    <section className="space-y-3 pt-4 border-t">
+                    <section className="space-y-3 pt-4 border-t border-border/40">
                         <div className="space-y-0.5">
                             <h2 className="text-sm font-medium text-red-500">Danger Zone</h2>
+                            <p className="text-xs text-muted-foreground">High-impact operations with irreversible outcomes.</p>
                         </div>
                         <div className="rounded-lg border border-red-200/50 bg-red-50/5 p-4 flex items-center justify-between">
                             <div className="space-y-1">
