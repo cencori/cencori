@@ -41,6 +41,15 @@ type ChatRequestBody = {
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
 };
 
+const normalizeGatewayModelId = (modelId: string): string => {
+    // OpenClaw custom provider aliases may send "cencori/<model>".
+    // Normalize to the actual upstream model ID used in provider configs.
+    if (modelId.startsWith("cencori/")) {
+        return modelId.slice("cencori/".length);
+    }
+    return modelId;
+};
+
 const OPENAI_COMPATIBLE_ENV_KEYS: Record<string, string> = {
     openai: "OPENAI_API_KEY",
     groq: "GROQ_API_KEY",
@@ -214,10 +223,11 @@ export async function POST(req: NextRequest) {
         }
 
         // Apply config model — dashboard config overrides client request
-        const model = config.model || body.model;
-        if (!model) {
+        const configuredModel = config.model || body.model;
+        if (!configuredModel) {
             return new NextResponse("No model configured. Set a model in the agent dashboard.", { status: 400 });
         }
+        const model = normalizeGatewayModelId(configuredModel);
 
         // Inject system prompt from config
         if (config.system_prompt) {
