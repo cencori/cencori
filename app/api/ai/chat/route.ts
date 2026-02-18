@@ -305,6 +305,13 @@ export async function POST(req: NextRequest) {
         environment,
         key_type,
         allowed_domains,
+        agent_id,
+        agents (
+            id,
+            name,
+            is_active,
+            shadow_mode
+        ),
         projects!inner(
           id,
           organization_id,
@@ -327,6 +334,33 @@ export async function POST(req: NextRequest) {
                 { error: 'Invalid API key' },
                 { status: 401 }
             );
+        }
+
+        // Handle Agent Identity
+        let agentIdentity = null;
+        // @ts-ignore
+        if (keyData.key_type === 'agent' || apiKey.startsWith('cake_')) {
+            if (!keyData.agent_id) {
+                return NextResponse.json(
+                    { error: 'Invalid Agent Key: No agent associated with this key' },
+                    { status: 401 }
+                );
+            }
+
+            // @ts-ignore
+            const rawAgent = keyData.agents;
+            const agent = Array.isArray(rawAgent) ? rawAgent[0] : rawAgent;
+
+            if (agent && !agent.is_active) {
+                return NextResponse.json(
+                    { error: 'Agent is disabled', message: 'This agent has been deactivated.' },
+                    { status: 403 }
+                );
+            }
+            if (agent) {
+                agentIdentity = agent;
+                console.log('[Agent Identity] Request from:', agent.name);
+            }
         }
 
 

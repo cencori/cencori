@@ -39,16 +39,61 @@ export async function OPTIONS() {
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
 
-    // Extract API key from Authorization header
+    // 1. Try API Key Auth (Legacy/External)
     const authHeader = req.headers.get('Authorization');
     const apiKey = req.headers.get('CENCORI_API_KEY')
-        || (authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '').trim() : null);
+        || (authHeader?.startsWith('Bearer cencori_') ? authHeader.replace('Bearer ', '').trim() : null);
 
-    if (!apiKey) {
+    let isAuthenticated = false;
+
+    if (apiKey) {
+        // Validate API key
+        const supabase = createAdminClient();
+        const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+        const { data: keyData, error: keyError } = await supabase
+            .from('api_keys')
+            .select('id, project_id')
+            .eq('key_hash', keyHash)
+            .is('revoked_at', null)
+            .single();
+
+        if (keyError || !keyData) {
+            return addGatewayHeaders(
+                NextResponse.json({
+                    error: {
+                        message: 'Invalid API key',
+                        type: 'invalid_request_error',
+                        code: 'invalid_api_key'
+                    }
+                }, { status: 401 }),
+                { requestId }
+            );
+        }
+        isAuthenticated = true;
+    } else if (authHeader && !authHeader.startsWith('Bearer cencori_')) {
+        // 2. Try User Session Auth (OpenClaw Gateway)
+        // If the header is NOT a cencori_ key, assume it's a Supabase JWT
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: authHeader } },
+        });
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (!authError && user) {
+            isAuthenticated = true;
+        }
+    }
+
+    if (!isAuthenticated) {
+        // 3. Unauthorized
         return addGatewayHeaders(
             NextResponse.json({
                 error: {
-                    message: 'Missing API key. Use Authorization: Bearer <api_key> or CENCORI_API_KEY header',
+                    message: 'Missing API key or valid session. Use Authorization: Bearer <key>',
                     type: 'invalid_request_error',
                     code: 'missing_api_key'
                 }
@@ -57,30 +102,7 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    // Validate API key
-    const supabase = createAdminClient();
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
-    const { data: keyData, error: keyError } = await supabase
-        .from('api_keys')
-        .select('id, project_id')
-        .eq('key_hash', keyHash)
-        .is('revoked_at', null)
-        .single();
-
-    if (keyError || !keyData) {
-        return addGatewayHeaders(
-            NextResponse.json({
-                error: {
-                    message: 'Invalid API key',
-                    type: 'invalid_request_error',
-                    code: 'invalid_api_key'
-                }
-            }, { status: 401 }),
-            { requestId }
-        );
-    }
-
-    // Optional filtering by provider or type
+    // Optional filtering by provider or type (Restored Feature)
     const url = new URL(req.url);
     const filterProvider = url.searchParams.get('provider');
     const filterType = url.searchParams.get('type');
