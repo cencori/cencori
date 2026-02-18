@@ -119,6 +119,9 @@ If you prefer OpenClaw's provider config (`~/.openclaw/openclaw.json`) instead o
 
 This works without an `X-Agent-ID` header. Cencori resolves the agent from the API key automatically.
 
+Use raw model IDs in OpenClaw (for example `gemini-2.5-flash` or `llama-3.3-70b-versatile`).
+`cencori/<model>` aliases are also accepted for compatibility, but raw IDs are recommended.
+
 ### 5. Monitor & Control
 
 Switch to the **Live Feed** tab to watch the agent's activity in real-time. If **Shadow Mode** is enabled, you'll be prompted to approve or reject risky actions before they execute.
@@ -185,6 +188,11 @@ Each intercepted action appears in the Live Feed with **Approve** / **Reject** b
 - Check that your machine can reach `https://cencori.com/api/v1/`
 - Regenerate the key from Configuration if needed
 - If using `CENCORI_AGENT_ID`, confirm it matches the agent shown in the Configuration tab
+
+### HTTP 405 from OpenClaw
+- Set provider `baseUrl` to `https://<your-domain>/api/v1` (not `/api/v1/chat/completions`)
+- Keep `api` set to `openai-completions` so OpenClaw calls the correct endpoint
+- Use a raw model ID like `gemini-2.5-flash` if your provider setup is strict about model names
 
 ### Agent not picking up new model
 - The agent syncs config on each heartbeat (every 30 seconds)
