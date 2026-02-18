@@ -229,12 +229,9 @@ export async function POST(req: NextRequest) {
             const lastMessage =
                 typeof lastMsg?.content === "string" ? lastMsg.content : JSON.stringify(lastMsg?.content ?? "");
 
-            const geminiChatConfig: {
-                history: Array<{ role: string; parts: Array<{ text: string }> }>;
-                systemInstruction?: { parts: Array<{ text: string }> };
-            } = { history };
+            const geminiChatConfig: Parameters<typeof geminiModel.startChat>[0] = { history };
             if (typeof systemInstruction === "string") {
-                geminiChatConfig.systemInstruction = { parts: [{ text: systemInstruction }] };
+                geminiChatConfig.systemInstruction = systemInstruction;
             }
 
             const chat = geminiModel.startChat(geminiChatConfig);
