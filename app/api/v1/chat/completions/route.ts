@@ -3,6 +3,7 @@ import { OpenAI } from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { detectProviderFromModel } from "@/lib/providers/config";
+import { OPENAI_COMPATIBLE_ENDPOINTS } from "@/lib/providers/openai-compatible";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import {
     validateGatewayRequest,
@@ -31,6 +32,20 @@ type ChatRequestBody = {
     messages?: ChatMessage[];
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+};
+
+const OPENAI_COMPATIBLE_ENV_KEYS: Record<string, string> = {
+    openai: "OPENAI_API_KEY",
+    groq: "GROQ_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    together: "TOGETHER_API_KEY",
+    perplexity: "PERPLEXITY_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+    xai: "XAI_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    qwen: "QWEN_API_KEY",
+    meta: "TOGETHER_API_KEY",
+    huggingface: "HUGGINGFACE_API_KEY",
 };
 
 /**
@@ -272,9 +287,21 @@ export async function POST(req: NextRequest) {
             return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
 
         } else {
-            // ── OpenAI Path ──
-            const openaiKey = process.env.OPENAI_API_KEY;
-            const openai = new OpenAI({ apiKey: openaiKey });
+            // ── OpenAI-compatible Path (OpenAI, Groq, Mistral, etc.) ──
+            const providerKeyEnv = OPENAI_COMPATIBLE_ENV_KEYS[provider];
+            const providerApiKey = providerKeyEnv ? process.env[providerKeyEnv] : undefined;
+            if (!providerApiKey) {
+                return NextResponse.json(
+                    { error: `Provider API key missing for '${provider}'. Set ${providerKeyEnv || "provider key env"} on the server.` },
+                    { status: 500 }
+                );
+            }
+
+            const providerEndpoint = provider === "openai" ? null : OPENAI_COMPATIBLE_ENDPOINTS[provider];
+            const openai = new OpenAI({
+                apiKey: providerApiKey,
+                ...(providerEndpoint ? { baseURL: providerEndpoint.baseURL } : {}),
+            });
 
             const openAiMessages = messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
             const response = await openai.chat.completions.create({
@@ -361,7 +388,7 @@ export async function POST(req: NextRequest) {
 
                     // Usage tracking
                     if (gatewayCtx) {
-                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider: 'openai', status: 'success' }).catch(console.error);
+                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
                         incrementUsage(gatewayCtx).catch(console.error);
                     }
                 }
