@@ -4,6 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { detectProviderFromModel } from "@/lib/providers/config";
 import { OPENAI_COMPATIBLE_ENDPOINTS } from "@/lib/providers/openai-compatible";
+import { AnthropicProvider } from "@/lib/providers/anthropic";
+import { CohereProvider } from "@/lib/providers/cohere";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import {
     validateGatewayRequest,
@@ -26,6 +28,11 @@ type ToolCallPayload = {
 type ChatMessage = {
     role: "system" | "user" | "assistant" | "tool" | string;
     content: unknown;
+};
+type UnifiedMessage = {
+    role: "system" | "user" | "assistant" | "tool";
+    content: string;
+    toolCallId?: string;
 };
 type ChatRequestBody = {
     model?: string;
@@ -221,6 +228,13 @@ export async function POST(req: NextRequest) {
             ];
         }
 
+        const toUnifiedMessages = (items: ChatMessage[]): UnifiedMessage[] => {
+            return items.map((m) => ({
+                role: (m.role === "system" || m.role === "assistant" || m.role === "tool") ? m.role : "user",
+                content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+            }));
+        };
+
         // ── Provider Routing ──
         const provider = detectProviderFromModel(model) || 'openai';
 
@@ -286,6 +300,56 @@ export async function POST(req: NextRequest) {
             });
             return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
 
+        } else if (provider === "anthropic" || provider === "cohere") {
+            // ── Non-OpenAI Native Adapters (Anthropic/Cohere) ──
+            const providerImpl = provider === "anthropic"
+                ? new AnthropicProvider(process.env.ANTHROPIC_API_KEY)
+                : new CohereProvider(process.env.COHERE_API_KEY || "");
+
+            const streamResponse = new ReadableStream({
+                async start(controller) {
+                    try {
+                        const unifiedMessages = toUnifiedMessages(messages);
+                        const stream = providerImpl.stream({
+                            model,
+                            messages: unifiedMessages,
+                        });
+
+                        for await (const chunk of stream) {
+                            if (chunk.delta) {
+                                const openaiChunk = {
+                                    id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
+                                    object: "chat.completion.chunk",
+                                    created: Math.floor(Date.now() / 1000),
+                                    model,
+                                    choices: [{
+                                        index: 0,
+                                        delta: { content: chunk.delta },
+                                        finish_reason: chunk.finishReason || null
+                                    }]
+                                };
+                                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+                            }
+                        }
+
+                        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                        controller.close();
+
+                        if (gatewayCtx) {
+                            logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
+                            incrementUsage(gatewayCtx).catch(console.error);
+                        }
+                    } catch (error: unknown) {
+                        console.error(`[Gateway] ${provider} streaming error:`, error);
+                        controller.error(error);
+                    }
+                }
+            });
+
+            const response = new NextResponse(streamResponse, {
+                headers: { "Content-Type": "text/event-stream" }
+            });
+            return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
         } else {
             // ── OpenAI-compatible Path (OpenAI, Groq, Mistral, etc.) ──
             const providerKeyEnv = OPENAI_COMPATIBLE_ENV_KEYS[provider];
