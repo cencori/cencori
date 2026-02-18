@@ -432,7 +432,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
                                     }`}
                             >
-                                {isActive ? "Active" : "Stopped"}
+                                {isActive ? "Actived" : "Deactivated"}
                             </Badge>
                         </h1>
                         <p className="text-xs text-muted-foreground">
@@ -448,8 +448,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                         onClick={() => handleToggleActive(!isActive)}
                         disabled={isPending}
                     >
-                        <Power className="w-4 h-4" />
-                        {isActive ? "Stop Agent" : "Start Agent"}
+                        {isActive ? "Deactivate" : "Activate"}
                     </Button>
                 </div>
             </div>

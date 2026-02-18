@@ -131,7 +131,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Latest multimodal Llama' },
             { id: 'llama-4-scout', name: 'Llama 4 Scout', type: 'chat', contextWindow: 256000, description: 'Advanced Llama 4 model' },
             // Llama 3.3
-            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', type: 'chat', contextWindow: 128000, description: 'Latest Llama 3 model' },
+            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: 'chat', contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model' },
             { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: 'chat', contextWindow: 128000, description: 'Ultra-fast inference' },
             { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', type: 'chat', contextWindow: 32768, description: 'MoE architecture' },
         ],
