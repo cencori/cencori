@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Terminal, Blocks } from "lucide-react";
 import { Microsoft, GoogleCloud, Cloudflare } from "@lobehub/icons";
-import { N8nLogo, ZapierLogo, MakeLogo } from "@/components/icons/BrandIcons";
+import { N8nLogo, ZapierLogo, MakeLogo, OpenClawLogo, AutoGPTLogo, CrewAILogo } from "@/components/icons/BrandIcons";
 import Link from "next/link";
 
 const sdks = [
@@ -129,6 +129,30 @@ const enterprise = [
     },
 ];
 
+const agents = [
+    {
+        name: "OpenClaw",
+        description: "Autonomous desktop operator with Shadow Mode",
+        icon: <OpenClawLogo className="w-5 h-5" />,
+        docsUrl: "/docs/agents/overview",
+        status: "stable" as const,
+    },
+    {
+        name: "AutoGPT",
+        description: "Recursive task-solving agent blueprint",
+        icon: <AutoGPTLogo className="w-5 h-5" />,
+        docsUrl: "/docs/agents/overview",
+        status: "stable" as const,
+    },
+    {
+        name: "CrewAI",
+        description: "Multi-agent orchestration framework",
+        icon: <CrewAILogo className="w-5 h-5" />,
+        docsUrl: "/docs/agents/overview",
+        status: "stable" as const,
+    },
+];
+
 const frameworks = [
     {
         name: "LangChain",
@@ -168,6 +192,32 @@ export default function IntegrationsPage() {
             <div className="mb-8">
                 <h1 className="text-base font-medium">Integrations</h1>
             </div>
+
+            <section className="mb-8">
+                <h2 className="text-[13px] font-medium mb-4">Autonomous Agents</h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {agents.map((agent) => (
+                        <div key={agent.name} className="bg-card border border-border/40 rounded-md p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded bg-muted/50 flex items-center justify-center">
+                                        {agent.icon}
+                                    </div>
+                                    <span className="text-[13px] font-medium">{agent.name}</span>
+                                </div>
+                                <StatusBadge status={agent.status} />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2 mb-3">{agent.description}</p>
+                            <Button variant="outline" size="sm" className="h-6 text-[11px] px-2 w-full" asChild>
+                                <Link href={agent.docsUrl}>
+                                    View Docs <ExternalLink className="h-3 w-3 ml-1" />
+                                </Link>
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
             <section className="mb-8">
                 <h2 className="text-[13px] font-medium mb-4">SDKs</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

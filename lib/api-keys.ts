@@ -12,7 +12,7 @@ const API_KEY_LENGTH = 32;
  * Generates a secure random API key
  * Format: cen_<32 random characters>
  */
-export function generateApiKey(): string {
+export function generateApiKey(prefix: string = API_KEY_PREFIX): string {
     // Generate random bytes and convert to base58 (no confusing characters)
     const base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     let result = "";
@@ -22,7 +22,7 @@ export function generateApiKey(): string {
         result += base58Chars[randomIndex];
     }
 
-    return `${API_KEY_PREFIX}${result}`;
+    return `${prefix}${result}`;
 }
 
 /**

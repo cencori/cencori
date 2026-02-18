@@ -1,0 +1,149 @@
+---
+title: "OpenClaw"
+description: "Deploy and configure the OpenClaw autonomous desktop operator with Cencori."
+section: "Agents"
+order: 2
+---
+
+# OpenClaw
+
+**OpenClaw** is an autonomous desktop operator that controls your mouse, keyboard, and browser. It runs as a local daemon on your machine and connects to the Cencori Brain for model routing, configuration, and real-time monitoring.
+
+> [!TIP]
+> OpenClaw is model-agnostic. It uses Cencori as its "Remote Brain," meaning you can switch between GPT-4o, Gemini, Claude, and more from the dashboard—without touching the local agent.
+
+## Architecture
+
+<GhostContainer maxWidth="xl">
+
+<GhostLabel>OpenClaw Connection Flow</GhostLabel>
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  <GhostBox label="Local Machine" className="border border-current/20">
+    <GhostBoxTitle>OpenClaw Daemon</GhostBoxTitle>
+    <GhostBoxContent>Runs locally. Captures desktop state, screenshots, and executes tool calls.</GhostBoxContent>
+    <GhostGrid items="Mouse Control, Keyboard Input, Browser Automation, File System" columns={2} className="mt-3" />
+  </GhostBox>
+  <GhostBox label="Cencori Cloud" variant="muted" className="border border-current/20">
+    <GhostBoxTitle>AI Gateway</GhostBoxTitle>
+    <GhostBoxContent>Receives agent requests at /api/v1/chat/completions, injects config, and routes to providers.</GhostBoxContent>
+    <GhostGrid items="Model Routing, Shadow Mode, Key Auth, Audit Logging" columns={2} className="mt-3" />
+  </GhostBox>
+</div>
+
+<GhostArrow label="authenticated via cake_ key" />
+
+<GhostBox label="Intelligence Layer" variant="muted" className="border border-current/20">
+  <GhostBoxTitle>Cencori Brain — Config & Security</GhostBoxTitle>
+  <GhostGrid items="System Prompt Injection, Model Selection, Shadow Mode Intercept, Live Feed Streaming, Cost Tracking, Failover" columns={3} />
+</GhostBox>
+
+<GhostArrow label="routed to selected provider" />
+
+<GhostBox label="Providers" className="border border-current/20">
+  <GhostGrid items="OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI" columns={3} />
+</GhostBox>
+
+<GhostArrow label="streamed" />
+
+<GhostBox label="Response" className="border border-current/20">
+  <GhostBoxTitle>Tool Calls Executed Locally</GhostBoxTitle>
+  <GhostBoxContent>Response streamed back to the daemon. Tool calls (click, type, navigate) are executed on your machine in real-time.</GhostBoxContent>
+</GhostBox>
+
+<GhostCaption>The "Remote Brain" Model — Your machine is the body, Cencori is the brain.</GhostCaption>
+
+</GhostContainer>
+
+## Quick Start
+
+### 1. Deploy from the Marketplace
+
+Navigate to **Agents → Agent Marketplace** in your project dashboard and click **Deploy Agent** on the OpenClaw card.
+
+### 2. Generate an API Key
+
+Go to the agent's **Configuration** tab and click **Generate Key**. Copy the key—you'll only see it once.
+
+### 3. Connect Your Machine
+
+Run the following command in your terminal:
+
+```bash
+npx openclaw connect --key=cake_your_key_here
+```
+
+This connects your local machine to the Cencori Brain. The agent will appear as **"Online"** in the dashboard.
+
+### 4. Monitor & Control
+
+Switch to the **Live Feed** tab to watch the agent's activity in real-time. If **Shadow Mode** is enabled, you'll be prompted to approve or reject risky actions before they execute.
+
+## Capabilities
+
+| Feature | Description |
+|---|---|
+| **Desktop Control** | Full mouse and keyboard automation |
+| **Browser Automation** | Navigate, click, fill forms, extract data |
+| **File System** | Read, write, move, and delete files |
+| **App Interaction** | Launch and control desktop applications |
+| **Screenshot Capture** | Visual state streaming to the dashboard |
+
+## Configuration
+
+All configuration is managed from the Cencori Dashboard—no local `.env` files needed.
+
+### Model Selection
+
+Choose any supported model from the **Configuration** tab:
+
+- **OpenAI**: GPT-4o, GPT-4o Mini
+- **Google**: Gemini 2.0 Flash, Gemini 1.5 Pro
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3.5 Haiku
+- **DeepSeek**: DeepSeek Chat, DeepSeek Reasoner
+
+The agent picks up the new model on its next heartbeat without requiring a restart.
+
+### System Prompt
+
+Customize the agent's persona and instructions from the **System Prompt** editor. For example:
+
+```
+You are a desktop assistant focused on file organization.
+Only modify files within the ~/Documents directory.
+Always ask before deleting anything.
+```
+
+### Shadow Mode
+
+When enabled, Shadow Mode intercepts potentially dangerous actions:
+
+- **Terminal commands** (e.g., `rm -rf`, `sudo`)
+- **File deletions** or moves outside safe directories
+- **External network requests** to unknown domains
+
+Each intercepted action appears in the Live Feed with **Approve** / **Reject** buttons.
+
+## Security
+
+| Mechanism | Detail |
+|---|---|
+| **API Key Auth** | All requests authenticated with `cake_` prefixed keys |
+| **Key Hashing** | Raw keys are never stored; only SHA-256 hashes |
+| **Shadow Mode** | Human-in-the-loop approval for risky operations |
+| **RLS Policies** | Database-level access control per organization |
+
+## Troubleshooting
+
+### Agent stuck on "Waiting for connection"
+- Verify your API key is correct and not expired
+- Check that your machine can reach `https://cencori.com/api/v1/`
+- Regenerate the key from Configuration if needed
+
+### Agent not picking up new model
+- The agent syncs config on each heartbeat (every 30 seconds)
+- Force a refresh by restarting the local daemon
+
+### Shadow Mode not triggering
+- Ensure Shadow Mode is toggled **on** in the Live Feed sidebar
+- Check the agent's system prompt isn't overriding safety instructions
