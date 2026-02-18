@@ -75,6 +75,13 @@ const sidebarItems: SidebarGroup[] = [
         ],
     },
     {
+        title: "Agents",
+        items: [
+            { title: "Overview", href: "/docs/agents/overview" },
+            { title: "OpenClaw", href: "/docs/agents/openclaw" },
+        ],
+    },
+    {
         title: "Platform",
         items: [
             { title: "Architecture", href: "/docs/platform/core-architecture" },

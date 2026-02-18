@@ -1,4 +1,6 @@
 import React from "react";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     className?: string;
@@ -91,6 +93,8 @@ export { Cursor as CursorLogo } from "@lobehub/icons";
 // AI Editor Logos - Re-exported from @lobehub/icons
 export { Windsurf as WindsurfLogo } from "@lobehub/icons";
 export { Claude as ClaudeLogo } from "@lobehub/icons";
+export { CrewAI as CrewAILogo } from "@lobehub/icons";
+export { N8n as N8nLogo } from "@lobehub/icons";
 
 // Framework Logos (custom SVGs - not available in @lobehub/icons)
 interface FrameworkIconProps extends React.SVGProps<SVGSVGElement> {
@@ -284,15 +288,7 @@ export function GoogleCloudLogo({ className, ...props }: IconProps) {
     );
 }
 
-// n8n Logo
-export function N8nLogo({ className, ...props }: IconProps) {
-    return (
-        <svg viewBox="0 0 128 128" className={className} {...props}>
-            <path fill="#FF6D5A" d="M64 5.901l57.142 32.991v65.982L64 137.865 6.858 104.874V38.892L64 5.901z" opacity="0" />
-            <path d="M66.44 60.66V33.88h-9.88v29.08c0 9.14 3.76 13.56 12.06 13.56h5.36v-8.76h-2.58c-4.14 0-4.96-1.74-4.96-6.14V60.66zM46.74 38.64h-3.32c-4.14 0-4.96 1.74-4.96 6.14v31.78H28.58V33.88h14.82v8.12c2.28-6.16 6.5-9 14-9h5.36v8.76h-4c-8.3-.02-12.02 4.4-12.02 13.54v21.26h-9.88V38.64h-.12zM80.72 76.56h3.32c4.14 0 4.96-1.74 4.96-6.14V38.64h9.88v37.92H84.06v-8.12c-2.28 6.16-6.5 9-14 9H64.7v-8.76h4c8.3.02 12.02-4.4 12.02-13.54V38.64h9.88v21.26c0 10.32 4.7 13.62 12.64 12.44l-1.38-8.52c-2.74.42-3.72-.56-3.72-3.92V38.64h9.88v24.64c0 12.16-5.46 19.38-19.46 17.06l1.32-8.54c5.18.52 7.02-1.9 7.02-6.54v-8.7z" fill="#FF6D5A" />
-        </svg>
-    );
-}
+
 
 // Zapier Logo
 export function ZapierLogo({ className, ...props }: IconProps) {
@@ -309,6 +305,44 @@ export function MakeLogo({ className, ...props }: IconProps) {
         <svg viewBox="0 0 128 128" className={className} {...props}>
             <circle cx="64" cy="64" r="64" fill="#6f00e6" />
             <path fill="#fff" d="M35.5 45.5h16.2v37H35.5zM76.3 45.5h16.2v37H76.3zM55.9 82.5V59.4l8.1 11.2 8.1-11.2v23.1h13.2V45.5h-10.8L64 59.9 53.5 45.5H42.7v37h13.2z" />
+        </svg>
+    );
+}
+
+// OpenClaw Logo (Custom Placeholder)
+export function OpenClawLogo({ className, ...props }: any) {
+    return (
+        <div className={cn("relative overflow-hidden rounded-md", className)} {...props}>
+            <Image
+                src="/oc.JPG"
+                alt="OpenClaw"
+                fill
+                className="object-cover"
+                sizes="64px"
+            />
+        </div>
+    );
+}
+
+// AutoGPT Logo (Custom Placeholder)
+export function AutoGPTLogo({ className, ...props }: any) {
+    return (
+        <div className={cn("relative overflow-hidden rounded-md", className)} {...props}>
+            <Image
+                src="/autogpt.png"
+                alt="AutoGPT"
+                fill
+                className="object-cover"
+                sizes="64px"
+            />
+        </div>
+    );
+}
+// Custom Agent Logo (User Provided)
+export function CustomAgentLogo({ className, ...props }: IconProps) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className} {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" />
         </svg>
     );
 }
