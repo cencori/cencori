@@ -3,6 +3,9 @@ import { OpenAI } from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { detectProviderFromModel } from "@/lib/providers/config";
+import { OPENAI_COMPATIBLE_ENDPOINTS } from "@/lib/providers/openai-compatible";
+import { AnthropicProvider } from "@/lib/providers/anthropic";
+import { CohereProvider } from "@/lib/providers/cohere";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import {
     validateGatewayRequest,
@@ -26,11 +29,30 @@ type ChatMessage = {
     role: "system" | "user" | "assistant" | "tool" | string;
     content: unknown;
 };
+type UnifiedMessage = {
+    role: "system" | "user" | "assistant" | "tool";
+    content: string;
+    toolCallId?: string;
+};
 type ChatRequestBody = {
     model?: string;
     messages?: ChatMessage[];
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+};
+
+const OPENAI_COMPATIBLE_ENV_KEYS: Record<string, string> = {
+    openai: "OPENAI_API_KEY",
+    groq: "GROQ_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    together: "TOGETHER_API_KEY",
+    perplexity: "PERPLEXITY_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+    xai: "XAI_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    qwen: "QWEN_API_KEY",
+    meta: "TOGETHER_API_KEY",
+    huggingface: "HUGGINGFACE_API_KEY",
 };
 
 /**
@@ -206,6 +228,13 @@ export async function POST(req: NextRequest) {
             ];
         }
 
+        const toUnifiedMessages = (items: ChatMessage[]): UnifiedMessage[] => {
+            return items.map((m) => ({
+                role: (m.role === "system" || m.role === "assistant" || m.role === "tool") ? m.role : "user",
+                content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+            }));
+        };
+
         // ── Provider Routing ──
         const provider = detectProviderFromModel(model) || 'openai';
 
@@ -271,10 +300,72 @@ export async function POST(req: NextRequest) {
             });
             return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
 
+        } else if (provider === "anthropic" || provider === "cohere") {
+            // ── Non-OpenAI Native Adapters (Anthropic/Cohere) ──
+            const providerImpl = provider === "anthropic"
+                ? new AnthropicProvider(process.env.ANTHROPIC_API_KEY)
+                : new CohereProvider(process.env.COHERE_API_KEY || "");
+
+            const streamResponse = new ReadableStream({
+                async start(controller) {
+                    try {
+                        const unifiedMessages = toUnifiedMessages(messages);
+                        const stream = providerImpl.stream({
+                            model,
+                            messages: unifiedMessages,
+                        });
+
+                        for await (const chunk of stream) {
+                            if (chunk.delta) {
+                                const openaiChunk = {
+                                    id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
+                                    object: "chat.completion.chunk",
+                                    created: Math.floor(Date.now() / 1000),
+                                    model,
+                                    choices: [{
+                                        index: 0,
+                                        delta: { content: chunk.delta },
+                                        finish_reason: chunk.finishReason || null
+                                    }]
+                                };
+                                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+                            }
+                        }
+
+                        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                        controller.close();
+
+                        if (gatewayCtx) {
+                            logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
+                            incrementUsage(gatewayCtx).catch(console.error);
+                        }
+                    } catch (error: unknown) {
+                        console.error(`[Gateway] ${provider} streaming error:`, error);
+                        controller.error(error);
+                    }
+                }
+            });
+
+            const response = new NextResponse(streamResponse, {
+                headers: { "Content-Type": "text/event-stream" }
+            });
+            return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
         } else {
-            // ── OpenAI Path ──
-            const openaiKey = process.env.OPENAI_API_KEY;
-            const openai = new OpenAI({ apiKey: openaiKey });
+            // ── OpenAI-compatible Path (OpenAI, Groq, Mistral, etc.) ──
+            const providerKeyEnv = OPENAI_COMPATIBLE_ENV_KEYS[provider];
+            const providerApiKey = providerKeyEnv ? process.env[providerKeyEnv] : undefined;
+            if (!providerApiKey) {
+                return NextResponse.json(
+                    { error: `Provider API key missing for '${provider}'. Set ${providerKeyEnv || "provider key env"} on the server.` },
+                    { status: 500 }
+                );
+            }
+
+            const providerEndpoint = provider === "openai" ? null : OPENAI_COMPATIBLE_ENDPOINTS[provider];
+            const openai = new OpenAI({
+                apiKey: providerApiKey,
+                ...(providerEndpoint ? { baseURL: providerEndpoint.baseURL } : {}),
+            });
 
             const openAiMessages = messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
             const response = await openai.chat.completions.create({
@@ -361,7 +452,7 @@ export async function POST(req: NextRequest) {
 
                     // Usage tracking
                     if (gatewayCtx) {
-                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider: 'openai', status: 'success' }).catch(console.error);
+                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
                         incrementUsage(gatewayCtx).catch(console.error);
                     }
                 }
