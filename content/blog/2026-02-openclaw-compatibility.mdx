@@ -1,0 +1,110 @@
+---
+title: "Run OpenClaw With Cencori"
+slug: "openclaw-compatibility"
+date: "2026-02-18"
+excerpt: "OpenClaw now works with Cencori using the standard OpenAI-compatible setup: base URL + API key. No custom header required."
+coverImage: "/blog/images/covers/openclaw.png"
+tags: ["Product", "Agents", "OpenClaw", "Integration"]
+published: true
+---
+
+OpenClaw users can now connect directly to Cencori using the normal OpenAI-compatible flow:
+
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- optional `CENCORI_AGENT_ID`
+
+No extra protocol, no custom gateway glue, no required `X-Agent-ID` header.
+
+If your tool can target an OpenAI-compatible endpoint, it can use Cencori.
+
+## Why This Matters
+
+OpenClaw is a strong agent runtime for desktop automation. Cencori adds the production layer around it:
+
+- centralized model routing
+- configurable system prompts
+- live monitoring
+- safety approvals with Shadow Mode
+- usage and cost tracking
+
+So you keep OpenClaw’s autonomy and add control from one dashboard.
+
+## Quick Start
+
+### 1. Deploy OpenClaw from Agent Marketplace
+
+In Cencori:
+- go to `Agents -> Agent Marketplace`
+- deploy the OpenClaw blueprint
+- open the agent’s Configuration tab
+
+### 2. Generate your Cencori API key
+
+Create or roll a key in the same Configuration page.
+
+### 3. Connect OpenClaw using environment variables
+
+```bash
+export OPENAI_BASE_URL=https://cencori.com/api/v1
+export OPENAI_API_KEY=cake_your_key_here
+# Optional: force a specific agent (multi-agent setups)
+export CENCORI_AGENT_ID=your_agent_id
+```
+
+Then run OpenClaw:
+
+```bash
+openclaw onboard
+```
+
+### 4. Optional: use OpenClaw provider config file
+
+If you prefer `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "models": {
+    "providers": {
+      "cencori": {
+        "baseUrl": "https://cencori.com/api/v1",
+        "apiKey": "cake_your_key_here",
+        "api": "openai-completions"
+      }
+    }
+  }
+}
+```
+
+## What Happens in Cencori
+
+Once connected:
+
+- all requests route through your Cencori gateway
+- selected model in Agent Configuration is applied
+- system prompt is injected from dashboard config
+- actions appear in Live Feed
+- Shadow Mode can require approval before risky tool execution
+
+## Important Behavior
+
+`CENCORI_AGENT_ID` is optional.
+
+By default, Cencori resolves the agent from the API key.  
+Set `CENCORI_AGENT_ID` only when you want explicit routing in multi-agent workflows.
+
+## Recommended First Run
+
+For safety, start with:
+- `Shadow Mode` on
+- a test API key
+- a constrained prompt (limited directories/domains)
+
+This gives you fast validation with guardrails before broader rollout.
+
+## Start Here
+
+- OpenClaw docs: `/docs/agents/openclaw`
+- Agents overview: `/docs/agents/overview`
+
+If you're already using OpenClaw, point it to Cencori and you’re live.
