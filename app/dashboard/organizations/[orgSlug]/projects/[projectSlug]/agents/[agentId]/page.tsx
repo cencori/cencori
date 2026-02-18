@@ -47,12 +47,13 @@ export default async function AgentPage({ params }: AgentPageProps) {
         system_prompt: config?.system_prompt || "",
     };
 
-    // 3. Fetch Keys (Check if exists)
+    // 3. Fetch Keys (Check if non-revoked key exists)
     const { data: apiKeyData } = await supabase
         .from('api_keys')
         .select('key_hash')
         .eq('project_id', agentData.project_id)
         .like('name', `Agent ${agentId} Key%`)
+        .is('revoked_at', null)
         .limit(1)
         .maybeSingle();
 

@@ -71,7 +71,7 @@ export async function createAgent({
         project_id: projectId,
         key_hash: keyHash,
         key_prefix: 'cake_',
-        name: `Agent ${agent.id} Key (${name})`
+        name: `Agent ${agent.id} Key`
     });
 
     if (keyError) {
