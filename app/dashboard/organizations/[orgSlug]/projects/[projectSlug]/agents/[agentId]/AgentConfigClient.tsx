@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
-    Power,
     Eye,
     EyeOff,
     Copy,
@@ -57,7 +56,21 @@ import {
 
 import { OpenClawLogo, AutoGPTLogo, N8nLogo, CrewAILogo, PythonLogo, CustomAgentLogo } from "@/components/icons/BrandIcons";
 import AgentLiveFeed from "./AgentLiveFeed";
-import { generateAgentKey, getAgentTelemetry, type AgentTelemetry, updateAgentConfig, updateAgentName, deleteAgent } from "./actions";
+import {
+    generateAgentKey,
+    getAgentTelemetry,
+    type AgentTelemetry,
+    getN8nConnection,
+    installN8nStarterWorkflow,
+    setN8nWorkflowActive,
+    saveN8nConnection,
+    syncN8nWorkflowHealth,
+    testN8nConnection,
+    disconnectN8nConnection,
+    updateAgentConfig,
+    updateAgentName,
+    deleteAgent
+} from "./actions";
 import { SUPPORTED_PROVIDERS } from "@/lib/providers/config";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -125,6 +138,23 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const [agentName, setAgentName] = useState(agent.name);
     const [editingName, setEditingName] = useState(false);
     const [pendingAgentName, setPendingAgentName] = useState(agent.name);
+    const [n8nBaseUrl, setN8nBaseUrl] = useState("");
+    const [n8nApiKey, setN8nApiKey] = useState("");
+    const [n8nWorkspaceId, setN8nWorkspaceId] = useState("");
+    const [n8nStatus, setN8nStatus] = useState<"connected" | "error" | "disconnected">("disconnected");
+    const [n8nLastTestedAt, setN8nLastTestedAt] = useState<string | null>(null);
+    const [n8nLastError, setN8nLastError] = useState<string | null>(null);
+    const [n8nHasSavedApiKey, setN8nHasSavedApiKey] = useState(false);
+    const [n8nLoading, setN8nLoading] = useState(false);
+    const [n8nWorkflowUrl, setN8nWorkflowUrl] = useState<string | null>(null);
+    const [n8nWorkflowId, setN8nWorkflowId] = useState<string | null>(null);
+    const [n8nWorkflowActive, setN8nWorkflowActiveState] = useState(false);
+    const [n8nTemplateVersion, setN8nTemplateVersion] = useState<string | null>(null);
+    const [n8nInstalledAt, setN8nInstalledAt] = useState<string | null>(null);
+    const [n8nLastExecutionAt, setN8nLastExecutionAt] = useState<string | null>(null);
+    const [n8nLastExecutionStatus, setN8nLastExecutionStatus] = useState<string | null>(null);
+    const [n8nExecutionSuccessRate, setN8nExecutionSuccessRate] = useState<number | null>(null);
+    const [n8nExecutionAvgDurationMs, setN8nExecutionAvgDurationMs] = useState<number | null>(null);
 
     // Persist changes when toggles change
     const handleToggleActive = (val: boolean) => {
@@ -189,6 +219,171 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
         }
     };
 
+    const loadN8nConnection = async () => {
+        if (agent.blueprint !== "n8n") return;
+        setN8nLoading(true);
+        try {
+            const data = await getN8nConnection(agent.id);
+            if (!data) return;
+            setN8nBaseUrl(data.baseUrl);
+            setN8nWorkspaceId(data.workspaceId || "");
+            setN8nStatus(data.connectionStatus);
+            setN8nLastTestedAt(data.lastTestedAt);
+            setN8nLastError(data.lastError);
+            setN8nHasSavedApiKey(data.hasApiKey);
+            setN8nWorkflowId(data.starterWorkflowId);
+            setN8nWorkflowUrl(data.starterWorkflowUrl);
+            setN8nWorkflowActiveState(data.workflowActive);
+            setN8nTemplateVersion(data.starterTemplateVersion);
+            setN8nInstalledAt(data.starterInstalledAt);
+            setN8nLastExecutionAt(data.lastExecutionAt);
+            setN8nLastExecutionStatus(data.lastExecutionStatus);
+            setN8nExecutionSuccessRate(data.executionSuccessRate);
+            setN8nExecutionAvgDurationMs(data.executionAvgDurationMs);
+        } catch {
+            toast.error("Failed to load n8n connection");
+        } finally {
+            setN8nLoading(false);
+        }
+    };
+
+    const handleSaveN8n = () => {
+        if (!n8nBaseUrl.trim()) {
+            toast.error("n8n Base URL is required");
+            return;
+        }
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await saveN8nConnection({
+                    agentId: agent.id,
+                    path: window.location.pathname,
+                    baseUrl: n8nBaseUrl,
+                    apiKey: n8nApiKey,
+                    workspaceId: n8nWorkspaceId,
+                });
+                setN8nApiKey("");
+                setN8nHasSavedApiKey(true);
+                setN8nStatus("disconnected");
+                setN8nLastError(null);
+                toast.success("n8n connection saved");
+            } catch {
+                toast.error("Failed to save n8n connection");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleTestN8n = () => {
+        if (!n8nBaseUrl.trim()) {
+            toast.error("Enter n8n Base URL first");
+            return;
+        }
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await saveN8nConnection({
+                    agentId: agent.id,
+                    path: window.location.pathname,
+                    baseUrl: n8nBaseUrl,
+                    apiKey: n8nApiKey,
+                    workspaceId: n8nWorkspaceId,
+                });
+                const result = await testN8nConnection(agent.id, window.location.pathname);
+                await loadN8nConnection();
+                setN8nApiKey("");
+                if (result.success) {
+                    toast.success(result.message);
+                } else {
+                    toast.error(result.message);
+                }
+            } catch {
+                toast.error("Failed to test n8n connection");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleDisconnectN8n = () => {
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await disconnectN8nConnection(agent.id, window.location.pathname);
+                setN8nBaseUrl("");
+                setN8nApiKey("");
+                setN8nWorkspaceId("");
+                setN8nStatus("disconnected");
+                setN8nLastError(null);
+                setN8nLastTestedAt(null);
+                setN8nHasSavedApiKey(false);
+                setN8nWorkflowUrl(null);
+                setN8nWorkflowId(null);
+                setN8nWorkflowActiveState(false);
+                setN8nTemplateVersion(null);
+                setN8nInstalledAt(null);
+                setN8nLastExecutionAt(null);
+                setN8nLastExecutionStatus(null);
+                setN8nExecutionSuccessRate(null);
+                setN8nExecutionAvgDurationMs(null);
+                toast.success("n8n disconnected");
+            } catch {
+                toast.error("Failed to disconnect n8n");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleInstallStarterWorkflow = () => {
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                const result = await installN8nStarterWorkflow(agent.id, window.location.pathname);
+                if (result.workflowId) setN8nWorkflowId(result.workflowId);
+                if (result.workflowUrl) setN8nWorkflowUrl(result.workflowUrl);
+                await loadN8nConnection();
+                toast.success("Starter workflow installed in n8n");
+            } catch {
+                toast.error("Failed to install starter workflow");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleSetWorkflowActive = (active: boolean) => {
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await setN8nWorkflowActive(agent.id, window.location.pathname, active);
+                setN8nWorkflowActiveState(active);
+                await loadN8nConnection();
+                toast.success(active ? "Workflow published" : "Workflow unpublished");
+            } catch {
+                toast.error("Failed to update workflow publish state");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleRefreshN8nHealth = () => {
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await syncN8nWorkflowHealth(agent.id, window.location.pathname);
+                await loadN8nConnection();
+                toast.success("Workflow health refreshed");
+            } catch {
+                toast.error("Failed to refresh n8n workflow health");
+            } finally {
+                setN8nLoading(false);
+            }
+        });
+    };
+
     const handleSaveAgentName = () => {
         const nextName = pendingAgentName.trim();
         if (!nextName) {
@@ -228,25 +423,50 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const isMaskedKey = apiKey === "cake_*****************";
     const keyDisplay = isMaskedKey ? '<YOUR_KEY>' : (apiKey || '<YOUR_KEY>');
 
-    const getConnectCommand = (blueprint: string) => {
-        const envVars = `# Step 2: Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${keyDisplay}\nexport CENCORI_AGENT_ID=${agent.id}`;
+    const getBlueprintSetup = (blueprint: string) => {
+        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${keyDisplay}\nexport CENCORI_AGENT_ID=${agent.id}`;
         switch (blueprint) {
-            case 'openclaw':
-                return `# Step 1: Install OpenClaw\ncurl -sSL https://openclaw.ai/install.sh | bash\n\n${envVars}\n\n# Step 3: Run\nopenclaw onboard`;
-            case 'n8n':
-                return `# Step 1: Install n8n\nnpx n8n\n\n${envVars}`;
-            case 'autogpt':
-                return `# Step 1: Install AutoGPT\npip install autogpt\n\n${envVars}\n\n# Step 3: Run\nautogpt run`;
-            case 'crewai':
-                return `# Step 1: Install CrewAI\npip install crewai\n\n${envVars}`;
-            case 'python-interpreter':
-                return `# Step 1: Install dependencies\npip install openai\n\n${envVars}`;
+            case "openclaw":
+                return {
+                    subtitle: "Autonomous Desktop Operator",
+                    keyHelp: "Use this key to authenticate your local OpenClaw instance.",
+                    command: `# Step 1: Install OpenClaw\ncurl -sSL https://openclaw.ai/install.sh | bash\n\n# Step 2: Configure\n${envVars}\n\n# Step 3: Run\nopenclaw onboard`,
+                };
+            case "n8n":
+                return {
+                    subtitle: "Workflow Automation Agent",
+                    keyHelp: "Use this key in n8n OpenAI credentials (Base URL: https://cencori.com/api/v1).",
+                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://cencori.com/api/v1\n# API Key: ${keyDisplay}\n\n# Step 3: In OpenAI Chat Model node\n# Model: ${selectedModel}\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agent.id}`,
+                };
+            case "autogpt":
+                return {
+                    subtitle: "Autonomous Recursive Agent",
+                    keyHelp: "Use this key to authenticate your AutoGPT runtime.",
+                    command: `# Step 1: Install AutoGPT\npip install autogpt\n\n# Step 2: Configure\n${envVars}\n\n# Step 3: Run\nautogpt run`,
+                };
+            case "crewai":
+                return {
+                    subtitle: "Multi-Agent Orchestration",
+                    keyHelp: "Use this key in your CrewAI environment configuration.",
+                    command: `# Step 1: Install CrewAI\npip install crewai\n\n# Step 2: Configure\n${envVars}`,
+                };
+            case "python-interpreter":
+                return {
+                    subtitle: "Secure Python Execution",
+                    keyHelp: "Use this key in your Python OpenAI client configuration.",
+                    command: `# Step 1: Install dependencies\npip install openai\n\n# Step 2: Configure\n${envVars}`,
+                };
             default:
-                return `${envVars}`;
+                return {
+                    subtitle: "General Purpose Agent",
+                    keyHelp: "Use this key to authenticate your agent runtime.",
+                    command: envVars,
+                };
         }
     };
 
-    const connectCommand = getConnectCommand(agent.blueprint);
+    const blueprintSetup = getBlueprintSetup(agent.blueprint);
+    const connectCommand = blueprintSetup.command;
 
     useEffect(() => {
         let cancelled = false;
@@ -278,6 +498,11 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
             clearInterval(timer);
         };
     }, [agent.id]);
+
+    useEffect(() => {
+        loadN8nConnection();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [agent.id, agent.blueprint]);
 
     useEffect(() => {
         const channel = supabase
@@ -432,11 +657,11 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
                                     }`}
                             >
-                                {isActive ? "Actived" : "Deactivated"}
+                                {isActive ? "Activated" : "Deactivated"}
                             </Badge>
                         </h1>
                         <p className="text-xs text-muted-foreground">
-                            {agent.blueprint === 'openclaw' ? 'Autonomous Desktop Operator' : 'General Purpose Agent'}
+                            {blueprintSetup.subtitle}
                         </p>
                     </div>
                 </div>
@@ -630,7 +855,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                 <p className="text-[10px] text-muted-foreground">
                                     {isMaskedKey
                                         ? "Key is active but hidden for security. Regenerate if you need a new one."
-                                        : "Use this key to authenticate your local OpenClaw instance."}
+                                        : blueprintSetup.keyHelp}
                                 </p>
                             </div>
 
@@ -660,6 +885,214 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                             </div>
                         </div>
                     </section>
+
+                    {/* 2. Model Configuration */}
+                    {agent.blueprint === "n8n" && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">n8n Connection</h2>
+                                <p className="text-xs text-muted-foreground">Connect this agent to your n8n workspace control plane.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Connection</p>
+                                </div>
+                                <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                                    <Label className="text-xs font-medium">n8n Base URL</Label>
+                                    <Input
+                                        value={n8nBaseUrl}
+                                        onChange={(e) => setN8nBaseUrl(e.target.value)}
+                                        placeholder="https://your-n8n.example.com"
+                                        className="h-9 text-xs"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Cencori uses this URL for API calls like <code>/api/v1/workflows</code>.
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                                    <Label className="text-xs font-medium">n8n API Key</Label>
+                                    <Input
+                                        value={n8nApiKey}
+                                        onChange={(e) => setN8nApiKey(e.target.value)}
+                                        placeholder={n8nHasSavedApiKey ? "•••••••••••••••• (saved)" : "n8n_api_..."}
+                                        className="h-9 text-xs font-mono"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {n8nHasSavedApiKey
+                                            ? "Leave blank to keep existing key. Enter a new key to rotate."
+                                            : "Required for first connection. Stored encrypted."}
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3 space-y-2">
+                                    <Label className="text-xs font-medium">Workspace ID (optional)</Label>
+                                    <Input
+                                        value={n8nWorkspaceId}
+                                        onChange={(e) => setN8nWorkspaceId(e.target.value)}
+                                        placeholder="main"
+                                        className="h-9 text-xs"
+                                    />
+                                </div>
+                                <div className="px-4 py-3 bg-muted/10 border-t border-border/40">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Status</span>
+                                        <Badge
+                                            variant="outline"
+                                            className={`h-5 px-1.5 text-[10px] border ${n8nStatus === "connected"
+                                                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/20"
+                                                : n8nStatus === "error"
+                                                    ? "bg-rose-500/15 text-rose-500 border-rose-500/20"
+                                                    : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
+                                                }`}
+                                        >
+                                            {n8nStatus}
+                                        </Badge>
+                                    </div>
+                                    {n8nLastTestedAt && (
+                                        <p className="text-[10px] text-muted-foreground mt-1">
+                                            Last tested: {new Date(n8nLastTestedAt).toLocaleString()}
+                                        </p>
+                                    )}
+                                    {n8nLastError && (
+                                        <p className="text-[10px] text-rose-500 mt-1">{n8nLastError}</p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-2 px-4 py-2 bg-muted/20 border-t border-border/40">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleDisconnectN8n}
+                                        disabled={isPending || n8nLoading || !n8nHasSavedApiKey}
+                                        className="h-8 text-xs"
+                                    >
+                                        Disconnect
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleSaveN8n}
+                                        disabled={isPending || n8nLoading}
+                                        className="h-8 text-xs"
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleTestN8n}
+                                        disabled={isPending || n8nLoading}
+                                        className="h-8 text-xs"
+                                    >
+                                        {n8nLoading && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                                        Test Connection
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Workflow Control</p>
+                                </div>
+                                <div className="px-4 py-3 space-y-1.5">
+                                    {n8nWorkflowId ? (
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Workflow ID: <span className="font-mono">{n8nWorkflowId}</span>
+                                        </p>
+                                    ) : (
+                                        <p className="text-[10px] text-muted-foreground">No starter workflow installed yet.</p>
+                                    )}
+                                    {n8nWorkflowUrl && (
+                                        <p className="text-[10px]">
+                                            Workflow:{" "}
+                                            <a
+                                                href={n8nWorkflowUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary underline"
+                                            >
+                                                Open in n8n
+                                            </a>
+                                        </p>
+                                    )}
+                                    <p className="text-[10px] text-muted-foreground">
+                                        State: <span className={n8nWorkflowActive ? "text-emerald-500" : "text-zinc-500"}>
+                                            {n8nWorkflowActive ? "Published" : "Unpublished"}
+                                        </span>
+                                    </p>
+                                    {n8nTemplateVersion && (
+                                        <p className="text-[10px] text-muted-foreground">Template: {n8nTemplateVersion}</p>
+                                    )}
+                                    {n8nInstalledAt && (
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Installed: {new Date(n8nInstalledAt).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-2 px-4 py-2 bg-muted/20 border-t border-border/40">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleInstallStarterWorkflow}
+                                        disabled={isPending || n8nLoading || !n8nHasSavedApiKey}
+                                        className="h-8 text-xs"
+                                    >
+                                        Install Starter Workflow
+                                    </Button>
+                                    {n8nWorkflowId && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleSetWorkflowActive(!n8nWorkflowActive)}
+                                            disabled={isPending || n8nLoading}
+                                            className="h-8 text-xs"
+                                        >
+                                            {n8nWorkflowActive ? "Unpublish" : "Publish"}
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Execution Health</p>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="rounded border border-border/60 bg-background px-2 py-1.5">
+                                            <p className="text-[10px] text-muted-foreground">Success rate</p>
+                                            <p className="text-xs font-medium">
+                                                {n8nExecutionSuccessRate !== null ? `${n8nExecutionSuccessRate}%` : "—"}
+                                            </p>
+                                        </div>
+                                        <div className="rounded border border-border/60 bg-background px-2 py-1.5">
+                                            <p className="text-[10px] text-muted-foreground">Avg runtime</p>
+                                            <p className="text-xs font-medium">
+                                                {n8nExecutionAvgDurationMs !== null ? `${n8nExecutionAvgDurationMs} ms` : "—"}
+                                            </p>
+                                        </div>
+                                        <div className="rounded border border-border/60 bg-background px-2 py-1.5 col-span-2">
+                                            <p className="text-[10px] text-muted-foreground">Last execution</p>
+                                            <p className="text-xs font-medium">{n8nLastExecutionStatus || "—"}</p>
+                                            {n8nLastExecutionAt && (
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    {new Date(n8nLastExecutionAt).toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end px-4 py-2 bg-muted/20 border-t border-border/40">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleRefreshN8nHealth}
+                                        disabled={isPending || n8nLoading || !n8nWorkflowId}
+                                        className="h-8 text-xs"
+                                    >
+                                        Refresh Health
+                                    </Button>
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
                     {/* 2. Model Configuration */}
                     <section className="space-y-3">

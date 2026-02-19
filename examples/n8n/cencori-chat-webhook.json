@@ -1,0 +1,95 @@
+{
+  "name": "Cencori Starter (Webhook -> Chat)",
+  "nodes": [
+    {
+      "id": "Webhook_1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ],
+      "parameters": {
+        "path": "cencori-starter",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "Cencori_Request_1",
+      "name": "Cencori Chat Completion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://cencori.com/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.CENCORI_API_KEY}}"
+            },
+            {
+              "name": "X-Agent-ID",
+              "value": "{{$env.CENCORI_AGENT_ID}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specificationBody": "json",
+        "jsonBody": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"={{$json.body?.prompt || \\\"Hello from n8n\\\"}}\"}]}"
+      }
+    },
+    {
+      "id": "Respond_1",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Cencori Chat Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cencori Chat Completion": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}

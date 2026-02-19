@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabaseServer";
 import { Button } from "@/components/ui/button";
 import { SparklesIcon, ShieldCheckIcon, CpuChipIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { OpenClawLogo, AutoGPTLogo } from "@/components/icons/BrandIcons";
+import { OpenClawLogo, AutoGPTLogo, N8nLogo, CrewAILogo, PythonLogo, CustomAgentLogo } from "@/components/icons/BrandIcons";
 
 interface AgentsPageProps {
     params: Promise<{
@@ -57,7 +57,11 @@ export default async function AgentsPage({ params }: AgentsPageProps) {
                                     <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
                                         {agent.blueprint === 'openclaw' ? <OpenClawLogo className="w-5 h-5" /> :
                                             agent.blueprint === 'autogpt' ? <AutoGPTLogo className="w-5 h-5" /> :
-                                                <SparklesIcon className="w-5 h-5" />}
+                                                agent.blueprint === 'n8n' ? <N8nLogo className="w-5 h-5" /> :
+                                                    agent.blueprint === 'crewai' ? <CrewAILogo className="w-5 h-5" /> :
+                                                        agent.blueprint === 'python-interpreter' ? <PythonLogo className="w-5 h-5" /> :
+                                                            agent.blueprint === 'custom' ? <CustomAgentLogo className="w-5 h-5" /> :
+                                                                <SparklesIcon className="w-5 h-5" />}
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium leading-none mb-1">{agent.name}</h3>
