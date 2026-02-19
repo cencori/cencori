@@ -138,7 +138,9 @@ export function getAllTags(): string[] {
 
 import { MDXComponents } from '@/components/blog/MDXComponents';
 import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
+import { CUSTOM_SHIKI_THEME } from './shiki-theme';
 
 /**
  * Parse and render MDX content
@@ -151,10 +153,11 @@ export async function parseMDX(content: string) {
             mdxOptions: {
                 remarkPlugins: [remarkGfm],
                 rehypePlugins: [
+                    rehypeSlug,
                     [
                         rehypePrettyCode,
                         {
-                            theme: 'github-dark',
+                            theme: CUSTOM_SHIKI_THEME,
                         },
                     ],
                 ],
