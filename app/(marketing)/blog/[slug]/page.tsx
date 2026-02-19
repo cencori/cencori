@@ -159,19 +159,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                             )}
 
                             {/* Content */}
-                            <div className="prose prose-zinc dark:prose-invert max-w-prose 
-                                prose-headings:font-semibold prose-headings:tracking-tight 
-                                prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4
-                                prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
-                                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:mb-6
-                                prose-li:text-muted-foreground prose-li:leading-relaxed
-                                prose-a:text-primary prose-a:no-underline hover:prose-a:underline 
-                                prose-img:rounded-lg prose-img:border prose-img:border-border/50
-                                prose-code:text-sm prose-code:bg-muted prose-code:px-1.5 prose-code:py-50 prose-code:rounded
-                                prose-pre:bg-[#0d0d0d] prose-pre:border prose-pre:border-border/50 prose-pre:overflow-x-auto
-                                prose-strong:text-foreground prose-strong:font-semibold
-                                prose-ul:my-4 prose-ol:my-4
-                            ">
+                            <div className="prose prose-zinc dark:prose-invert max-w-none">
                                 {content}
                             </div>
 

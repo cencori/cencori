@@ -1,0 +1,54 @@
+---
+title: "Introducing Gemini 3.1 Pro: Enhanced Reasoning & Agentic Workflows"
+slug: "introducing-gemini-3-1-pro"
+date: "2026-02-19"
+excerpt: "Google just released Gemini 3.1 Pro and it's already live on Cencori. Experience 1M context, elite reasoning, and optimized agentic tool use."
+coverImage: "/blog/images/covers/gem.png"
+authors:
+  - balla
+tags: ["Google", "Gemini", "AI Models", "Update"]
+published: true
+---
+
+Google has just released **Gemini 3.1 Pro Preview**, and we're excited to announce that it's available today on Cencori.
+
+As Google's newest flagship offering, Gemini 3.1 Pro represents a significant leap forward in reasoning capabilities and agentic engineering usability.
+
+## What's New?
+
+Gemini 3.1 Pro isn't just a minor iteration. It introduces several key enhancements that make it a powerhouse for complex AI applications:
+
+### 1. Enhanced Reasoning
+3.1 Pro scores higher on complex problem-solving benchmarks, providing more accurate and nuanced responses for intricate logic tasks.
+
+### 2. Massive 1M Context Window
+Process entire code repositories, massive PDF documents, or hour-long videos in a single request. With a **1 million token context window**, you can feed the model everything it needs to know without worrying about hitting limits.
+
+### 3. Optimized for Agentic Workflows
+The new `gemini-3.1-pro-preview-customtools` endpoint is specifically designed for developers building AI agents. It features improved performance when handling simultaneous, multi-step tool calls and bash operations.
+
+## Use it Today
+
+You can start using Gemini 3.1 Pro through the Cencori SDK immediately.
+
+```typescript
+import { Cencori } from '@cencori/sdk';
+
+const cencori = new Cencori();
+
+// Traditional chat
+const response = await cencori.ai.chat({
+  model: 'gemini-3.1-pro-preview',
+  messages: [{ role: 'user', content: 'Analyze this repo architecture...' }]
+});
+
+// Specialized tool use for agents
+const agentResponse = await cencori.ai.chat({
+  model: 'gemini-3.1-pro-preview-customtools',
+  messages: [...]
+});
+```
+
+We've updated our [Providers Documentation](/docs/ai/providers) with the latest model IDs and configuration details.
+
+Stay tuned as we continue to roll out more frontier models as soon as they drop!

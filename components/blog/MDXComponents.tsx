@@ -13,7 +13,7 @@ export const MDXComponents = {
     h1: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
         <h1
             className={cn(
-                "mt-2 scroll-m-20 text-4xl md:text-5xl font-bold tracking-tight leading-tight",
+                "mt-2 scroll-m-20 text-4xl font-bold tracking-tight",
                 className
             )}
             {...props}
@@ -22,7 +22,7 @@ export const MDXComponents = {
     h2: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
         <h2
             className={cn(
-                "mt-16 scroll-m-20 border-b border-border/40 pb-3 text-3xl md:text-4xl font-bold tracking-tight first:mt-0",
+                "mt-10 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0",
                 className
             )}
             {...props}
@@ -31,7 +31,7 @@ export const MDXComponents = {
     h3: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
         <h3
             className={cn(
-                "mt-12 scroll-m-20 text-2xl md:text-3xl font-semibold tracking-tight",
+                "mt-8 scroll-m-20 text-xl font-semibold tracking-tight",
                 className
             )}
             {...props}
@@ -40,7 +40,7 @@ export const MDXComponents = {
     h4: ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
         <h4
             className={cn(
-                "mt-8 scroll-m-20 text-xl font-semibold tracking-tight",
+                "mt-4 scroll-m-20 text-lg font-semibold tracking-tight",
                 className
             )}
             {...props}
@@ -48,30 +48,29 @@ export const MDXComponents = {
     ),
     p: ({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) => (
         <p
-            className={cn("leading-8 text-[16px] [&:not(:first-child)]:mt-6 text-foreground/80", className)}
+            className={cn("leading-7 [&:not(:first-child)]:mt-4 text-[0.95rem] text-foreground", className)}
             {...props}
         />
     ),
     ul: ({ className, ...props }: HTMLAttributes<HTMLUListElement>) => (
-        <ul className={cn("my-8 ml-6 list-disc space-y-3 text-foreground/80", className)} {...props} />
+        <ul className={cn("my-3 ml-5 list-disc [&>li]:mt-1 text-[0.95rem] text-foreground", className)} {...props} />
     ),
     ol: ({ className, ...props }: HTMLAttributes<HTMLOListElement>) => (
-        <ol className={cn("my-8 ml-6 list-decimal space-y-3 text-foreground/80", className)} {...props} />
+        <ol className={cn("my-3 ml-5 list-decimal [&>li]:mt-1 text-[0.95rem] text-foreground", className)} {...props} />
     ),
     li: ({ className, ...props }: HTMLAttributes<HTMLLIElement>) => (
-        <li className={cn("leading-7 text-[16px]", className)} {...props} />
+        <li className={cn("leading-7", className)} {...props} />
     ),
     blockquote: ({ className, ...props }: HTMLAttributes<HTMLQuoteElement>) => (
         <blockquote
             className={cn(
-                "my-8 border-l-4 border-purple-500/40 pl-6 py-2 italic text-foreground/70 bg-muted/30 rounded-r-lg",
+                "my-4 border-l-4 border-primary/40 pl-4 py-1 italic text-muted-foreground",
                 className
             )}
             {...props}
         />
     ),
     a: ({ className, href, children, ...props }: HTMLAttributes<HTMLAnchorElement> & { href?: string }) => {
-        // Check if link is external
         const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
 
         if (isExternal) {
@@ -80,7 +79,7 @@ export const MDXComponents = {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-primary underline underline-offset-4 hover:no-underline", className)}
                     {...props}
                 >
                     {children}
@@ -88,12 +87,11 @@ export const MDXComponents = {
             );
         }
 
-        // Internal link using Next.js Link
         if (href) {
             return (
                 <Link
                     href={href}
-                    className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                    className={cn("font-medium text-primary underline underline-offset-4 hover:no-underline", className)}
                     {...props}
                 >
                     {children}
@@ -101,10 +99,9 @@ export const MDXComponents = {
             );
         }
 
-        // Fallback for links without href
         return (
             <a
-                className={cn("font-medium text-blue-400 no-underline hover:underline underline-offset-4 transition-colors", className)}
+                className={cn("font-medium text-primary underline underline-offset-4 hover:no-underline", className)}
                 {...props}
             >
                 {children}
@@ -116,7 +113,7 @@ export const MDXComponents = {
         const className = codeElement?.props?.className ?? '';
         const code = codeElement?.props?.children ?? props.children;
         return (
-            <div className="not-prose my-6">
+            <div className="not-prose my-4">
                 <CodeBlock className={className}>{code as ReactNode}</CodeBlock>
             </div>
         );
@@ -124,20 +121,16 @@ export const MDXComponents = {
     code: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <code
             className={cn(
-                "font-mono text-[0.85em] font-medium text-blue-300",
+                "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm",
                 className
             )}
             {...props}
         />
     ),
-    // Table components
     table: ({ className, ...props }: HTMLAttributes<HTMLTableElement>) => (
-        <div className="my-8 w-full overflow-x-auto">
+        <div className="my-5 w-full overflow-x-auto rounded-md border border-border/40">
             <table
-                className={cn(
-                    "w-full border-collapse text-sm",
-                    className
-                )}
+                className={cn("w-full text-sm", className)}
                 {...props}
             />
         </div>
@@ -150,17 +143,14 @@ export const MDXComponents = {
     ),
     tr: ({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) => (
         <tr
-            className={cn(
-                "border-b border-border/50 transition-colors",
-                className
-            )}
+            className={cn("border-b border-border/50 transition-colors hover:bg-muted/50", className)}
             {...props}
         />
     ),
     th: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
         <th
             className={cn(
-                "px-4 py-3 text-left font-semibold text-foreground/90 border-b border-border/70 bg-muted/20",
+                "border-r border-border/40 px-4 py-2 text-left font-semibold bg-muted/40 last:border-r-0",
                 className
             )}
             {...props}
@@ -168,20 +158,13 @@ export const MDXComponents = {
     ),
     td: ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
         <td
-            className={cn(
-                "px-4 py-3 text-foreground/80 align-top",
-                className
-            )}
+            className={cn("border-r border-border/40 px-4 py-2 text-left last:border-r-0", className)}
             {...props}
         />
     ),
-    // Horizontal rule - short centered separator
     hr: ({ className, ...props }: HTMLAttributes<HTMLHRElement>) => (
-        <div className={cn("my-10 flex justify-center", className)} {...props}>
-            <span className="w-12 h-px bg-border/60" />
-        </div>
+        <hr className={cn("my-6 border-border/40", className)} {...props} />
     ),
-    // Strong/bold text
     strong: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
         <strong className={cn("font-semibold text-foreground", className)} {...props} />
     ),
