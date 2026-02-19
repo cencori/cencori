@@ -10,7 +10,9 @@ interface ProviderKeyResponse {
     keyHint?: string;
     isActive: boolean;
     defaultModel?: string;
+    defaultImageModel?: string;
     createdAt?: string;
+    apiKey?: string;
 }
 
 export async function GET(
@@ -24,7 +26,7 @@ export async function GET(
 
         const { data: project, error: projectError } = await supabase
             .from('projects')
-            .select('id, default_provider, default_model')
+            .select('id, organization_id, default_provider, default_model, default_image_model')
             .eq('id', projectId)
             .single();
 
@@ -34,7 +36,7 @@ export async function GET(
 
         const { data: providerKeys, error } = await supabase
             .from('provider_keys')
-            .select('provider, key_hint, is_active, created_at')
+            .select('provider, encrypted_key, key_hint, is_active, created_at, default_model, default_image_model')
             .eq('project_id', projectId);
 
         if (error) {
@@ -45,12 +47,25 @@ export async function GET(
 
         const providers: ProviderKeyResponse[] = SUPPORTED_PROVIDERS.map(p => {
             const key = keyMap.get(p.id);
+            let decryptedKey = undefined;
+            if (key?.encrypted_key && project.organization_id) {
+                try {
+                    const { decryptApiKey } = require('@/lib/encryption');
+                    decryptedKey = decryptApiKey(key.encrypted_key, project.organization_id);
+                } catch (e) {
+                    console.error(`Failed to decrypt key for ${p.id}`);
+                }
+            }
+
             return {
                 provider: p.id,
                 providerName: p.name,
                 hasKey: !!key,
                 keyHint: key?.key_hint || undefined,
+                apiKey: decryptedKey,
                 isActive: key?.is_active ?? false,
+                defaultModel: key?.default_model || undefined,
+                defaultImageModel: key?.default_image_model || undefined,
                 createdAt: key?.created_at || undefined,
             };
         });
@@ -60,6 +75,7 @@ export async function GET(
             defaults: {
                 provider: project.default_provider,
                 model: project.default_model,
+                imageModel: project.default_image_model,
             },
         });
     } catch (error) {
@@ -88,7 +104,7 @@ export async function POST(
         }
 
         const body = await req.json();
-        const { provider, apiKey, setAsDefault, defaultModel } = body;
+        const { provider, apiKey, setAsDefault, defaultModel, defaultImageModel } = body;
 
         const providerConfig = getProvider(provider);
         if (!providerConfig) {
@@ -114,6 +130,8 @@ export async function POST(
                 encrypted_key: encryptedKey,
                 key_hint: keyHint,
                 is_active: true,
+                default_model: defaultModel || undefined,
+                default_image_model: defaultImageModel || undefined,
                 updated_at: new Date().toISOString(),
             }, {
                 onConflict: 'project_id,provider',
@@ -126,10 +144,11 @@ export async function POST(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        if (setAsDefault || defaultModel) {
+        if (setAsDefault || defaultModel || defaultImageModel) {
             const projectUpdate: Record<string, string> = {};
             if (setAsDefault) projectUpdate.default_provider = provider;
             if (defaultModel) projectUpdate.default_model = defaultModel;
+            if (defaultImageModel) projectUpdate.default_image_model = defaultImageModel;
 
             await supabase
                 .from('projects')
@@ -142,7 +161,10 @@ export async function POST(
             provider: {
                 provider: providerKey.provider,
                 keyHint: providerKey.key_hint,
+                apiKey: apiKey, // return the raw key
                 isActive: providerKey.is_active,
+                defaultModel: providerKey.default_model,
+                defaultImageModel: providerKey.default_image_model,
             },
         }, { status: 201 });
     } catch (error) {

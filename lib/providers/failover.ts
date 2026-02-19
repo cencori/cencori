@@ -10,17 +10,17 @@
  * When primary fails, try fallbacks in order
  */
 export const FALLBACK_CHAINS: Record<string, string[]> = {
-    'openai': ['anthropic', 'google'],
-    'anthropic': ['openai', 'google'],
-    'google': ['openai', 'anthropic'],
-    'xai': ['openai', 'anthropic'],
-    'deepseek': ['openai', 'anthropic'],
-    'mistral': ['openai', 'anthropic'],
-    'cohere': ['openai', 'anthropic'],
-    'groq': ['openai', 'anthropic'],
-    'perplexity': ['openai', 'anthropic'],
-    'together': ['openai', 'anthropic'],
-    'qwen': ['openai', 'anthropic'],
+    'openai': ['anthropic', 'google', 'groq', 'mistral'],
+    'anthropic': ['openai', 'google', 'groq', 'mistral'],
+    'google': ['openai', 'anthropic', 'groq', 'mistral'],
+    'xai': ['openai', 'anthropic', 'groq', 'google'],
+    'deepseek': ['openai', 'anthropic', 'groq', 'google'],
+    'mistral': ['openai', 'anthropic', 'groq', 'google'],
+    'cohere': ['openai', 'anthropic', 'google'],
+    'groq': ['openai', 'anthropic', 'google', 'mistral'],
+    'perplexity': ['openai', 'anthropic', 'google'],
+    'together': ['openai', 'anthropic', 'google'],
+    'qwen': ['openai', 'anthropic', 'google'],
 };
 
 /**
@@ -56,14 +56,20 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'grok-4.1': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
     'grok-3': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
 
-    // DeepSeek models → fallbacks
-    'deepseek-v3.2': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
-    'deepseek-v3.1': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
-    'deepseek-chat': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
-
     // Mistral models → fallbacks
-    'mistral-large-latest': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4' },
+    'mistral-large-latest': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
     'codestral-latest': { 'openai': 'gpt-4.1', 'anthropic': 'claude-sonnet-4' },
+
+    // Groq models → fallbacks
+    'llama-3.3-70b-versatile': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
+    'llama-3.3-70b-specdec': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
+    'llama-3.1-70b-versatile': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
+    'mixtral-8x7b-32768': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4.5', 'google': 'gemini-2.5-flash-lite' },
+    'llama3-70b-8192': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
+
+    // DeepSeek models → fallbacks
+    'deepseek-chat': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
+    'deepseek-reasoner': { 'openai': 'o1', 'anthropic': 'claude-opus-4', 'google': 'gemini-3-deep-think' },
 };
 
 /**

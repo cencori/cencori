@@ -11,7 +11,8 @@ export async function PATCH(
     try {
         const { projectId, provider } = await params;
         const body = await req.json();
-        const { apiKey, isActive } = body;
+        console.log('[PATCH provider-keys] Request body:', body);
+        const { apiKey, isActive, defaultModel, defaultImageModel, setAsDefault } = body;
 
         const { data: project } = await supabase
             .from('projects')
@@ -34,6 +35,12 @@ export async function PATCH(
         if (typeof isActive === 'boolean') {
             updateData.is_active = isActive;
         }
+        if (defaultModel) {
+            updateData.default_model = defaultModel;
+        }
+        if (defaultImageModel) {
+            updateData.default_image_model = defaultImageModel;
+        }
 
         const { data: providerKey, error } = await supabase
             .from('provider_keys')
@@ -44,6 +51,7 @@ export async function PATCH(
             .single();
 
         if (error) {
+            console.error('[PATCH provider-keys] Update error:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
@@ -51,12 +59,27 @@ export async function PATCH(
             return NextResponse.json({ error: 'Provider key not found' }, { status: 404 });
         }
 
+        if (setAsDefault || defaultModel || defaultImageModel) {
+            const projectUpdate: Record<string, string> = {};
+            if (setAsDefault) projectUpdate.default_provider = provider;
+            if (defaultModel) projectUpdate.default_model = defaultModel;
+            if (defaultImageModel) projectUpdate.default_image_model = defaultImageModel;
+
+            await supabase
+                .from('projects')
+                .update(projectUpdate)
+                .eq('id', projectId);
+        }
+
         return NextResponse.json({
             success: true,
             provider: {
                 provider: providerKey.provider,
                 keyHint: providerKey.key_hint,
+                apiKey: apiKey || undefined, // Send back if they just updated it
                 isActive: providerKey.is_active,
+                defaultModel: providerKey.default_model,
+                defaultImageModel: providerKey.default_image_model,
             },
         });
     } catch (error) {

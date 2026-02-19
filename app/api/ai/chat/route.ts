@@ -151,11 +151,11 @@ async function initializeBYOKProviders(
     projectId: string,
     organizationId: string,
     targetProvider: string
-): Promise<boolean> {
+): Promise<{ success: boolean; defaultModel?: string; defaultImageModel?: string }> {
     try {
         const { data: providerKey, error } = await supabase
             .from('provider_keys')
-            .select('encrypted_key, is_active')
+            .select('encrypted_key, is_active, default_model, default_image_model')
             .eq('project_id', projectId)
             .eq('provider', targetProvider)
             .single();
@@ -165,38 +165,58 @@ async function initializeBYOKProviders(
             if (targetProvider === 'google') {
                 router.registerProvider(targetProvider, new GeminiProvider(apiKey));
                 console.log(`[BYOK] Using user's Google API key for project ${projectId}`);
-                return true;
+                return {
+                    success: true,
+                    defaultModel: providerKey.default_model || undefined,
+                    defaultImageModel: providerKey.default_image_model || undefined
+                };
             } else if (targetProvider === 'openai') {
                 router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
                 console.log(`[BYOK] Using user's OpenAI API key for project ${projectId}`);
-                return true;
+                return {
+                    success: true,
+                    defaultModel: providerKey.default_model || undefined,
+                    defaultImageModel: providerKey.default_image_model || undefined
+                };
             } else if (targetProvider === 'anthropic') {
                 router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
                 console.log(`[BYOK] Using user's Anthropic API key for project ${projectId}`);
-                return true;
+                return {
+                    success: true,
+                    defaultModel: providerKey.default_model || undefined,
+                    defaultImageModel: providerKey.default_image_model || undefined
+                };
             } else if (isOpenAICompatible(targetProvider)) {
                 router.registerProvider(
                     targetProvider,
                     new OpenAICompatibleProvider(targetProvider, apiKey)
                 );
                 console.log(`[BYOK] Using user's ${targetProvider} API key for project ${projectId}`);
-                return true;
+                return {
+                    success: true,
+                    defaultModel: providerKey.default_model || undefined,
+                    defaultImageModel: providerKey.default_image_model || undefined
+                };
             } else if (targetProvider === 'cohere') {
                 router.registerProvider(targetProvider, new CohereProvider(apiKey));
                 console.log(`[BYOK] Using user's Cohere API key for project ${projectId}`);
-                return true;
+                return {
+                    success: true,
+                    defaultModel: providerKey.default_model || undefined,
+                    defaultImageModel: providerKey.default_image_model || undefined
+                };
             }
         }
 
         if (router.hasProvider(targetProvider)) {
             console.log(`[BYOK] No user key for ${targetProvider}, using env-based default`);
-            return true;
+            return { success: true };
         }
 
-        return false;
+        return { success: false };
     } catch (error) {
         console.error(`[API] Failed to initialize BYOK provider ${targetProvider}:`, error);
-        return router.hasProvider(targetProvider);
+        return { success: router.hasProvider(targetProvider) };
     }
 }
 
@@ -593,14 +613,14 @@ export async function POST(req: NextRequest) {
         const requestedModel = model || project.default_model || 'gemini-2.0-flash';
         const providerName = router.detectProvider(requestedModel);
         const normalizedModel = router.normalizeModelName(requestedModel);
-        const byokInitialized = await initializeBYOKProviders(
+        const byokResult = await initializeBYOKProviders(
             supabase,
             project.id,
             organizationId,
             providerName
         );
 
-        if (!byokInitialized) {
+        if (!byokResult.success) {
             initializeDefaultProviders();
         }
         if (!router.hasProvider(providerName)) {
@@ -691,24 +711,36 @@ export async function POST(req: NextRequest) {
                             continue;
                         }
 
+                        let fallbackDefaultModel: string | undefined;
                         if (!router.hasProvider(fallbackProviderName)) {
-                            const initialized = await initializeBYOKProviders(
+                            const byokResult = await initializeBYOKProviders(
                                 supabase,
                                 project.id,
                                 organizationId,
                                 fallbackProviderName
                             );
-                            if (!initialized) {
+                            if (!byokResult.success) {
                                 console.log(`[Failover/Stream] Skipping ${fallbackProviderName} - not configured`);
                                 continue;
                             }
+                            fallbackDefaultModel = byokResult.defaultModel;
+                        } else {
+                            // If provider already registered (e.g. it was an env default), 
+                            // we still want to check if the user has a preferred model for it
+                            const { data: pk } = await supabase
+                                .from('provider_keys')
+                                .select('default_model')
+                                .eq('project_id', project.id)
+                                .eq('provider', fallbackProviderName)
+                                .single();
+                            fallbackDefaultModel = pk?.default_model || undefined;
                         }
 
                         try {
                             const fallbackProvider = router.getProvider(fallbackProviderName);
-                            const fallbackModel = getFallbackModel(normalizedModel, fallbackProviderName);
+                            const fallbackModel = fallbackDefaultModel || getFallbackModel(normalizedModel, fallbackProviderName);
 
-                            console.log(`[Failover/Stream] Trying ${fallbackProviderName} with model ${fallbackModel}`);
+                            console.log(`[Failover/Stream] Trying ${fallbackProviderName} with model ${fallbackModel} (User Preference: ${!!fallbackDefaultModel})`);
 
                             actualProvider = fallbackProviderName;
                             actualModel = fallbackModel;

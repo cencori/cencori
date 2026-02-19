@@ -55,7 +55,10 @@ interface ProviderKeyData {
     providerName: string;
     hasKey: boolean;
     keyHint?: string;
+    apiKey?: string;
     isActive: boolean;
+    defaultModel?: string;
+    defaultImageModel?: string;
     createdAt?: string;
 }
 
@@ -140,9 +143,34 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
             if (!res.ok) throw new Error("Failed to update");
             return res.json();
         },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["provider-keys", projectId] });
+            toast.success(variables.isActive ? "Provider enabled" : "Provider disabled");
+        },
+    });
+
+    // Update existing key mutation
+    const updateKeyMutation = useMutation({
+        mutationFn: async (payload: { provider: string; apiKey?: string; setAsDefault?: boolean; defaultModel?: string; defaultImageModel?: string }) => {
+            const res = await fetch(`/api/projects/${projectId}/provider-keys/${payload.provider}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    apiKey: payload.apiKey || undefined,
+                    setAsDefault: payload.setAsDefault,
+                    defaultModel: payload.defaultModel || undefined,
+                    defaultImageModel: payload.defaultImageModel || undefined,
+                }),
+            });
+            if (!res.ok) throw new Error("Failed to update key settings");
+            return res.json();
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["provider-keys", projectId] });
+            toast.success("Provider settings updated");
+            resetDialog();
         },
+        onError: () => toast.error("Failed to update provider settings"),
     });
 
     const resetDialog = () => {
@@ -157,14 +185,29 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     };
 
     const handleAddKey = () => {
-        if (!selectedProvider || !apiKey) return;
-        addKeyMutation.mutate({
-            provider: selectedProvider.id,
-            apiKey,
-            setAsDefault: setAsDefault,
-            defaultModel: selectedModel || undefined,
-            defaultImageModel: selectedImageModel || undefined,
-        });
+        if (!selectedProvider) return;
+
+        const existingKey = data?.providers.find(p => p.provider === selectedProvider.id);
+
+        if (existingKeyHint) {
+            updateKeyMutation.mutate({
+                provider: selectedProvider.id,
+                // Only send apiKey if the user typed something new and it's different from the already saved one
+                apiKey: apiKey && apiKey !== existingKey?.apiKey ? apiKey : undefined,
+                setAsDefault: setAsDefault,
+                defaultModel: selectedModel || undefined,
+                defaultImageModel: selectedImageModel || undefined,
+            });
+        } else {
+            if (!apiKey) return;
+            addKeyMutation.mutate({
+                provider: selectedProvider.id,
+                apiKey,
+                setAsDefault: setAsDefault,
+                defaultModel: selectedModel || undefined,
+                defaultImageModel: selectedImageModel || undefined,
+            });
+        }
     };
 
     const openAddDialog = (provider: AIProviderConfig) => {
@@ -175,17 +218,23 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
         // Check if provider already has a key
         const existingKey = data?.providers.find(p => p.provider === provider.id);
 
-        // If this provider is the default AND has a saved default model, use it
-        // Otherwise, use the first model in the list
-        if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.model) {
-            // Use the saved default model from the project settings
+        // Initialize Set as Default tracking based on global defaults
+        setSetAsDefault(data?.defaults?.provider === provider.id);
+
+        // Initializing model selections:
+        // Priority: 1. Per-provider default model, 2. Global project default (if this provider matches), 3. First available
+        if (existingKey?.defaultModel) {
+            setSelectedModel(existingKey.defaultModel);
+        } else if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.model) {
             setSelectedModel(data.defaults.model);
         } else if (chatModels.length > 0) {
             setSelectedModel(chatModels[0].id);
         }
 
         // Set default image model
-        if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.imageModel) {
+        if (existingKey?.defaultImageModel) {
+            setSelectedImageModel(existingKey.defaultImageModel);
+        } else if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.imageModel) {
             setSelectedImageModel(data.defaults.imageModel);
         } else if (imageModels.length > 0) {
             setSelectedImageModel(imageModels[0].id);
@@ -195,6 +244,9 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
         if (existingKey?.hasKey) {
             setExistingKeyHint(existingKey.keyHint || '***');
+            if (existingKey.apiKey) {
+                setApiKey(existingKey.apiKey);
+            }
             setIsProviderActive(existingKey.isActive);
         } else {
             setExistingKeyHint(null);
@@ -272,7 +324,10 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
             })}
 
             {/* Add/Edit Dialog - Cenpact Design */}
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+                if (!open) resetDialog();
+                else setDialogOpen(true);
+            }}>
                 <DialogContent className="rounded-xl sm:max-w-sm p-0 gap-0 border-border/50">
                     <DialogHeader className="px-4 py-3 border-b border-border/40">
                         <div className="flex items-center gap-2">
@@ -294,46 +349,22 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                         <div className="space-y-1.5">
                             <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">API Key</Label>
                             <div className="relative">
-                                {existingKeyHint ? (
-                                    // Show masked key for existing provider (disabled with eye toggle)
-                                    <>
-                                        <Input
-                                            type={showKey ? "text" : "password"}
-                                            value={`••••••••••••••••${existingKeyHint.replace('...', '')}`}
-                                            disabled
-                                            className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/50 border-border/50 cursor-not-allowed"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="absolute right-0 top-0 h-8 w-8 p-0"
-                                            onClick={() => setShowKey(!showKey)}
-                                        >
-                                            {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                        </Button>
-                                    </>
-                                ) : (
-                                    // New key input
-                                    <>
-                                        <Input
-                                            type={showKey ? "text" : "password"}
-                                            placeholder={selectedProvider?.keyPrefix || "sk-..."}
-                                            value={apiKey}
-                                            onChange={(e) => setApiKey(e.target.value)}
-                                            className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/30 border-border/50"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="absolute right-0 top-0 h-8 w-8 p-0"
-                                            onClick={() => setShowKey(!showKey)}
-                                        >
-                                            {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                        </Button>
-                                    </>
-                                )}
+                                <Input
+                                    type={showKey ? "text" : "password"}
+                                    placeholder={selectedProvider?.keyPrefix || "sk-..."}
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                    className="h-8 pr-8 rounded-lg text-[11px] font-mono bg-muted/30 border-border/50"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-0 top-0 h-8 w-8 p-0"
+                                    onClick={() => setShowKey(!showKey)}
+                                >
+                                    {showKey ? <EyeOff className="h-3 w-3 text-muted-foreground" /> : <Eye className="h-3 w-3 text-muted-foreground" />}
+                                </Button>
                             </div>
                         </div>
 
@@ -443,19 +474,11 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                     Cancel
                                 </Button>
                                 <Button
-                                    onClick={() => {
-                                        if (existingKeyHint) {
-                                            // For existing keys, just close (toggle already saved)
-                                            resetDialog();
-                                        } else {
-                                            // For new keys, save
-                                            handleAddKey();
-                                        }
-                                    }}
-                                    disabled={!existingKeyHint && (!apiKey || addKeyMutation.isPending)}
+                                    onClick={handleAddKey}
+                                    disabled={(addKeyMutation.isPending || updateKeyMutation.isPending) || (!existingKeyHint && !apiKey)}
                                     className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
                                 >
-                                    {addKeyMutation.isPending ? (
+                                    {addKeyMutation.isPending || updateKeyMutation.isPending ? (
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                         'Save'
