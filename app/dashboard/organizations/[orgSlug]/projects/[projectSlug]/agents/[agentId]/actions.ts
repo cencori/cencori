@@ -129,6 +129,7 @@ export type AgentTelemetry = {
 };
 
 export type AgentN8nConnection = {
+    connectionMode: "api" | "manual";
     baseUrl: string;
     workspaceId: string | null;
     connectionStatus: "connected" | "error" | "disconnected";
@@ -211,7 +212,7 @@ export async function getN8nConnection(agentId: string): Promise<AgentN8nConnect
     const supabase = await createServerClient();
     const { data, error } = await supabase
         .from("agent_n8n_connections")
-        .select("base_url, workspace_id, connection_status, last_tested_at, last_error, api_key_encrypted, starter_workflow_id, starter_workflow_url, starter_template_version, starter_installed_at, starter_workflow_active, last_execution_at, last_execution_status, execution_success_rate, execution_avg_duration_ms")
+        .select("connection_mode, base_url, workspace_id, connection_status, last_tested_at, last_error, api_key_encrypted, starter_workflow_id, starter_workflow_url, starter_template_version, starter_installed_at, starter_workflow_active, last_execution_at, last_execution_status, execution_success_rate, execution_avg_duration_ms")
         .eq("agent_id", agentId)
         .maybeSingle();
 
@@ -223,6 +224,7 @@ export async function getN8nConnection(agentId: string): Promise<AgentN8nConnect
     if (!data) return null;
 
     return {
+        connectionMode: (data.connection_mode || (data.api_key_encrypted ? "api" : "manual")) as AgentN8nConnection["connectionMode"],
         baseUrl: data.base_url,
         workspaceId: data.workspace_id,
         connectionStatus: (data.connection_status || "disconnected") as AgentN8nConnection["connectionStatus"],
@@ -249,6 +251,7 @@ export async function saveN8nConnection(input: {
     baseUrl: string;
     apiKey?: string;
     workspaceId?: string;
+    connectionMode: "api" | "manual";
 }) {
     const supabase = await createServerClient();
     const baseUrl = normalizeN8nBaseUrl(input.baseUrl);
@@ -266,18 +269,26 @@ export async function saveN8nConnection(input: {
         .maybeSingle();
 
     const trimmedKey = input.apiKey?.trim();
-    const apiKeyEncrypted = trimmedKey
-        ? encryptApiKey(trimmedKey, organizationId)
-        : existing?.api_key_encrypted;
+    const nextMode = input.connectionMode;
+    let apiKeyEncrypted: string | null = null;
 
-    if (!apiKeyEncrypted) {
+    if (nextMode === "api") {
+        apiKeyEncrypted = trimmedKey
+            ? encryptApiKey(trimmedKey, organizationId)
+            : (existing?.api_key_encrypted ?? null);
+    } else {
+        apiKeyEncrypted = null;
+    }
+
+    if (nextMode === "api" && !apiKeyEncrypted) {
         throw new Error("n8n API key is required for first-time connection");
     }
 
     const payload: {
         agent_id: string;
         base_url: string;
-        api_key_encrypted: string;
+        api_key_encrypted: string | null;
+        connection_mode: "api" | "manual";
         workspace_id: string | null;
         connection_status?: string;
         created_by?: string | null;
@@ -285,12 +296,16 @@ export async function saveN8nConnection(input: {
         agent_id: input.agentId,
         base_url: baseUrl,
         api_key_encrypted: apiKeyEncrypted,
+        connection_mode: nextMode,
         workspace_id: input.workspaceId?.trim() || null,
     };
 
+    // Persist meaningful status so refresh reflects real state.
+    // Manual mode has no API handshake, so a saved config is considered connected.
+    payload.connection_status = nextMode === "manual" ? "connected" : "disconnected";
+
     if (!existing) {
         const { data: auth } = await supabase.auth.getUser();
-        payload.connection_status = "disconnected";
         payload.created_by = auth.user?.id || null;
     }
 
@@ -311,12 +326,15 @@ export async function testN8nConnection(agentId: string, path: string) {
 
     const { data: conn, error: connError } = await supabase
         .from("agent_n8n_connections")
-        .select("base_url, api_key_encrypted")
+        .select("connection_mode, base_url, api_key_encrypted")
         .eq("agent_id", agentId)
         .maybeSingle();
 
     if (connError || !conn) {
         throw new Error("n8n connection not configured");
+    }
+    if (conn.connection_mode === "manual" || !conn.api_key_encrypted) {
+        throw new Error("Manual mode enabled: API test is unavailable without n8n API key");
     }
 
     const organizationId = await getAgentOrganizationId(supabase, agentId);
@@ -443,7 +461,7 @@ export async function installN8nStarterWorkflow(agentId: string, path: string) {
     const [{ data: conn, error: connError }, { data: config }] = await Promise.all([
         supabase
             .from("agent_n8n_connections")
-            .select("base_url, api_key_encrypted, starter_workflow_id")
+            .select("connection_mode, base_url, api_key_encrypted, starter_workflow_id")
             .eq("agent_id", agentId)
             .maybeSingle(),
         supabase
@@ -455,6 +473,9 @@ export async function installN8nStarterWorkflow(agentId: string, path: string) {
 
     if (connError || !conn) {
         throw new Error("Connect n8n first before installing a starter workflow");
+    }
+    if (conn.connection_mode === "manual" || !conn.api_key_encrypted) {
+        throw new Error("Manual mode enabled: install starter workflow in n8n by importing template JSON");
     }
 
     const organizationId = await getAgentOrganizationId(supabase, agentId);
@@ -555,12 +576,15 @@ export async function setN8nWorkflowActive(
     const supabase = await createServerClient();
     const { data: conn, error } = await supabase
         .from("agent_n8n_connections")
-        .select("base_url, api_key_encrypted, starter_workflow_id")
+        .select("connection_mode, base_url, api_key_encrypted, starter_workflow_id")
         .eq("agent_id", agentId)
         .maybeSingle();
 
     if (error || !conn?.starter_workflow_id) {
         throw new Error("Install starter workflow first");
+    }
+    if (conn.connection_mode === "manual" || !conn.api_key_encrypted) {
+        throw new Error("Manual mode enabled: publish/unpublish from n8n UI");
     }
 
     const organizationId = await getAgentOrganizationId(supabase, agentId);
@@ -597,12 +621,15 @@ export async function syncN8nWorkflowHealth(agentId: string, path: string) {
     const supabase = await createServerClient();
     const { data: conn, error } = await supabase
         .from("agent_n8n_connections")
-        .select("base_url, api_key_encrypted, starter_workflow_id")
+        .select("connection_mode, base_url, api_key_encrypted, starter_workflow_id")
         .eq("agent_id", agentId)
         .maybeSingle();
 
     if (error || !conn?.starter_workflow_id) {
         throw new Error("Install starter workflow first");
+    }
+    if (conn.connection_mode === "manual" || !conn.api_key_encrypted) {
+        throw new Error("Manual mode enabled: execution sync requires n8n API key");
     }
 
     const organizationId = await getAgentOrganizationId(supabase, agentId);

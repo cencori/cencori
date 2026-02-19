@@ -22,6 +22,18 @@ If you deployed an **n8n Workflow** agent in Cencori:
 5. Use **Publish** / **Unpublish** to control whether the starter workflow is live.
 6. Use **Refresh Health** to sync execution status and runtime metrics back into Cencori.
 
+### Fallback mode (no n8n API key)
+
+If your n8n workspace plan does not expose API keys:
+
+1. In Cencori n8n agent config, set **Mode** to **Manual Fallback**.
+2. Save your n8n Base URL (API key is not required in this mode).
+3. Import the starter JSON manually in n8n:
+   - [`/examples/n8n/cencori-chat-webhook.json`](/examples/n8n/cencori-chat-webhook.json)
+4. Publish and manage the workflow directly in n8n UI.
+
+In manual mode, one-click install/publish and execution health sync are disabled by design.
+
 ### Quick start (manual node setup)
 
 1.  Add an **HTTP Request** node to your workflow.

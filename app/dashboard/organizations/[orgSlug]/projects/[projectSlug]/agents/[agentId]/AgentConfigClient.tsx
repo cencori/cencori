@@ -141,11 +141,14 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const [n8nBaseUrl, setN8nBaseUrl] = useState("");
     const [n8nApiKey, setN8nApiKey] = useState("");
     const [n8nWorkspaceId, setN8nWorkspaceId] = useState("");
+    const [n8nConnectionMode, setN8nConnectionMode] = useState<"api" | "manual">("api");
     const [n8nStatus, setN8nStatus] = useState<"connected" | "error" | "disconnected">("disconnected");
     const [n8nLastTestedAt, setN8nLastTestedAt] = useState<string | null>(null);
     const [n8nLastError, setN8nLastError] = useState<string | null>(null);
     const [n8nHasSavedApiKey, setN8nHasSavedApiKey] = useState(false);
     const [n8nLoading, setN8nLoading] = useState(false);
+    const [n8nConnectionAction, setN8nConnectionAction] = useState<"connecting" | "disconnecting" | null>(null);
+    const [n8nSaveLoading, setN8nSaveLoading] = useState(false);
     const [n8nWorkflowUrl, setN8nWorkflowUrl] = useState<string | null>(null);
     const [n8nWorkflowId, setN8nWorkflowId] = useState<string | null>(null);
     const [n8nWorkflowActive, setN8nWorkflowActiveState] = useState(false);
@@ -155,6 +158,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const [n8nLastExecutionStatus, setN8nLastExecutionStatus] = useState<string | null>(null);
     const [n8nExecutionSuccessRate, setN8nExecutionSuccessRate] = useState<number | null>(null);
     const [n8nExecutionAvgDurationMs, setN8nExecutionAvgDurationMs] = useState<number | null>(null);
+    const n8nActionButtonClass = "h-8 text-xs bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90";
 
     // Persist changes when toggles change
     const handleToggleActive = (val: boolean) => {
@@ -227,6 +231,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
             if (!data) return;
             setN8nBaseUrl(data.baseUrl);
             setN8nWorkspaceId(data.workspaceId || "");
+            setN8nConnectionMode(data.connectionMode);
             setN8nStatus(data.connectionStatus);
             setN8nLastTestedAt(data.lastTestedAt);
             setN8nLastError(data.lastError);
@@ -253,6 +258,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
             return;
         }
         setN8nLoading(true);
+        setN8nSaveLoading(true);
         startTransition(async () => {
             try {
                 await saveN8nConnection({
@@ -261,6 +267,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     baseUrl: n8nBaseUrl,
                     apiKey: n8nApiKey,
                     workspaceId: n8nWorkspaceId,
+                    connectionMode: n8nConnectionMode,
                 });
                 setN8nApiKey("");
                 setN8nHasSavedApiKey(true);
@@ -271,6 +278,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                 toast.error("Failed to save n8n connection");
             } finally {
                 setN8nLoading(false);
+                setN8nSaveLoading(false);
             }
         });
     };
@@ -289,6 +297,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                     baseUrl: n8nBaseUrl,
                     apiKey: n8nApiKey,
                     workspaceId: n8nWorkspaceId,
+                    connectionMode: n8nConnectionMode,
                 });
                 const result = await testN8nConnection(agent.id, window.location.pathname);
                 await loadN8nConnection();
@@ -308,12 +317,14 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
 
     const handleDisconnectN8n = () => {
         setN8nLoading(true);
+        setN8nConnectionAction("disconnecting");
         startTransition(async () => {
             try {
                 await disconnectN8nConnection(agent.id, window.location.pathname);
                 setN8nBaseUrl("");
                 setN8nApiKey("");
                 setN8nWorkspaceId("");
+                setN8nConnectionMode("api");
                 setN8nStatus("disconnected");
                 setN8nLastError(null);
                 setN8nLastTestedAt(null);
@@ -332,6 +343,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                 toast.error("Failed to disconnect n8n");
             } finally {
                 setN8nLoading(false);
+                setN8nConnectionAction(null);
             }
         });
     };
@@ -380,6 +392,62 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                 toast.error("Failed to refresh n8n workflow health");
             } finally {
                 setN8nLoading(false);
+            }
+        });
+    };
+
+    const handleConnectN8n = () => {
+        setN8nConnectionAction("connecting");
+        if (n8nConnectionMode === "api") {
+            setN8nLoading(true);
+            startTransition(async () => {
+                try {
+                    await saveN8nConnection({
+                        agentId: agent.id,
+                        path: window.location.pathname,
+                        baseUrl: n8nBaseUrl,
+                        apiKey: n8nApiKey,
+                        workspaceId: n8nWorkspaceId,
+                        connectionMode: n8nConnectionMode,
+                    });
+                    const result = await testN8nConnection(agent.id, window.location.pathname);
+                    await loadN8nConnection();
+                    setN8nApiKey("");
+                    if (result.success) {
+                        toast.success(result.message);
+                    } else {
+                        toast.error(result.message);
+                    }
+                } catch {
+                    toast.error("Failed to connect n8n");
+                } finally {
+                    setN8nLoading(false);
+                    setN8nConnectionAction(null);
+                }
+            });
+            return;
+        }
+        setN8nLoading(true);
+        startTransition(async () => {
+            try {
+                await saveN8nConnection({
+                    agentId: agent.id,
+                    path: window.location.pathname,
+                    baseUrl: n8nBaseUrl,
+                    apiKey: n8nApiKey,
+                    workspaceId: n8nWorkspaceId,
+                    connectionMode: n8nConnectionMode,
+                });
+                setN8nApiKey("");
+                setN8nHasSavedApiKey(true);
+                setN8nStatus("connected");
+                setN8nLastError(null);
+                toast.success("Manual n8n connection saved");
+            } catch {
+                toast.error("Failed to connect n8n");
+            } finally {
+                setN8nLoading(false);
+                setN8nConnectionAction(null);
             }
         });
     };
@@ -898,6 +966,23 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Connection</p>
                                 </div>
                                 <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                                    <Label className="text-xs font-medium">Mode</Label>
+                                    <Select value={n8nConnectionMode} onValueChange={(v: "api" | "manual") => setN8nConnectionMode(v)}>
+                                        <SelectTrigger className="h-9 text-xs">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="api" className="text-xs">API Control Plane (Recommended)</SelectItem>
+                                            <SelectItem value="manual" className="text-xs">Manual Fallback</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {n8nConnectionMode === "api"
+                                            ? "Use one-click install, publish/unpublish, and health sync from Cencori."
+                                            : "Use n8n UI import/publish manually. Cencori still handles model routing and logs."}
+                                    </p>
+                                </div>
+                                <div className="px-4 py-3 border-b border-border/40 space-y-2">
                                     <Label className="text-xs font-medium">n8n Base URL</Label>
                                     <Input
                                         value={n8nBaseUrl}
@@ -909,20 +994,22 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                         Cencori uses this URL for API calls like <code>/api/v1/workflows</code>.
                                     </p>
                                 </div>
-                                <div className="px-4 py-3 border-b border-border/40 space-y-2">
-                                    <Label className="text-xs font-medium">n8n API Key</Label>
-                                    <Input
-                                        value={n8nApiKey}
-                                        onChange={(e) => setN8nApiKey(e.target.value)}
-                                        placeholder={n8nHasSavedApiKey ? "•••••••••••••••• (saved)" : "n8n_api_..."}
-                                        className="h-9 text-xs font-mono"
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        {n8nHasSavedApiKey
-                                            ? "Leave blank to keep existing key. Enter a new key to rotate."
-                                            : "Required for first connection. Stored encrypted."}
-                                    </p>
-                                </div>
+                                {n8nConnectionMode === "api" && (
+                                    <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                                        <Label className="text-xs font-medium">n8n API Key</Label>
+                                        <Input
+                                            value={n8nApiKey}
+                                            onChange={(e) => setN8nApiKey(e.target.value)}
+                                            placeholder={n8nHasSavedApiKey ? "•••••••••••••••• (saved)" : "n8n_api_..."}
+                                            className="h-9 text-xs font-mono"
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            {n8nHasSavedApiKey
+                                                ? "Leave blank to keep existing key. Enter a new key to rotate."
+                                                : "Required for first connection. Stored encrypted."}
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="px-4 py-3 space-y-2">
                                     <Label className="text-xs font-medium">Workspace ID (optional)</Label>
                                     <Input
@@ -957,33 +1044,69 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     )}
                                 </div>
                                 <div className="flex justify-end gap-2 px-4 py-2 bg-muted/20 border-t border-border/40">
+                                    {n8nStatus === "disconnected" ? (
+                                        <Button
+                                            size="sm"
+                                            variant="default"
+                                            onClick={handleConnectN8n}
+                                            disabled={isPending || n8nLoading || !n8nBaseUrl.trim()}
+                                            className={n8nActionButtonClass}
+                                        >
+                                            {n8nConnectionAction === "connecting" ? (
+                                                <>
+                                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                                    Connecting...
+                                                </>
+                                            ) : (
+                                                "Connect"
+                                            )}
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="default"
+                                            onClick={handleDisconnectN8n}
+                                            disabled={isPending || n8nLoading || (!n8nHasSavedApiKey && !n8nBaseUrl)}
+                                            className={n8nActionButtonClass}
+                                        >
+                                            {n8nConnectionAction === "disconnecting" ? (
+                                                <>
+                                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                                    Disconnecting...
+                                                </>
+                                            ) : (
+                                                "Disconnect"
+                                            )}
+                                        </Button>
+                                    )}
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        onClick={handleDisconnectN8n}
-                                        disabled={isPending || n8nLoading || !n8nHasSavedApiKey}
-                                        className="h-8 text-xs"
-                                    >
-                                        Disconnect
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
+                                        variant="default"
                                         onClick={handleSaveN8n}
                                         disabled={isPending || n8nLoading}
-                                        className="h-8 text-xs"
+                                        className={n8nActionButtonClass}
                                     >
-                                        Save
+                                        {n8nSaveLoading ? (
+                                            <>
+                                                <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            "Save"
+                                        )}
                                     </Button>
-                                    <Button
-                                        size="sm"
-                                        onClick={handleTestN8n}
-                                        disabled={isPending || n8nLoading}
-                                        className="h-8 text-xs"
-                                    >
-                                        {n8nLoading && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                                        Test Connection
-                                    </Button>
+                                    {n8nConnectionMode === "api" && (
+                                        <Button
+                                            size="sm"
+                                            variant="default"
+                                            onClick={handleTestN8n}
+                                            disabled={isPending || n8nLoading}
+                                            className={n8nActionButtonClass}
+                                        >
+                                            {n8nLoading && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                                            Test Connection
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 
@@ -992,6 +1115,21 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Workflow Control</p>
                                 </div>
                                 <div className="px-4 py-3 space-y-1.5">
+                                    {n8nConnectionMode === "manual" && (
+                                        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2">
+                                            <p className="text-[10px] text-amber-300">
+                                                Manual mode: import the starter template in n8n UI, then publish from n8n.
+                                            </p>
+                                            <a
+                                                href="/examples/n8n/cencori-chat-webhook.json"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[10px] text-amber-200 underline"
+                                            >
+                                                Open starter template JSON
+                                            </a>
+                                        </div>
+                                    )}
                                     {n8nWorkflowId ? (
                                         <p className="text-[10px] text-muted-foreground">
                                             Workflow ID: <span className="font-mono">{n8nWorkflowId}</span>
@@ -1027,22 +1165,53 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                     )}
                                 </div>
                                 <div className="flex justify-end gap-2 px-4 py-2 bg-muted/20 border-t border-border/40">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleInstallStarterWorkflow}
-                                        disabled={isPending || n8nLoading || !n8nHasSavedApiKey}
-                                        className="h-8 text-xs"
-                                    >
-                                        Install Starter Workflow
-                                    </Button>
-                                    {n8nWorkflowId && (
+                                    {n8nConnectionMode === "api" ? (
                                         <Button
                                             size="sm"
-                                            variant="outline"
+                                            variant="default"
+                                            onClick={handleInstallStarterWorkflow}
+                                            disabled={isPending || n8nLoading || !n8nHasSavedApiKey}
+                                            className={n8nActionButtonClass}
+                                        >
+                                            Install Starter Workflow
+                                        </Button>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                size="sm"
+                                                variant="default"
+                                                onClick={() => window.open("/examples/n8n/cencori-chat-webhook.json", "_blank", "noopener,noreferrer")}
+                                                className={n8nActionButtonClass}
+                                            >
+                                                Open Starter Template
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="default"
+                                                onClick={() => {
+                                                    const steps = [
+                                                        "1. Download / open starter template JSON",
+                                                        "2. In n8n, click Import from file",
+                                                        "3. Select cencori-chat-webhook.json",
+                                                        "4. Set CENCORI_API_KEY and CENCORI_AGENT_ID in n8n env vars",
+                                                        "5. Publish workflow from n8n UI",
+                                                    ].join("\n");
+                                                    navigator.clipboard.writeText(steps);
+                                                    toast.success("Manual import steps copied");
+                                                }}
+                                                className={n8nActionButtonClass}
+                                            >
+                                                Copy Import Steps
+                                            </Button>
+                                        </>
+                                    )}
+                                    {n8nWorkflowId && n8nConnectionMode === "api" && (
+                                        <Button
+                                            size="sm"
+                                            variant="default"
                                             onClick={() => handleSetWorkflowActive(!n8nWorkflowActive)}
                                             disabled={isPending || n8nLoading}
-                                            className="h-8 text-xs"
+                                            className={n8nActionButtonClass}
                                         >
                                             {n8nWorkflowActive ? "Unpublish" : "Publish"}
                                         </Button>
@@ -1082,10 +1251,10 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                 <div className="flex justify-end px-4 py-2 bg-muted/20 border-t border-border/40">
                                     <Button
                                         size="sm"
-                                        variant="outline"
+                                        variant="default"
                                         onClick={handleRefreshN8nHealth}
-                                        disabled={isPending || n8nLoading || !n8nWorkflowId}
-                                        className="h-8 text-xs"
+                                        disabled={isPending || n8nLoading || !n8nWorkflowId || n8nConnectionMode !== "api"}
+                                        className={n8nActionButtonClass}
                                     >
                                         Refresh Health
                                     </Button>
