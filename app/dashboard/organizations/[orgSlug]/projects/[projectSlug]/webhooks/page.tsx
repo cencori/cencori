@@ -212,7 +212,6 @@ export default function WebhooksPage({ params }: PageProps) {
                 <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                     <DialogTrigger asChild>
                         <Button size="sm" className="h-8 text-xs">
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
                             Add webhook
                         </Button>
                     </DialogTrigger>
