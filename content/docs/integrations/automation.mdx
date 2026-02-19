@@ -11,7 +11,18 @@ You can integrate Cencori into your automation workflows using standard HTTP req
 
 n8n is a powerful open-source workflow automation tool. You can use the **HTTP Request** node to connect to Cencori.
 
-### Step-by-Step Guide
+### Dashboard-first setup (recommended)
+
+If you deployed an **n8n Workflow** agent in Cencori:
+
+1. Open the agent's **Configuration** tab.
+2. Add your `n8n Base URL` and `n8n API Key`.
+3. Click **Test Connection**.
+4. Click **Install Starter Workflow** to push a ready-made webhook workflow into n8n.
+5. Use **Publish** / **Unpublish** to control whether the starter workflow is live.
+6. Use **Refresh Health** to sync execution status and runtime metrics back into Cencori.
+
+### Quick start (manual node setup)
 
 1.  Add an **HTTP Request** node to your workflow.
 2.  In the node settings, configure the following:
@@ -21,7 +32,7 @@ n8n is a powerful open-source workflow automation tool. You can use the **HTTP R
     -   **Generic Credential Type**: Select `Header Auth`.
 3.  Create a new Credential:
     -   **Name**: `Authorization`
-    -   **Value**: `Bearer csk_your_api_key_here` (replace with your actual API key).
+    -   **Value**: `Bearer cake_your_api_key_here` (replace with your actual API key).
 4.  Under **Body Parameters**, set:
     -   **Send Body**: Toggle to `On`.
     -   **Body Content Type**: Select `JSON`.
@@ -40,6 +51,48 @@ n8n is a powerful open-source workflow automation tool. You can use the **HTTP R
     ```
     *(Tip: You can use expressions to insert dynamic data from previous nodes into the "content" field.)*
 
+### cURL quick test (direct to Cencori)
+
+Use this to validate your Cencori key outside n8n:
+
+```bash
+curl -sS https://cencori.com/api/v1/chat/completions \
+  -H "Authorization: Bearer cake_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role":"user","content":"Hello from curl"}]
+  }'
+```
+
+### cURL create workflow in n8n (optional)
+
+You can also create the starter workflow directly via n8n API:
+
+```bash
+curl -sS -X POST "https://your-n8n.example.com/api/v1/workflows" \
+  -H "X-N8N-API-KEY: n8n_api_key_here" \
+  -H "Content-Type: application/json" \
+  --data-binary @examples/n8n/cencori-chat-webhook.json
+```
+
+### Importable workflow template
+
+You can import a ready-made n8n workflow template here:
+
+- [`/examples/n8n/cencori-chat-webhook.json`](/examples/n8n/cencori-chat-webhook.json)
+
+The template includes:
+- Webhook trigger node
+- Cencori chat completion request node
+- Structured response node for downstream steps
+
+### n8n hardening notes
+
+- Keep `baseUrl` as `https://cencori.com/api/v1` and call `/chat/completions` from n8n.
+- Use raw model IDs like `gemini-2.5-flash` or `llama-3.3-70b-versatile`.
+- `CENCORI_AGENT_ID` is optional for OpenAI-compatible clients. Cencori can derive the agent from the API key.
+
 ## Make (formerly Integromat)
 
 Use the native **HTTP** app to make requests to Cencori.
@@ -53,7 +106,7 @@ Use the native **HTTP** app to make requests to Cencori.
     -   **Method**: `POST`
     -   **Headers**: Add a new header:
         -   **Name**: `Authorization`
-        -   **Value**: `Bearer csk_your_api_key_here`
+        -   **Value**: `Bearer cake_your_api_key_here`
     -   **Body type**: `Raw`
     -   **Content type**: `JSON (application/json)`
 4.  In the **Request content** field, enter your JSON payload:
@@ -97,7 +150,7 @@ Use the **Webhooks by Zapier** action to connect Cencori to thousands of apps.
         ```
     -   **Headers**:
         -   `Content-Type`: `application/json`
-        -   `Authorization`: `Bearer csk_your_api_key_here`
+        -   `Authorization`: `Bearer cake_your_api_key_here`
 4.  Test the step to see the AI response.
 
 > [!TIP]

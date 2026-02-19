@@ -2,7 +2,6 @@
 
 import { createServerClient } from "@/lib/supabaseServer";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import crypto from "crypto";
 
 export async function createAgent({
@@ -42,10 +41,18 @@ export async function createAgent({
     // Different defaults per blueprint?
     let model = "gpt-4o";
     let systemPrompt = "You are a helpful assistant.";
+    let temperature = 0.7;
 
     if (blueprintId === "openclaw") {
         model = "gemini-2.5-flash"; // Our validated model
         systemPrompt = "You are OpenClaw, an autonomous operator capable of controlling this computer.";
+        temperature = 0.5;
+    }
+
+    if (blueprintId === "n8n") {
+        model = "gpt-4o-mini";
+        systemPrompt = "You are an automation-focused AI assistant operating inside n8n workflows. Return concise, deterministic outputs that are safe to parse in downstream steps.";
+        temperature = 0.2;
     }
 
     const { error: configError } = await supabase
@@ -54,7 +61,7 @@ export async function createAgent({
             agent_id: agent.id,
             model: model,
             system_prompt: systemPrompt,
-            temperature: 0.7
+            temperature
         });
 
     if (configError) {

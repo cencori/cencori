@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Copy, Loader2, Play, Terminal, ArrowRight } from "lucide-react";
+import { Check, Copy, Loader2, ArrowRight } from "lucide-react";
 import { createAgent } from "@/app/dashboard/organizations/[orgSlug]/projects/[projectSlug]/agents/actions";
 import { toast } from "sonner";
 
@@ -40,7 +40,7 @@ export function DeployAgentDialog({
     const [step, setStep] = useState<'name' | 'deploying' | 'success'>('name');
     const [agentName, setAgentName] = useState("");
     const [result, setResult] = useState<{ agentId: string, apiKey: string } | null>(null);
-    const [isPending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
 
     const handleDeploy = () => {
         if (!agentName) {
@@ -81,24 +81,86 @@ export function DeployAgentDialog({
         router.push(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/agents/${result.agentId}`);
     };
 
-    const getConnectCommand = (blueprint: string, apiKey: string, agentId: string) => {
-        const envVars = `# Step 2: Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${apiKey}\nexport CENCORI_AGENT_ID=${agentId}`;
+    const getBlueprintSetup = (blueprint: string, apiKey: string, agentId: string) => {
+        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${apiKey}\nexport CENCORI_AGENT_ID=${agentId}`;
         switch (blueprint) {
-            case 'openclaw':
-                return `# Step 1: Install OpenClaw\ncurl -sSL https://openclaw.ai/install.sh | bash\n\n${envVars}\n\n# Step 3: Run\nopenclaw onboard`;
-            case 'n8n':
-                return `# Step 1: Install n8n\nnpx n8n\n\n${envVars}`;
-            case 'autogpt':
-                return `# Step 1: Install AutoGPT\npip install autogpt\n\n${envVars}\n\n# Step 3: Run\nautogpt run`;
-            case 'crewai':
-                return `# Step 1: Install CrewAI\npip install crewai\n\n${envVars}`;
-            case 'python-interpreter':
-                return `# Step 1: Install dependencies\npip install openai\n\n${envVars}`;
+            case "openclaw":
+                return {
+                    title: "How OpenClaw Works",
+                    description: "Your agent is ready. Use these variables to connect OpenClaw to Cencori.",
+                    notes: [
+                        "Runs locally on your computer",
+                        "Connects securely to Cencori's Gateway",
+                        "Shadow Mode requires approval for risky actions",
+                    ],
+                    command: `# Step 1: Install OpenClaw\ncurl -sSL https://openclaw.ai/install.sh | bash\n\n# Step 2: Configure\n${envVars}\n\n# Step 3: Run\nopenclaw onboard`,
+                    helpText: "This command installs and runs OpenClaw with your unique key.",
+                };
+            case "n8n":
+                return {
+                    title: "How n8n Workflow Works",
+                    description: "Your agent is ready. Start n8n and create an OpenAI credential pointing to Cencori.",
+                    notes: [
+                        "Build AI workflows visually in n8n",
+                        "Use Cencori as OpenAI-compatible backend",
+                        "Select any model from your Cencori agent config",
+                    ],
+                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://cencori.com/api/v1\n# API Key: ${apiKey}\n\n# Step 3: In OpenAI Chat Model node\n# Model: gpt-4o-mini (or your configured Cencori model)\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agentId}`,
+                    helpText: "Use the Base URL and API key above in n8n OpenAI credentials.",
+                };
+            case "autogpt":
+                return {
+                    title: "How AutoGPT Works",
+                    description: "Your agent is ready. Use these variables to connect AutoGPT to Cencori.",
+                    notes: [
+                        "Recursive task planning and execution",
+                        "Long-running autonomous loops",
+                        "Shadow Mode guardrails in Cencori",
+                    ],
+                    command: `# Step 1: Install AutoGPT\npip install autogpt\n\n# Step 2: Configure\n${envVars}\n\n# Step 3: Run\nautogpt run`,
+                    helpText: "This command configures and starts AutoGPT with your Cencori key.",
+                };
+            case "crewai":
+                return {
+                    title: "How CrewAI Works",
+                    description: "Your agent is ready. Use these variables to connect CrewAI to Cencori.",
+                    notes: [
+                        "Role-based multi-agent orchestration",
+                        "Task delegation across specialists",
+                        "Centralized model control in Cencori",
+                    ],
+                    command: `# Step 1: Install CrewAI\npip install crewai\n\n# Step 2: Configure\n${envVars}`,
+                    helpText: "Set these variables before running your CrewAI project.",
+                };
+            case "python-interpreter":
+                return {
+                    title: "How Python Sandbox Works",
+                    description: "Your agent is ready. Use these variables in your Python runtime.",
+                    notes: [
+                        "Execute model-generated Python safely",
+                        "Route requests through Cencori governance",
+                        "Track usage and behavior in Live Feed",
+                    ],
+                    command: `# Step 1: Install dependencies\npip install openai\n\n# Step 2: Configure\n${envVars}`,
+                    helpText: "Set these variables before your Python OpenAI client runs.",
+                };
             default:
-                return envVars;
+                return {
+                    title: "How This Agent Works",
+                    description: "Your agent is ready. Use these variables to connect it to Cencori.",
+                    notes: [
+                        "OpenAI-compatible endpoint",
+                        "Centralized monitoring and controls",
+                        "Model routing from Cencori dashboard",
+                    ],
+                    command: envVars,
+                    helpText: "Set these variables in your runtime environment.",
+                };
         }
     };
-    const connectCommand = result ? getConnectCommand(blueprintId, result.apiKey, result.agentId) : "";
+    const previewSetup = getBlueprintSetup(blueprintId, "<YOUR_API_KEY>", "<YOUR_AGENT_ID>");
+    const setup = result ? getBlueprintSetup(blueprintId, result.apiKey, result.agentId) : previewSetup;
+    const connectCommand = setup?.command || "";
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -126,11 +188,11 @@ export function DeployAgentDialog({
                                 />
                             </div>
                             <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                                <p className="font-medium mb-1">How OpenClaw Works:</p>
+                                <p className="font-medium mb-1">{previewSetup.title}:</p>
                                 <ul className="list-disc list-inside space-y-1">
-                                    <li>Runs locally on your computer</li>
-                                    <li>Connects securely to Cencori's Gateway</li>
-                                    <li>"Shadow Mode" requires approval for risky actions</li>
+                                    {previewSetup.notes.map((note) => (
+                                        <li key={note}>{note}</li>
+                                    ))}
                                 </ul>
                             </div>
                         </div>
@@ -159,7 +221,7 @@ export function DeployAgentDialog({
                                 Agent Deployed!
                             </DialogTitle>
                             <DialogDescription>
-                                Your agent is ready. Add these environment variables to connect any OpenAI-compatible agent.
+                                {setup?.description || "Your agent is ready. Add these variables to connect your runtime."}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -187,7 +249,7 @@ export function DeployAgentDialog({
                                     </div>
                                 </div>
                                 <p className="text-[10px] text-muted-foreground">
-                                    This command installs and runs the OpenClaw client with your unique key.
+                                    {setup?.helpText || "Use these values in your runtime configuration."}
                                 </p>
                             </div>
                         </div>
