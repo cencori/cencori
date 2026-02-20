@@ -42,6 +42,12 @@ function getTimelineConfig(timeRange: string, now: Date): { startTime: Date; gro
                 groupBy: 'day',
                 useEarliest: false,
             };
+        case '90d':
+            return {
+                startTime: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
+                groupBy: 'day',
+                useEarliest: false,
+            };
         case 'all':
             return {
                 startTime: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
