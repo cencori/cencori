@@ -13,10 +13,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import crypto from "crypto";
 import { addGatewayHeaders } from "@/lib/gateway-middleware";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
+import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
@@ -52,12 +54,10 @@ export async function GET(req: NextRequest) {
     };
 
     try {
-        // ── Auth (same dual-mode as chat/completions) ──
+        // ── Auth (API key for agents, or JWT for dashboard testing) ──
         const authHeader = req.headers.get("Authorization");
-        const apiKey = req.headers.get('CENCORI_API_KEY')
-            || (authHeader?.startsWith('Bearer cake_') ? authHeader.replace('Bearer ', '').trim() : null)
-            || (authHeader?.startsWith('Bearer cencori_') ? authHeader.replace('Bearer ', '').trim() : null)
-            || (authHeader?.startsWith('Bearer cen_') ? authHeader.replace('Bearer ', '').trim() : null);
+        const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
+        let authenticatedUserId: string | null = null;
 
         if (!apiKey && !authHeader) {
             return respond(
@@ -90,6 +90,21 @@ export async function GET(req: NextRequest) {
                 apiKeyId: data.id,
                 environment: data.environment || null,
             };
+        } else if (authHeader) {
+            const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+            const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+                global: { headers: { Authorization: authHeader } },
+            });
+            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            if (authError || !user) {
+                return respond(
+                    NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+                    'invalid_session',
+                    'Invalid or expired user session'
+                );
+            }
+            authenticatedUserId = user.id;
         }
 
         // ── Parse action IDs ──
@@ -111,11 +126,23 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // ── Fetch action statuses ──
+        // ── Fetch action statuses with project/org context ──
         const adminClient = createAdminClient();
         const { data: actions, error: fetchError } = await adminClient
             .from("agent_actions")
-            .select("id, status, payload, approved_at")
+            .select(`
+                id,
+                status,
+                payload,
+                approved_at,
+                agents!inner(
+                    project_id,
+                    projects!inner(
+                        organization_id,
+                        organizations!inner(owner_id)
+                    )
+                )
+            `)
             .in("id", ids);
 
         if (fetchError) {
@@ -126,6 +153,82 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        type Relation<T> = T | T[] | null | undefined;
+        const unwrapOne = <T>(value: Relation<T>): T | null => {
+            if (!value) return null;
+            return Array.isArray(value) ? (value[0] ?? null) : value;
+        };
+
+        const scopedActions = (actions || []).map((action) => {
+            const agent = unwrapOne(action.agents as Relation<{ project_id: string; projects: Relation<{ organization_id: string; organizations: Relation<{ owner_id: string | null }> }> }>);
+            const project = unwrapOne(agent?.projects);
+            const organization = unwrapOne(project?.organizations);
+
+            return {
+                id: action.id,
+                status: action.status,
+                payload: action.payload,
+                approved_at: action.approved_at,
+                projectId: agent?.project_id || null,
+                organizationId: project?.organization_id || null,
+                organizationOwnerId: organization?.owner_id || null,
+            };
+        });
+
+        if (apiLogContext) {
+            const hasCrossProjectAction = scopedActions.some(
+                (action) => action.projectId !== apiLogContext?.projectId
+            );
+            if (hasCrossProjectAction) {
+                return respond(
+                    NextResponse.json({ error: "Action does not belong to this project" }, { status: 403 }),
+                    'action_project_scope_denied',
+                    'Action does not belong to this project'
+                );
+            }
+        } else if (authenticatedUserId) {
+            const requestedOrgIds = Array.from(
+                new Set(scopedActions.map((action) => action.organizationId).filter((orgId): orgId is string => !!orgId))
+            );
+
+            let memberOrgIds = new Set<string>();
+            if (requestedOrgIds.length > 0) {
+                const { data: memberships, error: membershipError } = await adminClient
+                    .from('organization_members')
+                    .select('organization_id')
+                    .eq('user_id', authenticatedUserId)
+                    .in('organization_id', requestedOrgIds);
+
+                if (membershipError) {
+                    return respond(
+                        NextResponse.json({ error: "Failed to validate access" }, { status: 500 }),
+                        'membership_check_failed',
+                        membershipError.message
+                    );
+                }
+
+                memberOrgIds = new Set(
+                    (memberships || [])
+                        .map((membership) => membership.organization_id)
+                        .filter((orgId): orgId is string => !!orgId)
+                );
+            }
+
+            const unauthorizedAction = scopedActions.find((action) => {
+                if (!action.organizationId) return true;
+                if (action.organizationOwnerId && action.organizationOwnerId === authenticatedUserId) return false;
+                return !memberOrgIds.has(action.organizationId);
+            });
+
+            if (unauthorizedAction) {
+                return respond(
+                    NextResponse.json({ error: "Unauthorized to access one or more actions" }, { status: 403 }),
+                    'action_scope_denied',
+                    'User is not authorized to access one or more actions'
+                );
+            }
+        }
+
         // Build response map
         const statusMap: Record<string, {
             status: string;
@@ -133,7 +236,7 @@ export async function GET(req: NextRequest) {
             tool?: string;
         }> = {};
 
-        for (const action of actions || []) {
+        for (const action of scopedActions) {
             statusMap[action.id] = {
                 status: action.status,
                 approved_at: action.approved_at,

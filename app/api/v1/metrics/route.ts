@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
 import { addGatewayHeaders } from '@/lib/gateway-middleware';
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
+import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
 interface MetricsResponse {
     period: string;
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
         return addGatewayHeaders(response, { requestId });
     };
 
-    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
+    const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
     if (!apiKey) {
         return respond(
             NextResponse.json(
