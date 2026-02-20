@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
 import { addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
+import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
 /**
  * GET /api/v1/models
@@ -72,8 +73,7 @@ export async function GET(req: NextRequest) {
 
     // 1. Try API Key Auth (Legacy/External)
     const authHeader = req.headers.get('Authorization');
-    const apiKey = req.headers.get('CENCORI_API_KEY')
-        || (authHeader?.startsWith('Bearer cencori_') ? authHeader.replace('Bearer ', '').trim() : null);
+    const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
     let isAuthenticated = false;
 
@@ -109,9 +109,9 @@ export async function GET(req: NextRequest) {
         };
 
         isAuthenticated = true;
-    } else if (authHeader && !authHeader.startsWith('Bearer cencori_')) {
+    } else if (authHeader) {
         // 2. Try User Session Auth (OpenClaw Gateway)
-        // If the header is NOT a cencori_ key, assume it's a Supabase JWT
+        // If no recognized API key was provided, assume the bearer token is a Supabase JWT.
         const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 

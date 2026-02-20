@@ -1,103 +1,110 @@
-/**
- * API Key Utilities
- * Handles generation, hashing, validation, and masking of API keys
- */
+import crypto from 'crypto';
 
-import { createHash, randomBytes } from "crypto";
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const DEFAULT_CEN_PREFIX = 'cen_';
+const DEFAULT_CEN_KEY_BODY_LENGTH = 32;
+const MASK_FILL = '••••••••••••••';
 
-const API_KEY_PREFIX = "cen_";
-const API_KEY_LENGTH = 32;
+const CENCORI_API_KEY_PREFIXES = [
+    'cake_',
+    'cencori_',
+    'cen_',
+    'csk_',
+    'cpk_',
+    'csk_test_',
+    'cpk_test_',
+];
 
-/**
- * Generates a secure random API key
- * Format: cen_<32 random characters>
- */
-export function generateApiKey(prefix: string = API_KEY_PREFIX): string {
-    // Generate random bytes and convert to base58 (no confusing characters)
-    const base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    let result = "";
+export function generateApiKey(
+    prefix = DEFAULT_CEN_PREFIX,
+    bodyLength = DEFAULT_CEN_KEY_BODY_LENGTH
+): string {
+    const bytes = crypto.randomBytes(bodyLength);
+    let keyBody = '';
 
-    for (let i = 0; i < API_KEY_LENGTH; i++) {
-        const randomIndex = randomBytes(1)[0] % base58Chars.length;
-        result += base58Chars[randomIndex];
+    for (let i = 0; i < bodyLength; i += 1) {
+        keyBody += BASE58_ALPHABET[bytes[i] % BASE58_ALPHABET.length];
     }
 
-    return `${prefix}${result}`;
+    return `${prefix}${keyBody}`;
 }
 
-/**
- * Extracts the prefix from an API key for indexing
- * Returns first 8 characters (e.g., "cen_abcd")
- */
 export function extractKeyPrefix(apiKey: string): string {
-    return apiKey.substring(0, 8);
+    return apiKey.slice(0, 8);
 }
 
-/**
- * Hashes an API key using SHA-256 for storage
- * Note: For production, consider using bcrypt, but SHA-256 is simpler for initial implementation
- */
 export function hashApiKey(apiKey: string): string {
-    return createHash("sha256").update(apiKey).digest("hex");
+    return crypto.createHash('sha256').update(apiKey).digest('hex');
 }
 
-/**
- * Validates API key format
- */
-export function validateApiKey(apiKey: string): boolean {
-    if (!apiKey || typeof apiKey !== "string") {
+export function verifyApiKey(apiKey: string, expectedHash: string): boolean {
+    if (!apiKey || !expectedHash) return false;
+
+    const computedHash = hashApiKey(apiKey);
+    if (computedHash.length !== expectedHash.length) return false;
+
+    try {
+        return crypto.timingSafeEqual(
+            Buffer.from(computedHash, 'hex'),
+            Buffer.from(expectedHash, 'hex')
+        );
+    } catch {
         return false;
     }
-
-    // Check if it starts with correct prefix
-    if (!apiKey.startsWith(API_KEY_PREFIX)) {
-        return false;
-    }
-
-    // Check total length
-    if (apiKey.length !== API_KEY_PREFIX.length + API_KEY_LENGTH) {
-        return false;
-    }
-
-    // Check if it only contains base58 characters after prefix
-    const base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    const keyBody = apiKey.substring(API_KEY_PREFIX.length);
-
-    for (const char of keyBody) {
-        if (!base58Chars.includes(char)) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
-/**
- * Masks an API key for display
- * Shows: cen_••••••••••••••1234
- */
-export function maskApiKey(keyPrefix: string, lastFour?: string): string {
-    const maskedMiddle = "••••••••••••••";
+export function validateApiKey(apiKey: unknown): apiKey is string {
+    if (typeof apiKey !== 'string') return false;
+    if (!apiKey) return false;
 
-    if (lastFour) {
-        return `${keyPrefix}${maskedMiddle}${lastFour}`;
+    // Legacy base58 format used in tests and older keys.
+    if (/^cen_[1-9A-HJ-NP-Za-km-z]{32}$/.test(apiKey)) {
+        return true;
     }
 
-    // If only prefix provided, just mask the rest
-    return `${keyPrefix}${maskedMiddle}`;
+    // Current gateway key formats.
+    if (/^(?:csk|cpk)(?:_test)?_[a-f0-9]{48}$/i.test(apiKey)) {
+        return true;
+    }
+
+    if (/^cake_[a-f0-9]{48}$/i.test(apiKey)) {
+        return true;
+    }
+
+    if (/^cencori_[A-Za-z0-9._-]{16,}$/.test(apiKey)) {
+        return true;
+    }
+
+    return false;
 }
 
-/**
- * Gets the last 4 characters of a key for display
- */
+export function maskApiKey(prefix: string, lastFour?: string): string {
+    return `${prefix}${MASK_FILL}${lastFour ?? ''}`;
+}
+
 export function getKeyLastFour(apiKey: string): string {
     return apiKey.slice(-4);
 }
 
-/**
- * Verifies if a provided key matches the stored hash
- */
-export function verifyApiKey(providedKey: string, storedHash: string): boolean {
-    const providedHash = hashApiKey(providedKey);
-    return providedHash === storedHash;
+export function extractBearerToken(authHeader: string | null): string | null {
+    if (!authHeader) return null;
+
+    const [scheme, ...rest] = authHeader.trim().split(/\s+/);
+    if (!scheme || !/^bearer$/i.test(scheme) || rest.length === 0) return null;
+
+    const token = rest.join(' ').trim();
+    return token || null;
+}
+
+export function isCencoriApiKey(token: string | null): token is string {
+    if (!token) return false;
+    return CENCORI_API_KEY_PREFIXES.some((prefix) => token.startsWith(prefix));
+}
+
+export function extractCencoriApiKeyFromHeaders(headers: Pick<Headers, 'get'>): string | null {
+    const directKey = headers.get('CENCORI_API_KEY')?.trim();
+    if (directKey) return directKey;
+
+    const bearerToken = extractBearerToken(headers.get('Authorization'));
+    return isCencoriApiKey(bearerToken) ? bearerToken : null;
 }

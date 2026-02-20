@@ -3,9 +3,11 @@ import { OpenAI } from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { detectProviderFromModel } from "@/lib/providers/config";
-import { OPENAI_COMPATIBLE_ENDPOINTS } from "@/lib/providers/openai-compatible";
+import { OPENAI_COMPATIBLE_ENDPOINTS, OpenAICompatibleProvider } from "@/lib/providers/openai-compatible";
 import { AnthropicProvider } from "@/lib/providers/anthropic";
 import { CohereProvider } from "@/lib/providers/cohere";
+import { OpenAIProvider } from "@/lib/providers/openai";
+import { GeminiProvider } from "@/lib/providers/gemini";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import {
@@ -16,6 +18,8 @@ import {
     incrementUsage,
     type GatewayContext,
 } from "@/lib/gateway-middleware";
+import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import type { AIProvider } from "@/lib/providers/base";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -40,6 +44,71 @@ type ChatRequestBody = {
     messages?: ChatMessage[];
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
+};
+
+type UsageAndCost = {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    providerCostUsd: number;
+    cencoriChargeUsd: number;
+    markupPercentage: number;
+};
+
+const estimateTokenCount = (text: string): number => {
+    if (!text) return 0;
+    return Math.max(1, Math.ceil(text.length / 4));
+};
+
+const stringifyMessageContent = (content: unknown): string => {
+    if (typeof content === "string") return content;
+    return JSON.stringify(content ?? "");
+};
+
+const calculateUsageAndCost = async (
+    providerImpl: AIProvider,
+    model: string,
+    messages: ChatMessage[],
+    completionText: string
+): Promise<UsageAndCost> => {
+    const promptText = messages.map((msg) => stringifyMessageContent(msg.content)).join("\n");
+
+    let promptTokens = 0;
+    let completionTokens = 0;
+    try {
+        promptTokens = await providerImpl.countTokens(promptText, model);
+        completionTokens = await providerImpl.countTokens(completionText, model);
+    } catch {
+        promptTokens = estimateTokenCount(promptText);
+        completionTokens = estimateTokenCount(completionText);
+    }
+
+    const totalTokens = promptTokens + completionTokens;
+
+    let pricing = {
+        inputPer1KTokens: 0,
+        outputPer1KTokens: 0,
+        cencoriMarkupPercentage: 0,
+    };
+    try {
+        pricing = await providerImpl.getPricing(model);
+    } catch {
+        // Keep defaults; logging should never block the request.
+    }
+
+    const providerCostUsd =
+        (promptTokens / 1000) * pricing.inputPer1KTokens
+        + (completionTokens / 1000) * pricing.outputPer1KTokens;
+    const cencoriChargeUsd = providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100);
+
+    return {
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        providerCostUsd,
+        cencoriChargeUsd,
+        markupPercentage: pricing.cencoriMarkupPercentage,
+    };
 };
 
 const normalizeGatewayModelId = (modelId: string): string => {
@@ -148,16 +217,13 @@ export async function POST(req: NextRequest) {
 
     try {
         const authHeader = req.headers.get("Authorization");
+        const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
         // Determine auth mode: API key (production agents) vs user token (dashboard testing)
-        const isApiKeyAuth = !!(
-            req.headers.get('CENCORI_API_KEY')
-            || authHeader?.startsWith('Bearer cake_')
-            || authHeader?.startsWith('Bearer cencori_')
-            || authHeader?.startsWith('Bearer cen_')
-        );
+        const isApiKeyAuth = !!providedApiKey;
 
         let authenticatedProjectId: string | null = null;
+        let authenticatedUserId: string | null = null;
 
         if (isApiKeyAuth) {
             // ── Production Path: Full gateway validation (rate limit, spend cap, auth) ──
@@ -176,6 +242,7 @@ export async function POST(req: NextRequest) {
             if (authError || !user) {
                 return respond(new NextResponse("Unauthorized", { status: 401 }));
             }
+            authenticatedUserId = user.id;
         } else {
             return respond(new NextResponse("Missing Authorization", { status: 401 }));
         }
@@ -236,6 +303,48 @@ export async function POST(req: NextRequest) {
                 { status: 403 }
             );
             return respond(errResponse, 'agent_project_scope_denied', 'API key does not have access to this agent');
+        }
+
+        // Dashboard JWT path must still be scoped to organizations the user can access.
+        if (!authenticatedProjectId && authenticatedUserId) {
+            const { data: agentProject, error: projectError } = await adminClient
+                .from("projects")
+                .select(`
+                    id,
+                    organization_id,
+                    organizations!inner(owner_id)
+                `)
+                .eq("id", agentRecord.project_id)
+                .single();
+
+            if (projectError || !agentProject) {
+                return respond(
+                    NextResponse.json({ error: "Agent project not found" }, { status: 404 }),
+                    'agent_project_not_found',
+                    'Agent project not found'
+                );
+            }
+
+            const ownerId = (agentProject.organizations as { owner_id?: string } | null)?.owner_id || null;
+
+            let hasOrgAccess = ownerId === authenticatedUserId;
+            if (!hasOrgAccess) {
+                const { data: member, error: memberError } = await adminClient
+                    .from('organization_members')
+                    .select('id')
+                    .eq('organization_id', agentProject.organization_id)
+                    .eq('user_id', authenticatedUserId)
+                    .single();
+                hasOrgAccess = !memberError && !!member;
+            }
+
+            if (!hasOrgAccess) {
+                return respond(
+                    NextResponse.json({ error: "Unauthorized for this agent" }, { status: 403 }),
+                    'agent_org_scope_denied',
+                    'User is not authorized for this agent project'
+                );
+            }
         }
 
         // ── Check if agent is active ──
@@ -313,33 +422,62 @@ export async function POST(req: NextRequest) {
             }
 
             const chat = geminiModel.startChat(geminiChatConfig);
-
+            const providerForMetrics = new GeminiProvider(geminiKey);
             const result = await chat.sendMessageStream(lastMessage);
 
             const streamResponse = new ReadableStream({
                 async start(controller) {
-                    for await (const chunk of result.stream) {
-                        const text = chunk.text();
-                        const openaiChunk = {
-                            id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
-                            object: "chat.completion.chunk",
-                            created: Math.floor(Date.now() / 1000),
-                            model,
-                            choices: [{
-                                index: 0,
-                                delta: { content: text },
-                                finish_reason: null
-                            }]
-                        };
-                        const sse = `data: ${JSON.stringify(openaiChunk)}\n\n`;
-                        controller.enqueue(new TextEncoder().encode(sse));
-                    }
-                    controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-                    controller.close();
+                    let fullResponseText = "";
+                    try {
+                        for await (const chunk of result.stream) {
+                            const text = chunk.text();
+                            fullResponseText += text;
+                            const openaiChunk = {
+                                id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
+                                object: "chat.completion.chunk",
+                                created: Math.floor(Date.now() / 1000),
+                                model,
+                                choices: [{
+                                    index: 0,
+                                    delta: { content: text },
+                                    finish_reason: null
+                                }]
+                            };
+                            const sse = `data: ${JSON.stringify(openaiChunk)}\n\n`;
+                            controller.enqueue(new TextEncoder().encode(sse));
+                        }
+                        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                        controller.close();
 
-                    if (gatewayCtx) {
-                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider: 'google', status: 'success' }).catch(console.error);
-                        incrementUsage(gatewayCtx).catch(console.error);
+                        if (gatewayCtx) {
+                            const usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, fullResponseText);
+                            await logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider: 'google',
+                                status: 'success',
+                                promptTokens: usageAndCost.promptTokens,
+                                completionTokens: usageAndCost.completionTokens,
+                                totalTokens: usageAndCost.totalTokens,
+                                costUsd: usageAndCost.providerCostUsd,
+                                providerCostUsd: usageAndCost.providerCostUsd,
+                                cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
+                                markupPercentage: usageAndCost.markupPercentage,
+                            });
+                            await incrementUsage(gatewayCtx);
+                        }
+                    } catch (error: unknown) {
+                        const message = error instanceof Error ? error.message : "Google streaming failed";
+                        if (gatewayCtx) {
+                            void logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider: 'google',
+                                status: 'error',
+                                errorMessage: message,
+                            });
+                        }
+                        controller.error(error);
                     }
                 }
             });
@@ -357,6 +495,7 @@ export async function POST(req: NextRequest) {
 
             const streamResponse = new ReadableStream({
                 async start(controller) {
+                    let fullResponseText = "";
                     try {
                         const unifiedMessages = toUnifiedMessages(messages);
                         const stream = providerImpl.stream({
@@ -366,6 +505,7 @@ export async function POST(req: NextRequest) {
 
                         for await (const chunk of stream) {
                             if (chunk.delta) {
+                                fullResponseText += chunk.delta;
                                 const openaiChunk = {
                                     id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
                                     object: "chat.completion.chunk",
@@ -385,11 +525,33 @@ export async function POST(req: NextRequest) {
                         controller.close();
 
                         if (gatewayCtx) {
-                            logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
-                            incrementUsage(gatewayCtx).catch(console.error);
+                            const usageAndCost = await calculateUsageAndCost(providerImpl, model, messages, fullResponseText);
+                            await logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider,
+                                status: 'success',
+                                promptTokens: usageAndCost.promptTokens,
+                                completionTokens: usageAndCost.completionTokens,
+                                totalTokens: usageAndCost.totalTokens,
+                                costUsd: usageAndCost.providerCostUsd,
+                                providerCostUsd: usageAndCost.providerCostUsd,
+                                cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
+                                markupPercentage: usageAndCost.markupPercentage,
+                            });
+                            await incrementUsage(gatewayCtx);
                         }
                     } catch (error: unknown) {
                         console.error(`[Gateway] ${provider} streaming error:`, error);
+                        if (gatewayCtx) {
+                            void logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider,
+                                status: 'error',
+                                errorMessage: error instanceof Error ? error.message : `${provider} streaming failed`,
+                            });
+                        }
                         controller.error(error);
                     }
                 }
@@ -419,6 +581,9 @@ export async function POST(req: NextRequest) {
                 apiKey: providerApiKey,
                 ...(providerEndpoint ? { baseURL: providerEndpoint.baseURL } : {}),
             });
+            const providerForMetrics: AIProvider = provider === "openai"
+                ? new OpenAIProvider(providerApiKey)
+                : new OpenAICompatibleProvider(provider, providerApiKey);
 
             const openAiMessages = messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
             const response = await openai.chat.completions.create({
@@ -434,79 +599,110 @@ export async function POST(req: NextRequest) {
 
             const streamResponse = new ReadableStream({
                 async start(controller) {
-                    for await (const chunk of response) {
-                        const delta = chunk.choices[0]?.delta;
+                    let fullResponseText = "";
+                    try {
+                        for await (const chunk of response) {
+                            const delta = chunk.choices[0]?.delta;
 
-                        // Collect tool calls from stream chunks
-                        if (delta?.tool_calls) {
-                            for (const tc of delta.tool_calls) {
-                                if (!collectedToolCalls[tc.index]) {
-                                    collectedToolCalls[tc.index] = {
-                                        id: tc.id || "",
-                                        type: tc.type || "function",
-                                        function: { name: "", arguments: "" }
-                                    };
+                            if (delta?.content) {
+                                fullResponseText += delta.content;
+                            }
+
+                            // Collect tool calls from stream chunks
+                            if (delta?.tool_calls) {
+                                for (const tc of delta.tool_calls) {
+                                    if (!collectedToolCalls[tc.index]) {
+                                        collectedToolCalls[tc.index] = {
+                                            id: tc.id || "",
+                                            type: tc.type || "function",
+                                            function: { name: "", arguments: "" }
+                                        };
+                                    }
+                                    const existing = collectedToolCalls[tc.index];
+                                    if (tc.id) existing.id = tc.id;
+                                    if (tc.function?.name) existing.function.name += tc.function.name;
+                                    if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
                                 }
-                                const existing = collectedToolCalls[tc.index];
-                                if (tc.id) existing.id = tc.id;
-                                if (tc.function?.name) existing.function.name += tc.function.name;
-                                if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+                            }
+
+                            // Forward the chunk as-is (agent client sees the tool_calls)
+                            const text = `data: ${JSON.stringify(chunk)}\n\n`;
+                            controller.enqueue(new TextEncoder().encode(text));
+                        }
+
+                        // ── Shadow Mode Intercept ──
+                        // After the stream ends, if shadow_mode is ON and there were tool calls,
+                        // insert them as pending and send a custom event telling the agent to wait.
+                        const toolCallValues = Object.values(collectedToolCalls);
+
+                        if (shadowMode && toolCallValues.length > 0) {
+                            const pendingActionIds: string[] = [];
+
+                            for (const tc of toolCallValues) {
+                                const actionId = await createPendingAction(adminClient, agentId, {
+                                    tool_call_id: tc.id,
+                                    tool: tc.function.name,
+                                    arguments: tc.function.arguments,
+                                });
+                                if (actionId) pendingActionIds.push(actionId);
+                            }
+
+                            // Custom SSE event: tells the agent client to HOLD execution
+                            // and poll /api/v1/agent/actions/poll for approval
+                            if (pendingActionIds.length > 0) {
+                                const shadowEvent = {
+                                    type: "shadow_approval_required",
+                                    agent_id: agentId,
+                                    pending_action_ids: pendingActionIds,
+                                    message: "Tool calls require approval. Poll /api/v1/agent/actions/poll to check status.",
+                                    poll_url: `/api/v1/agent/actions/poll?ids=${pendingActionIds.join(",")}`,
+                                };
+                                const sse = `event: shadow_mode\ndata: ${JSON.stringify(shadowEvent)}\n\n`;
+                                controller.enqueue(new TextEncoder().encode(sse));
+                            }
+                        } else if (!shadowMode && toolCallValues.length > 0) {
+                            // Shadow mode OFF: log as executed (fire-and-forget)
+                            for (const tc of toolCallValues) {
+                                createExecutedAction(adminClient, agentId, {
+                                    tool_call_id: tc.id,
+                                    tool: tc.function.name,
+                                    arguments: tc.function.arguments,
+                                }).catch(console.error);
                             }
                         }
 
-                        // Forward the chunk as-is (agent client sees the tool_calls)
-                        const text = `data: ${JSON.stringify(chunk)}\n\n`;
-                        controller.enqueue(new TextEncoder().encode(text));
-                    }
+                        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                        controller.close();
 
-                    // ── Shadow Mode Intercept ──
-                    // After the stream ends, if shadow_mode is ON and there were tool calls,
-                    // insert them as pending and send a custom event telling the agent to wait.
-                    const toolCallValues = Object.values(collectedToolCalls);
-
-                    if (shadowMode && toolCallValues.length > 0) {
-                        const pendingActionIds: string[] = [];
-
-                        for (const tc of toolCallValues) {
-                            const actionId = await createPendingAction(adminClient, agentId, {
-                                tool_call_id: tc.id,
-                                tool: tc.function.name,
-                                arguments: tc.function.arguments,
+                        // Usage tracking
+                        if (gatewayCtx) {
+                            const usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, fullResponseText);
+                            await logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider,
+                                status: 'success',
+                                promptTokens: usageAndCost.promptTokens,
+                                completionTokens: usageAndCost.completionTokens,
+                                totalTokens: usageAndCost.totalTokens,
+                                costUsd: usageAndCost.providerCostUsd,
+                                providerCostUsd: usageAndCost.providerCostUsd,
+                                cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
+                                markupPercentage: usageAndCost.markupPercentage,
                             });
-                            if (actionId) pendingActionIds.push(actionId);
+                            await incrementUsage(gatewayCtx);
                         }
-
-                        // Custom SSE event: tells the agent client to HOLD execution
-                        // and poll /api/v1/agent/actions/poll for approval
-                        if (pendingActionIds.length > 0) {
-                            const shadowEvent = {
-                                type: "shadow_approval_required",
-                                agent_id: agentId,
-                                pending_action_ids: pendingActionIds,
-                                message: "Tool calls require approval. Poll /api/v1/agent/actions/poll to check status.",
-                                poll_url: `/api/v1/agent/actions/poll?ids=${pendingActionIds.join(",")}`,
-                            };
-                            const sse = `event: shadow_mode\ndata: ${JSON.stringify(shadowEvent)}\n\n`;
-                            controller.enqueue(new TextEncoder().encode(sse));
+                    } catch (error: unknown) {
+                        if (gatewayCtx) {
+                            void logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider,
+                                status: 'error',
+                                errorMessage: error instanceof Error ? error.message : 'OpenAI-compatible streaming failed',
+                            });
                         }
-                    } else if (!shadowMode && toolCallValues.length > 0) {
-                        // Shadow mode OFF: log as executed (fire-and-forget)
-                        for (const tc of toolCallValues) {
-                            createExecutedAction(adminClient, agentId, {
-                                tool_call_id: tc.id,
-                                tool: tc.function.name,
-                                arguments: tc.function.arguments,
-                            }).catch(console.error);
-                        }
-                    }
-
-                    controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-                    controller.close();
-
-                    // Usage tracking
-                    if (gatewayCtx) {
-                        logGatewayRequest(gatewayCtx, { endpoint: '/v1/chat/completions', model, provider, status: 'success' }).catch(console.error);
-                        incrementUsage(gatewayCtx).catch(console.error);
+                        controller.error(error);
                     }
                 }
             });

@@ -12,18 +12,18 @@ import {
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage, ToolCall } from '@/lib/providers/base';
-import { checkInputSecurity, checkOutputSecurity, SecurityCheckResult } from '@/lib/safety/multi-layer-check';
+import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact, applyTokenize, deTokenize } from '@/lib/safety/custom-data-rules';
 import { geolocation, ipAddress } from '@vercel/functions';
 import { decryptApiKey } from '@/lib/encryption';
 import { isCircuitOpen, recordSuccess, recordFailure } from '@/lib/providers/circuit-breaker';
-import { getFallbackChain, getFallbackModel, isRetryableError, isNonRetryableError } from '@/lib/providers/failover';
+import { getFallbackChain, getFallbackModel, isNonRetryableError } from '@/lib/providers/failover';
 import { triggerFallbackWebhook, triggerSecurityWebhook } from '@/lib/webhooks';
-import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
 import { checkSpendCap, checkAndSendBudgetAlerts } from '@/lib/budgets';
 import { getProjectSecurityConfig } from '@/lib/safety/utils';
-import { handleCorsPreFlight, addGatewayHeaders } from '@/lib/gateway-middleware';
+import { handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
 
 const router = new ProviderRouter();
@@ -238,7 +238,7 @@ async function lookupCountryFromIp(ip: string): Promise<string | null> {
                     return countryCode.toUpperCase();
                 }
             }
-        } catch (e) {
+        } catch {
         }
 
         const fallbackResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
@@ -257,6 +257,26 @@ async function lookupCountryFromIp(ip: string): Promise<string | null> {
         console.warn('[Geo] IP lookup failed for IP:', ip, error);
         return null;
     }
+}
+
+async function incrementMonthlyUsage(
+    supabase: ReturnType<typeof createAdminClient>,
+    organizationId: string,
+    fallbackUsage: number
+): Promise<void> {
+    const { error } = await supabase.rpc('increment_monthly_usage', {
+        org_id: organizationId,
+    });
+
+    if (!error) {
+        return;
+    }
+
+    // Fallback path for environments where RPC is unavailable.
+    await supabase
+        .from('organizations')
+        .update({ monthly_requests_used: fallbackUsage + 1 })
+        .eq('id', organizationId);
 }
 
 function validateDomain(origin: string | null, allowedDomains: string[] | null): boolean {
@@ -306,11 +326,11 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
+        const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
         if (!apiKey) {
             return NextResponse.json(
-                { error: 'Missing CENCORI_API_KEY header' },
+                { error: 'Missing API key. Provide CENCORI_API_KEY or Authorization: Bearer <key>' },
                 { status: 401 }
             );
         }
@@ -356,9 +376,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Handle Agent Identity
-        let agentIdentity = null;
-        // @ts-ignore
         if (keyData.key_type === 'agent' || apiKey.startsWith('cake_')) {
             if (!keyData.agent_id) {
                 return NextResponse.json(
@@ -367,7 +384,6 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            // @ts-ignore
             const rawAgent = keyData.agents;
             const agent = Array.isArray(rawAgent) ? rawAgent[0] : rawAgent;
 
@@ -378,7 +394,6 @@ export async function POST(req: NextRequest) {
                 );
             }
             if (agent) {
-                agentIdentity = agent;
                 console.log('[Agent Identity] Request from:', agent.name);
             }
         }
@@ -434,6 +449,18 @@ export async function POST(req: NextRequest) {
                         ? 'Upgrade to Pro for 50,000 requests/month'
                         : 'Upgrade your plan to get more requests',
                     upgrade_url: '/billing'
+                },
+                { status: 429 }
+            );
+        }
+
+        const rateLimitResult = await checkRateLimit(project.id);
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                {
+                    error: 'Rate limit exceeded',
+                    message: `${rateLimitResult.limit} requests per minute allowed. Try again shortly.`,
+                    retry_after_ms: Math.max(0, rateLimitResult.reset - Date.now()),
                 },
                 { status: 429 }
             );
@@ -862,10 +889,7 @@ export async function POST(req: NextRequest) {
                                 const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
                                 const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-                                await supabase
-                                    .from('organizations')
-                                    .update({ monthly_requests_used: currentUsage + 1 })
-                                    .eq('id', organizationId);
+                                await incrementMonthlyUsage(supabase, organizationId, currentUsage);
 
                                 let streamLoggedContent = fullContent;
                                 let streamLoggedMessages = messages;
@@ -1109,10 +1133,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        await supabase
-            .from('organizations')
-            .update({ monthly_requests_used: currentUsage + 1 })
-            .eq('id', organizationId);
+        await incrementMonthlyUsage(supabase, organizationId, currentUsage);
         let loggedMessages = messages;
         let loggedResponse = response.content;
 
