@@ -395,7 +395,7 @@ export default function MemoryPage({ params }: { params: PageParams }) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold">AI Memory</h1>
+                        <h1 className="text-xl font-semibold">Memory</h1>
                         <p className="text-xs text-muted-foreground mt-0.5">
                             Store and search data using vector embeddings
                         </p>
