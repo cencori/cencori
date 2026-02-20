@@ -7,6 +7,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import ReactMarkdown from "react-markdown";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import {
     Search,
     Code2,
@@ -238,11 +239,11 @@ export function CommandPalette({
                         keywords: ["token", "secret", "credentials", "key"],
                     },
                     {
-                        id: "project-analytics",
-                        label: "Analytics",
-                        icon: <ChartBarIcon className="h-3.5 w-3.5" />,
-                        action: () => navigate(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`),
-                        keywords: ["stats", "metrics", "usage", "charts", "reports"],
+                        id: "project-observability",
+                        label: "Observability",
+                        icon: <ObservabilityIcon className="h-3.5 w-3.5" />,
+                        action: () => navigate(`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/observability`),
+                        keywords: ["observability", "analytics", "stats", "metrics", "usage", "charts", "reports"],
                     },
                     {
                         id: "logs",

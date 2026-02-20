@@ -643,20 +643,20 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
           </section>
 
-          {/* Project Analytics */}
+          {/* Project Observability */}
           <section className="space-y-3">
             <div className="space-y-0.5">
-              <h2 className="text-sm font-medium">Project analytics</h2>
+              <h2 className="text-sm font-medium">Project observability</h2>
               <p className="text-xs md:text-[10px] text-muted-foreground">View usage and request statistics.</p>
             </div>
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Analytics</p>
+                  <p className="text-sm md:text-xs font-medium">Observability</p>
                   <p className="text-xs md:text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
                 </div>
                 <Button variant="outline" size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs" asChild>
-                  <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/analytics`}>
+                  <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/observability`}>
                     View
                   </Link>
                 </Button>
@@ -678,7 +678,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     <div className="space-y-0.5">
                       <p className="text-sm md:text-xs font-medium">Deleting this project will remove all data.</p>
                       <p className="text-xs md:text-[10px] text-muted-foreground">
-                        This includes API keys, logs, and analytics. This action cannot be undone.
+                        This includes API keys, logs, and observability data. This action cannot be undone.
                       </p>
                     </div>
                     <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

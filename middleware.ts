@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import type { NextFetchEvent, NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr"
 
 // Supabase config
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
+const webLogIngestSecret = process.env.WEB_LOG_INGEST_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
 // Security headers for all responses
 const securityHeaders: Record<string, string> = {
@@ -44,7 +46,27 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     return response;
 }
 
-export async function middleware(request: NextRequest) {
+function extractProjectScope(pathname: string): { orgSlug: string; projectSlug: string } | null {
+    const match = pathname.match(/^\/dashboard\/organizations\/([^/]+)\/projects\/([^/]+)(?:\/|$)/);
+    if (!match) return null;
+
+    return { orgSlug: match[1], projectSlug: match[2] };
+}
+
+function isLocalhostHost(host: string): boolean {
+    const normalized = host.toLowerCase();
+
+    return (
+        normalized === 'localhost'
+        || normalized.startsWith('localhost:')
+        || normalized === '127.0.0.1'
+        || normalized.startsWith('127.0.0.1:')
+        || normalized === '[::1]'
+        || normalized.startsWith('[::1]:')
+    );
+}
+
+export async function middleware(request: NextRequest, event: NextFetchEvent) {
     const hostname = request.headers.get('host') ?? '';
     const domain = hostname.split(':')[0];
 
@@ -116,7 +138,81 @@ export async function middleware(request: NextRequest) {
     await supabase.auth.getUser();
 
     // Apply security headers to all responses
-    return applySecurityHeaders(response);
+    response = applySecurityHeaders(response);
+
+    // Non-blocking web traffic logging for project-scoped dashboard routes.
+    const projectScope = extractProjectScope(pathname);
+    const skipLocalhostIngest = isProductionRuntime && isLocalhostHost(hostname);
+
+    if (projectScope && webLogIngestSecret && !skipLocalhostIngest) {
+        const requestId = crypto.randomUUID();
+        const forwardedFor = request.headers.get('x-forwarded-for');
+        const clientIp = forwardedFor?.split(',')[0]?.trim() || request.headers.get('x-real-ip');
+        const queryString = request.nextUrl.searchParams.toString();
+        const protocol = request.headers.get('x-forwarded-proto')
+            || request.nextUrl.protocol.replace(':', '')
+            || null;
+        const runtimeEnv = process.env.VERCEL_ENV || process.env.NODE_ENV || null;
+
+        const ingestUrl = new URL('/api/internal/web-logs/ingest', request.url);
+
+        event.waitUntil(
+            fetch(ingestUrl, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-cencori-internal-key': webLogIngestSecret,
+                },
+                body: JSON.stringify({
+                    requestId,
+                    orgSlug: projectScope.orgSlug,
+                    projectSlug: projectScope.projectSlug,
+                    host: hostname,
+                    method: request.method,
+                    path: pathname,
+                    queryString: queryString || null,
+                    statusCode: response.status,
+                    message: `${pathname}${queryString ? `?${queryString}` : ''} status=${response.status}`,
+                    userAgent: request.headers.get('user-agent'),
+                    referer: request.headers.get('referer'),
+                    ipAddress: clientIp || null,
+                    countryCode: request.headers.get('x-vercel-ip-country') || null,
+                    metadata: {
+                        runtime: {
+                            source: 'middleware',
+                            env: runtimeEnv,
+                        },
+                        scope: {
+                            org_slug: projectScope.orgSlug,
+                            project_slug: projectScope.projectSlug,
+                            query_count: request.nextUrl.searchParams.size,
+                        },
+                        connection: {
+                            protocol,
+                        },
+                        request_headers: {
+                            accept: request.headers.get('accept'),
+                            accept_language: request.headers.get('accept-language'),
+                            sec_fetch_site: request.headers.get('sec-fetch-site'),
+                            sec_fetch_mode: request.headers.get('sec-fetch-mode'),
+                            sec_fetch_dest: request.headers.get('sec-fetch-dest'),
+                        },
+                        vercel: {
+                            request_id: request.headers.get('x-vercel-id'),
+                            deployment_url: process.env.VERCEL_URL || null,
+                            ip_city: request.headers.get('x-vercel-ip-city'),
+                            ip_region: request.headers.get('x-vercel-ip-country-region'),
+                            ip_continent: request.headers.get('x-vercel-ip-continent'),
+                        },
+                    },
+                }),
+            }).catch((error) => {
+                console.error('[Web Logs] Failed to enqueue web request log:', error);
+            })
+        );
+    }
+
+    return response;
 }
 
 export const config = {

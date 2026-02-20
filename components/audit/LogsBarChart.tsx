@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bar, BarChart, XAxis, YAxis, Cell, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
 
 interface LogsBarChartProps {
     projectId: string;
     timeRange: string;
-    environment: 'production' | 'test';
+    environment?: 'production' | 'test';
+    source?: 'ai' | 'api' | 'web';
 }
 
 interface LogBucket {
@@ -24,16 +25,32 @@ const chartConfig = {
     filtered: { label: 'Filtered', color: 'hsl(24 80% 50%)' },
 } satisfies ChartConfig;
 
-export function LogsBarChart({ projectId, timeRange, environment }: LogsBarChartProps) {
+export function LogsBarChart({
+    projectId,
+    timeRange,
+    environment,
+    source = 'ai',
+}: LogsBarChartProps) {
     const [data, setData] = useState<LogBucket[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
             try {
-                const res = await fetch(
-                    `/api/projects/${projectId}/analytics/trends?time_range=${timeRange}&environment=${environment}`
-                );
+                const params = new URLSearchParams({ time_range: timeRange });
+                if ((source === 'ai' || source === 'api') && environment) {
+                    params.set('environment', environment);
+                }
+
+                const endpoint =
+                    source === 'ai'
+                        ? `/api/projects/${projectId}/analytics/trends`
+                        : source === 'api'
+                            ? `/api/projects/${projectId}/logs/gateway/timeline`
+                            : `/api/projects/${projectId}/logs/web/timeline`;
+
+                const res = await fetch(`${endpoint}?${params.toString()}`);
                 if (!res.ok) return;
                 const json = await res.json();
                 setData(json.trends || []);
@@ -44,7 +61,7 @@ export function LogsBarChart({ projectId, timeRange, environment }: LogsBarChart
             }
         };
         fetchData();
-    }, [projectId, timeRange, environment]);
+    }, [projectId, timeRange, environment, source]);
 
     if (loading || data.length === 0) {
         return null;

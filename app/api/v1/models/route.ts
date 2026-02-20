@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
 import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
 import { addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
+import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
 
 /**
  * GET /api/v1/models
@@ -38,6 +39,36 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    let apiLogContext: { projectId: string; apiKeyId: string; environment: string | null } | null = null;
+
+    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
+        if (apiLogContext) {
+            const forwardedFor = req.headers.get('x-forwarded-for');
+            const clientIp = forwardedFor?.split(',')[0]?.trim() || req.headers.get('x-real-ip');
+
+            void logApiGatewayRequest({
+                projectId: apiLogContext.projectId,
+                apiKeyId: apiLogContext.apiKeyId,
+                requestId,
+                endpoint: '/v1/models',
+                method: 'GET',
+                statusCode: response.status,
+                startedAt,
+                environment: apiLogContext.environment,
+                ipAddress: clientIp,
+                countryCode: req.headers.get('x-vercel-ip-country') || req.headers.get('x-cencori-user-country'),
+                userAgent: req.headers.get('user-agent'),
+                callerOrigin: callerIdentity.callerOrigin,
+                clientApp: callerIdentity.clientApp,
+                errorCode: errorCode || null,
+                errorMessage: errorMessage || null,
+            });
+        }
+
+        return addGatewayHeaders(response, { requestId });
+    };
 
     // 1. Try API Key Auth (Legacy/External)
     const authHeader = req.headers.get('Authorization');
@@ -52,13 +83,13 @@ export async function GET(req: NextRequest) {
         const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
         const { data: keyData, error: keyError } = await supabase
             .from('api_keys')
-            .select('id, project_id')
+            .select('id, project_id, environment')
             .eq('key_hash', keyHash)
             .is('revoked_at', null)
             .single();
 
         if (keyError || !keyData) {
-            return addGatewayHeaders(
+            return respond(
                 NextResponse.json({
                     error: {
                         message: 'Invalid API key',
@@ -66,9 +97,17 @@ export async function GET(req: NextRequest) {
                         code: 'invalid_api_key'
                     }
                 }, { status: 401 }),
-                { requestId }
+                'invalid_api_key',
+                'Invalid API key'
             );
         }
+
+        apiLogContext = {
+            projectId: keyData.project_id,
+            apiKeyId: keyData.id,
+            environment: keyData.environment || null,
+        };
+
         isAuthenticated = true;
     } else if (authHeader && !authHeader.startsWith('Bearer cencori_')) {
         // 2. Try User Session Auth (OpenClaw Gateway)
@@ -90,7 +129,7 @@ export async function GET(req: NextRequest) {
 
     if (!isAuthenticated) {
         // 3. Unauthorized
-        return addGatewayHeaders(
+        return respond(
             NextResponse.json({
                 error: {
                     message: 'Missing API key or valid session. Use Authorization: Bearer <key>',
@@ -98,7 +137,8 @@ export async function GET(req: NextRequest) {
                     code: 'missing_api_key'
                 }
             }, { status: 401 }),
-            { requestId }
+            'missing_api_key',
+            'Missing API key or valid session'
         );
     }
 
@@ -115,7 +155,7 @@ export async function GET(req: NextRequest) {
         filteredModels = filteredModels.filter(m => m.type === filterType);
     }
 
-    return addGatewayHeaders(
+    return respond(
         NextResponse.json({
             object: 'list',
             data: filteredModels,
@@ -124,7 +164,6 @@ export async function GET(req: NextRequest) {
                 name: p.name,
                 model_count: p.models.length,
             })),
-        }),
-        { requestId }
+        })
     );
 }

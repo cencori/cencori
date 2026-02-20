@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Activity, Server, Puzzle, Cpu, Webhook, Brain, Boxes, Bot } from "lucide-react";
+import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Brain, Boxes, Bot } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
+import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -102,7 +103,7 @@ async function prefetchProjectPage(
                 staleTime: 30 * 1000,
             });
         },
-        analytics: async () => {
+        observability: async () => {
             await queryClient.prefetchQuery({
                 queryKey: ["analyticsStats", projectId, "7d"],
                 queryFn: async () => {
@@ -239,7 +240,7 @@ export default function ProjectLayoutClient({
     const coreItems: NavItem[] = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
         { href: `${basePath}/agents`, icon: Bot, label: "Agents" },
-        { href: `${basePath}/analytics`, icon: Activity, label: "Analytics", prefetch: createPrefetch("analytics") },
+        { href: `${basePath}/observability`, icon: ObservabilityIcon, label: "Observability", prefetch: createPrefetch("observability") },
         { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
     ];
 
@@ -303,4 +304,3 @@ export default function ProjectLayoutClient({
         </SidebarProvider>
     );
 }
-
