@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
+import { addGatewayHeaders } from '@/lib/gateway-middleware';
+import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
 
 interface MetricsResponse {
     period: string;
@@ -71,26 +73,71 @@ function getPeriodDates(period: string): { start: Date; end: Date } {
 
 export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
+    const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    let apiLogContext: { projectId: string; apiKeyId: string; environment: string | null } | null = null;
+
+    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
+        if (apiLogContext) {
+            const forwardedFor = req.headers.get('x-forwarded-for');
+            const clientIp = forwardedFor?.split(',')[0]?.trim() || req.headers.get('x-real-ip');
+
+            void logApiGatewayRequest({
+                projectId: apiLogContext.projectId,
+                apiKeyId: apiLogContext.apiKeyId,
+                requestId,
+                endpoint: '/v1/metrics',
+                method: 'GET',
+                statusCode: response.status,
+                startedAt,
+                environment: apiLogContext.environment,
+                ipAddress: clientIp,
+                countryCode: req.headers.get('x-vercel-ip-country') || req.headers.get('x-cencori-user-country'),
+                userAgent: req.headers.get('user-agent'),
+                callerOrigin: callerIdentity.callerOrigin,
+                clientApp: callerIdentity.clientApp,
+                errorCode: errorCode || null,
+                errorMessage: errorMessage || null,
+            });
+        }
+
+        return addGatewayHeaders(response, { requestId });
+    };
 
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!apiKey) {
-        return NextResponse.json(
+        return respond(
+            NextResponse.json(
             { error: 'Missing API key. Use Authorization: Bearer <api_key>' },
             { status: 401 }
+            ),
+            'missing_api_key',
+            'Missing API key'
         );
     }
 
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
     const { data: keyData, error: keyError } = await supabase
         .from('api_keys')
-        .select('project_id, projects!inner(id, name, organization_id)')
+        .select('id, project_id, environment, projects!inner(id, name, organization_id)')
         .eq('key_hash', keyHash)
         .is('revoked_at', null)
         .single();
 
     if (keyError || !keyData) {
-        return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        return respond(
+            NextResponse.json({ error: 'Invalid API key' }, { status: 401 }),
+            'invalid_api_key',
+            'Invalid API key'
+        );
     }
+
+    apiLogContext = {
+        projectId: keyData.project_id,
+        apiKeyId: keyData.id,
+        environment: keyData.environment || null,
+    };
 
     const projectId = keyData.project_id;
 
@@ -106,7 +153,11 @@ export async function GET(req: NextRequest) {
 
     if (error) {
         console.error('[Metrics API] Query error:', error);
-        return NextResponse.json({ error: 'Failed to fetch metrics' }, { status: 500 });
+        return respond(
+            NextResponse.json({ error: 'Failed to fetch metrics' }, { status: 500 }),
+            'metrics_query_failed',
+            error.message
+        );
     }
 
     const total = requests?.length || 0;
@@ -180,5 +231,5 @@ export async function GET(req: NextRequest) {
         models,
     };
 
-    return NextResponse.json(response);
+    return respond(NextResponse.json(response));
 }

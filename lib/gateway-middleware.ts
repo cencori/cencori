@@ -375,7 +375,7 @@ export function addGatewayHeaders(response: NextResponse, options: HeaderOptions
 
     // CORS headers
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, CENCORI_API_KEY, X-Cencori-User-IP, X-Cencori-User-Country');
     response.headers.set('Access-Control-Expose-Headers', 'X-Request-Id, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset');
 
@@ -388,7 +388,7 @@ export function addGatewayHeaders(response: NextResponse, options: HeaderOptions
 export function handleCorsPreFlight(): NextResponse {
     const response = new NextResponse(null, { status: 204 });
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, CENCORI_API_KEY, X-Cencori-User-IP, X-Cencori-User-Country');
     response.headers.set('Access-Control-Max-Age', '86400');
     return response;

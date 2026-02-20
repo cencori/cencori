@@ -15,8 +15,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import crypto from "crypto";
+import { addGatewayHeaders } from "@/lib/gateway-middleware";
+import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 
 export async function GET(req: NextRequest) {
+    const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    let apiLogContext: { projectId: string; apiKeyId: string; environment: string | null } | null = null;
+
+    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
+        if (apiLogContext) {
+            const forwardedFor = req.headers.get('x-forwarded-for');
+            const clientIp = forwardedFor?.split(',')[0]?.trim() || req.headers.get('x-real-ip');
+
+            void logApiGatewayRequest({
+                projectId: apiLogContext.projectId,
+                apiKeyId: apiLogContext.apiKeyId,
+                requestId,
+                endpoint: '/v1/agent/actions/poll',
+                method: 'GET',
+                statusCode: response.status,
+                startedAt,
+                environment: apiLogContext.environment,
+                ipAddress: clientIp,
+                countryCode: req.headers.get('x-vercel-ip-country') || req.headers.get('x-cencori-user-country'),
+                userAgent: req.headers.get('user-agent'),
+                callerOrigin: callerIdentity.callerOrigin,
+                clientApp: callerIdentity.clientApp,
+                errorCode: errorCode || null,
+                errorMessage: errorMessage || null,
+            });
+        }
+
+        return addGatewayHeaders(response, { requestId });
+    };
+
     try {
         // ── Auth (same dual-mode as chat/completions) ──
         const authHeader = req.headers.get("Authorization");
@@ -26,7 +60,11 @@ export async function GET(req: NextRequest) {
             || (authHeader?.startsWith('Bearer cen_') ? authHeader.replace('Bearer ', '').trim() : null);
 
         if (!apiKey && !authHeader) {
-            return NextResponse.json({ error: "Missing Authorization" }, { status: 401 });
+            return respond(
+                NextResponse.json({ error: "Missing Authorization" }, { status: 401 }),
+                'missing_authorization',
+                'Missing Authorization header'
+            );
         }
 
         if (apiKey) {
@@ -35,24 +73,42 @@ export async function GET(req: NextRequest) {
             const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
             const { data, error } = await adminClient
                 .from('api_keys')
-                .select('id')
+                .select('id, project_id, environment')
                 .eq('key_hash', keyHash)
                 .is('revoked_at', null)
                 .single();
             if (error || !data) {
-                return NextResponse.json({ error: "Invalid API Key" }, { status: 401 });
+                return respond(
+                    NextResponse.json({ error: "Invalid API Key" }, { status: 401 }),
+                    'invalid_api_key',
+                    'Invalid API key'
+                );
             }
+
+            apiLogContext = {
+                projectId: data.project_id,
+                apiKeyId: data.id,
+                environment: data.environment || null,
+            };
         }
 
         // ── Parse action IDs ──
         const idsParam = req.nextUrl.searchParams.get("ids");
         if (!idsParam) {
-            return NextResponse.json({ error: "Missing 'ids' query parameter" }, { status: 400 });
+            return respond(
+                NextResponse.json({ error: "Missing 'ids' query parameter" }, { status: 400 }),
+                'missing_ids',
+                "Missing 'ids' query parameter"
+            );
         }
 
         const ids = idsParam.split(",").filter(Boolean);
         if (ids.length === 0 || ids.length > 20) {
-            return NextResponse.json({ error: "Provide 1-20 action IDs" }, { status: 400 });
+            return respond(
+                NextResponse.json({ error: "Provide 1-20 action IDs" }, { status: 400 }),
+                'invalid_ids',
+                'Provide 1-20 action IDs'
+            );
         }
 
         // ── Fetch action statuses ──
@@ -63,7 +119,11 @@ export async function GET(req: NextRequest) {
             .in("id", ids);
 
         if (fetchError) {
-            return NextResponse.json({ error: "Failed to fetch actions" }, { status: 500 });
+            return respond(
+                NextResponse.json({ error: "Failed to fetch actions" }, { status: 500 }),
+                'action_fetch_failed',
+                fetchError.message
+            );
         }
 
         // Build response map
@@ -85,16 +145,21 @@ export async function GET(req: NextRequest) {
         const allResolved = Object.values(statusMap).every(a => a.status !== 'pending');
         const anyRejected = Object.values(statusMap).some(a => a.status === 'rejected');
 
-        return NextResponse.json({
+        return respond(NextResponse.json({
             actions: statusMap,
             all_resolved: allResolved,
             any_rejected: anyRejected,
             // If still pending, suggest a retry interval
             ...(allResolved ? {} : { retry_after_ms: 2000 }),
-        });
+        }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Poll Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        return respond(
+            NextResponse.json({ error: message }, { status: 500 }),
+            'internal_error',
+            message
+        );
     }
 }

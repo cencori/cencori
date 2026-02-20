@@ -7,6 +7,7 @@ import { OPENAI_COMPATIBLE_ENDPOINTS } from "@/lib/providers/openai-compatible";
 import { AnthropicProvider } from "@/lib/providers/anthropic";
 import { CohereProvider } from "@/lib/providers/cohere";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import {
     validateGatewayRequest,
     addGatewayHeaders,
@@ -114,6 +115,37 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+    const endpoint = '/v1/chat/completions';
+    const startedAt = Date.now();
+    const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    let gatewayCtx: GatewayContext | null = null;
+
+    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
+        if (!gatewayCtx) {
+            return response;
+        }
+
+        void logApiGatewayRequest({
+            projectId: gatewayCtx.projectId,
+            apiKeyId: gatewayCtx.apiKeyId,
+            requestId: gatewayCtx.requestId,
+            endpoint,
+            method: 'POST',
+            statusCode: response.status,
+            startedAt,
+            environment: gatewayCtx.environment,
+            ipAddress: gatewayCtx.clientIp,
+            countryCode: gatewayCtx.countryCode,
+            userAgent: req.headers.get('user-agent'),
+            callerOrigin: callerIdentity.callerOrigin,
+            clientApp: callerIdentity.clientApp,
+            errorCode: errorCode || null,
+            errorMessage: errorMessage || null,
+        });
+
+        return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
+    };
+
     try {
         const authHeader = req.headers.get("Authorization");
 
@@ -125,7 +157,6 @@ export async function POST(req: NextRequest) {
             || authHeader?.startsWith('Bearer cen_')
         );
 
-        let gatewayCtx: GatewayContext | null = null;
         let authenticatedProjectId: string | null = null;
 
         if (isApiKeyAuth) {
@@ -142,9 +173,11 @@ export async function POST(req: NextRequest) {
                 global: { headers: { Authorization: authHeader } },
             });
             const { data: { user }, error: authError } = await userClient.auth.getUser();
-            if (authError || !user) return new NextResponse("Unauthorized", { status: 401 });
+            if (authError || !user) {
+                return respond(new NextResponse("Unauthorized", { status: 401 }));
+            }
         } else {
-            return new NextResponse("Missing Authorization", { status: 401 });
+            return respond(new NextResponse("Missing Authorization", { status: 401 }));
         }
 
         // ── Agent ID (from header, or derived from API key) ──
@@ -162,7 +195,9 @@ export async function POST(req: NextRequest) {
             if (match) agentId = match[1];
         }
 
-        if (!agentId) return new NextResponse("Missing X-Agent-ID header or unable to derive agent from API key", { status: 400 });
+        if (!agentId) {
+            return respond(new NextResponse("Missing X-Agent-ID header or unable to derive agent from API key", { status: 400 }));
+        }
 
         // ── Get Agent Config (join with agents table for project scoping) ──
         const { data: config, error: configError } = await adminClient
@@ -184,7 +219,7 @@ export async function POST(req: NextRequest) {
                 { error: "Agent configuration not found. Create the agent in Cencori first." },
                 { status: 404 }
             );
-            return gatewayCtx ? addGatewayHeaders(errResponse, { requestId: gatewayCtx.requestId }) : errResponse;
+            return respond(errResponse, 'agent_config_not_found', 'Agent configuration not found');
         }
 
         const agentRecord = config.agents as unknown as {
@@ -200,7 +235,7 @@ export async function POST(req: NextRequest) {
                 { error: "API key does not have access to this agent" },
                 { status: 403 }
             );
-            return gatewayCtx ? addGatewayHeaders(errResponse, { requestId: gatewayCtx.requestId }) : errResponse;
+            return respond(errResponse, 'agent_project_scope_denied', 'API key does not have access to this agent');
         }
 
         // ── Check if agent is active ──
@@ -209,7 +244,7 @@ export async function POST(req: NextRequest) {
                 { error: "Agent is not active. Enable it from the dashboard." },
                 { status: 403 }
             );
-            return gatewayCtx ? addGatewayHeaders(errResponse, { requestId: gatewayCtx.requestId }) : errResponse;
+            return respond(errResponse, 'agent_inactive', 'Agent is not active');
         }
 
         const shadowMode = agentRecord.shadow_mode;
@@ -219,13 +254,17 @@ export async function POST(req: NextRequest) {
         let messages = body.messages ?? [];
         const { tools, tool_choice } = body;
         if (messages.length === 0) {
-            return new NextResponse("Missing messages", { status: 400 });
+            return respond(new NextResponse("Missing messages", { status: 400 }), 'missing_messages', 'Missing messages');
         }
 
         // Apply config model — dashboard config overrides client request
         const configuredModel = config.model || body.model;
         if (!configuredModel) {
-            return new NextResponse("No model configured. Set a model in the agent dashboard.", { status: 400 });
+            return respond(
+                new NextResponse("No model configured. Set a model in the agent dashboard.", { status: 400 }),
+                'missing_model_configuration',
+                'No model configured for agent'
+            );
         }
         const model = normalizeGatewayModelId(configuredModel);
 
@@ -308,7 +347,7 @@ export async function POST(req: NextRequest) {
             const response = new NextResponse(streamResponse, {
                 headers: { "Content-Type": "text/event-stream" }
             });
-            return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
+            return respond(response);
 
         } else if (provider === "anthropic" || provider === "cohere") {
             // ── Non-OpenAI Native Adapters (Anthropic/Cohere) ──
@@ -359,15 +398,19 @@ export async function POST(req: NextRequest) {
             const response = new NextResponse(streamResponse, {
                 headers: { "Content-Type": "text/event-stream" }
             });
-            return gatewayCtx ? addGatewayHeaders(response, { requestId: gatewayCtx.requestId }) : response;
+            return respond(response);
         } else {
             // ── OpenAI-compatible Path (OpenAI, Groq, Mistral, etc.) ──
             const providerKeyEnv = OPENAI_COMPATIBLE_ENV_KEYS[provider];
             const providerApiKey = providerKeyEnv ? process.env[providerKeyEnv] : undefined;
             if (!providerApiKey) {
-                return NextResponse.json(
-                    { error: `Provider API key missing for '${provider}'. Set ${providerKeyEnv || "provider key env"} on the server.` },
-                    { status: 500 }
+                return respond(
+                    NextResponse.json(
+                        { error: `Provider API key missing for '${provider}'. Set ${providerKeyEnv || "provider key env"} on the server.` },
+                        { status: 500 }
+                    ),
+                    'provider_key_missing',
+                    `Provider API key missing for '${provider}'`
                 );
             }
 
@@ -471,12 +514,16 @@ export async function POST(req: NextRequest) {
             const nextResponse = new NextResponse(streamResponse, {
                 headers: { "Content-Type": "text/event-stream" }
             });
-            return gatewayCtx ? addGatewayHeaders(nextResponse, { requestId: gatewayCtx.requestId }) : nextResponse;
+            return respond(nextResponse);
         }
 
     } catch (error: unknown) {
         console.error("Gateway Error:", error);
         const message = error instanceof Error ? error.message : "Internal server error";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return respond(
+            NextResponse.json({ error: message }, { status: 500 }),
+            'internal_error',
+            message
+        );
     }
 }

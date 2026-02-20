@@ -99,7 +99,7 @@ export function ExportDialog({ projectId, type, environment = "production" }: Ex
 
     const typeLabels = {
         logs: "Request Logs",
-        analytics: "Analytics Data",
+        analytics: "Observability Data",
         "security-incidents": "Security Incidents",
     };
 
