@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -14,216 +15,18 @@ interface DocsSidebarProps {
     className?: string;
 }
 
-interface SidebarLink {
+interface SidebarItem {
     title: string;
     href: string;
+    order: number;
 }
 
-interface SidebarGroup {
+interface SidebarSection {
     title: string;
-    items: (SidebarLink | SidebarNestedGroup)[];
+    items: SidebarItem[];
 }
 
-interface SidebarNestedGroup {
-    title: string;
-    items: SidebarLink[];
-}
-
-const sidebarItems: SidebarGroup[] = [
-    {
-        title: "Getting Started",
-        items: [
-            { title: "Introduction", href: "/docs/introduction" },
-            { title: "Quick Start", href: "/docs/quick-start" },
-            { title: "The Modern AI Stack", href: "/docs/getting-started/stack" },
-            { title: "Installation", href: "/docs/installation" },
-            { title: "Making Your First Request", href: "/docs/getting-started/first-request" },
-        ],
-    },
-    // ... (lines 42-140 omitted for brevity in instruction, but I will only replace the relevant chunks if I can, or use multi_replace if needed. Actually, since I can't skip lines in replacement content easily without including them, I will do two separate replaces or one big one if they are close. They are far apart (lines 33-40 and 141-149). I should use multi_replace_file_content.)
-    {
-        title: "AI",
-        items: [
-            { title: "Overview", href: "/docs/ai" },
-            { title: "Observability", href: "/docs/ai/observability" },
-            { title: "Routing & Failover", href: "/docs/ai/routing-failover" },
-            { title: "Caching", href: "/docs/ai/caching" },
-            { title: "AI Gateway", href: "/docs/ai/gateway" },
-            { title: "Node.js SDK", href: "/docs/ai/sdk" },
-            { title: "Python SDK", href: "/docs/ai/python-sdk" },
-            { title: "Go SDK", href: "/docs/ai/go-sdk" },
-            { title: "Universal Proxy", href: "/docs/ai/universal-proxy" },
-            { title: "SDK Configuration", href: "/docs/ai/sdk-configuration" },
-            { title: "Vercel AI SDK", href: "/docs/ai/vercel-sdk" },
-            { title: "TanStack AI", href: "/docs/ai/tanstack" },
-            { title: "Providers", href: "/docs/ai/providers" },
-            { title: "Models", href: "/docs/ai/models" },
-            { title: "Failover", href: "/docs/ai/failover" },
-            { title: "Streaming", href: "/docs/ai/streaming" },
-            { title: "Tool Calling", href: "/docs/ai/tool-calling" },
-            { title: "Structured Output", href: "/docs/ai/structured-output" },
-        ],
-    },
-    {
-        title: "Endpoints",
-        items: [
-            { title: "Chat", href: "/docs/ai/endpoints/chat" },
-            { title: "Images", href: "/docs/ai/endpoints/images" },
-            { title: "Embeddings", href: "/docs/ai/endpoints/embeddings" },
-            { title: "Audio", href: "/docs/ai/endpoints/audio" },
-            { title: "Moderation", href: "/docs/ai/endpoints/moderation" },
-        ],
-    },
-    {
-        title: "Agents",
-        items: [
-            { title: "Overview", href: "/docs/agents/overview" },
-            { title: "OpenClaw", href: "/docs/agents/openclaw" },
-        ],
-    },
-    {
-        title: "Platform",
-        items: [
-            { title: "Architecture", href: "/docs/platform/core-architecture" },
-            { title: "Comparisons", href: "/docs/platform/comparisons" },
-            { title: "Projects", href: "/docs/platform/projects" },
-            { title: "Billing & Usage", href: "/docs/platform/billing" },
-            { title: "Bring Your Own Key", href: "/docs/platform/byok" },
-            { title: "API Keys", href: "/docs/platform/api-keys" },
-            { title: "Organizations", href: "/docs/platform/organizations" },
-            { title: "Credits System", href: "/docs/platform/credits" },
-            { title: "Rate Limiting", href: "/docs/platform/rate-limiting" },
-            { title: "Semantic Caching", href: "/docs/platform/semantic-caching" },
-            { title: "Agent Frameworks", href: "/docs/platform/agent-frameworks" },
-        ],
-    },
-    {
-        title: "Memory",
-        items: [
-            { title: "Overview", href: "/docs/ai/memory" },
-            { title: "Namespaces", href: "/docs/ai/memory/namespaces" },
-            { title: "Store & Search", href: "/docs/ai/memory/store-search" },
-            { title: "Vector Store", href: "/docs/ai/memory/vector-store" },
-            { title: "Filtering & Search", href: "/docs/ai/memory/filtering" },
-            { title: "RAG", href: "/docs/ai/memory/rag" },
-        ],
-    },
-    {
-        title: "Security",
-        items: [
-            { title: "Cencori Scan", href: "/docs/security/scan" },
-            { title: "PII Detection", href: "/docs/security/pii-detection" },
-            { title: "Prompt Injection", href: "/docs/security/prompt-injection" },
-            { title: "Content Filtering", href: "/docs/security/content-filtering" },
-            { title: "Web Dashboard", href: "/docs/security/scan/web-dashboard" },
-            { title: "Security Incidents", href: "/docs/security/incidents" },
-        ],
-    },
-    {
-        title: "Workflows (Beta)",
-        items: [
-            { title: "Overview", href: "/docs/workflows" },
-            { title: "Concepts", href: "/docs/workflows/concepts" },
-            { title: "Visual Editor", href: "/docs/workflows/visual-editor" },
-            {
-                title: "Patterns",
-                items: [
-                    { title: "Adaptive Memory", href: "/docs/workflows/patterns/adaptive-memory" },
-                    { title: "RAG Ingestion", href: "/docs/workflows/patterns/rag-ingestion" },
-                    { title: "Email Automation", href: "/docs/workflows/patterns/email-automation" },
-                    { title: "Human-in-the-Loop", href: "/docs/workflows/patterns/human-in-the-loop" },
-                    { title: "Data Enrichment", href: "/docs/workflows/patterns/data-enrichment" },
-                    { title: "Emotional Intelligence", href: "/docs/workflows/patterns/emotional-intelligence" },
-                    { title: "Self-Healing Code", href: "/docs/workflows/patterns/self-healing-code" },
-                ]
-            },
-            {
-                title: "Reference",
-                items: [
-                    { title: "Triggers", href: "/docs/workflows/reference/triggers" },
-                    { title: "Steps", href: "/docs/workflows/reference/steps" },
-                    { title: "SDK API", href: "/docs/workflows/reference/sdk" },
-                    { title: "State Management", href: "/docs/workflows/concepts/state-management" },
-                ]
-            }
-        ],
-    },
-    {
-        title: "Integrations",
-        items: [
-            { title: "Vercel AI SDK", href: "/docs/integrations/vercel-ai-sdk" },
-            { title: "Supabase", href: "/docs/integrations/supabase" },
-            { title: "Firebase", href: "/docs/integrations/firebase" },
-            { title: "Neon", href: "/docs/integrations/neon" },
-            { title: "TanStack AI", href: "/docs/integrations/tanstack" },
-            { title: "LangChain", href: "/docs/integrations/langchain" },
-            { title: "Agent Frameworks", href: "/docs/integrations/agent-frameworks" },
-            { title: "Automation", href: "/docs/integrations/automation" },
-        ],
-    },
-    {
-        title: "Agentic Engineering",
-        items: [
-            { title: "Overview", href: "/docs/agentic-engineering/index" },
-            {
-                title: "Desktop IDEs",
-                items: [
-                    { title: "Cursor", href: "/docs/agentic-engineering/desktop/cursor" },
-                    { title: "Antigravity", href: "/docs/agentic-engineering/desktop/antigravity" },
-                    { title: "Windsurf", href: "/docs/agentic-engineering/desktop/windsurf" },
-                    { title: "VS Code", href: "/docs/agentic-engineering/desktop/vs-code" },
-                    { title: "Continue", href: "/docs/agentic-engineering/desktop/continue" },
-                    { title: "Trae", href: "/docs/agentic-engineering/desktop/trae" },
-                    { title: "PearAI", href: "/docs/agentic-engineering/desktop/pearai" },
-                    { title: "Void", href: "/docs/agentic-engineering/desktop/void" },
-                    { title: "Melty", href: "/docs/agentic-engineering/desktop/melty" },
-                ]
-            },
-            {
-                title: "Web Generators",
-                items: [
-                    { title: "Lovable", href: "/docs/agentic-engineering/web/lovable" },
-                    { title: "v0", href: "/docs/agentic-engineering/web/v0" },
-                    { title: "Bolt", href: "/docs/agentic-engineering/web/bolt" },
-                    { title: "Replit", href: "/docs/agentic-engineering/web/replit" },
-                    { title: "CodeSandbox", href: "/docs/agentic-engineering/web/codesandbox" },
-                ]
-            }
-        ],
-    },
-    {
-        title: "Guides",
-        items: [
-            { title: "Migrating from OpenAI", href: "/docs/guides/migrate-openai" },
-            { title: "Migrating from Anthropic", href: "/docs/guides/migrate-anthropic" },
-            { title: "Custom Providers", href: "/docs/guides/custom-providers" },
-            { title: "Cost Optimization", href: "/docs/guides/cost-optimization" },
-            { title: "Audit Logs", href: "/docs/guides/audit-logs" },
-            { title: "Analytics", href: "/docs/guides/analytics" },
-        ],
-    },
-    {
-        title: "API Reference",
-        items: [
-            { title: "Authentication", href: "/docs/api/auth" },
-            { title: "Projects API", href: "/docs/api/projects" },
-            { title: "API Keys API", href: "/docs/api/keys" },
-            { title: "Metrics", href: "/docs/api/metrics" },
-            { title: "Errors", href: "/docs/api/errors" },
-        ],
-    },
-];
-
-// Helper to check if a group has the active link
-function isGroupActive(items: (SidebarLink | SidebarNestedGroup)[], pathname: string): boolean {
-    return items.some(item => {
-        if ('href' in item && item.href === pathname) return true;
-        if ('items' in item) return item.items.some(subItem => subItem.href === pathname);
-        return false;
-    });
-}
-
-function SidebarLinkItem({ item, pathname }: { item: SidebarLink, pathname: string }) {
+function SidebarLinkItem({ item, pathname }: { item: SidebarItem; pathname: string }) {
     const isActive = pathname === item.href;
     return (
         <li className="relative">
@@ -247,51 +50,49 @@ function SidebarLinkItem({ item, pathname }: { item: SidebarLink, pathname: stri
 
 export function DocsSidebar({ className }: DocsSidebarProps) {
     const pathname = usePathname();
+    const [sections, setSections] = useState<SidebarSection[]>([]);
 
-    const activeSection = sidebarItems.find(group => isGroupActive(group.items, pathname))?.title || "Getting Started";
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/docs/navigation", { cache: "no-store" });
+                if (!res.ok) return;
+                const data = await res.json() as { sections?: SidebarSection[] };
+                if (!cancelled) setSections(data.sections || []);
+            } catch {
+                // If fetch fails we keep an empty sidebar state.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
-    // Find active nested group
-    const activeNestedGroups = sidebarItems
-        .flatMap(group => group.items)
-        .filter((item): item is SidebarNestedGroup => 'items' in item)
-        .filter(nested => nested.items.some(sub => sub.href === pathname))
-        .map(nested => nested.title);
+    const activeSection = useMemo(() => {
+        const current = sections.find((group) => group.items.some((item) => item.href === pathname));
+        return current?.title;
+    }, [sections, pathname]);
+
+    const defaultOpenSections = useMemo(() => {
+        if (activeSection) return [activeSection];
+        return sections.length > 0 ? [sections[0].title] : [];
+    }, [activeSection, sections]);
 
     return (
         <aside className={cn("w-64 shrink-0 hidden md:block border-r border-border/40 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto bg-background/50 backdrop-blur-sm", className)}>
             <div className="px-3 py-6 lg:py-8">
-                <Accordion type="multiple" defaultValue={[activeSection]} className="w-full space-y-2">
-                    {sidebarItems.map((group, index) => (
-                        <AccordionItem key={index} value={group.title} className="border-none">
+                <Accordion type="multiple" defaultValue={defaultOpenSections} className="w-full space-y-2">
+                    {sections.map((group) => (
+                        <AccordionItem key={group.title} value={group.title} className="border-none">
                             <AccordionTrigger className="py-1.5 px-3 text-xs font-medium hover:no-underline hover:text-foreground transition-all text-muted-foreground data-[state=open]:text-foreground decoration-none">
                                 {group.title}
                             </AccordionTrigger>
                             <AccordionContent className="pb-1 mt-1">
                                 <ul className="relative ml-3.5 border-l border-border/60">
-                                    {group.items.map((item, itemIndex) => {
-                                        if ('items' in item) {
-                                            // Nested Group (Accordion inside specific item list)
-                                            return (
-                                                <li key={itemIndex} className="relative">
-                                                    <Accordion type="multiple" defaultValue={activeNestedGroups}>
-                                                        <AccordionItem value={item.title} className="border-none">
-                                                            <AccordionTrigger className="py-1.5 pl-4 pr-3 text-[13px] hover:no-underline text-muted-foreground hover:text-foreground font-normal [&[data-state=open]]:text-foreground">
-                                                                {item.title}
-                                                            </AccordionTrigger>
-                                                            <AccordionContent className="pb-1">
-                                                                <ul className="relative ml-3.5 border-l border-border/60">
-                                                                    {item.items.map((subItem, subIndex) => (
-                                                                        <SidebarLinkItem key={subIndex} item={subItem} pathname={pathname} />
-                                                                    ))}
-                                                                </ul>
-                                                            </AccordionContent>
-                                                        </AccordionItem>
-                                                    </Accordion>
-                                                </li>
-                                            );
-                                        }
-                                        return <SidebarLinkItem key={itemIndex} item={item} pathname={pathname} />;
-                                    })}
+                                    {group.items.map((item) => (
+                                        <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
+                                    ))}
                                 </ul>
                             </AccordionContent>
                         </AccordionItem>
@@ -301,3 +102,4 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
         </aside>
     );
 }
+
