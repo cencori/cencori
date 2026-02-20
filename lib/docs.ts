@@ -135,12 +135,17 @@ export function getDocsNavigation(): NavSection[] {
     const result: NavSection[] = [];
     const sectionOrder = [
         'Getting Started',
+        'Agents',
         'platform',
+        'Platform',
         'AI',
         'AI Endpoints',
         'AI Memory',
         'Core Concepts',
         'Security',
+        'Integrations',
+        'Agentic Engineering',
+        'Workflows (Beta)',
         'Guides',
         'API Reference',
     ];
@@ -228,12 +233,17 @@ export function getDocNavigation(currentSlug: string): { prev: Doc | null; next:
         if (a.section !== b.section) {
             const sectionOrder = [
                 'Getting Started',
+                'Agents',
                 'platform',
+                'Platform',
                 'AI',
                 'AI Endpoints',
                 'AI Memory',
                 'Core Concepts',
                 'Security',
+                'Integrations',
+                'Agentic Engineering',
+                'Workflows (Beta)',
                 'Guides',
                 'API Reference',
             ];

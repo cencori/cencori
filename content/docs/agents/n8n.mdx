@@ -1,0 +1,99 @@
+---
+title: "n8n"
+description: "Deploy and configure the n8n workflow agent with Cencori."
+section: "Agents"
+order: 3
+---
+
+# n8n Workflow
+
+**n8n Workflow** lets you run AI automations in n8n while Cencori handles model routing, agent identity, logs, and governance.
+
+> [!TIP]
+> Use **API mode** when your n8n workspace supports API keys. Use **Manual Fallback** when it does not.
+
+## Architecture
+
+- **n8n runtime** executes workflow logic and triggers
+- **Cencori gateway** receives model calls at `/api/v1/chat/completions`
+- **Agent config** controls model/prompt/shadow mode from Cencori dashboard
+
+## Quick Start
+
+### 1. Deploy the n8n agent
+
+Go to **Agents → Agent Marketplace** and deploy **n8n Workflow**.
+
+### 2. Open n8n connection settings
+
+Open the agent’s **Configuration** tab and find **n8n Connection**.
+
+### 3. Choose connection mode
+
+#### API Control Plane (recommended)
+
+Use when your n8n workspace has API key access.
+
+1. Set `Mode` to **API Control Plane**
+2. Enter:
+   - `n8n Base URL` (for example `https://your-workspace.app.n8n.cloud`)
+   - `n8n API Key`
+   - optional `Workspace ID`
+3. Click **Connect** (or **Test Connection**)
+4. Click **Install Starter Workflow**
+5. Click **Publish**
+6. Click **Refresh Health**
+
+#### Manual Fallback (no n8n API key)
+
+Use when n8n API keys are unavailable on your plan/workspace.
+
+1. Set `Mode` to **Manual Fallback**
+2. Enter `n8n Base URL`
+3. Click **Connect**
+4. In **Workflow Control**, click:
+   - **Open Starter Template**
+   - or **Copy Import Steps**
+5. Import/publish the workflow directly in n8n UI
+
+## Required env vars in n8n
+
+For the starter template workflow:
+
+```bash
+CENCORI_API_KEY=cake_your_key_here
+CENCORI_AGENT_ID=your_agent_id
+```
+
+## Workflow Control card
+
+- **Install Starter Workflow** (API mode only)
+- **Publish / Unpublish** (API mode only)
+- **Open Starter Template** (manual mode)
+- **Copy Import Steps** (manual mode)
+
+## Execution Health card
+
+- Success rate
+- Average runtime
+- Last execution status/time
+- **Refresh Health** (API mode only)
+
+## Troubleshooting
+
+### “Connected” in Cencori but n8n node errors
+
+Cencori connection status only confirms agent-side config.  
+If n8n shows node errors, fix workflow node configuration in n8n editor.
+
+### n8n toast: “A Chat Model sub-node must be connected”
+
+That error is from n8n’s AI Agent node setup. Either:
+
+- wire a chat model node correctly, or
+- use the provided HTTP starter template workflow.
+
+### API key option not visible in n8n
+
+If your workspace does not expose n8n API keys, use **Manual Fallback** mode.
+

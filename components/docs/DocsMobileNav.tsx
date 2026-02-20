@@ -23,6 +23,9 @@ export function DocsMobileNav({ onOpenSearch }: DocsMobileNavProps) {
     // Determine current section based on path for breadcrumb
     const getSectionTitle = () => {
         if (pathname.includes("/docs/ai")) return "AI SDK";
+        if (pathname.includes("/docs/agents")) return "Agents";
+        if (pathname.includes("/docs/platform")) return "Platform";
+        if (pathname.includes("/docs/integrations")) return "Integrations";
         if (pathname.includes("/docs/security")) return "Security";
         if (pathname.includes("/docs/concepts")) return "Core Concepts";
         if (pathname.includes("/docs/guides")) return "Guides";
