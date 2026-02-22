@@ -2,112 +2,17 @@ import { NextRequest } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import {
+    calculateScore,
+    scanFileContent,
+    shouldScanFile,
+    summarizeIssues,
+    type ScanIssue,
+} from '../../../../../../../packages/scan/src/scanner/core';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
-}
-
-// Scanner patterns
-const SECRET_PATTERNS = [
-    { name: "OpenAI API Key", pattern: /sk-[a-zA-Z0-9]{20,}(?:T3BlbkFJ[a-zA-Z0-9]{20,})?/g, severity: "critical" as const },
-    { name: "OpenAI Project Key", pattern: /sk-proj-[a-zA-Z0-9_-]{80,}/g, severity: "critical" as const },
-    { name: "Anthropic API Key", pattern: /sk-ant-[a-zA-Z0-9_-]{40,}/g, severity: "critical" as const },
-    { name: "Google AI Key", pattern: /AIza[0-9A-Za-z_-]{35}/g, severity: "critical" as const },
-    { name: "AWS Access Key", pattern: /AKIA[0-9A-Z]{16}/g, severity: "critical" as const },
-    { name: "GitHub Token", pattern: /gh[pousr]_[A-Za-z0-9_]{36,}/g, severity: "critical" as const },
-    { name: "Stripe Secret Key", pattern: /sk_(live|test)_[0-9a-zA-Z]{24,}/g, severity: "critical" as const },
-    { name: "Private Key", pattern: /-----BEGIN (?:RSA|EC|DSA|OPENSSH) PRIVATE KEY-----/g, severity: "critical" as const },
-    { name: "Generic Secret", pattern: /(?:secret|password|passwd|pwd)\s*[:=]\s*['"][^'"]{8,}['"]/gi, severity: "high" as const },
-];
-
-const VULNERABILITY_PATTERNS = [
-    { name: "SQL Injection", pattern: /(?:SELECT|INSERT|UPDATE|DELETE|DROP).+\$\{[^}]+\}/gi, severity: "high" as const },
-    { name: "XSS (innerHTML)", pattern: /\.innerHTML\s*=/g, severity: "medium" as const },
-    { name: "Hardcoded Password", pattern: /password\s*[:=]\s*['"][^'"]{4,}['"]/gi, severity: "high" as const },
-    { name: "eval() Usage", pattern: /\beval\s*\(/g, severity: "high" as const },
-];
-
-interface ScanIssue {
-    type: string;
-    severity: string;
-    name: string;
-    match: string;
-    line: number;
-    file: string;
-}
-
-function redact(match: string, showChars = 4): string {
-    if (match.length <= showChars * 2) return "****";
-    return match.substring(0, showChars) + "****";
-}
-
-function getLine(content: string, index: number): number {
-    return content.substring(0, index).split("\n").length;
-}
-
-function scanCode(code: string, filePath: string): ScanIssue[] {
-    const issues: ScanIssue[] = [];
-
-    for (const pattern of SECRET_PATTERNS) {
-        pattern.pattern.lastIndex = 0;
-        let match;
-        while ((match = pattern.pattern.exec(code)) !== null) {
-            issues.push({
-                type: "secret",
-                severity: pattern.severity,
-                name: pattern.name,
-                match: redact(match[0]),
-                line: getLine(code, match.index),
-                file: filePath,
-            });
-        }
-    }
-
-    for (const pattern of VULNERABILITY_PATTERNS) {
-        pattern.pattern.lastIndex = 0;
-        let match;
-        while ((match = pattern.pattern.exec(code)) !== null) {
-            issues.push({
-                type: "vulnerability",
-                severity: pattern.severity,
-                name: pattern.name,
-                match: match[0].substring(0, 40),
-                line: getLine(code, match.index),
-                file: filePath,
-            });
-        }
-    }
-
-    return issues;
-}
-
-function calculateScore(issues: ScanIssue[]): "A" | "B" | "C" | "D" | "F" {
-    const critical = issues.filter((i) => i.severity === "critical").length;
-    const high = issues.filter((i) => i.severity === "high").length;
-    const medium = issues.filter((i) => i.severity === "medium").length;
-
-    if (critical > 0) return "F";
-    if (high > 2) return "D";
-    if (high > 0 || medium > 3) return "C";
-    if (medium > 0) return "B";
-    return "A";
-}
-
-const SCANNABLE_EXTENSIONS = [
-    '.js', '.jsx', '.ts', '.tsx', '.py', '.rb', '.go', '.java',
-    '.php', '.cs', '.cpp', '.c', '.h', '.swift', '.kt', '.rs',
-    '.env', '.json', '.yaml', '.yml', '.toml', '.xml', '.sh', '.bash'
-];
-
-const SKIP_PATHS = [
-    'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
-    'vendor', '__pycache__', '.venv', 'venv', 'package-lock.json',
-    'yarn.lock', 'pnpm-lock.yaml', '.DS_Store'
-];
-
-function shouldScan(path: string): boolean {
-    if (SKIP_PATHS.some(skip => path.includes(skip))) return false;
-    return SCANNABLE_EXTENSIONS.some(ext => path.endsWith(ext));
 }
 
 // GET /api/scan/projects/[id]/scan/stream - Stream scan events via SSE
@@ -131,6 +36,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         async start(controller) {
             // Accumulate all logs for persistence
             const allLogs: Array<{ type: string; time: number; message?: string; data?: unknown }> = [];
+            const supabaseAdmin = createAdminClient();
+            let scanRunId: string | null = null;
 
             const sendEvent = (event: { type: string; time: number; message?: string; data?: unknown }) => {
                 allLogs.push(event);
@@ -139,8 +46,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             };
 
             try {
-                const supabaseAdmin = createAdminClient();
-
                 // Send initial event
                 sendEvent({ type: 'start', time: 0, message: 'Starting security scan...' });
 
@@ -154,6 +59,17 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
                 if (projectError || !project) {
                     sendEvent({ type: 'error', time: Date.now() - startTime, message: 'Project not found' });
+                    controller.close();
+                    return;
+                }
+
+                const githubAccess = await verifyProjectGithubAccess(user, project);
+                if (!githubAccess) {
+                    sendEvent({
+                        type: 'error',
+                        time: Date.now() - startTime,
+                        message: 'GitHub access for this project is no longer authorized',
+                    });
                     controller.close();
                     return;
                 }
@@ -173,14 +89,18 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     controller.close();
                     return;
                 }
+                scanRunId = scanRun.id;
 
                 sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Scan initialized', data: { scanId: scanRun.id } });
 
                 // Connect to GitHub
-                const octokit = await getInstallationOctokit(project.github_installation_id);
+                const octokit = await getInstallationOctokit(githubAccess.installationId);
                 sendEvent({ type: 'success', time: Date.now() - startTime, message: 'Connected to repository' });
 
-                const [owner, repo] = project.github_repo_full_name.split('/');
+                const [owner, repo] = githubAccess.repository.fullName.split('/');
+                if (!owner || !repo) {
+                    throw new Error('Invalid repository reference');
+                }
 
                 // Get repository tree
                 sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Fetching file tree...' });
@@ -196,6 +116,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     treeData = response.data;
                 } catch (treeError: unknown) {
                     if (treeError && typeof treeError === 'object' && 'status' in treeError && treeError.status === 409) {
+                        const emptySummary = summarizeIssues([]);
                         sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Repository is empty - no files to scan' });
                         sendEvent({
                             type: 'complete',
@@ -206,6 +127,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 score: 'A',
                                 filesScanned: 0,
                                 issuesFound: 0,
+                                summary: emptySummary,
                                 issues: []
                             }
                         });
@@ -221,7 +143,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 scan_duration_ms: Date.now() - startTime,
                                 secrets_count: 0,
                                 vulnerabilities_count: 0,
-                                results: { issues: [], message: 'Repository is empty' },
+                                results: {
+                                    issues: [],
+                                    summary: emptySummary,
+                                    message: 'Repository is empty',
+                                },
                                 logs: allLogs,
                             })
                             .eq('id', scanRun.id);
@@ -244,7 +170,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
                 // Filter scannable files
                 const filesToScan = treeData.tree
-                    .filter(item => item.type === 'blob' && item.path && shouldScan(item.path))
+                    .filter(item => item.type === 'blob' && item.path && shouldScanFile(item.path))
                     .slice(0, 100);
 
                 sendEvent({
@@ -272,7 +198,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         const content = Buffer.from(blobData.content, 'base64').toString('utf-8');
                         if (content.length > 500000) continue;
 
-                        const fileIssues = scanCode(content, file.path);
+                        const fileIssues = scanFileContent(file.path, content);
 
                         // If issues found, report them immediately
                         if (fileIssues.length > 0) {
@@ -311,8 +237,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
                 const scanDuration = Date.now() - startTime;
                 const score = calculateScore(allIssues);
-                const secretsCount = allIssues.filter(i => i.type === 'secret').length;
-                const vulnsCount = allIssues.filter(i => i.type === 'vulnerability').length;
+                const summary = summarizeIssues(allIssues);
+                const secretsCount = summary.secrets;
+                const vulnsCount = summary.vulnerabilities;
 
                 // Send completion event first (so it gets logged)
                 sendEvent({
@@ -327,6 +254,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         secretsCount,
                         vulnerabilitiesCount: vulnsCount,
                         scanDurationMs: scanDuration,
+                        summary,
                         issues: allIssues
                     }
                 });
@@ -342,7 +270,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         scan_duration_ms: scanDuration,
                         secrets_count: secretsCount,
                         vulnerabilities_count: vulnsCount,
-                        results: { issues: allIssues },
+                        results: { issues: allIssues, summary },
                         logs: allLogs,
                     })
                     .eq('id', scanRun.id);
@@ -361,12 +289,41 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
             } catch (error) {
                 console.error('[Scan Stream] Error:', error);
-                sendEvent({
+                const errorMessage = error instanceof Error ? error.message : 'Scan failed';
+                const errorEvent = {
                     type: 'error',
                     time: Date.now() - startTime,
-                    message: error instanceof Error ? error.message : 'Scan failed'
-                });
-                controller.close();
+                    message: errorMessage,
+                } as const;
+
+                try {
+                    sendEvent(errorEvent);
+                } catch {
+                    // Stream may already be closed; keep the error in persisted logs.
+                    allLogs.push(errorEvent);
+                }
+
+                if (scanRunId) {
+                    try {
+                        await supabaseAdmin
+                            .from('scan_runs')
+                            .update({
+                                status: 'failed',
+                                error_message: errorMessage,
+                                scan_duration_ms: Date.now() - startTime,
+                                logs: allLogs,
+                            })
+                            .eq('id', scanRunId);
+                    } catch (persistError) {
+                        console.error('[Scan Stream] Failed to persist failed scan status:', persistError);
+                    }
+                }
+
+                try {
+                    controller.close();
+                } catch {
+                    // no-op if stream already closed
+                }
             }
         }
     });

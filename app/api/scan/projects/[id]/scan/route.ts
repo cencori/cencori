@@ -2,117 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import {
+    calculateScore,
+    scanFileContent,
+    shouldScanFile,
+    summarizeIssues,
+    type ScanIssue,
+} from '../../../../../../packages/scan/src/scanner/core';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
-}
-
-// Scanner patterns (same as analyze endpoint)
-const SECRET_PATTERNS = [
-    { name: "OpenAI API Key", pattern: /sk-[a-zA-Z0-9]{20,}(?:T3BlbkFJ[a-zA-Z0-9]{20,})?/g, severity: "critical" as const },
-    { name: "OpenAI Project Key", pattern: /sk-proj-[a-zA-Z0-9_-]{80,}/g, severity: "critical" as const },
-    { name: "Anthropic API Key", pattern: /sk-ant-[a-zA-Z0-9_-]{40,}/g, severity: "critical" as const },
-    { name: "Google AI Key", pattern: /AIza[0-9A-Za-z_-]{35}/g, severity: "critical" as const },
-    { name: "AWS Access Key", pattern: /AKIA[0-9A-Z]{16}/g, severity: "critical" as const },
-    { name: "GitHub Token", pattern: /gh[pousr]_[A-Za-z0-9_]{36,}/g, severity: "critical" as const },
-    { name: "Stripe Secret Key", pattern: /sk_(live|test)_[0-9a-zA-Z]{24,}/g, severity: "critical" as const },
-    { name: "Private Key", pattern: /-----BEGIN (?:RSA|EC|DSA|OPENSSH) PRIVATE KEY-----/g, severity: "critical" as const },
-    { name: "Generic Secret", pattern: /(?:secret|password|passwd|pwd)\s*[:=]\s*['"][^'"]{8,}['"]/gi, severity: "high" as const },
-];
-
-const VULNERABILITY_PATTERNS = [
-    { name: "SQL Injection", pattern: /(?:SELECT|INSERT|UPDATE|DELETE|DROP).+\$\{[^}]+\}/gi, severity: "high" as const },
-    { name: "XSS (innerHTML)", pattern: /\.innerHTML\s*=/g, severity: "medium" as const },
-    { name: "Hardcoded Password", pattern: /password\s*[:=]\s*['"][^'"]{4,}['"]/gi, severity: "high" as const },
-    { name: "eval() Usage", pattern: /\beval\s*\(/g, severity: "high" as const },
-];
-
-interface ScanIssue {
-    type: string;
-    severity: string;
-    name: string;
-    match: string;
-    line: number;
-    file: string;
-}
-
-function redact(match: string, showChars = 4): string {
-    if (match.length <= showChars * 2) return "****";
-    return match.substring(0, showChars) + "****";
-}
-
-function getLine(content: string, index: number): number {
-    return content.substring(0, index).split("\n").length;
-}
-
-function scanCode(code: string, filePath: string): ScanIssue[] {
-    const issues: ScanIssue[] = [];
-
-    for (const pattern of SECRET_PATTERNS) {
-        pattern.pattern.lastIndex = 0;
-        let match;
-        while ((match = pattern.pattern.exec(code)) !== null) {
-            issues.push({
-                type: "secret",
-                severity: pattern.severity,
-                name: pattern.name,
-                match: redact(match[0]),
-                line: getLine(code, match.index),
-                file: filePath,
-            });
-        }
-    }
-
-    for (const pattern of VULNERABILITY_PATTERNS) {
-        pattern.pattern.lastIndex = 0;
-        let match;
-        while ((match = pattern.pattern.exec(code)) !== null) {
-            issues.push({
-                type: "vulnerability",
-                severity: pattern.severity,
-                name: pattern.name,
-                match: match[0].substring(0, 40),
-                line: getLine(code, match.index),
-                file: filePath,
-            });
-        }
-    }
-
-    return issues;
-}
-
-function calculateScore(issues: ScanIssue[]): "A" | "B" | "C" | "D" | "F" {
-    const critical = issues.filter((i) => i.severity === "critical").length;
-    const high = issues.filter((i) => i.severity === "high").length;
-    const medium = issues.filter((i) => i.severity === "medium").length;
-
-    if (critical > 0) return "F";
-    if (high > 2) return "D";
-    if (high > 0 || medium > 3) return "C";
-    if (medium > 0) return "B";
-    return "A";
-}
-
-// File extensions to scan
-const SCANNABLE_EXTENSIONS = [
-    '.js', '.jsx', '.ts', '.tsx', '.py', '.rb', '.go', '.java',
-    '.php', '.cs', '.cpp', '.c', '.h', '.swift', '.kt', '.rs',
-    '.env', '.json', '.yaml', '.yml', '.toml', '.xml', '.sh', '.bash'
-];
-
-// Files/folders to skip
-const SKIP_PATHS = [
-    'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
-    'vendor', '__pycache__', '.venv', 'venv', 'package-lock.json',
-    'yarn.lock', 'pnpm-lock.yaml', '.DS_Store'
-];
-
-function shouldScan(path: string): boolean {
-    // Skip if in ignore list
-    if (SKIP_PATHS.some(skip => path.includes(skip))) return false;
-
-    // Check if has scannable extension
-    return SCANNABLE_EXTENSIONS.some(ext => path.endsWith(ext));
 }
 
 // POST /api/scan/projects/[id]/scan - Run a scan on the project
@@ -141,6 +41,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
+        const githubAccess = await verifyProjectGithubAccess(user, project);
+        if (!githubAccess) {
+            return NextResponse.json(
+                { error: 'GitHub access for this project is no longer authorized' },
+                { status: 403 }
+            );
+        }
+
         // Create a scan run record
         const { data: scanRun, error: runError } = await supabaseAdmin
             .from('scan_runs')
@@ -160,10 +68,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         try {
             // Get GitHub octokit for the installation
-            const octokit = await getInstallationOctokit(project.github_installation_id);
+            const octokit = await getInstallationOctokit(githubAccess.installationId);
 
             // Parse owner/repo from full name
-            const [owner, repo] = project.github_repo_full_name.split('/');
+            const [owner, repo] = githubAccess.repository.fullName.split('/');
+
+            if (!owner || !repo) {
+                throw new Error('Invalid repository reference');
+            }
 
             // Get repository tree (all files)
             let treeData;
@@ -181,6 +93,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     console.log('[Scan] Repository is empty, no files to scan');
 
                     // Update scan run with empty results
+                    const emptySummary = summarizeIssues([]);
                     await supabaseAdmin
                         .from('scan_runs')
                         .update({
@@ -191,7 +104,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                             scan_duration_ms: Date.now() - startTime,
                             secrets_count: 0,
                             vulnerabilities_count: 0,
-                            results: { issues: [], message: 'Repository is empty - no files to scan' },
+                            results: {
+                                issues: [],
+                                summary: emptySummary,
+                                message: 'Repository is empty - no files to scan',
+                            },
                         })
                         .eq('id', scanRun.id);
 
@@ -214,6 +131,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                             files_scanned: 0,
                             issues_found: 0,
                             scan_duration_ms: Date.now() - startTime,
+                            summary: emptySummary,
                             issues: [],
                             message: 'Repository is empty - no files to scan',
                         }
@@ -227,7 +145,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
             // Filter and scan files (limit to first 100 scannable files for performance)
             const filesToScan = treeData.tree
-                .filter(item => item.type === 'blob' && item.path && shouldScan(item.path))
+                .filter(item => item.type === 'blob' && item.path && shouldScanFile(item.path))
                 .slice(0, 100);
 
             for (const file of filesToScan) {
@@ -248,7 +166,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     if (content.length > 500000) continue;
 
                     // Scan the file
-                    const fileIssues = scanCode(content, file.path);
+                    const fileIssues = scanFileContent(file.path, content);
                     allIssues.push(...fileIssues);
                     filesScanned++;
 
@@ -260,10 +178,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
             const scanDuration = Date.now() - startTime;
             const score = calculateScore(allIssues);
-
-            // Count issues by type
-            const secretsCount = allIssues.filter(i => i.type === 'secret').length;
-            const vulnsCount = allIssues.filter(i => i.type === 'vulnerability').length;
+            const summary = summarizeIssues(allIssues);
+            const secretsCount = summary.secrets;
+            const vulnsCount = summary.vulnerabilities;
 
             // Update scan run with results
             await supabaseAdmin
@@ -276,7 +193,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     scan_duration_ms: scanDuration,
                     secrets_count: secretsCount,
                     vulnerabilities_count: vulnsCount,
-                    results: { issues: allIssues },
+                    results: { issues: allIssues, summary },
                 })
                 .eq('id', scanRun.id);
 
@@ -299,6 +216,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     files_scanned: filesScanned,
                     issues_found: allIssues.length,
                     scan_duration_ms: scanDuration,
+                    summary,
                     issues: allIssues,
                 }
             });
