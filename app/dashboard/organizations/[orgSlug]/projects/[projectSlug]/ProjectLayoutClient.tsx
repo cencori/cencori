@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Brain, Boxes, Bot } from "lucide-react";
+import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
@@ -249,7 +249,6 @@ export default function ProjectLayoutClient({
         { href: `${basePath}/models`, icon: Boxes, label: "Models" },
         { href: `${basePath}/custom-providers`, icon: Server, label: "Custom Providers" },
         { href: `${basePath}/playground`, icon: BeakerIcon, label: "Playground" },
-        { href: `${basePath}/memory`, icon: Brain, label: "Memory" },
     ];
 
     const securityItems: NavItem[] = [
