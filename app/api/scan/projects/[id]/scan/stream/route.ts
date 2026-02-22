@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import {
     calculateScore,
     scanFileContent,
@@ -117,6 +118,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 } catch (treeError: unknown) {
                     if (treeError && typeof treeError === 'object' && 'status' in treeError && treeError.status === 409) {
                         const emptySummary = summarizeIssues([]);
+                        const emptyResearch = analyzeRepositoryResearch({ files: [], issues: [] });
                         sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Repository is empty - no files to scan' });
                         sendEvent({
                             type: 'complete',
@@ -128,6 +130,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 filesScanned: 0,
                                 issuesFound: 0,
                                 summary: emptySummary,
+                                research: emptyResearch,
                                 issues: []
                             }
                         });
@@ -146,6 +149,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 results: {
                                     issues: [],
                                     summary: emptySummary,
+                                    research: emptyResearch,
                                     message: 'Repository is empty',
                                 },
                                 logs: allLogs,
@@ -180,6 +184,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 });
 
                 const allIssues: ScanIssue[] = [];
+                const scannedFiles: Array<{ path: string; content: string }> = [];
                 let filesScanned = 0;
                 let lastProgressUpdate = 0;
 
@@ -199,6 +204,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         if (content.length > 500000) continue;
 
                         const fileIssues = scanFileContent(file.path, content);
+                        scannedFiles.push({ path: file.path, content });
 
                         // If issues found, report them immediately
                         if (fileIssues.length > 0) {
@@ -238,6 +244,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 const scanDuration = Date.now() - startTime;
                 const score = calculateScore(allIssues);
                 const summary = summarizeIssues(allIssues);
+                const research = analyzeRepositoryResearch({ files: scannedFiles, issues: allIssues });
                 const secretsCount = summary.secrets;
                 const vulnsCount = summary.vulnerabilities;
 
@@ -255,6 +262,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         vulnerabilitiesCount: vulnsCount,
                         scanDurationMs: scanDuration,
                         summary,
+                        research,
                         issues: allIssues
                     }
                 });
@@ -270,7 +278,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         scan_duration_ms: scanDuration,
                         secrets_count: secretsCount,
                         vulnerabilities_count: vulnsCount,
-                        results: { issues: allIssues, summary },
+                        results: { issues: allIssues, summary, research },
                         logs: allLogs,
                     })
                     .eq('id', scanRun.id);

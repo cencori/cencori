@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Shield,
     GitBranch,
-    Settings,
-    Play,
     CheckCircle,
     AlertTriangle,
     Clock,
     FileText,
     ChevronRight,
-    Zap,
     Loader2,
     ArrowLeft,
     Trash2,
@@ -49,6 +46,86 @@ interface ScanIssue {
     file: string;
 }
 
+interface ScanSummary {
+    secrets: number;
+    pii: number;
+    routes: number;
+    config: number;
+    vulnerabilities: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+}
+
+interface InteractionNode {
+    file: string;
+    name: string;
+    kind: "api-route" | "component" | "hook" | "service" | "module";
+    imports: string[];
+    dependents: string[];
+    issueCount: number;
+    highestSeverity: "critical" | "high" | "medium" | "low" | "none";
+    riskScore: number;
+}
+
+interface InteractionEdge {
+    from: string;
+    to: string;
+    kind: "import";
+}
+
+interface InteractionHotspot {
+    file: string;
+    name: string;
+    kind: "api-route" | "component" | "hook" | "service" | "module";
+    riskScore: number;
+    reason: string;
+}
+
+interface DataFlowStage {
+    kind: "source" | "transform" | "sink";
+    file: string;
+    line: number;
+    label: string;
+    code: string;
+}
+
+interface DataFlowTrace {
+    id: string;
+    file: string;
+    line: number;
+    source: string;
+    sink: string;
+    severity: "critical" | "high" | "medium";
+    confidence: number;
+    summary: string;
+    stages: DataFlowStage[];
+}
+
+interface RepositoryResearch {
+    generatedAt: string;
+    filesIndexed: number;
+    interactionMap: {
+        nodes: InteractionNode[];
+        edges: InteractionEdge[];
+        hotspots: InteractionHotspot[];
+    };
+    dataFlows: {
+        traces: DataFlowTrace[];
+        criticalCount: number;
+        highCount: number;
+        mediumCount: number;
+    };
+    reasoningNotes: string[];
+}
+
+interface ScanResultPayload {
+    issues: ScanIssue[];
+    summary?: ScanSummary;
+    research?: RepositoryResearch;
+}
+
 interface ScanRun {
     id: string;
     slug?: string;
@@ -58,7 +135,7 @@ interface ScanRun {
     files_scanned: number;
     issues_found: number;
     scan_duration_ms: number;
-    results?: { issues: ScanIssue[] };
+    results?: ScanResultPayload;
     logs?: Array<{ type: string; time: number; message?: string; data?: unknown }>;
 }
 
@@ -87,6 +164,18 @@ const severityColors: Record<string, string> = {
     medium: "text-yellow-500",
     low: "text-blue-400",
 };
+
+const scoreRank: Record<string, number> = {
+    A: 5,
+    B: 4,
+    C: 3,
+    D: 2,
+    F: 1,
+};
+
+function issueFingerprint(issue: ScanIssue): string {
+    return `${issue.type}:${issue.severity}:${issue.name}:${issue.file}:${issue.line}`;
+}
 
 function formatTimeAgo(dateString: string | null): string {
     if (!dateString) return "Never";
@@ -117,6 +206,7 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<ScanProject | null>(null);
     const [scans, setScans] = useState<ScanRun[]>([]);
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
+    const [baselineScanId, setBaselineScanId] = useState<string>("");
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
     const [fixSheetOpen, setFixSheetOpen] = useState(false);
@@ -157,11 +247,6 @@ export default function ProjectDetailPage() {
 
     // Changelog timeframe options
     const [changelogTimeframe, setChangelogTimeframe] = useState<'24h' | '7d' | '30d'>('7d');
-    const timeframeLabels: Record<string, string> = {
-        '24h': '24 hours',
-        '7d': '7 days',
-        '30d': '30 days',
-    };
     useEffect(() => {
         const fetchProject = async () => {
             try {
@@ -169,10 +254,14 @@ export default function ProjectDetailPage() {
                 if (response.ok) {
                     const data = await response.json();
                     setProject(data.project);
-                    setScans(data.scans || []);
-                    if (data.scans && data.scans.length > 0) {
-                        const lastScan = data.scans[0];
+                    const fetchedScans: ScanRun[] = data.scans || [];
+                    setScans(fetchedScans);
+                    if (fetchedScans.length > 0) {
+                        const lastScan = fetchedScans[0];
                         setCurrentScan(lastScan);
+                        if (fetchedScans.length > 1) {
+                            setBaselineScanId(fetchedScans[1].id);
+                        }
 
                         // Populate scan log from last scan's results
                         if (lastScan.results?.issues && lastScan.results.issues.length > 0) {
@@ -244,6 +333,55 @@ export default function ProjectDetailPage() {
         };
         fetchChangelogs();
     }, [projectId]);
+
+    useEffect(() => {
+        const currentScanId = currentScan?.id;
+        if (!currentScanId || scans.length < 2) {
+            if (scans.length < 2) {
+                setBaselineScanId("");
+            }
+            return;
+        }
+
+        const baselineStillValid = scans.some((scan) => scan.id === baselineScanId && scan.id !== currentScanId);
+        if (baselineStillValid) return;
+
+        const nextBaseline = scans.find((scan) => scan.id !== currentScanId);
+        setBaselineScanId(nextBaseline?.id || "");
+    }, [baselineScanId, currentScan?.id, scans]);
+
+    const baselineScan = useMemo(() => {
+        if (!baselineScanId) return null;
+        return scans.find((scan) => scan.id === baselineScanId) || null;
+    }, [baselineScanId, scans]);
+
+    const currentResearch = currentScan?.results?.research || null;
+
+    const scanDiff = useMemo(() => {
+        if (!currentScan || !baselineScan) {
+            return null;
+        }
+
+        const currentIssues = currentScan.results?.issues || [];
+        const baselineIssues = baselineScan.results?.issues || [];
+
+        const currentSet = new Set(currentIssues.map(issueFingerprint));
+        const baselineSet = new Set(baselineIssues.map(issueFingerprint));
+
+        const addedIssues = currentIssues.filter((issue) => !baselineSet.has(issueFingerprint(issue)));
+        const removedIssues = baselineIssues.filter((issue) => !currentSet.has(issueFingerprint(issue)));
+
+        const scoreA = currentScan.score ? scoreRank[currentScan.score] || 0 : 0;
+        const scoreB = baselineScan.score ? scoreRank[baselineScan.score] || 0 : 0;
+
+        return {
+            addedIssues,
+            removedIssues,
+            issueDelta: currentScan.issues_found - baselineScan.issues_found,
+            fileDelta: currentScan.files_scanned - baselineScan.files_scanned,
+            scoreDelta: scoreA - scoreB,
+        };
+    }, [baselineScan, currentScan]);
 
     const handleGenerateChangelog = async () => {
         if (!project) return;
@@ -336,7 +474,7 @@ export default function ProjectDetailPage() {
                             files_scanned: result.filesScanned,
                             issues_found: result.issuesFound,
                             scan_duration_ms: result.scanDurationMs,
-                            results: { issues: result.issues },
+                            results: { issues: result.issues, summary: result.summary, research: result.research },
                             created_at: new Date().toISOString(),
                         });
 
@@ -399,7 +537,7 @@ export default function ProjectDetailPage() {
                         <Shield className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium mb-1">Project not found</p>
-                    <p className="text-xs text-muted-foreground">The project you're looking for doesn't exist.</p>
+                    <p className="text-xs text-muted-foreground">The project you&apos;re looking for doesn&apos;t exist.</p>
                 </div>
             </div>
         );
@@ -460,6 +598,7 @@ export default function ProjectDetailPage() {
             <Tabs defaultValue="scan" className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="scan">Scan</TabsTrigger>
+                    <TabsTrigger value="research">Research</TabsTrigger>
                     <TabsTrigger value="changelog">Changelog</TabsTrigger>
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
@@ -592,6 +731,8 @@ export default function ProjectDetailPage() {
                                                             createdAt: currentScan.created_at,
                                                             logs: currentScan.logs || [],
                                                             issues: currentScan.results?.issues || [],
+                                                            summary: currentScan.results?.summary || null,
+                                                            research: currentScan.results?.research || null,
                                                         };
                                                         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                                                         const url = URL.createObjectURL(blob);
@@ -732,6 +873,210 @@ export default function ProjectDetailPage() {
                             </div>
                         </div>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="research" className="space-y-6">
+                    {!currentScan ? (
+                        <div className="bg-card border border-border/40 rounded-md p-6 text-center text-sm text-muted-foreground">
+                            Run a scan to build repository intelligence and compare against prior runs.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Files Indexed</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.filesIndexed ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Components Mapped</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.nodes.length ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Interaction Edges</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.edges.length ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Data Flow Traces</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.dataFlows.traces.length ?? 0}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-border/40">
+                                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Interaction Hotspots</p>
+                                    </div>
+                                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                                        {currentResearch?.interactionMap.hotspots.length ? (
+                                            currentResearch.interactionMap.hotspots.map((hotspot) => (
+                                                <div key={hotspot.file} className="rounded border border-border/40 p-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-xs font-medium font-mono truncate">{hotspot.file}</p>
+                                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                                            score {hotspot.riskScore}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                                        {hotspot.kind} · {hotspot.reason}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">No hotspots available for this scan.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data Flow Traces</p>
+                                        {currentResearch && (
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {currentResearch.dataFlows.criticalCount} critical · {currentResearch.dataFlows.highCount} high
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                                        {currentResearch?.dataFlows.traces.length ? (
+                                            currentResearch.dataFlows.traces.slice(0, 12).map((trace) => (
+                                                <div key={trace.id} className="rounded border border-border/40 p-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-xs font-medium truncate">{trace.summary}</p>
+                                                        <span className={cn("text-[11px] uppercase", severityColors[trace.severity])}>
+                                                            {trace.severity}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+                                                        {trace.file}:{trace.line} · confidence {(trace.confidence * 100).toFixed(0)}%
+                                                    </p>
+                                                    <div className="mt-2 space-y-1">
+                                                        {trace.stages.map((stage, idx) => (
+                                                            <p key={`${trace.id}-${idx}`} className="text-[11px] text-muted-foreground">
+                                                                <span className="uppercase tracking-wide mr-2">{stage.kind}</span>
+                                                                {stage.label}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">No source-to-sink traces were identified in this run.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Diff Viewer</p>
+                                    <select
+                                        className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                        value={baselineScanId}
+                                        onChange={(event) => setBaselineScanId(event.target.value)}
+                                    >
+                                        <option value="">Select baseline run</option>
+                                        {scans
+                                            .filter((scan) => scan.id !== currentScan.id)
+                                            .map((scan) => (
+                                                <option key={scan.id} value={scan.id}>
+                                                    {new Date(scan.created_at).toLocaleString()} · {scan.score || "?"}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {!baselineScan || !scanDiff ? (
+                                    <div className="p-4 text-xs text-muted-foreground">
+                                        Select a prior scan run to compare with the current run.
+                                    </div>
+                                ) : (
+                                    <div className="p-4 space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Score Delta</p>
+                                                <p className={cn("text-lg font-semibold mt-1", scanDiff.scoreDelta < 0 ? "text-red-500" : "text-emerald-500")}>
+                                                    {scanDiff.scoreDelta > 0 ? "+" : ""}{scanDiff.scoreDelta}
+                                                </p>
+                                            </div>
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Issue Delta</p>
+                                                <p className={cn("text-lg font-semibold mt-1", scanDiff.issueDelta > 0 ? "text-red-500" : "text-emerald-500")}>
+                                                    {scanDiff.issueDelta > 0 ? "+" : ""}{scanDiff.issueDelta}
+                                                </p>
+                                            </div>
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">File Delta</p>
+                                                <p className="text-lg font-semibold mt-1">
+                                                    {scanDiff.fileDelta > 0 ? "+" : ""}{scanDiff.fileDelta}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
+                                                    Added Findings ({scanDiff.addedIssues.length})
+                                                </p>
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                                                    {scanDiff.addedIssues.length ? (
+                                                        scanDiff.addedIssues.map((issue) => (
+                                                            <p key={`added-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
+                                                                <span className={cn("mr-1", severityColors[issue.severity])}>
+                                                                    [{issue.severity.toUpperCase()}]
+                                                                </span>
+                                                                {issue.file}:{issue.line} {issue.name}
+                                                            </p>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground">No new findings compared to baseline.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] font-medium text-red-400 uppercase tracking-wider mb-2">
+                                                    Resolved Findings ({scanDiff.removedIssues.length})
+                                                </p>
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                                                    {scanDiff.removedIssues.length ? (
+                                                        scanDiff.removedIssues.map((issue) => (
+                                                            <p key={`removed-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
+                                                                <span className={cn("mr-1", severityColors[issue.severity])}>
+                                                                    [{issue.severity.toUpperCase()}]
+                                                                </span>
+                                                                {issue.file}:{issue.line} {issue.name}
+                                                            </p>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground">No findings were resolved in the current run.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Research Notes</p>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {currentResearch?.reasoningNotes.length ? (
+                                        currentResearch.reasoningNotes.map((note, index) => (
+                                            <p key={`${index}-${note}`} className="text-xs text-muted-foreground">
+                                                {index + 1}. {note}
+                                            </p>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            This scan run has no generated research notes. Run a fresh scan to produce deeper analysis.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="changelog">

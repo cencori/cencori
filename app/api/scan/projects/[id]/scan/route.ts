@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import {
     calculateScore,
     scanFileContent,
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
                     // Update scan run with empty results
                     const emptySummary = summarizeIssues([]);
+                    const emptyResearch = analyzeRepositoryResearch({ files: [], issues: [] });
                     await supabaseAdmin
                         .from('scan_runs')
                         .update({
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                             results: {
                                 issues: [],
                                 summary: emptySummary,
+                                research: emptyResearch,
                                 message: 'Repository is empty - no files to scan',
                             },
                         })
@@ -132,6 +135,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                             issues_found: 0,
                             scan_duration_ms: Date.now() - startTime,
                             summary: emptySummary,
+                            research: emptyResearch,
                             issues: [],
                             message: 'Repository is empty - no files to scan',
                         }
@@ -141,6 +145,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             }
 
             const allIssues: ScanIssue[] = [];
+            const scannedFiles: Array<{ path: string; content: string }> = [];
             let filesScanned = 0;
 
             // Filter and scan files (limit to first 100 scannable files for performance)
@@ -168,6 +173,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     // Scan the file
                     const fileIssues = scanFileContent(file.path, content);
                     allIssues.push(...fileIssues);
+                    scannedFiles.push({ path: file.path, content });
                     filesScanned++;
 
                 } catch (fileErr) {
@@ -179,6 +185,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             const scanDuration = Date.now() - startTime;
             const score = calculateScore(allIssues);
             const summary = summarizeIssues(allIssues);
+            const research = analyzeRepositoryResearch({ files: scannedFiles, issues: allIssues });
             const secretsCount = summary.secrets;
             const vulnsCount = summary.vulnerabilities;
 
@@ -193,7 +200,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     scan_duration_ms: scanDuration,
                     secrets_count: secretsCount,
                     vulnerabilities_count: vulnsCount,
-                    results: { issues: allIssues, summary },
+                    results: { issues: allIssues, summary, research },
                 })
                 .eq('id', scanRun.id);
 
@@ -217,6 +224,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     issues_found: allIssues.length,
                     scan_duration_ms: scanDuration,
                     summary,
+                    research,
                     issues: allIssues,
                 }
             });
