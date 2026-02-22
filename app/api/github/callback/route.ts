@@ -31,9 +31,38 @@ export async function GET(req: NextRequest) {
 
   // Helper to build redirect URL
   const buildRedirect = (path: string) => new URL(path, req.url);
+  const appendQueryParam = (path: string, key: string, value: string) => {
+    const url = buildRedirect(path);
+    url.searchParams.set(key, value);
+    return url;
+  };
+  const scanRedirectBase = customRedirect || '/scan/import';
 
-  if (!installation_id || !setup_action) {
-    console.error('Missing required query parameters for GitHub App callback.');
+  if (!setup_action) {
+    console.error('Missing setup_action query parameter for GitHub App callback.');
+    if (isScanSource) {
+      return NextResponse.redirect(buildRedirect('/scan/import?error=callback_failed'));
+    }
+    return NextResponse.redirect(buildRedirect(orgSlug ? `/dashboard/organizations/${orgSlug}/projects?error=github_callback_failed` : '/dashboard/organizations'));
+  }
+
+  if (setup_action === 'request') {
+    console.log(`GitHub App installation request submitted. Source: ${source || 'dashboard/organizations'}`);
+    if (isScanSource) {
+      return NextResponse.redirect(appendQueryParam(scanRedirectBase, 'success', 'installation_requested'));
+    }
+
+    if (orgSlug) {
+      return NextResponse.redirect(
+        buildRedirect(`/dashboard/organizations/${orgSlug}/projects/import/github?success=installation_requested`)
+      );
+    }
+
+    return NextResponse.redirect(buildRedirect('/dashboard?success=installation_requested'));
+  }
+
+  if (!installation_id) {
+    console.error(`Missing installation_id for GitHub App callback action: ${setup_action}`);
     if (isScanSource) {
       return NextResponse.redirect(buildRedirect('/scan/import?error=callback_failed'));
     }
@@ -158,13 +187,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(buildRedirect(`/dashboard/organizations/${orgSlug}/projects?error=installation_validation_failed`));
     }
 
-  } else if (setup_action === 'request') {
-    console.log(`GitHub App installation requested`);
+  } else {
+    console.error(`Unsupported setup_action in GitHub callback: ${setup_action}`);
+    if (isScanSource) {
+      return NextResponse.redirect(buildRedirect('/scan/import?error=callback_failed'));
+    }
+    return NextResponse.redirect(buildRedirect(orgSlug ? `/dashboard/organizations/${orgSlug}/projects?error=github_callback_failed` : '/dashboard/organizations'));
   }
 
   // Redirect based on source
   if (isScanSource) {
-    return NextResponse.redirect(buildRedirect(customRedirect || '/scan/import?success=github_connected'));
+    return NextResponse.redirect(appendQueryParam(scanRedirectBase, 'success', 'github_connected'));
   }
 
   if (orgSlug) {

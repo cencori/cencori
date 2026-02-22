@@ -19,7 +19,6 @@ import {
     Search,
     Loader2,
     ArrowLeft,
-    ExternalLink,
     Check,
     PlusIcon
 } from "lucide-react";
@@ -60,6 +59,9 @@ export default function ImportRepoPage() {
     const [selectedInstallationId, setSelectedInstallationId] = useState<number | null>(null);
     const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const successParam = urlParams?.get('success');
+    const errorParam = urlParams?.get('error');
 
     // Fetch repos from GitHub installations
     useEffect(() => {
@@ -192,13 +194,8 @@ export default function ImportRepoPage() {
     }
 
     if (!isConnected) {
-        // Check for success/error query params
-        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const success = urlParams?.get('success');
-        const errorParam = urlParams?.get('error');
-
         // If success, trigger a refetch
-        if (success === 'github_connected' && !isLoading) {
+        if (successParam === 'github_connected' && !isLoading) {
             window.location.href = '/scan/import';
             return null;
         }
@@ -217,12 +214,14 @@ export default function ImportRepoPage() {
                     <h1 className="text-sm font-medium mb-1">
                         {error?.includes('Unauthorized') ? 'Sign in to continue' : 'Connect GitHub'}
                     </h1>
-                    <p className="text-xs text-muted-foreground mb-4">
-                        {error?.includes('Unauthorized')
-                            ? "Sign in to your Cencori account to import repositories."
-                            : errorParam
-                                ? `Error: ${errorParam.replace(/_/g, ' ')}`
-                                : error || "Install the Cencori GitHub App to import repositories."
+                        <p className="text-xs text-muted-foreground mb-4">
+                            {error?.includes('Unauthorized')
+                                ? "Sign in to your Cencori account to import repositories."
+                                : successParam === 'installation_requested'
+                                    ? "Installation request submitted. Ask an organization owner to approve it, then refresh this page."
+                                : errorParam
+                                    ? `Error: ${errorParam.replace(/_/g, ' ')}`
+                                    : error || "Install the Cencori GitHub App to import repositories."
                         }
                     </p>
                     {error?.includes('Unauthorized') ? (
@@ -249,6 +248,14 @@ export default function ImportRepoPage() {
                 <ArrowLeft className="h-3 w-3" />
                 Back to projects
             </Link>
+
+            {(successParam === 'installation_requested' || errorParam === 'callback_failed') && (
+                <div className="mb-4 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+                    {successParam === 'installation_requested'
+                        ? 'GitHub App request submitted. An organization owner must approve the request before repos appear here.'
+                        : 'GitHub callback was incomplete. If this was an organization request, approval may still be pending.'}
+                </div>
+            )}
 
             <div className="mb-8">
                 <h1 className="text-base font-medium mb-1">Import Repository</h1>
