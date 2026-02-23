@@ -809,7 +809,7 @@ export default function FixWorkspacePage() {
 
             {/* ── Diff dialog ─────────────────────────────────────────── */}
             <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
-                <DialogContent className="max-w-[95vw] w-[95vw] p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
+                <DialogContent className="!max-w-[95vw] !w-[95vw] p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
                     {/* Header bar */}
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border/25">
                         <span className="text-sm font-medium text-foreground">
@@ -858,7 +858,7 @@ export default function FixWorkspacePage() {
                                     void handleSendChat();
                                 }
                             }}
-                            placeholder="Ask a question about your security findings..."
+                            placeholder="Ask..."
                             rows={1}
                             className="flex-1 resize-none bg-transparent py-2 text-sm placeholder:text-muted-foreground focus:outline-none max-h-32"
                             style={{ minHeight: "24px" }}
