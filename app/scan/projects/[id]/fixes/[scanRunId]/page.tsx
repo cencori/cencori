@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { ScanMarkdownRenderer } from "@/components/scan/ScanMarkdownRenderer";
 import { ScanThinkingIndicator } from "@/components/scan/ScanThinkingIndicator";
 import { Button } from "@/components/ui/button";
 import {
@@ -711,9 +711,7 @@ export default function FixWorkspacePage() {
                                     <ScanThinkingIndicator finished={!message.isStreaming} />
                                 </div>
                                 {message.content && (
-                                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                                        <MarkdownRenderer content={message.content} />
-                                    </div>
+                                    <ScanMarkdownRenderer content={message.content} />
                                 )}
                             </div>
                         )
