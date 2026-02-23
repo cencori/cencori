@@ -773,7 +773,7 @@ export default function FixWorkspacePage() {
                                 className="h-8 text-xs px-4"
                                 onClick={() => setDiffDialogOpen(true)}
                             >
-                                diffs ({fixes.length})
+                                Diffs ({fixes.length})
                             </Button>
                             {scanRun?.fix_status === "pr_opened" && scanRun?.fix_pr_url ? (
                                 <Button
