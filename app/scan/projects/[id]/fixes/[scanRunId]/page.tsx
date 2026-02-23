@@ -689,7 +689,6 @@ export default function FixWorkspacePage() {
                             className="h-7 text-xs px-3"
                             onClick={() => prInfo.url && window.open(prInfo.url, "_blank")}
                         >
-                            <ExternalLink className="h-3 w-3 mr-1.5" />
                             Open on GitHub
                         </Button>
                     </div>
@@ -782,7 +781,6 @@ export default function FixWorkspacePage() {
                                     className="h-8 text-xs px-4"
                                     onClick={() => window.open(scanRun?.fix_pr_url as string, "_blank")}
                                 >
-                                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                                     Open PR
                                 </Button>
                             ) : (
