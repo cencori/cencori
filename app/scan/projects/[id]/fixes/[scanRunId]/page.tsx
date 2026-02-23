@@ -6,21 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ScanThinkingIndicator } from "@/components/scan/ScanThinkingIndicator";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import {
-    AlertTriangle,
     ArrowLeft,
     ArrowUp,
-    CheckCircle2,
+    ChevronDown,
     ExternalLink,
     GitPullRequest,
     Loader2,
@@ -119,43 +113,97 @@ function fixIssueKey(fix: FixProposal): string {
     return `${fix.file}:${fix.line}:${fix.issueType}:${fix.issueName}`;
 }
 
-function DiffView({ original, fixed }: { original: string; fixed: string }) {
+function computeDiffStats(original: string, fixed: string): { added: number; removed: number } {
     const originalLines = original.split("\n");
     const fixedLines = fixed.split("\n");
     const max = Math.max(originalLines.length, fixedLines.length);
+    let added = 0, removed = 0;
+    for (let i = 0; i < max; i++) {
+        const before = originalLines[i] ?? "";
+        const after = fixedLines[i] ?? "";
+        if (before !== after) {
+            if (before !== "") removed++;
+            if (after !== "") added++;
+        }
+    }
+    return { added, removed };
+}
+
+function FileDiffPanel({ fix, defaultOpen = false }: { fix: FixProposal; defaultOpen?: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
+    const originalLines = fix.originalCode.split("\n");
+    const fixedLines = fix.fixedCode.split("\n");
+    const max = Math.max(originalLines.length, fixedLines.length);
+    const { added, removed } = computeDiffStats(fix.originalCode, fix.fixedCode);
+
+    // build unified diff rows
+    const rows: { type: "same" | "add" | "remove"; content: string; lineNum: number }[] = [];
+    let lineCounter = 1;
+    for (let i = 0; i < max; i++) {
+        const before = originalLines[i] ?? "";
+        const after = fixedLines[i] ?? "";
+        if (before === after) {
+            rows.push({ type: "same", content: before, lineNum: lineCounter++ });
+        } else {
+            if (before !== "") rows.push({ type: "remove", content: before, lineNum: lineCounter });
+            if (after !== "") { rows.push({ type: "add", content: after, lineNum: lineCounter }); lineCounter++; }
+        }
+    }
 
     return (
-        <div className="rounded border border-border/40 overflow-hidden text-[11px] font-mono">
-            {Array.from({ length: max }).map((_, idx) => {
-                const before = originalLines[idx] ?? "";
-                const after = fixedLines[idx] ?? "";
+        <div className="border-b border-border/20 last:border-b-0">
+            {/* File row */}
+            <button
+                onClick={() => setOpen((v) => !v)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+            >
+                <ChevronDown
+                    className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-150", open ? "" : "-rotate-90")}
+                />
+                <span className="flex-1 text-xs font-mono text-foreground/90 truncate">{fix.file}</span>
+                <span className="text-xs font-mono text-emerald-400 shrink-0">+{added}</span>
+                <span className="text-xs font-mono text-red-400 shrink-0 ml-1">-{removed}</span>
+            </button>
 
-                if (before === after) {
-                    return (
-                        <div key={`same-${idx}`} className="px-3 py-0.5 text-muted-foreground">
-                            <span className="inline-block w-4 mr-2 text-muted-foreground/50"> </span>
-                            {before || " "}
+            {/* Code panel */}
+            {open && (
+                <div className="font-mono text-[11px] leading-5 overflow-x-auto">
+                    {rows.map((row, idx) => (
+                        <div
+                            key={idx}
+                            className={cn(
+                                "flex gap-0 min-w-0",
+                                row.type === "add" && "bg-emerald-500/15",
+                                row.type === "remove" && "bg-red-500/15",
+                            )}
+                        >
+                            {/* Line number */}
+                            <span className={cn(
+                                "select-none shrink-0 w-10 text-right pr-3 py-0.5 border-r border-border/20",
+                                row.type === "add" ? "text-emerald-500/50 border-emerald-500/20" :
+                                    row.type === "remove" ? "text-red-500/50 border-red-500/20" :
+                                        "text-muted-foreground/40"
+                            )}>{row.lineNum}</span>
+                            {/* Sign */}
+                            <span className={cn(
+                                "select-none shrink-0 w-5 text-center py-0.5",
+                                row.type === "add" ? "text-emerald-400" :
+                                    row.type === "remove" ? "text-red-400" :
+                                        "text-transparent"
+                            )}>
+                                {row.type === "add" ? "+" : row.type === "remove" ? "-" : " "}
+                            </span>
+                            {/* Code */}
+                            <span className={cn(
+                                "flex-1 py-0.5 pr-4 whitespace-pre",
+                                row.type === "add" ? "text-emerald-200" :
+                                    row.type === "remove" ? "text-red-300" :
+                                        "text-foreground/75"
+                            )}>{row.content || " "}</span>
                         </div>
-                    );
-                }
-
-                return (
-                    <div key={`diff-${idx}`}>
-                        {before !== "" && (
-                            <div className="px-3 py-0.5 bg-red-500/10 text-red-300">
-                                <span className="inline-block w-4 mr-2 text-red-300/70">-</span>
-                                {before}
-                            </div>
-                        )}
-                        {after !== "" && (
-                            <div className="px-3 py-0.5 bg-emerald-500/10 text-emerald-300">
-                                <span className="inline-block w-4 mr-2 text-emerald-300/70">+</span>
-                                {after}
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -713,51 +761,36 @@ export default function FixWorkspacePage() {
 
             {/* ── Diff dialog ─────────────────────────────────────────── */}
             <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
-                <DialogContent className="max-w-5xl p-0">
-                    <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/40">
-                        <DialogTitle className="text-sm">Diff Review</DialogTitle>
-                        <DialogDescription className="text-xs">
-                            Reviewing {fixesForDiffDialog.length} fix diff{fixesForDiffDialog.length === 1 ? "" : "s"}.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="px-5 pb-5 max-h-[72vh] overflow-y-auto space-y-3">
+                <DialogContent className="max-w-4xl p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
+                    {/* Header bar */}
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border/25">
+                        <span className="text-sm font-medium text-foreground">
+                            {fixesForDiffDialog.length} file{fixesForDiffDialog.length === 1 ? "" : "s"} changed
+                        </span>
+                        {(() => {
+                            const totals = fixesForDiffDialog.reduce(
+                                (acc, fix) => {
+                                    const s = computeDiffStats(fix.originalCode, fix.fixedCode);
+                                    return { added: acc.added + s.added, removed: acc.removed + s.removed };
+                                },
+                                { added: 0, removed: 0 }
+                            );
+                            return (
+                                <>
+                                    <span className="text-sm font-mono text-emerald-400">+{totals.added}</span>
+                                    <span className="text-sm font-mono text-red-400">-{totals.removed}</span>
+                                </>
+                            );
+                        })()}
+                    </div>
+
+                    {/* File list */}
+                    <div className="max-h-[76vh] overflow-y-auto">
                         {fixesForDiffDialog.length === 0 ? (
-                            <div className="rounded border border-border/40 p-3 text-xs text-muted-foreground mt-3">
-                                No diffs available yet.
-                            </div>
+                            <p className="px-4 py-6 text-xs text-muted-foreground">No diffs available yet.</p>
                         ) : (
                             fixesForDiffDialog.map((fix) => (
-                                <div key={`diff-${fix.id}`} className="rounded-md border border-border/40 p-3 mt-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-medium truncate">{fix.issueName}</p>
-                                            <p className="text-[11px] text-muted-foreground font-mono truncate">
-                                                {fix.file}:{fix.line}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <Badge
-                                                variant="outline"
-                                                className={cn("text-[10px] h-5", severityBadgeStyles[fix.severity] || "")}
-                                            >
-                                                {fix.severity}
-                                            </Badge>
-                                            <label className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedFixIds.has(fix.id)}
-                                                    onChange={() => toggleFixSelection(fix.id)}
-                                                    className="h-3 w-3 rounded border-border bg-transparent"
-                                                />
-                                                Include
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <p className="mt-2 text-[11px] text-emerald-200">{fix.explanation}</p>
-                                    <div className="mt-2">
-                                        <DiffView original={fix.originalCode} fixed={fix.fixedCode} />
-                                    </div>
-                                </div>
+                                <FileDiffPanel key={fix.id} fix={fix} />
                             ))
                         )}
                     </div>

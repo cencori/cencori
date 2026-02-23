@@ -125,7 +125,7 @@ export default function ScanDashboardPage() {
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-base font-medium">Projects</h1>
+                <h1 className="text-base font-medium">Scan</h1>
             </div>
 
             {/* Search and Actions */}
