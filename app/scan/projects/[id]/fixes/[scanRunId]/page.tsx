@@ -161,7 +161,7 @@ function FileDiffPanel({ fix, defaultOpen = false }: { fix: FixProposal; default
             {/* File row */}
             <button
                 onClick={() => setOpen((v) => !v)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors text-left"
             >
                 <ChevronDown
                     className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-150", open ? "" : "-rotate-90")}
@@ -202,8 +202,8 @@ function FileDiffPanel({ fix, defaultOpen = false }: { fix: FixProposal; default
                             {/* Code */}
                             <span className={cn(
                                 "flex-1 py-0.5 pr-4 whitespace-pre",
-                                row.type === "add" ? "text-emerald-200" :
-                                    row.type === "remove" ? "text-red-300" :
+                                row.type === "add" ? "text-emerald-700 dark:text-emerald-200" :
+                                    row.type === "remove" ? "text-red-700 dark:text-red-300" :
                                         "text-foreground/75"
                             )}>{row.content || " "}</span>
                         </div>
@@ -809,7 +809,7 @@ export default function FixWorkspacePage() {
 
             {/* ── Diff dialog ─────────────────────────────────────────── */}
             <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
-                <DialogContent className="!max-w-[40vw] !w-[40vw] p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
+                <DialogContent className="!max-w-[40vw] !w-[40vw] p-0 overflow-hidden bg-background border border-border/30">
                     {/* Header bar */}
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border/25">
                         <span className="text-sm font-medium text-foreground">
