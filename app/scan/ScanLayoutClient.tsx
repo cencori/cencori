@@ -89,7 +89,7 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
 
     return (
-        <div className={`${GeistSans.className} ${GeistMono.variable} flex h-screen w-full flex-col`}>
+        <div className={`${GeistSans.className} ${GeistMono.variable} antialiased selection:bg-foreground selection:text-background flex h-screen w-full flex-col`}>
             {/* Navbar */}
             <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
