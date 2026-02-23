@@ -19,6 +19,89 @@ interface AcceptedFix {
     originalCode: string;
     fixedCode: string;
     explanation: string;
+    issueKey?: string;
+    updatedFileContent?: string;
+    aiModel?: string;
+}
+
+interface FileSelectionStats {
+    selected: number;
+    total: number;
+}
+
+function normalizeLine(line: string): string {
+    return line.replace(/\s+/g, ' ').trim();
+}
+
+function applySnippetFix(content: string, fix: AcceptedFix): { updatedContent: string; applied: boolean } {
+    if (!fix.originalCode || !fix.fixedCode || fix.originalCode.trim() === fix.fixedCode.trim()) {
+        return { updatedContent: content, applied: false };
+    }
+
+    if (content.includes(fix.originalCode)) {
+        return {
+            updatedContent: content.replace(fix.originalCode, fix.fixedCode),
+            applied: true,
+        };
+    }
+
+    const lines = content.split('\n');
+    const originalLines = fix.originalCode.split('\n');
+    const fixedLines = fix.fixedCode.split('\n');
+    if (originalLines.length === 0) {
+        return { updatedContent: content, applied: false };
+    }
+
+    const normalizedOriginal = originalLines.map(normalizeLine).join('\n');
+    const targetLineIndex = Math.max(0, fix.line - 1);
+    const searchStart = Math.max(0, targetLineIndex - 25);
+    const searchEnd = Math.min(
+        Math.max(0, lines.length - originalLines.length),
+        targetLineIndex + 25
+    );
+
+    for (let start = searchStart; start <= searchEnd; start += 1) {
+        const window = lines.slice(start, start + originalLines.length);
+        if (window.length !== originalLines.length) {
+            continue;
+        }
+
+        const exactMatch = window.join('\n').trim() === fix.originalCode.trim();
+        const normalizedMatch = window.map(normalizeLine).join('\n') === normalizedOriginal;
+        if (!exactMatch && !normalizedMatch) {
+            continue;
+        }
+
+        const nextLines = [...lines];
+        nextLines.splice(start, originalLines.length, ...fixedLines);
+        return {
+            updatedContent: nextLines.join('\n'),
+            applied: true,
+        };
+    }
+
+    return { updatedContent: content, applied: false };
+}
+
+function getSharedUpdatedFileContent(
+    fileFixes: AcceptedFix[],
+    selection?: FileSelectionStats
+): string | null {
+    if (!selection || selection.total <= 0 || selection.selected !== selection.total) {
+        return null;
+    }
+
+    const aiFileContents = fileFixes
+        .map((fix) => fix.updatedFileContent)
+        .filter((content): content is string => typeof content === 'string' && content.length > 0);
+
+    if (aiFileContents.length === 0 || aiFileContents.length !== fileFixes.length) {
+        return null;
+    }
+
+    const [firstContent, ...rest] = aiFileContents;
+    const allSame = rest.every((content) => content === firstContent);
+    return allSame ? firstContent : null;
 }
 
 // ─── Main Route Handler ─────────────────────────────────────────────────
@@ -39,7 +122,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     console.log(`[Fix Apply] User ${user.id} authenticated`);
 
     const body = await req.json();
-    const { scanRunId, fixes }: { scanRunId: string; fixes: AcceptedFix[] } = body;
+    const {
+        scanRunId,
+        fixes,
+        selectionByFile,
+    }: {
+        scanRunId: string;
+        fixes: AcceptedFix[];
+        selectionByFile?: Record<string, FileSelectionStats>;
+    } = body;
 
     if (!scanRunId || !fixes || fixes.length === 0) {
         console.log('[Fix Apply] Missing scanRunId or fixes in request body');
@@ -165,33 +256,30 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     continue;
                 }
 
-                let content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+                const originalContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
+                let content = originalContent;
 
-                // Apply each fix to this file
-                // Sort fixes by line number descending so replacements don't shift line numbers
-                const sortedFixes = [...fileFixes].sort((a, b) => b.line - a.line);
+                const fullySelectedUpdatedContent = getSharedUpdatedFileContent(
+                    fileFixes,
+                    selectionByFile?.[filePath]
+                );
 
-                for (const fix of sortedFixes) {
-                    // Replace the original code snippet with the fixed version
-                    if (content.includes(fix.originalCode)) {
-                        content = content.replace(fix.originalCode, fix.fixedCode);
-                    } else {
-                        // Fallback: try line-based replacement
-                        const lines = content.split('\n');
-                        const originalLines = fix.originalCode.split('\n');
-                        const fixedLines = fix.fixedCode.split('\n');
+                if (fullySelectedUpdatedContent && fullySelectedUpdatedContent !== content) {
+                    content = fullySelectedUpdatedContent;
+                } else {
+                    // Apply each fix to this file
+                    // Sort fixes by line number descending so replacements don't shift line numbers
+                    const sortedFixes = [...fileFixes].sort((a, b) => b.line - a.line);
 
-                        // Find the start of the original code
-                        const startLine = Math.max(0, fix.line - 6);
-                        const endLine = Math.min(lines.length, startLine + originalLines.length);
-
-                        // Verify the lines match before replacing
-                        const currentSnippet = lines.slice(startLine, endLine).join('\n');
-                        if (currentSnippet.trim() === fix.originalCode.trim()) {
-                            lines.splice(startLine, endLine - startLine, ...fixedLines);
-                            content = lines.join('\n');
-                        }
+                    for (const fix of sortedFixes) {
+                        const result = applySnippetFix(content, fix);
+                        content = result.updatedContent;
                     }
+                }
+
+                if (content === originalContent) {
+                    console.log(`[Fix Apply]   Skipping ${filePath} (no effective changes after apply)`);
+                    continue;
                 }
 
                 // Commit the updated file
