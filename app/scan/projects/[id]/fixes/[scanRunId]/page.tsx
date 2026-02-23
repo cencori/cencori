@@ -665,8 +665,10 @@ export default function FixWorkspacePage() {
                                 </div>
                             </div>
                         ) : (
-                            <div key={`msg-${idx}`} className="space-y-3">
-                                <ScanThinkingIndicator finished={aiHasStarted} />
+                            <div key={`msg-${idx}`} className="w-full max-w-none space-y-2">
+                                <div className="mb-2">
+                                    <ScanThinkingIndicator finished={aiHasStarted} />
+                                </div>
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                     {message.content && <MarkdownRenderer content={message.content} />}
                                 </div>
