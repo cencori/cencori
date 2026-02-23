@@ -70,7 +70,7 @@ export function ScanThinkingIndicator({ finished = false }: ScanThinkingIndicato
         <div className="w-full max-w-sm">
             <button
                 onClick={() => setIsExpanded((v) => !v)}
-                className="flex items-center gap-2 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                className="flex items-center gap-2 py-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors w-full text-left"
             >
                 <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
                     <ChevronRight className="w-3.5 h-3.5" />

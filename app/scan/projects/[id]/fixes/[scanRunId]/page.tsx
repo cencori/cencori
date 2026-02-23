@@ -656,12 +656,11 @@ export default function FixWorkspacePage() {
     return (
         <>
             {/* ── Main chat content ───────────────────────────────────── */}
-            <div className="w-full max-w-3xl mx-auto px-6 py-8 pb-40">
-
+            <div className="w-full max-w-3xl mx-auto px-4 py-8 pt-16 pb-40">
                 {/* Header: back link only */}
                 <Link
                     href={`/scan/projects/${projectId}`}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-10"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-8"
                 >
                     <ArrowLeft className="h-3 w-3" />
                     Back to project
@@ -691,7 +690,7 @@ export default function FixWorkspacePage() {
                 )}
 
                 {/* Chat thread */}
-                <div className="space-y-8">
+                <div className="space-y-6">
 
                     {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
                     {(loading || loadingFixes) && !aiHasStarted && (
@@ -702,16 +701,20 @@ export default function FixWorkspacePage() {
                     {chatMessages.map((message, idx) =>
                         message.role === "user" ? (
                             <div key={`msg-${idx}`} className="flex justify-end">
-                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
+                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
                                     <p className="text-sm">{message.content}</p>
                                 </div>
                             </div>
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-2">
                                 <div className="mb-2">
-                                    <ScanThinkingIndicator finished={aiHasStarted} />
+                                    <ScanThinkingIndicator finished={!message.isStreaming} />
                                 </div>
-                                {message.content && <MarkdownRenderer content={message.content} />}
+                                {message.content && (
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                        <MarkdownRenderer content={message.content} />
+                                    </div>
+                                )}
                             </div>
                         )
                     )}
@@ -798,8 +801,8 @@ export default function FixWorkspacePage() {
             </Dialog>
 
             {/* ── Fixed bottom input bar ──────────────────────────────── */}
-            <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-                <div className="w-full max-w-3xl mx-auto px-6 py-4">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm pb-8">
+                <div className="max-w-3xl mx-auto">
                     <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
                         <textarea
                             value={chatInput}
@@ -812,14 +815,14 @@ export default function FixWorkspacePage() {
                             }}
                             placeholder="Ask a question about your security findings..."
                             rows={1}
-                            className="flex-1 resize-none bg-transparent py-2 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none ring-0 shadow-none max-h-32"
+                            className="flex-1 resize-none bg-transparent py-2 text-sm placeholder:text-muted-foreground focus:outline-none max-h-32"
                             style={{ minHeight: "24px" }}
                         />
                         <div className="flex-shrink-0">
                             {chatLoading ? (
                                 <Button
                                     size="icon"
-                                    className="h-10 w-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
+                                    className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
                                     onClick={() => chatAbortRef.current?.abort()}
                                 >
                                     <StopCircle className="h-4 w-4 fill-current" />
@@ -836,7 +839,11 @@ export default function FixWorkspacePage() {
                             )}
                         </div>
                     </div>
-                    <p className="text-center text-[10px] text-muted-foreground/50 mt-2">Powered by Cencori AI</p>
+                    <div className="text-center mt-3">
+                        <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                            Powered by Cencori AI
+                        </Link>
+                    </div>
                 </div>
             </div>
         </>
