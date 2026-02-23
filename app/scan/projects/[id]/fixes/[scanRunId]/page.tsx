@@ -585,15 +585,16 @@ export default function FixWorkspacePage() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex h-screen flex-col items-start justify-center w-full max-w-3xl mx-auto px-6">
-                <ScanThinkingIndicator />
-            </div>
-        );
-    }
 
-    if (!scanRun || !project) {
+
+    // True once the first AI message has content (stream started)
+    const aiHasStarted = chatMessages.some((m) => m.role === "assistant" && m.content.length > 0);
+    // True once all AI messages are done streaming
+    const aiIsDone = chatMessages.length > 0 && chatMessages.every((m) => !m.isStreaming);
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    const lastIsAssistant = lastMessage?.role === "assistant";
+
+    if (!loading && (!scanRun || !project)) {
         return (
             <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <p className="text-sm text-red-400">{error || "Fix workspace not found."}</p>
@@ -603,13 +604,6 @@ export default function FixWorkspacePage() {
             </div>
         );
     }
-
-    // True once the first AI message has content (stream started)
-    const aiHasStarted = chatMessages.some((m) => m.role === "assistant" && m.content.length > 0);
-    // True once all AI messages are done streaming
-    const aiIsDone = chatMessages.length > 0 && chatMessages.every((m) => !m.isStreaming);
-    const lastMessage = chatMessages[chatMessages.length - 1];
-    const lastIsAssistant = lastMessage?.role === "assistant";
 
     return (
         <>
@@ -687,12 +681,12 @@ export default function FixWorkspacePage() {
                             >
                                 Review diffs ({fixes.length})
                             </Button>
-                            {scanRun.fix_status === "pr_opened" && scanRun.fix_pr_url ? (
+                            {scanRun?.fix_status === "pr_opened" && scanRun?.fix_pr_url ? (
                                 <Button
                                     size="sm"
                                     variant="outline"
                                     className="h-8 text-xs px-4"
-                                    onClick={() => window.open(scanRun.fix_pr_url as string, "_blank")}
+                                    onClick={() => window.open(scanRun?.fix_pr_url as string, "_blank")}
                                 >
                                     <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                                     Open PR
