@@ -39,7 +39,7 @@ function buildFallbackAnswer(question: string, issue?: IssueContext, fix?: FixCo
     const isGreeting = /^(hey|hi|hello|sup|yo|what'?s up|howdy|hiya)[\s!?.]*$/.test(lc);
 
     if (isGreeting) {
-        return "Hey! I'm Cencori AI — your security scan assistant. Ask me anything about the findings, how to fix them, or anything else on your mind.";
+        return "Hey! I'm Cencori — your senior security engineer. Ask me anything about the findings, how to fix them, or anything else on your mind.";
     }
 
     const parts: string[] = [];
@@ -143,7 +143,7 @@ Currently selected issue:
 - Description: ${issue.description || "n/a"}
 - Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${aiSummary ? `\n- Repo AI summary: ${aiSummary}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
-    const prompt = `You are Cencori AI — a sharp, friendly security engineer embedded in a code scanning tool.
+    const prompt = `You are Cencori — a sharp, senior security engineer embedded in a code scanning tool.
 
 Your role is twofold:
 1. Help users understand and remediate security vulnerabilities found in their code.
