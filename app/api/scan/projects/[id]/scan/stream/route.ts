@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
+import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import {
     calculateScore,
@@ -173,6 +174,43 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 const score = calculateScore(allIssues);
                 const summary = summarizeIssues(allIssues);
                 const research = analyzeRepositoryResearch({ files: scannedFiles, issues: allIssues });
+                const aiInsight = await generateRepositoryAiInsight({
+                    repository: githubAccess.repository.fullName,
+                    issues: allIssues.map((issue) => ({
+                        type: issue.type,
+                        name: issue.name,
+                        severity: issue.severity,
+                        file: issue.file,
+                        line: issue.line,
+                        match: issue.match,
+                        description: issue.description,
+                    })),
+                    research: {
+                        filesIndexed: research.filesIndexed,
+                        interactionHotspots: research.interactionMap.hotspots.map((hotspot) => ({
+                            file: hotspot.file,
+                            name: hotspot.name,
+                            riskScore: hotspot.riskScore,
+                            reason: hotspot.reason,
+                        })),
+                        dataFlowTraces: research.dataFlows.traces.map((trace) => ({
+                            file: trace.file,
+                            line: trace.line,
+                            severity: trace.severity,
+                            summary: trace.summary,
+                        })),
+                    },
+                });
+                const enrichedResearch = aiInsight
+                    ? {
+                        ...research,
+                        reasoningNotes: [
+                            ...research.reasoningNotes,
+                            `AI summary (${aiInsight.model}): ${aiInsight.summary}`,
+                            ...aiInsight.keyFindings.map((finding) => `AI finding: ${finding}`),
+                        ],
+                    }
+                    : research;
                 const secretsCount = summary.secrets;
                 const piiCount = summary.pii;
                 const vulnsCount = summary.vulnerabilities;
@@ -194,7 +232,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         vulnerabilitiesCount: vulnsCount,
                         scanDurationMs: scanDuration,
                         summary,
-                        research,
+                        research: enrichedResearch,
+                        ...(aiInsight ? { ai: aiInsight } : {}),
                         issues: allIssues,
                         totalCandidateFiles,
                         failedFiles,
@@ -223,7 +262,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         results: {
                             issues: allIssues,
                             summary,
-                            research,
+                            research: enrichedResearch,
+                            ...(aiInsight ? { ai: aiInsight } : {}),
                             total_candidate_files: totalCandidateFiles,
                             failed_files: failedFiles,
                             ...(noFilesMessage ? { message: noFilesMessage } : {}),

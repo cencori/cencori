@@ -63,6 +63,9 @@ interface FixProposal {
     originalCode: string;
     fixedCode: string;
     explanation: string;
+    issueKey?: string;
+    updatedFileContent?: string;
+    aiModel?: string;
 }
 
 interface ManualGuidance {
@@ -301,12 +304,28 @@ export default function FixWorkspacePage() {
         setCreatingPr(true);
         setError("");
         try {
+            const fileTotals = fixes.reduce<Record<string, number>>((acc, fix) => {
+                acc[fix.file] = (acc[fix.file] || 0) + 1;
+                return acc;
+            }, {});
+            const fileSelected = selectedFixes.reduce<Record<string, number>>((acc, fix) => {
+                acc[fix.file] = (acc[fix.file] || 0) + 1;
+                return acc;
+            }, {});
+            const selectionByFile = Object.fromEntries(
+                Object.entries(fileTotals).map(([file, total]) => [
+                    file,
+                    { selected: fileSelected[file] || 0, total },
+                ])
+            );
+
             const response = await fetch(`/api/scan/projects/${projectId}/fixes/apply`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     scanRunId,
                     fixes: selectedFixes,
+                    selectionByFile,
                 }),
             });
 

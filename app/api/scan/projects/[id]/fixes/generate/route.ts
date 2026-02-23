@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { generateFileFixWithGemini } from '@/lib/scan/gemini';
 import { randomUUID } from 'crypto';
 
 interface RouteParams {
@@ -21,6 +22,9 @@ export interface FixProposal {
     originalCode: string;
     fixedCode: string;
     explanation: string;
+    issueKey?: string;
+    updatedFileContent?: string;
+    aiModel?: string;
 }
 
 interface ScanIssue {
@@ -284,107 +288,97 @@ function buildManualGuidance(issue: ScanIssue): ManualGuidance {
     };
 }
 
-// ─── AI Fix Generation (batched, with timeout) ──────────────────────────
-
-interface AIFixInput {
-    issue: ScanIssue;
-    snippet: string;
+interface ScanResearchLike {
+    dataFlows?: {
+        traces?: Array<{
+            file?: string;
+            line?: number;
+            severity?: string;
+            summary?: string;
+        }>;
+    };
 }
 
-async function generateAIFixesBatched(
-    inputs: AIFixInput[]
-): Promise<Map<string, { fixedCode: string; explanation: string }>> {
-    const results = new Map<string, { fixedCode: string; explanation: string }>();
+interface PendingAiIssue {
+    issueId: string;
+    issue: ScanIssue;
+    issueKey: string;
+    snippet: string;
+    dataFlowContext?: string;
+}
 
-    if (inputs.length === 0) return results;
+function extractSnippet(content: string, line: number, radius: number = 6): string {
+    const lines = content.split('\n');
+    const startLine = Math.max(0, line - radius - 1);
+    const endLine = Math.min(lines.length, line + radius);
+    return lines.slice(startLine, endLine).join('\n');
+}
 
-    try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.log('[Fix Gen] No Google AI API key found, skipping AI fixes');
-            return results;
+function snippetsDiffer(originalCode: string, fixedCode: string): boolean {
+    return originalCode.trim() !== fixedCode.trim();
+}
+
+function findClosestChangedSnippet(
+    originalContent: string,
+    updatedContent: string,
+    targetLine: number,
+    radius: number = 6
+): { originalCode: string; fixedCode: string } | null {
+    const originalLines = originalContent.split('\n');
+    const updatedLines = updatedContent.split('\n');
+    const maxLines = Math.max(originalLines.length, updatedLines.length);
+    const changedLineIndexes: number[] = [];
+
+    for (let index = 0; index < maxLines; index += 1) {
+        const before = originalLines[index] ?? '';
+        const after = updatedLines[index] ?? '';
+        if (before !== after) {
+            changedLineIndexes.push(index);
         }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-        // Build a single prompt for ALL issues
-        const issueDescriptions = inputs.map((input, idx) => `
---- Issue ${idx + 1} ---
-ID: issue_${idx}
-Type: ${input.issue.type}
-Name: ${input.issue.name}
-Severity: ${input.issue.severity}
-File: ${input.issue.file}:${input.issue.line}
-Code:
-\`\`\`
-${input.snippet}
-\`\`\`
-`).join('\n');
-
-        const prompt = `You are a security engineer fixing code vulnerabilities. Fix ALL ${inputs.length} issues below.
-
-IMPORTANT: Respond ONLY with a valid JSON array. Each element must have this exact shape:
-{"id": "issue_0", "fixedCode": "the complete fixed code snippet", "explanation": "brief explanation"}
-
-Rules:
-- For hardcoded secrets: Replace with environment variables (process.env.VAR_NAME)
-- For XSS: Add proper escaping/sanitization
-- For SQL injection: Use parameterized queries
-- For eval(): Replace with safer alternatives (JSON.parse, etc.)
-- Keep the same code structure, only fix the security issue
-- Return the COMPLETE snippet with the fix applied
-
-${issueDescriptions}
-
-Respond with JSON array only, no markdown fences.`;
-
-        console.log(`[Fix Gen] Sending batched AI request for ${inputs.length} issues...`);
-        const startTime = Date.now();
-
-        // Race against a 30-second timeout
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('AI fix generation timed out after 30s')), 30000)
-        );
-
-        const result = await Promise.race([
-            model.generateContent(prompt),
-            timeoutPromise,
-        ]);
-
-        const elapsed = Date.now() - startTime;
-        console.log(`[Fix Gen] AI response received in ${elapsed}ms`);
-
-        const text = result.response.text();
-
-        // Extract JSON from response
-        let jsonStr = text.trim();
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) {
-            jsonStr = jsonMatch[1].trim();
-        }
-
-        const parsed = JSON.parse(jsonStr);
-        const fixArray = Array.isArray(parsed) ? parsed : [parsed];
-
-        for (const fix of fixArray) {
-            const id = fix.id || fix.ID;
-            const fixedCode = fix.fixedCode || fix.fixed_code;
-            if (id && fixedCode) {
-                results.set(id, {
-                    fixedCode,
-                    explanation: fix.explanation || 'AI-generated security fix',
-                });
-            }
-        }
-
-        console.log(`[Fix Gen] Parsed ${results.size} AI fixes from response`);
-    } catch (error) {
-        console.error('[Fix Gen] Batched AI fix failed:', error instanceof Error ? error.message : error);
     }
 
-    return results;
+    if (changedLineIndexes.length === 0) {
+        return null;
+    }
+
+    const targetIndex = Math.max(0, targetLine - 1);
+    const closestIndex = changedLineIndexes.reduce((best, current) => (
+        Math.abs(current - targetIndex) < Math.abs(best - targetIndex) ? current : best
+    ), changedLineIndexes[0]);
+
+    const start = Math.max(0, closestIndex - radius);
+    const originalEnd = Math.min(originalLines.length, closestIndex + radius + 1);
+    const updatedEnd = Math.min(updatedLines.length, closestIndex + radius + 1);
+
+    return {
+        originalCode: originalLines.slice(start, originalEnd).join('\n'),
+        fixedCode: updatedLines.slice(start, updatedEnd).join('\n'),
+    };
+}
+
+function getIssueDataFlowContext(research: ScanResearchLike | undefined, issue: ScanIssue): string | undefined {
+    const traces = research?.dataFlows?.traces;
+    if (!Array.isArray(traces) || traces.length === 0) {
+        return undefined;
+    }
+
+    const matchingTrace = traces.find((trace) => {
+        if (trace.file !== issue.file) {
+            return false;
+        }
+
+        if (typeof trace.line !== 'number') {
+            return true;
+        }
+
+        return Math.abs(trace.line - issue.line) <= 8;
+    });
+
+    if (!matchingTrace || !matchingTrace.summary) {
+        return undefined;
+    }
+
+    return `${matchingTrace.severity || 'medium'} risk data-flow: ${matchingTrace.summary}`;
 }
 
 // ─── Main Route Handler ─────────────────────────────────────────────────
@@ -446,6 +440,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const issues: ScanIssue[] = scanRun.results?.issues || [];
+    const research = (scanRun.results?.research || undefined) as ScanResearchLike | undefined;
+    const repositoryAiSummary =
+        typeof scanRun.results?.ai?.summary === 'string' ? scanRun.results.ai.summary : undefined;
     console.log(`[Fix Gen] Found ${issues.length} issues from scan run`);
 
     if (issues.length === 0) {
@@ -515,10 +512,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         );
     }
 
-    // ─── Phase 1: Deterministic fixes (instant) ─────────────────────
+    // ─── Phase 1: Deterministic fixes (fast path) ────────────────────
     const fixes: FixProposal[] = [];
-    const aiInputs: AIFixInput[] = [];
+    const pendingAiIssuesByFile = new Map<string, PendingAiIssue[]>();
     const resolvedIssueKeys = new Set<string>();
+    let aiIssueIndex = 0;
 
     for (const issue of issues) {
         const fileContent = fileContents.get(issue.file);
@@ -527,11 +525,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             continue;
         }
 
-        const lines = fileContent.split('\n');
-        const startLine = Math.max(0, issue.line - 6);
-        const endLine = Math.min(lines.length, issue.line + 5);
-        const snippet = lines.slice(startLine, endLine).join('\n');
-
+        const snippet = extractSnippet(fileContent, issue.line, 6);
         const deterministicFix = tryDeterministicFix(issue, fileContent);
 
         if (deterministicFix) {
@@ -547,40 +541,111 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 originalCode: snippet,
                 fixedCode: deterministicFix.fixedCode,
                 explanation: deterministicFix.explanation,
+                issueKey: issueKey(issue),
             });
             resolvedIssueKeys.add(issueKey(issue));
-        } else {
-            // Queue for batched AI processing
-            aiInputs.push({ issue, snippet });
+            continue;
         }
+
+        const pendingIssue: PendingAiIssue = {
+            issueId: `issue_${aiIssueIndex}`,
+            issue,
+            issueKey: issueKey(issue),
+            snippet,
+            dataFlowContext: getIssueDataFlowContext(research, issue),
+        };
+        aiIssueIndex += 1;
+
+        const existing = pendingAiIssuesByFile.get(issue.file) || [];
+        existing.push(pendingIssue);
+        pendingAiIssuesByFile.set(issue.file, existing);
     }
 
-    console.log(`[Fix Gen] Phase 1 done: ${fixes.length} deterministic, ${aiInputs.length} queued for AI`);
+    const pendingIssueCount = Array.from(pendingAiIssuesByFile.values()).reduce(
+        (sum, fileIssues) => sum + fileIssues.length,
+        0
+    );
+    console.log(
+        `[Fix Gen] Phase 1 done: ${fixes.length} deterministic, ${pendingIssueCount} queued for AI across ${pendingAiIssuesByFile.size} files`
+    );
 
-    // ─── Phase 2: Batched AI fixes (single LLM call) ────────────────
-    if (aiInputs.length > 0) {
-        const aiResults = await generateAIFixesBatched(aiInputs);
+    // ─── Phase 2: File-context AI fixes (Gemini) ─────────────────────
+    for (const [filePath, fileIssues] of pendingAiIssuesByFile.entries()) {
+        const fileContent = fileContents.get(filePath);
+        if (!fileContent) {
+            continue;
+        }
 
-        for (let i = 0; i < aiInputs.length; i++) {
-            const { issue, snippet } = aiInputs[i];
-            const aiFix = aiResults.get(`issue_${i}`);
+        console.log(`[Fix Gen]   → AI processing ${filePath} (${fileIssues.length} issues)`);
+        const aiResult = await generateFileFixWithGemini({
+            repository: githubAccess.repository.fullName,
+            repositorySummary: repositoryAiSummary,
+            filePath,
+            fileContent,
+            issues: fileIssues.map((entry) => ({
+                id: entry.issueId,
+                type: entry.issue.type,
+                name: entry.issue.name,
+                severity: entry.issue.severity,
+                line: entry.issue.line,
+                match: entry.issue.match,
+                description: entry.issue.description,
+                dataFlowContext: entry.dataFlowContext,
+            })),
+        });
 
-            if (aiFix) {
-                console.log(`[Fix Gen]   ✓ AI: ${issue.name} in ${issue.file}:${issue.line}`);
-                fixes.push({
-                    id: randomUUID(),
-                    file: issue.file,
-                    line: issue.line,
-                    issueType: issue.type,
-                    issueName: issue.name,
-                    severity: issue.severity,
-                    strategy: 'ai',
-                    originalCode: snippet,
-                    fixedCode: aiFix.fixedCode,
-                    explanation: aiFix.explanation,
-                });
-                resolvedIssueKeys.add(issueKey(issue));
+        if (!aiResult || !aiResult.updatedFileContent || aiResult.updatedFileContent === fileContent) {
+            console.log(`[Fix Gen]   ✗ AI skipped ${filePath} (no usable file update)`);
+            continue;
+        }
+
+        const decisionMap = new Map(
+            aiResult.issueDecisions.map((decision) => [decision.issueId, decision])
+        );
+
+        for (const entry of fileIssues) {
+            const decision = decisionMap.get(entry.issueId);
+            if (!decision || !decision.fixApplied) {
+                continue;
             }
+
+            let originalCode = entry.snippet;
+            let fixedCode = extractSnippet(aiResult.updatedFileContent, entry.issue.line, 6);
+
+            if (!snippetsDiffer(originalCode, fixedCode)) {
+                const fallback = findClosestChangedSnippet(
+                    fileContent,
+                    aiResult.updatedFileContent,
+                    entry.issue.line,
+                    6
+                );
+
+                if (fallback) {
+                    originalCode = fallback.originalCode;
+                    fixedCode = fallback.fixedCode;
+                }
+            }
+
+            if (!snippetsDiffer(originalCode, fixedCode)) {
+                continue;
+            }
+
+            fixes.push({
+                id: randomUUID(),
+                file: entry.issue.file,
+                line: entry.issue.line,
+                issueType: entry.issue.type,
+                issueName: entry.issue.name,
+                severity: entry.issue.severity,
+                strategy: 'ai',
+                originalCode,
+                fixedCode,
+                explanation: decision.explanation,
+                issueKey: entry.issueKey,
+                updatedFileContent: aiResult.updatedFileContent,
+                aiModel: aiResult.model,
+            });
+            resolvedIssueKeys.add(entry.issueKey);
         }
     }
 

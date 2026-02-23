@@ -27,6 +27,13 @@ interface ChatMessage {
     content: string;
 }
 
+interface ScanRunResultsLike {
+    issues?: IssueContext[];
+    ai?: {
+        summary?: string;
+    };
+}
+
 function buildFallbackAnswer(question: string, issue?: IssueContext, fix?: FixContext): string {
     const parts: string[] = [];
 
@@ -87,10 +94,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: "question is too long (max 2000 chars)" }, { status: 400 });
     }
 
+    let relatedIssues: IssueContext[] = [];
+    let aiSummary: string | undefined;
+
     if (scanRunId) {
         const { data: scanRun } = await supabaseAdmin
             .from("scan_runs")
-            .select("id")
+            .select("id, results")
             .eq("id", scanRunId)
             .eq("project_id", id)
             .single();
@@ -98,6 +108,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         if (!scanRun) {
             return NextResponse.json({ error: "Scan run not found" }, { status: 404 });
         }
+
+        const results = (scanRun.results || {}) as ScanRunResultsLike;
+        const runIssues = Array.isArray(results.issues) ? results.issues : [];
+        relatedIssues = runIssues
+            .filter((scanIssue) => scanIssue.file === issue.file && !(scanIssue.line === issue.line && scanIssue.name === issue.name))
+            .slice(0, 8);
+        aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
     }
 
     const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
@@ -108,9 +125,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     try {
         const { GoogleGenerativeAI } = await import("@google/generative-ai");
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const recentHistory = history.slice(-8).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join("\n");
+        const relatedIssueContext = relatedIssues.length > 0
+            ? relatedIssues
+                .map((scanIssue) => `- ${scanIssue.name || "unknown"} (${scanIssue.severity || "unknown"}) at ${scanIssue.file || "unknown"}:${scanIssue.line || 0}`)
+                .join("\n")
+            : "n/a";
 
         const prompt = `You are Cencori Security Research Assistant.
 Answer the user's question with practical, code-focused guidance.
@@ -123,6 +145,9 @@ Issue context:
 - Location: ${issue.file || "unknown"}${issue.line ? `:${issue.line}` : ""}
 - Detector description: ${issue.description || "n/a"}
 - Match excerpt: ${issue.match || "n/a"}
+- Related issues in file:
+${relatedIssueContext}
+- Repository AI summary: ${aiSummary || "n/a"}
 
 Proposed fix context:
 - Explanation: ${fix.explanation || "n/a"}
@@ -150,4 +175,3 @@ Respond in plain text with:
         return NextResponse.json({ answer: buildFallbackAnswer(question, issue, fix), source: "fallback" });
     }
 }
-
