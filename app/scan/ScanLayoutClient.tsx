@@ -49,7 +49,9 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Check auth
+    useEffect(() => {
+        document.title = "Scan";
+    }, []);
     useEffect(() => {
         const checkAuth = async () => {
             const { data, error } = await supabase.auth.getUser();
