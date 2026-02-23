@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
-import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
+import { ScanThinkingIndicator } from "@/components/scan/ScanThinkingIndicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -587,11 +587,8 @@ export default function FixWorkspacePage() {
 
     if (loading) {
         return (
-            <div className="w-full max-w-6xl mx-auto px-6 py-8">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Loading fix workspace...
-                </div>
+            <div className="w-full max-w-6xl mx-auto px-6 py-16">
+                <ScanThinkingIndicator phase="loading" />
             </div>
         );
     }
@@ -684,9 +681,9 @@ export default function FixWorkspacePage() {
                         </div>
                     </div>
 
-                    {/* ThinkingIndicator while waiting for first suggestions token */}
+                    {/* ScanThinkingIndicator while waiting for first suggestions token */}
                     {loadingFixes && chatMessages.length === 0 && (
-                        <ThinkingIndicator />
+                        <ScanThinkingIndicator phase="generating" />
                     )}
 
                     {/* Unified chat messages */}
@@ -700,7 +697,10 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="space-y-2">
                                 <div className="mb-2">
-                                    <ThinkingIndicator finished={!message.isStreaming} />
+                                    <ScanThinkingIndicator
+                                        phase={idx === 0 ? "streaming" : "chat"}
+                                        finished={!message.isStreaming}
+                                    />
                                 </div>
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                     {message.content && <MarkdownRenderer content={message.content} />}
