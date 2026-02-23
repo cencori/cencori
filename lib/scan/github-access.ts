@@ -65,21 +65,38 @@ async function getAuthorizedInstallationIds(user: AuthenticatedUserLike): Promis
     const installationIds = new Set<number>();
 
     // Installations linked to orgs owned by this user.
-    const { data: userOrgs, error: userOrgsError } = await supabaseAdmin
+    const { data: ownedOrgs, error: ownedOrgsError } = await supabaseAdmin
         .from("organizations")
         .select("id")
         .eq("owner_id", user.id);
 
-    if (userOrgsError) {
+    if (ownedOrgsError) {
         throw new Error("Failed to resolve user organizations");
     }
 
-    if (userOrgs && userOrgs.length > 0) {
-        const orgIds = userOrgs.map((org) => org.id);
+    // Installations linked to orgs the user is a member of.
+    const { data: memberships, error: membershipsError } = await supabaseAdmin
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", user.id);
+
+    if (membershipsError) {
+        throw new Error("Failed to resolve organization memberships");
+    }
+
+    const orgIds = new Set<string>();
+    ownedOrgs?.forEach((org) => orgIds.add(org.id));
+    memberships?.forEach((membership) => {
+        if (typeof membership.organization_id === "string") {
+            orgIds.add(membership.organization_id);
+        }
+    });
+
+    if (orgIds.size > 0) {
         const { data: orgLinks, error: orgLinksError } = await supabaseAdmin
             .from("organization_github_installations")
             .select("installation_id")
-            .in("organization_id", orgIds);
+            .in("organization_id", Array.from(orgIds));
 
         if (orgLinksError) {
             throw new Error("Failed to resolve organization GitHub installations");

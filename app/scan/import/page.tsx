@@ -58,6 +58,7 @@ export default function ImportRepoPage() {
     const [installations, setInstallations] = useState<GitHubInstallation[]>([]);
     const [selectedInstallationId, setSelectedInstallationId] = useState<number | null>(null);
     const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
+    const [isConnectingGitHub, setIsConnectingGitHub] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const successParam = urlParams?.get('success');
@@ -116,13 +117,33 @@ export default function ImportRepoPage() {
         fetchRepos();
     }, []);
 
-    const handleConnectGitHub = () => {
-        const state = JSON.stringify({
+    const handleConnectGitHub = async (openInNewTab = false) => {
+        setIsConnectingGitHub(true);
+        const fallbackState = JSON.stringify({
             redirect: "/scan/import",
             source: "scan"
         });
-        const url = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
-        window.location.href = url;
+        const fallbackUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(fallbackState)}`;
+
+        try {
+            const response = await fetch('/api/scan/github/install-url');
+            const data = response.ok ? await response.json() : null;
+            const installUrl = typeof data?.url === 'string' ? data.url : fallbackUrl;
+
+            if (openInNewTab) {
+                window.open(installUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                window.location.href = installUrl;
+            }
+        } catch {
+            if (openInNewTab) {
+                window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                window.location.href = fallbackUrl;
+            }
+        } finally {
+            setIsConnectingGitHub(false);
+        }
     };
 
     const handleImport = async (repo: GitHubRepo) => {
@@ -233,8 +254,17 @@ export default function ImportRepoPage() {
                             </a>
                         </Button>
                     ) : (
-                        <Button onClick={handleConnectGitHub} size="sm" className="h-7 text-xs px-3">
-                            Install GitHub App
+                        <Button
+                            onClick={() => handleConnectGitHub(false)}
+                            size="sm"
+                            className="h-7 text-xs px-3"
+                            disabled={isConnectingGitHub}
+                        >
+                            {isConnectingGitHub ? (
+                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Redirecting...</>
+                            ) : (
+                                "Install GitHub App"
+                            )}
                         </Button>
                     )}
                 </div>
@@ -284,15 +314,14 @@ export default function ImportRepoPage() {
                                     </SelectItem>
                                 ))}
                                 <div className="p-1 border-t mt-1">
-                                    <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs font-normal" asChild>
-                                        <a
-                                            href={`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(JSON.stringify({ redirect: "/scan/import", source: "scan" }))}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            <PlusIcon className="h-3 w-3 mr-2" />
-                                            Add GitHub Account
-                                        </a>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start h-7 text-xs font-normal"
+                                        onClick={() => handleConnectGitHub(true)}
+                                    >
+                                        <PlusIcon className="h-3 w-3 mr-2" />
+                                        Add GitHub Account
                                     </Button>
                                 </div>
                             </SelectContent>
