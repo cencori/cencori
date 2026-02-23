@@ -593,10 +593,10 @@ export default function ProjectDetailPage() {
             </Link>
 
             {/* Project header */}
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-base font-medium font-mono">{project.github_repo_full_name}</h1>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-8">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-base font-medium font-mono break-all">{project.github_repo_full_name}</h1>
                         {score && (
                             <Badge variant="outline" className="gap-1.5 text-[11px] px-2 py-0.5 border-foreground/20 text-foreground">
                                 <span className={cn("size-1.5 rounded-full", scoreColors[score] || "bg-gray-500")} />
@@ -604,7 +604,7 @@ export default function ProjectDetailPage() {
                             </Badge>
                         )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             Last scan: {formatTimeAgo(project.last_scan_at)}
@@ -643,79 +643,11 @@ export default function ProjectDetailPage() {
                 </TabsList>
 
                 <TabsContent value="scan" className="space-y-6">
-                    {/* Fix workflow banner */}
-                    {canShowFixBanner && activeScan && (
-                        <div className="p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div>
-                                    {activeScan.fix_status === "pr_opened" ? (
-                                        <>
-                                            <p className="text-[13px] font-medium text-emerald-300">Fix PR ready for review</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Pull request #{activeScan.fix_pr_number || "—"} is open on GitHub. Merge it, then click Done here.
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-[13px] font-medium text-emerald-300">Fix Workflow Available</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {activeIssueCount} issues detected. Choose Suggest Fix to open the dedicated remediation workspace.
-                                            </p>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {activeScan.fix_status === "pr_opened" ? (
-                                    <>
-                                        {activeScan.fix_pr_url && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 text-xs px-3"
-                                                onClick={() => window.open(activeScan.fix_pr_url as string, "_blank")}
-                                            >
-                                                <ExternalLink className="h-3 w-3 mr-1.5" />
-                                                View PR
-                                            </Button>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                            onClick={() => updateFixStatus("done")}
-                                            disabled={isUpdatingFixStatus}
-                                        >
-                                            {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs px-3"
-                                            onClick={() => updateFixStatus("dismiss")}
-                                            disabled={isUpdatingFixStatus}
-                                        >
-                                            {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                            onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
-                                        >
-                                            Suggest Fix
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
                         {/* Scan history sidebar */}
                         {scans.length > 0 && (
-                            <div className="w-48 shrink-0 space-y-1">
+                            <div className="w-full sm:w-48 shrink-0 space-y-1">
                                 <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
                                     Scan History
                                 </div>
@@ -779,7 +711,7 @@ export default function ProjectDetailPage() {
                         )}
 
                         {/* Scan log */}
-                        <div className="flex-1 bg-card border border-border/40 rounded-md overflow-hidden">
+                        <div className="flex-1 sm:mt-6 bg-card border border-border/40 rounded-md overflow-hidden">
                             <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
@@ -951,6 +883,55 @@ export default function ProjectDetailPage() {
                                     </div>
                                 )}
                             </div>
+                            {canShowFixBanner && activeScan && (
+                                <>
+                                    <div className="border-t border-border/40" />
+                                    <div className="px-4 py-3 flex items-center justify-between gap-2">
+                                        {activeScan.fix_status === "pr_opened" ? (
+                                            <>
+                                                {activeScan.fix_pr_url && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 text-xs px-3"
+                                                        onClick={() => window.open(activeScan.fix_pr_url as string, "_blank")}
+                                                    >
+                                                        <ExternalLink className="h-3 w-3 mr-1.5" />
+                                                        View PR
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                                    onClick={() => updateFixStatus("done")}
+                                                    disabled={isUpdatingFixStatus}
+                                                >
+                                                    {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-7 text-xs px-3"
+                                                    onClick={() => updateFixStatus("dismiss")}
+                                                    disabled={isUpdatingFixStatus}
+                                                >
+                                                    {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                                    onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
+                                                >
+                                                    Suggest Fix
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </TabsContent>
@@ -1160,7 +1141,7 @@ export default function ProjectDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="changelog">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                         <div>
                             <h2 className="text-[13px] font-medium">Changelog</h2>
                             <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
