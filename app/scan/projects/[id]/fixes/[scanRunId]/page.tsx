@@ -663,9 +663,7 @@ export default function FixWorkspacePage() {
                                 <div className="mb-2">
                                     <ScanThinkingIndicator finished={aiHasStarted} />
                                 </div>
-                                <div className="prose prose-sm dark:prose-invert max-w-none">
-                                    {message.content && <MarkdownRenderer content={message.content} />}
-                                </div>
+                                {message.content && <MarkdownRenderer content={message.content} />}
                             </div>
                         )
                     )}
