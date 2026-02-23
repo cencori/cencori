@@ -587,8 +587,8 @@ export default function FixWorkspacePage() {
 
     if (loading) {
         return (
-            <div className="w-full max-w-6xl mx-auto px-6 py-16">
-                <ScanThinkingIndicator phase="loading" />
+            <div className="flex h-screen flex-col items-start justify-center w-full max-w-3xl mx-auto px-6">
+                <ScanThinkingIndicator />
             </div>
         );
     }
@@ -604,67 +604,43 @@ export default function FixWorkspacePage() {
         );
     }
 
+    // True once the first AI message has content (stream started)
+    const aiHasStarted = chatMessages.some((m) => m.role === "assistant" && m.content.length > 0);
+    // True once all AI messages are done streaming
+    const aiIsDone = chatMessages.length > 0 && chatMessages.every((m) => !m.isStreaming);
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    const lastIsAssistant = lastMessage?.role === "assistant";
+
     return (
         <>
-            <div className="w-full max-w-6xl mx-auto px-6 py-8 pb-56">
-                <div className="flex items-center justify-between gap-4">
-                    <Link href={`/scan/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                        <ArrowLeft className="h-3 w-3" />
-                        Back to project
-                    </Link>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs px-3"
-                            onClick={() => updateWorkflowStatus("dismiss")}
-                            disabled={updatingStatus}
-                        >
-                            {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
-                        </Button>
-                        <Button
-                            size="sm"
-                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                            onClick={() => updateWorkflowStatus("done")}
-                            disabled={updatingStatus}
-                        >
-                            {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
-                        </Button>
-                    </div>
-                </div>
+            {/* ── Main chat content ───────────────────────────────────── */}
+            <div className="w-full max-w-3xl mx-auto px-6 py-8 pb-40">
 
-                <div className="mt-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-base font-medium">Fix Workspace</h1>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
-                            {project.github_repo_full_name}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {issues.length} issues
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {fixes.length} auto-fixable
-                        </Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        Review streamed remediation guidance, inspect diffs in the dialog, then open a branch-based PR.
-                    </p>
-                </div>
+                {/* Header: back link only */}
+                <Link
+                    href={`/scan/projects/${projectId}`}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-10"
+                >
+                    <ArrowLeft className="h-3 w-3" />
+                    Back to project
+                </Link>
 
+                {/* Error banner */}
                 {error && (
-                    <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                    <div className="mb-6 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
                         {error}
                     </div>
                 )}
 
+                {/* PR success banner */}
                 {prInfo && (
-                    <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 flex items-center justify-between gap-2">
-                        <span>PR #{prInfo.number} created successfully.</span>
+                    <div className="mb-6 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 flex items-center justify-between gap-2">
+                        <span>PR #{prInfo.number} created — branch pushed to GitHub.</span>
                         <Button
                             size="sm"
                             variant="outline"
                             className="h-7 text-xs px-3"
-                            onClick={() => window.open(prInfo.url, "_blank")}
+                            onClick={() => prInfo.url && window.open(prInfo.url, "_blank")}
                         >
                             <ExternalLink className="h-3 w-3 mr-1.5" />
                             Open on GitHub
@@ -672,163 +648,83 @@ export default function FixWorkspacePage() {
                     </div>
                 )}
 
-                {/* ── Chat area ─────────────────────────────────────────── */}
-                <div className="mt-4 space-y-6">
-                    {/* Initial user request bubble */}
+                {/* Chat thread */}
+                <div className="space-y-8">
+
+                    {/* Initial user bubble */}
                     <div className="flex justify-end">
-                        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
+                        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
                             <p className="text-sm">Generate a full remediation plan for this scan.</p>
                         </div>
                     </div>
 
-                    {/* ScanThinkingIndicator while waiting for first suggestions token */}
-                    {loadingFixes && chatMessages.length === 0 && (
-                        <ScanThinkingIndicator phase="generating" />
+                    {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
+                    {(loading || loadingFixes) && !aiHasStarted && (
+                        <ScanThinkingIndicator finished={false} />
                     )}
 
-                    {/* Unified chat messages */}
-                    {chatMessages.map((message, idx) => (
+                    {/* AI messages */}
+                    {chatMessages.map((message, idx) =>
                         message.role === "user" ? (
                             <div key={`msg-${idx}`} className="flex justify-end">
-                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
+                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
                                     <p className="text-sm">{message.content}</p>
                                 </div>
                             </div>
                         ) : (
-                            <div key={`msg-${idx}`} className="space-y-2">
-                                <div className="mb-2">
-                                    <ScanThinkingIndicator
-                                        phase={idx === 0 ? "streaming" : "chat"}
-                                        finished={!message.isStreaming}
-                                    />
-                                </div>
+                            <div key={`msg-${idx}`} className="space-y-3">
+                                <ScanThinkingIndicator finished={aiHasStarted} />
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                     {message.content && <MarkdownRenderer content={message.content} />}
                                 </div>
                             </div>
                         )
-                    ))}
+                    )}
+
+                    {/* Post-AI actions: Create PR + Show Diffs — appear after stream completes */}
+                    {aiIsDone && lastIsAssistant && fixes.length > 0 && (
+                        <div className="flex items-center gap-3 pt-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs px-4"
+                                onClick={() => setDiffDialogOpen(true)}
+                            >
+                                Review diffs ({fixes.length})
+                            </Button>
+                            {scanRun.fix_status === "pr_opened" && scanRun.fix_pr_url ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs px-4"
+                                    onClick={() => window.open(scanRun.fix_pr_url as string, "_blank")}
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                                    Open PR
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600"
+                                    onClick={handleCreatePr}
+                                    disabled={creatingPr || selectedFixes.length === 0}
+                                >
+                                    {creatingPr ? (
+                                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    ) : (
+                                        <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
+                                    )}
+                                    Create PR ({selectedFixes.length})
+                                </Button>
+                            )}
+                        </div>
+                    )}
 
                     <div ref={messagesEndRef} />
                 </div>
-
-                <div className="mt-6 space-y-3">
-                    {loadingFixes ? (
-                        <div className="rounded-md border border-border/40 p-4 text-xs text-muted-foreground flex items-center gap-2">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Generating detailed fixes...
-                        </div>
-                    ) : (
-                        issues.map((issue) => {
-                            const key = issueKey(issue);
-                            const fix = fixMap.get(key);
-                            const guidance = guidanceMap.get(key);
-                            const selected = selectedIssueKey === key;
-                            return (
-                                <div
-                                    key={key}
-                                    className={cn(
-                                        "rounded-md border p-3 transition-colors cursor-pointer",
-                                        selected ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/40 bg-card/50"
-                                    )}
-                                    onClick={() => setSelectedIssueKey(key)}
-                                >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-medium truncate">{issue.name}</p>
-                                            <p className="text-[11px] text-muted-foreground font-mono truncate mt-0.5">
-                                                {issue.file}:{issue.line}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <Badge
-                                                variant="outline"
-                                                className={cn("text-[10px] h-5", severityBadgeStyles[issue.severity] || "")}
-                                            >
-                                                {issue.severity}
-                                            </Badge>
-                                            {fix ? (
-                                                <Badge variant="outline" className="text-[10px] h-5 border-emerald-500/30 text-emerald-300">
-                                                    {fix.strategy === "ai" ? "AI fix" : "Auto fix"}
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="text-[10px] h-5 border-yellow-500/30 text-yellow-300">
-                                                    Manual
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <p className="mt-2 text-[11px] text-muted-foreground break-words">{issue.match}</p>
-                                    {issue.description && (
-                                        <p className="mt-1 text-[11px] text-muted-foreground">{issue.description}</p>
-                                    )}
-
-                                    {fix && (
-                                        <div className="mt-2 rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <p className="text-[11px] text-emerald-200">{fix.explanation}</p>
-                                                <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-6 text-[10px] px-2"
-                                                        onClick={() => {
-                                                            setSelectedIssueKey(key);
-                                                            setDiffDialogOpen(true);
-                                                        }}
-                                                    >
-                                                        View diff
-                                                    </Button>
-                                                    <label className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedFixIds.has(fix.id)}
-                                                            onChange={() => toggleFixSelection(fix.id)}
-                                                            className="h-3 w-3 rounded border-border bg-transparent"
-                                                        />
-                                                        Include
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {!fix && guidance && (
-                                        <div className="mt-2 rounded border border-yellow-500/20 bg-yellow-500/5 p-2">
-                                            <p className="text-[11px] text-yellow-200">{guidance.summary}</p>
-                                            {guidance.steps.length > 0 && (
-                                                <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
-                                                    {guidance.steps.map((step, idx) => (
-                                                        <li key={`${key}-step-${idx}`}>{step}</li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-
-                {issues.length === 0 && (
-                    <div className="mt-6 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-200 flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 mt-0.5" />
-                        <span>No issues were found in this scan run. Mark as Done to return to the project.</span>
-                    </div>
-                )}
-
-                {!loadingFixes && issues.length > 0 && fixes.length === 0 && (
-                    <div className="mt-4 rounded-md border border-yellow-500/20 bg-yellow-500/5 p-4 text-xs text-yellow-200 flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 mt-0.5" />
-                        <span>
-                            Issues were detected, but no safe auto-fix was generated. Use manual guidance and chat to plan remediation.
-                        </span>
-                    </div>
-                )}
             </div>
 
+            {/* ── Diff dialog ─────────────────────────────────────────── */}
             <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
                 <DialogContent className="max-w-5xl p-0">
                     <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/40">
@@ -847,9 +743,7 @@ export default function FixWorkspacePage() {
                                 <div key={`diff-${fix.id}`} className="rounded-md border border-border/40 p-3 mt-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="min-w-0">
-                                            <p className="text-xs font-medium truncate">
-                                                {fix.issueName}
-                                            </p>
+                                            <p className="text-xs font-medium truncate">{fix.issueName}</p>
                                             <p className="text-[11px] text-muted-foreground font-mono truncate">
                                                 {fix.file}:{fix.line}
                                             </p>
@@ -883,48 +777,9 @@ export default function FixWorkspacePage() {
                 </DialogContent>
             </Dialog>
 
-            <div className="fixed bottom-0 left-0 right-0 border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-                <div className="w-full max-w-6xl mx-auto px-6 py-3 space-y-3">
-                    {/* Action row */}
-                    <div className="flex items-center justify-between gap-3">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs px-4"
-                            onClick={() => setDiffDialogOpen(true)}
-                            disabled={fixes.length === 0}
-                        >
-                            Show Diffs ({fixesForDiffDialog.length})
-                        </Button>
-                        <div className="flex items-center gap-2">
-                            {scanRun.fix_status === "pr_opened" && scanRun.fix_pr_url && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs px-4"
-                                    onClick={() => window.open(scanRun.fix_pr_url as string, "_blank")}
-                                >
-                                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                                    Open PR
-                                </Button>
-                            )}
-                            <Button
-                                size="sm"
-                                className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600"
-                                onClick={handleCreatePr}
-                                disabled={creatingPr || selectedFixes.length === 0}
-                            >
-                                {creatingPr ? (
-                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                ) : (
-                                    <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
-                                )}
-                                Create PR ({selectedFixes.length})
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Chat input — pill style matching AskAISidebar */}
+            {/* ── Fixed bottom input bar ──────────────────────────────── */}
+            <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+                <div className="w-full max-w-3xl mx-auto px-6 py-4">
                     <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
                         <textarea
                             value={chatInput}
@@ -961,8 +816,10 @@ export default function FixWorkspacePage() {
                             )}
                         </div>
                     </div>
+                    <p className="text-center text-[10px] text-muted-foreground/50 mt-2">Powered by Cencori AI</p>
                 </div>
             </div>
         </>
     );
 }
+
