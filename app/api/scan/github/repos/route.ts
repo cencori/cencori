@@ -25,18 +25,31 @@ export async function GET() {
         // Collect installation IDs from multiple sources
         const installationIds: Set<number> = new Set();
 
-        // 1. Get installations linked to user's organizations
-        const { data: userOrgs } = await supabaseAdmin
+        // 1a. Get installations linked to organizations the user owns
+        const { data: ownedOrgs } = await supabaseAdmin
             .from('organizations')
             .select('id')
             .eq('owner_id', user.id);
 
-        if (userOrgs && userOrgs.length > 0) {
-            const orgIds = userOrgs.map(o => o.id);
+        // 1b. Get installations linked to organizations the user is a member of
+        const { data: membershipRows } = await supabaseAdmin
+            .from('organization_members')
+            .select('organization_id')
+            .eq('user_id', user.id);
+
+        const orgIds = new Set<string>();
+        ownedOrgs?.forEach((org) => orgIds.add(org.id));
+        membershipRows?.forEach((membership) => {
+            if (membership.organization_id) {
+                orgIds.add(membership.organization_id);
+            }
+        });
+
+        if (orgIds.size > 0) {
             const { data: links } = await supabaseAdmin
                 .from('organization_github_installations')
                 .select('installation_id')
-                .in('organization_id', orgIds);
+                .in('organization_id', Array.from(orgIds));
 
             links?.forEach(l => installationIds.add(l.installation_id));
         }
