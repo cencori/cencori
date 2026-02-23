@@ -15,11 +15,16 @@ import {
     ArrowLeft,
     ArrowUp,
     ChevronDown,
+    Copy,
     ExternalLink,
     GitPullRequest,
     Loader2,
+    RotateCcw,
     StopCircle,
+    ThumbsDown,
+    ThumbsUp,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ScanIssue {
     type: string;
@@ -96,6 +101,7 @@ interface ChatMessage {
     role: "user" | "assistant";
     content: string;
     isStreaming?: boolean;
+    isError?: boolean;
 }
 
 const severityBadgeStyles: Record<string, string> = {
@@ -612,7 +618,7 @@ export default function FixWorkspacePage() {
                     const next = [...prev];
                     const last = next[next.length - 1];
                     if (last?.role === "assistant" && last.isStreaming) {
-                        next[next.length - 1] = { role: "assistant", content: "Chat request failed. Please try again.", isStreaming: false };
+                        next[next.length - 1] = { role: "assistant", content: "Sorry, I encountered an error. Please try again.", isStreaming: false, isError: true };
                     }
                     return next;
                 });
@@ -706,12 +712,53 @@ export default function FixWorkspacePage() {
                                 </div>
                             </div>
                         ) : (
-                            <div key={`msg-${idx}`} className="w-full max-w-none space-y-2">
+                            <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
                                     <ScanThinkingIndicator finished={!message.isStreaming} />
                                 </div>
                                 {message.content && (
-                                    <ScanMarkdownRenderer content={message.content} />
+                                    message.isError ? (
+                                        <div className="inline-flex items-center gap-2 text-sm text-red-400/90 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                                            <span>{message.content}</span>
+                                        </div>
+                                    ) : (
+                                        <ScanMarkdownRenderer content={message.content} />
+                                    )
+                                )}
+                                {!message.isStreaming && message.content && (
+                                    <div className="flex items-center gap-0.5 pt-1">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Helpful">
+                                            <ThumbsUp className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Not helpful">
+                                            <ThumbsDown className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost" size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                            title="Copy"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(message.content);
+                                                toast.success("Copied");
+                                            }}
+                                        >
+                                            <Copy className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost" size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                            title="Retry"
+                                            onClick={() => {
+                                                const lastUser = [...chatMessages].reverse().find(m => m.role === "user");
+                                                if (lastUser) {
+                                                    setChatInput(lastUser.content);
+                                                    setTimeout(() => void handleSendChat(), 0);
+                                                }
+                                            }}
+                                        >
+                                            <RotateCcw className="h-3 w-3" />
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         )
