@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { randomUUID } from 'crypto';
 
 interface RouteParams {
@@ -24,11 +25,29 @@ export interface FixProposal {
 
 interface ScanIssue {
     type: string;
+    category?: string;
     severity: string;
     name: string;
     match: string;
     line: number;
     file: string;
+    description?: string;
+}
+
+interface IssueTypeCount {
+    type: string;
+    count: number;
+}
+
+interface ManualGuidance {
+    issueKey: string;
+    issueType: string;
+    issueName: string;
+    severity: string;
+    file: string;
+    line: number;
+    summary: string;
+    steps: string[];
 }
 
 // ─── Deterministic Fix Templates ────────────────────────────────────────
@@ -58,12 +77,18 @@ function tryDeterministicFix(
         case 'OpenAI API Key':
         case 'OpenAI Project Key':
         case 'Anthropic API Key':
-        case 'Google AI Key':
-        case 'AWS Access Key':
-        case 'GitHub Token':
+        case 'Google API Key':
+        case 'AWS Access Key ID':
+        case 'AWS Secret Access Key':
+        case 'GitHub Personal Access Token':
+        case 'GitHub OAuth Token':
         case 'Stripe Secret Key':
-        case 'Generic Secret':
-        case 'Hardcoded Password': {
+        case 'Supabase Service Role Key':
+        case 'JWT Secret Assignment':
+        case 'OAuth Client Secret':
+        case 'Google Client Secret':
+        case 'Generic API Key Assignment':
+        case 'Password Assignment': {
             const envVar = deriveEnvVarName(issue.name);
             const fixedSnippet = replaceSecretWithEnvVar(snippet, issue, envVar);
             if (fixedSnippet && fixedSnippet !== snippet) {
@@ -90,7 +115,7 @@ function tryDeterministicFix(
             return null;
         }
 
-        case 'XSS (innerHTML)': {
+        case 'Direct innerHTML Assignment': {
             const fixedSnippet = snippet.replace(
                 /\.innerHTML\s*=/g,
                 '.textContent ='
@@ -104,8 +129,9 @@ function tryDeterministicFix(
             return null;
         }
 
-        case 'eval() Usage':
-        case 'SQL Injection':
+        case 'Eval Usage':
+        case 'SQL String Concatenation':
+        case 'SQL String Addition':
             return null;
 
         default:
@@ -132,6 +158,130 @@ function replaceSecretWithEnvVar(snippet: string, issue: ScanIssue, envVar: stri
     if (fixedLine === targetLine) return null;
     lines[issueLineIndex] = fixedLine;
     return lines.join('\n');
+}
+
+function issueKey(issue: ScanIssue): string {
+    return `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
+}
+
+function summarizeIssueTypes(issues: ScanIssue[]): IssueTypeCount[] {
+    const counts = new Map<string, number>();
+    for (const issue of issues) {
+        const label = issue.name || issue.type || 'Unknown issue';
+        counts.set(label, (counts.get(label) || 0) + 1);
+    }
+
+    return [...counts.entries()]
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return a.type.localeCompare(b.type);
+        });
+}
+
+function buildManualGuidance(issue: ScanIssue): ManualGuidance {
+    const shared = {
+        issueKey: issueKey(issue),
+        issueType: issue.type,
+        issueName: issue.name,
+        severity: issue.severity,
+        file: issue.file,
+        line: issue.line,
+    };
+
+    if (issue.type === 'secret') {
+        return {
+            ...shared,
+            summary: issue.description || 'Secret-like value detected. Move it to environment variables and rotate exposed credentials.',
+            steps: [
+                'Move the secret to an environment variable and remove it from committed source.',
+                'Rotate the compromised credential in the provider dashboard.',
+                'Add secret scanning and pre-commit checks to block re-introduction.',
+            ],
+        };
+    }
+
+    if (issue.type === 'pii') {
+        return {
+            ...shared,
+            summary: issue.description || 'Potential personal data detected in source.',
+            steps: [
+                'Remove or anonymize personal data from committed code and fixtures.',
+                'Use synthetic test data for examples and tests.',
+                'Review logs and telemetry to ensure PII is not emitted downstream.',
+            ],
+        };
+    }
+
+    if (issue.type === 'route') {
+        return {
+            ...shared,
+            summary: issue.description || 'Potentially exposed route detected; verify authorization and rate limiting.',
+            steps: [
+                'Require authentication and role checks before business logic executes.',
+                'Apply request validation and strict input schemas.',
+                'Add route-level tests for unauthorized and malformed requests.',
+            ],
+        };
+    }
+
+    if (issue.name === 'SQL String Concatenation' || issue.name === 'SQL String Addition') {
+        return {
+            ...shared,
+            summary: issue.description || 'Potential SQL injection pattern detected.',
+            steps: [
+                'Replace string interpolation with parameterized queries.',
+                'Validate and constrain user-supplied identifiers or sort fields.',
+                'Add negative tests that include common injection payloads.',
+            ],
+        };
+    }
+
+    if (issue.name === 'React dangerouslySetInnerHTML' || issue.name === 'Direct innerHTML Assignment') {
+        return {
+            ...shared,
+            summary: issue.description || 'Potential XSS sink detected.',
+            steps: [
+                'Avoid raw HTML rendering where possible; use plain text APIs.',
+                'If HTML is required, sanitize with a vetted sanitizer (e.g., DOMPurify).',
+                'Add tests for script injection payloads.',
+            ],
+        };
+    }
+
+    if (issue.name === 'Eval Usage' || issue.name === 'Function Constructor') {
+        return {
+            ...shared,
+            summary: issue.description || 'Dynamic code execution pattern detected.',
+            steps: [
+                'Replace eval/new Function with explicit parsers or lookup tables.',
+                'Treat untrusted input as data, never executable code.',
+                'Add static checks to block eval-like constructs in CI.',
+            ],
+        };
+    }
+
+    if (issue.type === 'config') {
+        return {
+            ...shared,
+            summary: issue.description || 'Sensitive configuration file is tracked in the repository.',
+            steps: [
+                'Remove secrets from tracked config files and move them to environment variables.',
+                'Update .gitignore to block local secret files.',
+                'Rotate any credential that may already be exposed.',
+            ],
+        };
+    }
+
+    return {
+        ...shared,
+        summary: issue.description || 'Manual security review is recommended for this finding.',
+        steps: [
+            'Review the surrounding code path and trust boundaries.',
+            'Apply the least-privilege, validated-input, and secure-default principles.',
+            'Add regression tests covering the exploit scenario.',
+        ],
+    };
 }
 
 // ─── AI Fix Generation (batched, with timeout) ──────────────────────────
@@ -300,12 +450,31 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     if (issues.length === 0) {
         console.log('[Fix Gen] No issues to fix');
-        return NextResponse.json({ fixes: [], message: 'No issues to fix' });
+        return NextResponse.json({
+            fixes: [],
+            totalIssues: 0,
+            fixesGenerated: 0,
+            deterministicCount: 0,
+            aiCount: 0,
+            unfixableIssueCount: 0,
+            unfixableIssueTypes: [],
+            manualGuidance: [],
+            manualReviewRequired: false,
+            message: 'No issues found in this scan run.',
+        });
     }
 
     // ─── Fetch file contents in PARALLEL ────────────────────────────
-    const octokit = await getInstallationOctokit(project.github_installation_id);
-    const [owner, repo] = project.github_repo_full_name.split('/');
+    const githubAccess = await verifyProjectGithubAccess(user, project);
+    if (!githubAccess) {
+        return NextResponse.json(
+            { error: 'GitHub access for this project is no longer authorized' },
+            { status: 403 }
+        );
+    }
+
+    const octokit = await getInstallationOctokit(githubAccess.installationId);
+    const [owner, repo] = githubAccess.repository.fullName.split('/');
 
     const uniqueFiles = [...new Set(issues.map(i => i.file))];
     console.log(`[Fix Gen] Fetching ${uniqueFiles.length} files in parallel...`);
@@ -349,6 +518,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     // ─── Phase 1: Deterministic fixes (instant) ─────────────────────
     const fixes: FixProposal[] = [];
     const aiInputs: AIFixInput[] = [];
+    const resolvedIssueKeys = new Set<string>();
 
     for (const issue of issues) {
         const fileContent = fileContents.get(issue.file);
@@ -378,6 +548,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 fixedCode: deterministicFix.fixedCode,
                 explanation: deterministicFix.explanation,
             });
+            resolvedIssueKeys.add(issueKey(issue));
         } else {
             // Queue for batched AI processing
             aiInputs.push({ issue, snippet });
@@ -408,18 +579,35 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     fixedCode: aiFix.fixedCode,
                     explanation: aiFix.explanation,
                 });
+                resolvedIssueKeys.add(issueKey(issue));
             }
         }
     }
 
+    const unfixableIssues = issues.filter((issue) => !resolvedIssueKeys.has(issueKey(issue)));
+    const unfixableIssueTypes = summarizeIssueTypes(unfixableIssues);
+    const manualGuidance = unfixableIssues.map(buildManualGuidance);
+    const deterministicCount = fixes.filter((fix) => fix.strategy === 'deterministic').length;
+    const aiCount = fixes.filter((fix) => fix.strategy === 'ai').length;
+    const manualReviewRequired = unfixableIssues.length > 0;
+
     const totalTime = Date.now() - startTime;
-    console.log(`[Fix Gen] Complete in ${totalTime}ms: ${fixes.length} fixes (${fixes.filter(f => f.strategy === 'deterministic').length} deterministic, ${fixes.filter(f => f.strategy === 'ai').length} AI)`);
+    console.log(
+        `[Fix Gen] Complete in ${totalTime}ms: ${fixes.length} fixes (${deterministicCount} deterministic, ${aiCount} AI, ${unfixableIssues.length} manual review)`
+    );
 
     return NextResponse.json({
         fixes,
         totalIssues: issues.length,
         fixesGenerated: fixes.length,
-        deterministicCount: fixes.filter(f => f.strategy === 'deterministic').length,
-        aiCount: fixes.filter(f => f.strategy === 'ai').length,
+        deterministicCount,
+        aiCount,
+        unfixableIssueCount: unfixableIssues.length,
+        unfixableIssueTypes,
+        manualGuidance,
+        manualReviewRequired,
+        message: fixes.length === 0
+            ? `Detected ${issues.length} issue${issues.length === 1 ? '' : 's'}, but no safe auto-fix was generated.`
+            : undefined,
     });
 }

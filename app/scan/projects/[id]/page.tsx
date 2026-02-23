@@ -19,10 +19,10 @@ import {
     ArrowLeft,
     Trash2,
     Copy,
-    Download
+    Download,
+    ExternalLink
 } from "lucide-react";
 import Link from "next/link";
-import { FixPreviewSheet } from "@/components/scan/FixPreviewSheet";
 
 interface ScanProject {
     id: string;
@@ -137,6 +137,10 @@ interface ScanRun {
     scan_duration_ms: number;
     results?: ScanResultPayload;
     logs?: Array<{ type: string; time: number; message?: string; data?: unknown }>;
+    fix_status?: "pending" | "dismissed" | "pr_opened" | "done" | "not_applicable";
+    fix_pr_url?: string | null;
+    fix_pr_number?: number | null;
+    fix_branch_name?: string | null;
 }
 
 interface Changelog {
@@ -209,7 +213,7 @@ export default function ProjectDetailPage() {
     const [baselineScanId, setBaselineScanId] = useState<string>("");
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
-    const [fixSheetOpen, setFixSheetOpen] = useState(false);
+    const [isUpdatingFixStatus, setIsUpdatingFixStatus] = useState(false);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
@@ -476,6 +480,10 @@ export default function ProjectDetailPage() {
                             scan_duration_ms: result.scanDurationMs,
                             results: { issues: result.issues, summary: result.summary, research: result.research },
                             created_at: new Date().toISOString(),
+                            fix_status: result.issuesFound > 0 ? "pending" : "not_applicable",
+                            fix_pr_url: null,
+                            fix_pr_number: null,
+                            fix_branch_name: null,
                         });
 
                         // Refresh project data
@@ -544,6 +552,37 @@ export default function ProjectDetailPage() {
     }
 
     const score = project.last_scan_score || currentScan?.score;
+    const activeScan = currentScan || scans[0] || null;
+    const activeIssueCount = activeScan?.issues_found ?? project.last_scan_issues;
+    const canShowFixBanner = Boolean(
+        activeScan &&
+        activeScan.status === "completed" &&
+        activeIssueCount > 0 &&
+        activeScan.fix_status !== "dismissed" &&
+        activeScan.fix_status !== "done"
+    );
+
+    const updateFixStatus = async (action: "dismiss" | "done" | "reopen") => {
+        if (!activeScan) return;
+        setIsUpdatingFixStatus(true);
+        try {
+            const response = await fetch(`/api/scan/projects/${projectId}/fixes/${activeScan.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+            const updatedScan = data.scanRun as ScanRun;
+            setCurrentScan((prev) => (prev?.id === updatedScan.id ? { ...prev, ...updatedScan } : prev));
+            setScans((prev) => prev.map((scan) => (scan.id === updatedScan.id ? { ...scan, ...updatedScan } : scan)));
+        } finally {
+            setIsUpdatingFixStatus(false);
+        }
+    };
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
@@ -604,33 +643,74 @@ export default function ProjectDetailPage() {
                 </TabsList>
 
                 <TabsContent value="scan" className="space-y-6">
-                    {/* Auto-fix banner */}
-                    {(project.last_scan_issues > 0 || (currentScan?.issues_found || 0) > 0) && (
+                    {/* Fix workflow banner */}
+                    {canShowFixBanner && activeScan && (
                         <div className="p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div>
-                                    <p className="text-[13px] font-medium text-emerald-300">Auto-fix available</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {currentScan?.issues_found || project.last_scan_issues} issues can be automatically fixed
-                                    </p>
+                                    {activeScan.fix_status === "pr_opened" ? (
+                                        <>
+                                            <p className="text-[13px] font-medium text-emerald-300">Fix PR ready for review</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Pull request #{activeScan.fix_pr_number || "—"} is open on GitHub. Merge it, then click Done here.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-[13px] font-medium text-emerald-300">Fix Workflow Available</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {activeIssueCount} issues detected. Choose Suggest Fix to open the dedicated remediation workspace.
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                            <Button
-                                size="sm"
-                                className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                onClick={() => setFixSheetOpen(true)}
-                            >
-                                Create Fix PR
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {activeScan.fix_status === "pr_opened" ? (
+                                    <>
+                                        {activeScan.fix_pr_url && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs px-3"
+                                                onClick={() => window.open(activeScan.fix_pr_url as string, "_blank")}
+                                            >
+                                                <ExternalLink className="h-3 w-3 mr-1.5" />
+                                                View PR
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                            onClick={() => updateFixStatus("done")}
+                                            disabled={isUpdatingFixStatus}
+                                        >
+                                            {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs px-3"
+                                            onClick={() => updateFixStatus("dismiss")}
+                                            disabled={isUpdatingFixStatus}
+                                        >
+                                            {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                            onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
+                                        >
+                                            Suggest Fix
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     )}
-
-                    <FixPreviewSheet
-                        open={fixSheetOpen}
-                        onOpenChange={setFixSheetOpen}
-                        projectId={projectId}
-                        scanRunId={currentScan?.id || scans[0]?.id || null}
-                    />
 
                     <div className="flex gap-4">
                         {/* Scan history sidebar */}

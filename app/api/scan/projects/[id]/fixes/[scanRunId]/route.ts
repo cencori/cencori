@@ -1,0 +1,111 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@/lib/supabaseServer";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+
+interface RouteParams {
+    params: Promise<{ id: string; scanRunId: string }>;
+}
+
+async function requireProjectOwnership(projectId: string) {
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { data: project, error: projectError } = await supabaseAdmin
+        .from("scan_projects")
+        .select("*")
+        .eq("id", projectId)
+        .eq("user_id", user.id)
+        .single();
+
+    if (projectError || !project) {
+        return { error: NextResponse.json({ error: "Project not found" }, { status: 404 }) };
+    }
+
+    return { user, project, supabaseAdmin };
+}
+
+export async function GET(_req: NextRequest, { params }: RouteParams) {
+    const { id, scanRunId } = await params;
+    const auth = await requireProjectOwnership(id);
+    if ("error" in auth) return auth.error;
+
+    const { supabaseAdmin, project } = auth;
+    const { data: scanRun, error: scanError } = await supabaseAdmin
+        .from("scan_runs")
+        .select("*")
+        .eq("id", scanRunId)
+        .eq("project_id", id)
+        .single();
+
+    if (scanError || !scanRun) {
+        return NextResponse.json({ error: "Scan run not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+        project: {
+            id: project.id,
+            github_repo_full_name: project.github_repo_full_name,
+            github_repo_url: project.github_repo_url,
+        },
+        scanRun,
+    });
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
+    const { id, scanRunId } = await params;
+    const auth = await requireProjectOwnership(id);
+    if ("error" in auth) return auth.error;
+
+    const { supabaseAdmin } = auth;
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action;
+
+    let updates: Record<string, unknown> | null = null;
+    const now = new Date().toISOString();
+
+    if (action === "dismiss") {
+        updates = {
+            fix_status: "dismissed",
+            fix_dismissed_at: now,
+            fix_done_at: null,
+        };
+    } else if (action === "done") {
+        updates = {
+            fix_status: "done",
+            fix_done_at: now,
+        };
+    } else if (action === "reopen") {
+        updates = {
+            fix_status: "pending",
+            fix_dismissed_at: null,
+            fix_done_at: null,
+        };
+    }
+
+    if (!updates) {
+        return NextResponse.json(
+            { error: "Invalid action. Supported actions: dismiss, done, reopen" },
+            { status: 400 }
+        );
+    }
+
+    const { data: scanRun, error: updateError } = await supabaseAdmin
+        .from("scan_runs")
+        .update(updates)
+        .eq("id", scanRunId)
+        .eq("project_id", id)
+        .select("*")
+        .single();
+
+    if (updateError || !scanRun) {
+        return NextResponse.json({ error: "Failed to update fix workflow status" }, { status: 500 });
+    }
+
+    return NextResponse.json({ scanRun });
+}
+

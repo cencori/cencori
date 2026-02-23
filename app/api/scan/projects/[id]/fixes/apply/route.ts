@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -62,10 +63,29 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    console.log(`[Fix Apply] Project: ${project.github_repo_full_name}`);
+    const githubAccess = await verifyProjectGithubAccess(user, project);
+    if (!githubAccess) {
+        return NextResponse.json(
+            { error: 'GitHub access for this project is no longer authorized' },
+            { status: 403 }
+        );
+    }
 
-    const octokit = await getInstallationOctokit(project.github_installation_id);
-    const [owner, repo] = project.github_repo_full_name.split('/');
+    const { data: scanRun, error: scanRunError } = await supabaseAdmin
+        .from('scan_runs')
+        .select('id')
+        .eq('id', scanRunId)
+        .eq('project_id', id)
+        .single();
+
+    if (scanRunError || !scanRun) {
+        return NextResponse.json({ error: 'Scan run not found' }, { status: 404 });
+    }
+
+    console.log(`[Fix Apply] Project: ${githubAccess.repository.fullName}`);
+
+    const octokit = await getInstallationOctokit(githubAccess.installationId);
+    const [owner, repo] = githubAccess.repository.fullName.split('/');
 
     try {
         // 1. Get default branch
@@ -87,14 +107,35 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         // 3. Create new branch
         const shortId = scanRunId.substring(0, 8);
-        const branchName = `cencori/fix-${shortId}`;
+        const branchSeed = Date.now().toString(36).slice(-6);
+        let branchName = `cencori/fix-${shortId}-${branchSeed}`;
+        let branchCreated = false;
 
-        await octokit.request('POST /repos/{owner}/{repo}/git/refs', {
-            owner,
-            repo,
-            ref: `refs/heads/${branchName}`,
-            sha: baseSha,
-        });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const candidate = attempt === 0
+                ? branchName
+                : `cencori/fix-${shortId}-${Date.now().toString(36).slice(-6)}-${attempt}`;
+            try {
+                await octokit.request('POST /repos/{owner}/{repo}/git/refs', {
+                    owner,
+                    repo,
+                    ref: `refs/heads/${candidate}`,
+                    sha: baseSha,
+                });
+                branchName = candidate;
+                branchCreated = true;
+                break;
+            } catch (branchErr) {
+                const status = (branchErr as { status?: number })?.status;
+                if (status !== 422 || attempt === 2) {
+                    throw branchErr;
+                }
+            }
+        }
+
+        if (!branchCreated) {
+            throw new Error('Failed to create a unique fix branch');
+        }
 
         console.log(`[Fix Apply] Created branch: ${branchName}`);
 
@@ -108,6 +149,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         // 5. Apply fixes file by file
         console.log(`[Fix Apply] Applying fixes across ${fixesByFile.size} files`);
+        let filesChanged = 0;
         for (const [filePath, fileFixes] of fixesByFile) {
             console.log(`[Fix Apply]   Updating ${filePath} (${fileFixes.length} fixes)`);
             try {
@@ -162,12 +204,20 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     sha: fileData.sha,
                     branch: branchName,
                 });
+                filesChanged += 1;
 
                 console.log(`[Fix Apply]   ✓ Committed ${filePath}`);
             } catch (fileError) {
                 console.error(`[Fix Apply]   ✗ Failed to update ${filePath}:`, fileError);
                 // Continue with other files
             }
+        }
+
+        if (filesChanged === 0) {
+            return NextResponse.json(
+                { error: 'No changes could be safely applied for this fix set' },
+                { status: 422 }
+            );
         }
 
         // 6. Create Pull Request
@@ -203,13 +253,26 @@ ${issuesSummary}
             base: defaultBranch,
         });
 
+        await supabaseAdmin
+            .from('scan_runs')
+            .update({
+                fix_status: 'pr_opened',
+                fix_pr_url: pr.html_url,
+                fix_pr_number: pr.number,
+                fix_branch_name: branchName,
+                fix_dismissed_at: null,
+                fix_done_at: null,
+            })
+            .eq('id', scanRunId)
+            .eq('project_id', id);
+
         console.log(`[Fix Apply] ✓ PR #${pr.number} created: ${pr.html_url}`);
 
         return NextResponse.json({
             prUrl: pr.html_url,
             prNumber: pr.number,
             branchName,
-            filesChanged: fixesByFile.size,
+            filesChanged,
             fixesApplied: fixes.length,
         });
 
