@@ -35,25 +35,30 @@ interface ScanRunResultsLike {
 }
 
 function buildFallbackAnswer(question: string, issue?: IssueContext, fix?: FixContext): string {
+    const lc = question.toLowerCase().trim();
+    const isGreeting = /^(hey|hi|hello|sup|yo|what'?s up|howdy|hiya)[\s!?.]*$/.test(lc);
+
+    if (isGreeting) {
+        return "Hey! I'm Cencori AI — your security scan assistant. Ask me anything about the findings, how to fix them, or anything else on your mind.";
+    }
+
     const parts: string[] = [];
 
     if (issue?.name) {
-        parts.push(`Issue: ${issue.name} (${issue.severity || "unknown severity"}) in ${issue.file || "unknown file"}${issue.line ? `:${issue.line}` : ""}.`);
+        parts.push(`**${issue.name}** (${issue.severity || "unknown severity"}) in \`${issue.file || "unknown file"}${issue.line ? `:${issue.line}` : ""}\`.`);
     }
 
     if (issue?.description) {
-        parts.push(`What this means: ${issue.description}`);
+        parts.push(issue.description);
     }
 
     if (fix?.explanation) {
-        parts.push(`Suggested fix rationale: ${fix.explanation}`);
+        parts.push(`**Suggested fix:** ${fix.explanation}`);
     }
 
-    parts.push("Recommended next steps:");
-    parts.push("1. Validate user-controlled inputs at entry points.");
-    parts.push("2. Apply context-appropriate escaping/parameterization before sinks.");
-    parts.push("3. Add regression tests for the exploit path and expected safe behavior.");
-    parts.push(`Question received: "${question}"`);
+    if (parts.length === 0) {
+        parts.push("I'm here to help with your security scan findings. What would you like to know?");
+    }
 
     return parts.join("\n\n");
 }
@@ -117,7 +122,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
     }
 
-    // Build prompt eagerly (pure string ops)
     const recentHistory = history.slice(-8)
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
         .join("\n");
@@ -126,38 +130,38 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         ? relatedIssues
             .map((si) => `- ${si.name || "unknown"} (${si.severity || "unknown"}) at ${si.file || "unknown"}:${si.line || 0}`)
             .join("\n")
-        : "n/a";
+        : "";
 
-    const prompt = `You are Cencori, a senior security engineer helping a teammate fix vulnerabilities.
-Answer with practical, code-focused guidance and natural conversational tone.
-Light humor is allowed when appropriate, but stay technical and precise.
-Prefer short concrete recommendations, mention likely root cause and safe remediation.
+    const hasIssueContext = !!(issue.name || issue.file || issue.type);
 
-Issue context:
+    const issueSection = hasIssueContext ? `
+Currently selected issue:
 - Name: ${issue.name || "unknown"}
 - Type: ${issue.type || "unknown"}
 - Severity: ${issue.severity || "unknown"}
 - Location: ${issue.file || "unknown"}${issue.line ? `:${issue.line}` : ""}
-- Detector description: ${issue.description || "n/a"}
-- Match excerpt: ${issue.match || "n/a"}
-- Related issues in file:
-${relatedIssueContext}
-- Repository AI summary: ${aiSummary || "n/a"}
+- Description: ${issue.description || "n/a"}
+- Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${aiSummary ? `\n- Repo AI summary: ${aiSummary}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
-Proposed fix context:
-- Explanation: ${fix.explanation || "n/a"}
+    const prompt = `You are Cencori AI — a sharp, friendly security engineer embedded in a code scanning tool.
 
-Conversation history:
-${recentHistory || "n/a"}
+Your role is twofold:
+1. Help users understand and remediate security vulnerabilities found in their code.
+2. Have normal, helpful conversations — answer questions, explain concepts, or just chat.
 
-User question:
-${question}
+Personality: confident, approachable, concise, occasionally witty. Read the room — if someone greets you or asks something casual, respond like a person, not a security lecture. If the question is technical, be precise and actionable.
 
-Respond in plain text with:
-1) concise answer
-2) why this matters
-3) what to do next
-4) if useful, include a tiny patch sketch`;
+For security questions:
+- Lead with the most useful insight
+- Be concrete and code-focused
+- Use markdown when it helps readability (bold key terms, code blocks, short lists)
+- Skip unnecessary preamble
+- Include a code snippet only when it genuinely helps${issueSection}
+
+Conversation so far:
+${recentHistory || "(none yet)"}
+
+User: ${question}`;
 
     const encoder = new TextEncoder();
     const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
