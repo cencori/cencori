@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +18,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
     AlertTriangle,
-    ArrowUp,
     ArrowLeft,
+    ArrowUp,
     CheckCircle2,
     ExternalLink,
     GitPullRequest,
     Loader2,
+    StopCircle,
 } from "lucide-react";
 
 interface ScanIssue {
@@ -673,50 +675,41 @@ export default function FixWorkspacePage() {
                     </div>
                 )}
 
-                <div className="mt-4 rounded-xl border border-border/40 bg-card/20 p-4 md:p-6">
-                    <div className="mx-auto max-w-4xl space-y-6">
-                        {/* Initial user request bubble */}
-                        <div className="flex justify-end">
-                            <div className="rounded-full border border-border/40 bg-secondary/80 px-4 py-2 text-sm text-foreground/95">
-                                Generate a full remediation plan for this scan.
-                            </div>
+                {/* ── Chat area ─────────────────────────────────────────── */}
+                <div className="mt-4 space-y-6">
+                    {/* Initial user request bubble */}
+                    <div className="flex justify-end">
+                        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
+                            <p className="text-sm">Generate a full remediation plan for this scan.</p>
                         </div>
-
-                        {/* Loading while generating fixes (before first stream message) */}
-                        {loadingFixes && chatMessages.length === 0 && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Preparing suggestion context...
-                            </div>
-                        )}
-
-                        {/* Unified chat: suggestions stream in as first assistant message, follow-up chat below */}
-                        {chatMessages.map((message, idx) => (
-                            message.role === "user" ? (
-                                <div key={`msg-${idx}`} className="flex justify-end">
-                                    <div className="max-w-[80%] rounded-full border border-border/40 bg-secondary/80 px-4 py-2 text-sm text-foreground/95">
-                                        {message.content}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div key={`msg-${idx}`} className="space-y-2">
-                                    <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                                        <span className="text-muted-foreground/60">›</span>
-                                        {message.isStreaming ? "Streaming" : "Complete"}
-                                    </p>
-                                    <div className="prose prose-sm dark:prose-invert max-w-none min-h-6">
-                                        {message.content ? (
-                                            <MarkdownRenderer content={message.content} />
-                                        ) : (
-                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                        )}
-                                    </div>
-                                </div>
-                            )
-                        ))}
-
-                        <div ref={messagesEndRef} />
                     </div>
+
+                    {/* ThinkingIndicator while waiting for first suggestions token */}
+                    {loadingFixes && chatMessages.length === 0 && (
+                        <ThinkingIndicator />
+                    )}
+
+                    {/* Unified chat messages */}
+                    {chatMessages.map((message, idx) => (
+                        message.role === "user" ? (
+                            <div key={`msg-${idx}`} className="flex justify-end">
+                                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
+                                    <p className="text-sm">{message.content}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div key={`msg-${idx}`} className="space-y-2">
+                                <div className="mb-2">
+                                    <ThinkingIndicator finished={!message.isStreaming} />
+                                </div>
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                    {message.content && <MarkdownRenderer content={message.content} />}
+                                </div>
+                            </div>
+                        )
+                    ))}
+
+                    <div ref={messagesEndRef} />
                 </div>
 
                 <div className="mt-6 space-y-3">
@@ -892,6 +885,7 @@ export default function FixWorkspacePage() {
 
             <div className="fixed bottom-0 left-0 right-0 border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
                 <div className="w-full max-w-6xl mx-auto px-6 py-3 space-y-3">
+                    {/* Action row */}
                     <div className="flex items-center justify-between gap-3">
                         <Button
                             size="sm"
@@ -930,37 +924,41 @@ export default function FixWorkspacePage() {
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <div className="rounded-[34px] border border-border/40 bg-card/20 px-4 py-2">
-                            <div className="flex items-center gap-3">
-                                <div className="flex-1">
-                                    <Textarea
-                                        value={chatInput}
-                                        onChange={(event) => setChatInput(event.target.value)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === "Enter" && !event.shiftKey) {
-                                                event.preventDefault();
-                                                void handleSendChat();
-                                            }
-                                        }}
-                                        placeholder="Ask a question..."
-                                        rows={1}
-                                        className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-0 py-2 text-xl leading-tight placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
-                                    />
-                                </div>
+                    {/* Chat input — pill style matching AskAISidebar */}
+                    <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
+                        <textarea
+                            value={chatInput}
+                            onChange={(event) => setChatInput(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                    event.preventDefault();
+                                    void handleSendChat();
+                                }
+                            }}
+                            placeholder="Ask a question about your security findings..."
+                            rows={1}
+                            className="flex-1 resize-none bg-transparent py-2 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none ring-0 shadow-none max-h-32"
+                            style={{ minHeight: "24px" }}
+                        />
+                        <div className="flex-shrink-0">
+                            {chatLoading ? (
                                 <Button
                                     size="icon"
-                                    className="h-14 w-14 rounded-full bg-muted text-foreground hover:bg-muted/90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                    onClick={handleSendChat}
-                                    disabled={!chatInput.trim() || chatLoading}
+                                    className="h-10 w-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
+                                    onClick={() => chatAbortRef.current?.abort()}
                                 >
-                                    {chatLoading ? (
-                                        <Loader2 className="h-5 w-5 animate-spin" />
-                                    ) : (
-                                        <ArrowUp className="h-6 w-6" />
-                                    )}
+                                    <StopCircle className="h-4 w-4 fill-current" />
                                 </Button>
-                            </div>
+                            ) : (
+                                <Button
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={handleSendChat}
+                                    disabled={!chatInput.trim()}
+                                >
+                                    <ArrowUp className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
