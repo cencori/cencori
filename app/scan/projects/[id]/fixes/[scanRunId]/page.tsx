@@ -884,7 +884,7 @@ export default function FixWorkspacePage() {
                     </div>
                     <div className="text-center mt-3">
                         <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-                            Powered by Cencori AI
+                            Powered by Cencori
                         </Link>
                     </div>
                 </div>
