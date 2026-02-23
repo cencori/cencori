@@ -4,6 +4,43 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
+
+// Relative path with no traversal, no absolute, no null bytes
+function isSafeRelativePath(p: string): boolean {
+    if (!p || typeof p !== 'string') return false;
+    if (p.includes('\x00')) return false;                          // null byte
+    if (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p)) return false; // absolute path
+    const normalized = p.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    let depth = 0;
+    for (const part of parts) {
+        if (part === '..') { depth--; if (depth < 0) return false; }
+        else if (part !== '.') depth++;
+    }
+    return true;
+}
+
+function sanitizeFix(raw: unknown): AcceptedFix | null {
+    const fix = (raw || {}) as Record<string, unknown>;
+    const file = typeof fix.file === 'string' ? fix.file : null;
+    if (!file || !isSafeRelativePath(file)) return null;
+    const line = typeof fix.line === 'number' && Number.isFinite(fix.line) ? Math.max(0, Math.floor(fix.line)) : 0;
+    const originalCode = typeof fix.originalCode === 'string' ? fix.originalCode.slice(0, 51200) : '';
+    const fixedCode = typeof fix.fixedCode === 'string' ? fix.fixedCode.slice(0, 51200) : '';
+    const explanation = typeof fix.explanation === 'string' ? fix.explanation.slice(0, 1000) : '';
+    const id = typeof fix.id === 'string' ? fix.id.slice(0, 100) : '';
+    const issueType = typeof fix.issueType === 'string' ? fix.issueType.slice(0, 200) : '';
+    const issueName = typeof fix.issueName === 'string' ? fix.issueName.slice(0, 200) : '';
+    const severity = typeof fix.severity === 'string' ? fix.severity.slice(0, 50) : '';
+    const strategy = fix.strategy === 'deterministic' || fix.strategy === 'ai' ? fix.strategy : 'deterministic';
+    const issueKey = typeof fix.issueKey === 'string' ? fix.issueKey.slice(0, 300) : undefined;
+    const aiModel = typeof fix.aiModel === 'string' ? fix.aiModel.slice(0, 100) : undefined;
+    const updatedFileContent = typeof fix.updatedFileContent === 'string' ? fix.updatedFileContent.slice(0, 1024 * 1024) : undefined;
+    return { id, file, line, issueType, issueName, severity, strategy, originalCode, fixedCode, explanation, issueKey, aiModel, updatedFileContent };
+}
+
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
@@ -176,12 +213,24 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         selectionByFile?: Record<string, FileSelectionStats>;
     } = body;
 
-    if (!scanRunId || !fixes || fixes.length === 0) {
-        console.log('[Fix Apply] Missing scanRunId or fixes in request body');
+    if (!scanRunId || !fixes || !Array.isArray(fixes) || fixes.length === 0) {
         return NextResponse.json({ error: 'scanRunId and fixes are required' }, { status: 400 });
     }
 
-    console.log(`[Fix Apply] Processing ${fixes.length} fixes for scan run ${scanRunId}`);
+    if (!isValidUUID(scanRunId)) {
+        return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+    }
+
+    if (fixes.length > 100) {
+        return NextResponse.json({ error: 'Too many fixes (max 100 per request)' }, { status: 400 });
+    }
+
+    const sanitizedFixes = fixes.map(sanitizeFix).filter((f): f is AcceptedFix => f !== null);
+    if (sanitizedFixes.length === 0) {
+        return NextResponse.json({ error: 'No valid fixes after sanitization' }, { status: 400 });
+    }
+
+    console.log(`[Fix Apply] Processing ${sanitizedFixes.length} fixes (of ${fixes.length} submitted) for scan run ${scanRunId}`);
 
     const supabaseAdmin = createAdminClient();
 
@@ -306,7 +355,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         // 4. Group fixes by file
         const fixesByFile = new Map<string, AcceptedFix[]>();
-        for (const fix of fixes) {
+        for (const fix of sanitizedFixes) {
             const existing = fixesByFile.get(fix.file) || [];
             existing.push(fix);
             fixesByFile.set(fix.file, existing);
@@ -341,8 +390,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 if (fullySelectedUpdatedContent && fullySelectedUpdatedContent !== content) {
                     content = fullySelectedUpdatedContent;
                 } else {
-                    // Apply each fix to this file
-                    // Sort fixes by line number descending so replacements don't shift line numbers
                     const sortedFixes = [...fileFixes].sort((a, b) => b.line - a.line);
 
                     for (const fix of sortedFixes) {
@@ -356,7 +403,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     continue;
                 }
 
-                // Commit the updated file
                 await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
                     owner,
                     repo,
@@ -374,7 +420,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 if (isGithubPermissionError(fileError)) {
                     throw new GithubPermissionError(buildGithubPermissionErrorMessage(owner, repo));
                 }
-                // Continue with other files
             }
         }
 
@@ -386,13 +431,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         }
 
         // 6. Create Pull Request
-        const issuesSummary = fixes.map(f =>
+        const issuesSummary = sanitizedFixes.map(f =>
             `| \`${f.file}\` | ${f.issueName} | ${f.severity} | ${f.explanation} |`
         ).join('\n');
 
-        const prBody = `## 🛡️ Security Fixes by Cencori Scan
+        const prBody = `## Security Fixes by Cencori Scan
 
-This PR automatically resolves **${fixes.length}** security issue${fixes.length !== 1 ? 's' : ''} detected by [Cencori Scan](https://cencori.com).
+This PR automatically resolves **${sanitizedFixes.length}** security issue${sanitizedFixes.length !== 1 ? 's' : ''} detected by [Cencori Scan](https://cencori.com/scan).
 
 ### Changes
 
@@ -401,18 +446,18 @@ This PR automatically resolves **${fixes.length}** security issue${fixes.length 
 ${issuesSummary}
 
 ### Fix Strategies
-- **Auto Fix** (deterministic): ${fixes.filter(f => f.strategy === 'deterministic').length} fixes
-- **AI Fix** (LLM-generated): ${fixes.filter(f => f.strategy === 'ai').length} fixes
+- **Auto Fix** (deterministic): ${sanitizedFixes.filter(f => f.strategy === 'deterministic').length} fixes
+- **AI Fix** (LLM-generated): ${sanitizedFixes.filter(f => f.strategy === 'ai').length} fixes
 
 ---
 
-> 🔍 Review each change carefully before merging.
-> Generated by [Cencori Scan](https://scan.cencori.com) • [Documentation](https://cencori.com/docs)`;
+> Review each change carefully before merging.
+> Generated by [Cencori Scan](https://cencori.com/scan) • [Documentation](https://cencori.com/docs)`;
 
         const { data: pr } = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
             owner,
             repo,
-            title: `fix: resolve ${fixes.length} security issue${fixes.length !== 1 ? 's' : ''} found by Cencori Scan`,
+            title: `fix: resolve ${sanitizedFixes.length} security issue${sanitizedFixes.length !== 1 ? 's' : ''} found by Cencori Scan`,
             body: prBody,
             head: branchName,
             base: defaultBranch,

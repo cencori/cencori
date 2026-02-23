@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabaseServer';
 import {
     calculateScore,
     getTierDescription,
@@ -19,6 +20,13 @@ interface ScanResult {
 }
 
 export async function POST(request: NextRequest) {
+    // Auth guard — endpoint must not be publicly accessible
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await request.json();
         const { code } = body;

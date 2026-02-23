@@ -106,6 +106,27 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         const body = await req.json();
         const { auto_scan_enabled, slack_webhook_url, discord_webhook_url } = body;
 
+        const allowedKeys = ['auto_scan_enabled', 'slack_webhook_url', 'discord_webhook_url'];
+        const hasValidKey = allowedKeys.some((k) => k in body);
+        if (!hasValidKey) {
+            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        }
+
+        // Strict type checks to prevent SSRF and type confusion
+        if (auto_scan_enabled !== undefined && typeof auto_scan_enabled !== 'boolean') {
+            return NextResponse.json({ error: 'auto_scan_enabled must be a boolean' }, { status: 400 });
+        }
+        if (slack_webhook_url !== undefined && slack_webhook_url !== null) {
+            if (typeof slack_webhook_url !== 'string' || !slack_webhook_url.startsWith('https://hooks.slack.com/')) {
+                return NextResponse.json({ error: 'slack_webhook_url must be a valid Slack webhook URL (https://hooks.slack.com/...)' }, { status: 400 });
+            }
+        }
+        if (discord_webhook_url !== undefined && discord_webhook_url !== null) {
+            if (typeof discord_webhook_url !== 'string' || !discord_webhook_url.startsWith('https://discord.com/api/webhooks/')) {
+                return NextResponse.json({ error: 'discord_webhook_url must be a valid Discord webhook URL (https://discord.com/api/webhooks/...)' }, { status: 400 });
+            }
+        }
+
         const supabaseAdmin = createAdminClient();
 
         // Check ownership

@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
+
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
@@ -85,7 +88,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const question = typeof body.question === "string" ? body.question.trim() : "";
+    // Strip null bytes and ASCII control characters before processing
+    const rawQuestion = typeof body.question === "string" ? body.question : "";
+    const question = rawQuestion.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
     const scanRunId = typeof body.scanRunId === "string" ? body.scanRunId : undefined;
     const issue = (body.issue || {}) as IssueContext;
     const fix = (body.fix || {}) as FixContext;
@@ -97,6 +102,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     if (question.length > 2000) {
         return new Response(JSON.stringify({ error: "question is too long (max 2000 chars)" }), { status: 400 });
+    }
+
+    if (scanRunId && !isValidUUID(scanRunId)) {
+        return new Response(JSON.stringify({ error: "Invalid ID format" }), { status: 400 });
     }
 
     let relatedIssues: IssueContext[] = [];

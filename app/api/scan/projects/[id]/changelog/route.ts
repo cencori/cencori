@@ -218,13 +218,16 @@ export async function POST(
 
     const match = since.match(/(\d+)\s*(week|day|month)s?\s*ago/i);
     if (match) {
-        const amount = parseInt(match[1], 10);
+        const raw = parseInt(match[1], 10);
         const unit = match[2].toLowerCase();
         if (unit === 'week') {
+            const amount = Math.min(raw, 52); // cap at 1 year
             sinceDate.setDate(sinceDate.getDate() - amount * 7);
         } else if (unit === 'day') {
+            const amount = Math.min(raw, 365); // cap at 1 year
             sinceDate.setDate(sinceDate.getDate() - amount);
         } else if (unit === 'month') {
+            const amount = Math.min(raw, 12); // cap at 1 year
             sinceDate.setMonth(sinceDate.getMonth() - amount);
         }
     } else {
@@ -250,7 +253,7 @@ export async function POST(
         });
 
         // Filter out merge commits and parse
-         
+
         const commits: ParsedCommit[] = commitsData
             .filter((c: any) => !c.commit.message.startsWith('Merge'))
             .map((c: any) => ({
