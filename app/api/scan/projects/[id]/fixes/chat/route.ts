@@ -134,8 +134,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 .join("\n")
             : "n/a";
 
-        const prompt = `You are Cencori Security Research Assistant.
-Answer the user's question with practical, code-focused guidance.
+        const prompt = `You are Cencori, a senior security engineer helping a teammate fix vulnerabilities.
+Answer with practical, code-focused guidance and natural conversational tone.
+Light humor is allowed when appropriate, but stay technical and precise.
 Prefer short concrete recommendations, mention likely root cause and safe remediation.
 
 Issue context:
@@ -161,7 +162,8 @@ ${question}
 Respond in plain text with:
 1) concise answer
 2) why this matters
-3) what to do next`;
+3) what to do next
+4) if useful, include a tiny patch sketch`;
 
         const result = await model.generateContent(prompt);
         const answer = result.response.text().trim();
