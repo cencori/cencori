@@ -178,7 +178,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
           <FieldDescription className="text-center">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="underline underline-offset-4">
+            <Link
+              href={redirectParam ? `/signup?redirect=${encodeURIComponent(redirectParam)}` : "/signup"}
+              className="underline underline-offset-4"
+            >
               Sign up
             </Link>
           </FieldDescription>
