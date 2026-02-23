@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
     AlertTriangle,
+    ArrowUp,
     ArrowLeft,
     CheckCircle2,
     ExternalLink,
@@ -874,37 +875,38 @@ export default function FixWorkspacePage() {
                         </div>
                     </div>
 
-                    <div className="rounded-md border border-border/40 bg-card/60 p-2">
-                        <div className="flex items-end gap-2">
-                            <Textarea
-                                value={chatInput}
-                                onChange={(event) => setChatInput(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter" && !event.shiftKey) {
-                                        event.preventDefault();
-                                        void handleSendChat();
-                                    }
-                                }}
-                                placeholder="Chat with Cencori. Ask about a finding, challenge a fix, or request a safer patch."
-                                className="min-h-10 max-h-28 text-xs resize-none"
-                            />
-                            <Button
-                                size="sm"
-                                className="h-9 text-xs px-4 shrink-0"
-                                onClick={handleSendChat}
-                                disabled={!chatInput.trim() || chatLoading}
-                            >
-                                {chatLoading ? (
-                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                ) : (
-                                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                                )}
-                                Ask Cencori
-                            </Button>
+                    <div className="space-y-3">
+                        <div className="rounded-[34px] border border-border/40 bg-card/20 px-4 py-2">
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <Textarea
+                                        value={chatInput}
+                                        onChange={(event) => setChatInput(event.target.value)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" && !event.shiftKey) {
+                                                event.preventDefault();
+                                                void handleSendChat();
+                                            }
+                                        }}
+                                        placeholder="Ask a question..."
+                                        rows={1}
+                                        className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-0 py-2 text-xl leading-tight placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                    />
+                                </div>
+                                <Button
+                                    size="icon"
+                                    className="h-14 w-14 rounded-full bg-muted text-foreground hover:bg-muted/90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                    onClick={handleSendChat}
+                                    disabled={!chatInput.trim() || chatLoading}
+                                >
+                                    {chatLoading ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <ArrowUp className="h-6 w-6" />
+                                    )}
+                                </Button>
+                            </div>
                         </div>
-                        <p className="mt-1 text-[10px] text-muted-foreground">
-                            Press Enter to send, Shift+Enter for a new line.
-                        </p>
                     </div>
                 </div>
             </div>
