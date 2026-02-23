@@ -99,6 +99,7 @@ interface GenerateFixesResponse {
 interface ChatMessage {
     role: "user" | "assistant";
     content: string;
+    isStreaming?: boolean;
 }
 
 const severityBadgeStyles: Record<string, string> = {
@@ -177,15 +178,13 @@ export default function FixWorkspacePage() {
     const [selectedIssueKey, setSelectedIssueKey] = useState<string>("");
     const [error, setError] = useState<string>("");
     const [prInfo, setPrInfo] = useState<{ url: string; number: number } | null>(null);
-    const [suggestions, setSuggestions] = useState("");
-    const [streamingSuggestions, setStreamingSuggestions] = useState("");
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-    const [suggestionsError, setSuggestionsError] = useState("");
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
     const hasGeneratedFixes = useRef(false);
     const suggestionsAbortRef = useRef<AbortController | null>(null);
+    const chatAbortRef = useRef<AbortController | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const fetchWorkspace = useCallback(async () => {
         setLoading(true);
@@ -221,10 +220,8 @@ export default function FixWorkspacePage() {
             const controller = new AbortController();
             suggestionsAbortRef.current = controller;
 
-            setLoadingSuggestions(true);
-            setSuggestionsError("");
-            setSuggestions("");
-            setStreamingSuggestions("");
+            // Inject streaming assistant placeholder as first chat message
+            setChatMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
 
             try {
                 const suggestionPayloadFixes = generatedFixes.map((fix) => ({
@@ -241,11 +238,7 @@ export default function FixWorkspacePage() {
                 const response = await fetch(`/api/scan/projects/${projectId}/fixes/suggestions`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        scanRunId,
-                        fixes: suggestionPayloadFixes,
-                        manualGuidance: guidance,
-                    }),
+                    body: JSON.stringify({ scanRunId, fixes: suggestionPayloadFixes, manualGuidance: guidance }),
                     signal: controller.signal,
                 });
 
@@ -255,9 +248,7 @@ export default function FixWorkspacePage() {
                 }
 
                 const reader = response.body?.getReader();
-                if (!reader) {
-                    throw new Error("No streaming response body");
-                }
+                if (!reader) throw new Error("No streaming response body");
 
                 const decoder = new TextDecoder();
                 let fullContent = "";
@@ -272,38 +263,59 @@ export default function FixWorkspacePage() {
                     buffer = events.pop() || "";
 
                     for (const event of events) {
-                        const lines = event.split("\n");
-                        for (const line of lines) {
+                        for (const line of event.split("\n")) {
                             if (!line.startsWith("data: ")) continue;
                             const data = line.slice(6).trim();
                             if (!data || data === "[DONE]") continue;
-
                             try {
                                 const parsed = JSON.parse(data);
                                 if (typeof parsed.content === "string" && parsed.content.length > 0) {
                                     fullContent += parsed.content;
-                                    setStreamingSuggestions(fullContent);
+                                    setChatMessages((prev) => {
+                                        const next = [...prev];
+                                        const last = next[next.length - 1];
+                                        if (last?.role === "assistant") {
+                                            next[next.length - 1] = { ...last, content: fullContent };
+                                        }
+                                        return next;
+                                    });
                                 }
-                            } catch {
-                                // Ignore non-JSON chunks.
-                            }
+                            } catch { /* ignore non-JSON */ }
                         }
                     }
                 }
 
-                setSuggestions(fullContent);
-                setStreamingSuggestions("");
+                // Mark streaming done
+                setChatMessages((prev) => {
+                    const next = [...prev];
+                    const last = next[next.length - 1];
+                    if (last?.role === "assistant") next[next.length - 1] = { ...last, isStreaming: false };
+                    return next;
+                });
             } catch (err) {
                 if ((err as Error).name !== "AbortError") {
-                    setSuggestionsError(
-                        err instanceof Error ? err.message : "Failed to stream suggestions"
-                    );
+                    setChatMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last?.role === "assistant" && last.isStreaming) {
+                            next[next.length - 1] = { role: "assistant", content: "Failed to generate suggestions. Please try again.", isStreaming: false };
+                        }
+                        return next;
+                    });
+                } else {
+                    // On abort: remove empty placeholder or mark complete
+                    setChatMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last?.role === "assistant" && last.isStreaming) {
+                            if (!last.content) next.pop();
+                            else next[next.length - 1] = { ...last, isStreaming: false };
+                        }
+                        return next;
+                    });
                 }
             } finally {
-                if (suggestionsAbortRef.current === controller) {
-                    suggestionsAbortRef.current = null;
-                }
-                setLoadingSuggestions(false);
+                if (suggestionsAbortRef.current === controller) suggestionsAbortRef.current = null;
             }
         },
         [projectId, scanRunId]
@@ -351,8 +363,13 @@ export default function FixWorkspacePage() {
     useEffect(() => {
         return () => {
             suggestionsAbortRef.current?.abort();
+            chatAbortRef.current?.abort();
         };
     }, []);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [chatMessages]);
 
     const fixMap = useMemo(() => {
         const map = new Map<string, FixProposal>();
@@ -472,9 +489,16 @@ export default function FixWorkspacePage() {
 
         const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
         const nextMessages = [...chatMessages, userMessage];
-        setChatMessages(nextMessages);
+        setChatMessages((prev) => [...prev, userMessage]);
         setChatInput("");
         setChatLoading(true);
+
+        // Add streaming assistant placeholder
+        setChatMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
+
+        chatAbortRef.current?.abort();
+        const controller = new AbortController();
+        chatAbortRef.current = controller;
 
         try {
             const response = await fetch(`/api/scan/projects/${projectId}/fixes/chat`, {
@@ -487,18 +511,75 @@ export default function FixWorkspacePage() {
                     fix: selectedIssueFix,
                     history: nextMessages,
                 }),
+                signal: controller.signal,
             });
 
-            const data = await response.json().catch(() => ({}));
-            const answer = typeof data.answer === "string" ? data.answer : "I could not generate a response.";
-            setChatMessages((prev) => [...prev, { role: "assistant", content: answer }]);
-        } catch {
-            setChatMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: "Chat request failed. Please try again." },
-            ]);
+            if (!response.ok) throw new Error("Failed to get response");
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No response body");
+
+            const decoder = new TextDecoder();
+            let fullContent = "";
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split("\n\n");
+                buffer = events.pop() || "";
+                for (const event of events) {
+                    for (const line of event.split("\n")) {
+                        if (!line.startsWith("data: ")) continue;
+                        const data = line.slice(6).trim();
+                        if (!data || data === "[DONE]") continue;
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (typeof parsed.content === "string" && parsed.content.length > 0) {
+                                fullContent += parsed.content;
+                                setChatMessages((prev) => {
+                                    const next = [...prev];
+                                    const last = next[next.length - 1];
+                                    if (last?.role === "assistant") next[next.length - 1] = { ...last, content: fullContent };
+                                    return next;
+                                });
+                            }
+                        } catch { /* ignore */ }
+                    }
+                }
+            }
+
+            setChatMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last?.role === "assistant") next[next.length - 1] = { ...last, isStreaming: false };
+                return next;
+            });
+        } catch (err) {
+            if ((err as Error).name !== "AbortError") {
+                setChatMessages((prev) => {
+                    const next = [...prev];
+                    const last = next[next.length - 1];
+                    if (last?.role === "assistant" && last.isStreaming) {
+                        next[next.length - 1] = { role: "assistant", content: "Chat request failed. Please try again.", isStreaming: false };
+                    }
+                    return next;
+                });
+            } else {
+                setChatMessages((prev) => {
+                    const next = [...prev];
+                    const last = next[next.length - 1];
+                    if (last?.role === "assistant" && last.isStreaming) {
+                        if (!last.content) next.pop();
+                        else next[next.length - 1] = { ...last, isStreaming: false };
+                    }
+                    return next;
+                });
+            }
         } finally {
             setChatLoading(false);
+            if (chatAbortRef.current === controller) chatAbortRef.current = null;
         }
     };
 
@@ -594,59 +675,47 @@ export default function FixWorkspacePage() {
 
                 <div className="mt-4 rounded-xl border border-border/40 bg-card/20 p-4 md:p-6">
                     <div className="mx-auto max-w-4xl space-y-6">
+                        {/* Initial user request bubble */}
                         <div className="flex justify-end">
                             <div className="rounded-full border border-border/40 bg-secondary/80 px-4 py-2 text-sm text-foreground/95">
                                 Generate a full remediation plan for this scan.
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                                <span className="text-muted-foreground/60">›</span>
-                                {loadingSuggestions ? "Streaming" : "Complete"}
-                            </p>
-                            <div className="min-h-28">
-                                {suggestionsError ? (
-                                    <p className="text-sm text-red-300">{suggestionsError}</p>
-                                ) : loadingFixes ? (
-                                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Preparing suggestion context...
-                                    </div>
-                                ) : suggestions || streamingSuggestions ? (
-                                    <MarkdownRenderer content={streamingSuggestions || suggestions} />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        Suggestions will appear after fix generation completes.
-                                    </p>
-                                )}
+                        {/* Loading while generating fixes (before first stream message) */}
+                        {loadingFixes && chatMessages.length === 0 && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Preparing suggestion context...
                             </div>
-                        </div>
+                        )}
 
+                        {/* Unified chat: suggestions stream in as first assistant message, follow-up chat below */}
                         {chatMessages.map((message, idx) => (
                             message.role === "user" ? (
-                                <div key={`chat-user-${idx}`} className="flex justify-end">
+                                <div key={`msg-${idx}`} className="flex justify-end">
                                     <div className="max-w-[80%] rounded-full border border-border/40 bg-secondary/80 px-4 py-2 text-sm text-foreground/95">
                                         {message.content}
                                     </div>
                                 </div>
                             ) : (
-                                <div key={`chat-assistant-${idx}`} className="space-y-2">
+                                <div key={`msg-${idx}`} className="space-y-2">
                                     <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                                         <span className="text-muted-foreground/60">›</span>
-                                        Complete
+                                        {message.isStreaming ? "Streaming" : "Complete"}
                                     </p>
-                                    <MarkdownRenderer content={message.content} />
+                                    <div className="prose prose-sm dark:prose-invert max-w-none min-h-6">
+                                        {message.content ? (
+                                            <MarkdownRenderer content={message.content} />
+                                        ) : (
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                        )}
+                                    </div>
                                 </div>
                             )
                         ))}
 
-                        {chatLoading && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Thinking...
-                            </div>
-                        )}
+                        <div ref={messagesEndRef} />
                     </div>
                 </div>
 
