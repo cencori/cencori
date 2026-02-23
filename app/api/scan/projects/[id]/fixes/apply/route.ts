@@ -29,6 +29,50 @@ interface FileSelectionStats {
     total: number;
 }
 
+class GithubPermissionError extends Error {
+    status: number;
+
+    constructor(message: string) {
+        super(message);
+        this.name = 'GithubPermissionError';
+        this.status = 403;
+    }
+}
+
+function extractGithubErrorDetails(error: unknown): { status?: number; message: string } {
+    if (error instanceof Error) {
+        const status = (error as { status?: number }).status;
+        const responseData = (error as { response?: { data?: { message?: string } } }).response?.data;
+        const responseMessage = typeof responseData?.message === 'string' ? responseData.message : '';
+        return {
+            status,
+            message: responseMessage || error.message || 'Unknown GitHub API error',
+        };
+    }
+
+    return { message: String(error) };
+}
+
+function isGithubPermissionError(error: unknown): boolean {
+    const { status, message } = extractGithubErrorDetails(error);
+    if (status === 403) {
+        return true;
+    }
+
+    const normalized = message.toLowerCase();
+    return normalized.includes('resource not accessible by integration') ||
+        normalized.includes('must have push access') ||
+        normalized.includes('insufficient permissions');
+}
+
+function buildGithubPermissionErrorMessage(owner: string, repo: string): string {
+    return [
+        `GitHub App cannot write to ${owner}/${repo}.`,
+        'Grant app permissions: Contents (Read and write) and Pull requests (Read and write), and ensure this repository is included in the installation.',
+        'Then reinstall or update the installation and retry creating the PR.',
+    ].join(' ');
+}
+
 function normalizeLine(line: string): string {
     return line.replace(/\s+/g, ' ').trim();
 }
@@ -179,6 +223,33 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const [owner, repo] = githubAccess.repository.fullName.split('/');
 
     try {
+        // 0. Preflight permission check on this installation/repository pairing.
+        try {
+            const { data: installationData } = await octokit.request(
+                'GET /repos/{owner}/{repo}/installation',
+                { owner, repo }
+            );
+            const permissions = (installationData as { permissions?: Record<string, string> }).permissions || {};
+            const contentsPermission = permissions.contents;
+            const pullRequestPermission = permissions.pull_requests;
+            const hasRequiredWrite =
+                contentsPermission === 'write' && pullRequestPermission === 'write';
+
+            if (!hasRequiredWrite) {
+                return NextResponse.json(
+                    { error: buildGithubPermissionErrorMessage(owner, repo) },
+                    { status: 403 }
+                );
+            }
+        } catch (installationError) {
+            if (isGithubPermissionError(installationError)) {
+                return NextResponse.json(
+                    { error: buildGithubPermissionErrorMessage(owner, repo) },
+                    { status: 403 }
+                );
+            }
+        }
+
         // 1. Get default branch
         const { data: repoData } = await octokit.request('GET /repos/{owner}/{repo}', {
             owner,
@@ -218,6 +289,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 break;
             } catch (branchErr) {
                 const status = (branchErr as { status?: number })?.status;
+                if (isGithubPermissionError(branchErr)) {
+                    throw new GithubPermissionError(buildGithubPermissionErrorMessage(owner, repo));
+                }
                 if (status !== 422 || attempt === 2) {
                     throw branchErr;
                 }
@@ -297,6 +371,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 console.log(`[Fix Apply]   ✓ Committed ${filePath}`);
             } catch (fileError) {
                 console.error(`[Fix Apply]   ✗ Failed to update ${filePath}:`, fileError);
+                if (isGithubPermissionError(fileError)) {
+                    throw new GithubPermissionError(buildGithubPermissionErrorMessage(owner, repo));
+                }
                 // Continue with other files
             }
         }
@@ -366,6 +443,17 @@ ${issuesSummary}
 
     } catch (error) {
         console.error('[Fix Apply] PR creation failed:', error);
+        if (error instanceof GithubPermissionError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+
+        if (isGithubPermissionError(error)) {
+            return NextResponse.json(
+                { error: buildGithubPermissionErrorMessage(owner, repo) },
+                { status: 403 }
+            );
+        }
+
         return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Failed to create PR' },
             { status: 500 }

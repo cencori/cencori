@@ -4,8 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
     AlertTriangle,
@@ -14,7 +22,6 @@ import {
     ExternalLink,
     GitPullRequest,
     Loader2,
-    MessageSquare,
     Sparkles,
 } from "lucide-react";
 
@@ -160,7 +167,7 @@ export default function FixWorkspacePage() {
     const [loadingFixes, setLoadingFixes] = useState(true);
     const [creatingPr, setCreatingPr] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
-    const [showDiffs, setShowDiffs] = useState(false);
+    const [diffDialogOpen, setDiffDialogOpen] = useState(false);
     const [project, setProject] = useState<ProjectSummary | null>(null);
     const [scanRun, setScanRun] = useState<ScanRun | null>(null);
     const [issues, setIssues] = useState<ScanIssue[]>([]);
@@ -170,10 +177,15 @@ export default function FixWorkspacePage() {
     const [selectedIssueKey, setSelectedIssueKey] = useState<string>("");
     const [error, setError] = useState<string>("");
     const [prInfo, setPrInfo] = useState<{ url: string; number: number } | null>(null);
+    const [suggestions, setSuggestions] = useState("");
+    const [streamingSuggestions, setStreamingSuggestions] = useState("");
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [suggestionsError, setSuggestionsError] = useState("");
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
     const hasGeneratedFixes = useRef(false);
+    const suggestionsAbortRef = useRef<AbortController | null>(null);
 
     const fetchWorkspace = useCallback(async () => {
         setLoading(true);
@@ -201,6 +213,102 @@ export default function FixWorkspacePage() {
         }
     }, [projectId, scanRunId]);
 
+    const streamFixSuggestions = useCallback(
+        async (generatedFixes: FixProposal[], guidance: ManualGuidance[]) => {
+            if (!scanRunId) return;
+
+            suggestionsAbortRef.current?.abort();
+            const controller = new AbortController();
+            suggestionsAbortRef.current = controller;
+
+            setLoadingSuggestions(true);
+            setSuggestionsError("");
+            setSuggestions("");
+            setStreamingSuggestions("");
+
+            try {
+                const suggestionPayloadFixes = generatedFixes.map((fix) => ({
+                    file: fix.file,
+                    line: fix.line,
+                    issueType: fix.issueType,
+                    issueName: fix.issueName,
+                    severity: fix.severity,
+                    strategy: fix.strategy,
+                    explanation: fix.explanation,
+                    selected: true,
+                }));
+
+                const response = await fetch(`/api/scan/projects/${projectId}/fixes/suggestions`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        scanRunId,
+                        fixes: suggestionPayloadFixes,
+                        manualGuidance: guidance,
+                    }),
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || "Failed to stream suggestions");
+                }
+
+                const reader = response.body?.getReader();
+                if (!reader) {
+                    throw new Error("No streaming response body");
+                }
+
+                const decoder = new TextDecoder();
+                let fullContent = "";
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split("\n\n");
+                    buffer = events.pop() || "";
+
+                    for (const event of events) {
+                        const lines = event.split("\n");
+                        for (const line of lines) {
+                            if (!line.startsWith("data: ")) continue;
+                            const data = line.slice(6).trim();
+                            if (!data || data === "[DONE]") continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (typeof parsed.content === "string" && parsed.content.length > 0) {
+                                    fullContent += parsed.content;
+                                    setStreamingSuggestions(fullContent);
+                                }
+                            } catch {
+                                // Ignore non-JSON chunks.
+                            }
+                        }
+                    }
+                }
+
+                setSuggestions(fullContent);
+                setStreamingSuggestions("");
+            } catch (err) {
+                if ((err as Error).name !== "AbortError") {
+                    setSuggestionsError(
+                        err instanceof Error ? err.message : "Failed to stream suggestions"
+                    );
+                }
+            } finally {
+                if (suggestionsAbortRef.current === controller) {
+                    suggestionsAbortRef.current = null;
+                }
+                setLoadingSuggestions(false);
+            }
+        },
+        [projectId, scanRunId]
+    );
+
     const generateFixes = useCallback(async () => {
         setLoadingFixes(true);
         setError("");
@@ -218,15 +326,17 @@ export default function FixWorkspacePage() {
 
             const data: GenerateFixesResponse = await response.json();
             const generatedFixes = data.fixes || [];
+            const generatedGuidance = data.manualGuidance || [];
             setFixes(generatedFixes);
-            setManualGuidance(data.manualGuidance || []);
+            setManualGuidance(generatedGuidance);
             setSelectedFixIds(new Set(generatedFixes.map((fix) => fix.id)));
+            void streamFixSuggestions(generatedFixes, generatedGuidance);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to generate fixes");
         } finally {
             setLoadingFixes(false);
         }
-    }, [projectId, scanRunId]);
+    }, [projectId, scanRunId, streamFixSuggestions]);
 
     useEffect(() => {
         fetchWorkspace();
@@ -237,6 +347,12 @@ export default function FixWorkspacePage() {
         hasGeneratedFixes.current = true;
         generateFixes();
     }, [generateFixes, loading, scanRun]);
+
+    useEffect(() => {
+        return () => {
+            suggestionsAbortRef.current?.abort();
+        };
+    }, []);
 
     const fixMap = useMemo(() => {
         const map = new Map<string, FixProposal>();
@@ -264,6 +380,7 @@ export default function FixWorkspacePage() {
         () => fixes.filter((fix) => selectedFixIds.has(fix.id)),
         [fixes, selectedFixIds]
     );
+    const fixesForDiffDialog = selectedFixes.length > 0 ? selectedFixes : fixes;
 
     const toggleFixSelection = (fixId: string) => {
         setSelectedFixIds((prev) => {
@@ -351,7 +468,7 @@ export default function FixWorkspacePage() {
     };
 
     const handleSendChat = async () => {
-        if (!chatInput.trim() || !selectedIssue || chatLoading) return;
+        if (!chatInput.trim() || chatLoading) return;
 
         const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
         const nextMessages = [...chatMessages, userMessage];
@@ -366,7 +483,7 @@ export default function FixWorkspacePage() {
                 body: JSON.stringify({
                     scanRunId,
                     question: userMessage.content,
-                    issue: selectedIssue,
+                    issue: selectedIssue || undefined,
                     fix: selectedIssueFix,
                     history: nextMessages,
                 }),
@@ -408,74 +525,108 @@ export default function FixWorkspacePage() {
     }
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-6 py-8 pb-28">
-            <div className="flex items-center justify-between gap-4">
-                <Link href={`/scan/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                    <ArrowLeft className="h-3 w-3" />
-                    Back to project
-                </Link>
-                <div className="flex items-center gap-2">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs px-3"
-                        onClick={() => updateWorkflowStatus("dismiss")}
-                        disabled={updatingStatus}
-                    >
-                        {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
-                    </Button>
-                    <Button
-                        size="sm"
-                        className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                        onClick={() => updateWorkflowStatus("done")}
-                        disabled={updatingStatus}
-                    >
-                        {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
-                    </Button>
+        <>
+            <div className="w-full max-w-6xl mx-auto px-6 py-8 pb-56">
+                <div className="flex items-center justify-between gap-4">
+                    <Link href={`/scan/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                        <ArrowLeft className="h-3 w-3" />
+                        Back to project
+                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs px-3"
+                            onClick={() => updateWorkflowStatus("dismiss")}
+                            disabled={updatingStatus}
+                        >
+                            {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                            onClick={() => updateWorkflowStatus("done")}
+                            disabled={updatingStatus}
+                        >
+                            {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            <div className="mt-5">
-                <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-base font-medium">Fix Workspace</h1>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
-                        {project.github_repo_full_name}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {issues.length} issues
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {fixes.length} auto-fixable
-                    </Badge>
+                <div className="mt-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-base font-medium">Fix Workspace</h1>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                            {project.github_repo_full_name}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {issues.length} issues
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {fixes.length} auto-fixable
+                        </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Review streamed remediation guidance, inspect diffs in the dialog, then open a branch-based PR.
+                    </p>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                    Review every finding, inspect diffs, ask Cencori questions, and open a PR from a new branch.
-                </p>
-            </div>
 
-            {error && (
-                <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                    {error}
+                {error && (
+                    <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                        {error}
+                    </div>
+                )}
+
+                {prInfo && (
+                    <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 flex items-center justify-between gap-2">
+                        <span>PR #{prInfo.number} created successfully.</span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs px-3"
+                            onClick={() => window.open(prInfo.url, "_blank")}
+                        >
+                            <ExternalLink className="h-3 w-3 mr-1.5" />
+                            Open on GitHub
+                        </Button>
+                    </div>
+                )}
+
+                <div className="mt-4 rounded-md border border-border/40 bg-card/40 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                            <p className="text-xs font-medium">Streaming Fix Suggestions</p>
+                        </div>
+                        {loadingSuggestions && (
+                            <span className="text-[10px] text-emerald-300 flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Streaming
+                            </span>
+                        )}
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                        Cencori is reasoning over the full scan and generating a remediation brief in real time.
+                    </p>
+                    <div className="mt-3 rounded border border-border/40 bg-background/40 p-3 min-h-28">
+                        {suggestionsError ? (
+                            <p className="text-xs text-red-300">{suggestionsError}</p>
+                        ) : loadingFixes ? (
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Preparing suggestion context...
+                            </div>
+                        ) : suggestions || streamingSuggestions ? (
+                            <MarkdownRenderer content={streamingSuggestions || suggestions} />
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                Suggestions will appear after fix generation completes.
+                            </p>
+                        )}
+                    </div>
                 </div>
-            )}
 
-            {prInfo && (
-                <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 flex items-center justify-between gap-2">
-                    <span>PR #{prInfo.number} created successfully.</span>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs px-3"
-                        onClick={() => window.open(prInfo.url, "_blank")}
-                    >
-                        <ExternalLink className="h-3 w-3 mr-1.5" />
-                        Open on GitHub
-                    </Button>
-                </div>
-            )}
-
-            <div className="mt-6 grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4">
-                <div className="space-y-3">
+                <div className="mt-6 space-y-3">
                     {loadingFixes ? (
                         <div className="rounded-md border border-border/40 p-4 text-xs text-muted-foreground flex items-center gap-2">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -531,24 +682,29 @@ export default function FixWorkspacePage() {
                                         <div className="mt-2 rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
                                             <div className="flex items-start justify-between gap-2">
                                                 <p className="text-[11px] text-emerald-200">{fix.explanation}</p>
-                                                <label
-                                                    className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0"
-                                                    onClick={(event) => event.stopPropagation()}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedFixIds.has(fix.id)}
-                                                        onChange={() => toggleFixSelection(fix.id)}
-                                                        className="h-3 w-3 rounded border-border bg-transparent"
-                                                    />
-                                                    Include
-                                                </label>
-                                            </div>
-                                            {showDiffs && (
-                                                <div className="mt-2">
-                                                    <DiffView original={fix.originalCode} fixed={fix.fixedCode} />
+                                                <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-6 text-[10px] px-2"
+                                                        onClick={() => {
+                                                            setSelectedIssueKey(key);
+                                                            setDiffDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        View diff
+                                                    </Button>
+                                                    <label className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedFixIds.has(fix.id)}
+                                                            onChange={() => toggleFixSelection(fix.id)}
+                                                            className="h-3 w-3 rounded border-border bg-transparent"
+                                                        />
+                                                        Include
+                                                    </label>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     )}
 
@@ -570,19 +726,15 @@ export default function FixWorkspacePage() {
                     )}
                 </div>
 
-                <div className="rounded-md border border-border/40 bg-card/40 p-3 h-fit">
-                    <div className="flex items-center gap-2">
-                        <MessageSquare className="h-3.5 w-3.5 text-emerald-400" />
-                        <p className="text-xs font-medium">Ask Cencori</p>
-                    </div>
+                <div className="mt-6 rounded-md border border-border/40 bg-card/30 p-3">
+                    <p className="text-xs font-medium">Cencori Chat</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                        Ask about the selected issue, exploitability, and safe remediation.
+                        Chat casually about exploitability, trade-offs, or implementation details for any selected issue.
                     </p>
-
-                    <div className="mt-3 max-h-[360px] overflow-y-auto space-y-2 pr-1">
+                    <div className="mt-3 max-h-80 overflow-y-auto space-y-2 pr-1">
                         {chatMessages.length === 0 ? (
                             <div className="rounded border border-border/40 p-2 text-[11px] text-muted-foreground">
-                                Select an issue and ask a question to start.
+                                Ask a question from the input below to start the thread.
                             </div>
                         ) : (
                             chatMessages.map((message, idx) => (
@@ -602,86 +754,160 @@ export default function FixWorkspacePage() {
                                 </div>
                             ))
                         )}
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                        <Textarea
-                            value={chatInput}
-                            onChange={(event) => setChatInput(event.target.value)}
-                            placeholder="Why is this vulnerable and what is the safest fix here?"
-                            className="min-h-20 text-xs"
-                        />
-                        <Button
-                            size="sm"
-                            className="w-full h-7 text-xs"
-                            onClick={handleSendChat}
-                            disabled={!chatInput.trim() || !selectedIssue || chatLoading}
-                        >
-                            {chatLoading ? (
-                                <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                            ) : (
-                                <Sparkles className="h-3 w-3 mr-1.5" />
-                            )}
-                            Ask
-                        </Button>
+                        {chatLoading && (
+                            <div className="rounded border border-border/40 p-2 text-[11px] text-muted-foreground flex items-center gap-2">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Thinking...
+                            </div>
+                        )}
                     </div>
                 </div>
+
+                {issues.length === 0 && (
+                    <div className="mt-6 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-200 flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 mt-0.5" />
+                        <span>No issues were found in this scan run. Mark as Done to return to the project.</span>
+                    </div>
+                )}
+
+                {!loadingFixes && issues.length > 0 && fixes.length === 0 && (
+                    <div className="mt-4 rounded-md border border-yellow-500/20 bg-yellow-500/5 p-4 text-xs text-yellow-200 flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 mt-0.5" />
+                        <span>
+                            Issues were detected, but no safe auto-fix was generated. Use manual guidance and chat to plan remediation.
+                        </span>
+                    </div>
+                )}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 border-t border-border/40 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-                <div className="w-full max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs px-4"
-                        onClick={() => setShowDiffs((prev) => !prev)}
-                    >
-                        {showDiffs ? "Hide Diffs" : "Show Diffs"}
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        {scanRun.fix_status === "pr_opened" && scanRun.fix_pr_url && (
+            <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
+                <DialogContent className="max-w-5xl p-0">
+                    <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/40">
+                        <DialogTitle className="text-sm">Diff Review</DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Reviewing {fixesForDiffDialog.length} fix diff{fixesForDiffDialog.length === 1 ? "" : "s"}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="px-5 pb-5 max-h-[72vh] overflow-y-auto space-y-3">
+                        {fixesForDiffDialog.length === 0 ? (
+                            <div className="rounded border border-border/40 p-3 text-xs text-muted-foreground mt-3">
+                                No diffs available yet.
+                            </div>
+                        ) : (
+                            fixesForDiffDialog.map((fix) => (
+                                <div key={`diff-${fix.id}`} className="rounded-md border border-border/40 p-3 mt-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-medium truncate">
+                                                {fix.issueName}
+                                            </p>
+                                            <p className="text-[11px] text-muted-foreground font-mono truncate">
+                                                {fix.file}:{fix.line}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Badge
+                                                variant="outline"
+                                                className={cn("text-[10px] h-5", severityBadgeStyles[fix.severity] || "")}
+                                            >
+                                                {fix.severity}
+                                            </Badge>
+                                            <label className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedFixIds.has(fix.id)}
+                                                    onChange={() => toggleFixSelection(fix.id)}
+                                                    className="h-3 w-3 rounded border-border bg-transparent"
+                                                />
+                                                Include
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-[11px] text-emerald-200">{fix.explanation}</p>
+                                    <div className="mt-2">
+                                        <DiffView original={fix.originalCode} fixed={fix.fixedCode} />
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <div className="fixed bottom-0 left-0 right-0 border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+                <div className="w-full max-w-6xl mx-auto px-6 py-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs px-4"
+                            onClick={() => setDiffDialogOpen(true)}
+                            disabled={fixes.length === 0}
+                        >
+                            Show Diffs ({fixesForDiffDialog.length})
+                        </Button>
+                        <div className="flex items-center gap-2">
+                            {scanRun.fix_status === "pr_opened" && scanRun.fix_pr_url && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs px-4"
+                                    onClick={() => window.open(scanRun.fix_pr_url as string, "_blank")}
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                                    Open PR
+                                </Button>
+                            )}
                             <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-8 text-xs px-4"
-                                onClick={() => window.open(scanRun.fix_pr_url as string, "_blank")}
+                                className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600"
+                                onClick={handleCreatePr}
+                                disabled={creatingPr || selectedFixes.length === 0}
                             >
-                                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                                Open PR
+                                {creatingPr ? (
+                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                ) : (
+                                    <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
+                                )}
+                                Create PR ({selectedFixes.length})
                             </Button>
-                        )}
-                        <Button
-                            size="sm"
-                            className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600"
-                            onClick={handleCreatePr}
-                            disabled={creatingPr || selectedFixes.length === 0}
-                        >
-                            {creatingPr ? (
-                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                            ) : (
-                                <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
-                            )}
-                            Create PR ({selectedFixes.length})
-                        </Button>
+                        </div>
+                    </div>
+
+                    <div className="rounded-md border border-border/40 bg-card/60 p-2">
+                        <div className="flex items-end gap-2">
+                            <Textarea
+                                value={chatInput}
+                                onChange={(event) => setChatInput(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" && !event.shiftKey) {
+                                        event.preventDefault();
+                                        void handleSendChat();
+                                    }
+                                }}
+                                placeholder="Chat with Cencori. Ask about a finding, challenge a fix, or request a safer patch."
+                                className="min-h-10 max-h-28 text-xs resize-none"
+                            />
+                            <Button
+                                size="sm"
+                                className="h-9 text-xs px-4 shrink-0"
+                                onClick={handleSendChat}
+                                disabled={!chatInput.trim() || chatLoading}
+                            >
+                                {chatLoading ? (
+                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                ) : (
+                                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                                )}
+                                Ask Cencori
+                            </Button>
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                            Press Enter to send, Shift+Enter for a new line.
+                        </p>
                     </div>
                 </div>
             </div>
-
-            {issues.length === 0 && (
-                <div className="mt-6 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-200 flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 mt-0.5" />
-                    <span>No issues were found in this scan run. Mark as Done to return to the project.</span>
-                </div>
-            )}
-
-            {!loadingFixes && issues.length > 0 && fixes.length === 0 && (
-                <div className="mt-4 rounded-md border border-yellow-500/20 bg-yellow-500/5 p-4 text-xs text-yellow-200 flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5" />
-                    <span>
-                        Issues were detected, but no safe auto-fix was generated. Use the guidance cards and chat assistant for manual remediation.
-                    </span>
-                </div>
-            )}
-        </div>
+        </>
     );
 }
