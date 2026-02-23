@@ -651,13 +651,6 @@ export default function FixWorkspacePage() {
                 {/* Chat thread */}
                 <div className="space-y-8">
 
-                    {/* Initial user bubble */}
-                    <div className="flex justify-end">
-                        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
-                            <p className="text-sm">Generate a full remediation plan for this scan.</p>
-                        </div>
-                    </div>
-
                     {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
                     {(loading || loadingFixes) && !aiHasStarted && (
                         <ScanThinkingIndicator finished={false} />
