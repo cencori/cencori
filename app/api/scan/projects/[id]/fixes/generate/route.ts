@@ -6,6 +6,9 @@ import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { generateFileFixWithGemini } from '@/lib/scan/gemini';
 import { randomUUID } from 'crypto';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
+
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
@@ -397,14 +400,21 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (!isValidUUID(id)) {
+        return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+    }
+
     console.log(`[Fix Gen] User ${user.id} authenticated`);
 
     const body = await req.json();
     const { scanRunId } = body;
 
-    if (!scanRunId) {
-        console.log('[Fix Gen] Missing scanRunId in request body');
+    if (!scanRunId || typeof scanRunId !== 'string') {
         return NextResponse.json({ error: 'scanRunId is required' }, { status: 400 });
+    }
+
+    if (!isValidUUID(scanRunId)) {
+        return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
     }
 
     console.log(`[Fix Gen] Scan run ID: ${scanRunId}`);

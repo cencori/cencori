@@ -3,6 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
+
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
@@ -153,6 +156,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const scanRunId = typeof body.scanRunId === "string" ? body.scanRunId : "";
     if (!scanRunId) {
         return NextResponse.json({ error: "scanRunId is required" }, { status: 400 });
+    }
+    if (!isValidUUID(scanRunId)) {
+        return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
     }
 
     const fixes = sanitizeFixes(body.fixes);
