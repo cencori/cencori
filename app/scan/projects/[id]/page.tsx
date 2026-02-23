@@ -1232,7 +1232,7 @@ export default function ProjectDetailPage() {
                     )}
                 </TabsContent>
 
-                <TabsContent value="settings" className="max-w-xl">
+                <TabsContent value="settings">
                     <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
 
                     <div className="space-y-6">
