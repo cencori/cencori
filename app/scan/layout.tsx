@@ -59,6 +59,11 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         checkAuth();
     }, []);
 
+    // Set browser tab title
+    useEffect(() => {
+        document.title = "Scan";
+    }, []);
+
     // Extract current project from URL
     const projectId = pathname.match(/\/scan\/projects\/([^/]+)/)?.[1];
 
