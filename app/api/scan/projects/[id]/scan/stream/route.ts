@@ -4,12 +4,12 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
+import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import {
     calculateScore,
     scanFileContent,
     shouldScanFile,
     summarizeIssues,
-    type ScanIssue,
 } from '../../../../../../../packages/scan/src/scanner/core';
 
 interface RouteParams {
@@ -103,142 +103,70 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     throw new Error('Invalid repository reference');
                 }
 
-                // Get repository tree
-                sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Fetching file tree...' });
+                sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Indexing repository tree...' });
 
-                let treeData;
-                try {
-                    const response = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-                        owner,
-                        repo,
-                        tree_sha: 'HEAD',
-                        recursive: '1',
-                    });
-                    treeData = response.data;
-                } catch (treeError: unknown) {
-                    if (treeError && typeof treeError === 'object' && 'status' in treeError && treeError.status === 409) {
-                        const emptySummary = summarizeIssues([]);
-                        const emptyResearch = analyzeRepositoryResearch({ files: [], issues: [] });
-                        sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Repository is empty - no files to scan' });
-                        sendEvent({
-                            type: 'complete',
-                            time: Date.now() - startTime,
-                            message: 'Scan completed',
-                            data: {
-                                scanId: scanRun.id,
-                                score: 'A',
-                                filesScanned: 0,
-                                issuesFound: 0,
-                                summary: emptySummary,
-                                research: emptyResearch,
-                                issues: []
-                            }
-                        });
-
-                        // Save logs for empty repo
-                        await supabaseAdmin
-                            .from('scan_runs')
-                            .update({
-                                status: 'completed',
-                                score: 'A',
-                                files_scanned: 0,
-                                issues_found: 0,
-                                scan_duration_ms: Date.now() - startTime,
-                                secrets_count: 0,
-                                vulnerabilities_count: 0,
-                                results: {
-                                    issues: [],
-                                    summary: emptySummary,
-                                    research: emptyResearch,
-                                    message: 'Repository is empty',
-                                },
-                                logs: allLogs,
-                            })
-                            .eq('id', scanRun.id);
-
-                        await supabaseAdmin
-                            .from('scan_projects')
-                            .update({
-                                last_scan_at: new Date().toISOString(),
-                                last_scan_score: 'A',
-                                last_scan_issues: 0,
-                                last_scan_files: 0,
-                            })
-                            .eq('id', id);
-
-                        controller.close();
-                        return;
-                    }
-                    throw treeError;
-                }
-
-                // Filter scannable files
-                const filesToScan = treeData.tree
-                    .filter(item => item.type === 'blob' && item.path && shouldScanFile(item.path))
-                    .slice(0, 100);
-
-                sendEvent({
-                    type: 'info',
-                    time: Date.now() - startTime,
-                    message: `Found ${filesToScan.length} files to scan`
-                });
-
-                const allIssues: ScanIssue[] = [];
-                const scannedFiles: Array<{ path: string; content: string }> = [];
-                let filesScanned = 0;
                 let lastProgressUpdate = 0;
-
-                // Scan files
-                for (let i = 0; i < filesToScan.length; i++) {
-                    const file = filesToScan[i];
-                    if (!file.path || !file.sha) continue;
-
-                    try {
-                        const { data: blobData } = await octokit.request('GET /repos/{owner}/{repo}/git/blobs/{file_sha}', {
-                            owner,
-                            repo,
-                            file_sha: file.sha,
-                        });
-
-                        const content = Buffer.from(blobData.content, 'base64').toString('utf-8');
-                        if (content.length > 500000) continue;
-
-                        const fileIssues = scanFileContent(file.path, content);
-                        scannedFiles.push({ path: file.path, content });
-
-                        // If issues found, report them immediately
-                        if (fileIssues.length > 0) {
-                            allIssues.push(...fileIssues);
+                const {
+                    allIssues,
+                    scannedFiles,
+                    filesScanned,
+                    totalCandidateFiles,
+                    failedFiles,
+                } = await scanGithubRepository({
+                    octokit,
+                    owner,
+                    repo,
+                    shouldScanFile,
+                    scanFileContent,
+                    collectScannedFiles: true,
+                    onProgress: async (progress) => {
+                        if (progress.fileIssues.length > 0) {
                             sendEvent({
                                 type: 'issue',
                                 time: Date.now() - startTime,
-                                message: `Found ${fileIssues.length} issue(s) in ${file.path}`,
-                                data: { file: file.path, issues: fileIssues }
+                                message: `Found ${progress.fileIssues.length} issue(s) in ${progress.currentFile}`,
+                                data: { file: progress.currentFile, issues: progress.fileIssues }
                             });
                         }
 
-                        filesScanned++;
-
-                        // Send progress update every 10 files or every 2 seconds
                         const now = Date.now();
-                        if (filesScanned % 10 === 0 || now - lastProgressUpdate > 2000) {
+                        if (progress.processedFiles === 1) {
+                            sendEvent({
+                                type: 'info',
+                                time: now - startTime,
+                                message: `Found ${progress.totalFiles} files to scan`,
+                            });
+                        }
+
+                        if (
+                            progress.processedFiles === progress.totalFiles ||
+                            progress.processedFiles % 10 === 0 ||
+                            now - lastProgressUpdate > 2000
+                        ) {
                             sendEvent({
                                 type: 'progress',
                                 time: now - startTime,
-                                message: `Scanning... (${filesScanned}/${filesToScan.length} files)`,
+                                message: `Scanning... (${progress.processedFiles}/${progress.totalFiles} files)`,
                                 data: {
-                                    filesScanned,
-                                    totalFiles: filesToScan.length,
-                                    currentFile: file.path,
-                                    issuesFound: allIssues.length
+                                    filesScanned: progress.scannedFiles,
+                                    processedFiles: progress.processedFiles,
+                                    totalFiles: progress.totalFiles,
+                                    currentFile: progress.currentFile,
+                                    issuesFound: progress.issuesFound,
+                                    failedFiles: progress.failedFiles,
                                 }
                             });
                             lastProgressUpdate = now;
                         }
+                    },
+                });
 
-                    } catch {
-                        // Skip files that can't be fetched
-                    }
+                if (totalCandidateFiles === 0) {
+                    sendEvent({
+                        type: 'info',
+                        time: Date.now() - startTime,
+                        message: 'No scannable files found in repository',
+                    });
                 }
 
                 const scanDuration = Date.now() - startTime;
@@ -246,7 +174,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 const summary = summarizeIssues(allIssues);
                 const research = analyzeRepositoryResearch({ files: scannedFiles, issues: allIssues });
                 const secretsCount = summary.secrets;
+                const piiCount = summary.pii;
                 const vulnsCount = summary.vulnerabilities;
+                const noScannableFiles = totalCandidateFiles === 0;
+                const noFilesMessage = noScannableFiles ? 'No scannable files found in repository' : undefined;
 
                 // Send completion event first (so it gets logged)
                 sendEvent({
@@ -259,11 +190,15 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         filesScanned,
                         issuesFound: allIssues.length,
                         secretsCount,
+                        piiCount,
                         vulnerabilitiesCount: vulnsCount,
                         scanDurationMs: scanDuration,
                         summary,
                         research,
-                        issues: allIssues
+                        issues: allIssues,
+                        totalCandidateFiles,
+                        failedFiles,
+                        ...(noFilesMessage ? { message: noFilesMessage } : {}),
                     }
                 });
 
@@ -277,8 +212,22 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         issues_found: allIssues.length,
                         scan_duration_ms: scanDuration,
                         secrets_count: secretsCount,
+                        pii_count: piiCount,
                         vulnerabilities_count: vulnsCount,
-                        results: { issues: allIssues, summary, research },
+                        fix_status: allIssues.length > 0 ? 'pending' : 'not_applicable',
+                        fix_dismissed_at: null,
+                        fix_pr_url: null,
+                        fix_pr_number: null,
+                        fix_branch_name: null,
+                        fix_done_at: null,
+                        results: {
+                            issues: allIssues,
+                            summary,
+                            research,
+                            total_candidate_files: totalCandidateFiles,
+                            failed_files: failedFiles,
+                            ...(noFilesMessage ? { message: noFilesMessage } : {}),
+                        },
                         logs: allLogs,
                     })
                     .eq('id', scanRun.id);
@@ -319,6 +268,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 status: 'failed',
                                 error_message: errorMessage,
                                 scan_duration_ms: Date.now() - startTime,
+                                fix_status: 'not_applicable',
                                 logs: allLogs,
                             })
                             .eq('id', scanRunId);

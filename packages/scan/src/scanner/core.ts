@@ -117,6 +117,36 @@ function isLikelyFalsePositive(match: string, patternName: string): boolean {
     return false;
 }
 
+function detectExposedRouteFromPath(filePath: string): { framework: string; route: string } | null {
+    const normalized = filePath.replace(/\\/g, '/');
+
+    const appRouteMatch = normalized.match(/^app\/api(?:\/(.+))?\/route\.(?:[cm]?[jt]sx?)$/i);
+    if (appRouteMatch) {
+        const route = `/api/${appRouteMatch[1] || ''}`
+            .replace(/\/index$/i, '')
+            .replace(/\/+/g, '/');
+        return { framework: 'Next.js', route };
+    }
+
+    const pagesRouteMatch = normalized.match(/^pages\/api\/(.+)\.(?:[cm]?[jt]sx?)$/i);
+    if (pagesRouteMatch?.[1]) {
+        const route = `/api/${pagesRouteMatch[1]}`
+            .replace(/\/index$/i, '')
+            .replace(/\/+/g, '/');
+        return { framework: 'Next.js', route };
+    }
+
+    const expressRouteMatch = normalized.match(/(?:^|\/)routes\/(.+)\.(?:[cm]?[jt]sx?|py|rb|php|go|java)$/i);
+    if (expressRouteMatch?.[1]) {
+        const route = `/${expressRouteMatch[1]}`
+            .replace(/\/index$/i, '')
+            .replace(/\/+/g, '/');
+        return { framework: 'Express/Generic', route };
+    }
+
+    return null;
+}
+
 export function scanFileContent(filePath: string, content: string): ScanIssue[] {
     const issues: ScanIssue[] = [];
     const isDocFile = isDocOrTestFile(filePath);
@@ -179,6 +209,20 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
                 description: pattern.description,
             });
         }
+    }
+
+    const exposedRoute = detectExposedRouteFromPath(filePath);
+    if (exposedRoute) {
+        issues.push({
+            type: 'route',
+            severity: 'low',
+            name: 'Exposed API Route File',
+            file: filePath,
+            line: 1,
+            column: 1,
+            match: exposedRoute.route,
+            description: `${exposedRoute.framework} route detected. Verify authentication, authorization, and request validation.`,
+        });
     }
 
     for (const pattern of VULNERABILITY_PATTERNS) {

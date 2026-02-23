@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Sheet,
     SheetContent,
@@ -39,6 +39,20 @@ export interface FixProposal {
     originalCode: string;
     fixedCode: string;
     explanation: string;
+}
+
+interface IssueTypeCount {
+    type: string;
+    count: number;
+}
+
+interface GenerateFixesResponse {
+    fixes?: FixProposal[];
+    totalIssues?: number;
+    deterministicCount?: number;
+    aiCount?: number;
+    unfixableIssueTypes?: IssueTypeCount[];
+    message?: string;
 }
 
 interface FixPreviewSheetProps {
@@ -238,35 +252,15 @@ export function FixPreviewSheet({
     const [prUrl, setPrUrl] = useState<string>("");
     const [prNumber, setPrNumber] = useState<number>(0);
     const [stats, setStats] = useState({ total: 0, deterministic: 0, ai: 0 });
+    const [unfixableIssueTypes, setUnfixableIssueTypes] = useState<IssueTypeCount[]>([]);
+    const [manualReviewMessage, setManualReviewMessage] = useState<string>("");
     const hasTriggered = useRef(false);
 
-    // Trigger fix generation when sheet opens (useEffect is reliable, onOpenChange is not)
-    useEffect(() => {
-        if (open && scanRunId && !hasTriggered.current) {
-            hasTriggered.current = true;
-            console.log("[FixPreviewSheet] Sheet opened, triggering generateFixes");
-            generateFixes();
-        }
-        if (!open) {
-            hasTriggered.current = false;
-        }
-    }, [open, scanRunId]);
-
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            // Reset state when closing
-            setState("generating");
-            setFixes([]);
-            setAcceptedIds(new Set());
-            setError("");
-            setPrUrl("");
-        }
-        onOpenChange(isOpen);
-    };
-
-    const generateFixes = async () => {
+    const generateFixes = useCallback(async () => {
         setState("generating");
         setError("");
+        setUnfixableIssueTypes([]);
+        setManualReviewMessage("");
 
         try {
             const res = await fetch(`/api/scan/projects/${projectId}/fixes/generate`, {
@@ -280,21 +274,50 @@ export function FixPreviewSheet({
                 throw new Error(data.error || "Failed to generate fixes");
             }
 
-            const data = await res.json();
-            setFixes(data.fixes);
+            const data: GenerateFixesResponse = await res.json();
+            const generatedFixes = data.fixes || [];
+            setFixes(generatedFixes);
             setStats({
-                total: data.totalIssues,
-                deterministic: data.deterministicCount,
-                ai: data.aiCount,
+                total: data.totalIssues || 0,
+                deterministic: data.deterministicCount || 0,
+                ai: data.aiCount || 0,
             });
+            setUnfixableIssueTypes(data.unfixableIssueTypes || []);
+            setManualReviewMessage(data.message || "");
 
             // Accept all fixes by default
-            setAcceptedIds(new Set(data.fixes.map((f: FixProposal) => f.id)));
+            setAcceptedIds(new Set(generatedFixes.map((f: FixProposal) => f.id)));
             setState("review");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to generate fixes");
             setState("error");
         }
+    }, [projectId, scanRunId]);
+
+    // Trigger fix generation when sheet opens (useEffect is reliable, onOpenChange is not)
+    useEffect(() => {
+        if (open && scanRunId && !hasTriggered.current) {
+            hasTriggered.current = true;
+            console.log("[FixPreviewSheet] Sheet opened, triggering generateFixes");
+            generateFixes();
+        }
+        if (!open) {
+            hasTriggered.current = false;
+        }
+    }, [open, scanRunId, generateFixes]);
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            // Reset state when closing
+            setState("generating");
+            setFixes([]);
+            setAcceptedIds(new Set());
+            setError("");
+            setPrUrl("");
+            setUnfixableIssueTypes([]);
+            setManualReviewMessage("");
+        }
+        onOpenChange(isOpen);
     };
 
     const toggleFix = (id: string) => {
@@ -360,7 +383,7 @@ export function FixPreviewSheet({
                     </SheetTitle>
                     <SheetDescription className="text-xs">
                         {state === "generating" && "Generating fixes for detected issues..."}
-                        {state === "review" && (
+                        {state === "review" && fixes.length > 0 && (
                             <>
                                 {fixes.length} fix{fixes.length !== 1 ? "es" : ""} generated
                                 {stats.deterministic > 0 && (
@@ -372,6 +395,13 @@ export function FixPreviewSheet({
                                 {(stats.deterministic > 0 || stats.ai > 0) && ")"}
                                 {" — "}
                                 <span className="text-emerald-400">{acceptedCount} selected</span>
+                            </>
+                        )}
+                        {state === "review" && fixes.length === 0 && (
+                            <>
+                                {stats.total > 0
+                                    ? `${stats.total} issue${stats.total !== 1 ? "s" : ""} found — manual review required`
+                                    : "No issues found in this scan run"}
                             </>
                         )}
                         {state === "creating" && "Creating pull request..."}
@@ -434,11 +464,37 @@ export function FixPreviewSheet({
 
                     {state === "review" && fixes.length === 0 && (
                         <div className="text-center py-12">
-                            <CheckCircle className="h-8 w-8 text-emerald-400 mx-auto mb-3" />
-                            <p className="text-sm font-medium">No fixable issues found</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                All detected issues require manual review.
+                            {stats.total > 0 ? (
+                                <AlertTriangle className="h-8 w-8 text-yellow-400 mx-auto mb-3" />
+                            ) : (
+                                <CheckCircle className="h-8 w-8 text-emerald-400 mx-auto mb-3" />
+                            )}
+                            <p className="text-sm font-medium">
+                                {stats.total > 0 ? "Issues found, but no auto-fix generated" : "No issues found"}
                             </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {manualReviewMessage || (stats.total > 0
+                                    ? "No safe deterministic or AI fix was generated for the detected issues."
+                                    : "This scan run has no issues to fix.")}
+                            </p>
+                            {stats.total > 0 && unfixableIssueTypes.length > 0 && (
+                                <div className="mt-4 mx-auto max-w-md rounded-md border border-border/40 bg-card/40 p-3 text-left">
+                                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                                        Issue types requiring manual review
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {unfixableIssueTypes.slice(0, 6).map((issueType) => (
+                                            <Badge
+                                                key={issueType.type}
+                                                variant="outline"
+                                                className="text-[10px] h-5 border-border/50"
+                                            >
+                                                {issueType.type} ({issueType.count})
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
