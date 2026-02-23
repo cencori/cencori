@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
     }
 
     const supabaseAdmin = createAdminClient();
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         .single();
 
     if (projectError || !project) {
-        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        return new Response(JSON.stringify({ error: "Project not found" }), { status: 404 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -87,11 +87,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const history = Array.isArray(body.history) ? (body.history as ChatMessage[]) : [];
 
     if (!question) {
-        return NextResponse.json({ error: "question is required" }, { status: 400 });
+        return new Response(JSON.stringify({ error: "question is required" }), { status: 400 });
     }
 
     if (question.length > 2000) {
-        return NextResponse.json({ error: "question is too long (max 2000 chars)" }, { status: 400 });
+        return new Response(JSON.stringify({ error: "question is too long (max 2000 chars)" }), { status: 400 });
     }
 
     let relatedIssues: IssueContext[] = [];
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             .single();
 
         if (!scanRun) {
-            return NextResponse.json({ error: "Scan run not found" }, { status: 404 });
+            return new Response(JSON.stringify({ error: "Scan run not found" }), { status: 404 });
         }
 
         const results = (scanRun.results || {}) as ScanRunResultsLike;
@@ -117,24 +117,18 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
     }
 
-    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        return NextResponse.json({ answer: buildFallbackAnswer(question, issue, fix), source: "fallback" });
-    }
+    // Build prompt eagerly (pure string ops)
+    const recentHistory = history.slice(-8)
+        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+        .join("\n");
 
-    try {
-        const { GoogleGenerativeAI } = await import("@google/generative-ai");
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const relatedIssueContext = relatedIssues.length > 0
+        ? relatedIssues
+            .map((si) => `- ${si.name || "unknown"} (${si.severity || "unknown"}) at ${si.file || "unknown"}:${si.line || 0}`)
+            .join("\n")
+        : "n/a";
 
-        const recentHistory = history.slice(-8).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join("\n");
-        const relatedIssueContext = relatedIssues.length > 0
-            ? relatedIssues
-                .map((scanIssue) => `- ${scanIssue.name || "unknown"} (${scanIssue.severity || "unknown"}) at ${scanIssue.file || "unknown"}:${scanIssue.line || 0}`)
-                .join("\n")
-            : "n/a";
-
-        const prompt = `You are Cencori, a senior security engineer helping a teammate fix vulnerabilities.
+    const prompt = `You are Cencori, a senior security engineer helping a teammate fix vulnerabilities.
 Answer with practical, code-focused guidance and natural conversational tone.
 Light humor is allowed when appropriate, but stay technical and precise.
 Prefer short concrete recommendations, mention likely root cause and safe remediation.
@@ -165,15 +159,53 @@ Respond in plain text with:
 3) what to do next
 4) if useful, include a tiny patch sketch`;
 
-        const result = await model.generateContent(prompt);
-        const answer = result.response.text().trim();
+    const encoder = new TextEncoder();
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
 
-        return NextResponse.json({
-            answer: answer || buildFallbackAnswer(question, issue, fix),
-            source: "ai",
-        });
-    } catch (error) {
-        console.error("[Fix Chat] AI chat failed:", error);
-        return NextResponse.json({ answer: buildFallbackAnswer(question, issue, fix), source: "fallback" });
-    }
+    const stream = new ReadableStream({
+        async start(controller) {
+            const enqueue = (payload: string) =>
+                controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+
+            const sendFallback = () => {
+                enqueue(JSON.stringify({ content: buildFallbackAnswer(question, issue, fix) }));
+                enqueue("[DONE]");
+                controller.close();
+            };
+
+            if (!apiKey) {
+                sendFallback();
+                return;
+            }
+
+            try {
+                const { GoogleGenerativeAI } = await import("@google/generative-ai");
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+                const result = await model.generateContentStream(prompt);
+
+                for await (const chunk of result.stream) {
+                    const text = chunk.text();
+                    if (text) {
+                        enqueue(JSON.stringify({ content: text }));
+                    }
+                }
+
+                enqueue("[DONE]");
+                controller.close();
+            } catch (error) {
+                console.error("[Fix Chat] AI stream failed:", error);
+                sendFallback();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+        },
+    });
 }
