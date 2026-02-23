@@ -157,7 +157,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                             </div>
                             <DropdownMenuSeparator className="my-1" />
                             <DropdownMenuItem asChild className="text-xs py-1.5 cursor-pointer">
-                                <Link href="/docs/scan" className="flex items-center gap-2">
+                                <Link href="/docs/security/scan/web-dashboard" className="flex items-center gap-2">
                                     <Book className="h-3.5 w-3.5" />
                                     Scan Documentation
                                 </Link>
