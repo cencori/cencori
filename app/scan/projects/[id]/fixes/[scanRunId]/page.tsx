@@ -809,7 +809,7 @@ export default function FixWorkspacePage() {
 
             {/* ── Diff dialog ─────────────────────────────────────────── */}
             <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
-                <DialogContent className="!max-w-[50vw] !w-[50vw] p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
+                <DialogContent className="!max-w-[40vw] !w-[40vw] p-0 overflow-hidden bg-[#0d0d0d] border border-border/30">
                     {/* Header bar */}
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border/25">
                         <span className="text-sm font-medium text-foreground">
