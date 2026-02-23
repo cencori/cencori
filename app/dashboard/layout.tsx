@@ -39,6 +39,7 @@ import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { UpdateToast } from "@/components/ui/update-toast";
+import posthog from "posthog-js";
 
 
 // Optional header/nav links later
@@ -52,13 +53,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     async function check() {
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) {
-        // not signed in: redirect to login
         router.push("/login");
         return;
       }
       if (mounted) {
         setUser(data.user);
         setLoading(false);
+        // Identify user in PostHog
+        try {
+          posthog.identify(data.user.id, {
+            email: data.user.email,
+            name: data.user.user_metadata?.name ?? data.user.user_metadata?.full_name,
+            created_at: data.user.created_at,
+          });
+        } catch { /* non-critical */ }
       }
     }
     check();
@@ -556,6 +564,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                 className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
                 onClick={async () => {
                   await supabase.auth.signOut();
+                  posthog.reset(); // clear identified user on logout
                   router.push("/login");
                 }}
               >

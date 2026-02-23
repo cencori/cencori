@@ -268,7 +268,17 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
         });
     }
 
-    return issues;
+    const seen = new Set<string>();
+    const deduped: ScanIssue[] = [];
+    for (const issue of issues) {
+        const key = `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            deduped.push(issue);
+        }
+    }
+
+    return deduped;
 }
 
 export function calculateScore(issues: ScanIssue[]): ScanScore {

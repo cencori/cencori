@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { CookieConsent } from "@/components/CookieConsent";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
+import { PostHogProvider } from "@/components/PostHogProvider";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -236,10 +237,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning className={`${montserrat.variable} ${jetbrainsMono.variable} font-sans`}>
         <ThemeProvider>
-          {/* Include the Navbar here */}
-          {children}
-          <CookieConsent />
-          <Toaster />
+          <PostHogProvider>
+            {children}
+            <CookieConsent />
+            <Toaster />
+          </PostHogProvider>
         </ThemeProvider>
         <Analytics />
       </body>
