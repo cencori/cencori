@@ -120,7 +120,7 @@ test.describe('Authentication Security @security', () => {
                 },
                 form: {
                     email: 'test@example.com',
-                    password: 'test123',
+                    password: process.env.TEST_USER_PASSWORD || 'test123', // Fixed: Replaced hardcoded password with environment variable
                 },
             });
 
