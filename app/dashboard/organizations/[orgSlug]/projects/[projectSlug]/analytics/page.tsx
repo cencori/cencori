@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { authenticate } from '../auth'; // assuming an auth module exists
 
 interface PageProps {
     params: Promise<{
@@ -11,6 +12,9 @@ interface PageProps {
 export default async function AnalyticsRedirectPage({ params, searchParams }: PageProps) {
     const { orgSlug, projectSlug } = await params;
     const resolvedSearchParams = (await searchParams) || {};
+
+    // Authenticate before proceeding
+    await authenticate();
 
     const query = new URLSearchParams();
 
