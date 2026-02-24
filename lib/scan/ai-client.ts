@@ -21,13 +21,13 @@ function getProviders(): ProviderConfig[] {
         {
             name: "cerebras",
             baseURL: "https://api.cerebras.ai/v1",
-            model: "qwen-3-235b-a22b",
+            model: "llama3.1-8b",
             apiKey: process.env.CEREBRAS_API_KEY,
         },
         {
             name: "groq",
             baseURL: "https://api.groq.com/openai/v1",
-            model: "deepseek-r1-distill-llama-70b",
+            model: "llama-3.3-70b-versatile",
             apiKey: process.env.GROQ_API_KEY,
         },
     ];
