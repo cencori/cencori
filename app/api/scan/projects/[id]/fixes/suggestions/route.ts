@@ -3,6 +3,10 @@ import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
 
+// Allow up to 5 minutes for reasoning + content generation
+export const maxDuration = 300;
+
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
 
