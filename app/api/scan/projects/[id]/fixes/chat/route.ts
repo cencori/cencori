@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { streamWithFallback } from "@/lib/scan/ai-client";
+import { streamWithReasoning } from "@/lib/scan/ai-client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -181,10 +181,16 @@ User: ${question}`;
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 
             try {
-                await streamWithFallback(prompt, controller, encoder);
+                await streamWithReasoning(
+                    question,
+                    prompt, // System prompt
+                    controller,
+                    encoder,
+                    buildFallbackAnswer(question, issue, fix)
+                );
             } catch (error) {
                 console.error("[Fix Chat] All providers failed:", error);
-                enqueue(JSON.stringify({ content: buildFallbackAnswer(question, issue, fix) }));
+                enqueue(JSON.stringify({ type: "content", content: buildFallbackAnswer(question, issue, fix) }));
                 enqueue("[DONE]");
                 controller.close();
             }
