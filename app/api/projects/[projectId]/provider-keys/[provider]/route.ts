@@ -1,11 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import { encryptApiKey } from '@/lib/encryption';
-
-export async function PATCH(
-    req: NextRequest,
-    { params }: { params: Promise<{ projectId: string; provider: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ projectId: string; provider: string }> }) {
     const supabase = createAdminClient();
 
     try {
@@ -76,7 +69,7 @@ export async function PATCH(
             provider: {
                 provider: providerKey.provider,
                 keyHint: providerKey.key_hint,
-                apiKey: apiKey || undefined, // Send back if they just updated it
+                apiKey: apiKey || undefined,
                 isActive: providerKey.is_active,
                 defaultModel: providerKey.default_model,
                 defaultImageModel: providerKey.default_image_model,
@@ -88,10 +81,7 @@ export async function PATCH(
     }
 }
 
-export async function DELETE(
-    req: NextRequest,
-    { params }: { params: Promise<{ projectId: string; provider: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ projectId: string; provider: string }> }) {
     const supabase = createAdminClient();
 
     try {
