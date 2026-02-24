@@ -771,10 +771,25 @@ export default function FixWorkspacePage() {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 text-xs px-4"
+                                className="h-8 text-xs px-4 gap-1.5"
                                 onClick={() => setDiffDialogOpen(true)}
                             >
                                 Diffs ({fixes.length})
+                                {(() => {
+                                    const t = fixes.reduce(
+                                        (acc, fix) => {
+                                            const s = computeDiffStats(fix.originalCode, fix.fixedCode);
+                                            return { added: acc.added + s.added, removed: acc.removed + s.removed };
+                                        },
+                                        { added: 0, removed: 0 }
+                                    );
+                                    return (
+                                        <>
+                                            <span className="text-emerald-400">+{t.added}</span>
+                                            <span className="text-red-400">-{t.removed}</span>
+                                        </>
+                                    );
+                                })()}
                             </Button>
                             {scanRun?.fix_status === "pr_opened" && scanRun?.fix_pr_url ? (
                                 <Button
