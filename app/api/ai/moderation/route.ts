@@ -21,6 +21,7 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
     // ── Gateway validation ──
+    // This function is responsible for authentication, authorization, and core request validation.
     const validation = await validateGatewayRequest(req);
     if (!validation.success) {
         return validation.response;

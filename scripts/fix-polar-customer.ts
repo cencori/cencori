@@ -1,16 +1,14 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Polar } from '@polar-sh/sdk';
 
 const supabaseUrl = "https://hxkbdauihjhgccfvwyvz.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4a2JkYXVpaGpoZ2NjZnZ3eXZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDAxNjExMiwiZXhwIjoyMDc1NTkyMTEyfQ.TKRdIo1mL4uuvToG3BtTF0zYIwyt1CRP58Z8En8EsVk";
+const supabaseKey = process.env.GENERIC_API_KEY_ASSIGNMENT;
 const polarApiKey = "polar_oat_7QxaQuMQF43NKA7CxI2Ykpf8yVPMvHfddcSRW0PQvAX";
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const polar = new Polar({
     accessToken: polarApiKey,
     server: 'production',
-});
 
 async function run() {
     console.log('Listing all organizations...');

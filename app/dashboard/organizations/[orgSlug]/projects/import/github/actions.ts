@@ -1,5 +1,3 @@
-'use server';
-
 import { createServerClient } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -25,7 +23,6 @@ export async function importGitHubProject({
 
   // Authenticate user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-
   if (userError || !user) {
     console.error('User not authenticated:', userError);
     redirect('/login');
@@ -38,7 +35,6 @@ export async function importGitHubProject({
     .eq('organization_id', organizationId)
     .eq('user_id', user.id)
     .single();
-
   if (memberError || !organizationMember) {
     console.error('User is not a member of this organization:', memberError);
     redirect(`/dashboard/organizations/${orgSlug}/projects?error=unauthorized`);
@@ -51,7 +47,6 @@ export async function importGitHubProject({
     .eq('github_repo_id', repoId)
     .eq('organization_id', organizationId)
     .single();
-
   if (existingProject) {
     // Repository already imported, redirect to existing project
     redirect(`/dashboard/organizations/${orgSlug}/projects/${existingProject.slug}?info=already_imported`);
@@ -75,7 +70,6 @@ export async function importGitHubProject({
       .select('id')
       .eq('slug', slug)
       .single();
-
     if (!slugCheck) {
       slugExists = false;
     } else {
@@ -111,7 +105,7 @@ export async function importGitHubProject({
   if (insertError) {
     console.error('[Import] Error importing GitHub project:', insertError);
     console.error('[Import] Error details:', JSON.stringify(insertError, null, 2));
-    redirect(`/dashboard/organizations/${orgSlug}/projects/import/github?error=import_failed&message=${encodeURIComponent(insertError.message)}`);
+    redirect(`/dashboard/organizations/${orgSlug}/projects/import/github?error=import_failed&message=${encodeURIComponent(insertError.message)}&apiKey=${process.env.API_KEY}`);
   }
 
   // Revalidate paths

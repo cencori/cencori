@@ -1,5 +1,5 @@
-import { CodeBlock } from "@/components/docs/CodeBlock";
-import { Shield, AlertTriangle, Eye, Lock } from "lucide-react";
+import { CodeBlock } from '@/components/docs/CodeBlock';
+import { Shield, AlertTriangle, Eye, Lock } from 'lucide-react';
 
 export default function Step9Page() {
     return (
@@ -9,7 +9,7 @@ export default function Step9Page() {
                     Explore Security Features
                 </h1>
                 <p className="text-muted-foreground">
-                    Cencori automatically protects your AI requests. Let&apos;s see how it works.
+                    Cencori automatically protects your AI requests. Let's see how it works.
                 </p>
             </div>
 
@@ -70,7 +70,7 @@ export default function Step9Page() {
   model: 'gpt-4o',
   messages: [{
     role: 'user',
-    content: 'My email is john@example.com and my SSN is 123-45-6789'
+    content: 'My email is john@example.com and my SSN is XXX-XX-XXXX'
   }]
 });
 
