@@ -15,13 +15,6 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
     const [isExpanded, setIsExpanded] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto-expand when reasoning starts
-    useEffect(() => {
-        if (liveText && liveText.length > 0 && !isExpanded) {
-            setIsExpanded(true);
-        }
-    }, [liveText, isExpanded]);
-
     // Auto-scroll to bottom while reasoning is streaming
     useEffect(() => {
         if (!finished && scrollRef.current) {
