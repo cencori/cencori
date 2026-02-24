@@ -75,7 +75,7 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
                             // No reasoning yet — simple waiting state
                             <div className="flex items-center gap-2 py-2 text-[10px] font-mono text-muted-foreground/50">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-pulse" />
-                                Waiting for cencori...
+                                Cencori is thinking...
                             </div>
                         )}
                     </motion.div>
