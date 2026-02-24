@@ -652,7 +652,7 @@ export default function FixWorkspacePage() {
 
 
     // True once the first AI message has content (stream started)
-    const aiHasStarted = chatMessages.some((m) => m.role === "assistant" && m.content.length > 0);
+    const aiHasStarted = chatMessages.some((m) => m.role === "assistant");
     // True once all AI messages are done streaming
     const aiIsDone = chatMessages.length > 0 && chatMessages.every((m) => !m.isStreaming);
     const lastMessage = chatMessages[chatMessages.length - 1];
