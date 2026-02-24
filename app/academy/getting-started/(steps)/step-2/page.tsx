@@ -10,7 +10,7 @@ export default function Step2Page() {
                     Create a Project
                 </h1>
                 <p className="text-muted-foreground">
-                    Projects are containers for your API keys, settings, and logs. Let&apos;s create one.
+                    Projects are containers for your API keys, settings, and logs. Let’s create one.
                 </p>
             </div>
 
@@ -37,7 +37,7 @@ export default function Step2Page() {
                         <div>
                             <p className="font-medium">Go to your Dashboard</p>
                             <p className="text-muted-foreground mb-2">
-                                If you just signed up, you&apos;ll already be there
+                                If you just signed up, you’ll already be there
                             </p>
                             <Link href="/dashboard" target="_blank">
                                 <Button variant="outline" size="sm" className="gap-2">
@@ -50,7 +50,7 @@ export default function Step2Page() {
                     <li className="flex gap-3">
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">2</span>
                         <div>
-                            <p className="font-medium">Click &quot;New Project&quot;</p>
+                            <p className="font-medium">Click “New Project”</p>
                             <p className="text-muted-foreground">
                                 Find the button in the top-right or the empty state
                             </p>
@@ -61,7 +61,7 @@ export default function Step2Page() {
                         <div>
                             <p className="font-medium">Name your project</p>
                             <p className="text-muted-foreground">
-                                Something like &quot;My First App&quot; or &quot;Tutorial Project&quot; works great
+                                Something like “My First App” or “Tutorial Project” works great
                             </p>
                         </div>
                     </li>
@@ -70,7 +70,7 @@ export default function Step2Page() {
                         <div>
                             <p className="font-medium">Done! 🎉</p>
                             <p className="text-muted-foreground">
-                                You&apos;ll be taken to your project dashboard
+                                You’ll be taken to your project dashboard
                             </p>
                         </div>
                     </li>
