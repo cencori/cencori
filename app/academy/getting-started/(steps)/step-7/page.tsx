@@ -1,4 +1,4 @@
-import { CodeBlock } from "@/components/docs/CodeBlock";
+import { CodeBlock } from '@/components/docs/CodeBlock';
 
 export default function Step7Page() {
     return (
@@ -8,7 +8,7 @@ export default function Step7Page() {
                     Enable Streaming
                 </h1>
                 <p className="text-muted-foreground">
-                    Streaming gives your users a better experience by showing AI responses as they&apos;re generated, token by token.
+                    Streaming gives your users a better experience by showing AI responses as they're generated, token by token.
                 </p>
             </div>
 
@@ -53,7 +53,7 @@ for await (const chunk of stream) {
   
   // Check if generation is complete
   if (chunk.finish_reason) {
-    console.log('\\nDone!', chunk.finish_reason);
+    console.log('\nDone!', chunk.finish_reason);
   }
 }`}
                 />
@@ -66,10 +66,14 @@ for await (const chunk of stream) {
                     filename="app/api/chat/route.ts"
                     code={`import { Cencori } from 'cencori';
 import { NextRequest } from 'next/server';
+import { authenticate } from '../auth'; // assuming an authentication function
 
 const cencori = new Cencori();
 
 export async function POST(req: NextRequest) {
+  if (!(await authenticate(req))) {
+    return new Response('Unauthorized', { status: 401 });
+  }
   const { messages } = await req.json();
 
   const stream = cencori.ai.chatStream({
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       for await (const chunk of stream) {
         controller.enqueue(
-          encoder.encode(\`data: \${JSON.stringify(chunk)}\\n\\n\`)
+          encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`)
         );
       }
       controller.close();
@@ -110,8 +114,12 @@ export async function POST(req: NextRequest) {
                     filename="app/api/chat/route.ts"
                     code={`import { cencori } from '@cencori/ai-sdk';
 import { streamText } from 'ai';
+import { authenticate } from '../auth'; // assuming an authentication function
 
 export async function POST(req: Request) {
+  if (!(await authenticate(req))) {
+    return new Response('Unauthorized', { status: 401 });
+  }
   const { messages } = await req.json();
 
   const result = await streamText({
