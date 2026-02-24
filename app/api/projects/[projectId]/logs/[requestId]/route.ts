@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { authenticate } from '@/lib/authenticate';
 
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string; requestId: string }> }
 ) {
+    if (!(await authenticate(req))) {
+        return NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        );
+    }
+
     const supabaseAdmin = createAdminClient();
     const { projectId, requestId } = await params;
 
