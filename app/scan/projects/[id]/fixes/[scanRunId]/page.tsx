@@ -389,6 +389,13 @@ export default function FixWorkspacePage() {
     const generateFixes = useCallback(async () => {
         setLoadingFixes(true);
         setError("");
+
+        // ── Start reasoning immediately — don't wait for code patches ──────────
+        // The suggestions route fetches raw issues from the DB itself, so
+        // gpt-oss-120b can begin reasoning on scan data right away.
+        setChatPending(true);
+        void streamFixSuggestions([], []);
+
         try {
             const response = await fetch(`/api/scan/projects/${projectId}/fixes/generate`, {
                 method: "POST",
@@ -407,8 +414,6 @@ export default function FixWorkspacePage() {
             setFixes(generatedFixes);
             setManualGuidance(generatedGuidance);
             setSelectedFixIds(new Set(generatedFixes.map((fix) => fix.id)));
-            setChatPending(true); // keep thinking indicator alive until stream starts
-            void streamFixSuggestions(generatedFixes, generatedGuidance);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to generate fixes");
         } finally {
