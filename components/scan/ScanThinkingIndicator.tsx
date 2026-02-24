@@ -22,11 +22,10 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
         }
     }, [liveText, finished]);
 
-    // Collapse automatically when finished
+    // Collapse as soon as content starts arriving (finished=true)
     useEffect(() => {
         if (finished) setIsExpanded(false);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // intentionally empty — only collapse on unmount, not on finish
+    }, [finished]);
 
     const isRunning = !finished;
 

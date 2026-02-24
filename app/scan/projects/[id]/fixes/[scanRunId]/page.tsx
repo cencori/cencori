@@ -311,6 +311,7 @@ export default function FixWorkspacePage() {
 
                 const decoder = new TextDecoder();
                 let fullContent = "";
+                let localReasoning = "";
                 let buffer = "";
 
                 while (true) {
@@ -331,6 +332,7 @@ export default function FixWorkspacePage() {
                                 // Route by event type
                                 if (parsed.type === "reasoning" && typeof parsed.content === "string") {
                                     // Live reasoning from gpt-oss-120b → thinking indicator
+                                    localReasoning += parsed.content;
                                     setReasoningText((prev) => prev + parsed.content);
                                 } else if (typeof parsed.content === "string" && parsed.content.length > 0) {
                                     // content event (or legacy untyped) → chat message
@@ -351,11 +353,17 @@ export default function FixWorkspacePage() {
                     }
                 }
 
-                // Mark streaming done
+                // Mark streaming done — persist reasoning so 'Complete' badge stays visible
                 setChatMessages((prev) => {
                     const next = [...prev];
                     const last = next[next.length - 1];
-                    if (last?.role === "assistant") next[next.length - 1] = { ...last, isStreaming: false };
+                    if (last?.role === "assistant") {
+                        next[next.length - 1] = {
+                            ...last,
+                            isStreaming: false,
+                            reasoning: localReasoning || last.reasoning,
+                        };
+                    }
                     return next;
                 });
             } catch (err) {
@@ -743,8 +751,12 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
+                                    {/* Show while streaming (even without reasoning yet) or after if reasoning exists */}
                                     {(message.isStreaming || message.reasoning) && (
-                                        <ScanThinkingIndicator finished={!message.isStreaming} liveText={message.reasoning || undefined} />
+                                        <ScanThinkingIndicator
+                                            finished={!!message.content}
+                                            liveText={message.reasoning || undefined}
+                                        />
                                     )}
                                 </div>
                                 {message.content && (
