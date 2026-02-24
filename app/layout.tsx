@@ -1,5 +1,5 @@
 // app/layout.tsx
-import { Montserrat, JetBrains_Mono } from "next/font/google";
+import { Montserrat, JetBrains_Mono, Geist } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -17,6 +17,11 @@ const montserrat = Montserrat({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono"
+});
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
 });
 
 // Aggressive keyword targeting
@@ -235,7 +240,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${montserrat.variable} ${jetbrainsMono.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${montserrat.variable} ${jetbrainsMono.variable} ${geist.variable} font-sans`}>
         <ThemeProvider>
           <PostHogProvider>
             {children}

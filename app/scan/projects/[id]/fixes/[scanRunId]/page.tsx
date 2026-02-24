@@ -707,7 +707,7 @@ export default function FixWorkspacePage() {
                         message.role === "user" ? (
                             <div key={`msg-${idx}`} className="flex justify-end">
                                 <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3 py-2">
-                                    <p className="text-sm">{message.content}</p>
+                                    <p className="text-sm" style={{ fontFamily: 'var(--font-geist)' }}>{message.content}</p>
                                 </div>
                             </div>
                         ) : (
@@ -721,7 +721,9 @@ export default function FixWorkspacePage() {
                                             <span>{message.content}</span>
                                         </div>
                                     ) : (
-                                        <ScanMarkdownRenderer content={message.content} />
+                                        <div style={{ fontFamily: 'var(--font-geist)' }}>
+                                            <ScanMarkdownRenderer content={message.content} />
+                                        </div>
                                     )
                                 )}
                                 {!message.isStreaming && message.content && (
@@ -856,10 +858,10 @@ export default function FixWorkspacePage() {
                                     void handleSendChat();
                                 }
                             }}
-                            placeholder="Ask..."
+                            placeholder="Ask a question..."
                             rows={1}
                             className="flex-1 resize-none bg-transparent py-2 text-sm placeholder:text-muted-foreground focus:outline-none max-h-32"
-                            style={{ minHeight: "24px" }}
+                            style={{ fontFamily: 'var(--font-geist)', minHeight: "24px" }}
                         />
                         <div className="flex-shrink-0">
                             {chatLoading ? (
