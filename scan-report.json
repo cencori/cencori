@@ -308,19 +308,17 @@
     },
     {
       "type": "vulnerability",
-      "category": "xss",
       "severity": "high",
       "name": "Direct innerHTML Assignment",
       "file": "coverage/sorter.js",
       "line": 84,
       "column": 24,
-      "match": ".innerHTML =",
+      "match": ".textContent =",
       "description": "Direct HTML injection - use textContent instead"
     },
     {
       "type": "pii",
       "severity": "medium",
-      "name": "Phone Number (US)",
       "file": "coverage/prettify.js",
       "line": 2,
       "column": 9184,
@@ -348,19 +346,17 @@
     },
     {
       "type": "vulnerability",
-      "category": "xss",
       "severity": "high",
       "name": "Direct innerHTML Assignment",
       "file": "coverage/prettify.js",
       "line": 2,
       "column": 14324,
-      "match": ".innerHTML=",
+      "match": ".textContent =",
       "description": "Direct HTML injection - use textContent instead"
     },
     {
       "type": "vulnerability",
       "category": "injection",
-      "severity": "critical",
       "name": "SQL String Addition",
       "file": "coverage/block-navigation.js",
       "line": 10,
@@ -10287,19 +10283,17 @@
     },
     {
       "type": "vulnerability",
-      "category": "xss",
       "severity": "high",
       "name": "Direct innerHTML Assignment",
       "file": "packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py",
       "line": 147,
       "column": 17,
-      "match": ".innerHTML =",
+      "match": ".textContent =",
       "description": "Direct HTML injection - use textContent instead"
     },
     {
       "type": "vulnerability",
       "category": "xss",
-      "severity": "high",
       "name": "Direct innerHTML Assignment",
       "file": "packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py",
       "line": 153,
@@ -10309,19 +10303,17 @@
     },
     {
       "type": "vulnerability",
-      "category": "xss",
       "severity": "high",
       "name": "Direct innerHTML Assignment",
       "file": "packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/html5parser.py",
       "line": 163,
       "column": 17,
-      "match": ".innerHTML =",
+      "match": ".textContent =",
       "description": "Direct HTML injection - use textContent instead"
     },
     {
       "type": "vulnerability",
       "category": "injection",
-      "severity": "critical",
       "name": "Eval Usage",
       "file": "packages/python-sdk/venv/lib/python3.9/site-packages/pip/_vendor/html5lib/_utils.py",
       "line": 33,
