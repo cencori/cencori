@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { ChevronLeft, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 interface AcademyLayoutProps {
     children: ReactNode;
@@ -14,6 +16,14 @@ interface AcademyLayoutProps {
 export function AcademyLayout({ children }: AcademyLayoutProps) {
     const pathname = usePathname();
     const isHome = pathname === "/academy";
+    const router = useRouter();
+    const userRole = process.env.USER_ROLE;
+
+    useEffect(() => {
+        if (router.pathname === "/dashboard" && userRole !== "admin") {
+            router.push("/unauthorized");
+        }
+    }, [router.pathname, userRole]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -43,11 +53,13 @@ export function AcademyLayout({ children }: AcademyLayoutProps) {
                                     Docs
                                 </Button>
                             </Link>
-                            <Link href="/dashboard">
-                                <Button variant="outline" size="sm">
-                                    Dashboard
-                                </Button>
-                            </Link>
+                            {userRole === "admin" && (
+                                <Link href="/dashboard">
+                                    <Button variant="outline" size="sm">
+                                        Dashboard
+                                    </Button>
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </div>
