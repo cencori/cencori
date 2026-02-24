@@ -8,21 +8,23 @@ export default function Step6Page() {
                     Make Your First Request
                 </h1>
                 <p className="text-muted-foreground">
-                    Let&apos;s send your first AI chat request through Cencori. This is the exciting part! 🚀
+                    Let’s send your first AI chat request through Cencori. This is the exciting part! 🚀
                 </p>
             </div>
 
             <div className="space-y-4">
                 <h2 className="text-lg font-semibold">Basic Chat Request</h2>
                 <p className="text-sm text-muted-foreground">
-                    Here&apos;s the simplest way to make an AI request:
+                    Here’s the simplest way to make an AI request:
                 </p>
                 <CodeBlock
                     language="typescript"
                     filename="app/api/chat/route.ts"
                     code={`import { Cencori } from 'cencori';
 
-const cencori = new Cencori();
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
 
 // Make a chat request
 const response = await cencori.ai.chat({
@@ -45,17 +47,24 @@ console.log(response.usage);
             <div className="space-y-4">
                 <h2 className="text-lg font-semibold">In a Next.js API Route</h2>
                 <p className="text-sm text-muted-foreground">
-                    Here&apos;s a complete example for a Next.js app:
+                    Here’s a complete example for a Next.js app:
                 </p>
                 <CodeBlock
                     language="typescript"
                     filename="app/api/chat/route.ts"
                     code={`import { Cencori } from 'cencori';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticate } from '../auth';
 
-const cencori = new Cencori();
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
 
 export async function POST(req: NextRequest) {
+  if (!(await authenticate(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { messages } = await req.json();
 
   try {
