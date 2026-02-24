@@ -249,12 +249,11 @@ export async function streamWithFallback(
  *
  * Phase 1 — gpt-oss-120b (Cerebras reasoning model)
  *   Streams delta.reasoning tokens → SSE: {"type":"reasoning","content":"..."}
- *   The frontend pipes these to the ScanThinkingIndicator as live thought text.
+ *   Frontend pipes these to ScanThinkingIndicator as live thought text.
  *
- * Phase 2 — llama3.1-8b (Cerebras fast generator)
- *   Receives the reasoning output as context, then streams the remediation brief.
- *   Streams delta.content tokens → SSE: {"type":"content","content":"..."}
- *   Falls back to Groq → Gemini if Cerebras fast fails.
+ * Phase 2 — content generation with fallback chain:
+ *   Cerebras llama3.1-8b → Groq llama-3.3-70b-versatile → Gemini
+ *   Streams delta.content → SSE: {"type":"content","content":"..."}
  *
  * Completion: data: [DONE]
  */
@@ -276,6 +275,57 @@ export async function streamWithReasoning(
     const emitContent = (text: string) =>
         enqueue(JSON.stringify({ type: "content", content: text }));
 
+    // Helper: read a streaming OpenAI-compatible response and emit content chunks
+    async function streamOpenAIContent(
+        baseURL: string,
+        apiKey: string,
+        model: string,
+        messages: Array<{ role: string; content: string }>,
+    ): Promise<boolean> {
+        const res = await withTimeout(
+            fetch(`${baseURL}/chat/completions`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({ model, messages, temperature: 0.3, stream: true }),
+            }),
+            TIMEOUT_MS
+        );
+
+        if (!res.ok || !res.body) {
+            const errBody = await res.text().catch(() => "");
+            console.warn(`[AI Client] ${model} HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+            return false;
+        }
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buffer = "";
+        let gotContent = false;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += dec.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+                const trimmed = line.replace(/^data:\s*/, "").trim();
+                if (!trimmed || trimmed === "[DONE]") continue;
+                try {
+                    const parsed = JSON.parse(trimmed) as {
+                        choices?: Array<{ delta?: { content?: string } }>;
+                    };
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) { emitContent(content); gotContent = true; }
+                } catch { /* skip */ }
+            }
+        }
+        return gotContent;
+    }
+
     // ── Phase 1: reasoning with gpt-oss-120b ─────────────────────────────────
     let reasoningOutput = "";
 
@@ -296,7 +346,7 @@ export async function streamWithReasoning(
                             { role: "user", content: prompt },
                         ],
                         temperature: 0.6,
-                        max_tokens: 8000,
+                        max_tokens: 4000,
                         stream: true,
                     }),
                 }),
@@ -311,35 +361,27 @@ export async function streamWithReasoning(
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-
                     buffer += dec.decode(value, { stream: true });
                     const lines = buffer.split("\n");
                     buffer = lines.pop() ?? "";
-
                     for (const line of lines) {
                         const trimmed = line.replace(/^data:\s*/, "").trim();
                         if (!trimmed || trimmed === "[DONE]") continue;
-
                         try {
                             const parsed = JSON.parse(trimmed) as {
-                                choices?: Array<{
-                                    delta?: { reasoning?: string; content?: string };
-                                }>;
+                                choices?: Array<{ delta?: { reasoning?: string; content?: string } }>;
                             };
                             const delta = parsed.choices?.[0]?.delta;
-                            // Capture reasoning tokens → live thinking display
                             if (delta?.reasoning) {
                                 emitReasoning(delta.reasoning);
                                 reasoningOutput += delta.reasoning;
                             }
-                            // Some chunks may have content directly
                             if (delta?.content) {
                                 reasoningOutput += delta.content;
                             }
                         } catch { /* skip malformed */ }
                     }
                 }
-
                 console.log(`[AI Client] Phase 1 complete — ${reasoningOutput.length} reasoning chars`);
             } else {
                 const errBody = await res.text().catch(() => "");
@@ -350,100 +392,76 @@ export async function streamWithReasoning(
         }
     }
 
-    // ── Phase 2: fast content stream with llama3.1-8b ────────────────────────
-    // Build a rich prompt that includes the reasoning as context
-    const contentPrompt = reasoningOutput
-        ? `You are Cencori, a senior security engineer. Based on this security analysis:\n\n<reasoning>\n${reasoningOutput.slice(0, 4000)}\n</reasoning>\n\nNow write the remediation brief for the user.\n\n${prompt}`
-        : prompt;
+    // ── Phase 2: content generation with fallback chain ───────────────────────
+    const contentMessages = [
+        { role: "system", content: systemPrompt },
+        {
+            role: "user",
+            content: reasoningOutput
+                ? `Based on this security reasoning:\n\n<reasoning>\n${reasoningOutput.slice(0, 3000)}\n</reasoning>\n\nNow write the remediation brief.\n\n${prompt}`
+                : prompt,
+        },
+    ];
 
+    // Try Cerebras llama3.1-8b first
     if (cerebrasKey) {
         try {
-            console.log("[AI Client] Phase 2: llama3.1-8b content stream...");
-            const res = await withTimeout(
-                fetch(`${cerebrasBase}/chat/completions`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${cerebrasKey}`,
-                    },
-                    body: JSON.stringify({
-                        model: FAST_MODEL,
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: contentPrompt },
-                        ],
-                        temperature: 0.3,
-                        stream: true,
-                    }),
-                }),
-                TIMEOUT_MS
-            );
-
-            if (res.ok && res.body) {
-                const reader = res.body.getReader();
-                const dec = new TextDecoder();
-                let buffer = "";
-                let gotContent = false;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += dec.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() ?? "";
-
-                    for (const line of lines) {
-                        const trimmed = line.replace(/^data:\s*/, "").trim();
-                        if (!trimmed || trimmed === "[DONE]") continue;
-                        try {
-                            const parsed = JSON.parse(trimmed) as {
-                                choices?: Array<{ delta?: { content?: string } }>;
-                            };
-                            const content = parsed.choices?.[0]?.delta?.content;
-                            if (content) {
-                                emitContent(content);
-                                gotContent = true;
-                            }
-                        } catch { /* skip */ }
-                    }
-                }
-
-                if (gotContent) {
-                    console.log("[AI Client] ✓ Phase 2 content stream complete");
-                    enqueue("[DONE]");
-                    controller.close();
-                    return;
-                }
+            console.log("[AI Client] Phase 2: llama3.1-8b...");
+            const ok = await streamOpenAIContent(cerebrasBase, cerebrasKey, FAST_MODEL, contentMessages);
+            if (ok) {
+                console.log("[AI Client] ✓ Phase 2 via Cerebras llama");
+                enqueue("[DONE]");
+                controller.close();
+                return;
             }
         } catch (err) {
-            console.warn("[AI Client] Phase 2 llama failed:", err instanceof Error ? err.message : err);
+            console.warn("[AI Client] Phase 2 Cerebras failed:", err instanceof Error ? err.message : err);
         }
     }
 
-    // Fallback: use the standard fallback chain but wrap as content events
-    console.log("[AI Client] Phase 2 falling back to standard chain...");
-    const fallbackController: ReadableStreamDefaultController = {
-        ...controller,
-        enqueue: (chunk: Uint8Array) => {
-            // Re-wrap plain {content:...} → {type:"content", content:...}
-            const text = new TextDecoder().decode(chunk);
-            const lines = text.split("\n");
-            for (const line of lines) {
-                const stripped = line.replace(/^data:\s*/, "").trim();
-                if (!stripped || stripped === "[DONE]") {
-                    if (stripped === "[DONE]") controller.enqueue(chunk);
-                    continue;
-                }
-                try {
-                    const parsed = JSON.parse(stripped) as { content?: string };
-                    if (parsed.content) {
-                        emitContent(parsed.content);
-                    }
-                } catch { /* skip */ }
+    // Groq fallback
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey) {
+        try {
+            console.log("[AI Client] Phase 2: Groq llama-3.3-70b-versatile...");
+            const ok = await streamOpenAIContent(
+                "https://api.groq.com/openai/v1",
+                groqKey,
+                "llama-3.3-70b-versatile",
+                contentMessages,
+            );
+            if (ok) {
+                console.log("[AI Client] ✓ Phase 2 via Groq");
+                enqueue("[DONE]");
+                controller.close();
+                return;
             }
-        },
-    } as ReadableStreamDefaultController;
+        } catch (err) {
+            console.warn("[AI Client] Phase 2 Groq failed:", err instanceof Error ? err.message : err);
+        }
+    }
 
-    await streamWithFallback(contentPrompt, fallbackController, encoder);
+    // Gemini final fallback
+    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+        try {
+            console.log("[AI Client] Phase 2: Gemini fallback...");
+            const { GoogleGenerativeAI } = await import("@google/generative-ai");
+            const genAI = new GoogleGenerativeAI(geminiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const userMsg = contentMessages[contentMessages.length - 1].content;
+            const result = await model.generateContentStream(userMsg);
+            for await (const chunk of result.stream) {
+                const text = chunk.text();
+                if (text) emitContent(text);
+            }
+            console.log("[AI Client] ✓ Phase 2 via Gemini");
+        } catch (err) {
+            console.warn("[AI Client] Phase 2 Gemini failed:", err instanceof Error ? err.message : err);
+        }
+    }
+
+    enqueue("[DONE]");
+    controller.close();
 }
+
