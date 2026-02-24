@@ -12,7 +12,7 @@ interface ScanThinkingIndicatorProps {
 }
 
 export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinkingIndicatorProps) {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom while reasoning is streaming
