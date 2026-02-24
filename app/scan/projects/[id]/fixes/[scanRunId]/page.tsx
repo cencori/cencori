@@ -237,6 +237,8 @@ export default function FixWorkspacePage() {
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
+    const [chatPending, setChatPending] = useState(false);
+    const [reasoningText, setReasoningText] = useState("");
     const hasGeneratedFixes = useRef(false);
     const suggestionsAbortRef = useRef<AbortController | null>(null);
     const chatAbortRef = useRef<AbortController | null>(null);
@@ -325,7 +327,14 @@ export default function FixWorkspacePage() {
                             if (!data || data === "[DONE]") continue;
                             try {
                                 const parsed = JSON.parse(data);
-                                if (typeof parsed.content === "string" && parsed.content.length > 0) {
+                                // Route by event type
+                                if (parsed.type === "reasoning" && typeof parsed.content === "string") {
+                                    // Live reasoning from gpt-oss-120b → thinking indicator
+                                    setReasoningText((prev) => prev + parsed.content);
+                                } else if (typeof parsed.content === "string" && parsed.content.length > 0) {
+                                    // content event (or legacy untyped) → chat message
+                                    // First real chunk — clear the pending state
+                                    setChatPending(false);
                                     fullContent += parsed.content;
                                     setChatMessages((prev) => {
                                         const next = [...prev];
@@ -398,6 +407,7 @@ export default function FixWorkspacePage() {
             setFixes(generatedFixes);
             setManualGuidance(generatedGuidance);
             setSelectedFixIds(new Set(generatedFixes.map((fix) => fix.id)));
+            setChatPending(true); // keep thinking indicator alive until stream starts
             void streamFixSuggestions(generatedFixes, generatedGuidance);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to generate fixes");
@@ -698,8 +708,8 @@ export default function FixWorkspacePage() {
                 <div className="space-y-6">
 
                     {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
-                    {(loading || loadingFixes) && !aiHasStarted && (
-                        <ScanThinkingIndicator finished={false} />
+                    {(loading || loadingFixes || chatPending) && !aiHasStarted && (
+                        <ScanThinkingIndicator finished={false} liveText={reasoningText || undefined} />
                     )}
 
                     {/* AI messages */}
@@ -713,7 +723,7 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
-                                    <ScanThinkingIndicator finished={!message.isStreaming} />
+                                    <ScanThinkingIndicator finished={!message.isStreaming} liveText={undefined} />
                                 </div>
                                 {message.content && (
                                     message.isError ? (
