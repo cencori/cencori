@@ -559,6 +559,7 @@ export default function FixWorkspacePage() {
         setChatMessages((prev) => [...prev, userMessage]);
         setChatInput("");
         setChatLoading(true);
+        setReasoningText("");
 
         // Add streaming assistant placeholder
         setChatMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
