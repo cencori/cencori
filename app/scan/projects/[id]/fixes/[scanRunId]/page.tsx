@@ -100,6 +100,7 @@ interface GenerateFixesResponse {
 interface ChatMessage {
     role: "user" | "assistant";
     content: string;
+    reasoning?: string;
     isStreaming?: boolean;
     isError?: boolean;
 }
@@ -587,6 +588,7 @@ export default function FixWorkspacePage() {
 
             const decoder = new TextDecoder();
             let fullContent = "";
+            let fullReasoning = "";
             let buffer = "";
 
             while (true) {
@@ -602,7 +604,24 @@ export default function FixWorkspacePage() {
                         if (!data || data === "[DONE]") continue;
                         try {
                             const parsed = JSON.parse(data);
-                            if (typeof parsed.content === "string" && parsed.content.length > 0) {
+                            if (parsed.type === "reasoning" && typeof parsed.content === "string") {
+                                fullReasoning += parsed.content;
+                                setChatMessages((prev) => {
+                                    const next = [...prev];
+                                    const last = next[next.length - 1];
+                                    if (last?.role === "assistant") next[next.length - 1] = { ...last, reasoning: fullReasoning };
+                                    return next;
+                                });
+                            } else if (parsed.type === "content" && typeof parsed.content === "string") {
+                                fullContent += parsed.content;
+                                setChatMessages((prev) => {
+                                    const next = [...prev];
+                                    const last = next[next.length - 1];
+                                    if (last?.role === "assistant") next[next.length - 1] = { ...last, content: fullContent };
+                                    return next;
+                                });
+                            } else if (!parsed.type && typeof parsed.content === "string") {
+                                // Fallback for pure content streams
                                 fullContent += parsed.content;
                                 setChatMessages((prev) => {
                                     const next = [...prev];
@@ -723,7 +742,9 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
-                                    <ScanThinkingIndicator finished={!message.isStreaming} liveText={reasoningText || undefined} />
+                                    {(message.isStreaming || message.reasoning) && (
+                                        <ScanThinkingIndicator finished={!message.isStreaming} liveText={message.reasoning || undefined} />
+                                    )}
                                 </div>
                                 {message.content && (
                                     message.isError ? (
