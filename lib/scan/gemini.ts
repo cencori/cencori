@@ -1,9 +1,8 @@
 import { randomUUID } from "crypto";
+import { generateWithFallback } from "./ai-client";
 
-export const GEMINI_SCAN_MODEL = "gemini-2.5-flash";
-const GEMINI_FALLBACK_MODEL = "gemini-2.0-flash";
 const MAX_JSON_PARSE_ATTEMPTS = 3;
-const GEMINI_REQUEST_TIMEOUT_MS = 35_000;
+
 
 export interface AiIssueInput {
     type: string;
@@ -53,10 +52,6 @@ export interface AiFileFixResult {
     updatedFileContent: string;
     issueDecisions: AiFileFixIssueDecision[];
     summary?: string;
-}
-
-function getGeminiApiKey(): string | null {
-    return process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || null;
 }
 
 function tryParseJson<T>(value: string): T | null {
@@ -125,40 +120,6 @@ function parseJsonFromModel<T>(text: string): T | null {
     return null;
 }
 
-async function generateGeminiContent(prompt: string, preferredModel: string): Promise<{ model: string; text: string } | null> {
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-        return null;
-    }
-
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const models = [preferredModel, GEMINI_FALLBACK_MODEL];
-
-    for (const modelName of models) {
-        try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await Promise.race([
-                model.generateContent(prompt),
-                new Promise<never>((_, reject) =>
-                    setTimeout(
-                        () => reject(new Error(`Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS}ms`)),
-                        GEMINI_REQUEST_TIMEOUT_MS
-                    )
-                ),
-            ]);
-            const text = result.response.text().trim();
-            if (text) {
-                return { model: modelName, text };
-            }
-        } catch (error) {
-            console.error(`[Scan AI] Gemini request failed for model ${modelName}:`, error);
-        }
-    }
-
-    return null;
-}
-
 function issueKey(issue: Pick<AiIssueInput, "file" | "line" | "type" | "name">): string {
     return `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
 }
@@ -201,17 +162,17 @@ ${JSON.stringify(input.research.dataFlowTraces.slice(0, 12), null, 2)}
 
 Issues (prioritized):
 ${JSON.stringify(
-    issues.map((issue) => ({
-        issueKey: issueKey(issue),
-        severity: issue.severity,
-        type: issue.type,
-        name: issue.name,
-        location: `${issue.file}:${issue.line}`,
-        description: issue.description || null,
-    })),
-    null,
-    2
-)}
+        issues.map((issue) => ({
+            issueKey: issueKey(issue),
+            severity: issue.severity,
+            type: issue.type,
+            name: issue.name,
+            location: `${issue.file}:${issue.line}`,
+            description: issue.description || null,
+        })),
+        null,
+        2
+    )}
 
 Return JSON only with this exact shape:
 {
@@ -226,7 +187,7 @@ Rules:
 - Prefer root-cause grouping (auth gaps, injection sinks, secret management, validation gaps).
 - Do not include markdown fences.`;
 
-    const response = await generateGeminiContent(prompt, GEMINI_SCAN_MODEL);
+    const response = await generateWithFallback(prompt);
     if (!response) {
         return null;
     }
@@ -306,7 +267,7 @@ Rules:
 - For XSS use sanitization or safer rendering primitives.
 - Do not include markdown fences or extra keys.`;
 
-    const response = await generateGeminiContent(prompt, GEMINI_SCAN_MODEL);
+    const response = await generateWithFallback(prompt);
     if (!response) {
         return null;
     }
