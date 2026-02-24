@@ -774,7 +774,7 @@ export default function FixWorkspacePage() {
                                 className="h-8 text-xs px-4 gap-1.5"
                                 onClick={() => setDiffDialogOpen(true)}
                             >
-                                Diffs ({fixes.length})
+                                Diffs
                                 {(() => {
                                     const t = fixes.reduce(
                                         (acc, fix) => {
