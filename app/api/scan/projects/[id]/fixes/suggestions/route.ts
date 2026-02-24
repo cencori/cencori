@@ -245,7 +245,7 @@ Constraints:
             };
 
             try {
-                await streamWithReasoning(prompt, SYSTEM_PROMPT, controller, encoder);
+                await streamWithReasoning(prompt, SYSTEM_PROMPT, controller, encoder, fallbackResponse);
             } catch (error) {
                 console.error("[Fix Suggestions] Stream failed:", error);
                 sendData(JSON.stringify({ type: "content", content: fallbackResponse }));
