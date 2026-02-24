@@ -9,6 +9,7 @@ interface HeroProps {
 }
 
 export const Hero = ({ isAuthenticated = false }: HeroProps) => {
+    const dashboardLink = isAuthenticated ? "/dashboard/organizations" : "/login";
     return (
         <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
             {/* Background Effects */}
@@ -36,7 +37,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
 
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
-                    <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
+                    <Link href={dashboardLink}>
                         <Button size="default" className="h-7 px-3 text-[11px] font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
                             {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                         </Button>
