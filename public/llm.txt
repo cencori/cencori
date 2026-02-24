@@ -866,19 +866,17 @@ assistant = AssistantAgent(name="assistant", llm_config={"config_list": config_l
 ```
 
 ### LangChain
-
 ```python
 from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    model="gpt-4o",
+    model=process.env.GENERIC_API_KEY_ASSIGNMENT,
     api_key="your_cencori_api_key",
     base_url="https://api.cencori.com/v1"
 )
 ```
 
 ### OpenAI SDK (Direct)
-
 ```python
 from openai import OpenAI
 
