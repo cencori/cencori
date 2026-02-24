@@ -23,15 +23,7 @@ export async function GET(
 
         const { data: providers, error } = await supabase
             .from('custom_providers')
-            .select(`
-        id,
-        name,
-        base_url,
-        format,
-        is_active,
-        created_at,
-        custom_models(id, name, model_id)
-      `)
+            .select('id, name, base_url, format, is_active, created_at')
             .eq('organization_id', org.id)
             .order('created_at', { ascending: false });
 
@@ -69,10 +61,7 @@ export async function POST(
         const { name, baseUrl, apiKey, format, models } = body;
 
         if (!name || !baseUrl || !format) {
-            return NextResponse.json(
-                { error: 'Missing required fields: name, baseUrl, format' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Missing required fields: name, baseUrl, format' }, { status: 400 });
         }
 
         const encryptedKey = apiKey ? encryptApiKey(apiKey, org.id) : null;
@@ -87,7 +76,7 @@ export async function POST(
                 format,
                 is_active: true,
             })
-            .select()
+            .select('id, name, base_url, format, is_active, created_at')
             .single();
 
         if (error) {
