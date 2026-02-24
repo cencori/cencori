@@ -293,7 +293,7 @@ export async function streamWithReasoning(
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify({ model, messages, temperature: 0.3, stream: true }),
+                body: JSON.stringify({ model, messages, temperature: 0.5, stream: true }),
             }),
             TIMEOUT_MS
         );
@@ -402,7 +402,7 @@ export async function streamWithReasoning(
         {
             role: "user",
             content: reasoningOutput
-                ? `Based on this security reasoning:\n\n<reasoning>\n${reasoningOutput.slice(0, 3000)}\n</reasoning>\n\nNow write the remediation brief.\n\n${prompt}`
+                ? `Use this reasoning to inform your reply, but follow all personality and format instructions exactly — including keeping casual messages short and conversational:\n\n<reasoning>\n${reasoningOutput.slice(0, 3000)}\n</reasoning>\n\n${prompt}`
                 : prompt,
         },
     ];
