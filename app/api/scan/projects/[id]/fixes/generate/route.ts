@@ -6,6 +6,9 @@ import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { generateFileFixWithGemini } from '@/lib/scan/gemini';
 import { randomUUID } from 'crypto';
 
+// Allow up to 5 minutes for large repos with many files
+export const maxDuration = 300;
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
 
@@ -387,302 +390,308 @@ function getIssueDataFlowContext(research: ScanResearchLike | undefined, issue: 
 // ─── Main Route Handler ─────────────────────────────────────────────────
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
-    const { id } = await params;
-    const startTime = Date.now();
-    const supabase = await createServerClient();
+    try {
+        const { id } = await params;
+        const startTime = Date.now();
+        const supabase = await createServerClient();
 
-    console.log(`[Fix Gen] Starting fix generation for project ${id}`);
+        console.log(`[Fix Gen] Starting fix generation for project ${id}`);
 
-    // Auth check
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-        console.log('[Fix Gen] Unauthorized request');
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+        // Auth check
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+            console.log('[Fix Gen] Unauthorized request');
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-    if (!isValidUUID(id)) {
-        return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
-    }
+        if (!isValidUUID(id)) {
+            return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+        }
 
-    console.log(`[Fix Gen] User ${user.id} authenticated`);
+        console.log(`[Fix Gen] User ${user.id} authenticated`);
 
-    const body = await req.json();
-    const { scanRunId } = body;
+        const body = await req.json();
+        const { scanRunId } = body;
 
-    if (!scanRunId || typeof scanRunId !== 'string') {
-        return NextResponse.json({ error: 'scanRunId is required' }, { status: 400 });
-    }
+        if (!scanRunId || typeof scanRunId !== 'string') {
+            return NextResponse.json({ error: 'scanRunId is required' }, { status: 400 });
+        }
 
-    if (!isValidUUID(scanRunId)) {
-        return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
-    }
+        if (!isValidUUID(scanRunId)) {
+            return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+        }
 
-    console.log(`[Fix Gen] Scan run ID: ${scanRunId}`);
+        console.log(`[Fix Gen] Scan run ID: ${scanRunId}`);
 
-    const supabaseAdmin = createAdminClient();
+        const supabaseAdmin = createAdminClient();
 
-    // Get project (verify ownership)
-    const { data: project, error: projectError } = await supabaseAdmin
-        .from('scan_projects')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single();
+        // Get project (verify ownership)
+        const { data: project, error: projectError } = await supabaseAdmin
+            .from('scan_projects')
+            .select('*')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single();
 
-    if (projectError || !project) {
-        console.log(`[Fix Gen] Project ${id} not found for user ${user.id}`);
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
+        if (projectError || !project) {
+            console.log(`[Fix Gen] Project ${id} not found for user ${user.id}`);
+            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
 
-    console.log(`[Fix Gen] Project found: ${project.github_repo_full_name}`);
+        console.log(`[Fix Gen] Project found: ${project.github_repo_full_name}`);
 
-    // Get scan run results
-    const { data: scanRun, error: scanError } = await supabaseAdmin
-        .from('scan_runs')
-        .select('*')
-        .eq('id', scanRunId)
-        .eq('project_id', id)
-        .single();
+        // Get scan run results
+        const { data: scanRun, error: scanError } = await supabaseAdmin
+            .from('scan_runs')
+            .select('*')
+            .eq('id', scanRunId)
+            .eq('project_id', id)
+            .single();
 
-    if (scanError || !scanRun) {
-        console.log(`[Fix Gen] Scan run ${scanRunId} not found`);
-        return NextResponse.json({ error: 'Scan run not found' }, { status: 404 });
-    }
+        if (scanError || !scanRun) {
+            console.log(`[Fix Gen] Scan run ${scanRunId} not found`);
+            return NextResponse.json({ error: 'Scan run not found' }, { status: 404 });
+        }
 
-    const issues: ScanIssue[] = scanRun.results?.issues || [];
-    const research = (scanRun.results?.research || undefined) as ScanResearchLike | undefined;
-    const repositoryAiSummary =
-        typeof scanRun.results?.ai?.summary === 'string' ? scanRun.results.ai.summary : undefined;
-    console.log(`[Fix Gen] Found ${issues.length} issues from scan run`);
+        const issues: ScanIssue[] = scanRun.results?.issues || [];
+        const research = (scanRun.results?.research || undefined) as ScanResearchLike | undefined;
+        const repositoryAiSummary =
+            typeof scanRun.results?.ai?.summary === 'string' ? scanRun.results.ai.summary : undefined;
+        console.log(`[Fix Gen] Found ${issues.length} issues from scan run`);
 
-    if (issues.length === 0) {
-        console.log('[Fix Gen] No issues to fix');
-        return NextResponse.json({
-            fixes: [],
-            totalIssues: 0,
-            fixesGenerated: 0,
-            deterministicCount: 0,
-            aiCount: 0,
-            unfixableIssueCount: 0,
-            unfixableIssueTypes: [],
-            manualGuidance: [],
-            manualReviewRequired: false,
-            message: 'No issues found in this scan run.',
-        });
-    }
+        if (issues.length === 0) {
+            console.log('[Fix Gen] No issues to fix');
+            return NextResponse.json({
+                fixes: [],
+                totalIssues: 0,
+                fixesGenerated: 0,
+                deterministicCount: 0,
+                aiCount: 0,
+                unfixableIssueCount: 0,
+                unfixableIssueTypes: [],
+                manualGuidance: [],
+                manualReviewRequired: false,
+                message: 'No issues found in this scan run.',
+            });
+        }
 
-    // ─── Fetch file contents in PARALLEL ────────────────────────────
-    const githubAccess = await verifyProjectGithubAccess(user, project);
-    if (!githubAccess) {
-        return NextResponse.json(
-            { error: 'GitHub access for this project is no longer authorized' },
-            { status: 403 }
+        // ─── Fetch file contents in PARALLEL ────────────────────────────
+        const githubAccess = await verifyProjectGithubAccess(user, project);
+        if (!githubAccess) {
+            return NextResponse.json(
+                { error: 'GitHub access for this project is no longer authorized' },
+                { status: 403 }
+            );
+        }
+
+        const octokit = await getInstallationOctokit(githubAccess.installationId);
+        const [owner, repo] = githubAccess.repository.fullName.split('/');
+
+        const uniqueFiles = [...new Set(issues.map(i => i.file))];
+        console.log(`[Fix Gen] Fetching ${uniqueFiles.length} files in parallel...`);
+
+        const fileContents = new Map<string, string>();
+        const fetchStart = Date.now();
+
+        await Promise.all(
+            uniqueFiles.map(async (filePath) => {
+                try {
+                    const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+                        owner,
+                        repo,
+                        path: filePath,
+                        ref: 'HEAD',
+                    });
+
+                    if ('content' in data && data.content) {
+                        const content = Buffer.from(data.content, 'base64').toString('utf-8');
+                        fileContents.set(filePath, content);
+                    }
+                } catch (err) {
+                    const status = (err as { status?: number })?.status;
+                    const message = err instanceof Error ? err.message : String(err);
+                    console.error(`[Fix Gen]   ✗ Could not fetch: ${filePath} (status=${status}, error=${message})`);
+                }
+            })
         );
-    }
 
-    const octokit = await getInstallationOctokit(githubAccess.installationId);
-    const [owner, repo] = githubAccess.repository.fullName.split('/');
+        console.log(`[Fix Gen] Fetched ${fileContents.size}/${uniqueFiles.length} files in ${Date.now() - fetchStart}ms`);
 
-    const uniqueFiles = [...new Set(issues.map(i => i.file))];
-    console.log(`[Fix Gen] Fetching ${uniqueFiles.length} files in parallel...`);
+        // If no files could be fetched, return an error instead of silently returning 0 fixes
+        if (fileContents.size === 0) {
+            console.error('[Fix Gen] Failed to fetch ANY files from GitHub — likely a GitHub App permission or installation issue');
+            return NextResponse.json(
+                { error: 'Could not access repository files. The GitHub App installation may need to be reinstalled, or the repository permissions may have changed.' },
+                { status: 502 }
+            );
+        }
 
-    const fileContents = new Map<string, string>();
-    const fetchStart = Date.now();
+        // ─── Phase 1: Deterministic fixes (fast path) ────────────────────
+        const fixes: FixProposal[] = [];
+        const pendingAiIssuesByFile = new Map<string, PendingAiIssue[]>();
+        const resolvedIssueKeys = new Set<string>();
+        let aiIssueIndex = 0;
 
-    await Promise.all(
-        uniqueFiles.map(async (filePath) => {
-            try {
-                const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-                    owner,
-                    repo,
-                    path: filePath,
-                    ref: 'HEAD',
+        for (const issue of issues) {
+            const fileContent = fileContents.get(issue.file);
+            if (!fileContent) {
+                console.log(`[Fix Gen]   Skipping ${issue.name} in ${issue.file} — no file content`);
+                continue;
+            }
+
+            const snippet = extractSnippet(fileContent, issue.line, 6);
+            const deterministicFix = tryDeterministicFix(issue, fileContent);
+
+            if (deterministicFix) {
+                console.log(`[Fix Gen]   ✓ Deterministic: ${issue.name} in ${issue.file}:${issue.line}`);
+                fixes.push({
+                    id: randomUUID(),
+                    file: issue.file,
+                    line: issue.line,
+                    issueType: issue.type,
+                    issueName: issue.name,
+                    severity: issue.severity,
+                    strategy: 'deterministic',
+                    originalCode: snippet,
+                    fixedCode: deterministicFix.fixedCode,
+                    explanation: deterministicFix.explanation,
+                    issueKey: issueKey(issue),
                 });
-
-                if ('content' in data && data.content) {
-                    const content = Buffer.from(data.content, 'base64').toString('utf-8');
-                    fileContents.set(filePath, content);
-                }
-            } catch (err) {
-                const status = (err as { status?: number })?.status;
-                const message = err instanceof Error ? err.message : String(err);
-                console.error(`[Fix Gen]   ✗ Could not fetch: ${filePath} (status=${status}, error=${message})`);
+                resolvedIssueKeys.add(issueKey(issue));
+                continue;
             }
-        })
-    );
 
-    console.log(`[Fix Gen] Fetched ${fileContents.size}/${uniqueFiles.length} files in ${Date.now() - fetchStart}ms`);
-
-    // If no files could be fetched, return an error instead of silently returning 0 fixes
-    if (fileContents.size === 0) {
-        console.error('[Fix Gen] Failed to fetch ANY files from GitHub — likely a GitHub App permission or installation issue');
-        return NextResponse.json(
-            { error: 'Could not access repository files. The GitHub App installation may need to be reinstalled, or the repository permissions may have changed.' },
-            { status: 502 }
-        );
-    }
-
-    // ─── Phase 1: Deterministic fixes (fast path) ────────────────────
-    const fixes: FixProposal[] = [];
-    const pendingAiIssuesByFile = new Map<string, PendingAiIssue[]>();
-    const resolvedIssueKeys = new Set<string>();
-    let aiIssueIndex = 0;
-
-    for (const issue of issues) {
-        const fileContent = fileContents.get(issue.file);
-        if (!fileContent) {
-            console.log(`[Fix Gen]   Skipping ${issue.name} in ${issue.file} — no file content`);
-            continue;
-        }
-
-        const snippet = extractSnippet(fileContent, issue.line, 6);
-        const deterministicFix = tryDeterministicFix(issue, fileContent);
-
-        if (deterministicFix) {
-            console.log(`[Fix Gen]   ✓ Deterministic: ${issue.name} in ${issue.file}:${issue.line}`);
-            fixes.push({
-                id: randomUUID(),
-                file: issue.file,
-                line: issue.line,
-                issueType: issue.type,
-                issueName: issue.name,
-                severity: issue.severity,
-                strategy: 'deterministic',
-                originalCode: snippet,
-                fixedCode: deterministicFix.fixedCode,
-                explanation: deterministicFix.explanation,
+            const pendingIssue: PendingAiIssue = {
+                issueId: `issue_${aiIssueIndex}`,
+                issue,
                 issueKey: issueKey(issue),
-            });
-            resolvedIssueKeys.add(issueKey(issue));
-            continue;
+                snippet,
+                dataFlowContext: getIssueDataFlowContext(research, issue),
+            };
+            aiIssueIndex += 1;
+
+            const existing = pendingAiIssuesByFile.get(issue.file) || [];
+            existing.push(pendingIssue);
+            pendingAiIssuesByFile.set(issue.file, existing);
         }
 
-        const pendingIssue: PendingAiIssue = {
-            issueId: `issue_${aiIssueIndex}`,
-            issue,
-            issueKey: issueKey(issue),
-            snippet,
-            dataFlowContext: getIssueDataFlowContext(research, issue),
-        };
-        aiIssueIndex += 1;
-
-        const existing = pendingAiIssuesByFile.get(issue.file) || [];
-        existing.push(pendingIssue);
-        pendingAiIssuesByFile.set(issue.file, existing);
-    }
-
-    const pendingIssueCount = Array.from(pendingAiIssuesByFile.values()).reduce(
-        (sum, fileIssues) => sum + fileIssues.length,
-        0
-    );
-    console.log(
-        `[Fix Gen] Phase 1 done: ${fixes.length} deterministic, ${pendingIssueCount} queued for AI across ${pendingAiIssuesByFile.size} files`
-    );
-
-    // ─── Phase 2: File-context AI fixes (Gemini) ─────────────────────
-    for (const [filePath, fileIssues] of pendingAiIssuesByFile.entries()) {
-        const fileContent = fileContents.get(filePath);
-        if (!fileContent) {
-            continue;
-        }
-
-        console.log(`[Fix Gen]   → AI processing ${filePath} (${fileIssues.length} issues)`);
-        const aiResult = await generateFileFixWithGemini({
-            repository: githubAccess.repository.fullName,
-            repositorySummary: repositoryAiSummary,
-            filePath,
-            fileContent,
-            issues: fileIssues.map((entry) => ({
-                id: entry.issueId,
-                type: entry.issue.type,
-                name: entry.issue.name,
-                severity: entry.issue.severity,
-                line: entry.issue.line,
-                match: entry.issue.match,
-                description: entry.issue.description,
-                dataFlowContext: entry.dataFlowContext,
-            })),
-        });
-
-        if (!aiResult || !aiResult.updatedFileContent || aiResult.updatedFileContent === fileContent) {
-            console.log(`[Fix Gen]   ✗ AI skipped ${filePath} (no usable file update)`);
-            continue;
-        }
-
-        const decisionMap = new Map(
-            aiResult.issueDecisions.map((decision) => [decision.issueId, decision])
+        const pendingIssueCount = Array.from(pendingAiIssuesByFile.values()).reduce(
+            (sum, fileIssues) => sum + fileIssues.length,
+            0
+        );
+        console.log(
+            `[Fix Gen] Phase 1 done: ${fixes.length} deterministic, ${pendingIssueCount} queued for AI across ${pendingAiIssuesByFile.size} files`
         );
 
-        for (const entry of fileIssues) {
-            const decision = decisionMap.get(entry.issueId);
-            if (!decision || !decision.fixApplied) {
+        // ─── Phase 2: File-context AI fixes (Gemini) ─────────────────────
+        for (const [filePath, fileIssues] of pendingAiIssuesByFile.entries()) {
+            const fileContent = fileContents.get(filePath);
+            if (!fileContent) {
                 continue;
             }
 
-            let originalCode = entry.snippet;
-            let fixedCode = extractSnippet(aiResult.updatedFileContent, entry.issue.line, 6);
-
-            if (!snippetsDiffer(originalCode, fixedCode)) {
-                const fallback = findClosestChangedSnippet(
-                    fileContent,
-                    aiResult.updatedFileContent,
-                    entry.issue.line,
-                    6
-                );
-
-                if (fallback) {
-                    originalCode = fallback.originalCode;
-                    fixedCode = fallback.fixedCode;
-                }
-            }
-
-            if (!snippetsDiffer(originalCode, fixedCode)) {
-                continue;
-            }
-
-            fixes.push({
-                id: randomUUID(),
-                file: entry.issue.file,
-                line: entry.issue.line,
-                issueType: entry.issue.type,
-                issueName: entry.issue.name,
-                severity: entry.issue.severity,
-                strategy: 'ai',
-                originalCode,
-                fixedCode,
-                explanation: decision.explanation,
-                issueKey: entry.issueKey,
-                updatedFileContent: aiResult.updatedFileContent,
-                aiModel: aiResult.model,
+            console.log(`[Fix Gen]   → AI processing ${filePath} (${fileIssues.length} issues)`);
+            const aiResult = await generateFileFixWithGemini({
+                repository: githubAccess.repository.fullName,
+                repositorySummary: repositoryAiSummary,
+                filePath,
+                fileContent,
+                issues: fileIssues.map((entry) => ({
+                    id: entry.issueId,
+                    type: entry.issue.type,
+                    name: entry.issue.name,
+                    severity: entry.issue.severity,
+                    line: entry.issue.line,
+                    match: entry.issue.match,
+                    description: entry.issue.description,
+                    dataFlowContext: entry.dataFlowContext,
+                })),
             });
-            resolvedIssueKeys.add(entry.issueKey);
+
+            if (!aiResult || !aiResult.updatedFileContent || aiResult.updatedFileContent === fileContent) {
+                console.log(`[Fix Gen]   ✗ AI skipped ${filePath} (no usable file update)`);
+                continue;
+            }
+
+            const decisionMap = new Map(
+                aiResult.issueDecisions.map((decision) => [decision.issueId, decision])
+            );
+
+            for (const entry of fileIssues) {
+                const decision = decisionMap.get(entry.issueId);
+                if (!decision || !decision.fixApplied) {
+                    continue;
+                }
+
+                let originalCode = entry.snippet;
+                let fixedCode = extractSnippet(aiResult.updatedFileContent, entry.issue.line, 6);
+
+                if (!snippetsDiffer(originalCode, fixedCode)) {
+                    const fallback = findClosestChangedSnippet(
+                        fileContent,
+                        aiResult.updatedFileContent,
+                        entry.issue.line,
+                        6
+                    );
+
+                    if (fallback) {
+                        originalCode = fallback.originalCode;
+                        fixedCode = fallback.fixedCode;
+                    }
+                }
+
+                if (!snippetsDiffer(originalCode, fixedCode)) {
+                    continue;
+                }
+
+                fixes.push({
+                    id: randomUUID(),
+                    file: entry.issue.file,
+                    line: entry.issue.line,
+                    issueType: entry.issue.type,
+                    issueName: entry.issue.name,
+                    severity: entry.issue.severity,
+                    strategy: 'ai',
+                    originalCode,
+                    fixedCode,
+                    explanation: decision.explanation,
+                    issueKey: entry.issueKey,
+                    updatedFileContent: aiResult.updatedFileContent,
+                    aiModel: aiResult.model,
+                });
+                resolvedIssueKeys.add(entry.issueKey);
+            }
         }
+
+        const unfixableIssues = issues.filter((issue) => !resolvedIssueKeys.has(issueKey(issue)));
+        const unfixableIssueTypes = summarizeIssueTypes(unfixableIssues);
+        const manualGuidance = unfixableIssues.map(buildManualGuidance);
+        const deterministicCount = fixes.filter((fix) => fix.strategy === 'deterministic').length;
+        const aiCount = fixes.filter((fix) => fix.strategy === 'ai').length;
+        const manualReviewRequired = unfixableIssues.length > 0;
+
+        const totalTime = Date.now() - startTime;
+        console.log(
+            `[Fix Gen] Complete in ${totalTime}ms: ${fixes.length} fixes (${deterministicCount} deterministic, ${aiCount} AI, ${unfixableIssues.length} manual review)`
+        );
+
+        return NextResponse.json({
+            fixes,
+            totalIssues: issues.length,
+            fixesGenerated: fixes.length,
+            deterministicCount,
+            aiCount,
+            unfixableIssueCount: unfixableIssues.length,
+            unfixableIssueTypes,
+            manualGuidance,
+            manualReviewRequired,
+            message: fixes.length === 0
+                ? `Detected ${issues.length} issue${issues.length === 1 ? '' : 's'}, but no safe auto-fix was generated.`
+                : undefined,
+        });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unexpected error during fix generation';
+        console.error('[Fix Gen] Unhandled error:', message);
+        return NextResponse.json({ error: message }, { status: 500 });
     }
-
-    const unfixableIssues = issues.filter((issue) => !resolvedIssueKeys.has(issueKey(issue)));
-    const unfixableIssueTypes = summarizeIssueTypes(unfixableIssues);
-    const manualGuidance = unfixableIssues.map(buildManualGuidance);
-    const deterministicCount = fixes.filter((fix) => fix.strategy === 'deterministic').length;
-    const aiCount = fixes.filter((fix) => fix.strategy === 'ai').length;
-    const manualReviewRequired = unfixableIssues.length > 0;
-
-    const totalTime = Date.now() - startTime;
-    console.log(
-        `[Fix Gen] Complete in ${totalTime}ms: ${fixes.length} fixes (${deterministicCount} deterministic, ${aiCount} AI, ${unfixableIssues.length} manual review)`
-    );
-
-    return NextResponse.json({
-        fixes,
-        totalIssues: issues.length,
-        fixesGenerated: fixes.length,
-        deterministicCount,
-        aiCount,
-        unfixableIssueCount: unfixableIssues.length,
-        unfixableIssueTypes,
-        manualGuidance,
-        manualReviewRequired,
-        message: fixes.length === 0
-            ? `Detected ${issues.length} issue${issues.length === 1 ? '' : 's'}, but no safe auto-fix was generated.`
-            : undefined,
-    });
 }
