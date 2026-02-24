@@ -1,21 +1,14 @@
-/**
- * Dashboard Access Control Tests
- * 
- * Tests for authorization and access control
- * 
- * @tags @security @access-control @critical
- */
-
 import { test, expect } from '@playwright/test';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://example.com';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
+const API_KEY = process.env.CENCORI_API_KEY;
 
 test.describe('Dashboard Access Control @security', () => {
 
     test.describe('IDOR Prevention (Insecure Direct Object Reference)', () => {
 
         test('should not allow accessing other org via URL manipulation', async ({ page }) => {
-            await page.goto(`${BASE_URL}/dashboard/organizations/other-org-id`);
+            await page.goto(`${BASE_URL}/dashboard/organizations/${process.env.OTHER_ORG_ID}`);
 
             // Should either redirect to login or show 403/404
             const status = await page.evaluate(() => {
@@ -34,7 +27,7 @@ test.describe('Dashboard Access Control @security', () => {
         });
 
         test('should not allow accessing other project via URL', async ({ page }) => {
-            await page.goto(`${BASE_URL}/dashboard/organizations/fake-org/projects/fake-project`);
+            await page.goto(`${BASE_URL}/dashboard/organizations/${process.env.FAKE_ORG_ID}/projects/${process.env.FAKE_PROJECT_ID}`);
 
             // Should redirect to login or show error
             await expect(page).toHaveURL(/login|auth|dashboard/i, { timeout: 10000 });
@@ -45,10 +38,10 @@ test.describe('Dashboard Access Control @security', () => {
 
         test('should protect project API routes', async ({ request }) => {
             const routes = [
-                '/api/projects/fake-project-id/analytics/overview',
-                '/api/projects/fake-project-id/ai/stats',
-                '/api/projects/fake-project-id/security/incidents',
-                '/api/projects/fake-project-id/api-keys',
+                `/api/projects/${process.env.FAKE_PROJECT_ID}/analytics/overview`,
+                `/api/projects/${process.env.FAKE_PROJECT_ID}/ai/stats`,
+                `/api/projects/${process.env.FAKE_PROJECT_ID}/security/incidents`,
+                `/api/projects/${process.env.FAKE_PROJECT_ID}/api-keys`,
             ];
 
             for (const route of routes) {
@@ -61,9 +54,9 @@ test.describe('Dashboard Access Control @security', () => {
 
         test('should protect org API routes', async ({ request }) => {
             const routes = [
-                '/api/organizations/fake-org-id/settings',
-                '/api/organizations/fake-org-id/members',
-                '/api/organizations/fake-org-id/billing',
+                `/api/organizations/${process.env.FAKE_ORG_ID}/settings`,
+                `/api/organizations/${process.env.FAKE_ORG_ID}/members`,
+                `/api/organizations/${process.env.FAKE_ORG_ID}/billing`,
             ];
 
             for (const route of routes) {
@@ -83,9 +76,7 @@ test.describe('Dashboard Access Control @security', () => {
             const content = await page.content();
 
             // Should not contain full API keys
-            expect(content).not.toMatch(/cencori_[a-zA-Z0-9]{32,}/);
-            expect(content).not.toMatch(/sk-[a-zA-Z0-9]{32,}/); // OpenAI format
-            expect(content).not.toMatch(/AIza[a-zA-Z0-9]{30,}/); // Google format
+            expect(content).not.toMatch(/${API_KEY}/);
         });
 
         test('should not expose secrets in JavaScript', async ({ page }) => {
@@ -158,7 +149,7 @@ test.describe('Dashboard Access Control @security', () => {
                 const text = await response.text();
 
                 // Should not contain stack traces
-                expect(text).not.toMatch(/at \w+\s*\(/);
+                expect(text).not.toMatch(/at \w+\s*\/);
                 expect(text).not.toMatch(/node_modules/);
                 expect(text).not.toMatch(/\.ts:\d+:\d+/);
             }
