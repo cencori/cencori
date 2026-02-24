@@ -12,7 +12,7 @@ interface ScanThinkingIndicatorProps {
 }
 
 export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinkingIndicatorProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom while reasoning is streaming
@@ -21,6 +21,11 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [liveText, finished]);
+
+    // Collapse automatically when finished (optional, but a nice touch)
+    useEffect(() => {
+        if (finished) setIsExpanded(false);
+    }, [finished]);
 
     const isRunning = !finished;
 
@@ -32,7 +37,7 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
                 const lines = liveText.trimEnd().split("\n");
                 for (let i = lines.length - 1; i >= 0; i--) {
                     const line = lines[i].trim();
-                    if (line.length > 0) return line.slice(-70);
+                    if (line.length > 0) return line.replace(/<\/?think>/g, "").slice(-70);
                 }
                 return "Thinking...";
             })()
@@ -64,9 +69,9 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
                         {liveText && liveText.length > 0 ? (
                             <div
                                 ref={scrollRef}
-                                className="max-h-56 overflow-y-auto text-[10px] font-mono text-muted-foreground/70 leading-relaxed whitespace-pre-wrap py-1"
+                                className="max-h-56 overflow-y-auto text-[11px] font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap py-1"
                             >
-                                {liveText}
+                                {liveText.replace(/<\/?think>/g, "")}
                                 {!finished && (
                                     <span className="inline-block w-1.5 h-3 bg-emerald-400/70 animate-pulse ml-0.5 align-middle" />
                                 )}
