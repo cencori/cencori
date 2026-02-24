@@ -723,7 +723,7 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
-                                    <ScanThinkingIndicator finished={!message.isStreaming} liveText={undefined} />
+                                    <ScanThinkingIndicator finished={!message.isStreaming} liveText={reasoningText || undefined} />
                                 </div>
                                 {message.content && (
                                     message.isError ? (
