@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { streamWithFallback } from "@/lib/scan/ai-client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -152,7 +153,7 @@ Currently selected issue:
 - Description: ${issue.description || "n/a"}
 - Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${aiSummary ? `\n- Repo AI summary: ${aiSummary}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
-    const prompt = `You are Cencori — a sharp, senior security engineer embedded in a code scanning tool.
+    const prompt = `You are Cencori — a sharp, senior security engineer embedded in a code scanning product.
 
 Your role is twofold:
 1. Help users understand and remediate security vulnerabilities found in their code.
@@ -173,43 +174,19 @@ ${recentHistory || "(none yet)"}
 User: ${question}`;
 
     const encoder = new TextEncoder();
-    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
 
     const stream = new ReadableStream({
         async start(controller) {
             const enqueue = (payload: string) =>
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 
-            const sendFallback = () => {
+            try {
+                await streamWithFallback(prompt, controller, encoder);
+            } catch (error) {
+                console.error("[Fix Chat] All providers failed:", error);
                 enqueue(JSON.stringify({ content: buildFallbackAnswer(question, issue, fix) }));
                 enqueue("[DONE]");
                 controller.close();
-            };
-
-            if (!apiKey) {
-                sendFallback();
-                return;
-            }
-
-            try {
-                const { GoogleGenerativeAI } = await import("@google/generative-ai");
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-                const result = await model.generateContentStream(prompt);
-
-                for await (const chunk of result.stream) {
-                    const text = chunk.text();
-                    if (text) {
-                        enqueue(JSON.stringify({ content: text }));
-                    }
-                }
-
-                enqueue("[DONE]");
-                controller.close();
-            } catch (error) {
-                console.error("[Fix Chat] AI stream failed:", error);
-                sendFallback();
             }
         },
     });
