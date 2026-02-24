@@ -6,14 +6,11 @@ export async function GET(req: NextRequest) {
     const installationId = searchParams.get('installation_id');
 
     if (!installationId) {
-        return NextResponse.json(
-            { error: 'Installation ID is required' },
-            { status: 400 }
-        );
+        return NextResponse.json({ error: 'Installation ID is required' }, { status: 400 });
     }
 
     try {
-        const installationOctokit = await getInstallationOctokit(Number(installationId));
+        const installationOctokit = await getInstallationOctokit(process.env.GITHUB_INSTALLATION_ID);
 
         const { data } = await installationOctokit.request('GET /installation/repositories', {
             per_page: 100,
@@ -29,9 +26,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ repositories });
     } catch (error) {
         console.error('Error fetching repositories:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch repositories' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to fetch repositories' }, { status: 500 });
     }
 }
