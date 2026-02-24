@@ -2,8 +2,16 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, Shield, Code2, Trophy, Twitter, Linkedin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
 export default function CompletePage() {
+    const router = useRouter();
+    useEffect(() => {
+        if (!process.env.ADMIN_ROUTE_ENABLED) {
+            router.push('/');
+        }
+    }, []);
     return (
         <div className="max-w-2xl mx-auto text-center">
             {/* Celebration */}
@@ -80,17 +88,19 @@ export default function CompletePage() {
                             </CardContent>
                         </Card>
                     </Link>
-                    <Link href="/dashboard">
-                        <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
-                            <CardHeader className="pb-2">
-                                <ArrowRight className="h-5 w-5 text-primary mb-2" />
-                                <CardTitle className="text-base">Start Building</CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-sm text-muted-foreground">
-                                Head to your dashboard and build something!
-                            </CardContent>
-                        </Card>
-                    </Link>
+                    {process.env.ADMIN_ROUTE_ENABLED && (
+                        <Link href="/dashboard">
+                            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
+                                <CardHeader className="pb-2">
+                                    <ArrowRight className="h-5 w-5 text-primary mb-2" />
+                                    <CardTitle className="text-base">Start Building</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-sm text-muted-foreground">
+                                    Head to your dashboard and build something!
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -101,7 +111,7 @@ export default function CompletePage() {
                 </p>
                 <div className="flex justify-center gap-3">
                     <a
-                        href="https://twitter.com/intent/tweet?text=Just%20completed%20the%20Cencori%20Getting%20Started%20course!%20Now%20I%20can%20build%20production%20AI%20apps%20with%20built-in%20security.%20%F0%9F%9A%80&url=https://cencori.com/academy"
+                        href={`https://twitter.com/intent/tweet?text=Just%20completed%20the%20Cencori%20Getting%20Started%20course!%20Now%20I%20can%20build%20production%20AI%20apps%20with%20built-in%20security.%20%F0%9F%9A%80&url=https://cencori.com/academy`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -111,7 +121,7 @@ export default function CompletePage() {
                         </Button>
                     </a>
                     <a
-                        href="https://www.linkedin.com/sharing/share-offsite/?url=https://cencori.com/academy"
+                        href={`https://www.linkedin.com/sharing/share-offsite/?url=https://cencori.com/academy`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
