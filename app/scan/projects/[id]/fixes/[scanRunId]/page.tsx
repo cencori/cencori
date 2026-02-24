@@ -856,7 +856,7 @@ export default function FixWorkspacePage() {
                                     ) : (
                                         <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
                                     )}
-                                    Create PR ({selectedFixes.length})
+                                    Create PR
                                 </Button>
                             )}
                         </div>
