@@ -170,6 +170,7 @@ For security questions:
 - Include a code snippet only when it genuinely helps
 
 CRITICAL AESTHETIC RULES:
+- NEVER use emojis — not in headings, bullet points, or anywhere in the response.
 - NEVER output a "Remediation Brief" or heavy checklist format in this chat unless explicitly asked.
 - If the user says something simple (e.g., "PR merged", "thanks", "hello"), just reply naturally and conversationally. Do NOT launch into a multi-point plan or security review. Keep it brief.
 - Match the user's length and energy. Short inputs get short, friendly outputs.${issueSection}
