@@ -262,9 +262,11 @@ export async function streamWithReasoning(
     systemPrompt: string,
     controller: ReadableStreamDefaultController,
     encoder: TextEncoder,
+    fallbackContent?: string,
 ): Promise<void> {
     const cerebrasKey = process.env.CEREBRAS_API_KEY;
     const cerebrasBase = "https://api.cerebras.ai/v1";
+    let contentEmitted = false;
 
     const enqueue = (payload: string) =>
         controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
@@ -272,8 +274,10 @@ export async function streamWithReasoning(
     const emitReasoning = (text: string) =>
         enqueue(JSON.stringify({ type: "reasoning", content: text }));
 
-    const emitContent = (text: string) =>
+    const emitContent = (text: string) => {
         enqueue(JSON.stringify({ type: "content", content: text }));
+        contentEmitted = true;
+    };
 
     // Helper: read a streaming OpenAI-compatible response and emit content chunks
     async function streamOpenAIContent(
@@ -346,7 +350,7 @@ export async function streamWithReasoning(
                             { role: "user", content: prompt },
                         ],
                         temperature: 0.6,
-                        max_tokens: 4000,
+                        max_tokens: 2000,
                         stream: true,
                     }),
                 }),
@@ -461,7 +465,16 @@ export async function streamWithReasoning(
         }
     }
 
+    // If nothing was emitted at all — emit fallback so the message is never blank
+    if (!contentEmitted && fallbackContent) {
+        console.log("[AI Client] All providers failed — emitting fallback content");
+        emitContent(fallbackContent);
+    } else if (!contentEmitted) {
+        console.warn("[AI Client] All providers failed and no fallback provided — stream is empty");
+    }
+
     enqueue("[DONE]");
     controller.close();
 }
+
 
