@@ -6,6 +6,9 @@
  */
 
 const TIMEOUT_MS = 35_000;
+const REASONING_MODEL = "gpt-oss-120b";   // Cerebras reasoning model
+const FAST_MODEL = "llama3.1-8b";          // Cerebras fast streamer
+
 
 export type AiProvider = "cerebras" | "groq" | "gemini";
 
@@ -239,4 +242,208 @@ export async function streamWithFallback(
     // Total failure — close cleanly without content
     enqueue("[DONE]");
     controller.close();
+}
+
+/**
+ * Dual-model reasoning stream:
+ *
+ * Phase 1 — gpt-oss-120b (Cerebras reasoning model)
+ *   Streams delta.reasoning tokens → SSE: {"type":"reasoning","content":"..."}
+ *   The frontend pipes these to the ScanThinkingIndicator as live thought text.
+ *
+ * Phase 2 — llama3.1-8b (Cerebras fast generator)
+ *   Receives the reasoning output as context, then streams the remediation brief.
+ *   Streams delta.content tokens → SSE: {"type":"content","content":"..."}
+ *   Falls back to Groq → Gemini if Cerebras fast fails.
+ *
+ * Completion: data: [DONE]
+ */
+export async function streamWithReasoning(
+    prompt: string,
+    systemPrompt: string,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+): Promise<void> {
+    const cerebrasKey = process.env.CEREBRAS_API_KEY;
+    const cerebrasBase = "https://api.cerebras.ai/v1";
+
+    const enqueue = (payload: string) =>
+        controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+
+    const emitReasoning = (text: string) =>
+        enqueue(JSON.stringify({ type: "reasoning", content: text }));
+
+    const emitContent = (text: string) =>
+        enqueue(JSON.stringify({ type: "content", content: text }));
+
+    // ── Phase 1: reasoning with gpt-oss-120b ─────────────────────────────────
+    let reasoningOutput = "";
+
+    if (cerebrasKey) {
+        try {
+            console.log("[AI Client] Phase 1: gpt-oss-120b reasoning...");
+            const res = await withTimeout(
+                fetch(`${cerebrasBase}/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${cerebrasKey}`,
+                    },
+                    body: JSON.stringify({
+                        model: REASONING_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: prompt },
+                        ],
+                        temperature: 0.6,
+                        max_tokens: 8000,
+                        stream: true,
+                    }),
+                }),
+                TIMEOUT_MS
+            );
+
+            if (res.ok && res.body) {
+                const reader = res.body.getReader();
+                const dec = new TextDecoder();
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += dec.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        const trimmed = line.replace(/^data:\s*/, "").trim();
+                        if (!trimmed || trimmed === "[DONE]") continue;
+
+                        try {
+                            const parsed = JSON.parse(trimmed) as {
+                                choices?: Array<{
+                                    delta?: { reasoning?: string; content?: string };
+                                }>;
+                            };
+                            const delta = parsed.choices?.[0]?.delta;
+                            // Capture reasoning tokens → live thinking display
+                            if (delta?.reasoning) {
+                                emitReasoning(delta.reasoning);
+                                reasoningOutput += delta.reasoning;
+                            }
+                            // Some chunks may have content directly
+                            if (delta?.content) {
+                                reasoningOutput += delta.content;
+                            }
+                        } catch { /* skip malformed */ }
+                    }
+                }
+
+                console.log(`[AI Client] Phase 1 complete — ${reasoningOutput.length} reasoning chars`);
+            } else {
+                const errBody = await res.text().catch(() => "");
+                console.warn(`[AI Client] gpt-oss-120b HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+            }
+        } catch (err) {
+            console.warn("[AI Client] Phase 1 reasoning failed:", err instanceof Error ? err.message : err);
+        }
+    }
+
+    // ── Phase 2: fast content stream with llama3.1-8b ────────────────────────
+    // Build a rich prompt that includes the reasoning as context
+    const contentPrompt = reasoningOutput
+        ? `You are Cencori, a senior security engineer. Based on this security analysis:\n\n<reasoning>\n${reasoningOutput.slice(0, 4000)}\n</reasoning>\n\nNow write the remediation brief for the user.\n\n${prompt}`
+        : prompt;
+
+    if (cerebrasKey) {
+        try {
+            console.log("[AI Client] Phase 2: llama3.1-8b content stream...");
+            const res = await withTimeout(
+                fetch(`${cerebrasBase}/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${cerebrasKey}`,
+                    },
+                    body: JSON.stringify({
+                        model: FAST_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: contentPrompt },
+                        ],
+                        temperature: 0.3,
+                        stream: true,
+                    }),
+                }),
+                TIMEOUT_MS
+            );
+
+            if (res.ok && res.body) {
+                const reader = res.body.getReader();
+                const dec = new TextDecoder();
+                let buffer = "";
+                let gotContent = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += dec.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        const trimmed = line.replace(/^data:\s*/, "").trim();
+                        if (!trimmed || trimmed === "[DONE]") continue;
+                        try {
+                            const parsed = JSON.parse(trimmed) as {
+                                choices?: Array<{ delta?: { content?: string } }>;
+                            };
+                            const content = parsed.choices?.[0]?.delta?.content;
+                            if (content) {
+                                emitContent(content);
+                                gotContent = true;
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+
+                if (gotContent) {
+                    console.log("[AI Client] ✓ Phase 2 content stream complete");
+                    enqueue("[DONE]");
+                    controller.close();
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn("[AI Client] Phase 2 llama failed:", err instanceof Error ? err.message : err);
+        }
+    }
+
+    // Fallback: use the standard fallback chain but wrap as content events
+    console.log("[AI Client] Phase 2 falling back to standard chain...");
+    const fallbackController: ReadableStreamDefaultController = {
+        ...controller,
+        enqueue: (chunk: Uint8Array) => {
+            // Re-wrap plain {content:...} → {type:"content", content:...}
+            const text = new TextDecoder().decode(chunk);
+            const lines = text.split("\n");
+            for (const line of lines) {
+                const stripped = line.replace(/^data:\s*/, "").trim();
+                if (!stripped || stripped === "[DONE]") {
+                    if (stripped === "[DONE]") controller.enqueue(chunk);
+                    continue;
+                }
+                try {
+                    const parsed = JSON.parse(stripped) as { content?: string };
+                    if (parsed.content) {
+                        emitContent(parsed.content);
+                    }
+                } catch { /* skip */ }
+            }
+        },
+    } as ReadableStreamDefaultController;
+
+    await streamWithFallback(contentPrompt, fallbackController, encoder);
 }

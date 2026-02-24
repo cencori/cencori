@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { streamWithReasoning } from "@/lib/scan/ai-client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -143,6 +143,10 @@ function buildFallbackSuggestions(input: {
     return lines.join("\n");
 }
 
+const SYSTEM_PROMPT = `You are Cencori, a senior security engineer embedded in the codebase.
+Be direct, practical, and opinionated. You can use light humor sparingly, but stay technical.
+Always provide remediation guidance grounded in the provided scan data.`;
+
 export async function POST(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createServerClient();
@@ -199,37 +203,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         manualGuidance,
     });
 
-    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    const encoder = new TextEncoder();
+    const selectedFixes = fixes.filter((fix) => fix.selected !== false);
 
-    const stream = new ReadableStream({
-        async start(controller) {
-            const sendData = (payload: string) => {
-                controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
-            };
-
-            const sendJson = (payload: Record<string, unknown>) => {
-                sendData(JSON.stringify(payload));
-            };
-
-            try {
-                if (!apiKey) {
-                    sendJson({ content: fallbackResponse });
-                    sendData("[DONE]");
-                    controller.close();
-                    return;
-                }
-
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({
-                    model: "gemini-2.5-flash",
-                    systemInstruction: `You are Cencori, a senior security engineer.
-Be direct, practical, and opinionated. You can use light humor sparingly, but stay technical.
-Always provide remediation guidance grounded in the provided scan data.`,
-                });
-
-                const selectedFixes = fixes.filter((fix) => fix.selected !== false);
-                const prompt = `Repository: ${project.github_repo_full_name}
+    const prompt = `Repository: ${project.github_repo_full_name}
 
 Repository AI scan summary:
 ${repositoryAiSummary || "n/a"}
@@ -245,7 +221,7 @@ ${JSON.stringify(manualGuidance.slice(0, 120), null, 2)}
 
 Produce a markdown remediation brief with this structure:
 1) Executive Summary
-2) Streaming Fix Suggestions (group by file and include exact code-level intent)
+2) Auto-Fix Plan (group by file, include exact code-level intent)
 3) Manual Review Queue
 4) PR Readiness Checklist
 5) Post-merge Validation
@@ -256,26 +232,19 @@ Constraints:
 - Be concrete and specific to files/lines where possible.
 - Keep it concise but complete.`;
 
-                const chat = model.startChat({
-                    generationConfig: {
-                        temperature: 0.35,
-                        maxOutputTokens: 1800,
-                    },
-                });
+    const encoder = new TextEncoder();
 
-                const result = await chat.sendMessageStream(prompt);
-                for await (const chunk of result.stream) {
-                    const chunkText = chunk.text();
-                    if (chunkText) {
-                        sendJson({ content: chunkText });
-                    }
-                }
+    const stream = new ReadableStream({
+        async start(controller) {
+            const sendData = (payload: string) => {
+                controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+            };
 
-                sendData("[DONE]");
-                controller.close();
+            try {
+                await streamWithReasoning(prompt, SYSTEM_PROMPT, controller, encoder);
             } catch (error) {
                 console.error("[Fix Suggestions] Stream failed:", error);
-                sendJson({ content: fallbackResponse });
+                sendData(JSON.stringify({ type: "content", content: fallbackResponse }));
                 sendData("[DONE]");
                 controller.close();
             }
