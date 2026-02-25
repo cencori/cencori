@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getLimitForTier, type SubscriptionTier } from '@/lib/polarClient';
-import crypto from 'crypto';
-type PolarWebhookEvent = {
-    type: string;
-    data: {
-        id: string;
-        customer_id?: string;
-        product_id?: string;
-        status?: 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
-        current_period_start?: string;
-        current_period_end?: string;
-        metadata?: Record<string, string>;
-        product_price_id?: string;
-        products?: string[];
-    };
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
+
+type SubscriptionPayload = {
+    id: string;
+    customerId: string;
+    productId: string;
+    status: string;
+    currentPeriodStart: Date | string;
+    currentPeriodEnd: Date | string | null;
+    metadata?: Record<string, string | number | boolean>;
 };
-function getProductIdToTier(productId: string): SubscriptionTier {
+
+function getProductIdToTier(productId: string | null | undefined): SubscriptionTier {
+    if (!productId) {
+        return 'free';
+    }
+
     const proMonthly = process.env.POLAR_PRODUCT_PRO_MONTHLY;
     const proAnnual = process.env.POLAR_PRODUCT_PRO_ANNUAL;
     const teamMonthly = process.env.POLAR_PRODUCT_TEAM_MONTHLY;
@@ -31,83 +32,112 @@ function getProductIdToTier(productId: string): SubscriptionTier {
     return 'free';
 }
 
-function verifyPolarSignature(
-    payload: string,
-    signature: string | null,
-    secret: string
-): boolean {
-    if (!signature) {
-        console.error('[Polar Webhook] No signature provided');
-        return false;
+function toNullableISOString(value: Date | string | null | undefined): string | null {
+    if (!value) {
+        return null;
     }
 
     try {
-        const hmac = crypto.createHmac('sha256', secret);
-        const digest = hmac.update(payload).digest('hex');
-
-        return crypto.timingSafeEqual(
-            Buffer.from(signature),
-            Buffer.from(digest)
-        );
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toISOString();
     } catch (error) {
-        console.error('[Polar Webhook] Signature verification error:', error);
-        return false;
+        console.error('[Polar Webhook] Failed to normalize date:', error);
+        return null;
     }
+}
+
+async function resolveOrganizationId(
+    supabaseAdmin: ReturnType<typeof createAdminClient>,
+    payload: SubscriptionPayload
+) {
+    const metadataOrgId = payload.metadata?.org_id;
+    if (typeof metadataOrgId === 'string' && metadataOrgId.length > 0) {
+        return metadataOrgId;
+    }
+
+    const { data: bySubscription, error: subscriptionLookupError } = await supabaseAdmin
+        .from('organizations')
+        .select('id')
+        .eq('subscription_id', payload.id)
+        .maybeSingle();
+
+    if (subscriptionLookupError) {
+        console.error('[Polar Webhook] Failed to resolve org by subscription_id:', subscriptionLookupError);
+    }
+
+    if (bySubscription?.id) {
+        return bySubscription.id;
+    }
+
+    const { data: byCustomer, error: customerLookupError } = await supabaseAdmin
+        .from('organizations')
+        .select('id')
+        .eq('polar_customer_id', payload.customerId)
+        .maybeSingle();
+
+    if (customerLookupError) {
+        console.error('[Polar Webhook] Failed to resolve org by polar_customer_id:', customerLookupError);
+    }
+
+    return byCustomer?.id ?? null;
 }
 
 export async function POST(req: NextRequest) {
     try {
         const rawBody = await req.text();
-        const signature = req.headers.get('x-polar-signature');
         const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
-        if (webhookSecret) {
-            if (!verifyPolarSignature(rawBody, signature, webhookSecret)) {
-                console.error('[Polar Webhook] Invalid signature');
-                return NextResponse.json(
-                    { error: 'Invalid signature' },
-                    { status: 401 }
-                );
-            }
-            console.log('[Polar Webhook] Signature verified ✓');
-        } else {
-            console.warn('[Polar Webhook] No webhook secret configured - skipping verification');
+
+        if (!webhookSecret) {
+            console.error('[Polar Webhook] Missing POLAR_WEBHOOK_SECRET');
+            return NextResponse.json(
+                { error: 'Missing webhook secret configuration' },
+                { status: 500 }
+            );
         }
 
-        const event: PolarWebhookEvent = JSON.parse(rawBody);
+        let event: ReturnType<typeof validateEvent>;
+        try {
+            event = validateEvent(rawBody, Object.fromEntries(req.headers.entries()), webhookSecret);
+        } catch (error) {
+            if (error instanceof WebhookVerificationError) {
+                console.error('[Polar Webhook] Invalid signature');
+                return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+            }
+            throw error;
+        }
+
         const supabaseAdmin = createAdminClient();
 
         console.log('[Polar Webhook] Received event:', event.type);
-        console.log('[Polar Webhook] Event data:', JSON.stringify(event.data, null, 2));
-
-        const orgId = event.data.metadata?.org_id;
 
         switch (event.type) {
             case 'subscription.created':
             case 'subscription.active':
+            case 'subscription.uncanceled':
             case 'subscription.updated': {
+                const payload: SubscriptionPayload = event.data;
+                const orgId = await resolveOrganizationId(supabaseAdmin, payload);
+
                 if (!orgId) {
-                    console.warn('[Polar Webhook] No org_id in subscription event metadata');
-                    return NextResponse.json({ received: true, warning: 'No org_id' });
+                    console.warn('[Polar Webhook] Unable to resolve organization for subscription update:', payload.id);
+                    return NextResponse.json({ received: true, warning: 'org_not_resolved' });
                 }
 
-                const productId = event.data.product_id || event.data.products?.[0];
-                if (!productId) {
-                    console.error('[Polar Webhook] No product_id in subscription event');
-                    return NextResponse.json({ received: true, warning: 'No product_id' });
-                }
-
-                const tier = getProductIdToTier(productId);
+                const tier = getProductIdToTier(payload.productId);
                 const limit = getLimitForTier(tier);
 
                 const { error } = await supabaseAdmin
                     .from('organizations')
                     .update({
                         subscription_tier: tier,
-                        subscription_status: event.data.status || 'active',
-                        subscription_id: event.data.id,
-                        polar_customer_id: event.data.customer_id,
-                        subscription_current_period_start: event.data.current_period_start,
-                        subscription_current_period_end: event.data.current_period_end,
+                        subscription_status: payload.status || 'active',
+                        subscription_id: payload.id,
+                        polar_customer_id: payload.customerId,
+                        subscription_current_period_start: toNullableISOString(payload.currentPeriodStart),
+                        subscription_current_period_end: toNullableISOString(payload.currentPeriodEnd),
                         monthly_request_limit: limit,
                     })
                     .eq('id', orgId);
@@ -123,17 +153,23 @@ export async function POST(req: NextRequest) {
 
             case 'subscription.canceled':
             case 'subscription.revoked': {
+                const payload: SubscriptionPayload = event.data;
+                const orgId = await resolveOrganizationId(supabaseAdmin, payload);
+
                 if (!orgId) {
-                    console.warn('[Polar Webhook] No org_id in cancellation event metadata');
-                    return NextResponse.json({ received: true, warning: 'No org_id' });
+                    console.warn('[Polar Webhook] Unable to resolve organization for subscription cancellation:', payload.id);
+                    return NextResponse.json({ received: true, warning: 'org_not_resolved' });
                 }
 
                 const { error } = await supabaseAdmin
                     .from('organizations')
                     .update({
                         subscription_tier: 'free',
-                        subscription_status: 'canceled',
-                        monthly_request_limit: 1000,
+                        subscription_status: payload.status || 'canceled',
+                        subscription_id: payload.id,
+                        polar_customer_id: payload.customerId,
+                        subscription_current_period_end: toNullableISOString(payload.currentPeriodEnd),
+                        monthly_request_limit: getLimitForTier('free'),
                     })
                     .eq('id', orgId);
 

@@ -1,19 +1,30 @@
 "use client";
 
 import React from 'react';
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 interface PlanProps {
     tier: string;
     status: string;
     currentPeriodEnd: string | null;
     price: number;
+    actionUrl?: string | null;
+    actionLabel?: string;
+    actionExternal?: boolean;
 }
 
-export function PlanDetails({ tier, status, currentPeriodEnd, price }: PlanProps) {
+export function PlanDetails({
+    tier,
+    status,
+    currentPeriodEnd,
+    price,
+    actionUrl,
+    actionLabel = 'Manage Plan',
+    actionExternal = false
+}: PlanProps) {
     const features = [
         "Distributed Gateway Nodes",
         "Unlimited API Projects",
@@ -75,10 +86,29 @@ export function PlanDetails({ tier, status, currentPeriodEnd, price }: PlanProps
                             <p className="text-[10px] text-muted-foreground max-w-[200px] leading-relaxed">
                                 Need more? Explore our Team and Enterprise plans for custom scaling.
                             </p>
-                            <Button variant="link" className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest hover:text-foreground hover:no-underline transition-colors w-auto">
-                                VIEW ALL FEATURES
-                                <ArrowRight size={12} className="ml-1 transition-transform group-hover:translate-x-0.5" />
-                            </Button>
+                            {actionUrl ? (
+                                actionExternal ? (
+                                    <Button
+                                        variant="link"
+                                        className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest hover:text-foreground hover:no-underline transition-colors w-auto"
+                                        onClick={() => window.open(actionUrl, '_blank', 'noopener,noreferrer')}
+                                    >
+                                        {actionLabel}
+                                        <ArrowRight size={12} className="ml-1 transition-transform group-hover:translate-x-0.5" />
+                                    </Button>
+                                ) : (
+                                    <Button asChild variant="link" className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest hover:text-foreground hover:no-underline transition-colors w-auto">
+                                        <Link href={actionUrl}>
+                                            {actionLabel}
+                                            <ArrowRight size={12} className="ml-1 transition-transform group-hover:translate-x-0.5" />
+                                        </Link>
+                                    </Button>
+                                )
+                            ) : (
+                                <Button variant="link" className="w-full h-auto p-0 text-[10px] font-medium text-muted-foreground uppercase tracking-widest opacity-50 cursor-not-allowed w-auto" disabled>
+                                    {actionLabel}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>

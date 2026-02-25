@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { polarClient, POLAR_CONFIG, getProductId } from '@/lib/polarClient';
+import { polarClient, getProductId } from '@/lib/polarClient';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { createServerClient } from '@/lib/supabaseServer';
+
+type CheckoutTier = 'pro' | 'team';
+type CheckoutCycle = 'monthly' | 'annual';
+
+type CheckoutRequestBody = {
+  tier?: CheckoutTier;
+  cycle?: CheckoutCycle;
+  orgId?: string;
+  embedOrigin?: string;
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const { tier, cycle, orgId, embedOrigin } = await req.json();
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { tier, cycle, orgId, embedOrigin } = await req.json() as CheckoutRequestBody;
 
     if (!tier || !cycle || !orgId) {
       return NextResponse.json(
@@ -35,7 +53,7 @@ export async function POST(req: NextRequest) {
       .from('organizations')
       .select('id, slug, name, owner_id')
       .eq('id', orgId)
-      .single();
+      .maybeSingle();
 
     if (orgError || !org) {
       console.error('[Checkout API] Org fetch error:', orgError);
@@ -45,19 +63,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let hasOrgAccess = org.owner_id === user.id;
+    if (!hasOrgAccess) {
+      const { data: membership, error: membershipError } = await supabaseAdmin
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', org.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('[Checkout API] Membership check failed:', membershipError);
+        return NextResponse.json(
+          { error: 'Failed to verify organization access' },
+          { status: 500 }
+        );
+      }
+
+      hasOrgAccess = !!membership;
+    }
+
+    if (!hasOrgAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     console.log('[Checkout API] Creating checkout for org:', org.slug);
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || req.nextUrl.origin).replace(/\/$/, '');
 
     const checkoutOptions: Parameters<typeof polarClient.checkouts.create>[0] = {
       products: [productId],
-      successUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard/organizations/${org.slug}/billing?success=true`,
+      successUrl: `${appBaseUrl}/dashboard/organizations/${org.slug}/billing?success=true`,
       metadata: {
         org_id: org.id,
         org_slug: org.slug,
       },
     };
 
-    if (embedOrigin) {
-      checkoutOptions.embedOrigin = embedOrigin;
+    if (typeof embedOrigin === 'string' && embedOrigin.trim().length > 0) {
+      checkoutOptions.embedOrigin = embedOrigin.trim();
     }
 
     const checkout = await polarClient.checkouts.create(checkoutOptions);

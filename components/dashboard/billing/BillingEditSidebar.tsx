@@ -10,6 +10,7 @@ import { updateBillingDetails } from '@/app/dashboard/organizations/[orgSlug]/bi
 import { toast } from 'sonner';
 import { useTransition } from 'react';
 import { CountrySelector } from './CountrySelector';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface BillingEditSidebarProps {
     isOpen: boolean;
@@ -31,6 +32,7 @@ interface BillingEditSidebarProps {
 export function BillingEditSidebar({ isOpen, onClose, initialData, orgSlug }: BillingEditSidebarProps) {
     const [country, setCountry] = React.useState(initialData.country || "");
     const [isPending, startTransition] = useTransition();
+    const queryClient = useQueryClient();
 
     React.useEffect(() => {
         setCountry(initialData.country || "");
@@ -42,6 +44,37 @@ export function BillingEditSidebar({ isOpen, onClose, initialData, orgSlug }: Bi
             if (result.error) {
                 toast.error(result.error);
             } else {
+                const getString = (key: string) => String(formData.get(key) || '').trim();
+                const getNullableString = (key: string) => {
+                    const value = getString(key);
+                    return value.length > 0 ? value : null;
+                };
+
+                queryClient.setQueryData(
+                    ['orgBilling', orgSlug],
+                    (previous: unknown) => {
+                        if (!previous || typeof previous !== 'object') {
+                            return previous;
+                        }
+
+                        return {
+                            ...previous,
+                            name: getString('name'),
+                            billing_email: getString('email'),
+                            billing_address_line1: getNullableString('line1'),
+                            billing_address_line2: getNullableString('line2'),
+                            billing_city: getNullableString('city'),
+                            billing_state: getNullableString('state'),
+                            billing_zip: getNullableString('zip'),
+                            billing_country: getNullableString('country'),
+                            billing_tax_id: getNullableString('taxId'),
+                        };
+                    }
+                );
+
+                queryClient.invalidateQueries({ queryKey: ['orgBilling', orgSlug] });
+                queryClient.invalidateQueries({ queryKey: ['orgPortalUrl', orgSlug] });
+
                 toast.success('Billing details updated');
                 onClose();
             }

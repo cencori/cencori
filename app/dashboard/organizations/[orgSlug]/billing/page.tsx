@@ -2,16 +2,14 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useQuery } from '@tanstack/react-query';
-// Import UI components
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
-import { getInvoices, getCustomerPortalUrl } from './actions';
-import { CheckCircle, CreditCard, LayoutDashboard, Settings, Info, ArrowUpRight } from 'lucide-react';
+import { getInvoices, getCustomerPortalUrl, getPaymentMethods } from './actions';
+import { CreditCard, Info } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
+import Link from 'next/link';
 
 // Import modular components
 import { UsageOverview } from "@/components/dashboard/billing/UsageOverview";
@@ -43,6 +41,7 @@ interface Organization {
 
 interface ProjectData {
     id: string;
+    slug: string;
     name: string;
     monthly_budget: number | null;
     spend_cap: number | null;
@@ -51,6 +50,14 @@ interface ProjectData {
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
+}
+
+interface CreditTransaction {
+    id: string;
+    amount: number;
+    transaction_type: string;
+    description: string | null;
+    created_at: string;
 }
 
 function useBillingData(orgSlug: string) {
@@ -75,7 +82,7 @@ function useBillingData(orgSlug: string) {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('projects')
-                .select('id, name, monthly_budget, spend_cap, enforce_spend_cap')
+                .select('id, slug, name, monthly_budget, spend_cap, enforce_spend_cap')
                 .eq('organization_id', orgQuery.data!.id);
 
             if (error) throw error;
@@ -95,7 +102,7 @@ function useBillingData(orgSlug: string) {
                 .limit(5);
 
             if (error) return [];
-            return data;
+            return (data || []) as CreditTransaction[];
         },
     });
 
@@ -109,14 +116,28 @@ function useBillingData(orgSlug: string) {
         queryFn: () => getCustomerPortalUrl(orgSlug)
     });
 
+    const paymentMethodsQuery = useQuery({
+        queryKey: ["orgPaymentMethods", orgSlug],
+        queryFn: () => getPaymentMethods(orgSlug)
+    });
+
     return {
         org: orgQuery.data,
         projects: projectsQuery.data || [],
         transactions: creditsQuery.data || [],
         invoices: invoicesQuery.data || [],
         portalUrl: portalUrlQuery.data,
-        isLoading: orgQuery.isLoading || projectsQuery.isLoading,
-        error: orgQuery.error || projectsQuery.error
+        paymentMethods: paymentMethodsQuery.data || [],
+        isLoading: orgQuery.isLoading
+            || projectsQuery.isLoading
+            || invoicesQuery.isLoading
+            || portalUrlQuery.isLoading
+            || paymentMethodsQuery.isLoading,
+        error: orgQuery.error
+            || projectsQuery.error
+            || invoicesQuery.error
+            || portalUrlQuery.error
+            || paymentMethodsQuery.error
     };
 }
 
@@ -136,7 +157,7 @@ export default function BillingPage({ params }: PageProps) {
         }
     }, [searchParams]);
 
-    const { org, projects, transactions, invoices, portalUrl, isLoading, error } = useBillingData(orgSlug);
+    const { org, projects, transactions, invoices, portalUrl, paymentMethods, isLoading, error } = useBillingData(orgSlug);
 
     if (isLoading) {
         return (
@@ -176,6 +197,7 @@ export default function BillingPage({ params }: PageProps) {
     // Mapping for project budget format
     const formattedProjects = projects.map(p => ({
         id: p.id,
+        slug: p.slug,
         name: p.name,
         monthlyBudget: p.monthly_budget,
         spendCap: p.spend_cap,
@@ -184,13 +206,18 @@ export default function BillingPage({ params }: PageProps) {
     }));
 
     // Mapping for credits format
-    const formattedTransactions = transactions.map((t: any) => ({
+    const formattedTransactions = transactions.map((t) => ({
         id: t.id,
         amount: t.amount,
         type: t.transaction_type,
-        description: t.description,
+        description: t.description || 'No description',
         createdAt: t.created_at
     }));
+
+    const planActionUrl = portalUrl || '/pricing';
+    const planActionLabel = portalUrl
+        ? (org.subscription_tier === 'free' ? 'Upgrade Plan' : 'Manage Subscription')
+        : 'View Plans';
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8 pb-32">
@@ -228,6 +255,9 @@ export default function BillingPage({ params }: PageProps) {
                     status={org.subscription_status}
                     currentPeriodEnd={org.subscription_current_period_end}
                     price={org.subscription_tier === 'pro' ? 49 : org.subscription_tier === 'team' ? 149 : 0}
+                    actionUrl={planActionUrl}
+                    actionLabel={planActionLabel}
+                    actionExternal={Boolean(portalUrl)}
                 />
 
                 <CreditBalance
@@ -236,13 +266,13 @@ export default function BillingPage({ params }: PageProps) {
                 />
 
                 <PaymentMethods
-                    methods={[]}
+                    methods={paymentMethods}
                     portalUrl={portalUrl}
                 />
 
-                <CostControl projects={formattedProjects} />
+                <CostControl orgSlug={orgSlug} projects={formattedProjects} />
 
-                <InvoiceHistory invoices={invoices as any} />
+                <InvoiceHistory invoices={invoices} />
 
                 <BillingCommunication
                     orgSlug={orgSlug}
@@ -267,8 +297,8 @@ export default function BillingPage({ params }: PageProps) {
                             <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
                                 For enterprise contracts or custom invoicing, please reach out to our team.
                             </p>
-                            <Button variant="link" className="h-auto p-0 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:no-underline transition-colors uppercase tracking-wider">
-                                Contact Support →
+                            <Button asChild variant="link" className="h-auto p-0 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:no-underline transition-colors uppercase tracking-wider">
+                                <Link href="mailto:support@cencori.com">Contact Support →</Link>
                             </Button>
                         </div>
                     </div>
