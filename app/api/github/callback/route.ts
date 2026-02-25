@@ -194,24 +194,48 @@ export async function GET(req: NextRequest) {
       }
 
       // For dashboard source: link to specific org
-      if (orgSlug && !isScanSource && linkedUserId) {
-        const { data: orgData } = await supabaseAdmin
-          .from('organizations')
-          .select('id, owner_id')
-          .eq('slug', orgSlug)
-          .maybeSingle();
+      if (orgSlug && !isScanSource) {
+        // Use live session user, fall back to signed stateUserId
+        const effectiveUserId = linkedUserId;
+        if (effectiveUserId) {
+          const { data: orgData } = await supabaseAdmin
+            .from('organizations')
+            .select('id, owner_id')
+            .eq('slug', orgSlug)
+            .maybeSingle();
 
-        if (orgData && orgData.owner_id === linkedUserId) {
-          const { error: linkError } = await supabaseAdmin
-            .from('organization_github_installations')
-            .upsert({
-              organization_id: orgData.id,
-              installation_id: parsedInstallationId,
-            }, { onConflict: 'organization_id, installation_id' });
+          if (orgData) {
+            // Allow org owners and members to link
+            let canLink = orgData.owner_id === effectiveUserId;
+            if (!canLink) {
+              const { data: membership } = await supabaseAdmin
+                .from('organization_members')
+                .select('user_id')
+                .eq('organization_id', orgData.id)
+                .eq('user_id', effectiveUserId)
+                .maybeSingle();
+              canLink = !!membership;
+            }
 
-          if (linkError) {
-            console.error('Error linking installation to org:', linkError);
+            if (canLink) {
+              const { error: linkError } = await supabaseAdmin
+                .from('organization_github_installations')
+                .upsert({
+                  organization_id: orgData.id,
+                  installation_id: parsedInstallationId,
+                }, { onConflict: 'organization_id, installation_id' });
+
+              if (linkError) {
+                console.error('Error linking installation to org:', linkError);
+              } else {
+                console.log(`Linked installation ${parsedInstallationId} to org ${orgData.id} (user ${effectiveUserId})`);
+              }
+            } else {
+              console.warn(`User ${effectiveUserId} does not have access to org ${orgSlug} — skipping link`);
+            }
           }
+        } else {
+          console.warn(`No userId available to link installation ${parsedInstallationId} to org ${orgSlug}`);
         }
       }
 

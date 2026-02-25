@@ -183,11 +183,14 @@ export default function GitHubImportPage({ params }: PageProps) {
     }
   };
 
-  const handleInstallConfirm = (accountType: 'user' | 'organization', accountLogin?: string) => {
+  const handleInstallConfirm = async (accountType: 'user' | 'organization', accountLogin?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
     const state = JSON.stringify({
+      source: 'dashboard',
       orgSlug,
       accountType,
-      accountLogin
+      accountLogin,
+      userId: user?.id,
     });
     const githubAppInstallationUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
     window.location.href = githubAppInstallationUrl;
