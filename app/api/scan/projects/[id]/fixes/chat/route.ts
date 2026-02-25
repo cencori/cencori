@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
+import { searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -132,6 +133,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
     }
 
+    // Retrieve relevant past memories for this project (RAG)
+    const memoryContext = await searchMemory(id, user.id, question, supabaseAdmin);
+
     const recentHistory = history.slice(-8)
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
         .join("\n");
@@ -153,6 +157,10 @@ Currently selected issue:
 - Description: ${issue.description || "n/a"}
 - Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${aiSummary ? `\n- Repo AI summary: ${aiSummary}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
+    const memorySection = memoryContext
+        ? `\n\n## Relevant context from this project's history\n${memoryContext}`
+        : "";
+
     const prompt = `You are Cencori — a sharp, senior security engineer embedded in a code scanning product.
 
 Your role is twofold:
@@ -173,7 +181,7 @@ CRITICAL AESTHETIC RULES:
 - NEVER use emojis — not in headings, bullet points, or anywhere in the response.
 - NEVER output a "Remediation Brief" or heavy checklist format in this chat unless explicitly asked.
 - If the user says something simple (e.g., "PR merged", "thanks", "hello"), just reply naturally and conversationally. Do NOT launch into a multi-point plan or security review. Keep it brief.
-- Match the user's length and energy. Short inputs get short, friendly outputs.${issueSection}
+- Match the user's length and energy. Short inputs get short, friendly outputs.${issueSection}${memorySection}
 
 Conversation so far:
 ${recentHistory || "(none yet)"}
@@ -187,14 +195,26 @@ User: ${question}`;
             const enqueue = (payload: string) =>
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 
+            let accumulatedResponse = "";
+
             try {
                 await streamWithReasoning(
                     question,
                     prompt, // System prompt
                     controller,
                     encoder,
-                    buildFallbackAnswer(question, issue, fix)
+                    buildFallbackAnswer(question, issue, fix),
+                    (chunk) => { accumulatedResponse += chunk; },
                 );
+
+                // After streaming completes, fire-and-forget memory write with the actual response
+                const memoryText = [
+                    `Q: ${question.slice(0, 500)}`,
+                    `A: ${accumulatedResponse.slice(0, 1500)}`,
+                    issue.name ? `(Issue: ${issue.name}${issue.file ? ` in ${issue.file}` : ""})` : "",
+                ].filter(Boolean).join("\n");
+
+                writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId).catch(() => { });
             } catch (error) {
                 console.error("[Fix Chat] All providers failed:", error);
                 enqueue(JSON.stringify({ type: "content", content: buildFallbackAnswer(question, issue, fix) }));

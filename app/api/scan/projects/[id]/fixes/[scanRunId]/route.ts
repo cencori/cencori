@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { writeMemory } from "@/lib/scan/scan-memory";
 
 interface RouteParams {
     params: Promise<{ id: string; scanRunId: string }>;
@@ -104,6 +105,23 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
     if (updateError || !scanRun) {
         return NextResponse.json({ error: "Failed to update fix workflow status" }, { status: 500 });
+    }
+
+    // Fire-and-forget memory write — gives RAG context of past user decisions
+    const { project } = auth;
+    const repo = project.github_repo_full_name ?? id;
+    const issueCount = Array.isArray(scanRun.results?.issues) ? scanRun.results.issues.length : 0;
+
+    if (action === "dismiss") {
+        const memoryContent = `User dismissed scan run ${scanRunId.slice(0, 8)} for ${repo}. ` +
+            `${issueCount > 0 ? `${issueCount} issue(s) were found.` : ""} Marked as not applicable.`;
+        writeMemory(id, auth.user.id, memoryContent, "dismiss", supabaseAdmin, scanRunId).catch(() => { });
+    } else if (action === "done") {
+        const prUrl = typeof scanRun.fix_pr_url === "string" ? scanRun.fix_pr_url : "(no PR URL)";
+        const branchName = typeof scanRun.fix_branch_name === "string" ? scanRun.fix_branch_name : "";
+        const memoryContent = `User marked fixes as done for ${repo}. ` +
+            `${branchName ? `Branch: ${branchName}. ` : ""}PR: ${prUrl}.`;
+        writeMemory(id, auth.user.id, memoryContent, "done", supabaseAdmin, scanRunId).catch(() => { });
     }
 
     return NextResponse.json({ scanRun });
