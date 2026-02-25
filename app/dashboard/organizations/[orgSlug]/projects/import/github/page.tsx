@@ -112,7 +112,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [linkingInstallation, setLinkingInstallation] = useState(false);
+  const [linkingInstallationId, setLinkingInstallationId] = useState<number | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const GITHUB_APP_SLUG = "cencori";
@@ -201,9 +201,9 @@ export default function GitHubImportPage({ params }: PageProps) {
   };
 
   const handleLinkInstallation = async (installation: GitHubInstallation) => {
-    if (!githubData?.organizationId || linkingInstallation) return;
+    if (!githubData?.organizationId || linkingInstallationId !== null) return;
 
-    setLinkingInstallation(true);
+    setLinkingInstallationId(installation.installation_id);
     try {
       const response = await fetch('/api/github/link-installation', {
         method: 'POST',
@@ -217,12 +217,15 @@ export default function GitHubImportPage({ params }: PageProps) {
       if (!response.ok) throw new Error('Failed to link installation');
 
       toast.success(`Linked GitHub account: ${installation.github_account_login}`);
+      // router.refresh() forces a full server-side revalidation so the
+      // organization_github_installations row is visible to the next query
+      router.refresh();
       await refetch();
     } catch (error) {
       console.error('Error linking installation:', error);
       toast.error('Failed to link GitHub account. Please try again.');
     } finally {
-      setLinkingInstallation(false);
+      setLinkingInstallationId(null);
     }
   };
 
@@ -309,16 +312,15 @@ export default function GitHubImportPage({ params }: PageProps) {
                     size="sm"
                     className="h-7 text-xs px-3 w-full"
                     onClick={() => handleLinkInstallation(installation)}
-                    disabled={linkingInstallation}
+                    disabled={linkingInstallationId !== null}
                   >
-                    {linkingInstallation ? (
+                    {linkingInstallationId === installation.installation_id ? (
                       <>
                         <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                         Linking...
                       </>
                     ) : (
                       <>
-                        <GitHubLogo className="mr-1.5 h-3 w-3" />
                         Link @{installation.github_account_login}
                       </>
                     )}
