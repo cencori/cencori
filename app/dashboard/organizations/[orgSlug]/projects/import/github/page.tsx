@@ -43,46 +43,22 @@ interface PageProps {
   params: Promise<{ orgSlug: string }>;
 }
 
-// Hook to fetch GitHub repositories and installation status
+// Hook to fetch GitHub status and repos via server-side API (bypasses RLS)
 function useGitHubData(orgSlug: string) {
   return useQuery({
-    queryKey: ["githubRepos", orgSlug],
+    queryKey: ["githubStatus", orgSlug],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Not authenticated");
-
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('id, slug')
-        .eq('slug', orgSlug)
-        .single();
-
-      if (orgError || !orgData) throw new Error('Organization not found');
-
-      const { data: linkData } = await supabase
-        .from('organization_github_installations')
-        .select('installation_id')
-        .eq('organization_id', orgData.id)
-        .single();
-
-      if (!linkData) {
-        return {
-          organizationId: orgData.id,
-          installationId: null,
-          repositories: [] as GitHubRepo[],
-          status: 'not_installed' as const,
-        };
+      const res = await fetch(`/api/github/status?orgSlug=${encodeURIComponent(orgSlug)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to fetch GitHub status');
       }
-
-      const response = await fetch(`/api/github/repositories?installation_id=${linkData.installation_id}`);
-      if (!response.ok) throw new Error('Failed to fetch repositories');
-
-      const data = await response.json();
-      return {
-        organizationId: orgData.id,
-        installationId: linkData.installation_id,
-        repositories: (data.repositories || []) as GitHubRepo[],
-        status: 'installed' as const,
+      const data = await res.json();
+      return data as {
+        status: 'installed' | 'not_installed';
+        organizationId: string;
+        installationId?: number;
+        repositories?: GitHubRepo[];
       };
     },
     staleTime: 30 * 1000,
