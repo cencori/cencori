@@ -92,14 +92,11 @@ export function UpgradeDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
+            <DialogContent className="sm:max-w-3xl p-0 overflow-hidden gap-0">
                 {/* Header */}
                 <div className="px-6 pt-6 pb-4 border-b border-border/50">
                     <DialogHeader>
                         <div className="flex items-center gap-2 mb-1">
-                            <div className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                                <Zap className="w-3 h-3 text-amber-500" />
-                            </div>
                             <DialogTitle className="text-sm font-semibold">Upgrade your plan</DialogTitle>
                         </div>
                         {reason && (
