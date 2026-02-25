@@ -171,27 +171,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.redirect(buildRedirect(`/dashboard/organizations/${orgSlug}/projects?error=installation_failed`));
       }
 
-      // For scan source: link to user's organizations automatically
-      if (isScanSource && linkedUserId) {
-        // Get user's organizations
-        const { data: userOrgs } = await supabaseAdmin
-          .from('organizations')
-          .select('id')
-          .eq('owner_id', linkedUserId);
-
-        if (userOrgs && userOrgs.length > 0) {
-          // Link installation to all user's organizations
-          for (const org of userOrgs) {
-            await supabaseAdmin
-              .from('organization_github_installations')
-              .upsert({
-                organization_id: org.id,
-                installation_id: parsedInstallationId,
-              }, { onConflict: 'organization_id, installation_id' });
-          }
-          console.log(`Linked installation ${parsedInstallationId} to ${userOrgs.length} organizations for user ${linkedUserId}`);
-        }
-      }
+      // Installation saved to github_app_installations.
+      // We do NOT auto-link to any org here — the user-installations API
+      // will surface this installation (matched by github_account_login or
+      // installed_by_user_id) as a linkable option in each org's import page,
+      // allowing explicit per-org linking instead of bulk assignment.
 
       // For dashboard source: link to specific org
       if (orgSlug && !isScanSource) {
