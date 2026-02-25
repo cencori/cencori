@@ -6,7 +6,8 @@
  *   writeMemory  — embed and store a new memory entry
  *
  * Uses Gemini text-embedding-004 (768-dim), consistent with the semantic cache.
- * Both operations fail silently — if they error, the chat/scan feature still works.
+ * In best-effort mode, failures are swallowed so the chat/scan feature still works.
+ * In strict mode, callers can opt into hard failures for enforcement paths.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -28,10 +29,36 @@ export interface MemoryEntry {
     created_at: string;
 }
 
-async function embedText(text: string): Promise<number[] | null> {
+export type ScanMemoryErrorCode =
+    | 'missing_embedding_key'
+    | 'embedding_failed'
+    | 'embedding_unavailable'
+    | 'search_failed'
+    | 'write_failed';
+
+export class ScanMemoryError extends Error {
+    code: ScanMemoryErrorCode;
+
+    constructor(code: ScanMemoryErrorCode, message: string) {
+        super(message);
+        this.name = 'ScanMemoryError';
+        this.code = code;
+    }
+}
+
+export interface ScanMemoryOptions {
+    enforce?: boolean;
+}
+
+async function embedText(text: string, options?: ScanMemoryOptions): Promise<number[] | null> {
+    const enforce = options?.enforce ?? false;
     const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
     if (!geminiKey) {
-        console.warn('[Scan Memory] No API key — skipping embedding');
+        const message = '[Scan Memory] No API key configured for embeddings';
+        if (enforce) {
+            throw new ScanMemoryError('missing_embedding_key', message);
+        }
+        console.warn(`${message} — skipping embedding`);
         return null;
     }
 
@@ -44,6 +71,12 @@ async function embedText(text: string): Promise<number[] | null> {
         if (!Array.isArray(values) || values.length !== EMBEDDING_DIMS) return null;
         return values;
     } catch (err) {
+        if (enforce) {
+            throw new ScanMemoryError(
+                'embedding_failed',
+                `[Scan Memory] Embedding failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
         console.warn('[Scan Memory] Embedding failed:', err instanceof Error ? err.message : err);
         return null;
     }
@@ -59,10 +92,17 @@ export async function searchMemory(
     query: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     supabase: SupabaseClient<any>,
+    options?: ScanMemoryOptions,
 ): Promise<string> {
+    const enforce = options?.enforce ?? false;
     try {
-        const embedding = await embedText(query);
-        if (!embedding) return '';
+        const embedding = await embedText(query, { enforce });
+        if (!embedding) {
+            if (enforce) {
+                throw new ScanMemoryError('embedding_unavailable', '[Scan Memory] Embedding is required in strict mode');
+            }
+            return '';
+        }
 
         const { data, error } = await supabase.rpc('match_scan_memory', {
             query_embedding: embedding,
@@ -72,7 +112,13 @@ export async function searchMemory(
             match_count: MAX_RESULTS,
         });
 
-        if (error || !Array.isArray(data) || data.length === 0) return '';
+        if (error) {
+            if (enforce) {
+                throw new ScanMemoryError('search_failed', `[Scan Memory] Search failed: ${error.message}`);
+            }
+            return '';
+        }
+        if (!Array.isArray(data) || data.length === 0) return '';
 
         const entries = data as MemoryEntry[];
         const lines = entries.map(entry => {
@@ -87,6 +133,13 @@ export async function searchMemory(
 
         return lines.join('\n');
     } catch (err) {
+        if (enforce) {
+            if (err instanceof ScanMemoryError) throw err;
+            throw new ScanMemoryError(
+                'search_failed',
+                `[Scan Memory] Search failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
         console.warn('[Scan Memory] Search failed:', err instanceof Error ? err.message : err);
         return '';
     }
@@ -104,10 +157,15 @@ export async function writeMemory(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     supabase: SupabaseClient<any>,
     scanRunId?: string,
+    options?: ScanMemoryOptions,
 ): Promise<void> {
+    const enforce = options?.enforce ?? false;
     try {
         const truncated = content.slice(0, MAX_CONTENT_CHARS);
-        const embedding = await embedText(truncated);
+        const embedding = await embedText(truncated, { enforce });
+        if (enforce && !embedding) {
+            throw new ScanMemoryError('embedding_unavailable', '[Scan Memory] Embedding is required in strict mode');
+        }
 
         const { error } = await supabase
             .from('scan_chat_memory')
@@ -121,9 +179,19 @@ export async function writeMemory(
             });
 
         if (error) {
+            if (enforce) {
+                throw new ScanMemoryError('write_failed', `[Scan Memory] Write failed: ${error.message}`);
+            }
             console.warn('[Scan Memory] Write failed:', error.message);
         }
     } catch (err) {
+        if (enforce) {
+            if (err instanceof ScanMemoryError) throw err;
+            throw new ScanMemoryError(
+                'write_failed',
+                `[Scan Memory] Write error: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
         console.warn('[Scan Memory] Write error:', err instanceof Error ? err.message : err);
     }
 }

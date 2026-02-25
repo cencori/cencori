@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
-import { searchMemory, writeMemory } from "@/lib/scan/scan-memory";
+import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
+import { ScanMemoryError, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -71,6 +72,7 @@ function buildFallbackAnswer(question: string, issue?: IssueContext, fix?: FixCo
 export async function POST(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createServerClient();
+    const strictEnforcement = isScanStrictEnforcementEnabled();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
@@ -133,8 +135,22 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
     }
 
-    // Retrieve relevant past memories for this project (RAG)
-    const memoryContext = await searchMemory(id, user.id, question, supabaseAdmin);
+    let memoryContext = "";
+    try {
+        memoryContext = await searchMemory(id, user.id, question, supabaseAdmin, { enforce: strictEnforcement });
+    } catch (err) {
+        const details = err instanceof Error ? err.message : "Unknown memory retrieval error";
+        console.error("[Fix Chat] RAG memory retrieval failed:", details);
+        const code = err instanceof ScanMemoryError ? err.code : "search_failed";
+        return new Response(
+            JSON.stringify({
+                error: "RAG memory retrieval failed",
+                code,
+                details,
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+        );
+    }
 
     const recentHistory = history.slice(-8)
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
@@ -196,6 +212,7 @@ User: ${question}`;
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 
             let accumulatedResponse = "";
+            let finishedStreaming = false;
 
             try {
                 await streamWithReasoning(
@@ -205,21 +222,40 @@ User: ${question}`;
                     encoder,
                     buildFallbackAnswer(question, issue, fix),
                     (chunk) => { accumulatedResponse += chunk; },
+                    { emitDone: false, closeController: false },
                 );
+                finishedStreaming = true;
 
-                // After streaming completes, fire-and-forget memory write with the actual response
+                // Persist memory before terminating the stream so strict mode can enforce it.
                 const memoryText = [
                     `Q: ${question.slice(0, 500)}`,
                     `A: ${accumulatedResponse.slice(0, 1500)}`,
                     issue.name ? `(Issue: ${issue.name}${issue.file ? ` in ${issue.file}` : ""})` : "",
                 ].filter(Boolean).join("\n");
 
-                writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId).catch(() => { });
-            } catch (error) {
-                console.error("[Fix Chat] All providers failed:", error);
-                enqueue(JSON.stringify({ type: "content", content: buildFallbackAnswer(question, issue, fix) }));
+                await writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId, {
+                    enforce: strictEnforcement,
+                });
                 enqueue("[DONE]");
                 controller.close();
+            } catch (error) {
+                console.error("[Fix Chat] Streaming or memory persistence failed:", error);
+                if (!finishedStreaming) {
+                    enqueue(JSON.stringify({ type: "content", content: buildFallbackAnswer(question, issue, fix) }));
+                    enqueue("[DONE]");
+                    controller.close();
+                } else {
+                    try {
+                        enqueue(JSON.stringify({
+                            type: "error",
+                            message: "RAG memory persistence failed after response generation.",
+                        }));
+                        enqueue("[DONE]");
+                        controller.close();
+                    } catch {
+                        // Stream may already be closed; nothing else to do.
+                    }
+                }
             }
         },
     });

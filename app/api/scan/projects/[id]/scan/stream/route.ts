@@ -6,6 +6,8 @@ import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
+import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import {
     calculateScore,
     scanFileContent,
@@ -39,6 +41,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             // Accumulate all logs for persistence
             const allLogs: Array<{ type: string; time: number; message?: string; data?: unknown }> = [];
             const supabaseAdmin = createAdminClient();
+            const strictEnforcement = isScanStrictEnforcementEnabled();
             let scanRunId: string | null = null;
 
             const sendEvent = (event: { type: string; time: number; message?: string; data?: unknown }) => {
@@ -108,7 +111,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
                 let lastProgressUpdate = 0;
                 const {
-                    allIssues,
+                    allIssues: rawIssues,
                     scannedFiles,
                     filesScanned,
                     totalCandidateFiles,
@@ -159,6 +162,29 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                             });
                             lastProgressUpdate = now;
                         }
+                    },
+                });
+
+                const fileContentMap = new Map<string, string>(
+                    scannedFiles.map(file => [file.path, file.content])
+                );
+                sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Running LLM false-positive filter...' });
+
+                const {
+                    filtered: allIssues,
+                    suppressed: suppressedIssues,
+                    evaluated: llmEvaluatedIssues,
+                    enforced: llmEnforced,
+                } = await filterIssuesWithLLM(rawIssues, fileContentMap, { enforce: strictEnforcement });
+
+                sendEvent({
+                    type: 'success',
+                    time: Date.now() - startTime,
+                    message: `LLM filter complete: ${suppressedIssues.length} issue(s) suppressed`,
+                    data: {
+                        evaluatedIssues: llmEvaluatedIssues,
+                        rawIssueCount: rawIssues.length,
+                        filteredIssueCount: allIssues.length,
                     },
                 });
 
@@ -235,6 +261,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         research: enrichedResearch,
                         ...(aiInsight ? { ai: aiInsight } : {}),
                         issues: allIssues,
+                        rawIssueCount: rawIssues.length,
+                        suppressedIssueCount: suppressedIssues.length,
                         totalCandidateFiles,
                         failedFiles,
                         ...(noFilesMessage ? { message: noFilesMessage } : {}),
@@ -261,6 +289,13 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         fix_done_at: null,
                         results: {
                             issues: allIssues,
+                            suppressed_issues: suppressedIssues,
+                            raw_issue_count: rawIssues.length,
+                            llm_filter: {
+                                enforced: llmEnforced,
+                                evaluated_issues: llmEvaluatedIssues,
+                                suppressed_count: suppressedIssues.length,
+                            },
                             summary,
                             research: enrichedResearch,
                             ...(aiInsight ? { ai: aiInsight } : {}),
