@@ -21,13 +21,34 @@ export async function POST(req: NextRequest) {
 
         const { data: org, error: orgError } = await supabase
             .from('organizations')
-            .select('id')
+            .select('id, owner_id')
             .eq('id', organizationId)
-            .eq('owner_id', user.id)
             .single();
 
         if (orgError || !org) {
-            console.error('[Link Installation] User does not own organization:', orgError);
+            console.error('[Link Installation] Organization not found:', orgError);
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
+
+        let hasOrgAccess = org.owner_id === user.id;
+        if (!hasOrgAccess) {
+            const { data: membership, error: membershipError } = await supabase
+                .from('organization_members')
+                .select('user_id')
+                .eq('organization_id', organizationId)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (membershipError) {
+                console.error('[Link Installation] Error checking org membership:', membershipError);
+                return NextResponse.json({ error: 'Failed to verify organization access' }, { status: 500 });
+            }
+
+            hasOrgAccess = !!membership;
+        }
+
+        if (!hasOrgAccess) {
+            console.error('[Link Installation] User does not have access to organization:', organizationId);
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 

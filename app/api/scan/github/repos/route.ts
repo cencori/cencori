@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import { getReachableGithubInstallationIds } from '@/lib/github-installations';
 
 // GET /api/scan/github/repos - Get all repos from user's GitHub installations
 export async function GET() {
@@ -15,62 +16,7 @@ export async function GET() {
 
     try {
         const supabaseAdmin = createAdminClient();
-
-        // Get user's GitHub identity from their linked accounts
-        const githubIdentity = user.identities?.find(i => i.provider === 'github');
-        const githubUsername = githubIdentity?.identity_data?.user_name ||
-            githubIdentity?.identity_data?.preferred_username ||
-            null;
-
-        // Collect installation IDs from multiple sources
-        const installationIds: Set<number> = new Set();
-
-        // 1a. Get installations linked to organizations the user owns
-        const { data: ownedOrgs } = await supabaseAdmin
-            .from('organizations')
-            .select('id')
-            .eq('owner_id', user.id);
-
-        // 1b. Get installations linked to organizations the user is a member of
-        const { data: membershipRows } = await supabaseAdmin
-            .from('organization_members')
-            .select('organization_id')
-            .eq('user_id', user.id);
-
-        const orgIds = new Set<string>();
-        ownedOrgs?.forEach((org) => orgIds.add(org.id));
-        membershipRows?.forEach((membership) => {
-            if (membership.organization_id) {
-                orgIds.add(membership.organization_id);
-            }
-        });
-
-        if (orgIds.size > 0) {
-            const { data: links } = await supabaseAdmin
-                .from('organization_github_installations')
-                .select('installation_id')
-                .in('organization_id', Array.from(orgIds));
-
-            links?.forEach(l => installationIds.add(l.installation_id));
-        }
-
-        // 2a. Get installations where the GitHub account matches user's GitHub username
-        if (githubUsername) {
-            const { data: userInstallations } = await supabaseAdmin
-                .from('github_app_installations')
-                .select('installation_id')
-                .ilike('github_account_login', githubUsername);
-
-            userInstallations?.forEach(i => installationIds.add(i.installation_id));
-        }
-
-        // 2b. Get installations explicitly linked to this user (installed by them)
-        const { data: linkedInstallations } = await supabaseAdmin
-            .from('github_app_installations')
-            .select('installation_id')
-            .eq('installed_by_user_id', user.id);
-
-        linkedInstallations?.forEach(i => installationIds.add(i.installation_id));
+        const installationIds = await getReachableGithubInstallationIds(user);
 
         if (installationIds.size === 0) {
             return NextResponse.json({
