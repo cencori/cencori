@@ -4,7 +4,6 @@ import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
 import { importGitHubProject } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -403,11 +402,11 @@ export default function GitHubImportPage({ params }: PageProps) {
         </div>
       ) : (
         <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-          <Table>
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow className="hover:bg-transparent border-b border-border/40">
                 <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-4">Repository</TableHead>
-                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 w-24"></TableHead>
+                <TableHead className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider h-8 w-[110px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -416,13 +415,18 @@ export default function GitHubImportPage({ params }: PageProps) {
                   key={repo.id}
                   className="hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
                 >
-                  <TableCell className="py-3 px-4">
-                    <div className="text-[13px] font-medium">{repo.full_name}</div>
-                    <div className="text-[11px] text-muted-foreground line-clamp-1">
+                  <TableCell className="py-3 px-4 min-w-0">
+                    <div className="text-[13px] font-medium truncate" title={repo.full_name}>
+                      {repo.full_name}
+                    </div>
+                    <div
+                      className="text-[11px] text-muted-foreground truncate"
+                      title={repo.description || 'No description'}
+                    >
                       {repo.description || 'No description'}
                     </div>
                   </TableCell>
-                  <TableCell className="py-3 pr-4">
+                  <TableCell className="py-3 pr-4 text-right">
                     <Button
                       size="sm"
                       className="h-7 text-xs px-3"
