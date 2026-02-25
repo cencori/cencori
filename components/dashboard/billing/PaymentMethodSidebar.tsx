@@ -4,8 +4,6 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, Lock, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 interface PaymentMethodSidebarProps {
@@ -24,7 +22,8 @@ export function PaymentMethodSidebar({ isOpen, onClose, portalUrl }: PaymentMeth
 
         // If we have a portal URL, redirect there
         if (portalUrl) {
-            window.open(portalUrl, '_blank');
+            window.open(portalUrl, '_blank', 'noopener,noreferrer');
+            setIsPending(false);
             onClose();
             return;
         }
@@ -83,9 +82,10 @@ export function PaymentMethodSidebar({ isOpen, onClose, portalUrl }: PaymentMeth
 
                             <Button
                                 onClick={handleSubmit}
+                                disabled={isPending}
                                 className="w-full max-w-xs h-10 gap-2 text-xs font-medium uppercase tracking-wider"
                             >
-                                <span>Go to Billing Portal</span>
+                                <span>{isPending ? 'Opening Portal...' : 'Go to Billing Portal'}</span>
                                 <ExternalLink size={12} />
                             </Button>
                         </div>

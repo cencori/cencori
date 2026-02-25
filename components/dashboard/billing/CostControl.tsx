@@ -1,13 +1,14 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 interface Project {
     id: string;
+    slug: string;
     name: string;
     monthlyBudget: number | null;
     spendCap: number | null;
@@ -16,10 +17,13 @@ interface Project {
 }
 
 interface CostControlProps {
+    orgSlug: string;
     projects: Project[];
 }
 
-export function CostControl({ projects }: CostControlProps) {
+export function CostControl({ orgSlug, projects }: CostControlProps) {
+    const firstProject = projects[0];
+
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
             <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
@@ -29,9 +33,17 @@ export function CostControl({ projects }: CostControlProps) {
                         Configure budgets and spending limits for each project.
                     </p>
                 </div>
-                <Button variant="outline" className="h-7 text-xs">
-                    Configure Alerts
-                </Button>
+                {firstProject ? (
+                    <Button asChild variant="outline" className="h-7 text-xs">
+                        <Link href={`/dashboard/organizations/${orgSlug}/projects/${firstProject.slug}/settings`}>
+                            Configure Alerts
+                        </Link>
+                    </Button>
+                ) : (
+                    <Button variant="outline" className="h-7 text-xs" disabled>
+                        Configure Alerts
+                    </Button>
+                )}
             </div>
 
             <div className="p-0">
@@ -68,8 +80,10 @@ export function CostControl({ projects }: CostControlProps) {
                                     {project.spendCap ? `$${project.spendCap.toLocaleString()}` : 'Unlimited'}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <ChevronRight size={14} className="text-muted-foreground" />
+                                    <Button asChild variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Link href={`/dashboard/organizations/${orgSlug}/projects/${project.slug}/settings`}>
+                                            <ChevronRight size={14} className="text-muted-foreground" />
+                                        </Link>
                                     </Button>
                                 </td>
                             </tr>

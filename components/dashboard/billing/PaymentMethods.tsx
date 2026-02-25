@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Trash2 } from "lucide-react";
@@ -24,6 +23,13 @@ interface PaymentMethodsProps {
 
 export function PaymentMethods({ methods, portalUrl }: PaymentMethodsProps) {
     const [isAddSidebarOpen, setIsAddSidebarOpen] = useState(false);
+    const openPortal = () => {
+        if (!portalUrl) {
+            return;
+        }
+
+        window.open(portalUrl, '_blank', 'noopener,noreferrer');
+    };
 
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
@@ -38,6 +44,7 @@ export function PaymentMethods({ methods, portalUrl }: PaymentMethodsProps) {
                     variant="outline"
                     className="h-7 text-xs"
                     onClick={() => setIsAddSidebarOpen(true)}
+                    disabled={!portalUrl}
                 >
                     <Plus size={12} className="mr-1.5" />
                     Add Method
@@ -78,7 +85,13 @@ export function PaymentMethods({ methods, portalUrl }: PaymentMethodsProps) {
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                        onClick={openPortal}
+                                        disabled={!portalUrl}
+                                    >
                                         <Trash2 size={12} />
                                     </Button>
                                 </td>
@@ -105,7 +118,7 @@ export function PaymentMethods({ methods, portalUrl }: PaymentMethodsProps) {
                     <Button
                         variant="link"
                         className="h-auto p-0 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={() => window.open(portalUrl, '_blank')}
+                        onClick={openPortal}
                     >
                         Open Secure Payment Portal →
                     </Button>
