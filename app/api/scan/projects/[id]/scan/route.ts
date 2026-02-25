@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import {
     calculateScore,
     scanFileContent,
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     try {
         const supabaseAdmin = createAdminClient();
+        const strictEnforcement = isScanStrictEnforcementEnabled();
 
         // Get project
         const { data: project, error: projectError } = await supabaseAdmin
@@ -101,9 +103,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
 
             // LLM post-processing: filter false positives from route/vulnerability findings
-            const { filtered: allIssues, suppressed: suppressedIssues } = await filterIssuesWithLLM(
+            const {
+                filtered: allIssues,
+                suppressed: suppressedIssues,
+                evaluated: llmEvaluatedIssues,
+                enforced: llmEnforced,
+            } = await filterIssuesWithLLM(
                 rawIssues,
                 fileContentMap,
+                { enforce: strictEnforcement },
             );
 
             const scanDuration = Date.now() - startTime;
@@ -177,6 +185,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                         issues: allIssues,
                         suppressed_issues: suppressedIssues,
                         raw_issue_count: rawIssues.length,
+                        llm_filter: {
+                            enforced: llmEnforced,
+                            evaluated_issues: llmEvaluatedIssues,
+                            suppressed_count: suppressedIssues.length,
+                        },
                         summary,
                         research: enrichedResearch,
                         ...(aiInsight ? { ai: aiInsight } : {}),

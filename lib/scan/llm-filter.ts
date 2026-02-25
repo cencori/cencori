@@ -7,22 +7,18 @@
  *
  * - Confirmed real  → confidence: 'high'
  * - Likely false positive → confidence: 'low' (filtered from primary results)
- * - AI unavailable / timeout → all issues kept as-is (safe fallback)
+ * - AI unavailable / timeout → all issues kept as-is (safe fallback, best-effort mode only)
  *
  * Secret + PII issues are NOT sent to the LLM — regex is already precise
  * for those and we don't want to expose secret values to an external model.
  */
 
-import type { ScanIssue } from '../../packages/scan/src/scanner/core';
-import { generateWithFallback } from './ai-client';
+import type { ScanIssue } from "../../packages/scan/src/scanner/core";
+import { generateWithFallback } from "./ai-client";
+import { isScanStrictEnforcementEnabled } from "./policy";
 
-// Issue types we want the LLM to validate
-const FILTERABLE_TYPES = new Set<ScanIssue['type']>(['route', 'vulnerability']);
-
-// Hard cap: don't send files larger than this to the LLM
+const FILTERABLE_TYPES = new Set<ScanIssue["type"]>(["route", "vulnerability"]);
 const MAX_FILE_CHARS = 60_000;
-
-// Max issues to validate in one LLM call (keeps prompts bounded)
 const MAX_ISSUES_PER_FILE = 20;
 
 interface LlmVerdict {
@@ -35,20 +31,37 @@ interface LlmFilterResponse {
     verdicts: LlmVerdict[];
 }
 
+export interface LlmFilterOptions {
+    enforce?: boolean;
+}
+
+export class LlmFilterEnforcementError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "LlmFilterEnforcementError";
+    }
+}
+
+function hasAiProviderConfigured(): boolean {
+    return Boolean(
+        process.env.CEREBRAS_API_KEY ||
+        process.env.GROQ_API_KEY ||
+        process.env.GOOGLE_AI_API_KEY ||
+        process.env.GEMINI_API_KEY
+    );
+}
+
 function issueKey(issue: ScanIssue): string {
     return `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
 }
 
 function tryParseJson<T>(text: string): T | null {
-    // Try raw parse first
     try { return JSON.parse(text) as T; } catch { /* fall through */ }
-    // Try extracting from a fenced code block
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fenced?.[1]) {
         try { return JSON.parse(fenced[1].trim()) as T; } catch { /* fall through */ }
     }
-    // Try extracting {...} or [...]
-    const firstBrace = text.indexOf('{');
+    const firstBrace = text.indexOf("{");
     if (firstBrace >= 0) {
         try { return JSON.parse(text.slice(firstBrace)) as T; } catch { /* fall through */ }
     }
@@ -59,16 +72,17 @@ async function validateFileIssues(
     filePath: string,
     fileContent: string,
     issues: ScanIssue[],
+    enforce: boolean,
 ): Promise<Map<string, boolean>> {
     const verdictMap = new Map<string, boolean>();
 
     if (issues.length === 0) return verdictMap;
 
     const truncatedContent = fileContent.length > MAX_FILE_CHARS
-        ? fileContent.slice(0, MAX_FILE_CHARS) + '\n// [file truncated for analysis]'
+        ? fileContent.slice(0, MAX_FILE_CHARS) + "\n// [file truncated for analysis]"
         : fileContent;
 
-    const issueList = issues.slice(0, MAX_ISSUES_PER_FILE).map(issue => ({
+    const issueList = issues.map(issue => ({
         key: issueKey(issue),
         type: issue.type,
         name: issue.name,
@@ -107,21 +121,49 @@ Return JSON only, no markdown fences:
 
     try {
         const response = await generateWithFallback(prompt);
-        if (!response) return verdictMap;
+        if (!response) {
+            if (enforce) {
+                throw new LlmFilterEnforcementError(
+                    `[LLM Filter] No AI provider response while validating ${filePath}`
+                );
+            }
+            return verdictMap;
+        }
 
         const parsed = tryParseJson<LlmFilterResponse>(response.text);
-        if (!parsed || !Array.isArray(parsed.verdicts)) return verdictMap;
+        if (!parsed || !Array.isArray(parsed.verdicts)) {
+            if (enforce) {
+                throw new LlmFilterEnforcementError(
+                    `[LLM Filter] Invalid AI response format while validating ${filePath}`
+                );
+            }
+            return verdictMap;
+        }
 
         for (const verdict of parsed.verdicts) {
-            if (typeof verdict.issueKey === 'string' && typeof verdict.isRealIssue === 'boolean') {
+            if (typeof verdict.issueKey === "string" && typeof verdict.isRealIssue === "boolean") {
                 verdictMap.set(verdict.issueKey, verdict.isRealIssue);
             }
         }
     } catch (err) {
-        console.warn('[LLM Filter] Failed to validate issues for', filePath, err instanceof Error ? err.message : err);
+        if (enforce) {
+            if (err instanceof LlmFilterEnforcementError) throw err;
+            throw new LlmFilterEnforcementError(
+                `[LLM Filter] Failed to validate issues for ${filePath}: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
+        console.warn("[LLM Filter] Failed to validate issues for", filePath, err instanceof Error ? err.message : err);
     }
 
     return verdictMap;
+}
+
+function chunkIssues(issues: ScanIssue[]): ScanIssue[][] {
+    const chunks: ScanIssue[][] = [];
+    for (let i = 0; i < issues.length; i += MAX_ISSUES_PER_FILE) {
+        chunks.push(issues.slice(i, i + MAX_ISSUES_PER_FILE));
+    }
+    return chunks;
 }
 
 export interface LlmFilterResult {
@@ -131,6 +173,8 @@ export interface LlmFilterResult {
     suppressed: ScanIssue[];
     /** How many issues were sent to the LLM for validation */
     evaluated: number;
+    /** Whether strict enforcement mode was enabled */
+    enforced: boolean;
 }
 
 /**
@@ -142,16 +186,23 @@ export interface LlmFilterResult {
 export async function filterIssuesWithLLM(
     issues: ScanIssue[],
     fileContents: Map<string, string>,
+    options?: LlmFilterOptions,
 ): Promise<LlmFilterResult> {
-    // Separate filterable types from non-filterable (secrets, pii, config)
+    const enforce = options?.enforce ?? isScanStrictEnforcementEnabled();
+
     const toFilter = issues.filter(i => FILTERABLE_TYPES.has(i.type));
     const keep = issues.filter(i => !FILTERABLE_TYPES.has(i.type));
 
     if (toFilter.length === 0) {
-        return { filtered: issues, suppressed: [], evaluated: 0 };
+        return { filtered: issues, suppressed: [], evaluated: 0, enforced: enforce };
     }
 
-    // Group by file
+    if (enforce && !hasAiProviderConfigured()) {
+        throw new LlmFilterEnforcementError(
+            "[LLM Filter] Strict enforcement enabled but no AI provider keys are configured"
+        );
+    }
+
     const byFile = new Map<string, ScanIssue[]>();
     for (const issue of toFilter) {
         const existing = byFile.get(issue.file) ?? [];
@@ -159,41 +210,52 @@ export async function filterIssuesWithLLM(
         byFile.set(issue.file, existing);
     }
 
+    const tasks = [...byFile.entries()].flatMap(([filePath, fileIssues]) =>
+        chunkIssues(fileIssues).map(chunk => ({ filePath, issues: chunk }))
+    );
+
     const confirmed: ScanIssue[] = [];
     const suppressed: ScanIssue[] = [];
     let evaluated = 0;
 
-    // Validate each file in parallel (capped at 6 concurrent calls)
-    const fileEntries = [...byFile.entries()];
     const CONCURRENCY = 6;
-
-    for (let i = 0; i < fileEntries.length; i += CONCURRENCY) {
-        const batch = fileEntries.slice(i, i + CONCURRENCY);
-
-        await Promise.all(batch.map(async ([filePath, fileIssues]) => {
+    for (let i = 0; i < tasks.length; i += CONCURRENCY) {
+        const batch = tasks.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async ({ filePath, issues: chunk }) => {
             const content = fileContents.get(filePath);
-
             if (!content) {
-                // No file content available — keep all issues (safe fallback)
-                for (const issue of fileIssues) {
-                    confirmed.push({ ...issue, confidence: 'high' });
+                if (enforce) {
+                    throw new LlmFilterEnforcementError(
+                        `[LLM Filter] Missing scanned file content for ${filePath}`
+                    );
+                }
+                for (const issue of chunk) {
+                    confirmed.push({ ...issue, confidence: "high" });
                 }
                 return;
             }
 
-            evaluated += fileIssues.length;
-            const verdictMap = await validateFileIssues(filePath, content, fileIssues);
+            evaluated += chunk.length;
+            const verdictMap = await validateFileIssues(filePath, content, chunk, enforce);
 
-            for (const issue of fileIssues) {
+            for (const issue of chunk) {
                 const key = issueKey(issue);
                 const verdict = verdictMap.get(key);
 
+                if (verdict === undefined) {
+                    if (enforce) {
+                        throw new LlmFilterEnforcementError(
+                            `[LLM Filter] Missing verdict for ${key} in strict mode`
+                        );
+                    }
+                    confirmed.push({ ...issue, confidence: "high" });
+                    continue;
+                }
+
                 if (verdict === false) {
-                    // LLM says false positive
-                    suppressed.push({ ...issue, confidence: 'low' });
+                    suppressed.push({ ...issue, confidence: "low" });
                 } else {
-                    // LLM confirmed real, or verdict missing (default: keep)
-                    confirmed.push({ ...issue, confidence: 'high' });
+                    confirmed.push({ ...issue, confidence: "high" });
                 }
             }
         }));
@@ -205,9 +267,9 @@ export async function filterIssuesWithLLM(
     ];
 
     console.log(
-        `[LLM Filter] Evaluated ${evaluated} issues across ${byFile.size} files. ` +
-        `Kept ${confirmed.length}, suppressed ${suppressed.length} false positives.`
+        `[LLM Filter] mode=${enforce ? "strict" : "best-effort"} evaluated=${evaluated} ` +
+        `files=${byFile.size} kept=${confirmed.length} suppressed=${suppressed.length}`
     );
 
-    return { filtered, suppressed, evaluated };
+    return { filtered, suppressed, evaluated, enforced: enforce };
 }

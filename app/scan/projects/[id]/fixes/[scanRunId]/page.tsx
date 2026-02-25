@@ -20,7 +20,7 @@ import {
     GitPullRequest,
     Loader2,
     RotateCcw,
-    StopCircle,
+    Square,
     ThumbsDown,
     ThumbsUp,
 } from "lucide-react";
@@ -629,6 +629,8 @@ export default function FixWorkspacePage() {
                                     if (last?.role === "assistant") next[next.length - 1] = { ...last, content: fullContent };
                                     return next;
                                 });
+                            } else if (parsed.type === "error" && typeof parsed.message === "string") {
+                                setError(parsed.message);
                             } else if (!parsed.type && typeof parsed.content === "string") {
                                 // Fallback for pure content streams
                                 fullContent += parsed.content;
@@ -929,7 +931,7 @@ export default function FixWorkspacePage() {
                                     className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all"
                                     onClick={() => chatAbortRef.current?.abort()}
                                 >
-                                    <StopCircle className="h-4 w-4 fill-current" />
+                                    <Square className="h-3.5 w-3.5 fill-current" />
                                 </Button>
                             ) : (
                                 <Button
@@ -953,4 +955,3 @@ export default function FixWorkspacePage() {
         </>
     );
 }
-

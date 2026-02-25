@@ -264,6 +264,10 @@ export async function streamWithReasoning(
     encoder: TextEncoder,
     fallbackContent?: string,
     onContentChunk?: (chunk: string) => void,
+    options?: {
+        emitDone?: boolean;
+        closeController?: boolean;
+    },
 ): Promise<void> {
     const cerebrasKey = process.env.CEREBRAS_API_KEY;
     const cerebrasBase = "https://api.cerebras.ai/v1";
@@ -271,6 +275,12 @@ export async function streamWithReasoning(
 
     const enqueue = (payload: string) =>
         controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+    const emitDone = options?.emitDone ?? true;
+    const closeController = options?.closeController ?? true;
+    const finalizeStream = () => {
+        if (emitDone) enqueue("[DONE]");
+        if (closeController) controller.close();
+    };
 
     const emitReasoning = (text: string) =>
         enqueue(JSON.stringify({ type: "reasoning", content: text }));
@@ -416,8 +426,7 @@ export async function streamWithReasoning(
             const ok = await streamOpenAIContent(cerebrasBase, cerebrasKey, FAST_MODEL, contentMessages);
             if (ok) {
                 console.log("[AI Client] ✓ Phase 2 via Cerebras llama");
-                enqueue("[DONE]");
-                controller.close();
+                finalizeStream();
                 return;
             }
         } catch (err) {
@@ -438,8 +447,7 @@ export async function streamWithReasoning(
             );
             if (ok) {
                 console.log("[AI Client] ✓ Phase 2 via Groq");
-                enqueue("[DONE]");
-                controller.close();
+                finalizeStream();
                 return;
             }
         } catch (err) {
@@ -475,8 +483,6 @@ export async function streamWithReasoning(
         console.warn("[AI Client] All providers failed and no fallback provided — stream is empty");
     }
 
-    enqueue("[DONE]");
-    controller.close();
+    finalizeStream();
 }
-
 
