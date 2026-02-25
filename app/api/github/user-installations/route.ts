@@ -129,11 +129,22 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Failed to fetch installation details' }, { status: 500 });
         }
 
+        // Deduplicate by github_account_login — keep highest installation_id per account
+        const seenLogins = new Map<string, typeof installations[0]>();
+        for (const inst of (installations || [])) {
+            const login = inst.github_account_login?.toLowerCase() ?? String(inst.installation_id);
+            const existing = seenLogins.get(login);
+            if (!existing || inst.installation_id > existing.installation_id) {
+                seenLogins.set(login, inst);
+            }
+        }
+        const deduplicated = Array.from(seenLogins.values());
+
         console.log(
-            `[User Installations] Found ${installations?.length ?? 0} linkable installations for user ${user.id} → org ${currentOrgId}`
+            `[User Installations] Found ${deduplicated.length} linkable installations (${installations?.length ?? 0} before dedup) for user ${user.id} → org ${currentOrgId}`
         );
 
-        return NextResponse.json({ installations: installations || [] });
+        return NextResponse.json({ installations: deduplicated });
     } catch (error) {
         console.error('[User Installations] Unexpected error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
