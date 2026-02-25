@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
+/**
+ * GET /api/github/user-installations?organizationId=...
+ *
+ * Returns all GitHub App installations accessible to the current user
+ * that are NOT already linked to the given organization.
+ *
+ * Sources checked (mirrors the Scan import logic):
+ *  1. Installations linked to any org the user owns
+ *  2. Installations linked to any org the user is a member of
+ *  3. Installations recorded under the user's GitHub account login
+ *  4. Installations explicitly recorded as installed by this user (installed_by_user_id)
+ */
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
 
@@ -19,86 +31,108 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+        // Verify the user has access to the requested org
         const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('id, owner_id')
             .eq('id', currentOrgId)
             .single();
 
-        if (orgError || !org || org.owner_id !== user.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        if (orgError || !org) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
+
+        // Allow org owners AND members
+        if (org.owner_id !== user.id) {
+            const { data: membership } = await supabase
+                .from('organization_members')
+                .select('user_id')
+                .eq('organization_id', currentOrgId)
+                .eq('user_id', user.id)
+                .single();
+
+            if (!membership) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            }
         }
 
         const supabaseAdmin = createAdminClient();
 
-        console.log('[User Installations] Current org ID:', currentOrgId);
-        console.log('[User Installations] User ID:', user.id);
-        const { data: currentOrgLinks, error: currentLinksError } = await supabaseAdmin
+        // ── Already linked to this org ──────────────────────────────────────────
+        const { data: currentOrgLinks } = await supabaseAdmin
             .from('organization_github_installations')
             .select('installation_id')
             .eq('organization_id', currentOrgId);
 
-        if (currentLinksError) {
-            console.error('[User Installations] Error fetching current org links:', currentLinksError);
-            return NextResponse.json({ error: 'Failed to fetch current installations' }, { status: 500 });
-        }
-
-        const currentOrgInstallationIds = currentOrgLinks?.map(link => link.installation_id) || [];
-        console.log('[User Installations] Current org already has these installations:', currentOrgInstallationIds);
-
-        const { data: userOrgs, error: userOrgsError } = await supabaseAdmin
-            .from('organizations')
-            .select('id')
-            .eq('owner_id', user.id);
-
-        if (userOrgsError || !userOrgs || userOrgs.length === 0) {
-            console.log('[User Installations] User has no organizations');
-            return NextResponse.json({ installations: [] });
-        }
-
-        const userOrgIds = userOrgs.map(o => o.id);
-        console.log('[User Installations] User owns', userOrgIds.length, 'organizations');
-
-        const { data: allUserLinks, error: allLinksError } = await supabaseAdmin
-            .from('organization_github_installations')
-            .select('installation_id')
-            .in('organization_id', userOrgIds);
-
-        if (allLinksError) {
-            console.error('[User Installations] Error fetching user installations:', allLinksError);
-            return NextResponse.json({ error: 'Failed to fetch installations' }, { status: 500 });
-        }
-
-        if (!allUserLinks || allUserLinks.length === 0) {
-            console.log('[User Installations] User has no installations linked to any org');
-            return NextResponse.json({ installations: [] });
-        }
-
-        const allUserInstallationIds = [...new Set(allUserLinks.map(link => link.installation_id))];
-        console.log('[User Installations] User has these installations across all orgs:', allUserInstallationIds);
-
-        const availableInstallationIds = allUserInstallationIds.filter(
-            id => !currentOrgInstallationIds.includes(id)
+        const alreadyLinkedIds = new Set(
+            (currentOrgLinks || []).map(l => l.installation_id)
         );
 
-        console.log('[User Installations] Available to link to current org:', availableInstallationIds);
+        // ── Collect all installation IDs reachable by this user ─────────────────
+        const reachableIds: Set<number> = new Set();
 
-        if (availableInstallationIds.length === 0) {
-            console.log('[User Installations] No installations available to link - all are already linked to this org');
+        // 1 & 2: orgs the user owns or is a member of
+        const [{ data: ownedOrgs }, { data: memberships }] = await Promise.all([
+            supabaseAdmin.from('organizations').select('id').eq('owner_id', user.id),
+            supabaseAdmin.from('organization_members').select('organization_id').eq('user_id', user.id),
+        ]);
+
+        const allOrgIds = new Set<string>();
+        (ownedOrgs || []).forEach(o => allOrgIds.add(o.id));
+        (memberships || []).forEach(m => { if (m.organization_id) allOrgIds.add(m.organization_id); });
+
+        if (allOrgIds.size > 0) {
+            const { data: orgLinks } = await supabaseAdmin
+                .from('organization_github_installations')
+                .select('installation_id')
+                .in('organization_id', Array.from(allOrgIds));
+            (orgLinks || []).forEach(l => reachableIds.add(l.installation_id));
+        }
+
+        // 3: installations whose GitHub account matches the user's GitHub username
+        const githubIdentity = user.identities?.find(i => i.provider === 'github');
+        const githubUsername =
+            githubIdentity?.identity_data?.user_name ||
+            githubIdentity?.identity_data?.preferred_username ||
+            null;
+
+        if (githubUsername) {
+            const { data: byLogin } = await supabaseAdmin
+                .from('github_app_installations')
+                .select('installation_id')
+                .ilike('github_account_login', githubUsername);
+            (byLogin || []).forEach(i => reachableIds.add(i.installation_id));
+        }
+
+        // 4: installations explicitly recorded as installed by this user
+        const { data: byUser } = await supabaseAdmin
+            .from('github_app_installations')
+            .select('installation_id')
+            .eq('installed_by_user_id', user.id);
+        (byUser || []).forEach(i => reachableIds.add(i.installation_id));
+
+        // ── Filter out what's already linked ────────────────────────────────────
+        const availableIds = Array.from(reachableIds).filter(id => !alreadyLinkedIds.has(id));
+
+        if (availableIds.length === 0) {
             return NextResponse.json({ installations: [] });
         }
 
+        // ── Fetch installation details ───────────────────────────────────────────
         const { data: installations, error: installationsError } = await supabaseAdmin
             .from('github_app_installations')
             .select('installation_id, github_account_type, github_account_login, github_account_name')
-            .in('installation_id', availableInstallationIds);
+            .in('installation_id', availableIds);
 
         if (installationsError) {
             console.error('[User Installations] Error fetching installation details:', installationsError);
             return NextResponse.json({ error: 'Failed to fetch installation details' }, { status: 500 });
         }
 
-        console.log('[User Installations] Found', installations?.length || 0, 'available installations for org', currentOrgId);
+        console.log(
+            `[User Installations] Found ${installations?.length ?? 0} linkable installations for user ${user.id} → org ${currentOrgId}`
+        );
+
         return NextResponse.json({ installations: installations || [] });
     } catch (error) {
         console.error('[User Installations] Unexpected error:', error);
