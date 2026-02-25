@@ -44,6 +44,24 @@ export async function importGitHubProject({
     redirect(`/dashboard/organizations/${orgSlug}/projects?error=unauthorized`);
   }
 
+  // Enforce free plan project limit
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('subscription_tier')
+    .eq('id', organizationId)
+    .single();
+
+  if ((org?.subscription_tier ?? 'free') === 'free') {
+    const { count } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId);
+
+    if ((count ?? 0) >= 1) {
+      redirect(`/dashboard/organizations/${orgSlug}/projects/import/github?error=project_limit_reached`);
+    }
+  }
+
   // Check if repository is already imported
   const { data: existingProject, error: existingError } = await supabase
     .from('projects')

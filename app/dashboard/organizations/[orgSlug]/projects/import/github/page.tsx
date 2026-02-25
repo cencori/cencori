@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { GitHubInstallDialog } from '@/components/github/GitHubInstallDialog';
+import { UpgradeDialog } from '@/components/billing/UpgradeDialog';
 
 // Official GitHub logo SVG
 const GitHubLogo = ({ className }: { className?: string }) => (
@@ -112,6 +113,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [linkingInstallation, setLinkingInstallation] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const GITHUB_APP_SLUG = "cencori";
 
@@ -126,7 +128,9 @@ export default function GitHubImportPage({ params }: PageProps) {
   // Handle error params from GitHub OAuth flow
   useEffect(() => {
     const errorType = searchParams.get('error');
-    if (errorType === 'account_type_mismatch') {
+    if (errorType === 'project_limit_reached') {
+      setUpgradeOpen(true);
+    } else if (errorType === 'account_type_mismatch') {
       const expected = searchParams.get('expected');
       const actual = searchParams.get('actual');
       const account = searchParams.get('account');
@@ -352,6 +356,17 @@ export default function GitHubImportPage({ params }: PageProps) {
           orgSlug={orgSlug}
           onConfirm={handleInstallConfirm}
         />
+
+        {githubData?.organizationId && (
+          <UpgradeDialog
+            open={upgradeOpen}
+            onOpenChange={setUpgradeOpen}
+            orgId={githubData.organizationId}
+            orgSlug={orgSlug}
+            reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+            recommendedTier="pro"
+          />
+        )}
       </div>
     );
   }
@@ -451,6 +466,17 @@ export default function GitHubImportPage({ params }: PageProps) {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {githubData?.organizationId && (
+        <UpgradeDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          orgId={githubData.organizationId}
+          orgSlug={orgSlug}
+          reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+          recommendedTier="pro"
+        />
       )}
     </div>
   );
