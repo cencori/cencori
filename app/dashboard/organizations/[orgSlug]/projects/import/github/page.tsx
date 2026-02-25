@@ -115,7 +115,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   const [linkingInstallationId, setLinkingInstallationId] = useState<number | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  const GITHUB_APP_SLUG = "cencori";
+
 
   // Fetch GitHub data with caching
   const { data: githubData, isLoading, error, refetch } = useGitHubData(orgSlug);
@@ -188,16 +188,16 @@ export default function GitHubImportPage({ params }: PageProps) {
   };
 
   const handleInstallConfirm = async (accountType: 'user' | 'organization', accountLogin?: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const state = JSON.stringify({
-      source: 'dashboard',
-      orgSlug,
-      accountType,
-      accountLogin,
-      userId: user?.id,
-    });
-    const githubAppInstallationUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
-    window.location.href = githubAppInstallationUrl;
+    const params = new URLSearchParams({ orgSlug, accountType });
+    if (accountLogin) params.set('accountLogin', accountLogin);
+
+    const res = await fetch(`/api/github/install-url?${params}`);
+    if (!res.ok) {
+      toast.error('Failed to generate installation URL. Please try again.');
+      return;
+    }
+    const { url } = await res.json();
+    window.location.href = url;
   };
 
   const handleLinkInstallation = async (installation: GitHubInstallation) => {
