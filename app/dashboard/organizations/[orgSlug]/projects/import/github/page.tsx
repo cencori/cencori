@@ -310,7 +310,7 @@ export default function GitHubImportPage({ params }: PageProps) {
                   <Button
                     key={installation.installation_id}
                     size="sm"
-                    className="h-7 text-xs px-3 w-full"
+                    className="h-7 text-xs px-3 w-fit"
                     onClick={() => handleLinkInstallation(installation)}
                     disabled={linkingInstallationId !== null}
                   >
