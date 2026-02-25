@@ -23,6 +23,8 @@ export interface ScanIssue {
     column: number;
     match: string;
     description?: string;
+    /** Set by the LLM post-processing filter. Undefined means not evaluated. */
+    confidence?: 'high' | 'low';
 }
 
 export interface ScanSummary {

@@ -15,12 +15,14 @@ import {
     Clock,
     FileText,
     ChevronRight,
+    ChevronDown,
     Loader2,
     ArrowLeft,
     Trash2,
     Copy,
     Download,
-    ExternalLink
+    ExternalLink,
+    EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -44,6 +46,8 @@ interface ScanIssue {
     match: string;
     line: number;
     file: string;
+    description?: string;
+    confidence?: 'high' | 'low';
 }
 
 interface ScanSummary {
@@ -122,6 +126,8 @@ interface RepositoryResearch {
 
 interface ScanResultPayload {
     issues: ScanIssue[];
+    suppressed_issues?: ScanIssue[];
+    raw_issue_count?: number;
     summary?: ScanSummary;
     research?: RepositoryResearch;
 }
@@ -212,6 +218,7 @@ export default function ProjectDetailPage() {
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
     const [baselineScanId, setBaselineScanId] = useState<string>("");
     const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
+    const [showSuppressed, setShowSuppressed] = useState(false);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
     const [isUpdatingFixStatus, setIsUpdatingFixStatus] = useState(false);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
@@ -883,6 +890,58 @@ export default function ProjectDetailPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Suppressed false positives — collapsible */}
+                            {(() => {
+                                const suppressed = currentScan?.results?.suppressed_issues;
+                                if (!suppressed || suppressed.length === 0) return null;
+                                return (
+                                    <>
+                                        <div className="border-t border-border/40" />
+                                        <button
+                                            onClick={() => setShowSuppressed(v => !v)}
+                                            className="w-full px-4 py-2 flex items-center gap-2 text-left hover:bg-secondary/30 transition-colors"
+                                        >
+                                            <span className="text-[11px] text-muted-foreground/60 flex-1">
+                                                Filtered
+                                            </span>
+                                            <ChevronDown className={cn(
+                                                "h-3 w-3 text-muted-foreground/40 transition-transform",
+                                                showSuppressed && "rotate-180"
+                                            )} />
+                                        </button>
+                                        {showSuppressed && (
+                                            <div className="px-4 pb-3 font-mono text-xs space-y-0.5">
+                                                {(() => {
+                                                    const byFile: Record<string, ScanIssue[]> = {};
+                                                    for (const issue of suppressed) {
+                                                        if (!byFile[issue.file]) byFile[issue.file] = [];
+                                                        byFile[issue.file].push(issue);
+                                                    }
+                                                    return Object.entries(byFile).map(([file, issues]) => (
+                                                        <div key={file} className="mt-1.5">
+                                                            <div className="flex items-center gap-2 text-muted-foreground/40">
+                                                                <FileText className="h-3 w-3 shrink-0" />
+                                                                <span>{file}</span>
+                                                            </div>
+                                                            {issues.map((issue, i) => (
+                                                                <div key={i} className="flex items-start gap-3 py-0.5 pl-5">
+                                                                    <ChevronRight className="h-3 w-3 text-muted-foreground/20 shrink-0 mt-0.5" />
+                                                                    <span className="text-muted-foreground/30 shrink-0">
+                                                                        [{(issue.severity || "low").toUpperCase()}]
+                                                                    </span>
+                                                                    <span className="text-muted-foreground/40">{issue.name}</span>
+                                                                    <span className="text-muted-foreground/25">line {issue.line}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                             {canShowFixBanner && activeScan && (
                                 <>
                                     <div className="border-t border-border/40" />

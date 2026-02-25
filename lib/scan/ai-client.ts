@@ -263,6 +263,7 @@ export async function streamWithReasoning(
     controller: ReadableStreamDefaultController,
     encoder: TextEncoder,
     fallbackContent?: string,
+    onContentChunk?: (chunk: string) => void,
 ): Promise<void> {
     const cerebrasKey = process.env.CEREBRAS_API_KEY;
     const cerebrasBase = "https://api.cerebras.ai/v1";
@@ -277,6 +278,7 @@ export async function streamWithReasoning(
     const emitContent = (text: string) => {
         enqueue(JSON.stringify({ type: "content", content: text }));
         contentEmitted = true;
+        onContentChunk?.(text);
     };
 
     // Helper: read a streaming OpenAI-compatible response and emit content chunks

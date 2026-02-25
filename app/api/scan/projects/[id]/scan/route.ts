@@ -6,12 +6,16 @@ import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
+import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
 import {
     calculateScore,
     scanFileContent,
     shouldScanFile,
     summarizeIssues,
 } from '../../../../../../packages/scan/src/scanner/core';
+
+// Allow up to 5 minutes — scan + LLM filter + AI insight can be slow on large repos
+export const maxDuration = 300;
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             }
 
             const {
-                allIssues,
+                allIssues: rawIssues,
                 scannedFiles,
                 filesScanned,
                 totalCandidateFiles,
@@ -90,6 +94,17 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 scanFileContent,
                 collectScannedFiles: true,
             });
+
+            // Build file content map for the LLM filter
+            const fileContentMap = new Map<string, string>(
+                scannedFiles.map(f => [f.path, f.content])
+            );
+
+            // LLM post-processing: filter false positives from route/vulnerability findings
+            const { filtered: allIssues, suppressed: suppressedIssues } = await filterIssuesWithLLM(
+                rawIssues,
+                fileContentMap,
+            );
 
             const scanDuration = Date.now() - startTime;
             const score = calculateScore(allIssues);
@@ -160,6 +175,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                     fix_done_at: null,
                     results: {
                         issues: allIssues,
+                        suppressed_issues: suppressedIssues,
+                        raw_issue_count: rawIssues.length,
                         summary,
                         research: enrichedResearch,
                         ...(aiInsight ? { ai: aiInsight } : {}),
