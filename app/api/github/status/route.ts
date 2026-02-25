@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
+import {
+    getOrganizationLinkedInstallationIds,
+    getUserOwnedGithubInstallationIds,
+} from '@/lib/github-installations';
 
 interface Repo {
     id: number;
@@ -10,12 +14,32 @@ interface Repo {
     description: string | null;
 }
 
+async function fetchInstallationRepositories(installationId: number): Promise<Repo[] | null> {
+    try {
+        const octokit = await getInstallationOctokit(installationId);
+        const { data } = await octokit.request('GET /installation/repositories', {
+            per_page: 100,
+        });
+
+        return data.repositories.map((repo) => ({
+            id: repo.id,
+            full_name: repo.full_name,
+            html_url: repo.html_url,
+            description: repo.description,
+        }));
+    } catch (error) {
+        console.error('[GitHub Status] Error fetching repos for installation', installationId, error);
+        return null;
+    }
+}
+
 /**
  * GET /api/github/status?orgSlug=...
  *
  * Single server-side endpoint for the GitHub import page.
- * Uses the admin client to bypass RLS on organization_github_installations,
- * then fetches repos via the GitHub App installation.
+ * Resolves repos from org-linked installations first, then falls back
+ * to installations owned by the current user (installed_by_user_id or
+ * matching GitHub account login).
  *
  * Returns:
  *  { status: 'not_installed', organizationId }
@@ -36,10 +60,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Missing orgSlug' }, { status: 400 });
     }
 
-    // Verify the user has access to this org (owner or member)
+    // Verify org exists and user has access (owner or member)
     const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .select('id, slug')
+        .select('id, slug, owner_id')
         .eq('slug', orgSlug)
         .single();
 
@@ -47,49 +71,100 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    // Use admin client to bypass RLS on organization_github_installations
-    const supabaseAdmin = createAdminClient();
+    let hasOrgAccess = orgData.owner_id === user.id;
+    if (!hasOrgAccess) {
+        const { data: membership, error: membershipError } = await supabase
+            .from('organization_members')
+            .select('user_id')
+            .eq('organization_id', orgData.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-    const { data: linkData } = await supabaseAdmin
-        .from('organization_github_installations')
-        .select('installation_id')
-        .eq('organization_id', orgData.id)
-        .limit(1)
-        .maybeSingle();
+        if (membershipError) {
+            console.error('[GitHub Status] Error checking organization membership:', membershipError);
+            return NextResponse.json({ error: 'Failed to verify organization access' }, { status: 500 });
+        }
 
-    if (!linkData) {
-        return NextResponse.json({
-            status: 'not_installed',
-            organizationId: orgData.id,
-        });
+        hasOrgAccess = !!membership;
     }
 
-    // Fetch the repos for this installation via GitHub App
-    try {
-        const octokit = await getInstallationOctokit(linkData.installation_id);
-        const { data } = await octokit.request('GET /installation/repositories', {
-            per_page: 100,
-        });
+    if (!hasOrgAccess) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
 
-        const repositories: Repo[] = data.repositories.map(repo => ({
-            id: repo.id,
-            full_name: repo.full_name,
-            html_url: repo.html_url,
-            description: repo.description,
-        }));
+    try {
+        const triedInstallationIds = new Set<number>();
+        const successfulInstallationIds: number[] = [];
+        const repositoriesById = new Map<number, Repo>();
+
+        const collectRepositories = async (installationIds: number[]) => {
+            for (const installationId of installationIds) {
+                if (triedInstallationIds.has(installationId)) {
+                    continue;
+                }
+
+                triedInstallationIds.add(installationId);
+                const repositories = await fetchInstallationRepositories(installationId);
+
+                if (!repositories) {
+                    continue;
+                }
+
+                successfulInstallationIds.push(installationId);
+                for (const repository of repositories) {
+                    repositoriesById.set(repository.id, repository);
+                }
+            }
+        };
+
+        const linkedInstallationIds = await getOrganizationLinkedInstallationIds(orgData.id);
+        const linkedInstallationIdSet = new Set(linkedInstallationIds);
+        await collectRepositories(linkedInstallationIds);
+
+        if (successfulInstallationIds.length === 0) {
+            const userOwnedInstallationIds = Array.from(await getUserOwnedGithubInstallationIds(user));
+            const fallbackInstallationIds = userOwnedInstallationIds.filter((id) => !triedInstallationIds.has(id));
+            await collectRepositories(fallbackInstallationIds);
+        }
+
+        if (successfulInstallationIds.length === 0) {
+            return NextResponse.json({
+                status: 'not_installed',
+                organizationId: orgData.id,
+            });
+        }
+
+        const fallbackSuccessfulIds = successfulInstallationIds.filter(
+            (installationId) => !linkedInstallationIdSet.has(installationId)
+        );
+
+        if (fallbackSuccessfulIds.length > 0) {
+            const supabaseAdmin = createAdminClient();
+            const { error: linkError } = await supabaseAdmin
+                .from('organization_github_installations')
+                .upsert(
+                    fallbackSuccessfulIds.map((installationId) => ({
+                        organization_id: orgData.id,
+                        installation_id: installationId,
+                    })),
+                    { onConflict: 'organization_id, installation_id' }
+                );
+
+            if (linkError) {
+                console.error('[GitHub Status] Failed to persist fallback installation links:', linkError);
+            }
+        }
 
         return NextResponse.json({
             status: 'installed',
             organizationId: orgData.id,
-            installationId: linkData.installation_id,
-            repositories,
+            installationId: successfulInstallationIds[0],
+            repositories: Array.from(repositoriesById.values()),
         });
-    } catch (err) {
-        console.error('[GitHub Status] Error fetching repos for installation', linkData.installation_id, err);
-        // Installation row exists but fetching repos failed — treat as not installed
+    } catch (error) {
+        console.error('[GitHub Status] Unexpected error:', error);
         return NextResponse.json({
-            status: 'not_installed',
-            organizationId: orgData.id,
-        });
+            error: 'Failed to fetch GitHub installation status',
+        }, { status: 500 });
     }
 }
