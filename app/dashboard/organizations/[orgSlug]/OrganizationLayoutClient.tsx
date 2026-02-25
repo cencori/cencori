@@ -22,6 +22,7 @@ import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { ActivityIcon } from "@/components/animate-ui/icons/activity";
 import { UnplugIcon } from "@/components/animate-ui/icons/unplug";
 import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
+import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -30,6 +31,9 @@ interface OrganizationData {
     id: string;
     name: string;
     slug: string;
+    subscription_tier: string;
+    monthly_requests_used: number;
+    monthly_request_limit: number;
 }
 
 type LayoutParams = { orgSlug: string } | Promise<{ orgSlug: string }>;
@@ -98,7 +102,7 @@ export default function OrganizationLayoutClient({
 
                 const { data: orgData, error: orgError } = await supabase
                     .from("organizations")
-                    .select("id, name, slug")
+                    .select("id, name, slug, subscription_tier, monthly_requests_used, monthly_request_limit")
                     .eq("slug", orgSlug)
                     .single();
 
@@ -258,7 +262,10 @@ export default function OrganizationLayoutClient({
                 </Sheet>
             )}
 
-            <main className="flex w-full flex-1 flex-col overflow-hidden">{children}</main>
+            <main className="flex w-full flex-1 flex-col overflow-hidden">
+                <UsageLimitBanner orgId={organization.id} orgSlug={organization.slug} />
+                {children}
+            </main>
         </SidebarProvider>
     );
 }

@@ -22,11 +22,13 @@ import {
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
 
 interface OrganizationData {
   id: string;
   name: string;
   slug: string;
+  subscription_tier: string;
 }
 
 // General region groups (auto-routing to nearest in group)
@@ -74,7 +76,7 @@ function useOrganization(orgSlug: string) {
 
       const { data: orgData, error: fetchError } = await supabase
         .from("organizations")
-        .select("id, name, slug")
+        .select("id, name, slug, subscription_tier")
         .eq("slug", orgSlug)
         .eq("owner_id", user.id)
         .single();
@@ -90,6 +92,7 @@ export default function NewProjectPage({ params }: PageProps) {
   const { orgSlug } = use(params);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // Fetch org with caching - INSTANT ON REVISIT!
   const { data: organization, isLoading: orgLoading, error: orgError } = useOrganization(orgSlug);
@@ -119,6 +122,20 @@ export default function NewProjectPage({ params }: PageProps) {
       toast.error("Organization data is not loaded yet. Please try again.");
       setLoading(false);
       return;
+    }
+
+    // Enforce free tier project limit
+    const tier = organization.subscription_tier || 'free';
+    if (tier === 'free') {
+      const { count } = await supabase
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organization.id);
+      if ((count ?? 0) >= 1) {
+        setLoading(false);
+        setUpgradeOpen(true);
+        return;
+      }
     }
 
     let newSlug = generateSlug();
@@ -345,6 +362,18 @@ export default function NewProjectPage({ params }: PageProps) {
           {loading ? "Creating..." : "Create project"}
         </Button>
       </div>
+
+      {/* Upgrade dialog — shown when free plan project limit is hit */}
+      {organization && (
+        <UpgradeDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          orgId={organization.id}
+          orgSlug={orgSlug}
+          reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+          recommendedTier="pro"
+        />
+      )}
     </div>
   );
 }

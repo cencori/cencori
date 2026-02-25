@@ -92,15 +92,27 @@ const tiers: Array<{
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
+    const [orgId, setOrgId] = useState<string | null>(null);
+    const [loadingTier, setLoadingTier] = useState<Tier | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             setIsAuthenticated(!!session);
+            if (session?.user) {
+                // Fetch the user's first org so we can pass orgId to checkout
+                const { data: membership } = await supabase
+                    .from('organization_members')
+                    .select('organization_id')
+                    .eq('user_id', session.user.id)
+                    .limit(1)
+                    .single();
+                if (membership) setOrgId(membership.organization_id);
+            }
         };
         checkAuth();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string; id?: string } } | null) => {
             setIsAuthenticated(!!session);
         });
 
@@ -109,13 +121,41 @@ export function Pricing() {
         };
     }, []);
 
-    const handleCTA = (tier: Tier) => {
+    const handleCTA = async (tier: Tier) => {
         if (tier === 'enterprise') {
             window.location.href = '/contact';
-        } else if (isAuthenticated) {
-            window.location.href = '/dashboard/organizations';
-        } else {
+            return;
+        }
+        if (!isAuthenticated) {
             window.location.href = '/signup';
+            return;
+        }
+        if (tier === 'free') {
+            window.location.href = '/dashboard/organizations';
+            return;
+        }
+        // Authenticated + paid plan → Polar checkout
+        if (!orgId) {
+            window.location.href = '/dashboard/organizations';
+            return;
+        }
+        setLoadingTier(tier);
+        try {
+            const res = await fetch('/api/billing/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tier, cycle: billingPeriod, orgId }),
+            });
+            const data = await res.json();
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl;
+            } else {
+                window.location.href = '/dashboard/organizations';
+            }
+        } catch {
+            window.location.href = '/dashboard/organizations';
+        } finally {
+            setLoadingTier(null);
         }
     };
 
@@ -236,9 +276,19 @@ export function Pricing() {
                                 className="w-full rounded-full h-9 text-xs font-medium cursor-pointer transition-all duration-300 group"
                                 variant={tier.ctaVariant || 'default'}
                                 onClick={() => handleCTA(tier.name)}
+                                disabled={loadingTier === tier.name}
                             >
-                                {tier.cta}
-                                <ArrowRight className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-0.5" />
+                                {loadingTier === tier.name ? (
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                                        Redirecting...
+                                    </span>
+                                ) : (
+                                    <>
+                                        {tier.cta}
+                                        <ArrowRight className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-0.5" />
+                                    </>
+                                )}
                             </Button>
                         </div>
                     ))}
