@@ -45,6 +45,63 @@ Cencori acts as a **Cloud Intelligence Provider**, not just a proxy.
 - **Retries**: Default 2 retries with exponential backoff (max delay 60s).
 - **Edge Runtime**: Official Node.js SDK is fully compatible with Vercel Edge & Cloudflare Workers.
 - **Telemetry**: SDK collects anonymous latency & OS version. Disable with `CENCORI_TELEMETRY=0`.
+- **Web Telemetry**: Report web traffic from your app to the Cencori dashboard via `cencori.telemetry.reportWebRequest()`.
+
+## Web Telemetry
+
+Report web traffic from your application to the Cencori dashboard. Logs appear under Logs → Web Gateway with your app's real domain as the host.
+
+### SDK Usage
+
+```typescript
+const cencori = new Cencori({ apiKey: 'csk_...' });
+
+// In your middleware or API handler:
+await cencori.telemetry.reportWebRequest({
+  host: 'dochat-zeta.vercel.app',
+  method: 'GET',
+  path: '/api/chat',
+  statusCode: 200,
+  latencyMs: 42,
+  userAgent: req.headers.get('user-agent') || undefined,
+});
+```
+
+### API Endpoint
+
+```
+POST /api/v1/telemetry/web
+Headers: { "CENCORI_API_KEY": "csk_..." }
+Body: {
+  "host": "dochat-zeta.vercel.app",
+  "method": "GET",
+  "path": "/api/chat",
+  "statusCode": 200,
+  "latencyMs": 42,
+  "userAgent": "Mozilla/5.0 ...",
+  "ipAddress": "1.2.3.4",
+  "countryCode": "US"
+}
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `host` | string | Yes | Your app's hostname (e.g. "dochat-zeta.vercel.app") |
+| `method` | string | Yes | HTTP method (GET, POST, etc.) |
+| `path` | string | Yes | Request path (e.g. "/api/chat") |
+| `statusCode` | number | Yes | HTTP status code |
+| `requestId` | string | No | Unique request ID for tracing |
+| `queryString` | string | No | Query string without leading "?" |
+| `message` | string | No | Human-readable log message |
+| `userAgent` | string | No | Client User-Agent |
+| `referer` | string | No | Referer header |
+| `ipAddress` | string | No | Client IP address |
+| `countryCode` | string | No | ISO 3166-1 alpha-2 country code |
+| `latencyMs` | number | No | Request latency in ms |
+
+Fire-and-forget — the SDK method never throws and never blocks your app.
 
 ## Supported SDKs & Integrations
 

@@ -75,6 +75,7 @@ export { ComputeNamespace } from './compute';
 export { WorkflowNamespace } from './workflow';
 export { StorageNamespace } from './storage';
 export { MemoryClient } from './memory';
+export { TelemetryClient, type WebTelemetryPayload } from './telemetry';
 
 // Default export for convenience
 export { Cencori as default } from './cencori';

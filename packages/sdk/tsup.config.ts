@@ -10,6 +10,7 @@ export default defineConfig({
         'workflow/index': 'src/workflow/index.ts',
         'storage/index': 'src/storage/index.ts',
         'memory/index': 'src/memory/index.ts',
+        'telemetry/index': 'src/telemetry/index.ts',
     },
     format: ['cjs', 'esm'],
     dts: true,

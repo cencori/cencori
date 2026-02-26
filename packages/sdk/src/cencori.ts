@@ -31,6 +31,7 @@ import { ComputeNamespace } from './compute';
 import { WorkflowNamespace } from './workflow';
 import { StorageNamespace } from './storage';
 import { MemoryClient } from './memory';
+import { TelemetryClient } from './telemetry';
 import { fetchWithRetry } from './utils';
 import {
     CencoriError,
@@ -97,6 +98,19 @@ export class Cencori {
     readonly memory: MemoryClient;
 
     /**
+     * Telemetry - Report web traffic from your app to the Cencori dashboard
+     * 
+     * @example
+     * await cencori.telemetry.reportWebRequest({
+     *   host: 'dochat-zeta.vercel.app',
+     *   method: 'GET',
+     *   path: '/api/chat',
+     *   statusCode: 200,
+     * });
+     */
+    readonly telemetry: TelemetryClient;
+
+    /**
      * Create a new Cencori client
      * 
      * @param config - Configuration options
@@ -131,6 +145,7 @@ export class Cencori {
         this.workflow = new WorkflowNamespace();
         this.storage = new StorageNamespace();
         this.memory = new MemoryClient(this.config);
+        this.telemetry = new TelemetryClient(this.config);
     }
 
     /**
@@ -226,4 +241,5 @@ export type { ComputeNamespace } from './compute';
 export type { WorkflowNamespace } from './workflow';
 export type { StorageNamespace } from './storage';
 export type { MemoryClient } from './memory';
+export type { TelemetryClient, WebTelemetryPayload } from './telemetry';
 

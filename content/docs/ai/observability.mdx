@@ -40,6 +40,37 @@ The **Dashboard > Analytics** tab provides high-level insights:
 - **Latency P95/P99**: Identify slow providers or regions.
 - **Error Rate**: Monitor stability.
 
+## Web Telemetry
+
+Track web traffic from your deployed application directly in Cencori. Logs appear under **Dashboard > Logs > Web Gateway** with your app's real domain as the host.
+
+### SDK Integration
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY! });
+
+// In your middleware or API route:
+await cencori.telemetry.reportWebRequest({
+  host: req.headers.get('host') || 'unknown',
+  method: req.method,
+  path: new URL(req.url).pathname,
+  statusCode: response.status,
+  latencyMs: Date.now() - startTime,
+  userAgent: req.headers.get('user-agent') || undefined,
+});
+```
+
+### Direct API
+
+```
+POST /api/v1/telemetry/web
+Headers: { "CENCORI_API_KEY": "csk_..." }
+```
+
+The SDK method is fire-and-forget — it never throws and never blocks your application.
+
 ## Data Export (Enterprise)
 
 You can export your raw log data to your own data warehouse.
