@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
+import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
 import Link from "next/link";
 
 type SignupFormProps = React.ComponentProps<"form">;
@@ -25,15 +26,12 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Determine where to redirect after signup
-  const getRedirectUrl = () => {
-    if (redirectParam) {
-      if (redirectParam.startsWith("/")) {
-        return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}${redirectParam}`;
-      }
-      return redirectParam;
+  const navigateAfterAuth = (target: string) => {
+    if (/^https?:\/\//i.test(target)) {
+      window.location.assign(target);
+      return;
     }
-    return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}/dashboard/organizations`;
+    router.push(target);
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -67,14 +65,15 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         return;
       }
 
-      // Decide redirect after sign up
-      const redirectTo = getRedirectUrl();
+      const { oauthRedirectTo, navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
+        defaultPath: "/dashboard/organizations",
+      });
 
       // Create user with password
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: redirectTo },
+        options: { emailRedirectTo: oauthRedirectTo },
       });
 
       if (signUpError) {
@@ -90,7 +89,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         body: JSON.stringify({ email }),
       }).catch(console.error);
 
-      router.push(redirectParam || "/dashboard/organizations");
+      navigateAfterAuth(navigationTarget);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unexpected error";
       setError(msg);
@@ -103,10 +102,12 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     setError(null);
     setLoading(true);
     try {
-      const redirectTo = getRedirectUrl();
+      const { oauthRedirectTo } = resolveAuthRedirectTargets(redirectParam, {
+        defaultPath: "/dashboard/organizations",
+      });
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo },
+        options: { redirectTo: oauthRedirectTo },
       });
       if (oauthError) {
         setError(oauthError.message);

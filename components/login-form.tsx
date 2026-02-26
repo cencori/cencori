@@ -13,14 +13,10 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
+import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
 import Link from "next/link";
 
 type LoginFormProps = React.ComponentProps<"form">;
-
-type FormValues = {
-  email: string;
-  password?: string;
-};
 
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
@@ -29,16 +25,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Determine where to redirect after login
-  const getRedirectUrl = () => {
-    if (redirectParam) {
-      // For relative URLs, prepend the base URL for OAuth
-      if (redirectParam.startsWith("/")) {
-        return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}${redirectParam}`;
-      }
-      return redirectParam;
+  const navigateAfterAuth = (target: string) => {
+    if (/^https?:\/\//i.test(target)) {
+      window.location.assign(target);
+      return;
     }
-    return `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""}/dashboard/organizations`;
+    router.push(target);
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -66,12 +58,15 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         return;
       }
       // If login returned a session, redirect to the specified URL or dashboard
+      const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
+        defaultPath: "/dashboard/organizations",
+      });
       if (data?.session) {
-        router.push(redirectParam || "/dashboard/organizations");
+        navigateAfterAuth(navigationTarget);
         return;
       }
 
-      router.push(redirectParam || "/dashboard/organizations");
+      navigateAfterAuth(navigationTarget);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unexpected error";
       setError(msg);
@@ -84,10 +79,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     setError(null);
     setLoading(true);
     try {
-      const redirectTo = getRedirectUrl();
+      const { oauthRedirectTo } = resolveAuthRedirectTargets(redirectParam, {
+        defaultPath: "/dashboard/organizations",
+      });
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo },
+        options: { redirectTo: oauthRedirectTo },
       });
       if (oauthError) {
         setError(oauthError.message);
