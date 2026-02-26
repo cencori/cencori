@@ -16,6 +16,7 @@ const EMBEDDING_MODEL = 'text-embedding-004';
 const EMBEDDING_DIMS = 768;
 const SEARCH_THRESHOLD = 0.65;
 const MAX_RESULTS = 5;
+const MAX_LEXICAL_CANDIDATES = 30;
 // Hard cap on stored memory content length
 const MAX_CONTENT_CHARS = 2000;
 
@@ -48,6 +49,90 @@ export class ScanMemoryError extends Error {
 
 export interface ScanMemoryOptions {
     enforce?: boolean;
+}
+
+function normalizeToken(token: string): string {
+    return token
+        .toLowerCase()
+        .replace(/[^a-z0-9_/-]/g, "")
+        .trim();
+}
+
+function extractQueryTokens(query: string): string[] {
+    const seen = new Set<string>();
+    const tokens: string[] = [];
+    const raw = query.split(/\s+/g);
+    for (const part of raw) {
+        const token = normalizeToken(part);
+        if (!token || token.length < 2 || seen.has(token)) continue;
+        seen.add(token);
+        tokens.push(token);
+        if (tokens.length >= 12) break;
+    }
+    return tokens;
+}
+
+function formatSourceLabel(source: MemorySource | string): string {
+    return source === 'chat' ? 'Past conversation' :
+        source === 'dismiss' ? 'Previously dismissed' :
+            source === 'pr_merged' ? 'PR merged' :
+                source === 'done' ? 'Marked as done' :
+                    'Note';
+}
+
+function formatMemoryEntries(entries: MemoryEntry[]): string {
+    return entries.map((entry) => `- [${formatSourceLabel(entry.source)}] ${entry.content}`).join('\n');
+}
+
+async function lexicalSearchMemory(
+    projectId: string,
+    userId: string,
+    query: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase: SupabaseClient<any>,
+): Promise<MemoryEntry[]> {
+    const tokens = extractQueryTokens(query);
+    if (tokens.length === 0) return [];
+
+    const { data, error } = await supabase
+        .from('scan_chat_memory')
+        .select('id, content, source, created_at')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(MAX_LEXICAL_CANDIDATES);
+
+    if (error) {
+        throw new ScanMemoryError('search_failed', `[Scan Memory] Lexical fallback failed: ${error.message}`);
+    }
+
+    if (!Array.isArray(data) || data.length === 0) return [];
+
+    const ranked = data
+        .map((row) => {
+            const content = typeof row.content === 'string' ? row.content : '';
+            const contentLc = content.toLowerCase();
+            let matches = 0;
+            for (const token of tokens) {
+                if (contentLc.includes(token)) matches += 1;
+            }
+            if (matches === 0) return null;
+            return {
+                id: String(row.id),
+                content,
+                source: typeof row.source === 'string' ? row.source : 'chat',
+                similarity: matches / tokens.length,
+                created_at: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+            } as MemoryEntry;
+        })
+        .filter((entry): entry is MemoryEntry => entry !== null)
+        .sort((a, b) => {
+            if (b.similarity !== a.similarity) return b.similarity - a.similarity;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        })
+        .slice(0, MAX_RESULTS);
+
+    return ranked;
 }
 
 async function embedText(text: string, options?: ScanMemoryOptions): Promise<number[] | null> {
@@ -95,59 +180,54 @@ export async function searchMemory(
     options?: ScanMemoryOptions,
 ): Promise<string> {
     const enforce = options?.enforce ?? false;
+    let semanticSearchError: string | null = null;
+
     try {
-        const embedding = await embedText(query, { enforce });
-        if (!embedding) {
-            if (enforce) {
-                throw new ScanMemoryError('embedding_unavailable', '[Scan Memory] Embedding is required in strict mode');
+        const embedding = await embedText(query, { enforce: false });
+        if (embedding) {
+            const { data, error } = await supabase.rpc('match_scan_memory', {
+                query_embedding: embedding,
+                p_project_id: projectId,
+                p_user_id: userId,
+                match_threshold: SEARCH_THRESHOLD,
+                match_count: MAX_RESULTS,
+            });
+
+            if (error) {
+                semanticSearchError = error.message;
+            } else if (Array.isArray(data) && data.length > 0) {
+                const entries = data as MemoryEntry[];
+                return formatMemoryEntries(entries);
             }
-            return '';
         }
-
-        const { data, error } = await supabase.rpc('match_scan_memory', {
-            query_embedding: embedding,
-            p_project_id: projectId,
-            p_user_id: userId,
-            match_threshold: SEARCH_THRESHOLD,
-            match_count: MAX_RESULTS,
-        });
-
-        if (error) {
-            if (enforce) {
-                throw new ScanMemoryError('search_failed', `[Scan Memory] Search failed: ${error.message}`);
-            }
-            return '';
-        }
-        if (!Array.isArray(data) || data.length === 0) return '';
-
-        const entries = data as MemoryEntry[];
-        const lines = entries.map(entry => {
-            const sourceLabel =
-                entry.source === 'chat' ? 'Past conversation' :
-                    entry.source === 'dismiss' ? 'Previously dismissed' :
-                        entry.source === 'pr_merged' ? 'PR merged' :
-                            entry.source === 'done' ? 'Marked as done' :
-                                'Note';
-            return `- [${sourceLabel}] ${entry.content}`;
-        });
-
-        return lines.join('\n');
     } catch (err) {
-        if (enforce) {
-            if (err instanceof ScanMemoryError) throw err;
-            throw new ScanMemoryError(
-                'search_failed',
-                `[Scan Memory] Search failed: ${err instanceof Error ? err.message : String(err)}`
-            );
+        semanticSearchError = err instanceof Error ? err.message : String(err);
+    }
+
+    try {
+        const lexicalEntries = await lexicalSearchMemory(projectId, userId, query, supabase);
+        if (lexicalEntries.length > 0) return formatMemoryEntries(lexicalEntries);
+
+        if (semanticSearchError) {
+            console.warn(`[Scan Memory] Semantic retrieval failed; lexical fallback returned no matches: ${semanticSearchError}`);
         }
-        console.warn('[Scan Memory] Search failed:', err instanceof Error ? err.message : err);
+        return '';
+    } catch (lexicalErr) {
+        const lexicalMessage = lexicalErr instanceof Error ? lexicalErr.message : String(lexicalErr);
+        if (enforce) {
+            const detail = semanticSearchError
+                ? `[Scan Memory] Search failed. Semantic retrieval error: ${semanticSearchError}. Lexical fallback error: ${lexicalMessage}`
+                : `[Scan Memory] Search failed. Lexical fallback error: ${lexicalMessage}`;
+            throw new ScanMemoryError('search_failed', detail);
+        }
+        console.warn('[Scan Memory] Search failed:', lexicalMessage);
         return '';
     }
 }
 
 /**
- * Embed and store a new memory entry. Fire-and-forget — do not await the result
- * in latency-sensitive paths (e.g. after a streaming response completes).
+ * Embed (when available) and store a new memory entry.
+ * In strict mode, persistence still succeeds without embeddings by storing null vectors.
  */
 export async function writeMemory(
     projectId: string,
@@ -162,10 +242,8 @@ export async function writeMemory(
     const enforce = options?.enforce ?? false;
     try {
         const truncated = content.slice(0, MAX_CONTENT_CHARS);
-        const embedding = await embedText(truncated, { enforce });
-        if (enforce && !embedding) {
-            throw new ScanMemoryError('embedding_unavailable', '[Scan Memory] Embedding is required in strict mode');
-        }
+        // Keep memory writes available even if embeddings are unavailable (e.g. rate limits).
+        const embedding = await embedText(truncated, { enforce: false });
 
         const { error } = await supabase
             .from('scan_chat_memory')
@@ -183,6 +261,10 @@ export async function writeMemory(
                 throw new ScanMemoryError('write_failed', `[Scan Memory] Write failed: ${error.message}`);
             }
             console.warn('[Scan Memory] Write failed:', error.message);
+        }
+
+        if (!embedding) {
+            console.warn('[Scan Memory] Stored memory without embedding; semantic retrieval will fall back to lexical search.');
         }
     } catch (err) {
         if (enforce) {

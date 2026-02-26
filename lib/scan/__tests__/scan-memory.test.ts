@@ -17,25 +17,55 @@ describe("scan-memory strict enforcement", () => {
         restoreEmbeddingEnv();
     });
 
-    test("searchMemory throws when strict mode is enabled and embedding key is missing", async () => {
+    test("searchMemory uses lexical fallback in strict mode when embedding key is missing", async () => {
         delete process.env.GOOGLE_AI_API_KEY;
         delete process.env.GEMINI_API_KEY;
 
+        const queryBuilder = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({
+                data: [
+                    {
+                        id: "mem-1",
+                        content: "User dismissed a SQL injection finding in api/users.ts",
+                        source: "dismiss",
+                        created_at: "2026-02-25T10:00:00.000Z",
+                    },
+                ],
+                error: null,
+            }),
+        };
+
         const supabase = {
             rpc: vi.fn(),
+            from: vi.fn(() => queryBuilder),
         } as unknown as Parameters<typeof searchMemory>[3];
 
-        await expect(
-            searchMemory("project-id", "user-id", "what was dismissed last time?", supabase, { enforce: true })
-        ).rejects.toBeInstanceOf(ScanMemoryError);
+        const result = await searchMemory("project-id", "user-id", "what sql issue was dismissed?", supabase, { enforce: true });
+
+        expect(result).toContain("[Previously dismissed]");
+        expect(result).toContain("SQL injection");
+        expect(supabase.rpc).not.toHaveBeenCalled();
     });
 
     test("searchMemory remains best-effort when strict mode is disabled", async () => {
         delete process.env.GOOGLE_AI_API_KEY;
         delete process.env.GEMINI_API_KEY;
 
+        const queryBuilder = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+
         const rpc = vi.fn();
-        const supabase = { rpc } as unknown as Parameters<typeof searchMemory>[3];
+        const supabase = {
+            rpc,
+            from: vi.fn(() => queryBuilder),
+        } as unknown as Parameters<typeof searchMemory>[3];
 
         const result = await searchMemory("project-id", "user-id", "hello", supabase, { enforce: false });
 
@@ -43,11 +73,55 @@ describe("scan-memory strict enforcement", () => {
         expect(rpc).not.toHaveBeenCalled();
     });
 
-    test("writeMemory throws when strict mode is enabled and embedding key is missing", async () => {
+    test("searchMemory throws in strict mode when lexical fallback query fails", async () => {
         delete process.env.GOOGLE_AI_API_KEY;
         delete process.env.GEMINI_API_KEY;
 
-        const insert = vi.fn();
+        const queryBuilder = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({
+                data: null,
+                error: { message: "db unavailable" },
+            }),
+        };
+
+        const supabase = {
+            rpc: vi.fn(),
+            from: vi.fn(() => queryBuilder),
+        } as unknown as Parameters<typeof searchMemory>[3];
+
+        await expect(
+            searchMemory("project-id", "user-id", "what was dismissed?", supabase, { enforce: true })
+        ).rejects.toMatchObject({ code: "search_failed" });
+    });
+
+    test("writeMemory stores records without embedding when strict mode is enabled and key is missing", async () => {
+        delete process.env.GOOGLE_AI_API_KEY;
+        delete process.env.GEMINI_API_KEY;
+
+        const insert = vi.fn().mockResolvedValue({ error: null });
+        const supabase = {
+            from: vi.fn(() => ({ insert })),
+        } as unknown as Parameters<typeof writeMemory>[4];
+
+        await expect(
+            writeMemory("project-id", "user-id", "memory content", "chat", supabase, undefined, { enforce: true })
+        ).resolves.toBeUndefined();
+
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+            embedding: null,
+            source: "chat",
+        }));
+    });
+
+    test("writeMemory throws on insert failure in strict mode", async () => {
+        delete process.env.GOOGLE_AI_API_KEY;
+        delete process.env.GEMINI_API_KEY;
+
+        const insert = vi.fn().mockResolvedValue({ error: { message: "insert failed" } });
         const supabase = {
             from: vi.fn(() => ({ insert })),
         } as unknown as Parameters<typeof writeMemory>[4];
@@ -55,7 +129,5 @@ describe("scan-memory strict enforcement", () => {
         await expect(
             writeMemory("project-id", "user-id", "memory content", "chat", supabase, undefined, { enforce: true })
         ).rejects.toBeInstanceOf(ScanMemoryError);
-
-        expect(insert).not.toHaveBeenCalled();
     });
 });
