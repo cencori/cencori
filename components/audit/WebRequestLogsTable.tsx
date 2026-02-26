@@ -154,7 +154,7 @@ export function WebRequestLogsTable({ projectId, filters }: WebRequestLogsTableP
                 </div>
                 <p className="text-sm font-medium mb-1">No web gateway requests found</p>
                 <p className="text-xs text-muted-foreground">
-                    Open project pages to start seeing HTTP traffic logs here.
+                    Add Cencori telemetry to your app to see web traffic logs here.
                 </p>
             </div>
         );

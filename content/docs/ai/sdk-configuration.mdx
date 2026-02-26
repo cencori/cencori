@@ -92,3 +92,20 @@ To opt-out of telemetry headers:
 ```bash
 export CENCORI_TELEMETRY=0
 ```
+
+## Web Telemetry (App Traffic)
+
+Separately from anonymous SDK telemetry, you can report **web traffic from your app** to the Cencori dashboard. This populates the **Logs → Web Gateway** tab with your app's real domain.
+
+```typescript
+// In your middleware or API route handler:
+await cencori.telemetry.reportWebRequest({
+  host: req.headers.get('host') || 'unknown',
+  method: req.method,
+  path: new URL(req.url).pathname,
+  statusCode: response.status,
+  latencyMs: Date.now() - startTime,
+});
+```
+
+This is fire-and-forget — it never throws and never blocks your application.
