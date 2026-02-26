@@ -43,6 +43,8 @@ const IMAGE_MODELS = {
     'dall-e-2': { provider: 'openai' as const, apiModel: 'dall-e-2', description: 'Fast, cost-effective' },
     'gemini-3-pro-image': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'High photorealism, fast' },
     'nano-banana-pro': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'Alias for Gemini 3 Pro Image' },
+    'gemini-3.1-flash-image': { provider: 'google' as const, apiModel: 'gemini-3.1-flash-image-generation', description: 'Nano Banana 2 — reasoning-guided, up to 4K' },
+    'nano-banana-2': { provider: 'google' as const, apiModel: 'gemini-3.1-flash-image-generation', description: 'Alias for Gemini 3.1 Flash Image' },
     'imagen-3': { provider: 'google' as const, apiModel: 'imagen-3.0-generate-002', description: 'Google Imagen 3' },
 } as const;
 
@@ -67,6 +69,7 @@ function normalizeModelName(model: string): { normalized: string; apiModel: stri
     if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('1.5')) return { normalized: 'gpt-image-1.5', apiModel: 'gpt-image-1.5' };
     if (modelLower.includes('gpt') && modelLower.includes('image')) return { normalized: 'gpt-image-1', apiModel: 'gpt-image-1' };
     if (modelLower.includes('gemini') && modelLower.includes('image')) return { normalized: 'gemini-3-pro-image', apiModel: 'gemini-2.0-flash-preview-image-generation' };
+    if (modelLower.includes('nano-banana-2') || modelLower.includes('nano banana 2')) return { normalized: 'nano-banana-2', apiModel: 'gemini-3.1-flash-image-generation' };
     if (modelLower.includes('nano') || modelLower.includes('banana')) return { normalized: 'nano-banana-pro', apiModel: 'gemini-2.0-flash-preview-image-generation' };
     if (modelLower.includes('imagen')) return { normalized: 'imagen-3', apiModel: 'imagen-3.0-generate-002' };
     return { normalized: model, apiModel: model };
@@ -136,6 +139,8 @@ const IMAGE_PRICING: Record<string, number> = {
     'gpt-image-1.5': 0.06,
     'gemini-3-pro-image': 0.02,
     'nano-banana-pro': 0.02,
+    'gemini-3.1-flash-image': 0.02,
+    'nano-banana-2': 0.02,
     'imagen-3': 0.03,
 };
 

@@ -84,6 +84,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // Gemini 3.1 Series (Feb 2026)
             { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', type: 'chat', contextWindow: 1000000, description: 'Latest flagship preview, 1M context, enhanced reasoning' },
             { id: 'gemini-3.1-pro-preview-customtools', name: 'Gemini 3.1 Pro (Custom Tools)', type: 'chat', contextWindow: 1000000, description: 'Optimized for custom tools and bash' },
+            { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image (Nano Banana 2)', type: 'image', contextWindow: 0, description: 'Reasoning-guided image synthesis, up to 4K' },
             // Gemini 3 Series (Late 2025)
             { id: 'gemini-3-pro', name: 'Gemini 3 Pro', type: 'chat', contextWindow: 2000000, description: 'Powerful Gemini model' },
             { id: 'gemini-3-flash', name: 'Gemini 3 Flash', type: 'chat', contextWindow: 1000000, description: 'Frontier speed & intelligence' },

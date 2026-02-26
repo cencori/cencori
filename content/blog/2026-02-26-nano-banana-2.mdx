@@ -1,0 +1,88 @@
+---
+title: "Nano Banana 2 Is Here: Reasoning-Guided Image Generation, Now on Cencori"
+slug: "nano-banana-2-image-generation"
+date: "2026-02-26"
+excerpt: "Google's Nano Banana 2 (Gemini 3.1 Flash Image) just dropped — blazing-fast, 4K-capable image generation built on reasoning, not diffusion. It's already live on Cencori."
+coverImage: "/blog/images/covers/banana.png"
+tags: ["Google", "Gemini", "Image Generation", "AI Models", "Update"]
+published: true
+---
+
+Google just released **Nano Banana 2**, and it's already live on Cencori. No waiting, no extra config — just swap the model ID and start generating.
+
+Technically known as **Gemini 3.1 Flash Image**, Nano Banana 2 is the successor to Nano Banana Pro (Gemini 3 Pro Image). It brings a fundamentally different approach to image generation: **reasoning-guided synthesis** instead of traditional diffusion.
+
+## Why This Matters
+
+Previous image models work by pattern matching — they denoise a random image until it looks like your prompt. Nano Banana 2 uses a multi-stage **Plan → Evaluate → Improve** loop, which means it actually *reasons* about what it's generating. The result: better logical consistency, fewer artifacts, and images that match your intent more closely.
+
+## What's New
+
+### Flash-Tier Speed, Pro-Level Quality
+Nano Banana 2 combines the speed of Gemini Flash with the fidelity of Nano Banana Pro. You get photorealistic imagery with vibrant lighting, richer textures, and sharper details — without the latency tradeoff.
+
+### 4K Native Resolution
+Generate images natively from 512px all the way up to **4K**. No upscaling hacks — the model generates at your target resolution from the start.
+
+### Production-Ready Text Rendering
+Crisp, accurate text within images, including multi-language localization. If you've been frustrated by garbled text in AI images, this is a significant step forward.
+
+### Better Creative Control
+Maintain subject consistency for up to **5 characters** and fidelity for up to **14 objects** in a single workflow. The model also pulls from Gemini's world knowledge and real-time web search for more contextually rich visuals.
+
+## Use It Today
+
+Two model IDs are available through the Cencori gateway:
+
+| Model ID | Description |
+|---|---|
+| `gemini-3.1-flash-image` | Canonical ID |
+| `nano-banana-2` | Alias (same model) |
+
+### SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const result = await cencori.ai.generateImage({
+  model: 'nano-banana-2',
+  prompt: 'A futuristic city skyline at golden hour, neon reflections on glass towers',
+  size: '1024x1024'
+});
+
+console.log(result.images[0]);
+```
+
+### cURL
+
+```bash
+curl -X POST https://api.cencori.com/v1/images/generate \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nano-banana-2",
+    "prompt": "Product photography of a ceramic mug on a marble surface, soft natural light"
+  }'
+```
+
+## All Supported Image Models
+
+For reference, here's the full lineup available through Cencori's image generation gateway:
+
+| Model | Provider | Best For |
+|---|---|---|
+| `gpt-image-1.5` | OpenAI | Text rendering, highest ELO |
+| `dall-e-3` | OpenAI | Creative, artistic images |
+| `nano-banana-2` | Google | Reasoning-guided, 4K, fast |
+| `gemini-3-pro-image` | Google | Photorealism |
+| `imagen-3` | Google | High-quality generation |
+
+Every request is automatically logged, rate-limited, and security-monitored through the Cencori gateway — whether you're using your own API keys (BYOK) or ours.
+
+## What's Next
+
+We're watching for Nano Banana 2's GA release, at which point Google may stabilize the API model ID. If anything changes, we'll update the mapping transparently — your code stays the same.
+
+Check out the [Models Catalog](/docs/ai/models) for the full list of supported models, or dive into the [Image Generation docs](/docs/sdk#image-generation) to get started.
