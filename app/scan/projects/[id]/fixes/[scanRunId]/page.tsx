@@ -561,6 +561,7 @@ export default function FixWorkspacePage() {
 
     const handleSendChat = async () => {
         if (!chatInput.trim() || chatLoading) return;
+        setError("");
 
         const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
         const nextMessages = [...chatMessages, userMessage];
@@ -590,7 +591,21 @@ export default function FixWorkspacePage() {
                 signal: controller.signal,
             });
 
-            if (!response.ok) throw new Error("Failed to get response");
+            if (!response.ok) {
+                let message = `Failed to get response (${response.status})`;
+                try {
+                    const data = await response.json();
+                    if (typeof data?.error === "string" && data.error.trim()) {
+                        const parts = [data.error.trim()];
+                        if (typeof data?.code === "string" && data.code.trim()) parts.push(`[${data.code.trim()}]`);
+                        if (typeof data?.details === "string" && data.details.trim()) parts.push(data.details.trim());
+                        message = parts.join(" ");
+                    }
+                } catch {
+                    // Keep default HTTP status message.
+                }
+                throw new Error(message);
+            }
 
             const reader = response.body?.getReader();
             if (!reader) throw new Error("No response body");
@@ -654,11 +669,15 @@ export default function FixWorkspacePage() {
             });
         } catch (err) {
             if ((err as Error).name !== "AbortError") {
+                const failureMessage = err instanceof Error
+                    ? err.message.slice(0, 500)
+                    : "Sorry, I encountered an error. Please try again.";
+                setError(failureMessage);
                 setChatMessages((prev) => {
                     const next = [...prev];
                     const last = next[next.length - 1];
                     if (last?.role === "assistant" && last.isStreaming) {
-                        next[next.length - 1] = { role: "assistant", content: "Sorry, I encountered an error. Please try again.", isStreaming: false, isError: true };
+                        next[next.length - 1] = { role: "assistant", content: failureMessage, isStreaming: false, isError: true };
                     }
                     return next;
                 });

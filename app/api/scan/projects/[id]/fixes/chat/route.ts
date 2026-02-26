@@ -245,10 +245,13 @@ User: ${question}`;
                     enqueue("[DONE]");
                     controller.close();
                 } else {
+                    const code = error instanceof ScanMemoryError ? error.code : "stream_failed";
+                    const details = error instanceof Error ? error.message : "Unknown error";
+                    const message = `RAG memory persistence failed (${code}): ${details}`.slice(0, 500);
                     try {
                         enqueue(JSON.stringify({
                             type: "error",
-                            message: "RAG memory persistence failed after response generation.",
+                            message,
                         }));
                         enqueue("[DONE]");
                         controller.close();
