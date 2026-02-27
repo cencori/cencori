@@ -82,6 +82,11 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
     });
 
     const pathname = request.nextUrl.pathname;
+    const isScanAuthPath =
+        pathname === '/signup'
+        || pathname.startsWith('/signup/')
+        || pathname === '/login'
+        || pathname.startsWith('/login/');
     // Skip rewriting for static files (images, etc)
     // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
     const isFile = pathname.includes('.') && !pathname.startsWith('/.well-known');
@@ -122,10 +127,12 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
         }
         // Handle scan subdomain
         else if (isScanSubdomain) {
-            const url = request.nextUrl.clone();
-            url.pathname = `/scan${url.pathname}`;
-            rewriteUrl = url;
-            response = NextResponse.rewrite(url);
+            if (!isScanAuthPath) {
+                const url = request.nextUrl.clone();
+                url.pathname = `/scan${url.pathname}`;
+                rewriteUrl = url;
+                response = NextResponse.rewrite(url);
+            }
         }
     }
 

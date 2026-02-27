@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
+import {
+    emitScanPaywall,
+    openScanPaywallFromResponse,
+    type ScanPaywallEntitlement,
+} from "@/lib/scan/paywall-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Shield,
@@ -224,6 +229,7 @@ export default function ProjectDetailPage() {
     const [isUpdatingFixStatus, setIsUpdatingFixStatus] = useState(false);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
     const [hasScanAccess, setHasScanAccess] = useState(true);
+    const [scanEntitlement, setScanEntitlement] = useState<ScanPaywallEntitlement | null>(null);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
         try {
@@ -274,6 +280,7 @@ export default function ProjectDetailPage() {
                 const data = await response.json();
                 if (!cancelled) {
                     setHasScanAccess(Boolean(data?.entitlement?.hasScanAccess));
+                    setScanEntitlement((data?.entitlement || null) as ScanPaywallEntitlement | null);
                 }
             } catch (err) {
                 console.error('Error fetching scan entitlement:', err);
@@ -451,7 +458,7 @@ export default function ProjectDetailPage() {
                 setChangelogs(prev => [data.changelog, ...prev]);
                 setSelectedChangelog(data.changelog);
             } else if (response.status === 402) {
-                setHasScanAccess(false);
+                await openScanPaywallFromResponse(response);
             }
         } catch (err) {
             console.error('Error generating changelog:', err);
@@ -466,6 +473,23 @@ export default function ProjectDetailPage() {
         setIsScanning(true);
         setScanLog([]);
 
+        const cachedMaxScansPerProject = scanEntitlement?.limits?.maxScansPerProject;
+        if (typeof cachedMaxScansPerProject === "number" && scans.length >= cachedMaxScansPerProject) {
+            emitScanPaywall({
+                error: "Free scan run limit reached for this project",
+                code: "SCAN_FREE_SCAN_LIMIT_REACHED",
+                entitlement: scanEntitlement,
+                limit: {
+                    type: "scan_runs_per_project",
+                    max: cachedMaxScansPerProject,
+                    used: scans.length,
+                    projectId,
+                },
+            });
+            setIsScanning(false);
+            return;
+        }
+
         try {
             const entitlementResponse = await fetch('/api/scan/entitlement');
             if (!entitlementResponse.ok) {
@@ -474,8 +498,26 @@ export default function ProjectDetailPage() {
             }
 
             const entitlementData = await entitlementResponse.json();
+            setScanEntitlement((entitlementData?.entitlement || null) as ScanPaywallEntitlement | null);
             if (!entitlementData?.entitlement?.hasScanAccess) {
                 setHasScanAccess(false);
+                setIsScanning(false);
+                return;
+            }
+
+            const maxScansPerProject = entitlementData?.entitlement?.limits?.maxScansPerProject;
+            if (typeof maxScansPerProject === "number" && scans.length >= maxScansPerProject) {
+                emitScanPaywall({
+                    error: "Free scan run limit reached for this project",
+                    code: "SCAN_FREE_SCAN_LIMIT_REACHED",
+                    entitlement: entitlementData.entitlement,
+                    limit: {
+                        type: "scan_runs_per_project",
+                        max: maxScansPerProject,
+                        used: scans.length,
+                        projectId,
+                    },
+                });
                 setIsScanning(false);
                 return;
             }
@@ -650,7 +692,7 @@ export default function ProjectDetailPage() {
             });
             if (!response.ok) {
                 if (response.status === 402) {
-                    setHasScanAccess(false);
+                    await openScanPaywallFromResponse(response);
                 }
                 return;
             }

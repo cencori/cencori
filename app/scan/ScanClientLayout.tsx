@@ -30,6 +30,11 @@ import {
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useTheme } from "next-themes";
+import { ScanPaywallDialog } from "@/components/scan/ScanPaywallDialog";
+import {
+    SCAN_PAYWALL_EVENT,
+    type ScanPaywallPayload,
+} from "@/lib/scan/paywall-client";
 
 interface ScanLayoutProps {
     children: ReactNode;
@@ -44,6 +49,8 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [user, setUser] = useState<User | null>(null);
+    const [paywallDialogOpen, setPaywallDialogOpen] = useState(false);
+    const [paywallPayload, setPaywallPayload] = useState<ScanPaywallPayload | null>(null);
 
     // Check auth
     useEffect(() => {
@@ -54,6 +61,19 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             }
         };
         checkAuth();
+    }, []);
+
+    useEffect(() => {
+        const handlePaywall = (event: Event) => {
+            const customEvent = event as CustomEvent<ScanPaywallPayload>;
+            setPaywallPayload(customEvent.detail || null);
+            setPaywallDialogOpen(true);
+        };
+
+        window.addEventListener(SCAN_PAYWALL_EVENT, handlePaywall as EventListener);
+        return () => {
+            window.removeEventListener(SCAN_PAYWALL_EVENT, handlePaywall as EventListener);
+        };
     }, []);
 
     // Extract current project from URL
@@ -251,6 +271,12 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             <main className="flex-1 overflow-y-auto bg-background pt-12">
                 {children}
             </main>
+
+            <ScanPaywallDialog
+                open={paywallDialogOpen}
+                onOpenChange={setPaywallDialogOpen}
+                payload={paywallPayload}
+            />
         </div>
     );
 }

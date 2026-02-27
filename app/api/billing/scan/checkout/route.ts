@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || req.nextUrl.origin).replace(/\/$/, '');
+        const scanBaseUrl = (process.env.NEXT_PUBLIC_SCAN_APP_URL || 'https://scan.cencori.com').replace(/\/$/, '');
         const checkoutOptions: Parameters<typeof polarClient.checkouts.create>[0] = {
             products: [productId],
-            successUrl: `${appBaseUrl}/scan?success=true&scanUpgrade=true`,
+            successUrl: `${scanBaseUrl}/?success=true&scanUpgrade=true`,
             customerEmail: user.email || undefined,
             customerName: (
                 (typeof user.user_metadata?.name === 'string' && user.user_metadata.name) ||
