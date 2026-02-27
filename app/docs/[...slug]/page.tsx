@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { buildOgImageUrl } from "@/lib/og";
 
 interface DocPageProps {
     params: Promise<{
@@ -31,6 +32,12 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
         };
     }
 
+    const ogImage = buildOgImageUrl({
+        title: doc.title,
+        subtitle: doc.section,
+        type: "docs",
+    });
+
     return {
         title: doc.title,
         description: doc.description,
@@ -40,7 +47,7 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
             type: "article",
             images: [
                 {
-                    url: `/api/og?title=${encodeURIComponent(doc.title)}&subtitle=${encodeURIComponent(doc.section)}&type=docs`,
+                    url: ogImage,
                     width: 1200,
                     height: 630,
                 },
@@ -52,7 +59,7 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
             creator: "@cencori",
             title: `${doc.title} | Cencori Docs`,
             description: doc.description,
-            images: [`/api/og?title=${encodeURIComponent(doc.title)}&subtitle=${encodeURIComponent(doc.section)}&type=docs`],
+            images: [ogImage],
         },
     };
 }

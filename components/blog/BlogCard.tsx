@@ -3,6 +3,7 @@ import Image from "next/image";
 import { BlogPost } from "@/lib/blog";
 import { Clock, ArrowUpRight } from "lucide-react";
 import { format } from "date-fns";
+import { buildOgImageUrl } from "@/lib/og";
 
 interface BlogCardProps {
     post: BlogPost;
@@ -15,7 +16,7 @@ export function BlogCard({ post }: BlogCardProps) {
                 {/* Cover Image */}
                 <div className="relative w-full h-36 overflow-hidden border-b border-border/40">
                     <Image
-                        src={post.coverImage || `/api/og?title=${encodeURIComponent(post.title)}&type=blog`}
+                        src={post.coverImage || buildOgImageUrl({ title: post.title, type: "blog" })}
                         alt={post.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -85,4 +86,3 @@ export function BlogCard({ post }: BlogCardProps) {
         </Link>
     );
 }
-

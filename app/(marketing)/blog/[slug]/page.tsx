@@ -11,6 +11,7 @@ import { Footer } from "@/components/landing/Footer";
 import { ShareButtons } from "@/components/blog/ShareButtons";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { buildOgImageUrl } from "@/lib/og";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -43,7 +44,12 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
     const ogImage = post.coverImage
         ? post.coverImage
-        : `/api/og?title=${encodeURIComponent(post.title)}&type=blog&author=${encodeURIComponent(authorName)}&date=${encodeURIComponent(formattedDate)}`;
+        : buildOgImageUrl({
+            title: post.title,
+            type: "blog",
+            author: authorName,
+            date: formattedDate,
+        });
 
     return {
         title: post.title,
@@ -214,4 +220,3 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </div>
     );
 }
-

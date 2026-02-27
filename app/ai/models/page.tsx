@@ -3,6 +3,13 @@ import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 import { ModelCatalog } from "@/components/models/ModelCatalog";
 import { SUPPORTED_PROVIDERS } from "@/lib/providers/config";
+import { buildOgImageUrl } from "@/lib/og";
+
+const modelsOgImage = buildOgImageUrl({
+    title: "AI Models",
+    subtitle: "Browse 80+ models from 14 providers",
+    type: "docs",
+});
 
 export const metadata: Metadata = {
     title: "AI Models",
@@ -13,7 +20,7 @@ export const metadata: Metadata = {
         type: "website",
         images: [
             {
-                url: `/api/og?title=${encodeURIComponent("AI Models")}&subtitle=${encodeURIComponent("Browse 80+ models from 14 providers")}&type=docs`,
+                url: modelsOgImage,
                 width: 1200,
                 height: 630,
             },

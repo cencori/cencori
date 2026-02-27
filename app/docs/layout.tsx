@@ -7,6 +7,13 @@ import { DocsContentWrapper } from "@/components/docs/DocsContentWrapper";
 import { DocsSidebarWrapper } from "@/components/docs/DocsSidebarWrapper";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { buildOgImageUrl } from "@/lib/og";
+
+const docsOgImage = buildOgImageUrl({
+    title: "Documentation",
+    subtitle: "Guides, API reference, and tutorials",
+    type: "docs",
+});
 
 export const metadata: Metadata = {
     title: "Documentation",
@@ -14,13 +21,13 @@ export const metadata: Metadata = {
     openGraph: {
         title: "Documentation | Cencori",
         description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: ["/api/og?title=Documentation&subtitle=Guides, API reference, and tutorials&type=docs"],
+        images: [docsOgImage],
     },
     twitter: {
         card: "summary_large_image",
         title: "Documentation | Cencori",
         description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: ["/api/og?title=Documentation&subtitle=Guides, API reference, and tutorials&type=docs"],
+        images: [docsOgImage],
     },
 };
 

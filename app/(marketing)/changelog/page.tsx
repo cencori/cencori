@@ -4,6 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import type { Metadata } from "next";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
+import { buildOgImageUrl } from "@/lib/og";
+
+const changelogOgImage = buildOgImageUrl({
+  title: "Changelog",
+  subtitle: "New features, improvements, and fixes",
+  type: "changelog",
+});
 
 export const metadata: Metadata = {
   title: "Changelog",
@@ -11,13 +18,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Changelog | Cencori",
     description: "New features, improvements, and fixes for Cencori.",
-    images: ["/api/og?title=Changelog&subtitle=New features, improvements, and fixes&type=changelog"],
+    images: [changelogOgImage],
   },
   twitter: {
     card: "summary_large_image",
     title: "Changelog | Cencori",
     description: "New features, improvements, and fixes for Cencori.",
-    images: ["/api/og?title=Changelog&subtitle=New features, improvements, and fixes&type=changelog"],
+    images: [changelogOgImage],
   },
 };
 
@@ -99,7 +106,7 @@ export default function ChangelogPage() {
 
             {/* Entries */}
             <div className="space-y-12">
-              {changelogData.map((entry, index) => (
+              {changelogData.map((entry) => (
                 <div key={entry.version} className="relative pl-8">
                   {/* Timeline dot */}
                   <div className="absolute left-0 top-1.5 w-[15px] h-[15px] rounded-full bg-background border-2 border-primary" />
