@@ -140,77 +140,15 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
     // Apply security headers to all responses
     response = applySecurityHeaders(response);
 
-    // Non-blocking web traffic logging for project-scoped dashboard routes.
-    const projectScope = extractProjectScope(pathname);
-    const skipLocalhostIngest = isProductionRuntime && isLocalhostHost(hostname);
+    // Web traffic logging is now handled by the external SDK telemetry endpoint
+    // (POST /api/v1/telemetry/web). The middleware ingest below was the old approach
+    // that only captured internal dashboard navigation. Disabled to avoid noise.
+    //
+    // If you need to re-enable internal dashboard logging, uncomment the block below.
 
-    if (projectScope && webLogIngestSecret && !skipLocalhostIngest) {
-        const requestId = crypto.randomUUID();
-        const forwardedFor = request.headers.get('x-forwarded-for');
-        const clientIp = forwardedFor?.split(',')[0]?.trim() || request.headers.get('x-real-ip');
-        const queryString = request.nextUrl.searchParams.toString();
-        const protocol = request.headers.get('x-forwarded-proto')
-            || request.nextUrl.protocol.replace(':', '')
-            || null;
-        const runtimeEnv = process.env.VERCEL_ENV || process.env.NODE_ENV || null;
-
-        const ingestUrl = new URL('/api/internal/web-logs/ingest', request.url);
-
-        event.waitUntil(
-            fetch(ingestUrl, {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json',
-                    'x-cencori-internal-key': webLogIngestSecret,
-                },
-                body: JSON.stringify({
-                    requestId,
-                    orgSlug: projectScope.orgSlug,
-                    projectSlug: projectScope.projectSlug,
-                    host: hostname,
-                    method: request.method,
-                    path: pathname,
-                    queryString: queryString || null,
-                    statusCode: response.status,
-                    message: `${pathname}${queryString ? `?${queryString}` : ''} status=${response.status}`,
-                    userAgent: request.headers.get('user-agent'),
-                    referer: request.headers.get('referer'),
-                    ipAddress: clientIp || null,
-                    countryCode: request.headers.get('x-vercel-ip-country') || null,
-                    metadata: {
-                        runtime: {
-                            source: 'middleware',
-                            env: runtimeEnv,
-                        },
-                        scope: {
-                            org_slug: projectScope.orgSlug,
-                            project_slug: projectScope.projectSlug,
-                            query_count: request.nextUrl.searchParams.size,
-                        },
-                        connection: {
-                            protocol,
-                        },
-                        request_headers: {
-                            accept: request.headers.get('accept'),
-                            accept_language: request.headers.get('accept-language'),
-                            sec_fetch_site: request.headers.get('sec-fetch-site'),
-                            sec_fetch_mode: request.headers.get('sec-fetch-mode'),
-                            sec_fetch_dest: request.headers.get('sec-fetch-dest'),
-                        },
-                        vercel: {
-                            request_id: request.headers.get('x-vercel-id'),
-                            deployment_url: process.env.VERCEL_URL || null,
-                            ip_city: request.headers.get('x-vercel-ip-city'),
-                            ip_region: request.headers.get('x-vercel-ip-country-region'),
-                            ip_continent: request.headers.get('x-vercel-ip-continent'),
-                        },
-                    },
-                }),
-            }).catch((error) => {
-                console.error('[Web Logs] Failed to enqueue web request log:', error);
-            })
-        );
-    }
+    // const projectScope = extractProjectScope(pathname);
+    // const skipLocalhostIngest = isProductionRuntime && isLocalhostHost(hostname);
+    // if (projectScope && webLogIngestSecret && !skipLocalhostIngest) { ... }
 
     return response;
 }
