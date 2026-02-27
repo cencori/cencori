@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getInstallationOctokit } from '@/lib/github';
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 
 // GET /api/scan/projects - List user's scan projects
 export async function GET() {
@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     try {

@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusIcon, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 
 // Heroicons archive-box-arrow-down icon
 const ArchiveBoxArrowDownIcon = ({ className }: { className?: string }) => (
@@ -27,6 +28,12 @@ interface ScanProject {
     created_at: string;
 }
 
+interface ScanEntitlementPayload {
+    entitlement?: {
+        hasScanAccess?: boolean;
+    };
+}
+
 const scoreColors: Record<string, string> = {
     A: "bg-emerald-500",
     B: "bg-blue-500",
@@ -34,13 +41,6 @@ const scoreColors: Record<string, string> = {
     D: "bg-orange-500",
     F: "bg-red-500",
 };
-
-function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.toLocaleString("en-US", { month: "short" });
-    return `${month} ${day}, ${date.getFullYear()}`;
-}
 
 function formatTimeAgo(dateString: string | null): string {
     if (!dateString) return "Never";
@@ -62,14 +62,24 @@ export default function ScanDashboardPage() {
     const [projects, setProjects] = useState<ScanProject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [hasScanAccess, setHasScanAccess] = useState(true);
 
     useEffect(() => {
-        const fetchProjects = async () => {
+        const fetchProjectsAndEntitlement = async () => {
             try {
-                const response = await fetch('/api/scan/projects');
-                if (response.ok) {
-                    const data = await response.json();
-                    setProjects(data.projects || []);
+                const [projectsResponse, entitlementResponse] = await Promise.all([
+                    fetch('/api/scan/projects'),
+                    fetch('/api/scan/entitlement'),
+                ]);
+
+                if (projectsResponse.ok) {
+                    const projectData = await projectsResponse.json();
+                    setProjects(projectData.projects || []);
+                }
+
+                if (entitlementResponse.ok) {
+                    const entitlementData = await entitlementResponse.json() as ScanEntitlementPayload;
+                    setHasScanAccess(Boolean(entitlementData.entitlement?.hasScanAccess));
                 }
             } catch (err) {
                 console.error('Error fetching projects:', err);
@@ -77,7 +87,7 @@ export default function ScanDashboardPage() {
                 setIsLoading(false);
             }
         };
-        fetchProjects();
+        fetchProjectsAndEntitlement();
     }, []);
 
     const filteredProjects = projects.filter(project =>
@@ -117,6 +127,20 @@ export default function ScanDashboardPage() {
                         </div>
                     ))}
                 </div>
+            </div>
+        );
+    }
+
+    if (!hasScanAccess) {
+        return (
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="mb-8">
+                    <h1 className="text-base font-medium">Scan Access</h1>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Choose a scan plan to import repositories and run scans.
+                    </p>
+                </div>
+                <ScanUpgradePanel />
             </div>
         );
     }

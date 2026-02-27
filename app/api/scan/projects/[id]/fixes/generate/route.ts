@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { generateFileFixWithGemini } from '@/lib/scan/gemini';
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 import { randomUUID } from 'crypto';
 
 // Allow up to 5 minutes for large repos with many files
@@ -402,6 +403,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         if (userError || !user) {
             console.log('[Fix Gen] Unauthorized request');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const paywallResponse = await getScanPaywallForUser(user.id);
+        if (paywallResponse) {
+            return paywallResponse;
         }
 
         if (!isValidUUID(id)) {

@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
-
-interface CommitData {
-    sha: string;
-    commit: {
-        message: string;
-        author: {
-            name: string;
-            date: string;
-        } | null;
-    };
-}
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 
 interface ParsedCommit {
     hash: string;
@@ -20,6 +9,17 @@ interface ParsedCommit {
     author: string;
     message: string;
     type: 'feat' | 'fix' | 'chore' | 'docs' | 'style' | 'refactor' | 'test' | 'other';
+}
+
+interface GithubCommitResponseItem {
+    sha: string;
+    commit: {
+        message: string;
+        author: {
+            name: string | null;
+            date: string | null;
+        } | null;
+    };
 }
 
 interface ChangelogEntry {
@@ -137,7 +137,7 @@ function generateMarkdown(entries: ChangelogEntry[], period: { start: string; en
 
 // GET - List changelogs for a project
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: projectId } = await params;
@@ -187,6 +187,11 @@ export async function POST(
 
     if (authError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     // Get project details
@@ -254,14 +259,15 @@ export async function POST(
 
         // Filter out merge commits and parse
 
-        const commits: ParsedCommit[] = commitsData
-            .filter((c: any) => !c.commit.message.startsWith('Merge'))
-            .map((c: any) => ({
-                hash: c.sha.substring(0, 7),
-                date: c.commit.author?.date || now.toISOString(),
-                author: c.commit.author?.name || 'Unknown',
-                message: c.commit.message.split('\n')[0], // First line only
-                type: parseCommitType(c.commit.message),
+        const parsedCommitsData = commitsData as GithubCommitResponseItem[];
+        const commits: ParsedCommit[] = parsedCommitsData
+            .filter((commit) => !commit.commit.message.startsWith('Merge'))
+            .map((commit) => ({
+                hash: commit.sha.substring(0, 7),
+                date: commit.commit.author?.date || now.toISOString(),
+                author: commit.commit.author?.name || 'Unknown',
+                message: commit.commit.message.split('\n')[0], // First line only
+                type: parseCommitType(commit.commit.message),
             }));
 
         const period = {

@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
@@ -198,6 +199,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     if (userError || !user) {
         console.log('[Fix Apply] Unauthorized request');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     console.log(`[Fix Apply] User ${user.id} authenticated`);

@@ -13,6 +13,8 @@ export const POLAR_CONFIG = {
         proAnnual: process.env.POLAR_PRODUCT_PRO_ANNUAL!,
         teamMonthly: process.env.POLAR_PRODUCT_TEAM_MONTHLY!,
         teamAnnual: process.env.POLAR_PRODUCT_TEAM_ANNUAL!,
+        scanMonthly: process.env.POLAR_PRODUCT_SCAN_MONTHLY || '',
+        scanTeamMonthly: process.env.POLAR_PRODUCT_SCAN_TEAM_MONTHLY || '',
         creditsStarter: process.env.POLAR_PRODUCT_CREDITS_STARTER || '',
         creditsGrowth: process.env.POLAR_PRODUCT_CREDITS_GROWTH || '',
         creditsScale: process.env.POLAR_PRODUCT_CREDITS_SCALE || '',
@@ -28,6 +30,7 @@ export const TIER_LIMITS = {
 } as const;
 
 export type SubscriptionTier = keyof typeof TIER_LIMITS;
+export type ScanSubscriptionTier = 'scan' | 'scan_team';
 
 export type CreditTopupPack = 'starter' | 'growth' | 'scale';
 
@@ -66,6 +69,29 @@ export function getProductId(tier: 'pro' | 'team', cycle: 'monthly' | 'annual'):
         return cycle === 'monthly' ? POLAR_CONFIG.products.proMonthly : POLAR_CONFIG.products.proAnnual;
     }
     return cycle === 'monthly' ? POLAR_CONFIG.products.teamMonthly : POLAR_CONFIG.products.teamAnnual;
+}
+
+export function getScanProductId(tier: ScanSubscriptionTier): string | null {
+    if (tier === 'scan') {
+        return POLAR_CONFIG.products.scanMonthly || null;
+    }
+    return POLAR_CONFIG.products.scanTeamMonthly || null;
+}
+
+export function getScanTierByProductId(productId: string | null | undefined): ScanSubscriptionTier | null {
+    if (!productId) {
+        return null;
+    }
+
+    if (productId === POLAR_CONFIG.products.scanMonthly) {
+        return 'scan';
+    }
+
+    if (productId === POLAR_CONFIG.products.scanTeamMonthly) {
+        return 'scan_team';
+    }
+
+    return null;
 }
 
 export function getCreditTopupPackConfig(pack: CreditTopupPack): CreditTopupPackConfig | null {

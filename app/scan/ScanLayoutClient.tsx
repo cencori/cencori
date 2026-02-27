@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -43,11 +43,9 @@ interface User {
 }
 
 export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
-    const router = useRouter();
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         document.title = "Scan";
@@ -58,7 +56,6 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
             if (!error && data.user) {
                 setUser(data.user as User);
             }
-            setLoading(false);
         };
         checkAuth();
     }, []);
@@ -87,6 +84,19 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
     const meta = user?.user_metadata ?? {};
     const avatar = (meta.avatar_url as string | null) ?? (meta.picture as string | null) ?? null;
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
+    const isScanSubdomainHost =
+        typeof window !== "undefined" && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
+    const scanEntryUrl = typeof window !== "undefined" ? `${window.location.origin}/scan` : "/scan";
+    const signInHref = isScanSubdomainHost
+        ? `https://cencori.com/login?redirect=${encodeURIComponent(scanEntryUrl)}`
+        : "/login?redirect=/scan";
+    const dashboardHref = isScanSubdomainHost
+        ? "https://cencori.com/dashboard/organizations"
+        : "/dashboard/organizations";
+    const docsHref = isScanSubdomainHost
+        ? "https://cencori.com/docs/scan"
+        : "/docs/scan";
+    const logoutHref = isScanSubdomainHost ? "https://cencori.com/login" : "/login";
 
     return (
         <div className={`${GeistSans.className} ${GeistMono.variable} antialiased selection:bg-foreground selection:text-background flex h-screen w-full flex-col`}>
@@ -161,10 +171,10 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
                             </div>
                             <DropdownMenuSeparator className="my-1" />
                             <DropdownMenuItem asChild className="text-xs py-1.5 cursor-pointer">
-                                <Link href="/docs/scan" className="flex items-center gap-2">
+                                <a href={docsHref} className="flex items-center gap-2">
                                     <Book className="h-3.5 w-3.5" />
                                     Scan Documentation
-                                </Link>
+                                </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild className="text-xs py-1.5 cursor-pointer">
                                 <Link href="mailto:support@cencori.com" className="flex items-center gap-2">
@@ -212,7 +222,12 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
                                     System
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="my-1" />
-                                <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/dashboard/organizations")}>
+                                <DropdownMenuItem
+                                    className="text-xs py-1.5 cursor-pointer"
+                                    onClick={() => {
+                                        window.location.href = dashboardHref;
+                                    }}
+                                >
                                     <ExternalLink className="mr-2 h-3.5 w-3.5" />
                                     Main Dashboard
                                 </DropdownMenuItem>
@@ -220,7 +235,7 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
                                     className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
                                     onClick={async () => {
                                         await supabase.auth.signOut();
-                                        router.push("/login");
+                                        window.location.href = logoutHref;
                                     }}
                                 >
                                     <LogOut className="mr-2 h-3.5 w-3.5" />
@@ -230,7 +245,7 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
                         </DropdownMenu>
                     ) : (
                         <Button asChild size="sm" variant="outline" className="h-7 text-xs px-3">
-                            <Link href="/login?redirect=/scan">Sign In</Link>
+                            <a href={signInHref}>Sign In</a>
                         </Button>
                     )}
                 </div>

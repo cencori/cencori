@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 import {
     Select,
     SelectContent,
@@ -59,7 +60,16 @@ export default function ImportRepoPage() {
     const [selectedInstallationId, setSelectedInstallationId] = useState<number | null>(null);
     const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
     const [isConnectingGitHub, setIsConnectingGitHub] = useState(false);
+    const [hasScanAccess, setHasScanAccess] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const scanSubdomainRedirect =
+        typeof window !== 'undefined'
+            ? `${window.location.origin}/import`
+            : 'https://scan.cencori.com/import';
+    const isScanSubdomainHost =
+        typeof window !== 'undefined'
+            ? /^(scan|scaan)(\.|$)/i.test(window.location.hostname)
+            : false;
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const successParam = urlParams?.get('success');
     const errorParam = urlParams?.get('error');
@@ -70,6 +80,18 @@ export default function ImportRepoPage() {
             setIsLoading(true);
             setError(null);
             try {
+                const entitlementResponse = await fetch('/api/scan/entitlement');
+                if (entitlementResponse.ok) {
+                    const entitlementData = await entitlementResponse.json();
+                    const canAccessScan = Boolean(entitlementData?.entitlement?.hasScanAccess);
+                    setHasScanAccess(canAccessScan);
+
+                    if (!canAccessScan) {
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+
                 const response = await fetch('/api/scan/github/repos');
 
                 if (response.status === 401) {
@@ -167,6 +189,9 @@ export default function ImportRepoPage() {
 
             if (response.ok) {
                 router.push(`/scan/projects/${data.project.id}`);
+            } else if (response.status === 402) {
+                setHasScanAccess(false);
+                setImportingRepoId(null);
             } else {
                 console.error('Import failed:', data.error);
                 setImportingRepoId(null);
@@ -215,6 +240,18 @@ export default function ImportRepoPage() {
     }
 
     if (!isConnected) {
+        if (!hasScanAccess) {
+            return (
+                <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                    <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+                        <ArrowLeft className="h-3 w-3" />
+                        Back to projects
+                    </Link>
+                    <ScanUpgradePanel />
+                </div>
+            );
+        }
+
         // If success, trigger a refetch
         if (successParam === 'github_connected' && !isLoading) {
             window.location.href = '/scan/import';
@@ -247,8 +284,8 @@ export default function ImportRepoPage() {
                     </p>
                     {error?.includes('Unauthorized') ? (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
-                            <a href={typeof window !== 'undefined' && window.location.hostname.includes('scan.')
-                                ? 'https://cencori.com/login?redirect=https://scan.cencori.com/import'
+                            <a href={isScanSubdomainHost
+                                ? `https://cencori.com/login?redirect=${encodeURIComponent(scanSubdomainRedirect)}`
                                 : '/login?redirect=/scan/import'}>
                                 Sign In
                             </a>
