@@ -5,7 +5,6 @@ import { Hero } from "@/components/landing/Hero";
 import { SocialProof } from "@/components/landing/SocialProof";
 import { Features } from "@/components/landing/Features";
 import { Integrations } from "@/components/landing/Integrations";
-import { Pricing } from "@/components/landing/Pricing";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 import { FAQ } from "@/components/landing/FAQ";
@@ -105,7 +104,6 @@ export default function HomePage() {
         <Features />
         <HowToSetup />
         <Integrations />
-        <Pricing />
         <FAQ />
         <CTA isAuthenticated={isAuthenticated} />
       </main>
