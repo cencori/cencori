@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ScanMarkdownRenderer } from "@/components/scan/ScanMarkdownRenderer";
 import { ScanThinkingIndicator } from "@/components/scan/ScanThinkingIndicator";
+import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -16,7 +17,6 @@ import {
     ArrowUp,
     ChevronDown,
     Copy,
-    ExternalLink,
     GitPullRequest,
     Loader2,
     RotateCcw,
@@ -104,13 +104,6 @@ interface ChatMessage {
     isStreaming?: boolean;
     isError?: boolean;
 }
-
-const severityBadgeStyles: Record<string, string> = {
-    critical: "bg-red-500/15 text-red-300 border-red-500/30",
-    high: "bg-orange-500/15 text-orange-300 border-orange-500/30",
-    medium: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
-    low: "bg-blue-500/15 text-blue-300 border-blue-500/30",
-};
 
 function issueKey(issue: Pick<ScanIssue, "file" | "line" | "type" | "name">): string {
     return `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
@@ -217,20 +210,18 @@ function FileDiffPanel({ fix, defaultOpen = false }: { fix: FixProposal; default
 
 export default function FixWorkspacePage() {
     const params = useParams();
-    const router = useRouter();
     const projectId = params.id as string;
     const scanRunId = params.scanRunId as string;
 
     const [loading, setLoading] = useState(true);
+    const [isCheckingAccess, setIsCheckingAccess] = useState(true);
     const [loadingFixes, setLoadingFixes] = useState(true);
     const [creatingPr, setCreatingPr] = useState(false);
-    const [updatingStatus, setUpdatingStatus] = useState(false);
     const [diffDialogOpen, setDiffDialogOpen] = useState(false);
     const [project, setProject] = useState<ProjectSummary | null>(null);
     const [scanRun, setScanRun] = useState<ScanRun | null>(null);
     const [issues, setIssues] = useState<ScanIssue[]>([]);
     const [fixes, setFixes] = useState<FixProposal[]>([]);
-    const [manualGuidance, setManualGuidance] = useState<ManualGuidance[]>([]);
     const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
     const [selectedIssueKey, setSelectedIssueKey] = useState<string>("");
     const [error, setError] = useState<string>("");
@@ -240,6 +231,7 @@ export default function FixWorkspacePage() {
     const [chatLoading, setChatLoading] = useState(false);
     const [chatPending, setChatPending] = useState(false);
     const [reasoningText, setReasoningText] = useState("");
+    const [hasScanAccess, setHasScanAccess] = useState(true);
     const hasGeneratedFixes = useRef(false);
     const suggestionsAbortRef = useRef<AbortController | null>(null);
     const chatAbortRef = useRef<AbortController | null>(null);
@@ -302,6 +294,10 @@ export default function FixWorkspacePage() {
                 });
 
                 if (!response.ok) {
+                    if (response.status === 402) {
+                        setHasScanAccess(false);
+                        return;
+                    }
                     const data = await response.json().catch(() => ({}));
                     throw new Error(data.error || "Failed to stream suggestions");
                 }
@@ -406,6 +402,10 @@ export default function FixWorkspacePage() {
             });
 
             if (!response.ok) {
+                if (response.status === 402) {
+                    setHasScanAccess(false);
+                    return;
+                }
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || "Failed to generate fixes");
             }
@@ -414,7 +414,6 @@ export default function FixWorkspacePage() {
             const generatedFixes = data.fixes || [];
             const generatedGuidance = data.manualGuidance || [];
             setFixes(generatedFixes);
-            setManualGuidance(generatedGuidance);
             setSelectedFixIds(new Set(generatedFixes.map((fix) => fix.id)));
             setChatPending(true);
             void streamFixSuggestions(generatedFixes, generatedGuidance);
@@ -426,14 +425,46 @@ export default function FixWorkspacePage() {
     }, [projectId, scanRunId, streamFixSuggestions]);
 
     useEffect(() => {
-        fetchWorkspace();
-    }, [fetchWorkspace]);
+        let cancelled = false;
+        const fetchEntitlement = async () => {
+            try {
+                const response = await fetch('/api/scan/entitlement');
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (!cancelled) {
+                    setHasScanAccess(Boolean(data?.entitlement?.hasScanAccess));
+                }
+            } catch (err) {
+                console.error('Error fetching scan entitlement:', err);
+            } finally {
+                if (!cancelled) {
+                    setIsCheckingAccess(false);
+                }
+            }
+        };
+
+        fetchEntitlement();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
-        if (loading || hasGeneratedFixes.current || !scanRun) return;
+        if (isCheckingAccess || !hasScanAccess) {
+            return;
+        }
+        fetchWorkspace();
+    }, [fetchWorkspace, hasScanAccess, isCheckingAccess]);
+
+    useEffect(() => {
+        if (loading || isCheckingAccess || !hasScanAccess || hasGeneratedFixes.current || !scanRun) return;
         hasGeneratedFixes.current = true;
         generateFixes();
-    }, [generateFixes, loading, scanRun]);
+    }, [generateFixes, hasScanAccess, isCheckingAccess, loading, scanRun]);
 
     useEffect(() => {
         return () => {
@@ -454,14 +485,6 @@ export default function FixWorkspacePage() {
         return map;
     }, [fixes]);
 
-    const guidanceMap = useMemo(() => {
-        const map = new Map<string, ManualGuidance>();
-        for (const guidance of manualGuidance) {
-            map.set(guidance.issueKey, guidance);
-        }
-        return map;
-    }, [manualGuidance]);
-
     const selectedIssue = useMemo(
         () => issues.find((issue) => issueKey(issue) === selectedIssueKey) || null,
         [issues, selectedIssueKey]
@@ -473,39 +496,6 @@ export default function FixWorkspacePage() {
         [fixes, selectedFixIds]
     );
     const fixesForDiffDialog = selectedFixes.length > 0 ? selectedFixes : fixes;
-
-    const toggleFixSelection = (fixId: string) => {
-        setSelectedFixIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(fixId)) {
-                next.delete(fixId);
-            } else {
-                next.add(fixId);
-            }
-            return next;
-        });
-    };
-
-    const updateWorkflowStatus = async (action: "dismiss" | "done" | "reopen") => {
-        setUpdatingStatus(true);
-        try {
-            const response = await fetch(`/api/scan/projects/${projectId}/fixes/${scanRunId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action }),
-            });
-            if (!response.ok) return;
-
-            const data = await response.json();
-            setScanRun(data.scanRun);
-
-            if (action === "dismiss" || action === "done") {
-                router.push(`/scan/projects/${projectId}`);
-            }
-        } finally {
-            setUpdatingStatus(false);
-        }
-    };
 
     const handleCreatePr = async () => {
         if (selectedFixes.length === 0) return;
@@ -540,6 +530,10 @@ export default function FixWorkspacePage() {
 
             const data = await response.json();
             if (!response.ok) {
+                if (response.status === 402) {
+                    setHasScanAccess(false);
+                    return;
+                }
                 throw new Error(data.error || "Failed to create PR");
             }
 
@@ -592,6 +586,10 @@ export default function FixWorkspacePage() {
             });
 
             if (!response.ok) {
+                if (response.status === 402) {
+                    setHasScanAccess(false);
+                    return;
+                }
                 let message = `Failed to get response (${response.status})`;
                 try {
                     const data = await response.json();
@@ -706,6 +704,29 @@ export default function FixWorkspacePage() {
     const aiIsDone = chatMessages.length > 0 && chatMessages.every((m) => !m.isStreaming);
     const lastMessage = chatMessages[chatMessages.length - 1];
     const lastIsAssistant = lastMessage?.role === "assistant";
+
+    if (isCheckingAccess) {
+        return (
+            <div className="w-full max-w-6xl mx-auto px-6 py-8">
+                <p className="text-xs text-muted-foreground">Checking scan access...</p>
+            </div>
+        );
+    }
+
+    if (!hasScanAccess) {
+        return (
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <Link
+                    href={`/scan/projects/${projectId}`}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6"
+                >
+                    <ArrowLeft className="h-3 w-3" />
+                    Back to project
+                </Link>
+                <ScanUpgradePanel />
+            </div>
+        );
+    }
 
     if (!loading && (!scanRun || !project)) {
         return (

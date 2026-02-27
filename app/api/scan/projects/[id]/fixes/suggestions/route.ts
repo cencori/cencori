@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
+import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 
 // Allow up to 5 minutes for reasoning + content generation
 export const maxDuration = 300;
@@ -160,6 +161,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     if (userError || !user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     const body = await req.json().catch(() => ({}));

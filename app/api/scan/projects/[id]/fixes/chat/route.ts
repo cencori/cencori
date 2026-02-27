@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
+import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
 import { ScanMemoryError, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
@@ -77,6 +78,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     if (userError || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     const supabaseAdmin = createAdminClient();

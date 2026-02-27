@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Shield,
@@ -22,7 +23,6 @@ import {
     Copy,
     Download,
     ExternalLink,
-    EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -208,6 +208,7 @@ export default function ProjectDetailPage() {
     const projectId = params.id as string;
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isCheckingAccess, setIsCheckingAccess] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [isGeneratingChangelog, setIsGeneratingChangelog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -222,6 +223,7 @@ export default function ProjectDetailPage() {
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
     const [isUpdatingFixStatus, setIsUpdatingFixStatus] = useState(false);
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
+    const [hasScanAccess, setHasScanAccess] = useState(true);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
         try {
@@ -258,6 +260,37 @@ export default function ProjectDetailPage() {
 
     // Changelog timeframe options
     const [changelogTimeframe, setChangelogTimeframe] = useState<'24h' | '7d' | '30d'>('7d');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchEntitlement = async () => {
+            try {
+                const response = await fetch('/api/scan/entitlement');
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (!cancelled) {
+                    setHasScanAccess(Boolean(data?.entitlement?.hasScanAccess));
+                }
+            } catch (err) {
+                console.error('Error fetching scan entitlement:', err);
+            } finally {
+                if (!cancelled) {
+                    setIsCheckingAccess(false);
+                }
+            }
+        };
+
+        fetchEntitlement();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         const fetchProject = async () => {
             try {
@@ -396,6 +429,7 @@ export default function ProjectDetailPage() {
 
     const handleGenerateChangelog = async () => {
         if (!project) return;
+        if (!hasScanAccess) return;
 
         // Map timeframe to since string
         const sinceMap: Record<string, string> = {
@@ -416,6 +450,8 @@ export default function ProjectDetailPage() {
                 const data = await response.json();
                 setChangelogs(prev => [data.changelog, ...prev]);
                 setSelectedChangelog(data.changelog);
+            } else if (response.status === 402) {
+                setHasScanAccess(false);
             }
         } catch (err) {
             console.error('Error generating changelog:', err);
@@ -431,6 +467,19 @@ export default function ProjectDetailPage() {
         setScanLog([]);
 
         try {
+            const entitlementResponse = await fetch('/api/scan/entitlement');
+            if (!entitlementResponse.ok) {
+                setIsScanning(false);
+                return;
+            }
+
+            const entitlementData = await entitlementResponse.json();
+            if (!entitlementData?.entitlement?.hasScanAccess) {
+                setHasScanAccess(false);
+                setIsScanning(false);
+                return;
+            }
+
             // Use SSE streaming endpoint
             const eventSource = new EventSource(`/api/scan/projects/${projectId}/scan/stream`);
 
@@ -544,6 +593,27 @@ export default function ProjectDetailPage() {
         );
     }
 
+    if (isCheckingAccess) {
+        return (
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <Skeleton className="h-6 w-40 mb-6" />
+                <Skeleton className="h-40 w-full" />
+            </div>
+        );
+    }
+
+    if (!hasScanAccess) {
+        return (
+            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+                    <ArrowLeft className="h-3 w-3" />
+                    Back to projects
+                </Link>
+                <ScanUpgradePanel />
+            </div>
+        );
+    }
+
     if (!project) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
@@ -579,6 +649,9 @@ export default function ProjectDetailPage() {
                 body: JSON.stringify({ action }),
             });
             if (!response.ok) {
+                if (response.status === 402) {
+                    setHasScanAccess(false);
+                }
                 return;
             }
 

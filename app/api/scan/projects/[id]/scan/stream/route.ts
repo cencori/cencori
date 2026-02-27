@@ -8,6 +8,7 @@ import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 import {
     calculateScore,
     scanFileContent,
@@ -20,7 +21,7 @@ interface RouteParams {
 }
 
 // GET /api/scan/projects/[id]/scan/stream - Stream scan events via SSE
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(_req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createServerClient();
 
@@ -31,6 +32,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
         });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     const encoder = new TextEncoder();

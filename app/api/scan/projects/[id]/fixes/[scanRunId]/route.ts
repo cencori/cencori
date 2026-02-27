@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
 import { ScanMemoryError, writeMemory } from "@/lib/scan/scan-memory";
 
@@ -62,6 +63,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const { id, scanRunId } = await params;
     const auth = await requireProjectOwnership(id);
     if ("error" in auth) return auth.error;
+
+    const paywallResponse = await getScanPaywallForUser(auth.user.id);
+    if (paywallResponse) {
+        return paywallResponse;
+    }
 
     const { supabaseAdmin } = auth;
     const strictEnforcement = isScanStrictEnforcementEnabled();

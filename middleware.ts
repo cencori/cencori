@@ -68,9 +68,10 @@ function isLocalhostHost(host: string): boolean {
 
 export async function middleware(request: NextRequest, event: NextFetchEvent) {
     const hostname = request.headers.get('host') ?? '';
-    const domain = hostname.split(':')[0];
+    const domain = hostname.split(':')[0].toLowerCase();
 
     // 2. Determine Response (Rewrite vs Next)
+    let rewriteUrl: URL | null = null;
     let response = NextResponse.next({
         request: { headers: request.headers },
     });
@@ -85,19 +86,30 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
         if (domain === 'pitch.cencori.com' || domain === 'pitch.localhost') {
             const url = request.nextUrl.clone();
             url.pathname = `/pitch${url.pathname}`;
+            rewriteUrl = url;
             response = NextResponse.rewrite(url);
         }
         // Handle design subdomain
         else if (domain === 'design.cencori.com' || domain === 'design.localhost') {
             const url = request.nextUrl.clone();
             url.pathname = `/design${url.pathname}`;
+            rewriteUrl = url;
             response = NextResponse.rewrite(url);
         }
         // Handle scan subdomain
-        else if (domain === 'scan.cencori.com' || domain === 'scan.localhost') {
+        else if (
+            domain === 'scan.cencori.com'
+            || domain === 'scan.localhost'
+            || domain === 'scaan.cencori.com'
+            || domain === 'scaan.localhost'
+        ) {
             const url = request.nextUrl.clone();
-            url.pathname = `/scan${url.pathname}`;
-            response = NextResponse.rewrite(url);
+            // Avoid /scan/scan/... on links that already include the scan prefix.
+            if (!(url.pathname === '/scan' || url.pathname.startsWith('/scan/'))) {
+                url.pathname = `/scan${url.pathname}`;
+                rewriteUrl = url;
+                response = NextResponse.rewrite(url);
+            }
         }
     }
 
@@ -116,12 +128,9 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
                 },
                 setAll(cookiesToSet) {
                     cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-                    response = NextResponse.next({ request })
-                    // Note: If we had a rewrite, re-calling NextResponse.next() here effectively cancels the rewrite.
-                    // We need to apply cookies to the EXISTING response object if possible.
-                    // BUT createServerClient usage usually demands refreshing the response.
-                    // WORKAROUND: Re-apply rewrite if response was a rewrite.
-                    // Actually, we can just mutate the response.cookies.
+                    response = rewriteUrl
+                        ? NextResponse.rewrite(rewriteUrl)
+                        : NextResponse.next({ request })
 
                     cookiesToSet.forEach(({ name, value, options }) =>
                         response.cookies.set(name, value, {

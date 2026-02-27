@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { addCredits } from '@/lib/credits';
-import { getCreditTopupCreditsByProductId, getLimitForTier, type SubscriptionTier } from '@/lib/polarClient';
+import {
+    getCreditTopupCreditsByProductId,
+    getLimitForTier,
+    getScanTierByProductId,
+    type ScanSubscriptionTier,
+    type SubscriptionTier,
+} from '@/lib/polarClient';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 
 type SubscriptionPayload = {
@@ -26,9 +32,9 @@ type OrderPaidPayload = {
     };
 };
 
-function getProductIdToTier(productId: string | null | undefined): SubscriptionTier {
+function getProductIdToTier(productId: string | null | undefined): SubscriptionTier | null {
     if (!productId) {
-        return 'free';
+        return null;
     }
 
     const proMonthly = process.env.POLAR_PRODUCT_PRO_MONTHLY;
@@ -42,7 +48,7 @@ function getProductIdToTier(productId: string | null | undefined): SubscriptionT
     if (productId === teamMonthly || productId === teamAnnual) {
         return 'team';
     }
-    return 'free';
+    return null;
 }
 
 function toNullableISOString(value: Date | string | null | undefined): string | null {
@@ -96,6 +102,101 @@ async function resolveOrganizationId(
     }
 
     return byCustomer?.id ?? null;
+}
+
+async function resolveScanSubscriptionUserId(
+    supabaseAdmin: ReturnType<typeof createAdminClient>,
+    payload: SubscriptionPayload
+) {
+    const metadataUserId = payload.metadata?.user_id;
+    if (typeof metadataUserId === 'string' && metadataUserId.length > 0) {
+        return metadataUserId;
+    }
+
+    const { data: bySubscription, error: subscriptionLookupError } = await supabaseAdmin
+        .from('scan_subscriptions')
+        .select('user_id')
+        .eq('subscription_id', payload.id)
+        .maybeSingle();
+
+    if (subscriptionLookupError) {
+        console.error('[Polar Webhook] Failed to resolve scan user by subscription_id:', subscriptionLookupError);
+    }
+
+    if (bySubscription?.user_id) {
+        return bySubscription.user_id;
+    }
+
+    if (!payload.customerId) {
+        return null;
+    }
+
+    const { data: byCustomer, error: customerLookupError } = await supabaseAdmin
+        .from('scan_subscriptions')
+        .select('user_id')
+        .eq('polar_customer_id', payload.customerId)
+        .maybeSingle();
+
+    if (customerLookupError) {
+        console.error('[Polar Webhook] Failed to resolve scan user by polar_customer_id:', customerLookupError);
+    }
+
+    return byCustomer?.user_id ?? null;
+}
+
+async function upsertScanSubscription(
+    supabaseAdmin: ReturnType<typeof createAdminClient>,
+    payload: SubscriptionPayload,
+    userId: string,
+    scanTier: ScanSubscriptionTier | null,
+    fallbackStatus: 'active' | 'canceled' = 'active'
+) {
+    let resolvedScanTier = scanTier;
+    if (!resolvedScanTier) {
+        const { data: existingRow, error: existingLookupError } = await supabaseAdmin
+            .from('scan_subscriptions')
+            .select('scan_tier')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (existingLookupError) {
+            console.error('[Polar Webhook] Failed to resolve existing scan tier:', existingLookupError);
+            throw existingLookupError;
+        }
+
+        if (!existingRow?.scan_tier) {
+            throw new Error(`Unable to resolve scan tier for scan subscription ${payload.id}`);
+        }
+
+        resolvedScanTier = existingRow.scan_tier as ScanSubscriptionTier;
+    }
+
+    const updates: {
+        user_id: string;
+        scan_tier: ScanSubscriptionTier;
+        status: string;
+        subscription_id: string;
+        polar_customer_id: string;
+        current_period_start: string | null;
+        current_period_end: string | null;
+    } = {
+        user_id: userId,
+        scan_tier: resolvedScanTier,
+        status: payload.status || fallbackStatus,
+        subscription_id: payload.id,
+        polar_customer_id: payload.customerId,
+        current_period_start: toNullableISOString(payload.currentPeriodStart),
+        current_period_end: toNullableISOString(payload.currentPeriodEnd),
+    };
+
+    const { error } = await supabaseAdmin
+        .from('scan_subscriptions')
+        .upsert(updates, { onConflict: 'user_id' });
+
+    if (error) {
+        console.error('[Polar Webhook] Scan subscription upsert error:', error);
+        throw error;
+    }
 }
 
 function parsePositiveNumber(value: unknown): number | null {
@@ -208,6 +309,20 @@ export async function POST(req: NextRequest) {
             case 'subscription.uncanceled':
             case 'subscription.updated': {
                 const payload: SubscriptionPayload = event.data;
+                const scanTier = getScanTierByProductId(payload.productId);
+                const scanUserId = await resolveScanSubscriptionUserId(supabaseAdmin, payload);
+
+                if (scanTier || scanUserId) {
+                    if (!scanUserId) {
+                        console.warn('[Polar Webhook] Unable to resolve user for scan subscription update:', payload.id);
+                        return NextResponse.json({ received: true, warning: 'scan_user_not_resolved' });
+                    }
+
+                    await upsertScanSubscription(supabaseAdmin, payload, scanUserId, scanTier, 'active');
+                    console.log(`[Polar Webhook] ✓ Updated scan subscription for user ${scanUserId} (${scanTier || 'existing_tier'})`);
+                    break;
+                }
+
                 const orgId = await resolveOrganizationId(supabaseAdmin, payload);
 
                 if (!orgId) {
@@ -216,6 +331,10 @@ export async function POST(req: NextRequest) {
                 }
 
                 const tier = getProductIdToTier(payload.productId);
+                if (!tier) {
+                    console.warn('[Polar Webhook] Subscription update with unmapped product, ignoring:', payload.productId);
+                    break;
+                }
                 const limit = getLimitForTier(tier);
 
                 const { error } = await supabaseAdmin
@@ -243,6 +362,20 @@ export async function POST(req: NextRequest) {
             case 'subscription.canceled':
             case 'subscription.revoked': {
                 const payload: SubscriptionPayload = event.data;
+                const scanTier = getScanTierByProductId(payload.productId);
+                const scanUserId = await resolveScanSubscriptionUserId(supabaseAdmin, payload);
+
+                if (scanTier || scanUserId) {
+                    if (!scanUserId) {
+                        console.warn('[Polar Webhook] Unable to resolve user for scan subscription cancellation:', payload.id);
+                        return NextResponse.json({ received: true, warning: 'scan_user_not_resolved' });
+                    }
+
+                    await upsertScanSubscription(supabaseAdmin, payload, scanUserId, scanTier, 'canceled');
+                    console.log(`[Polar Webhook] ✓ Marked scan subscription canceled for user ${scanUserId}`);
+                    break;
+                }
+
                 const orgId = await resolveOrganizationId(supabaseAdmin, payload);
 
                 if (!orgId) {

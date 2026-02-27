@@ -8,6 +8,7 @@ import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
+import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 import {
     calculateScore,
     scanFileContent,
@@ -23,7 +24,7 @@ interface RouteParams {
 }
 
 // POST /api/scan/projects/[id]/scan - Run a scan on the project
-export async function POST(req: NextRequest, { params }: RouteParams) {
+export async function POST(_req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createServerClient();
 
@@ -31,6 +32,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const paywallResponse = await getScanPaywallForUser(user.id);
+    if (paywallResponse) {
+        return paywallResponse;
     }
 
     try {
