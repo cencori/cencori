@@ -31,11 +31,12 @@ Cencori supports 14+ AI providers through a unified API. Use any model with a si
 ### OpenAI
 
 ```typescript
+await cencori.ai.chat({ model: 'gpt-5.2', messages: [...] });
+await cencori.ai.chat({ model: 'gpt-5-mini', messages: [...] });
+await cencori.ai.chat({ model: 'gpt-5-nano', messages: [...] });
+await cencori.ai.chat({ model: 'o4-mini', messages: [...] });
 await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
-await cencori.ai.chat({ model: 'gpt-4o-mini', messages: [...] });
-await cencori.ai.chat({ model: 'gpt-4-turbo', messages: [...] });
-await cencori.ai.chat({ model: 'o1', messages: [...] });
-await cencori.ai.chat({ model: 'o1-mini', messages: [...] });
+await cencori.ai.chat({ model: 'o3', messages: [...] });
 ```
 
 ### Anthropic

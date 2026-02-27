@@ -32,21 +32,30 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.openai.com/docs',
         keyPrefix: 'sk-',
         models: [
-            // GPT-5 Series (2025)
-            { id: 'gpt-5', name: 'GPT-5', type: 'chat', contextWindow: 256000, description: 'Latest flagship model' },
-            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: 'chat', contextWindow: 128000, description: 'Fast and efficient' },
-            // GPT-4 Series
+            // GPT-5 Series (latest)
+            { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: 'chat', contextWindow: 400000, description: 'Most capable GPT-5.2 variant' },
+            { id: 'gpt-5.2', name: 'GPT-5.2', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.2 flagship' },
+            { id: 'gpt-5.1', name: 'GPT-5.1', type: 'chat', contextWindow: 400000, description: 'Improved GPT-5 generation' },
+            { id: 'gpt-5-pro', name: 'GPT-5 Pro', type: 'chat', contextWindow: 400000, description: 'High-quality GPT-5 variant' },
+            { id: 'gpt-5', name: 'GPT-5', type: 'chat', contextWindow: 400000, description: 'Flagship model' },
+            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: 'chat', contextWindow: 400000, description: 'Fast and efficient' },
+            { id: 'gpt-5-nano', name: 'GPT-5 Nano', type: 'chat', contextWindow: 400000, description: 'Lowest-latency GPT-5 model' },
+            // GPT-4.1 / GPT-4o Series
+            { id: 'gpt-4.1', name: 'GPT-4.1', type: 'code', contextWindow: 1047576, description: 'Long-context GPT-4.1' },
+            { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: 'chat', contextWindow: 1047576, description: 'Balanced GPT-4.1 model' },
+            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: 'chat', contextWindow: 1047576, description: 'Fast GPT-4.1 nano model' },
             { id: 'gpt-4o', name: 'GPT-4o', type: 'chat', contextWindow: 128000, description: 'Omni-modal model' },
             { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: 'chat', contextWindow: 128000, description: 'Fast and cost-effective' },
-            { id: 'gpt-4.1', name: 'GPT-4.1', type: 'code', contextWindow: 256000, description: 'Long context, code-optimized' },
-            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', type: 'chat', contextWindow: 128000, description: 'Previous flagship' },
-            // O-Series Reasoning (2025)
-            { id: 'o3', name: 'o3', type: 'reasoning', contextWindow: 200000, description: 'Most advanced reasoning' },
-            { id: 'o3-mini', name: 'o3 Mini', type: 'reasoning', contextWindow: 128000, description: 'Fast reasoning model' },
-            { id: 'o1', name: 'o1', type: 'reasoning', contextWindow: 128000, description: 'Advanced reasoning model' },
-            { id: 'o1-mini', name: 'o1 Mini', type: 'reasoning', contextWindow: 128000, description: 'Efficient reasoning' },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', type: 'chat', contextWindow: 128000, description: 'Legacy GPT-4 model' },
+            // O-Series Reasoning (latest)
+            { id: 'o3-pro', name: 'o3 Pro', type: 'reasoning', contextWindow: 200000, description: 'Most advanced reasoning model' },
+            { id: 'o3', name: 'o3', type: 'reasoning', contextWindow: 200000, description: 'Advanced reasoning model' },
+            { id: 'o3-mini', name: 'o3 Mini', type: 'reasoning', contextWindow: 200000, description: 'Fast reasoning model' },
+            { id: 'o4-mini', name: 'o4 Mini', type: 'reasoning', contextWindow: 200000, description: 'Successor to o1-mini' },
+            { id: 'o1', name: 'o1', type: 'reasoning', contextWindow: 200000, description: 'Legacy reasoning model' },
             // Image Generation
             { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: 'image', contextWindow: 0, description: 'Best text rendering' },
+            { id: 'gpt-image-1', name: 'GPT Image 1', type: 'image', contextWindow: 0, description: 'ChatGPT image generation model' },
             { id: 'dall-e-3', name: 'DALL-E 3', type: 'image', contextWindow: 0, description: 'High quality images' },
             { id: 'dall-e-2', name: 'DALL-E 2', type: 'image', contextWindow: 0, description: 'Fast image generation' },
         ],
@@ -338,7 +347,7 @@ export function detectProviderFromModel(modelId: string): string | undefined {
         }
     }
     // Fallback pattern detection
-    if (modelId.startsWith('gpt-') || modelId.startsWith('o1')) return 'openai';
+    if (modelId.startsWith('gpt-') || modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) return 'openai';
     if (modelId.startsWith('claude-')) return 'anthropic';
     if (modelId.startsWith('gemini-')) return 'google';
     if (modelId.startsWith('mistral-') || modelId.startsWith('codestral')) return 'mistral';
