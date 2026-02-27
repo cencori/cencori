@@ -79,26 +79,6 @@
                 }
             ],
             "destination": "/pitch"
-        },
-        {
-            "source": "/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "/scan/:path*"
-        },
-        {
-            "source": "/",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "scan.cencori.com"
-                }
-            ],
-            "destination": "/scan"
         }
     ],
     "redirects": [
