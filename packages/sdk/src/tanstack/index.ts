@@ -55,10 +55,18 @@ export interface CencoriModelOptions {
 // All models supported through Cencori Gateway
 export const CENCORI_CHAT_MODELS = [
     // OpenAI
+    'gpt-5.2',
+    'gpt-5.1',
+    'gpt-5',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-4.1',
     'gpt-4o',
     'gpt-4o-mini',
+    'o3-pro',
+    'o3',
+    'o4-mini',
     'o1',
-    'o1-mini',
     // Anthropic
     'claude-3-5-sonnet',
     'claude-3-opus',
