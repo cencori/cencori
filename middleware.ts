@@ -69,6 +69,11 @@ function isLocalhostHost(host: string): boolean {
 export async function middleware(request: NextRequest, event: NextFetchEvent) {
     const hostname = request.headers.get('host') ?? '';
     const domain = hostname.split(':')[0].toLowerCase();
+    const isScanSubdomain =
+        domain === 'scan.cencori.com'
+        || domain === 'scan.localhost'
+        || domain === 'scaan.cencori.com'
+        || domain === 'scaan.localhost';
 
     // 2. Determine Response (Rewrite vs Next)
     let rewriteUrl: URL | null = null;
@@ -80,6 +85,25 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
     // Skip rewriting for static files (images, etc)
     // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
     const isFile = pathname.includes('.') && !pathname.startsWith('/.well-known');
+
+    // Canonicalize scan subdomain paths:
+    // - /scan      -> /
+    // - /scan/*    -> /*
+    if (isScanSubdomain && !isFile) {
+        if (pathname === '/scan' || pathname === '/scan/') {
+            const redirectUrl = request.nextUrl.clone();
+            redirectUrl.pathname = '/';
+            const redirectResponse = NextResponse.redirect(redirectUrl, 308);
+            return applySecurityHeaders(redirectResponse);
+        }
+
+        if (pathname.startsWith('/scan/')) {
+            const redirectUrl = request.nextUrl.clone();
+            redirectUrl.pathname = pathname.replace(/^\/scan/, '') || '/';
+            const redirectResponse = NextResponse.redirect(redirectUrl, 308);
+            return applySecurityHeaders(redirectResponse);
+        }
+    }
 
     if (!isFile) {
         // Handle pitch subdomain
@@ -97,19 +121,11 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
             response = NextResponse.rewrite(url);
         }
         // Handle scan subdomain
-        else if (
-            domain === 'scan.cencori.com'
-            || domain === 'scan.localhost'
-            || domain === 'scaan.cencori.com'
-            || domain === 'scaan.localhost'
-        ) {
+        else if (isScanSubdomain) {
             const url = request.nextUrl.clone();
-            // Avoid /scan/scan/... on links that already include the scan prefix.
-            if (!(url.pathname === '/scan' || url.pathname.startsWith('/scan/'))) {
-                url.pathname = `/scan${url.pathname}`;
-                rewriteUrl = url;
-                response = NextResponse.rewrite(url);
-            }
+            url.pathname = `/scan${url.pathname}`;
+            rewriteUrl = url;
+            response = NextResponse.rewrite(url);
         }
     }
 

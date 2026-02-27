@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getScanPaywallForUser } from '@/lib/scan/entitlements';
+import { getScanPaywallForUser, getScanProjectImportPaywallForUser } from '@/lib/scan/entitlements';
 
 // GET /api/scan/projects - List user's scan projects
 export async function GET() {
@@ -80,6 +80,11 @@ export async function POST(req: NextRequest) {
                 error: 'Repository already imported',
                 project: existingProject
             }, { status: 409 });
+        }
+
+        const importLimitResponse = await getScanProjectImportPaywallForUser(user.id);
+        if (importLimitResponse) {
+            return importLimitResponse;
         }
 
         // Create the project

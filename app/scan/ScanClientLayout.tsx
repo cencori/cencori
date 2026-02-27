@@ -82,7 +82,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
     const isScanSubdomainHost =
         typeof window !== "undefined" && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
-    const scanEntryUrl = typeof window !== "undefined" ? `${window.location.origin}/scan` : "/scan";
+    const scanEntryUrl = typeof window !== "undefined" ? window.location.href : "/scan";
     const signInHref = isScanSubdomainHost
         ? `https://cencori.com/login?redirect=${encodeURIComponent(scanEntryUrl)}`
         : "/login?redirect=/scan";

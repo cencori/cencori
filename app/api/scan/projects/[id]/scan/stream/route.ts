@@ -8,7 +8,7 @@ import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
-import { getScanPaywallForUser } from '@/lib/scan/entitlements';
+import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
 import {
     calculateScore,
     scanFileContent,
@@ -39,6 +39,34 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         return paywallResponse;
     }
 
+    const supabaseAdmin = createAdminClient();
+    const { data: project, error: projectError } = await supabaseAdmin
+        .from('scan_projects')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+    if (projectError || !project) {
+        return new Response(JSON.stringify({ error: 'Project not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    const scanRunLimitResponse = await getScanRunPaywallForProject(user.id, id);
+    if (scanRunLimitResponse) {
+        return scanRunLimitResponse;
+    }
+
+    const githubAccess = await verifyProjectGithubAccess(user, project);
+    if (!githubAccess) {
+        return new Response(JSON.stringify({ error: 'GitHub access for this project is no longer authorized' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
     const encoder = new TextEncoder();
     const startTime = Date.now();
 
@@ -46,7 +74,6 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         async start(controller) {
             // Accumulate all logs for persistence
             const allLogs: Array<{ type: string; time: number; message?: string; data?: unknown }> = [];
-            const supabaseAdmin = createAdminClient();
             const strictEnforcement = isScanStrictEnforcementEnabled();
             let scanRunId: string | null = null;
 
@@ -59,31 +86,6 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
             try {
                 // Send initial event
                 sendEvent({ type: 'start', time: 0, message: 'Starting security scan...' });
-
-                // Get project
-                const { data: project, error: projectError } = await supabaseAdmin
-                    .from('scan_projects')
-                    .select('*')
-                    .eq('id', id)
-                    .eq('user_id', user.id)
-                    .single();
-
-                if (projectError || !project) {
-                    sendEvent({ type: 'error', time: Date.now() - startTime, message: 'Project not found' });
-                    controller.close();
-                    return;
-                }
-
-                const githubAccess = await verifyProjectGithubAccess(user, project);
-                if (!githubAccess) {
-                    sendEvent({
-                        type: 'error',
-                        time: Date.now() - startTime,
-                        message: 'GitHub access for this project is no longer authorized',
-                    });
-                    controller.close();
-                    return;
-                }
 
                 // Create scan run record
                 const { data: scanRun, error: runError } = await supabaseAdmin
