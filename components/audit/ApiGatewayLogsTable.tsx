@@ -195,7 +195,8 @@ export function ApiGatewayLogsTable({ projectId, environment, filters }: ApiGate
                 </div>
                 <p className="text-sm font-medium mb-1">No API gateway requests found</p>
                 <p className="text-xs text-muted-foreground">
-                    Try adjusting your filters or call a `/v1/*` endpoint with your API key.
+                    Try adjusting filters or call a `/v1/*` endpoint using your project API key
+                    (`CENCORI_API_KEY` or `Authorization: Bearer ...`).
                 </p>
             </div>
         );

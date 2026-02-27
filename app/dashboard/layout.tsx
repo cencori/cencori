@@ -191,6 +191,53 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
   const currentOrg = organizations.find((org) => org.slug === orgSlug);
   const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
+  const currentOrgId = currentOrg?.id ?? null;
+
+  const {
+    data: orgCreditsData,
+    isLoading: orgCreditsLoading,
+    isError: orgCreditsError,
+  } = useQuery({
+    queryKey: ["orgCreditsBalance", currentOrgId],
+    enabled: !!currentOrgId,
+    queryFn: async () => {
+      if (!currentOrgId) {
+        return { credits_balance: 0 };
+      }
+
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("credits_balance")
+        .eq("id", currentOrgId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data as { credits_balance: number | string | null };
+    },
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+
+  const parsedCreditsBalance = Number(orgCreditsData?.credits_balance ?? 0);
+  const creditsBalance = Number.isFinite(parsedCreditsBalance) ? parsedCreditsBalance : 0;
+  const isLowCredits = creditsBalance > 0 && creditsBalance < 5;
+  const isOutOfCredits = creditsBalance <= 0;
+  const creditsPillClassName = [
+    "hidden lg:inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+    isOutOfCredits
+      ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15"
+      : isLowCredits
+        ? "border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/15"
+        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15",
+  ].join(" ");
+  const creditsLabel = orgCreditsError
+    ? "Credits --"
+    : orgCreditsLoading
+      ? "Credits..."
+      : `$${creditsBalance.toFixed(2)}`;
 
   return (
     <div className="min-h-screen bg-background transition-colors">
@@ -394,6 +441,18 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {orgSlug && (
+            <Link
+              href={`/dashboard/organizations/${orgSlug}/billing`}
+              className={creditsPillClassName}
+              aria-label="View organization credit balance"
+              title="Organization credits"
+            >
+              <CreditCard className="h-3 w-3" />
+              <span>{creditsLabel}</span>
+            </Link>
+          )}
+
           {/* Search Button (icon only on mobile) */}
           <button
             type="button"

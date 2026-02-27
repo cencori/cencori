@@ -47,7 +47,7 @@ const sidebarItems = [
             { title: "Multi-Provider", href: "/docs/concepts/multi-provider" },
             { title: "Models", href: "/docs/ai/models" },
             { title: "Streaming", href: "/docs/concepts/streaming" },
-            { title: "Credits System", href: "/docs/concepts/credits" },
+            { title: "Credits System", href: "/docs/platform/credits" },
             { title: "Rate Limiting", href: "/docs/concepts/rate-limiting" },
             { title: "Security", href: "/docs/concepts/security" },
         ],

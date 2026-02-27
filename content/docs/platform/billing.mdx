@@ -1,51 +1,71 @@
 ---
 title: "Billing & Usage"
-description: "Understanding subscription tiers, token pricing, and spend management."
+description: "Understand plan tiers, credit-based usage charging, and spend controls."
 section: "Platform"
 order: 2
 ---
 
-Cencori offers a transparent pricing model combining a fixed platform subscription with usage-based AI costs.
+Cencori billing combines plan limits with usage-based credits.
 
-## Subscription Tiers
+## Two-Layer Billing
 
-Choose the plan that fits your team size and scaling needs.
+1. **Plan Tier**: controls request limits and platform entitlements.
+2. **Credits Wallet**: prepaid balance used for AI request charges.
 
-| Feature | Free | Pro ($49/mo) | Team ($149/mo) |
-| :--- | :--- | :--- | :--- |
-| **Requests** | 1,000 / mo | 50,000 / mo | 250,000 / mo |
-| **Projects** | 1 | Unlimited | Unlimited |
-| **Support** | Community | Priority (24h) | Priority (4h) |
-| **Members** | 1 | 1 | 10 |
-| **Log Retention**| 3 days | 30 days | 90 days |
+Even with credits available, requests can still be blocked by:
+- monthly request limits,
+- spend caps,
+- or security/rate-limit controls.
 
-> [!TIP]
-> **Enterprise** plans are available for unlimited requests, custom SLAs, and dedicated support. [Contact Sales](/contact) for details.
+## Plan Tiers (Typical Limits)
 
-## Token Pricing
-
-Cencori simplifies billing by consolidating all AI provider costs into a single invoice. We pass through model costs with a small markup to cover infrastructure reliability, unified logging, and security scanning.
-
-### Markup Rates
-
-- **OpenAI**: +50% (e.g., GPT-4o input: ~$3.75/1M tokens)
-- **Anthropic**: +50%
-- **Google Vertex**: +0% (Native pricing)
-- **Custom Providers**: +0%
+| Tier | Monthly Request Limit |
+| :--- | :--- |
+| Free | 1,000 |
+| Pro | 50,000 |
+| Team | 250,000 |
+| Enterprise | Custom |
 
 > [!NOTE]
-> Markups cover the cost of the **Universal Proxy**, **PII Scanning**, **Prompt Injection Protection**, and **Compliance Logging** which run on every request.
+> Tiers and limits may vary by contract or deployment.
+
+## Usage Pricing
+
+For each successful request, Cencori computes:
+- provider cost from usage (tokens, image generations, audio duration/characters),
+- applies configured markup,
+- records final charge as `cencori_charge_usd`,
+- deducts that amount from org credits.
+
+Formula:
+
+```text
+provider_cost + markup = cencori_charge_usd
+```
+
+Markup is model/provider-specific and configured in pricing data.
+
+See [Credits System](/docs/platform/credits) for top-up and wallet details.
 
 ## Spend Management
 
-Prevent unexpected bills with our built-in budget controls.
+Use these controls to prevent runaway spend:
 
-### Monthly Budget
-Set a soft limit to receive email alerts when your spending reaches **50%**, **80%**, and **100%** of your threshold.
+- **Monthly Budget (soft)**: warning thresholds before overrun.
+- **Hard Spend Cap**: blocks requests once cap is reached.
+- **Rate Limits**: per-minute protection at project/API-key level.
 
-### Hard Spend Cap
-Set a hard limit (e.g., $500/mo). Once reached, Cencori will **block all AI requests** until the next billing cycle or until you increase the cap.
+## Managed vs BYOK Billing
 
-1. Go to **Settings > Billing**.
-2. Enable **Enforce spend cap**.
-3. Enter your maximum monthly amount.
+| Mode | Provider invoice | Cencori wallet usage |
+| :--- | :--- | :--- |
+| Managed keys | Paid by Cencori | Deducted from credits |
+| BYOK | Paid by your provider account | Depends on your plan and policy |
+
+See [Bring Your Own Key (BYOK)](/docs/platform/byok).
+
+## Where to Track Costs
+
+- Billing page (org-level balance and transactions)
+- Project logs and observability views
+- Request-level cost fields (`provider_cost_usd`, `cencori_charge_usd`, `markup_percentage`)

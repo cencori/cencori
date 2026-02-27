@@ -1,0 +1,81 @@
+---
+title: "CrewAI"
+description: "Route CrewAI multi-agent orchestrations through Cencori for billing, monitoring, and model switching."
+section: "Agents"
+order: 5
+---
+
+# CrewAI
+
+[CrewAI](https://crewai.com) is a cutting-edge framework for orchestrating role-playing, autonomous AI agents. By pointing CrewAI at Cencori, you can manage models centrally, enforce spend caps on expensive autonomous runs, and monitor every agent's thought process.
+
+## Quick Start
+
+### 1. Deploy from the Marketplace
+
+Navigate to **Agents → Agent Marketplace** in your project dashboard and click **Deploy Agent** on the CrewAI card.
+
+### 2. Generate an API Key
+
+Go to the agent's **Configuration** tab and click **Generate Key**. Copy the key.
+
+### 3. Install CrewAI
+
+```bash
+pip install crewai
+```
+
+### 4. Configure Your Script
+
+Set the standard OpenAI environment variables to point to Cencori *before* importing your CrewAI agents.
+
+```python title="crew.py"
+import os
+
+# 1. Point CrewAI to Cencori
+os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_KEY"] = "cake_YOUR_KEY_HERE"
+
+# 2. Set the model name (must match a model in the Cencori dashboard)
+os.environ["OPENAI_MODEL_NAME"] = "gpt-4o"
+
+# 3. Create your crew as normal
+from crewai import Agent, Task, Crew
+
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Uncover cutting-edge developments",
+    backstory="You are an expert analyst at a leading tech think tank.",
+    verbose=True,
+    allow_delegation=False,
+)
+
+task = Task(
+    description="Research the latest advancements in AI",
+    expected_output="A comprehensive 3-paragraph report",
+    agent=researcher
+)
+
+crew = Crew(
+    agents=[researcher],
+    tasks=[task],
+    verbose=True
+)
+
+result = crew.kickoff()
+print(result)
+```
+
+## Using Specific Models per Agent
+
+If you want different agents in your crew to use different models (e.g., a cheap `gpt-4o-mini` for basic research and a expensive `claude-3-5-sonnet` for writing), you can pass custom LLM instances to each agent.
+
+See the [CrewAI Custom LLM documentation](https://docs.crewai.com/concepts/llms) for advanced configuration.
+
+## Features
+
+| Feature | How it works with Cencori |
+|---|---|
+| **Multi-Agent Orchestration** | All agent calls flow through Cencori, appearing in your centralized logs. |
+| **Spend Caps** | Critical for autonomous loops. Cencori will hard-stop the crew if it hits your project's spend limit. |
+| **Model Agnostic** | Switch between OpenAI, Anthropic, or open-source models instantly from the Cencori UI without changing your CrewAI python code. |

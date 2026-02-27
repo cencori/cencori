@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
                     parts: [{ text: `${SYSTEM_PROMPT}\n\nUser question: ${question}` }],
                 },
             ],
-            model: 'gemini-2.5-flash',
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.7,
             maxOutputTokens: 1024,
         });

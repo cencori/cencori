@@ -96,6 +96,15 @@ export function extractBearerToken(authHeader: string | null): string | null {
     return token || null;
 }
 
+function isLikelyJwt(token: string): boolean {
+    if (!token.startsWith('eyJ')) return false;
+
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+
+    return parts.every((part) => part.length > 0 && /^[A-Za-z0-9_-]+$/.test(part));
+}
+
 export function isCencoriApiKey(token: string | null): token is string {
     if (!token) return false;
     return CENCORI_API_KEY_PREFIXES.some((prefix) => token.startsWith(prefix));
@@ -106,5 +115,13 @@ export function extractCencoriApiKeyFromHeaders(headers: Pick<Headers, 'get'>): 
     if (directKey) return directKey;
 
     const bearerToken = extractBearerToken(headers.get('Authorization'));
-    return isCencoriApiKey(bearerToken) ? bearerToken : null;
+    if (!bearerToken) return null;
+
+    if (isCencoriApiKey(bearerToken)) {
+        return bearerToken;
+    }
+
+    // Backward-compatible behavior: treat opaque/non-JWT bearer tokens as API keys.
+    // Supabase user sessions are JWTs and should continue down the user-auth path.
+    return isLikelyJwt(bearerToken) ? null : bearerToken;
 }

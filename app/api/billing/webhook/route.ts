@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getLimitForTier, type SubscriptionTier } from '@/lib/polarClient';
+import { addCredits } from '@/lib/credits';
+import { getCreditTopupCreditsByProductId, getLimitForTier, type SubscriptionTier } from '@/lib/polarClient';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 
 type SubscriptionPayload = {
@@ -11,6 +12,18 @@ type SubscriptionPayload = {
     currentPeriodStart: Date | string;
     currentPeriodEnd: Date | string | null;
     metadata?: Record<string, string | number | boolean>;
+};
+
+type PolarMetadata = Record<string, string | number | boolean | null>;
+
+type OrderPaidPayload = {
+    id: string;
+    customerId?: string | null;
+    productId?: string | null;
+    metadata?: PolarMetadata;
+    checkout?: {
+        metadata?: PolarMetadata;
+    };
 };
 
 function getProductIdToTier(productId: string | null | undefined): SubscriptionTier {
@@ -83,6 +96,82 @@ async function resolveOrganizationId(
     }
 
     return byCustomer?.id ?? null;
+}
+
+function parsePositiveNumber(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
+
+function extractOrderMetadata(payload: OrderPaidPayload): PolarMetadata {
+    if (payload.metadata && typeof payload.metadata === 'object') {
+        return payload.metadata;
+    }
+
+    if (payload.checkout?.metadata && typeof payload.checkout.metadata === 'object') {
+        return payload.checkout.metadata;
+    }
+
+    return {};
+}
+
+async function resolveOrganizationIdForOrder(
+    supabaseAdmin: ReturnType<typeof createAdminClient>,
+    payload: OrderPaidPayload,
+    metadata: PolarMetadata
+) {
+    const metadataOrgId = metadata.org_id;
+    if (typeof metadataOrgId === 'string' && metadataOrgId.length > 0) {
+        return metadataOrgId;
+    }
+
+    if (!payload.customerId) {
+        return null;
+    }
+
+    const { data: byCustomer, error: customerLookupError } = await supabaseAdmin
+        .from('organizations')
+        .select('id')
+        .eq('polar_customer_id', payload.customerId)
+        .maybeSingle();
+
+    if (customerLookupError) {
+        console.error('[Polar Webhook] Failed to resolve org by polar_customer_id:', customerLookupError);
+    }
+
+    return byCustomer?.id ?? null;
+}
+
+async function hasExistingTopupForOrder(
+    supabaseAdmin: ReturnType<typeof createAdminClient>,
+    organizationId: string,
+    orderId: string
+) {
+    const description = `Polar top-up order ${orderId}`;
+    const { data, error } = await supabaseAdmin
+        .from('credit_transactions')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('transaction_type', 'topup')
+        .eq('description', description)
+        .maybeSingle();
+
+    if (error) {
+        console.error('[Polar Webhook] Failed checking existing top-up transaction:', error);
+        return false;
+    }
+
+    return !!data?.id;
 }
 
 export async function POST(req: NextRequest) {
@@ -183,7 +272,65 @@ export async function POST(req: NextRequest) {
             }
 
             case 'order.paid': {
-                console.log('[Polar Webhook] Order paid - waiting for subscription.active event');
+                const payload: OrderPaidPayload = event.data as OrderPaidPayload;
+                const metadata = extractOrderMetadata(payload);
+
+                if (metadata.purchase_type !== 'credits_topup') {
+                    console.log('[Polar Webhook] Order paid for non-topup product, ignoring.');
+                    break;
+                }
+
+                if (!payload.id) {
+                    console.warn('[Polar Webhook] Missing order id for top-up order');
+                    break;
+                }
+
+                const orgId = await resolveOrganizationIdForOrder(supabaseAdmin, payload, metadata);
+                if (!orgId) {
+                    console.warn('[Polar Webhook] Unable to resolve organization for top-up order:', payload.id);
+                    return NextResponse.json({ received: true, warning: 'org_not_resolved' });
+                }
+
+                const existingTopup = await hasExistingTopupForOrder(supabaseAdmin, orgId, payload.id);
+                if (existingTopup) {
+                    console.log(`[Polar Webhook] Top-up already applied for order ${payload.id}, skipping duplicate event`);
+                    break;
+                }
+
+                const creditsFromMetadata = parsePositiveNumber(metadata.credits_amount);
+                const creditsFromProduct = getCreditTopupCreditsByProductId(payload.productId);
+                const creditsToAdd = creditsFromMetadata ?? creditsFromProduct;
+
+                if (!creditsToAdd || creditsToAdd <= 0) {
+                    console.warn('[Polar Webhook] Unable to determine credits amount for top-up order:', payload.id);
+                    break;
+                }
+
+                const credited = await addCredits(
+                    orgId,
+                    creditsToAdd,
+                    'topup',
+                    `Polar top-up order ${payload.id}`,
+                    {
+                        polar_order_id: payload.id,
+                        polar_customer_id: payload.customerId ?? null,
+                        credits_amount: creditsToAdd,
+                        credit_pack: typeof metadata.credit_pack === 'string' ? metadata.credit_pack : null,
+                    }
+                );
+
+                if (!credited) {
+                    throw new Error(`Failed to apply credits for order ${payload.id}`);
+                }
+
+                if (payload.customerId) {
+                    await supabaseAdmin
+                        .from('organizations')
+                        .update({ polar_customer_id: payload.customerId })
+                        .eq('id', orgId);
+                }
+
+                console.log(`[Polar Webhook] ✓ Credited org ${orgId} with $${creditsToAdd.toFixed(2)} from order ${payload.id}`);
                 break;
             }
 

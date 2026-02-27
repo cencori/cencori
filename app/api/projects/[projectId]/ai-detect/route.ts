@@ -2,10 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey } from '@/lib/encryption';
+import {
+    calculateTokenCharge,
+    chargeProjectUsageCredits,
+    parseCreditsBalance,
+    shouldEnforceProjectCredits,
+} from '@/lib/project-credit-billing';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
 }
+
+type DetectionUsage = {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+};
+
+type DetectionResult = {
+    success: boolean;
+    analysis: unknown;
+    model: string;
+    provider?: string;
+    tokens: number;
+    usage: DetectionUsage;
+};
 
 const PROVIDER_ENDPOINTS: Record<string, string> = {
     openai: 'https://api.openai.com/v1/chat/completions',
@@ -38,12 +59,66 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         const { data: project } = await supabaseAdmin
             .from('projects')
-            .select('organization_id, default_provider, default_model')
+            .select('organization_id, default_provider, default_model, organizations!inner(subscription_tier, credits_balance, billing_frozen)')
             .eq('id', projectId)
             .single();
 
         if (!project) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        let hasOrgAccess = false;
+        const { data: membership } = await supabaseAdmin
+            .from('organization_members')
+            .select('id')
+            .eq('organization_id', project.organization_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (membership?.id) {
+            hasOrgAccess = true;
+        } else {
+            const { data: organization } = await supabaseAdmin
+                .from('organizations')
+                .select('owner_id')
+                .eq('id', project.organization_id)
+                .maybeSingle();
+            hasOrgAccess = organization?.owner_id === user.id;
+        }
+
+        if (!hasOrgAccess) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        const organization = project.organizations as unknown as {
+            subscription_tier: string | null;
+            credits_balance: number | string | null;
+            billing_frozen: boolean | null;
+        };
+        const tier = organization?.subscription_tier || 'free';
+        const billingFrozen = Boolean(organization?.billing_frozen);
+        const creditsBalance = parseCreditsBalance(organization?.credits_balance);
+        const shouldEnforceCredits = shouldEnforceProjectCredits(tier);
+
+        if (billingFrozen) {
+            return NextResponse.json(
+                {
+                    error: 'Billing account frozen',
+                    message: 'Billing is currently frozen for this organization. Contact support.',
+                },
+                { status: 403 }
+            );
+        }
+
+        if (shouldEnforceCredits && creditsBalance <= 0) {
+            return NextResponse.json(
+                {
+                    error: 'Credit balance exhausted',
+                    message: 'Your organization has run out of credits. Top up to continue.',
+                    balance: 0,
+                },
+                { status: 403 }
+            );
         }
 
         const defaultProvider = project.default_provider || 'openai';
@@ -87,7 +162,7 @@ Respond with a JSON object containing:
 
 ${detectionPrompt}`;
 
-        let result;
+        let result: DetectionResult;
         const provider = providerKey.provider;
 
         if (provider === 'anthropic') {
@@ -102,7 +177,36 @@ ${detectionPrompt}`;
             result = await callOpenAICompatible(apiKey, systemPrompt, content, 'https://api.openai.com/v1/chat/completions', modelToUse, provider);
         }
 
-        return NextResponse.json(result);
+        const charge = await calculateTokenCharge(
+            provider,
+            result.model,
+            result.usage.promptTokens,
+            result.usage.completionTokens
+        );
+
+        const charged = await chargeProjectUsageCredits(
+            project.organization_id,
+            tier,
+            charge.cencoriChargeUsd,
+            'projects/ai-detect'
+        );
+
+        if (!charged) {
+            return NextResponse.json(
+                {
+                    error: 'INSUFFICIENT_CREDITS',
+                    message: 'Unable to charge credits for this request.',
+                },
+                { status: 402 }
+            );
+        }
+
+        return NextResponse.json({
+            ...result,
+            cost_usd: charge.cencoriChargeUsd,
+            provider_cost_usd: charge.providerCostUsd,
+            markup_percentage: charge.markupPercentage,
+        });
 
     } catch (error) {
         console.error('[AI Detect] Error:', error);
@@ -128,7 +232,7 @@ function getDefaultModelForProvider(provider: string): string {
     return defaults[provider] || 'gpt-4o-mini';
 }
 
-async function callAnthropic(apiKey: string, systemPrompt: string, content: string, model: string) {
+async function callAnthropic(apiKey: string, systemPrompt: string, content: string, model: string): Promise<DetectionResult> {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -167,16 +271,26 @@ async function callAnthropic(apiKey: string, systemPrompt: string, content: stri
         };
     }
 
+    const promptTokens = data.usage?.input_tokens || 0;
+    const completionTokens = data.usage?.output_tokens || 0;
+    const totalTokens = promptTokens + completionTokens;
+
     return {
         success: true,
         analysis,
         model,
-        tokens: data.usage?.input_tokens + data.usage?.output_tokens || 0,
+        provider: 'anthropic',
+        tokens: totalTokens,
+        usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens,
+        },
     };
 }
 
 
-async function callGoogle(apiKey: string, systemPrompt: string, content: string, model: string) {
+async function callGoogle(apiKey: string, systemPrompt: string, content: string, model: string): Promise<DetectionResult> {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -218,11 +332,21 @@ async function callGoogle(apiKey: string, systemPrompt: string, content: string,
         };
     }
 
+    const promptTokens = data.usageMetadata?.promptTokenCount || 0;
+    const completionTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = data.usageMetadata?.totalTokenCount || promptTokens + completionTokens;
+
     return {
         success: true,
         analysis,
         model,
-        tokens: data.usageMetadata?.totalTokenCount || 0,
+        provider: 'google',
+        tokens: totalTokens,
+        usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens,
+        },
     };
 }
 
@@ -233,7 +357,7 @@ async function callOpenAICompatible(
     endpoint: string,
     model: string,
     providerName: string
-) {
+): Promise<DetectionResult> {
     const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -274,16 +398,25 @@ async function callOpenAICompatible(
         };
     }
 
+    const promptTokens = data.usage?.prompt_tokens || 0;
+    const completionTokens = data.usage?.completion_tokens || 0;
+    const totalTokens = data.usage?.total_tokens || promptTokens + completionTokens;
+
     return {
         success: true,
         analysis,
-        model,
+        model: data.model || model,
         provider: providerName,
-        tokens: data.usage?.total_tokens || 0,
+        tokens: totalTokens,
+        usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens,
+        },
     };
 }
 
-async function callCohere(apiKey: string, systemPrompt: string, content: string) {
+async function callCohere(apiKey: string, systemPrompt: string, content: string): Promise<DetectionResult> {
     const response = await fetch('https://api.cohere.ai/v1/chat', {
         method: 'POST',
         headers: {
@@ -321,11 +454,20 @@ async function callCohere(apiKey: string, systemPrompt: string, content: string)
         };
     }
 
+    const promptTokens = data.meta?.billed_units?.input_tokens || 0;
+    const completionTokens = data.meta?.billed_units?.output_tokens || 0;
+    const totalTokens = promptTokens + completionTokens;
+
     return {
         success: true,
         analysis,
         model: 'command-r',
-        tokens: data.meta?.billed_units?.input_tokens + data.meta?.billed_units?.output_tokens || 0,
+        provider: 'cohere',
+        tokens: totalTokens,
+        usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens,
+        },
     };
 }
-

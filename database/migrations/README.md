@@ -49,18 +49,18 @@ COMMENT ON TABLE model_pricing IS 'Pricing configuration for all AI model provid
 
 -- Migration 002: Organization Credits System
 ALTER TABLE organizations 
-  ADD COLUMN IF NOT EXISTS credits_balance DECIMAL(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS credits_balance DECIMAL(14, 6) DEFAULT 0.00,
   ADD COLUMN IF NOT EXISTS credits_updated_at TIMESTAMP DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS credit_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  amount DECIMAL(10, 2) NOT NULL,
+  amount DECIMAL(14, 6) NOT NULL,
   transaction_type TEXT NOT NULL,
   description TEXT,
   reference_id UUID,
-  balance_before DECIMAL(10, 2) NOT NULL,
-  balance_after DECIMAL(10, 2) NOT NULL,
+  balance_before DECIMAL(14, 6) NOT NULL,
+  balance_after DECIMAL(14, 6) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   metadata JSONB
 );

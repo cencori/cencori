@@ -47,56 +47,17 @@ export async function deductCredits(
     description: string,
     referenceId?: string
 ): Promise<boolean> {
-    const supabase = createAdminClient();
-
-    try {
-        // Get current balance
-        const currentBalance = await getCreditsBalance(organizationId);
-
-        if (currentBalance < amount) {
-            console.warn(`[Credits] Insufficient balance for org ${organizationId}`);
-            return false;
-        }
-
-        const newBalance = currentBalance - amount;
-
-        // Update organization balance
-        const { error: updateError } = await supabase
-            .from('organizations')
-            .update({
-                credits_balance: newBalance,
-                credits_updated_at: new Date().toISOString(),
-            })
-            .eq('id', organizationId);
-
-        if (updateError) {
-            console.error('[Credits] Error updating balance:', updateError);
-            return false;
-        }
-
-        // Log transaction
-        const { error: logError } = await supabase
-            .from('credit_transactions')
-            .insert({
-                organization_id: organizationId,
-                amount: -amount,
-                transaction_type: 'usage',
-                description,
-                reference_id: referenceId,
-                balance_before: currentBalance,
-                balance_after: newBalance,
-            });
-
-        if (logError) {
-            console.error('[Credits] Error logging transaction:', logError);
-            // Don't fail if logging fails, credits already deducted
-        }
-
+    if (!(amount > 0)) {
         return true;
-    } catch (error) {
-        console.error('[Credits] Unexpected error deducting credits:', error);
-        return false;
     }
+
+    return applyCreditDelta(
+        organizationId,
+        -amount,
+        'usage',
+        description,
+        referenceId
+    );
 }
 
 /**
@@ -110,13 +71,64 @@ export async function addCredits(
     description: string,
     metadata?: Record<string, unknown>
 ): Promise<boolean> {
+    if (!(amount > 0)) {
+        return false;
+    }
+
+    return applyCreditDelta(
+        organizationId,
+        amount,
+        transactionType,
+        description,
+        undefined,
+        metadata
+    );
+}
+
+/**
+ * Apply manual credit adjustment/refund.
+ * Positive amount credits the wallet, negative amount debits it.
+ */
+export async function adjustCredits(
+    organizationId: string,
+    amount: number,
+    transactionType: 'refund' | 'adjustment',
+    description: string,
+    metadata?: Record<string, unknown>
+): Promise<boolean> {
+    if (!amount || !Number.isFinite(amount)) {
+        return false;
+    }
+
+    return applyCreditDelta(
+        organizationId,
+        amount,
+        transactionType,
+        description,
+        undefined,
+        metadata
+    );
+}
+
+async function applyCreditDelta(
+    organizationId: string,
+    delta: number,
+    transactionType: 'topup' | 'usage' | 'refund' | 'adjustment',
+    description: string,
+    referenceId?: string,
+    metadata?: Record<string, unknown>
+): Promise<boolean> {
     const supabase = createAdminClient();
 
     try {
         const currentBalance = await getCreditsBalance(organizationId);
-        const newBalance = currentBalance + amount;
+        const newBalance = currentBalance + delta;
 
-        // Update organization balance
+        if (newBalance < 0) {
+            console.warn(`[Credits] Insufficient balance for org ${organizationId}`);
+            return false;
+        }
+
         const { error: updateError } = await supabase
             .from('organizations')
             .update({
@@ -130,14 +142,14 @@ export async function addCredits(
             return false;
         }
 
-        // Log transaction
         const { error: logError } = await supabase
             .from('credit_transactions')
             .insert({
                 organization_id: organizationId,
-                amount,
+                amount: delta,
                 transaction_type: transactionType,
                 description,
+                reference_id: referenceId,
                 balance_before: currentBalance,
                 balance_after: newBalance,
                 metadata,
@@ -149,7 +161,7 @@ export async function addCredits(
 
         return true;
     } catch (error) {
-        console.error('[Credits] Unexpected error adding credits:', error);
+        console.error('[Credits] Unexpected error applying credit delta:', error);
         return false;
     }
 }

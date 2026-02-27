@@ -13,6 +13,9 @@ export const POLAR_CONFIG = {
         proAnnual: process.env.POLAR_PRODUCT_PRO_ANNUAL!,
         teamMonthly: process.env.POLAR_PRODUCT_TEAM_MONTHLY!,
         teamAnnual: process.env.POLAR_PRODUCT_TEAM_ANNUAL!,
+        creditsStarter: process.env.POLAR_PRODUCT_CREDITS_STARTER || '',
+        creditsGrowth: process.env.POLAR_PRODUCT_CREDITS_GROWTH || '',
+        creditsScale: process.env.POLAR_PRODUCT_CREDITS_SCALE || '',
     },
 };
 
@@ -26,6 +29,32 @@ export const TIER_LIMITS = {
 
 export type SubscriptionTier = keyof typeof TIER_LIMITS;
 
+export type CreditTopupPack = 'starter' | 'growth' | 'scale';
+
+type CreditTopupPackConfig = {
+    productId: string;
+    credits: number;
+    label: string;
+};
+
+export const CREDIT_TOPUP_PACKS: Record<CreditTopupPack, CreditTopupPackConfig> = {
+    starter: {
+        productId: POLAR_CONFIG.products.creditsStarter,
+        credits: 10,
+        label: '$10 credits',
+    },
+    growth: {
+        productId: POLAR_CONFIG.products.creditsGrowth,
+        credits: 50,
+        label: '$50 credits',
+    },
+    scale: {
+        productId: POLAR_CONFIG.products.creditsScale,
+        credits: 200,
+        label: '$200 credits',
+    },
+};
+
 // Helper to get limit for a tier
 export function getLimitForTier(tier: SubscriptionTier): number {
     return TIER_LIMITS[tier];
@@ -37,4 +66,27 @@ export function getProductId(tier: 'pro' | 'team', cycle: 'monthly' | 'annual'):
         return cycle === 'monthly' ? POLAR_CONFIG.products.proMonthly : POLAR_CONFIG.products.proAnnual;
     }
     return cycle === 'monthly' ? POLAR_CONFIG.products.teamMonthly : POLAR_CONFIG.products.teamAnnual;
+}
+
+export function getCreditTopupPackConfig(pack: CreditTopupPack): CreditTopupPackConfig | null {
+    const config = CREDIT_TOPUP_PACKS[pack];
+    if (!config?.productId) {
+        return null;
+    }
+
+    return config;
+}
+
+export function getCreditTopupCreditsByProductId(productId: string | null | undefined): number | null {
+    if (!productId) {
+        return null;
+    }
+
+    for (const config of Object.values(CREDIT_TOPUP_PACKS)) {
+        if (config.productId && config.productId === productId) {
+            return config.credits;
+        }
+    }
+
+    return null;
 }
