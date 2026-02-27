@@ -19,6 +19,7 @@ import { CreditBalance } from "@/components/dashboard/billing/CreditBalance";
 import { InvoiceHistory } from "@/components/dashboard/billing/InvoiceHistory";
 import { BillingCommunication } from "@/components/dashboard/billing/BillingCommunication";
 import { PaymentMethods } from "@/components/dashboard/billing/PaymentMethods";
+import { OperationalControls } from "./OperationalControls";
 
 interface Organization {
     id: string;
@@ -261,9 +262,12 @@ export default function BillingPage({ params }: PageProps) {
                 />
 
                 <CreditBalance
+                    orgId={org.id}
                     balance={org.credits_balance || 0}
                     transactions={formattedTransactions}
                 />
+
+                <OperationalControls orgSlug={orgSlug} />
 
                 <PaymentMethods
                     methods={paymentMethods}

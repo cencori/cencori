@@ -12,6 +12,8 @@ import crypto from 'crypto';
 import { geolocation, ipAddress } from '@vercel/functions';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
+import { deductCredits } from '@/lib/credits';
+import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
 // ──────────────────────────────────────────────
 // Types
@@ -159,7 +161,7 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     }
 
     // ── Extract API Key ──
-    const apiKey = req.headers.get('CENCORI_API_KEY') || req.headers.get('Authorization')?.replace('Bearer ', '');
+    const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
     if (!apiKey) {
         return {
@@ -195,7 +197,9 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
                     id,
                     subscription_tier,
                     monthly_requests_used,
-                    monthly_request_limit
+                    monthly_request_limit,
+                    credits_balance,
+                    billing_frozen
                 )
             )
         `)
@@ -244,12 +248,51 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
             subscription_tier: string;
             monthly_requests_used: number;
             monthly_request_limit: number;
+            credits_balance: string | number | null;
+            billing_frozen: boolean | null;
         };
     };
 
     const organization = project.organizations;
     const organizationId = organization.id;
     const tier = organization.subscription_tier || 'free';
+    const billingFrozen = Boolean(organization.billing_frozen);
+    const creditsBalance = Number(organization.credits_balance ?? 0);
+    const shouldEnforceCredits = tier !== 'free' && tier !== 'enterprise';
+
+    if (billingFrozen) {
+        return {
+            success: false,
+            response: addGatewayHeaders(
+                NextResponse.json(
+                    {
+                        error: 'Billing account frozen',
+                        message: 'Billing is currently frozen for this organization. Contact support.',
+                    },
+                    { status: 403 }
+                ),
+                { requestId }
+            ),
+        };
+    }
+
+    if (shouldEnforceCredits && creditsBalance <= 0) {
+        return {
+            success: false,
+            response: addGatewayHeaders(
+                NextResponse.json(
+                    {
+                        error: 'Credit balance exhausted',
+                        message: 'Your organization has run out of credits. Top up to continue.',
+                        balance: 0,
+                        top_up_url: '/dashboard/organizations',
+                    },
+                    { status: 403 }
+                ),
+                { requestId }
+            ),
+        };
+    }
 
     // ── Monthly limit check ──
     const currentUsage = organization.monthly_requests_used || 0;
@@ -434,12 +477,62 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
     }
 }
 
+async function chargeCreditsForRequest(context: GatewayContext): Promise<void> {
+    // Free and enterprise tiers are not credit-gated by default.
+    if (context.tier === 'free' || context.tier === 'enterprise') {
+        return;
+    }
+
+    const { data: requestLog, error: requestLogError } = await context.supabase
+        .from('ai_requests')
+        .select('id, endpoint, cencori_charge_usd')
+        .eq('request_id', context.requestId)
+        .maybeSingle();
+
+    if (requestLogError || !requestLog) {
+        if (requestLogError) {
+            console.warn(`[Gateway] Failed to load request log for credit charge (${context.requestId}):`, requestLogError.message);
+        }
+        return;
+    }
+
+    const amount = Number(requestLog.cencori_charge_usd ?? 0);
+    if (!(amount > 0)) {
+        return;
+    }
+
+    // Idempotency guard: avoid duplicate charges for the same request log row.
+    const { data: existingCharge, error: existingChargeError } = await context.supabase
+        .from('credit_transactions')
+        .select('id')
+        .eq('organization_id', context.organizationId)
+        .eq('transaction_type', 'usage')
+        .eq('reference_id', requestLog.id)
+        .maybeSingle();
+
+    if (existingChargeError) {
+        console.warn(`[Gateway] Failed to check existing credit charge (${context.requestId}):`, existingChargeError.message);
+    }
+
+    if (existingCharge?.id) {
+        return;
+    }
+
+    const description = `Usage charge: ${requestLog.endpoint || 'gateway'}`;
+    const charged = await deductCredits(context.organizationId, amount, description, requestLog.id);
+    if (!charged) {
+        console.warn(`[Gateway] Credit deduction failed for request ${context.requestId}. org=${context.organizationId} amount=${amount}`);
+    }
+}
+
 /**
  * Increment the monthly usage counter for the organization.
  * Called after a successful request.
  */
 export async function incrementUsage(context: GatewayContext): Promise<void> {
     try {
+        await chargeCreditsForRequest(context);
+
         // Try RPC first (atomic increment)
         const { error } = await context.supabase.rpc('increment_monthly_usage', {
             org_id: context.organizationId,

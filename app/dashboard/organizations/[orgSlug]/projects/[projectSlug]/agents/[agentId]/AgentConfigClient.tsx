@@ -1263,6 +1263,304 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                         </section>
                     )}
 
+                    {/* ── OpenClaw Setup ── */}
+                    {agent.blueprint === "openclaw" && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">OpenClaw Configuration</h2>
+                                <p className="text-xs text-muted-foreground">Paste this into your <code className="bg-muted px-1 rounded text-[10px]">~/.openclaw/openclaw.json</code> to connect.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10 flex justify-between items-center">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">openclaw.json provider config</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            const config = JSON.stringify({
+                                                models: {
+                                                    mode: "merge",
+                                                    providers: {
+                                                        cencori: {
+                                                            baseUrl: "https://cencori.com/api/v1",
+                                                            apiKey: isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>"),
+                                                            api: "openai-completions",
+                                                            models: [{
+                                                                id: selectedModel,
+                                                                name: selectedModel,
+                                                                reasoning: false,
+                                                                input: ["text"],
+                                                            }],
+                                                        },
+                                                    },
+                                                },
+                                                agents: {
+                                                    defaults: {
+                                                        model: { primary: `cencori/${selectedModel}` },
+                                                    },
+                                                },
+                                            }, null, 2);
+                                            navigator.clipboard.writeText(config);
+                                            toast.success("OpenClaw config copied");
+                                        }}
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
+                                        {JSON.stringify({
+                                            models: {
+                                                mode: "merge",
+                                                providers: {
+                                                    cencori: {
+                                                        baseUrl: "https://cencori.com/api/v1",
+                                                        apiKey: isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>"),
+                                                        api: "openai-completions",
+                                                        models: [{ id: selectedModel, name: selectedModel }],
+                                                    },
+                                                },
+                                            },
+                                            agents: { defaults: { model: { primary: `cencori/${selectedModel}` } } },
+                                        }, null, 2)}
+                                    </pre>
+                                </div>
+                                <div className="px-4 py-3 border-t border-border/40 bg-muted/10">
+                                    <p className="text-[10px] text-muted-foreground">
+                                        After saving, run <code className="bg-muted px-1 rounded">openclaw onboard</code> to start. Model changes in the Cencori dashboard apply automatically — no restart needed.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ── AutoGPT Setup ── */}
+                    {agent.blueprint === "autogpt" && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">AutoGPT Configuration</h2>
+                                <p className="text-xs text-muted-foreground">Add these to your AutoGPT <code className="bg-muted px-1 rounded text-[10px]">.env</code> file.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10 flex justify-between items-center">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">.env file</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            const env = [
+                                                `OPENAI_API_BASE=https://cencori.com/api/v1`,
+                                                `OPENAI_API_KEY=${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}`,
+                                                `SMART_LLM=${selectedModel}`,
+                                                `FAST_LLM=${selectedModel}`,
+                                            ].join("\n");
+                                            navigator.clipboard.writeText(env);
+                                            toast.success(".env config copied");
+                                        }}
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
+                                        {`OPENAI_API_BASE=https://cencori.com/api/v1
+OPENAI_API_KEY=${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}
+SMART_LLM=${selectedModel}
+FAST_LLM=${selectedModel}`}
+                                    </pre>
+                                </div>
+                                <div className="px-4 py-3 border-t border-border/40 bg-muted/10">
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Then run <code className="bg-muted px-1 rounded">autogpt run</code>. All requests route through Cencori for billing, logging, and shadow mode.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ── CrewAI Setup ── */}
+                    {agent.blueprint === "crewai" && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">CrewAI Configuration</h2>
+                                <p className="text-xs text-muted-foreground">Use this code snippet in your CrewAI project to route through Cencori.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10 flex justify-between items-center">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Python setup</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            const code = `import os
+os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_KEY"] = "${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}"
+os.environ["OPENAI_MODEL_NAME"] = "${selectedModel}"
+
+from crewai import Agent, Task, Crew
+
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Uncover cutting-edge developments",
+    backstory="You are an expert analyst at a leading tech think tank.",
+    verbose=True,
+    allow_delegation=False,
+)
+
+crew = Crew(agents=[researcher], tasks=[...])
+result = crew.kickoff()`;
+                                            navigator.clipboard.writeText(code);
+                                            toast.success("CrewAI snippet copied");
+                                        }}
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
+                                        {`import os
+os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_KEY"] = "${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}"
+os.environ["OPENAI_MODEL_NAME"] = "${selectedModel}"
+
+from crewai import Agent, Task, Crew
+
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Uncover cutting-edge developments",
+    backstory="You are an expert analyst...",
+    verbose=True,
+    allow_delegation=False,
+)
+
+crew = Crew(agents=[researcher], tasks=[...])
+result = crew.kickoff()`}
+                                    </pre>
+                                </div>
+                                <div className="px-4 py-3 border-t border-border/40 bg-muted/10">
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Set env vars before importing CrewAI. See <a href="https://docs.crewai.com/concepts/llms" target="_blank" rel="noreferrer" className="text-primary underline">CrewAI LLM docs</a> for custom provider details.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ── Python Sandbox Setup ── */}
+                    {agent.blueprint === "python-interpreter" && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">Python Client Setup</h2>
+                                <p className="text-xs text-muted-foreground">Use the OpenAI Python SDK with Cencori as the base URL.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10 flex justify-between items-center">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Python code</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            const code = `from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://cencori.com/api/v1",
+    api_key="${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}",
+    default_headers={"X-Agent-ID": "${agent.id}"},
+)
+
+response = client.chat.completions.create(
+    model="${selectedModel}",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(response.choices[0].message.content)`;
+                                            navigator.clipboard.writeText(code);
+                                            toast.success("Python snippet copied");
+                                        }}
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
+                                        {`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://cencori.com/api/v1",
+    api_key="${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}",
+    default_headers={"X-Agent-ID": "${agent.id}"},
+)
+
+response = client.chat.completions.create(
+    model="${selectedModel}",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(response.choices[0].message.content)`}
+                                    </pre>
+                                </div>
+                                <div className="px-4 py-3 border-t border-border/40 bg-muted/10">
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Install with <code className="bg-muted px-1 rounded">pip install openai</code>. The <code className="bg-muted px-1 rounded">X-Agent-ID</code> header is optional — Cencori derives it from your API key.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ── Custom Agent Setup ── */}
+                    {!["openclaw", "n8n", "autogpt", "crewai", "python-interpreter"].includes(agent.blueprint) && (
+                        <section className="space-y-4">
+                            <div className="space-y-0.5">
+                                <h2 className="text-sm font-medium">Integration Guide</h2>
+                                <p className="text-xs text-muted-foreground">Connect any OpenAI-compatible tool to Cencori.</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+                                <div className="px-4 py-2 border-b border-border/40 bg-muted/10 flex justify-between items-center">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">curl test request</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            const curl = `curl -X POST https://cencori.com/api/v1/chat/completions \\
+  -H "Authorization: Bearer ${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${selectedModel}",
+    "messages": [{"role": "user", "content": "Hello from my custom agent!"}],
+    "stream": false
+  }'`;
+                                            navigator.clipboard.writeText(curl);
+                                            toast.success("curl command copied");
+                                        }}
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                                <div className="px-4 py-3">
+                                    <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
+                                        {`curl -X POST https://cencori.com/api/v1/chat/completions \\
+  -H "Authorization: Bearer ${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${selectedModel}",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "stream": false
+  }'`}
+                                    </pre>
+                                </div>
+                                <div className="px-4 py-3 border-t border-border/40 bg-muted/10">
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Any tool that supports <code className="bg-muted px-1 rounded">OPENAI_BASE_URL</code> works — including Aider, Continue, LangChain, LlamaIndex, and OpenHands.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
                     {/* 2. Model Configuration */}
                     <section className="space-y-3">
                         <div className="space-y-0.5">

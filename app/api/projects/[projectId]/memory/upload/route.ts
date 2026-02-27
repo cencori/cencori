@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
+import {
+    calculateTokenCharge,
+    chargeProjectUsageCredits,
+    parseCreditsBalance,
+    shouldEnforceProjectCredits,
+} from "@/lib/project-credit-billing";
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
@@ -90,12 +96,43 @@ export async function POST(request: NextRequest, context: RouteParams) {
         // Verify user has access to project
         const { data: project } = await adminClient
             .from("projects")
-            .select("id, organization_id")
+            .select("id, organization_id, organizations!inner(subscription_tier, credits_balance, billing_frozen)")
             .eq("id", projectId)
             .single();
 
         if (!project) {
             return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        }
+
+        const organization = project.organizations as unknown as {
+            subscription_tier: string | null;
+            credits_balance: number | string | null;
+            billing_frozen: boolean | null;
+        };
+        const tier = organization?.subscription_tier || "free";
+        const billingFrozen = Boolean(organization?.billing_frozen);
+        const creditsBalance = parseCreditsBalance(organization?.credits_balance);
+        const shouldEnforceCredits = shouldEnforceProjectCredits(tier);
+
+        if (billingFrozen) {
+            return NextResponse.json(
+                {
+                    error: "Billing account frozen",
+                    message: "Billing is currently frozen for this organization. Contact support.",
+                },
+                { status: 403 }
+            );
+        }
+
+        if (shouldEnforceCredits && creditsBalance <= 0) {
+            return NextResponse.json(
+                {
+                    error: "Credit balance exhausted",
+                    message: "Your organization has run out of credits. Top up to continue.",
+                    balance: 0,
+                },
+                { status: 403 }
+            );
         }
 
         // Check user is member of organization
@@ -155,6 +192,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
             metadata: object;
             embedding: number[];
         }> = [];
+        let totalEmbeddingTokens = 0;
 
         // Process chunks in batches of 10
         for (let i = 0; i < chunks.length; i += 10) {
@@ -163,6 +201,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
                 model: "text-embedding-3-small",
                 input: batch,
             });
+            totalEmbeddingTokens += embeddingResponse.usage?.total_tokens ?? 0;
 
             for (let j = 0; j < batch.length; j++) {
                 memories.push({
@@ -176,6 +215,30 @@ export async function POST(request: NextRequest, context: RouteParams) {
                     embedding: embeddingResponse.data[j].embedding,
                 });
             }
+        }
+
+        const { cencoriChargeUsd } = await calculateTokenCharge(
+            "openai",
+            "text-embedding-3-small",
+            totalEmbeddingTokens,
+            0
+        );
+
+        const charged = await chargeProjectUsageCredits(
+            project.organization_id,
+            tier,
+            cencoriChargeUsd,
+            "projects/memory/upload"
+        );
+
+        if (!charged) {
+            return NextResponse.json(
+                {
+                    error: "INSUFFICIENT_CREDITS",
+                    message: "Unable to charge credits for this request.",
+                },
+                { status: 402 }
+            );
         }
 
         // Store all memories

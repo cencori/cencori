@@ -1,24 +1,24 @@
 ---
 title: "Bring Your Own Key (BYOK)"
-description: "Connect your own provider API keys to bypass Cencori's usage-based pricing."
+description: "Connect your own provider API keys for provider-level control while keeping Cencori routing, security, and observability."
 section: "Platform"
 order: 5
 ---
 
-**Bring Your Own Key (BYOK)** allows you to use your existing API keys (OpenAI, Anthropic, Google, etc.) within Cencori. This gives you full control over billing, rate limits, and model access while leveraging Cencori's observability and gateway features.
+**Bring Your Own Key (BYOK)** allows you to use your existing API keys (OpenAI, Anthropic, Google, etc.) within Cencori. This gives you control over provider access while still using Cencori's observability, routing, and security.
 
 ## Why Use BYOK?
 
 | Feature | Managed Keys (Standard) | BYOK (Custom Keys) |
 | :--- | :--- | :--- |
-| **Billing** | Single invoice from Cencori | Direct billing from Provider |
-| **Pricing** | Provider Cost + Cencori Markup | Provider Cost (0% Markup) |
+| **Provider Invoice** | Paid by Cencori | Paid by your provider account |
+| **Cencori Usage Charging** | Credit wallet is charged | Depends on your Cencori plan/policy |
 | **Rate Limits** | Shared Cencori limits | Your personal provider limits |
 | **Model Access** | Standard supported models | Access to betas/finetunes |
 | **Setup** | Instant (use Credits) | Requires configuration |
 
 > [!TIP]
-> BYOK is ideal for high-volume users who have negotiated rates with providers or need to use specific fine-tuned models.
+> BYOK is ideal if you need provider-specific capabilities (betas, custom limits, finetuned models) or direct provider billing controls.
 
 ## Configuring BYOK
 
@@ -39,9 +39,11 @@ Once enabled, the provider badge will show **"Enabled"**, and all requests for t
 
 ## Hybrid Usage
 
-You can mix and match Managed Keys and BYOK.
-- Use **Managed Keys** for experimental providers (e.g., trying out Gemini).
-- Use **BYOK** for your primary production provider (e.g., OpenAI) to optimize costs.
+You can mix and match Managed Keys and BYOK:
+- Use **Managed Keys** for fast onboarding and centralized ops.
+- Use **BYOK** where your team needs provider-specific controls.
+
+See [Credits System](/docs/platform/credits) and [Billing & Usage](/docs/platform/billing) for how usage charging is applied in your deployment.
 
 ## Security
 

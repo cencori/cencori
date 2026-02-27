@@ -24,6 +24,7 @@ import { getProjectSecurityConfig } from '@/lib/safety/utils';
 import { handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
+import { deductCredits } from '@/lib/credits';
 
 
 const router = new ProviderRouter();
@@ -279,6 +280,51 @@ async function incrementMonthlyUsage(
         .eq('id', organizationId);
 }
 
+async function chargeUsageCredits(
+    supabase: ReturnType<typeof createAdminClient>,
+    organizationId: string,
+    tier: string,
+    amount: number,
+    referenceId: string | null,
+    endpoint: string
+): Promise<void> {
+    // Free and enterprise tiers are not credit-gated by default.
+    if (tier === 'free' || tier === 'enterprise') {
+        return;
+    }
+    if (!(amount > 0) || !referenceId) {
+        return;
+    }
+
+    // Idempotency guard: avoid duplicate usage debits for the same request log row.
+    const { data: existingCharge, error: existingChargeError } = await supabase
+        .from('credit_transactions')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('transaction_type', 'usage')
+        .eq('reference_id', referenceId)
+        .maybeSingle();
+
+    if (existingChargeError) {
+        console.warn(`[Billing] Failed to check existing charge for reference=${referenceId}:`, existingChargeError.message);
+    }
+
+    if (existingCharge?.id) {
+        return;
+    }
+
+    const charged = await deductCredits(
+        organizationId,
+        amount,
+        `Usage charge: ${endpoint}`,
+        referenceId
+    );
+
+    if (!charged) {
+        console.warn(`[Billing] Failed to deduct credits for org=${organizationId} endpoint=${endpoint} amount=${amount}`);
+    }
+}
+
 function validateDomain(origin: string | null, allowedDomains: string[] | null): boolean {
     if (!origin || !allowedDomains || allowedDomains.length === 0) {
         return false;
@@ -357,14 +403,16 @@ export async function POST(req: NextRequest) {
           organization_id,
           default_model,
           default_provider,
-          organizations!inner(
-            id,
-            subscription_tier,
-            monthly_requests_used,
-            monthly_request_limit
-          )
-        )
-      `)
+	          organizations!inner(
+	            id,
+	            subscription_tier,
+	            monthly_requests_used,
+	            monthly_request_limit,
+	            credits_balance,
+	            billing_frozen
+	          )
+	        )
+	      `)
             .eq('key_hash', keyHash)
             .is('revoked_at', null)
             .single();
@@ -419,17 +467,44 @@ export async function POST(req: NextRequest) {
             organization_id: string;
             default_model: string | null;
             default_provider: string | null;
-            organizations: {
-                id: string;
-                subscription_tier: string;
-                monthly_requests_used: number;
-                monthly_request_limit: number;
-            };
-        };
+	            organizations: {
+	                id: string;
+	                subscription_tier: string;
+	                monthly_requests_used: number;
+	                monthly_request_limit: number;
+	                credits_balance: string | number | null;
+	                billing_frozen: boolean | null;
+	            };
+	        };
 
-        const organization = project.organizations;
-        const organizationId = organization.id;
-        const tier = organization.subscription_tier || 'free';
+	        const organization = project.organizations;
+	        const organizationId = organization.id;
+	        const tier = organization.subscription_tier || 'free';
+	        const billingFrozen = Boolean(organization.billing_frozen);
+	        const creditsBalance = Number(organization.credits_balance ?? 0);
+	        const shouldEnforceCredits = tier !== 'free' && tier !== 'enterprise';
+
+	        if (billingFrozen) {
+	            return NextResponse.json(
+	                {
+	                    error: 'Billing account frozen',
+	                    message: 'Billing is currently frozen for this organization. Contact support.',
+	                },
+	                { status: 403 }
+	            );
+	        }
+
+	        if (shouldEnforceCredits && creditsBalance <= 0) {
+	            return NextResponse.json(
+	                {
+	                    error: 'Credit balance exhausted',
+	                    message: 'Your organization has run out of credits. Top up to continue.',
+	                    balance: 0,
+	                    top_up_url: '/dashboard/organizations',
+	                },
+	                { status: 403 }
+	            );
+	        }
 
         const currentUsage = organization.monthly_requests_used || 0;
         const limit = organization.monthly_request_limit || 1000;
@@ -889,8 +964,6 @@ export async function POST(req: NextRequest) {
                                 const cost = (promptTokens / 1000) * pricing.inputPer1KTokens + (completionTokens / 1000) * pricing.outputPer1KTokens;
                                 const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
 
-                                await incrementMonthlyUsage(supabase, organizationId, currentUsage);
-
                                 let streamLoggedContent = fullContent;
                                 let streamLoggedMessages = messages;
                                 if (customRulesResult.rules.length > 0) {
@@ -917,40 +990,55 @@ export async function POST(req: NextRequest) {
                                     }
                                 }
 
-                                const { error: streamLogError } = await supabase.from('ai_requests').insert({
-                                    project_id: project.id,
-                                    api_key_id: keyData.id,
-                                    provider: streamActualProvider,
-                                    model: streamActualModel,
-                                    prompt_tokens: promptTokens,
-                                    completion_tokens: completionTokens,
-                                    total_tokens: promptTokens + completionTokens,
-                                    cost_usd: cost,
-                                    provider_cost_usd: cost,
-                                    cencori_charge_usd: charge,
-                                    markup_percentage: pricing.cencoriMarkupPercentage,
-                                    latency_ms: Date.now() - startTime,
-                                    status: streamUsedFallback ? 'success_fallback' : 'success',
-                                    end_user_id: userId,
-                                    request_payload: {
-                                        messages: streamLoggedMessages,
-                                        model,
-                                        temperature,
-                                        maxTokens,
-                                        max_tokens,
-                                        stream,
-                                        original_provider: streamUsedFallback ? providerName : undefined,
-                                        original_model: streamUsedFallback ? normalizedModel : undefined,
-                                        data_rules_applied: customRulesResult.rules.length > 0,
-                                    },
-                                    response_payload: { content: streamLoggedContent },
-                                    ip_address: clientIp,
-                                    country_code: countryCode,
-                                });
+                                const { data: streamLogData, error: streamLogError } = await supabase
+                                    .from('ai_requests')
+                                    .insert({
+                                        project_id: project.id,
+                                        api_key_id: keyData.id,
+                                        provider: streamActualProvider,
+                                        model: streamActualModel,
+                                        prompt_tokens: promptTokens,
+                                        completion_tokens: completionTokens,
+                                        total_tokens: promptTokens + completionTokens,
+                                        cost_usd: cost,
+                                        provider_cost_usd: cost,
+                                        cencori_charge_usd: charge,
+                                        markup_percentage: pricing.cencoriMarkupPercentage,
+                                        latency_ms: Date.now() - startTime,
+                                        status: streamUsedFallback ? 'success_fallback' : 'success',
+                                        end_user_id: userId,
+                                        request_payload: {
+                                            messages: streamLoggedMessages,
+                                            model,
+                                            temperature,
+                                            maxTokens,
+                                            max_tokens,
+                                            stream,
+                                            original_provider: streamUsedFallback ? providerName : undefined,
+                                            original_model: streamUsedFallback ? normalizedModel : undefined,
+                                            data_rules_applied: customRulesResult.rules.length > 0,
+                                        },
+                                        response_payload: { content: streamLoggedContent },
+                                        ip_address: clientIp,
+                                        country_code: countryCode,
+                                    })
+                                    .select('id')
+                                    .single();
 
                                 if (streamLogError) {
                                     console.error('[API] Failed to log streaming request:', streamLogError);
+                                } else {
+                                    await chargeUsageCredits(
+                                        supabase,
+                                        organizationId,
+                                        tier,
+                                        charge,
+                                        streamLogData?.id ?? null,
+                                        'ai/chat'
+                                    );
                                 }
+
+                                await incrementMonthlyUsage(supabase, organizationId, currentUsage);
 
                                 checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
                                     console.error('[Budget] Failed to check budget alerts:', err);
@@ -1133,7 +1221,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        await incrementMonthlyUsage(supabase, organizationId, currentUsage);
         let loggedMessages = messages;
         let loggedResponse = response.content;
 
@@ -1162,40 +1249,55 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const { error: logError } = await supabase.from('ai_requests').insert({
-            project_id: project.id,
-            api_key_id: keyData.id,
-            provider: actualProvider,
-            model: actualModel,
-            prompt_tokens: response.usage.promptTokens,
-            completion_tokens: response.usage.completionTokens,
-            total_tokens: response.usage.totalTokens,
-            cost_usd: response.cost.providerCostUsd,
-            provider_cost_usd: response.cost.providerCostUsd,
-            cencori_charge_usd: response.cost.cencoriChargeUsd,
-            markup_percentage: response.cost.markupPercentage,
-            latency_ms: response.latencyMs,
-            status: usedFallback ? 'success_fallback' : 'success',
-            end_user_id: userId,
-            request_payload: {
-                messages: loggedMessages,
-                model,
-                temperature,
-                maxTokens,
-                max_tokens,
-                stream,
-                original_provider: usedFallback ? providerName : undefined,
-                original_model: usedFallback ? normalizedModel : undefined,
-                data_rules_applied: customRulesResult.rules.length > 0,
-            },
-            response_payload: { content: loggedResponse, finishReason: response.finishReason },
-            ip_address: clientIp,
-            country_code: countryCode,
-        });
+        const { data: logData, error: logError } = await supabase
+            .from('ai_requests')
+            .insert({
+                project_id: project.id,
+                api_key_id: keyData.id,
+                provider: actualProvider,
+                model: actualModel,
+                prompt_tokens: response.usage.promptTokens,
+                completion_tokens: response.usage.completionTokens,
+                total_tokens: response.usage.totalTokens,
+                cost_usd: response.cost.providerCostUsd,
+                provider_cost_usd: response.cost.providerCostUsd,
+                cencori_charge_usd: response.cost.cencoriChargeUsd,
+                markup_percentage: response.cost.markupPercentage,
+                latency_ms: response.latencyMs,
+                status: usedFallback ? 'success_fallback' : 'success',
+                end_user_id: userId,
+                request_payload: {
+                    messages: loggedMessages,
+                    model,
+                    temperature,
+                    maxTokens,
+                    max_tokens,
+                    stream,
+                    original_provider: usedFallback ? providerName : undefined,
+                    original_model: usedFallback ? normalizedModel : undefined,
+                    data_rules_applied: customRulesResult.rules.length > 0,
+                },
+                response_payload: { content: loggedResponse, finishReason: response.finishReason },
+                ip_address: clientIp,
+                country_code: countryCode,
+            })
+            .select('id')
+            .single();
 
         if (logError) {
             console.error('[AI Chat] Failed to log request:', logError);
+        } else {
+            await chargeUsageCredits(
+                supabase,
+                organizationId,
+                tier,
+                response.cost.cencoriChargeUsd,
+                logData?.id ?? null,
+                'ai/chat'
+            );
         }
+
+        await incrementMonthlyUsage(supabase, organizationId, currentUsage);
 
         checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
             console.error('[Budget] Failed to check budget alerts:', err);

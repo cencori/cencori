@@ -1,0 +1,71 @@
+---
+title: "Python Sandbox"
+description: "Secure Python execution and LLM scripts routed through Cencori."
+section: "Agents"
+order: 6
+---
+
+# Python Sandbox
+
+The Python Sandbox is ideal for custom scripts, Jupyter notebooks, or minimal agent frameworks that use the official OpenAI Python SDK. 
+
+By simply changing the `base_url` in the SDK, all your Python AI scripts benefit from Cencori's unified logging, model routing, and spend caps.
+
+## Quick Start
+
+### 1. Deploy from the Marketplace
+
+Navigate to **Agents → Agent Marketplace** in your project dashboard and click **Deploy Agent** on the Python Sandbox card.
+
+### 2. Generate an API Key
+
+Go to the agent's **Configuration** tab and click **Generate Key**.
+
+### 3. Install the OpenAI SDK
+
+```bash
+pip install openai
+```
+
+### 4. Initialize the Client
+
+Initialize the standard `OpenAI` client, but point it to Cencori:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    # 1. Point the client to the Cencori Gateway
+    base_url="https://cencori.com/api/v1",
+    
+    # 2. Use your Cencori Agent Key
+    api_key="cake_YOUR_KEY_HERE",
+)
+
+response = client.chat.completions.create(
+    # 3. Model selection happens in the Cencori Dashboard, 
+    # but the SDK still requires this field string
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Write a python script to calculate fibonacci."},
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+## Using Other SDKs
+
+You can use the exact same approach for the Node.js/TypeScript SDK:
+
+```typescript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  baseURL: "https://cencori.com/api/v1",
+  apiKey: "cake_YOUR_KEY_HERE",
+});
+```
+
+Because Cencori perfectly implements the OpenAI proxy standard, any SDK or library built for OpenAI works out of the box.

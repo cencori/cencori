@@ -1,0 +1,50 @@
+---
+title: "AutoGPT"
+description: "Connect AutoGPT to Cencori to bring central configuration and spend caps to autonomous recursive loops."
+section: "Agents"
+order: 4
+---
+
+# AutoGPT
+
+[AutoGPT](https://agpt.co) is a powerful, recursive autonomous agent framework. Because AutoGPT can run in loops and consume significant tokens, routing it through Cencori is the safest way to deploy it — granting you strict spend caps and real-time observability.
+
+## Quick Start
+
+### 1. Deploy from the Marketplace
+
+Navigate to **Agents → Agent Marketplace** in your project dashboard and click **Deploy Agent** on the AutoGPT card.
+
+### 2. Generate an API Key
+
+Go to the agent's **Configuration** tab and click **Generate Key**. Copy the key.
+
+### 3. Install AutoGPT
+
+Follow the [official AutoGPT installation instructions](https://docs.agpt.co).
+
+### 4. Configure .env
+
+In your AutoGPT directory, find the `.env` file (or copy `.env.template` to `.env`) and update the OpenAI settings to point to Cencori:
+
+```env title=".env"
+# Point base URL to Cencori Gateway
+OPENAI_API_BASE=https://cencori.com/api/v1
+
+# Use your Cencori agent key
+OPENAI_API_KEY=cake_YOUR_KEY_HERE
+
+# Set models (must match models in your Cencori dashboard)
+SMART_LLM=gpt-4o
+FAST_LLM=gpt-4o-mini
+```
+
+### 5. Run
+
+Run AutoGPT as normal.
+
+```bash
+autogpt run
+```
+
+All recursive loops, web searches, and file operations will now log to your Cencori dashboard. If AutoGPT gets stuck in a loop, Cencori will automatically kill the connection once it hits your project's spend limit.

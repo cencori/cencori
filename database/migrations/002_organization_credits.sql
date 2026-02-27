@@ -4,19 +4,19 @@
 
 -- Add credits balance columns to organizations table
 ALTER TABLE organizations 
-  ADD COLUMN IF NOT EXISTS credits_balance DECIMAL(10, 2) DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS credits_balance DECIMAL(14, 6) DEFAULT 0.00,
   ADD COLUMN IF NOT EXISTS credits_updated_at TIMESTAMP DEFAULT NOW();
 
 -- Create credit transaction log table
 CREATE TABLE IF NOT EXISTS credit_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  amount DECIMAL(10, 2) NOT NULL, -- positive for top-up, negative for usage
+  amount DECIMAL(14, 6) NOT NULL, -- positive for top-up, negative for usage
   transaction_type TEXT NOT NULL, -- 'topup', 'usage', 'refund', 'adjustment'
   description TEXT,
   reference_id UUID, -- links to ai_requests.id for usage transactions
-  balance_before DECIMAL(10, 2) NOT NULL,
-  balance_after DECIMAL(10, 2) NOT NULL,
+  balance_before DECIMAL(14, 6) NOT NULL,
+  balance_after DECIMAL(14, 6) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   metadata JSONB
 );

@@ -29,9 +29,66 @@ import { decryptApiKey } from '@/lib/encryption';
 import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import { getProjectSecurityConfig } from '@/lib/safety/utils';
 import { getCache, saveCache, computeCacheKey, getSemanticCache, saveSemanticCache } from '@/lib/cache';
+import { getPricingFromDB } from '@/lib/providers/pricing';
 
 // Initialize Router
 const router = new ProviderRouter();
+
+function estimateTokenCount(text: string): number {
+    if (!text) return 0;
+    return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function getCachedUsage(response: unknown, prompt: string): {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+} {
+    const usage = (response as {
+        usage?: {
+            prompt_tokens?: number;
+            completion_tokens?: number;
+            total_tokens?: number;
+        };
+    })?.usage;
+
+    const promptTokens = Number(usage?.prompt_tokens ?? estimateTokenCount(prompt));
+    const completionTokens = Number(usage?.completion_tokens ?? 0);
+    const totalTokens = Number(usage?.total_tokens ?? promptTokens + completionTokens);
+
+    return { promptTokens, completionTokens, totalTokens };
+}
+
+async function getChargeForTokens(
+    provider: string,
+    model: string,
+    promptTokens: number,
+    completionTokens: number
+): Promise<{
+    providerCost: number;
+    cencoriCharge: number;
+    markupPercentage: number;
+}> {
+    try {
+        const pricing = await getPricingFromDB(provider, model);
+        const providerCost =
+            (promptTokens / 1000) * pricing.inputPer1KTokens
+            + (completionTokens / 1000) * pricing.outputPer1KTokens;
+        const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
+
+        return {
+            providerCost,
+            cencoriCharge,
+            markupPercentage: pricing.cencoriMarkupPercentage,
+        };
+    } catch {
+        return {
+            providerCost: 0,
+            cencoriCharge: 0,
+            markupPercentage: 0,
+        };
+    }
+}
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -107,6 +164,7 @@ export async function POST(req: NextRequest) {
         // Default to a chat model if none provided
         const requestedModel = model || ctx.defaultModel || 'gpt-3.5-turbo';
         const normalizedModel = router.normalizeModelName(requestedModel);
+        const providerName = router.detectProvider(requestedModel);
 
         // Ensure prompt exists
         if (!prompt || typeof prompt !== 'string') {
@@ -149,6 +207,30 @@ export async function POST(req: NextRequest) {
             // 1. Exact Match (L1 - Fast)
             const cachedResponse = await getCache(cacheKey);
             if (cachedResponse) {
+                const usage = getCachedUsage(cachedResponse, prompt);
+                const charge = await getChargeForTokens(
+                    providerName,
+                    normalizedModel,
+                    usage.promptTokens,
+                    usage.completionTokens
+                );
+
+                await logGatewayRequest(ctx, {
+                    endpoint: 'completions',
+                    model: normalizedModel,
+                    provider: providerName,
+                    status: 'success',
+                    promptTokens: usage.promptTokens,
+                    completionTokens: usage.completionTokens,
+                    totalTokens: usage.totalTokens,
+                    costUsd: charge.cencoriCharge,
+                    providerCostUsd: charge.providerCost,
+                    cencoriChargeUsd: charge.cencoriCharge,
+                    markupPercentage: charge.markupPercentage,
+                    metadata: { cache: 'exact' },
+                });
+                await incrementUsage(ctx);
+
                 const res = NextResponse.json({
                     ...cachedResponse,
                     id: `cached-${cachedResponse.id}`,
@@ -160,7 +242,6 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Provider Init ──
-        const providerName = router.detectProvider(requestedModel);
 
         // Initialize Default & BYOK
         initializeDefaultProviders();
@@ -185,6 +266,30 @@ export async function POST(req: NextRequest) {
             semanticEmbedding = embedding; // Store for later save if needed
 
             if (cachedRes) {
+                const usage = getCachedUsage(cachedRes, prompt);
+                const charge = await getChargeForTokens(
+                    providerName,
+                    normalizedModel,
+                    usage.promptTokens,
+                    usage.completionTokens
+                );
+
+                await logGatewayRequest(ctx, {
+                    endpoint: 'completions',
+                    model: normalizedModel,
+                    provider: providerName,
+                    status: 'success',
+                    promptTokens: usage.promptTokens,
+                    completionTokens: usage.completionTokens,
+                    totalTokens: usage.totalTokens,
+                    costUsd: charge.cencoriCharge,
+                    providerCostUsd: charge.providerCost,
+                    cencoriChargeUsd: charge.cencoriCharge,
+                    markupPercentage: charge.markupPercentage,
+                    metadata: { cache: 'semantic' },
+                });
+                await incrementUsage(ctx);
+
                 const res = NextResponse.json({
                     ...cachedRes,
                     id: `semantic-${cachedRes.id}`,
@@ -238,12 +343,47 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                         controller.close();
 
+                        const promptText = unifiedMessages.map(m => m.content).join('\n');
+                        let promptTokens = 0;
+                        let completionTokens = 0;
+
+                        try {
+                            promptTokens = await provider.countTokens(promptText, normalizedModel);
+                            completionTokens = await provider.countTokens(fullContent, normalizedModel);
+                        } catch {
+                            promptTokens = estimateTokenCount(promptText);
+                            completionTokens = estimateTokenCount(fullContent);
+                        }
+
+                        const totalTokens = promptTokens + completionTokens;
+
+                        let providerCost = 0;
+                        let cencoriCharge = 0;
+                        let markupPercentage = 0;
+
+                        try {
+                            const pricing = await provider.getPricing(normalizedModel);
+                            providerCost =
+                                (promptTokens / 1000) * pricing.inputPer1KTokens
+                                + (completionTokens / 1000) * pricing.outputPer1KTokens;
+                            cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
+                            markupPercentage = pricing.cencoriMarkupPercentage;
+                        } catch {
+                            // Keep zero values if pricing lookup fails; logging should not block response.
+                        }
+
                         await logGatewayRequest(streamCtx, {
                             endpoint: 'completions',
                             model: normalizedModel,
                             provider: providerName,
                             status: 'success',
-                            totalTokens: Math.ceil(fullContent.length / 4),
+                            promptTokens,
+                            completionTokens,
+                            totalTokens,
+                            costUsd: cencoriCharge,
+                            providerCostUsd: providerCost,
+                            cencoriChargeUsd: cencoriCharge,
+                            markupPercentage,
                         });
                         await incrementUsage(streamCtx);
 

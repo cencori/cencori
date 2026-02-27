@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
+import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
 interface WebTelemetryPayload {
     host: string;
@@ -31,9 +32,7 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
 
     // ── Extract API Key ──
-    const apiKey =
-        req.headers.get('CENCORI_API_KEY')
-        || req.headers.get('Authorization')?.replace('Bearer ', '');
+    const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
     if (!apiKey) {
         return NextResponse.json(

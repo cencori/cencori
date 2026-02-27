@@ -1,11 +1,9 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Transaction {
     id: string;
@@ -16,11 +14,50 @@ interface Transaction {
 }
 
 interface CreditProps {
+    orgId: string;
     balance: number;
     transactions: Transaction[];
 }
 
-export function CreditBalance({ balance, transactions }: CreditProps) {
+type CreditPackId = 'starter' | 'growth' | 'scale';
+
+const CREDIT_PACK_OPTIONS: Array<{ id: CreditPackId; label: string }> = [
+    { id: 'starter', label: '$10' },
+    { id: 'growth', label: '$50' },
+    { id: 'scale', label: '$200' },
+];
+
+export function CreditBalance({ orgId, balance, transactions }: CreditProps) {
+    const [selectedPack, setSelectedPack] = React.useState<CreditPackId>('growth');
+    const [isRecharging, setIsRecharging] = React.useState(false);
+
+    const handleRecharge = async () => {
+        if (isRecharging) return;
+        setIsRecharging(true);
+
+        try {
+            const res = await fetch('/api/billing/credits/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orgId,
+                    pack: selectedPack,
+                }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.checkoutUrl) {
+                throw new Error(data?.error || data?.details || 'Failed to start credits checkout');
+            }
+
+            window.location.href = data.checkoutUrl;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to start credits checkout';
+            toast.error(message);
+            setIsRecharging(false);
+        }
+    };
+
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
             <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
@@ -36,9 +73,27 @@ export function CreditBalance({ balance, transactions }: CreditProps) {
                             Available for on-demand generation
                         </p>
                     </div>
-                    <Button className="h-7 px-4 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-none rounded">
-                        Recharge
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={selectedPack}
+                            onChange={(e) => setSelectedPack(e.target.value as CreditPackId)}
+                            className="h-7 rounded border border-border bg-background px-2 text-xs"
+                            disabled={isRecharging}
+                        >
+                            {CREDIT_PACK_OPTIONS.map((pack) => (
+                                <option key={pack.id} value={pack.id}>
+                                    {pack.label}
+                                </option>
+                            ))}
+                        </select>
+                        <Button
+                            className="h-7 px-4 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-none rounded"
+                            onClick={handleRecharge}
+                            disabled={isRecharging}
+                        >
+                            {isRecharging ? 'Opening...' : 'Recharge'}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-3">
@@ -46,20 +101,26 @@ export function CreditBalance({ balance, transactions }: CreditProps) {
                         Recent Transactions
                     </div>
                     <div className="space-y-1">
-                        {transactions.map((t) => (
-                            <div key={t.id} className="flex items-center justify-between py-2 text-xs border-b border-border/40 last:border-0">
-                                <span className={cn(
-                                    "font-medium",
-                                    t.type === 'credit' ? "text-emerald-500" : "text-foreground"
-                                )}>
-                                    {t.type === 'credit' ? '+' : '-'}${t.amount.toFixed(2)}
-                                </span>
-                                <span className="text-muted-foreground">{t.description}</span>
-                                <span className="text-muted-foreground/50 tabular-nums">
-                                    {new Date(t.createdAt).toLocaleDateString()}
-                                </span>
-                            </div>
-                        ))}
+                        {transactions.map((t) => {
+                            const amount = Number(t.amount) || 0;
+                            const isCredit = amount >= 0;
+                            const absoluteAmount = Math.abs(amount).toFixed(2);
+
+                            return (
+                                <div key={t.id} className="flex items-center justify-between py-2 text-xs border-b border-border/40 last:border-0">
+                                    <span className={cn(
+                                        "font-medium",
+                                        isCredit ? "text-emerald-500" : "text-foreground"
+                                    )}>
+                                        {isCredit ? '+' : '-'}${absoluteAmount}
+                                    </span>
+                                    <span className="text-muted-foreground">{t.description}</span>
+                                    <span className="text-muted-foreground/50 tabular-nums">
+                                        {new Date(t.createdAt).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            );
+                        })}
                         {transactions.length === 0 && (
                             <div className="text-center py-4 text-xs text-muted-foreground">
                                 No recent transactions
