@@ -9,8 +9,11 @@ import { cn } from "@/lib/utils";
 
 type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
-type ScanTier = "scan" | "scan_team";
+type ScanTier = "scan_free" | "scan" | "scan_team";
+type PaidScanTier = Exclude<ScanTier, "scan_free">;
 type MatrixValue = boolean | string;
+const SCAN_APP_ORIGIN = "https://scan.cencori.com";
+const SCAN_SIGNUP_URL = `${SCAN_APP_ORIGIN}/signup?redirect=${encodeURIComponent(SCAN_APP_ORIGIN)}`;
 
 const tiers: Array<{
     name: Tier;
@@ -99,6 +102,19 @@ const scanAddons: Array<{
     features: string[];
     cta: string;
 }> = [
+    {
+        name: "scan_free",
+        displayName: "Scan Free",
+        price: 0,
+        description: "Start scanning at no cost with limited usage.",
+        features: [
+            "Up to 5 imported projects",
+            "2 scans per project",
+            "Scan dashboard access",
+            "Upgrade anytime to unlimited",
+        ],
+        cta: "Start Free",
+    },
     {
         name: "scan",
         displayName: "Scan",
@@ -283,6 +299,10 @@ function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPe
     return "Plus usage-based AI costs";
 }
 
+function isPaidScanTier(tier: ScanTier): tier is PaidScanTier {
+    return tier === "scan" || tier === "scan_team";
+}
+
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
@@ -360,7 +380,12 @@ export function Pricing() {
 
     const handleScanCTA = async (tier: ScanTier) => {
         if (!isAuthenticated) {
-            window.location.href = "/signup";
+            window.location.href = SCAN_SIGNUP_URL;
+            return;
+        }
+
+        if (tier === "scan_free") {
+            window.location.href = SCAN_APP_ORIGIN;
             return;
         }
 
@@ -369,16 +394,16 @@ export function Pricing() {
             const res = await fetch("/api/billing/scan/checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tier }),
+                body: JSON.stringify({ tier: isPaidScanTier(tier) ? tier : "scan" }),
             });
             const data = await res.json().catch(() => ({}));
             if (data.checkoutUrl) {
                 window.location.href = data.checkoutUrl;
             } else {
-                window.location.href = "/scan";
+                window.location.href = SCAN_APP_ORIGIN;
             }
         } catch {
-            window.location.href = "/scan";
+            window.location.href = SCAN_APP_ORIGIN;
         } finally {
             setLoadingScanTier(null);
         }
@@ -552,13 +577,13 @@ export function Pricing() {
                             plans include full scan access automatically. Free scan usage includes 5 imported projects and 2 scans per project.
                         </p>
                     </div>
-                    <div className="grid gap-0 border-border/50 md:grid-cols-2">
+                    <div className="grid gap-0 border-border/50 md:grid-cols-3">
                         {scanAddons.map((addon, index) => (
                             <article
                                 key={addon.name}
                                 className={cn(
                                     "flex flex-col gap-4 p-5",
-                                    index === 0 && "border-b border-border/50 md:border-b-0 md:border-r"
+                                    index < scanAddons.length - 1 && "border-b border-border/50 md:border-b-0 md:border-r"
                                 )}
                             >
                                 <div>
@@ -567,8 +592,8 @@ export function Pricing() {
                                 </div>
 
                                 <p className="text-3xl font-semibold tracking-tight">
-                                    ${addon.price}
-                                    <span className="text-base text-muted-foreground"> /mo</span>
+                                    {addon.price === 0 ? "Free" : `$${addon.price}`}
+                                    <span className="text-base text-muted-foreground">{addon.price === 0 ? "" : " /mo"}</span>
                                 </p>
 
                                 <ul className="space-y-2">

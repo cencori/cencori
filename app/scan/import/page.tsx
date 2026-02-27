@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
+import { openScanPaywallFromResponse } from "@/lib/scan/paywall-client";
 import {
     Select,
     SelectContent,
@@ -185,13 +186,15 @@ export default function ImportRepoPage() {
                 })
             });
 
-            const data = await response.json();
+            if (response.status === 402) {
+                await openScanPaywallFromResponse(response);
+                setImportingRepoId(null);
+                return;
+            }
 
+            const data = await response.json();
             if (response.ok) {
                 router.push(`/scan/projects/${data.project.id}`);
-            } else if (response.status === 402) {
-                setHasScanAccess(false);
-                setImportingRepoId(null);
             } else {
                 console.error('Import failed:', data.error);
                 setImportingRepoId(null);

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ScanMarkdownRenderer } from "@/components/scan/ScanMarkdownRenderer";
 import { ScanThinkingIndicator } from "@/components/scan/ScanThinkingIndicator";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
+import { openScanPaywallFromResponse } from "@/lib/scan/paywall-client";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -295,7 +296,7 @@ export default function FixWorkspacePage() {
 
                 if (!response.ok) {
                     if (response.status === 402) {
-                        setHasScanAccess(false);
+                        await openScanPaywallFromResponse(response);
                         return;
                     }
                     const data = await response.json().catch(() => ({}));
@@ -403,7 +404,7 @@ export default function FixWorkspacePage() {
 
             if (!response.ok) {
                 if (response.status === 402) {
-                    setHasScanAccess(false);
+                    await openScanPaywallFromResponse(response);
                     return;
                 }
                 const data = await response.json().catch(() => ({}));
@@ -528,12 +529,13 @@ export default function FixWorkspacePage() {
                 }),
             });
 
+            if (response.status === 402) {
+                await openScanPaywallFromResponse(response);
+                return;
+            }
+
             const data = await response.json();
             if (!response.ok) {
-                if (response.status === 402) {
-                    setHasScanAccess(false);
-                    return;
-                }
                 throw new Error(data.error || "Failed to create PR");
             }
 
@@ -587,7 +589,7 @@ export default function FixWorkspacePage() {
 
             if (!response.ok) {
                 if (response.status === 402) {
-                    setHasScanAccess(false);
+                    await openScanPaywallFromResponse(response);
                     return;
                 }
                 let message = `Failed to get response (${response.status})`;
