@@ -18,7 +18,7 @@ export const Footer = () => {
                             The security layer for AI development.
                         </p>
                         <div className="text-[10px] text-muted-foreground/60 font-mono">
-                            © 2025 FohnAI
+                            © 2026 FohnAI
                         </div>
                     </div>
 
