@@ -345,6 +345,36 @@ export async function POST(req: NextRequest) {
                     'User is not authorized for this agent project'
                 );
             }
+
+            // Synthesize gatewayCtx for dashboard requests so gateway logs are written.
+            // Resolve the project's first active API key for attribution.
+            const { data: dashboardKey } = await adminClient
+                .from('api_keys')
+                .select('id, environment')
+                .eq('project_id', agentRecord.project_id)
+                .is('revoked_at', null)
+                .order('created_at', { ascending: true })
+                .limit(1)
+                .single();
+
+            if (dashboardKey) {
+                gatewayCtx = {
+                    supabase: adminClient,
+                    projectId: agentRecord.project_id,
+                    organizationId: agentProject.organization_id,
+                    apiKeyId: dashboardKey.id,
+                    environment: dashboardKey.environment || 'production',
+                    keyType: 'dashboard',
+                    tier: 'free',
+                    requestId: crypto.randomUUID(),
+                    startTime: startedAt,
+                    clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '',
+                    countryCode: req.headers.get('x-vercel-ip-country') || null,
+                    projectName: '',
+                    defaultModel: null,
+                    defaultProvider: null,
+                };
+            }
         }
 
         // ── Check if agent is active ──
@@ -459,7 +489,7 @@ export async function POST(req: NextRequest) {
                                 promptTokens: usageAndCost.promptTokens,
                                 completionTokens: usageAndCost.completionTokens,
                                 totalTokens: usageAndCost.totalTokens,
-                                costUsd: usageAndCost.providerCostUsd,
+                                costUsd: usageAndCost.cencoriChargeUsd,
                                 providerCostUsd: usageAndCost.providerCostUsd,
                                 cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                 markupPercentage: usageAndCost.markupPercentage,
@@ -534,7 +564,7 @@ export async function POST(req: NextRequest) {
                                 promptTokens: usageAndCost.promptTokens,
                                 completionTokens: usageAndCost.completionTokens,
                                 totalTokens: usageAndCost.totalTokens,
-                                costUsd: usageAndCost.providerCostUsd,
+                                costUsd: usageAndCost.cencoriChargeUsd,
                                 providerCostUsd: usageAndCost.providerCostUsd,
                                 cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                 markupPercentage: usageAndCost.markupPercentage,
@@ -685,7 +715,7 @@ export async function POST(req: NextRequest) {
                                 promptTokens: usageAndCost.promptTokens,
                                 completionTokens: usageAndCost.completionTokens,
                                 totalTokens: usageAndCost.totalTokens,
-                                costUsd: usageAndCost.providerCostUsd,
+                                costUsd: usageAndCost.cencoriChargeUsd,
                                 providerCostUsd: usageAndCost.providerCostUsd,
                                 cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                 markupPercentage: usageAndCost.markupPercentage,
