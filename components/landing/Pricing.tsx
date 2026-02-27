@@ -103,10 +103,10 @@ const scanAddons: Array<{
         name: "scan",
         displayName: "Scan",
         price: 9,
-        description: "Standalone scan access for individual engineers.",
+        description: "Unlimited standalone scan access for individual engineers.",
         features: [
-            "Repository import",
-            "Full repository scans",
+            "Unlimited repository imports",
+            "Unlimited scans per project",
             "AI fix generation",
             "Fix PR workflow",
         ],
@@ -116,7 +116,7 @@ const scanAddons: Array<{
         name: "scan_team",
         displayName: "Scan Teams",
         price: 29,
-        description: "Standalone scan access for teams.",
+        description: "Unlimited standalone scan access for teams.",
         features: [
             "Everything in Scan",
             "Team-oriented scan workflows",
@@ -200,10 +200,10 @@ const matrixSections: Array<{
             {
                 feature: "Standalone scan add-on pricing",
                 values: {
-                    free: "$9 (individual) / $29 (teams)",
-                    pro: "Included",
-                    team: "Included",
-                    enterprise: "Included",
+                    free: "Free: 5 projects + 2 scans/project",
+                    pro: "Included (unlimited)",
+                    team: "Included (unlimited)",
+                    enterprise: "Included (unlimited)",
                 },
             },
             {
@@ -549,7 +549,7 @@ export function Pricing() {
                         <p className="text-sm font-semibold">Scan Add-on</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                             Standalone scan plans for users who only need scan workflows. Platform Pro, Team, and Enterprise
-                            plans include full scan access automatically.
+                            plans include full scan access automatically. Free scan usage includes 5 imported projects and 2 scans per project.
                         </p>
                     </div>
                     <div className="grid gap-0 border-border/50 md:grid-cols-2">
@@ -607,8 +607,9 @@ export function Pricing() {
                     <p>
                         Billing model: plan tier controls request limits and platform entitlements, while usage is charged as
                         provider cost plus configured markup through your credits wallet. Scan can also be purchased as a
-                        standalone add-on ($9 individual / $29 teams), while platform Pro, Team, and Enterprise include full
-                        scan access by default.
+                        standalone add-on ($9 individual / $29 teams) for unlimited usage. Free scan usage includes up to
+                        5 imported projects and 2 scans per project, while platform Pro, Team, and Enterprise include full
+                        unlimited scan access by default.
                     </p>
                 </div>
             </div>

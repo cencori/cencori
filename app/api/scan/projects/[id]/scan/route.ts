@@ -8,7 +8,7 @@ import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
-import { getScanPaywallForUser } from '@/lib/scan/entitlements';
+import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
 import {
     calculateScore,
     scanFileContent,
@@ -53,6 +53,11 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
 
         if (projectError || !project) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        const scanRunLimitResponse = await getScanRunPaywallForProject(user.id, id);
+        if (scanRunLimitResponse) {
+            return scanRunLimitResponse;
         }
 
         const githubAccess = await verifyProjectGithubAccess(user, project);

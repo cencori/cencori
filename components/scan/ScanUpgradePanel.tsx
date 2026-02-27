@@ -26,13 +26,13 @@ const scanPlans: ScanPlan[] = [
         title: "Scan",
         price: "$9",
         subtitle: "/month",
-        description: "For solo engineers shipping secure code faster.",
+        description: "For solo engineers who need unlimited scan workflows.",
         cta: "Get Scan",
         features: [
-            "Import repositories",
-            "Run full security scans",
+            "Unlimited repository imports",
+            "Unlimited scans per project",
             "Generate AI fix proposals",
-            "Create remediation PRs",
+            "Create remediation pull requests",
             "Security chat workspace",
         ],
     },
@@ -41,7 +41,7 @@ const scanPlans: ScanPlan[] = [
         title: "Scan Teams",
         price: "$29",
         subtitle: "/month",
-        description: "For teams that need shared secure delivery workflows.",
+        description: "For teams that need shared, unlimited secure delivery workflows.",
         cta: "Get Scan Teams",
         highlighted: true,
         features: [
@@ -61,8 +61,8 @@ interface ScanUpgradePanelProps {
 
 export function ScanUpgradePanel({
     className,
-    title = "Unlock Scan",
-    description = "Scan is a paid product. Choose a standalone scan plan, or use any Pro/Team/Enterprise platform plan for full scan access.",
+    title = "Upgrade Scan",
+    description = "Free Scan includes 5 project imports and 2 scans per project. Upgrade for unlimited scan workflows.",
 }: ScanUpgradePanelProps) {
     const [loadingTier, setLoadingTier] = useState<ScanCheckoutTier | null>(null);
     const [error, setError] = useState<string | null>(null);

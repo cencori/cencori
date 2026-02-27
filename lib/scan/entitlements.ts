@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export type ScanStandaloneTier = "scan" | "scan_team";
-type EntitlementSource = "platform" | "scan_subscription" | null;
+type EntitlementSource = "platform" | "scan_subscription" | "free" | null;
+type ScanPlan = "free" | "scan" | "scan_team" | "pro" | "team" | "enterprise";
+
+export const FREE_SCAN_MAX_PROJECTS = 5;
+export const FREE_SCAN_MAX_SCANS_PER_PROJECT = 2;
 
 interface OrganizationRow {
     id: string;
@@ -21,6 +25,15 @@ export interface ScanEntitlement {
     platformTier: "pro" | "team" | "enterprise" | null;
     scanTier: ScanStandaloneTier | null;
     scanStatus: string | null;
+    plan: ScanPlan;
+    limits: {
+        maxProjects: number | null;
+        maxScansPerProject: number | null;
+    };
+    usage: {
+        projectsImported: number | null;
+        remainingProjectImports: number | null;
+    };
 }
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
@@ -68,6 +81,26 @@ function highestPlatformTier(organizations: OrganizationRow[]): "pro" | "team" |
     }
 
     return best;
+}
+
+async function getImportedProjectCount(
+    userId: string,
+    supabaseAdmin = createAdminClient()
+): Promise<number> {
+    const { count, error } = await supabaseAdmin
+        .from("scan_projects")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+
+    if (error) {
+        throw new Error(`Failed to resolve imported scan project count: ${error.message}`);
+    }
+
+    return count ?? 0;
+}
+
+export function hasUnlimitedScanAccess(entitlement: ScanEntitlement): boolean {
+    return entitlement.source === "platform" || entitlement.source === "scan_subscription";
 }
 
 export async function getScanEntitlementForUser(userId: string): Promise<ScanEntitlement> {
@@ -123,6 +156,15 @@ export async function getScanEntitlementForUser(userId: string): Promise<ScanEnt
             platformTier,
             scanTier: null,
             scanStatus: "active",
+            plan: platformTier,
+            limits: {
+                maxProjects: null,
+                maxScansPerProject: null,
+            },
+            usage: {
+                projectsImported: null,
+                remainingProjectImports: null,
+            },
         };
     }
 
@@ -144,25 +186,68 @@ export async function getScanEntitlementForUser(userId: string): Promise<ScanEnt
             platformTier: null,
             scanTier: typedScanSubscription.scan_tier,
             scanStatus: typedScanSubscription.status || "active",
+            plan: typedScanSubscription.scan_tier,
+            limits: {
+                maxProjects: null,
+                maxScansPerProject: null,
+            },
+            usage: {
+                projectsImported: null,
+                remainingProjectImports: null,
+            },
         };
     }
 
+    const projectsImported = await getImportedProjectCount(userId, supabaseAdmin);
+
     return {
-        hasScanAccess: false,
-        source: null,
+        hasScanAccess: true,
+        source: "free",
         platformTier: null,
         scanTier: typedScanSubscription?.scan_tier || null,
         scanStatus: typedScanSubscription?.status || null,
+        plan: "free",
+        limits: {
+            maxProjects: FREE_SCAN_MAX_PROJECTS,
+            maxScansPerProject: FREE_SCAN_MAX_SCANS_PER_PROJECT,
+        },
+        usage: {
+            projectsImported,
+            remainingProjectImports: Math.max(FREE_SCAN_MAX_PROJECTS - projectsImported, 0),
+        },
     };
 }
 
-export function createScanPaywallResponse(entitlement: ScanEntitlement) {
+interface ScanPaywallOptions {
+    error?: string;
+    code?: string;
+    upgradeUrl?: string;
+    limitType?: "project_imports" | "scan_runs_per_project";
+    limit?: number;
+    used?: number;
+    projectId?: string;
+}
+
+export function createScanPaywallResponse(
+    entitlement: ScanEntitlement,
+    options: ScanPaywallOptions = {}
+) {
     return NextResponse.json(
         {
-            error: "Scan subscription required",
-            code: "SCAN_SUBSCRIPTION_REQUIRED",
+            error: options.error || "Scan subscription required",
+            code: options.code || "SCAN_SUBSCRIPTION_REQUIRED",
             entitlement,
-            upgradeUrl: "/scan?upgrade=scan",
+            upgradeUrl: options.upgradeUrl || "/scan?upgrade=scan",
+            ...(options.limitType
+                ? {
+                    limit: {
+                        type: options.limitType,
+                        max: options.limit ?? null,
+                        used: options.used ?? null,
+                        ...(options.projectId ? { projectId: options.projectId } : {}),
+                    },
+                }
+                : {}),
         },
         { status: 402 }
     );
@@ -175,4 +260,60 @@ export async function getScanPaywallForUser(userId: string): Promise<NextRespons
     }
 
     return createScanPaywallResponse(entitlement);
+}
+
+export async function getScanProjectImportPaywallForUser(userId: string): Promise<NextResponse | null> {
+    const entitlement = await getScanEntitlementForUser(userId);
+
+    if (!entitlement.hasScanAccess || hasUnlimitedScanAccess(entitlement)) {
+        return entitlement.hasScanAccess ? null : createScanPaywallResponse(entitlement);
+    }
+
+    const projectsImported = entitlement.usage.projectsImported ?? await getImportedProjectCount(userId);
+    if (projectsImported < FREE_SCAN_MAX_PROJECTS) {
+        return null;
+    }
+
+    return createScanPaywallResponse(entitlement, {
+        error: "Free scan project limit reached",
+        code: "SCAN_FREE_PROJECT_LIMIT_REACHED",
+        limitType: "project_imports",
+        limit: FREE_SCAN_MAX_PROJECTS,
+        used: projectsImported,
+    });
+}
+
+export async function getScanRunPaywallForProject(
+    userId: string,
+    projectId: string
+): Promise<NextResponse | null> {
+    const entitlement = await getScanEntitlementForUser(userId);
+
+    if (!entitlement.hasScanAccess || hasUnlimitedScanAccess(entitlement)) {
+        return entitlement.hasScanAccess ? null : createScanPaywallResponse(entitlement);
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { count, error } = await supabaseAdmin
+        .from("scan_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId);
+
+    if (error) {
+        throw new Error(`Failed to resolve scan run count: ${error.message}`);
+    }
+
+    const scansUsed = count ?? 0;
+    if (scansUsed < FREE_SCAN_MAX_SCANS_PER_PROJECT) {
+        return null;
+    }
+
+    return createScanPaywallResponse(entitlement, {
+        error: "Free scan run limit reached for this project",
+        code: "SCAN_FREE_SCAN_LIMIT_REACHED",
+        limitType: "scan_runs_per_project",
+        limit: FREE_SCAN_MAX_SCANS_PER_PROJECT,
+        used: scansUsed,
+        projectId,
+    });
 }

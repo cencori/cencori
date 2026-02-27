@@ -16,7 +16,8 @@ const faqData = [
     {
         id: "supported-models",
         question: "What AI models and providers do you support?",
-        answer: "We support 14+ AI providers with 75+ models including: OpenAI (GPT-5, GPT-4o, o3), Anthropic (Claude Opus 4, Sonnet 4), Google (Gemini 3 Pro, Gemini 2.5 Flash), xAI (Grok 4), Mistral (Large 3), DeepSeek (V3.2), Cohere (Command A), Perplexity (Sonar Pro), and more. You can switch between models dynamically - no code changes needed."
+        answer: "We support 14+ AI providers with 75+ models including: OpenAI (GPT-5, GPT-4o, o3), Anthropic (Claude Opus 4, Sonnet 4), Google (Gemini 3 Pro, Gemini 2.5 Flash), xAI (Grok 4), Mistral (Large 3), DeepSeek (V3.2), Cohere (Command A), Perplexity (Sonar Pro), and more. You can switch between models dynamically - no code changes needed.",
+        content: "We support 14+ AI providers with 75+ models including: OpenAI (GPT-5, GPT-4o, o3), Anthropic (Claude Opus 4, Sonnet 4), Google (Gemini 3 Pro, Gemini 2.5 Flash), xAI (Grok 4), Mistral (Large 3), DeepSeek (V3.2), Cohere (Command A), Perplexity (Sonar Pro), Meta (Llama 4), and more. You can switch between models dynamically - no code changes needed. BYOK (Bring Your Own Key) is fully supported!"
     },
     {
         id: "latency",
@@ -26,7 +27,17 @@ const faqData = [
     {
         id: "environments",
         question: "What's the difference between Production and Development environments?",
-        answer: "Each project has separate Production and Development environments with isolated API keys. Production keys (start with cen_) count toward your tier limits and are logged for compliance. Development keys (start with cen_test_) don't count toward limits, perfect for testing. This lets you iterate safely without affecting production quotas or compliance logs."
+        answer: "Each project has separate Production and Development environments with isolated API keys. Production keys (start with cen_) count toward your tier limits and are logged for compliance. Development keys (start with cen_test_) don't count toward limits, perfect for testing. This lets you iterate safely without affecting production quotas or compliance logs.",
+        content: (
+            <>
+                <p className="mb-2">Each project has separate Production and Development environments with isolated API keys:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li><strong className="text-foreground">Production</strong> keys (start with <code className="bg-muted px-1 rounded">cen_</code>): Count toward your tier limits, logged for compliance</li>
+                    <li><strong className="text-foreground">Development</strong> keys (start with <code className="bg-muted px-1 rounded">cen_test_</code>): Don&apos;t count toward limits, perfect for testing</li>
+                </ul>
+                <p className="mt-2">This lets you iterate safely without affecting production quotas or compliance logs.</p>
+            </>
+        )
     },
     {
         id: "request-limits",
@@ -36,7 +47,8 @@ const faqData = [
     {
         id: "data-security",
         question: "Is my data secure? Where do you store requests and responses?",
-        answer: "Yes. All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We store request/response logs in Supabase (SOC 2 compliant) for audit and analytics purposes. Logs are retained for 90 days by default (customizable for enterprise). We never train models on your data or share it with third parties."
+        answer: "Yes. All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We store request/response logs in Supabase (SOC 2 compliant) for audit and analytics purposes. Logs are retained for 90 days by default (customizable for enterprise). We never train models on your data or share it with third parties.",
+        content: "Yes. All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We store request/response logs in Supabase (SOC 2 compliant) for audit and analytics purposes. Logs are retained for 90 days by default (customizable for enterprise). We never train models on your data or share it with third parties. SOC 2 Type II compliance is in progress (expected Q2 2025)."
     },
     {
         id: "project-level",
@@ -46,7 +58,20 @@ const faqData = [
     {
         id: "vs-openai",
         question: "How is Cencori different from using OpenAI directly?",
-        answer: "OpenAI gives you the model. Cencori gives you everything else — the infrastructure for AI production. This includes security (prompt injection, PII detection, content filtering), multi-provider routing (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost tracking (spend per user/feature), plus compute and workflow capabilities. Think of it as the difference between renting a database vs. using Supabase."
+        answer: "OpenAI gives you the model. Cencori gives you everything else — the infrastructure for AI production. This includes security (prompt injection, PII detection, content filtering), multi-provider routing (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost tracking (spend per user/feature), plus compute and workflow capabilities. Think of it as the difference between renting a database vs. using Supabase.",
+        content: (
+            <>
+                <p className="mb-2">OpenAI gives you the model. Cencori gives you production-ready AI infrastructure:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Security (prompt injection, PII detection, content filtering)</li>
+                    <li>Multi-provider support (switch between GPT-4, Claude, Gemini)</li>
+                    <li>Audit logs &amp; compliance (SOC 2, GDPR)</li>
+                    <li>Cost optimization (track spend per user/feature)</li>
+                    <li>Cost tracking (spend per user/feature)</li>
+                </ul>
+                <p className="mt-2">Think of it as the difference between renting a database vs. using Supabase.</p>
+            </>
+        )
     },
     {
         id: "what-is-cencori",
@@ -94,7 +119,7 @@ export function FAQ() {
                                 {item.question}
                             </AccordionTrigger>
                             <AccordionContent className="text-muted-foreground">
-                                {item.answer}
+                                {item.content || item.answer}
                             </AccordionContent>
                         </AccordionItem>
                     ))}
