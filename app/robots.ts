@@ -7,7 +7,8 @@ export default function robots(): MetadataRoute.Robots {
                 userAgent: '*',
                 allow: [
                     '/',
-                    '/api/og',       // Allow social crawlers to fetch OG images
+                    '/og',           // Allow social crawlers to fetch OG images
+                    '/api/og',       // Backward compatibility for existing shared links
                 ],
                 disallow: [
                     '/dashboard/',      // Don't index authenticated app

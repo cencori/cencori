@@ -1,6 +1,13 @@
 import { Metadata } from "next";
 import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
+import { buildOgImageUrl } from "@/lib/og";
+
+const academyOgImage = buildOgImageUrl({
+    title: "Cencori Academy",
+    subtitle: "Interactive tutorials for AI production",
+    type: "docs",
+});
 
 export const metadata: Metadata = {
     title: "Academy | Cencori",
@@ -8,7 +15,7 @@ export const metadata: Metadata = {
     openGraph: {
         title: "Cencori Academy",
         description: "Interactive tutorials for building production AI applications",
-        images: ["/api/og?title=Cencori Academy&subtitle=Interactive tutorials for AI production&type=docs"],
+        images: [academyOgImage],
     },
 };
 
