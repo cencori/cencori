@@ -61,7 +61,8 @@ export async function GET(
         let query = supabaseAdmin
             .from('web_request_logs')
             .select('*', { count: 'exact' })
-            .eq('project_id', projectId);
+            .eq('project_id', projectId)
+            .not('host', 'like', '%cencori.com%');
 
         if (method !== 'all') {
             query = query.eq('method', method.toUpperCase());

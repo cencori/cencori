@@ -152,10 +152,21 @@ export function WebRequestLogsTable({ projectId, filters }: WebRequestLogsTableP
                 <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
                     <FileText className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium mb-1">No web gateway requests found</p>
-                <p className="text-xs text-muted-foreground">
-                    Add Cencori telemetry to your app to see web traffic logs here.
+                <p className="text-sm font-medium mb-1">No web traffic logged yet</p>
+                <p className="text-xs text-muted-foreground mb-4 max-w-sm">
+                    Integrate the Cencori SDK in your app to see real web traffic from your domain here.
                 </p>
+                <code className="text-[11px] text-muted-foreground bg-secondary/60 rounded-md px-3 py-2 mb-4 block max-w-xs text-left">
+                    {`await cencori.telemetry\n  .reportWebRequest({ ... })`}
+                </code>
+                <a
+                    href="https://cencori.com/docs/ai/observability#web-telemetry"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                >
+                    View integration guide →
+                </a>
             </div>
         );
     }
