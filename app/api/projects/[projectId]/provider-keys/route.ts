@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
 import { SUPPORTED_PROVIDERS, getProvider } from '@/lib/providers/config';
 
@@ -19,14 +20,20 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
 ) {
-    const supabase = createAdminClient();
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     try {
         const { projectId } = await params;
+        const supabaseAdmin = createAdminClient();
 
-        const { data: project, error: projectError } = await supabase
+        const { data: project, error: projectError } = await supabaseAdmin
             .from('projects')
-            .select('id, organization_id, default_provider, default_model, default_image_model')
+            .select('id, organization_id, default_provider, default_model, default_image_model, organizations!inner(owner_id)')
             .eq('id', projectId)
             .single();
 
@@ -34,9 +41,33 @@ export async function GET(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        const { data: providerKeys, error } = await supabase
+        const ownerId = (project.organizations as { owner_id?: string } | null)?.owner_id || null;
+        const isOwner = ownerId === user.id;
+        let membershipRole: string | null = null;
+
+        if (!isOwner) {
+            const { data: membership, error: membershipError } = await supabaseAdmin
+                .from('organization_members')
+                .select('role')
+                .eq('organization_id', project.organization_id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (membershipError) {
+                console.error('[API] Error checking project access:', membershipError);
+                return NextResponse.json({ error: 'Failed to verify project access' }, { status: 500 });
+            }
+
+            membershipRole = membership?.role ?? null;
+        }
+
+        if (!isOwner && membershipRole !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+        }
+
+        const { data: providerKeys, error } = await supabaseAdmin
             .from('provider_keys')
-            .select('provider, encrypted_key, key_hint, is_active, created_at, default_model, default_image_model')
+            .select('provider, key_hint, is_active, created_at, default_model, default_image_model')
             .eq('project_id', projectId);
 
         if (error) {
@@ -47,22 +78,11 @@ export async function GET(
 
         const providers: ProviderKeyResponse[] = SUPPORTED_PROVIDERS.map(p => {
             const key = keyMap.get(p.id);
-            let decryptedKey = undefined;
-            if (key?.encrypted_key && project.organization_id) {
-                try {
-                    const { decryptApiKey } = require('@/lib/encryption');
-                    decryptedKey = decryptApiKey(key.encrypted_key, project.organization_id);
-                } catch (e) {
-                    console.error(`Failed to decrypt key for ${p.id}`);
-                }
-            }
-
             return {
                 provider: p.id,
                 providerName: p.name,
                 hasKey: !!key,
                 keyHint: key?.key_hint || undefined,
-                apiKey: decryptedKey,
                 isActive: key?.is_active ?? false,
                 defaultModel: key?.default_model || undefined,
                 defaultImageModel: key?.default_image_model || undefined,
@@ -88,19 +108,49 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string }> }
 ) {
-    const supabase = createAdminClient();
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     try {
         const { projectId } = await params;
+        const supabaseAdmin = createAdminClient();
 
-        const { data: project, error: projectError } = await supabase
+        const { data: project, error: projectError } = await supabaseAdmin
             .from('projects')
-            .select('id, organization_id')
+            .select('id, organization_id, organizations!inner(owner_id)')
             .eq('id', projectId)
             .single();
 
         if (projectError || !project) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        const ownerId = (project.organizations as { owner_id?: string } | null)?.owner_id || null;
+        const isOwner = ownerId === user.id;
+        let membershipRole: string | null = null;
+
+        if (!isOwner) {
+            const { data: membership, error: membershipError } = await supabaseAdmin
+                .from('organization_members')
+                .select('role')
+                .eq('organization_id', project.organization_id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (membershipError) {
+                console.error('[API] Error checking project access:', membershipError);
+                return NextResponse.json({ error: 'Failed to verify project access' }, { status: 500 });
+            }
+
+            membershipRole = membership?.role ?? null;
+        }
+
+        if (!isOwner && membershipRole !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
         }
 
         const body = await req.json();
@@ -122,7 +172,7 @@ export async function POST(
 
         const keyHint = apiKey.length > 4 ? `...${apiKey.slice(-4)}` : '****';
 
-        const { data: providerKey, error } = await supabase
+        const { data: providerKey, error } = await supabaseAdmin
             .from('provider_keys')
             .upsert({
                 project_id: projectId,
@@ -150,7 +200,7 @@ export async function POST(
             if (defaultModel) projectUpdate.default_model = defaultModel;
             if (defaultImageModel) projectUpdate.default_image_model = defaultImageModel;
 
-            await supabase
+            await supabaseAdmin
                 .from('projects')
                 .update(projectUpdate)
                 .eq('id', projectId);
@@ -161,7 +211,6 @@ export async function POST(
             provider: {
                 provider: providerKey.provider,
                 keyHint: providerKey.key_hint,
-                apiKey: apiKey, // return the raw key
                 isActive: providerKey.is_active,
                 defaultModel: providerKey.default_model,
                 defaultImageModel: providerKey.default_image_model,

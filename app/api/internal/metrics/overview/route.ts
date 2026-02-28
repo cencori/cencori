@@ -13,8 +13,6 @@ import {
 } from '@/internal/analytics/lib/queries';
 import type { TimePeriod } from '@/internal/analytics/lib/types';
 
-const ALLOW_ALL_IN_DEV = true;
-
 const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
 async function isAuthorizedAdmin(email: string): Promise<boolean> {
@@ -33,29 +31,14 @@ async function isAuthorizedAdmin(email: string): Promise<boolean> {
 }
 
 export async function GET(req: NextRequest) {
-    const adminEmail = req.headers.get('X-Admin-Email');
-
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    const isDev = process.env.NODE_ENV === 'development';
-
-    if (!adminEmail && !user && !isDev) {
+    if (!user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let isAllowed = false;
-
-    if (adminEmail) {
-        isAllowed = await isAuthorizedAdmin(adminEmail);
-    }
-
-    if (!isAllowed && user?.email) {
-        isAllowed = await isAuthorizedAdmin(user.email);
-    }
-    if (!isAllowed && ALLOW_ALL_IN_DEV && isDev) {
-        isAllowed = true;
-    }
+    const isAllowed = await isAuthorizedAdmin(user.email);
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
