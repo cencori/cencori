@@ -99,14 +99,13 @@ export function ScanPaywallDialog({ open, onOpenChange, payload }: ScanPaywallDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg border border-border/50 bg-background/95 p-0">
+            <DialogContent className="sm:max-w-2xl border border-border/50 bg-background/95 p-0">
                 <div className="border-b border-border/40 px-5 py-4">
                     <Badge variant="outline" className="mb-2 text-[10px] uppercase tracking-wide">
                         Scan Plan
                     </Badge>
                     <DialogHeader className="space-y-1 text-left">
                         <DialogTitle className="flex items-center gap-2 text-base">
-                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
                             {copy.title}
                         </DialogTitle>
                         <DialogDescription className="text-xs text-muted-foreground">
