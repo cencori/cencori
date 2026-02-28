@@ -34,7 +34,7 @@ export const Footer = () => {
                             <li><Link href="/storage" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Data Storage</Link></li>
                             <li><Link href="/edge" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Edge</Link></li>
                             <li><Link href="/enterprise" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Enterprise</Link></li>
-                            <li><a href="https://scan.cencori.app" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Scan</a></li>
+                            <li><a href="https://scan.cencori.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Scan</a></li>
                         </ul>
                     </div>
 
