@@ -1,26 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ orgSlug: string; providerId: string }> }
 ) {
-  const supabase = createAdminClient();
+  const supabase = await createServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   
   try {
     const { orgSlug, providerId } = await params;
     const body = await req.json();
     const { name, baseUrl, apiKey, format, isActive } = body;
+    const supabaseAdmin = createAdminClient();
     
-    const { data: org } = await supabase
+    const { data: org } = await supabaseAdmin
       .from('organizations')
-      .select('id')
+      .select('id, owner_id')
       .eq('slug', orgSlug)
       .single();
     
     if (!org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    const isOwner = org.owner_id === user.id;
+    let membershipRole: string | null = null;
+    if (!isOwner) {
+      const { data: membership, error: membershipError } = await supabaseAdmin
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', org.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('[API] Error checking organization access:', membershipError);
+        return NextResponse.json({ error: 'Failed to verify organization access' }, { status: 500 });
+      }
+
+      membershipRole = membership?.role ?? null;
+    }
+
+    if (!isOwner && membershipRole !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
     
     const updateData: Record<string, unknown> = {};
@@ -32,7 +61,7 @@ export async function PATCH(
       updateData.api_key_encrypted = apiKey ? encryptApiKey(apiKey, org.id) : null;
     }
     
-    const { data: provider, error } = await supabase
+    const { data: provider, error } = await supabaseAdmin
       .from('custom_providers')
       .update(updateData)
       .eq('id', providerId)
@@ -55,22 +84,50 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ orgSlug: string; providerId: string }> }
 ) {
-  const supabase = createAdminClient();
+  const supabase = await createServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   
   try {
     const { orgSlug, providerId } = await params;
+    const supabaseAdmin = createAdminClient();
     
-    const { data: org } = await supabase
+    const { data: org } = await supabaseAdmin
       .from('organizations')
-      .select('id')
+      .select('id, owner_id')
       .eq('slug', orgSlug)
       .single();
     
     if (!org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
+
+    const isOwner = org.owner_id === user.id;
+    let membershipRole: string | null = null;
+    if (!isOwner) {
+      const { data: membership, error: membershipError } = await supabaseAdmin
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', org.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('[API] Error checking organization access:', membershipError);
+        return NextResponse.json({ error: 'Failed to verify organization access' }, { status: 500 });
+      }
+
+      membershipRole = membership?.role ?? null;
+    }
+
+    if (!isOwner && membershipRole !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+    }
     
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('custom_providers')
       .delete()
       .eq('id', providerId)

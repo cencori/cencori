@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import type { NextFetchEvent, NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 // Supabase config
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
-const webLogIngestSecret = process.env.WEB_LOG_INGEST_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Security headers for all responses
 const securityHeaders: Record<string, string> = {
@@ -46,27 +47,111 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     return response;
 }
 
-function extractProjectScope(pathname: string): { orgSlug: string; projectSlug: string } | null {
-    const match = pathname.match(/^\/dashboard\/organizations\/([^/]+)\/projects\/([^/]+)(?:\/|$)/);
-    if (!match) return null;
-
-    return { orgSlug: match[1], projectSlug: match[2] };
-}
-
-function isLocalhostHost(host: string): boolean {
-    const normalized = host.toLowerCase();
-
+function isProtectedApiPath(pathname: string): boolean {
     return (
-        normalized === 'localhost'
-        || normalized.startsWith('localhost:')
-        || normalized === '127.0.0.1'
-        || normalized.startsWith('127.0.0.1:')
-        || normalized === '[::1]'
-        || normalized.startsWith('[::1]:')
+        pathname.startsWith('/api/projects/')
+        || pathname.startsWith('/api/organizations/')
+        || pathname === '/api/github/repositories'
+        || pathname === '/api/internal/metrics/overview'
+        || pathname === '/api/internal/admins/verify'
     );
 }
 
-export async function middleware(request: NextRequest, event: NextFetchEvent) {
+function extractProjectId(pathname: string): string | null {
+    const match = pathname.match(/^\/api\/projects\/([^/]+)/);
+    return match?.[1] || null;
+}
+
+function extractOrgSlug(pathname: string): string | null {
+    const match = pathname.match(/^\/api\/organizations\/([^/]+)/);
+    return match?.[1] || null;
+}
+
+async function canAccessOrganization(
+    adminClient: SupabaseClient,
+    userId: string,
+    orgSlug: string,
+): Promise<{ allowed: boolean; status?: number }> {
+    const { data: orgData, error: orgError } = await adminClient
+        .from('organizations')
+        .select('id, owner_id')
+        .eq('slug', orgSlug)
+        .maybeSingle();
+    const org = orgData as { id: string; owner_id: string | null } | null;
+
+    if (orgError) {
+        console.error('[Middleware] Organization lookup failed:', orgError);
+        return { allowed: false, status: 500 };
+    }
+
+    if (!org) {
+        return { allowed: false, status: 404 };
+    }
+
+    if (org.owner_id === userId) {
+        return { allowed: true };
+    }
+
+    const { data: membership, error: membershipError } = await adminClient
+        .from('organization_members')
+        .select('user_id')
+        .eq('organization_id', org.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (membershipError) {
+        console.error('[Middleware] Organization membership check failed:', membershipError);
+        return { allowed: false, status: 500 };
+    }
+
+    return { allowed: !!membership, status: membership ? 200 : 403 };
+}
+
+async function canAccessProject(
+    adminClient: SupabaseClient,
+    userId: string,
+    projectId: string,
+): Promise<{ allowed: boolean; status?: number }> {
+    const { data: projectData, error: projectError } = await adminClient
+        .from('projects')
+        .select('id, organization_id, organizations!inner(owner_id)')
+        .eq('id', projectId)
+        .maybeSingle();
+    const project = projectData as {
+        organization_id: string;
+        organizations: { owner_id?: string | null } | null;
+    } | null;
+
+    if (projectError) {
+        console.error('[Middleware] Project lookup failed:', projectError);
+        return { allowed: false, status: 500 };
+    }
+
+    if (!project) {
+        return { allowed: false, status: 404 };
+    }
+
+    const ownerId = (project.organizations as { owner_id?: string } | null)?.owner_id || null;
+    if (ownerId === userId) {
+        return { allowed: true };
+    }
+
+    const { data: membership, error: membershipError } = await adminClient
+        .from('organization_members')
+        .select('user_id')
+        .eq('organization_id', project.organization_id)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (membershipError) {
+        console.error('[Middleware] Project membership check failed:', membershipError);
+        return { allowed: false, status: 500 };
+    }
+
+    return { allowed: !!membership, status: membership ? 200 : 403 };
+}
+
+export async function middleware(request: NextRequest) {
     const hostname = request.headers.get('host') ?? '';
     const domain = hostname.split(':')[0].toLowerCase();
     const isScanSubdomain =
@@ -82,6 +167,7 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
     });
 
     const pathname = request.nextUrl.pathname;
+    const needsApiAccessCheck = isProtectedApiPath(pathname);
     const isScanAuthPath =
         pathname === '/signup'
         || pathname.startsWith('/signup/')
@@ -167,20 +253,55 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
     );
 
     // Refresh auth token
-    await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (needsApiAccessCheck) {
+        if (!user) {
+            return applySecurityHeaders(
+                NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            );
+        }
+
+        if (!supabaseServiceRoleKey) {
+            console.error('[Middleware] Missing SUPABASE_SERVICE_ROLE_KEY for protected API access checks');
+            return applySecurityHeaders(
+                NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 })
+            );
+        }
+
+        const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+        });
+
+        const projectId = extractProjectId(pathname);
+        if (projectId) {
+            const access = await canAccessProject(adminClient, user.id, projectId);
+            if (!access.allowed) {
+                return applySecurityHeaders(
+                    NextResponse.json(
+                        { error: access.status === 404 ? 'Project not found' : 'Forbidden' },
+                        { status: access.status || 403 }
+                    )
+                );
+            }
+        }
+
+        const orgSlug = extractOrgSlug(pathname);
+        if (orgSlug) {
+            const access = await canAccessOrganization(adminClient, user.id, orgSlug);
+            if (!access.allowed) {
+                return applySecurityHeaders(
+                    NextResponse.json(
+                        { error: access.status === 404 ? 'Organization not found' : 'Forbidden' },
+                        { status: access.status || 403 }
+                    )
+                );
+            }
+        }
+    }
 
     // Apply security headers to all responses
     response = applySecurityHeaders(response);
-
-    // Web traffic logging is now handled by the external SDK telemetry endpoint
-    // (POST /api/v1/telemetry/web). The middleware ingest below was the old approach
-    // that only captured internal dashboard navigation. Disabled to avoid noise.
-    //
-    // If you need to re-enable internal dashboard logging, uncomment the block below.
-
-    // const projectScope = extractProjectScope(pathname);
-    // const skipLocalhostIngest = isProductionRuntime && isLocalhostHost(hostname);
-    // if (projectScope && webLogIngestSecret && !skipLocalhostIngest) { ... }
 
     return response;
 }
@@ -188,5 +309,10 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
 export const config = {
     matcher: [
         '/((?!api|_next/static|_next/image|favicon.ico).*)',
+        '/api/projects/:path*',
+        '/api/organizations/:path*',
+        '/api/github/repositories',
+        '/api/internal/metrics/overview',
+        '/api/internal/admins/verify',
     ],
 }

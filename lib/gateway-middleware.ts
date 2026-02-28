@@ -116,13 +116,14 @@ async function lookupCountryFromIp(ip: string): Promise<string | null> {
             // Fall through to fallback
         }
 
-        const fallbackResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
+        const fallbackResponse = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/country/`, {
             signal: AbortSignal.timeout(3000),
+            headers: { 'Accept': 'text/plain' },
         });
         if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            if (data.status === 'success' && data.countryCode) {
-                return data.countryCode;
+            const countryCode = (await fallbackResponse.text()).trim();
+            if (countryCode && countryCode.length === 2) {
+                return countryCode.toUpperCase();
             }
         }
 

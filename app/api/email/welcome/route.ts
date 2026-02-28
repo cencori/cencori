@@ -1,22 +1,38 @@
 import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabaseServer';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
+  const supabase = await createServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { email } = await request.json();
 
-    if (!email) {
+    if (!email || typeof email !== 'string') {
       return NextResponse.json(
         { error: 'Email is required' },
         { status: 400 }
       );
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== user.email.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     const { data, error } = await resend.emails.send({
       from: 'Cencori <welcome@cencori.com>',
-      to: email,
+      to: normalizedEmail,
       subject: 'Welcome to Cencori! 🚀',
       html: `
         <!DOCTYPE html>

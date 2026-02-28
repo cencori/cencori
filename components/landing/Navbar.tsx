@@ -144,7 +144,7 @@ export default function Navbar({
                 { title: "Integration", href: "/integration" },
                 { title: "Data Storage", href: "/storage" },
                 { title: "Edge", href: "/edge" },
-                { title: "Scan", href: "/scan" },
+                { title: "Scan", href: "https://scan.cencori.app" },
             ]
         },
         {
@@ -209,7 +209,7 @@ export default function Navbar({
             [
                 { title: "Data Storage", href: "/storage", description: "Vector database & RAG." },
                 { title: "Edge", href: "/edge", description: "Platform integrations & edge middleware." },
-                { title: "Scan", href: "/scan", description: "Security scanning & vulnerability detection." },
+                { title: "Scan", href: "https://scan.cencori.app", description: "Security scanning & vulnerability detection." },
             ],
         ],
     };

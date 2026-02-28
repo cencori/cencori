@@ -23,7 +23,11 @@ const projectCache = new Map<string, { projectId: string; organizationId: string
 const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
 function getInternalIngestSecret(): string | undefined {
-    return process.env.WEB_LOG_INGEST_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    return process.env.WEB_LOG_INGEST_SECRET;
+}
+
+function secretsMatch(receivedSecret: string | null, expectedSecret: string): boolean {
+    return !!receivedSecret && receivedSecret === expectedSecret;
 }
 
 function readCachedProject(orgSlug: string, projectSlug: string) {
@@ -65,7 +69,12 @@ export async function POST(req: NextRequest) {
     const secret = getInternalIngestSecret();
     const receivedSecret = req.headers.get('x-cencori-internal-key');
 
-    if (!secret || !receivedSecret || receivedSecret !== secret) {
+    if (!secret) {
+        console.error('[Web Logs Ingest] Missing WEB_LOG_INGEST_SECRET');
+        return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
+    }
+
+    if (!secretsMatch(receivedSecret, secret)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
