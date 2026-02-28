@@ -129,12 +129,28 @@ interface RepositoryResearch {
     reasoningNotes: string[];
 }
 
+interface RepositoryAiContext {
+    id: string;
+    model: string;
+    provider: "cerebras" | "groq" | "gemini";
+    generatedAt: string;
+    summary: string;
+    architectureFindings: string[];
+    riskThemes: string[];
+    priorityFiles: string[];
+    suggestedChecks: string[];
+    snapshotsAnalyzed: number;
+    filesAnalyzed: number;
+    issuesObserved: number;
+}
+
 interface ScanResultPayload {
     issues: ScanIssue[];
     suppressed_issues?: ScanIssue[];
     raw_issue_count?: number;
     summary?: ScanSummary;
     research?: RepositoryResearch;
+    ai_context?: RepositoryAiContext;
 }
 
 interface ScanRun {
@@ -230,6 +246,7 @@ export default function ProjectDetailPage() {
     const [selectedChangelog, setSelectedChangelog] = useState<Changelog | null>(null);
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const [scanEntitlement, setScanEntitlement] = useState<ScanPaywallEntitlement | null>(null);
+    const [liveAiContext, setLiveAiContext] = useState<RepositoryAiContext | null>(null);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
         try {
@@ -407,6 +424,7 @@ export default function ProjectDetailPage() {
     }, [baselineScanId, scans]);
 
     const currentResearch = currentScan?.results?.research || null;
+    const currentAiContext = (isScanning ? liveAiContext : null) || currentScan?.results?.ai_context || null;
 
     const scanDiff = useMemo(() => {
         if (!currentScan || !baselineScan) {
@@ -472,6 +490,7 @@ export default function ProjectDetailPage() {
 
         setIsScanning(true);
         setScanLog([]);
+        setLiveAiContext(null);
 
         const cachedMaxScansPerProject = scanEntitlement?.limits?.maxScansPerProject;
         if (typeof cachedMaxScansPerProject === "number" && scans.length >= cachedMaxScansPerProject) {
@@ -560,6 +579,11 @@ export default function ProjectDetailPage() {
                                 line: issue.line,
                             }))
                         ]);
+                    } else if (data.type === 'ai_context') {
+                        const aiContext = data.data as RepositoryAiContext | undefined;
+                        const summaryMessage = aiContext?.summary || data.message || 'AI context update';
+                        setScanLog(prev => [...prev, { type: "ai_context", message: summaryMessage, time: timeStr }]);
+                        setLiveAiContext(aiContext || null);
                     } else if (data.type === 'complete') {
                         const result = data.data;
                         setScanLog(prev => [...prev, {
@@ -576,7 +600,12 @@ export default function ProjectDetailPage() {
                             files_scanned: result.filesScanned,
                             issues_found: result.issuesFound,
                             scan_duration_ms: result.scanDurationMs,
-                            results: { issues: result.issues, summary: result.summary, research: result.research },
+                            results: {
+                                issues: result.issues,
+                                summary: result.summary,
+                                research: result.research,
+                                ...(result.aiContext ? { ai_context: result.aiContext as RepositoryAiContext } : {}),
+                            },
                             created_at: new Date().toISOString(),
                             fix_status: result.issuesFound > 0 ? "pending" : "not_applicable",
                             fix_pr_url: null,
@@ -594,10 +623,12 @@ export default function ProjectDetailPage() {
 
                         eventSource.close();
                         setIsScanning(false);
+                        setLiveAiContext(null);
                     } else if (data.type === 'error') {
                         setScanLog(prev => [...prev, { type: "error", message: data.message, time: timeStr }]);
                         eventSource.close();
                         setIsScanning(false);
+                        setLiveAiContext(null);
                     }
                 } catch (parseErr) {
                     console.error('Error parsing SSE event:', parseErr);
@@ -608,12 +639,14 @@ export default function ProjectDetailPage() {
                 setScanLog(prev => [...prev, { type: "error", message: "Connection lost" }]);
                 eventSource.close();
                 setIsScanning(false);
+                setLiveAiContext(null);
             };
 
         } catch (err) {
             console.error('Scan error:', err);
             setScanLog(prev => [...prev, { type: "error", message: "Failed to run scan" }]);
             setIsScanning(false);
+            setLiveAiContext(null);
         }
     };
 
@@ -867,6 +900,7 @@ export default function ProjectDetailPage() {
                                                             issues: currentScan.results?.issues || [],
                                                             summary: currentScan.results?.summary || null,
                                                             research: currentScan.results?.research || null,
+                                                            aiContext: currentScan.results?.ai_context || null,
                                                         };
                                                         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                                                         const url = URL.createObjectURL(blob);
@@ -948,6 +982,13 @@ export default function ProjectDetailPage() {
                                                     <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
                                                     <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
                                                     <span className="text-emerald-500">{entry.message}</span>
+                                                </>
+                                            )}
+                                            {entry.type === "ai_context" && (
+                                                <>
+                                                    <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                    <Shield className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />
+                                                    <span className="text-blue-300">{entry.message}</span>
                                                 </>
                                             )}
                                             {entry.type === "error" && (
@@ -1133,6 +1174,38 @@ export default function ProjectDetailPage() {
                                 <div className="bg-card border border-border/40 rounded-md p-4">
                                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Data Flow Traces</p>
                                     <p className="text-xl font-semibold mt-1">{currentResearch?.dataFlows.traces.length ?? 0}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Live AI Context</p>
+                                    {currentAiContext && (
+                                        <p className="text-[10px] text-muted-foreground">
+                                            {currentAiContext.model} · {currentAiContext.snapshotsAnalyzed} snapshot{currentAiContext.snapshotsAnalyzed === 1 ? "" : "s"}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {currentAiContext ? (
+                                        <>
+                                            <p className="text-xs text-foreground">{currentAiContext.summary}</p>
+                                            {currentAiContext.riskThemes.length > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium text-foreground/90">Risk themes:</span> {currentAiContext.riskThemes.join(" · ")}
+                                                </p>
+                                            )}
+                                            {currentAiContext.priorityFiles.length > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium text-foreground/90">Priority files:</span> {currentAiContext.priorityFiles.slice(0, 6).join(", ")}
+                                                </p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            AI context snapshots are stored when a live scan stream is running.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

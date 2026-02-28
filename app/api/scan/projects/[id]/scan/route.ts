@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
 import {
@@ -93,6 +94,10 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                 throw new Error('Invalid repository reference');
             }
 
+            const aiContextTracker = createRepositoryAiContextTracker({
+                repository: githubAccess.repository.fullName,
+            });
+
             const {
                 allIssues: rawIssues,
                 scannedFiles,
@@ -106,6 +111,24 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                 shouldScanFile,
                 scanFileContent,
                 collectScannedFiles: true,
+                onProgress: async (progress) => {
+                    aiContextTracker.ingest({
+                        filePath: progress.currentFile,
+                        fileContent: progress.fileContent,
+                        fileIssues: progress.fileIssues,
+                        totals: {
+                            processedFiles: progress.processedFiles,
+                            totalFiles: progress.totalFiles,
+                            issuesFound: progress.issuesFound,
+                        },
+                    });
+                },
+            });
+
+            const aiContext = await aiContextTracker.finalize({
+                processedFiles: filesScanned,
+                totalFiles: totalCandidateFiles,
+                issuesFound: rawIssues.length,
             });
 
             // Build file content map for the LLM filter
@@ -204,6 +227,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                         summary,
                         research: enrichedResearch,
                         ...(aiInsight ? { ai: aiInsight } : {}),
+                        ...(aiContext ? { ai_context: aiContext } : {}),
                         total_candidate_files: totalCandidateFiles,
                         failed_files: failedFiles,
                         ...(noFilesMessage ? { message: noFilesMessage } : {}),
@@ -233,6 +257,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                     summary,
                     research: enrichedResearch,
                     ...(aiInsight ? { ai: aiInsight } : {}),
+                    ...(aiContext ? { ai_context: aiContext } : {}),
                     issues: allIssues,
                     total_candidate_files: totalCandidateFiles,
                     failed_files: failedFiles,

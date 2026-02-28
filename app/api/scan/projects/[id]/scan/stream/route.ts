@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
 import {
@@ -117,6 +118,26 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
                 sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Indexing repository tree...' });
 
+                const aiContextTracker = createRepositoryAiContextTracker({
+                    repository: githubAccess.repository.fullName,
+                    onUpdate: async (contextUpdate) => {
+                        sendEvent({
+                            type: 'ai_context',
+                            time: Date.now() - startTime,
+                            message: contextUpdate.summary,
+                            data: contextUpdate,
+                        });
+                    },
+                });
+
+                if (aiContextTracker.isEnabled) {
+                    sendEvent({
+                        type: 'info',
+                        time: Date.now() - startTime,
+                        message: 'Running live AI context scan in parallel...',
+                    });
+                }
+
                 let lastProgressUpdate = 0;
                 const {
                     allIssues: rawIssues,
@@ -132,6 +153,17 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                     scanFileContent,
                     collectScannedFiles: true,
                     onProgress: async (progress) => {
+                        aiContextTracker.ingest({
+                            filePath: progress.currentFile,
+                            fileContent: progress.fileContent,
+                            fileIssues: progress.fileIssues,
+                            totals: {
+                                processedFiles: progress.processedFiles,
+                                totalFiles: progress.totalFiles,
+                                issuesFound: progress.issuesFound,
+                            },
+                        });
+
                         if (progress.fileIssues.length > 0) {
                             sendEvent({
                                 type: 'issue',
@@ -172,6 +204,20 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                         }
                     },
                 });
+
+                const aiContext = await aiContextTracker.finalize({
+                    processedFiles: filesScanned,
+                    totalFiles: totalCandidateFiles,
+                    issuesFound: rawIssues.length,
+                });
+
+                if (aiContext) {
+                    sendEvent({
+                        type: 'success',
+                        time: Date.now() - startTime,
+                        message: `AI context scan complete (${aiContext.snapshotsAnalyzed} snapshot${aiContext.snapshotsAnalyzed === 1 ? '' : 's'})`,
+                    });
+                }
 
                 const fileContentMap = new Map<string, string>(
                     scannedFiles.map(file => [file.path, file.content])
@@ -268,6 +314,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                         summary,
                         research: enrichedResearch,
                         ...(aiInsight ? { ai: aiInsight } : {}),
+                        ...(aiContext ? { aiContext } : {}),
                         issues: allIssues,
                         rawIssueCount: rawIssues.length,
                         suppressedIssueCount: suppressedIssues.length,
@@ -307,6 +354,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                             summary,
                             research: enrichedResearch,
                             ...(aiInsight ? { ai: aiInsight } : {}),
+                            ...(aiContext ? { ai_context: aiContext } : {}),
                             total_candidate_files: totalCandidateFiles,
                             failed_files: failedFiles,
                             ...(noFilesMessage ? { message: noFilesMessage } : {}),
