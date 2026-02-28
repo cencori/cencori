@@ -16,6 +16,7 @@ export interface RepositoryScanProgress {
     totalFiles: number;
     issuesFound: number;
     fileIssues: ScanIssue[];
+    fileContent?: string;
     failedFiles: number;
 }
 
@@ -233,9 +234,11 @@ export async function scanGithubRepository(options: ScanRepositoryOptions): Prom
 
             const file = candidateFiles[currentIndex];
             let fileIssues: ScanIssue[] = [];
+            let fileContent: string | undefined;
 
             try {
                 const content = await fetchFileContent(octokit, owner, repo, ref, file);
+                fileContent = content;
                 fileIssues = scanFileContent(file.path, content);
                 allIssues.push(...fileIssues);
                 filesScanned += 1;
@@ -256,6 +259,7 @@ export async function scanGithubRepository(options: ScanRepositoryOptions): Prom
                         totalFiles: candidateFiles.length,
                         issuesFound: allIssues.length,
                         fileIssues,
+                        fileContent,
                         failedFiles,
                     });
                 }
