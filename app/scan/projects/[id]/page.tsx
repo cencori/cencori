@@ -478,7 +478,7 @@ export default function ProjectDetailPage() {
             emitScanPaywall({
                 error: "Free scan run limit reached for this project",
                 code: "SCAN_FREE_SCAN_LIMIT_REACHED",
-                entitlement: scanEntitlement,
+                entitlement: scanEntitlement ?? undefined,
                 limit: {
                     type: "scan_runs_per_project",
                     max: cachedMaxScansPerProject,
