@@ -35,7 +35,7 @@ When a user recharges:
 1. They select a credit pack in Billing (`Starter`, `Growth`, `Scale` by default).
 2. Checkout is created.
 3. On successful payment, Cencori credits the organization wallet.
-4. A `topup` transaction is written to `credit_transactions`.
+4. A `topup` transaction is written to the transaction history.
 
 > [!NOTE]
 > Top-up settlement is idempotent: duplicate payment events do not double-credit the same order.
@@ -46,14 +46,14 @@ For each successful request:
 
 1. Cencori computes provider cost from model pricing and token/image/audio usage.
 2. Cencori applies model/provider markup.
-3. Final charge (`cencori_charge_usd`) is logged.
+3. Final charge is logged.
 4. Credits are deducted from org balance.
 5. A `usage` transaction is written with a reference to the request log.
 
 Formula:
 
 ```text
-provider_cost + markup = cencori_charge_usd
+provider_cost + markup = total_charge
 ```
 
 ## Example
@@ -63,9 +63,9 @@ Request:
 - Input tokens: 1,000
 - Output tokens: 500
 
-If computed `cencori_charge_usd = 0.0245`, then:
-- org balance decreases by `0.0245`
-- transaction log records `-0.0245` usage
+If the final calculated charge is **0.0245 credits**, then:
+- Your organization balance decreases by **0.0245**.
+- A usage record of **-0.0245** is added to your transaction history.
 
 ## Enforcement Behavior
 
@@ -102,7 +102,7 @@ If you operate your own Cencori deployment:
 1. Configure Polar credit products (`starter`, `growth`, `scale`).
 2. Set webhook endpoint and subscribe to `order.paid`.
 3. Ensure provider keys are configured for managed mode.
-4. Keep `model_pricing` data current for accurate charging.
+4. Keep model pricing data current for accurate charging.
 5. Set spend caps and monitor low-balance orgs.
 
 ## Troubleshooting
@@ -115,7 +115,7 @@ If you operate your own Cencori deployment:
 ### Credits not deducted on requests
 - Check whether endpoint is routed through billing middleware/charged path.
 - Confirm request reached a successful completion path.
-- Verify request log contains `cencori_charge_usd > 0`.
+- Verify request log contains charge greater than 0.
 
 ### `Credit balance exhausted` errors
 - Recharge org wallet.
