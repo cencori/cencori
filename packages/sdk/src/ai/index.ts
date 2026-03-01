@@ -28,6 +28,14 @@ interface OpenAIChatResponse {
     model?: string;
     content?: string;
     finish_reason?: string;
+    toolCalls?: Array<{
+        id: string;
+        type: 'function';
+        function: {
+            name: string;
+            arguments: string;
+        };
+    }>;
     tool_calls?: Array<{
         id: string;
         type: 'function';
@@ -122,7 +130,7 @@ export class AINamespace {
         const data = await response.json() as OpenAIChatResponse;
 
         const choice = data.choices?.[0];
-        const rawToolCalls = data.tool_calls ?? choice?.message?.tool_calls;
+        const rawToolCalls = data.toolCalls ?? data.tool_calls ?? choice?.message?.tool_calls;
         const toolCalls = rawToolCalls?.map(tc => ({
             id: tc.id,
             type: tc.type as 'function',
@@ -339,7 +347,7 @@ export class AINamespace {
         }
 
         const data = await response.json() as OpenAIChatResponse;
-        const toolCall = data.tool_calls?.[0] ?? data.choices?.[0]?.message?.tool_calls?.[0];
+        const toolCall = data.toolCalls?.[0] ?? data.tool_calls?.[0] ?? data.choices?.[0]?.message?.tool_calls?.[0];
 
         if (!toolCall) {
             throw new Error('Model did not return structured output');

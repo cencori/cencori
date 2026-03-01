@@ -98,6 +98,37 @@ describe('AINamespace chat response parsing', () => {
             totalTokens: 30,
         });
     });
+
+    it('parses legacy camelCase toolCalls responses', async () => {
+        const ns = createNamespace();
+
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            content: 'Structured',
+            model: 'gpt-4o',
+            finish_reason: 'tool_calls',
+            toolCalls: [{
+                id: 'call_camel',
+                type: 'function',
+                function: {
+                    name: 'generate_object',
+                    arguments: '{"ok":true}',
+                },
+            }],
+            usage: {
+                prompt_tokens: 5,
+                completion_tokens: 3,
+                total_tokens: 8,
+            },
+        }), { status: 200 }));
+
+        const result = await ns.chat({
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: 'hello' }],
+        });
+
+        expect(result.finishReason).toBe('tool_calls');
+        expect(result.toolCalls?.[0]?.id).toBe('call_camel');
+    });
 });
 
 describe('AINamespace generateObject', () => {
@@ -137,5 +168,43 @@ describe('AINamespace generateObject', () => {
 
         expect(result.object).toEqual({ name: 'Ada', age: 30 });
         expect(result.usage.totalTokens).toBe(19);
+    });
+
+    it('reads structured output from top-level toolCalls', async () => {
+        const ns = createNamespace();
+
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            id: 'chatcmpl-structured-2',
+            model: 'gpt-4o',
+            toolCalls: [{
+                id: 'call_structured_camel',
+                type: 'function',
+                function: {
+                    name: 'generate_object',
+                    arguments: '{"name":"Lin","age":28}',
+                },
+            }],
+            usage: {
+                prompt_tokens: 11,
+                completion_tokens: 6,
+                total_tokens: 17,
+            },
+        }), { status: 200 }));
+
+        const result = await ns.generateObject<{ name: string; age: number }>({
+            model: 'gpt-4o',
+            prompt: 'Generate a user profile',
+            schema: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string' },
+                    age: { type: 'number' },
+                },
+                required: ['name', 'age'],
+            },
+        });
+
+        expect(result.object).toEqual({ name: 'Lin', age: 28 });
+        expect(result.usage.totalTokens).toBe(17);
     });
 });

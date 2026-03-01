@@ -1333,6 +1333,7 @@ export async function POST(req: NextRequest) {
             model: actualModel,
             provider: actualProvider,
             ...(openAiToolCalls && openAiToolCalls.length > 0 ? { tool_calls: openAiToolCalls } : {}),
+            toolCalls: openAiToolCalls ?? null,
             usage: {
                 prompt_tokens: response.usage.promptTokens,
                 completion_tokens: response.usage.completionTokens,
