@@ -247,12 +247,14 @@ export async function POST(req: NextRequest) {
             return respond(new NextResponse("Missing Authorization", { status: 401 }));
         }
 
-        // ── Agent ID (from header, or derived from API key) ──
+        // ── Agent resolution (optional for API key requests) ──
         const adminClient = createAdminClient();
         let agentId = req.headers.get("X-Agent-ID");
+        let shadowMode = false;
+        let agentConfig: { model?: string | null; system_prompt?: string | null } | null = null;
 
         if (!agentId && gatewayCtx) {
-            // Derive agent ID from the API key's name (format: "Agent {uuid} Key")
+            // Derive agent ID from API key name (format: "Agent {uuid} Key") when available.
             const { data: keyRecord } = await adminClient
                 .from("api_keys")
                 .select("name")
@@ -262,131 +264,143 @@ export async function POST(req: NextRequest) {
             if (match) agentId = match[1];
         }
 
-        if (!agentId) {
-            return respond(new NextResponse("Missing X-Agent-ID header or unable to derive agent from API key", { status: 400 }));
-        }
-
-        // ── Get Agent Config (join with agents table for project scoping) ──
-        const { data: config, error: configError } = await adminClient
-            .from("agent_configs")
-            .select(`
-                *,
-                agents!inner (
-                    id,
-                    project_id,
-                    is_active,
-                    shadow_mode
-                )
-            `)
-            .eq("agent_id", agentId)
-            .single();
-
-        if (configError || !config) {
-            const errResponse = NextResponse.json(
-                { error: "Agent configuration not found. Create the agent in Cencori first." },
-                { status: 404 }
-            );
-            return respond(errResponse, 'agent_config_not_found', 'Agent configuration not found');
-        }
-
-        const agentRecord = config.agents as unknown as {
-            id: string;
-            project_id: string;
-            is_active: boolean;
-            shadow_mode: boolean;
-        };
-
-        // ── Project Scoping ──
-        if (authenticatedProjectId && agentRecord.project_id !== authenticatedProjectId) {
-            const errResponse = NextResponse.json(
-                { error: "API key does not have access to this agent" },
-                { status: 403 }
-            );
-            return respond(errResponse, 'agent_project_scope_denied', 'API key does not have access to this agent');
-        }
-
-        // Dashboard JWT path must still be scoped to organizations the user can access.
-        if (!authenticatedProjectId && authenticatedUserId) {
-            const { data: agentProject, error: projectError } = await adminClient
-                .from("projects")
+        if (agentId) {
+            // ── Agent Path: config injection + shadow mode + agent scoping ──
+            const { data: config, error: configError } = await adminClient
+                .from("agent_configs")
                 .select(`
-                    id,
-                    organization_id,
-                    organizations!inner(owner_id)
+                    *,
+                    agents!inner (
+                        id,
+                        project_id,
+                        is_active,
+                        shadow_mode
+                    )
                 `)
-                .eq("id", agentRecord.project_id)
+                .eq("agent_id", agentId)
                 .single();
 
-            if (projectError || !agentProject) {
-                return respond(
-                    NextResponse.json({ error: "Agent project not found" }, { status: 404 }),
-                    'agent_project_not_found',
-                    'Agent project not found'
+            if (configError || !config) {
+                const errResponse = NextResponse.json(
+                    { error: "Agent configuration not found. Create the agent in Cencori first." },
+                    { status: 404 }
                 );
+                return respond(errResponse, 'agent_config_not_found', 'Agent configuration not found');
             }
 
-            const ownerId = (agentProject.organizations as { owner_id?: string } | null)?.owner_id || null;
+            const agentRecord = config.agents as unknown as {
+                id: string;
+                project_id: string;
+                is_active: boolean;
+                shadow_mode: boolean;
+            };
 
-            let hasOrgAccess = ownerId === authenticatedUserId;
-            if (!hasOrgAccess) {
-                const { data: member, error: memberError } = await adminClient
-                    .from('organization_members')
-                    .select('id')
-                    .eq('organization_id', agentProject.organization_id)
-                    .eq('user_id', authenticatedUserId)
+            // ── Project Scoping ──
+            if (authenticatedProjectId && agentRecord.project_id !== authenticatedProjectId) {
+                const errResponse = NextResponse.json(
+                    { error: "API key does not have access to this agent" },
+                    { status: 403 }
+                );
+                return respond(errResponse, 'agent_project_scope_denied', 'API key does not have access to this agent');
+            }
+
+            // Dashboard JWT path must still be scoped to organizations the user can access.
+            if (!authenticatedProjectId && authenticatedUserId) {
+                const { data: agentProject, error: projectError } = await adminClient
+                    .from("projects")
+                    .select(`
+                        id,
+                        organization_id,
+                        organizations!inner(owner_id)
+                    `)
+                    .eq("id", agentRecord.project_id)
                     .single();
-                hasOrgAccess = !memberError && !!member;
+
+                if (projectError || !agentProject) {
+                    return respond(
+                        NextResponse.json({ error: "Agent project not found" }, { status: 404 }),
+                        'agent_project_not_found',
+                        'Agent project not found'
+                    );
+                }
+
+                const ownerId = (agentProject.organizations as { owner_id?: string } | null)?.owner_id || null;
+
+                let hasOrgAccess = ownerId === authenticatedUserId;
+                if (!hasOrgAccess) {
+                    const { data: member, error: memberError } = await adminClient
+                        .from('organization_members')
+                        .select('id')
+                        .eq('organization_id', agentProject.organization_id)
+                        .eq('user_id', authenticatedUserId)
+                        .single();
+                    hasOrgAccess = !memberError && !!member;
+                }
+
+                if (!hasOrgAccess) {
+                    return respond(
+                        NextResponse.json({ error: "Unauthorized for this agent" }, { status: 403 }),
+                        'agent_org_scope_denied',
+                        'User is not authorized for this agent project'
+                    );
+                }
+
+                // Synthesize gatewayCtx for dashboard requests so gateway logs are written.
+                // Resolve the project's first active API key for attribution.
+                const { data: dashboardKey } = await adminClient
+                    .from('api_keys')
+                    .select('id, environment')
+                    .eq('project_id', agentRecord.project_id)
+                    .is('revoked_at', null)
+                    .order('created_at', { ascending: true })
+                    .limit(1)
+                    .single();
+
+                if (dashboardKey) {
+                    gatewayCtx = {
+                        supabase: adminClient,
+                        projectId: agentRecord.project_id,
+                        organizationId: agentProject.organization_id,
+                        apiKeyId: dashboardKey.id,
+                        environment: dashboardKey.environment || 'production',
+                        keyType: 'dashboard',
+                        tier: 'free',
+                        requestId: crypto.randomUUID(),
+                        startTime: startedAt,
+                        clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '',
+                        countryCode: req.headers.get('x-vercel-ip-country') || null,
+                        projectName: '',
+                        defaultModel: null,
+                        defaultProvider: null,
+                    };
+                }
             }
 
-            if (!hasOrgAccess) {
-                return respond(
-                    NextResponse.json({ error: "Unauthorized for this agent" }, { status: 403 }),
-                    'agent_org_scope_denied',
-                    'User is not authorized for this agent project'
+            // ── Check if agent is active ──
+            if (!agentRecord.is_active) {
+                const errResponse = NextResponse.json(
+                    { error: "Agent is not active. Enable it from the dashboard." },
+                    { status: 403 }
                 );
+                return respond(errResponse, 'agent_inactive', 'Agent is not active');
             }
 
-            // Synthesize gatewayCtx for dashboard requests so gateway logs are written.
-            // Resolve the project's first active API key for attribution.
-            const { data: dashboardKey } = await adminClient
-                .from('api_keys')
-                .select('id, environment')
-                .eq('project_id', agentRecord.project_id)
-                .is('revoked_at', null)
-                .order('created_at', { ascending: true })
-                .limit(1)
-                .single();
-
-            if (dashboardKey) {
-                gatewayCtx = {
-                    supabase: adminClient,
-                    projectId: agentRecord.project_id,
-                    organizationId: agentProject.organization_id,
-                    apiKeyId: dashboardKey.id,
-                    environment: dashboardKey.environment || 'production',
-                    keyType: 'dashboard',
-                    tier: 'free',
-                    requestId: crypto.randomUUID(),
-                    startTime: startedAt,
-                    clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '',
-                    countryCode: req.headers.get('x-vercel-ip-country') || null,
-                    projectName: '',
-                    defaultModel: null,
-                    defaultProvider: null,
-                };
-            }
-        }
-
-        // ── Check if agent is active ──
-        if (!agentRecord.is_active) {
-            const errResponse = NextResponse.json(
-                { error: "Agent is not active. Enable it from the dashboard." },
-                { status: 403 }
+            shadowMode = agentRecord.shadow_mode;
+            agentConfig = {
+                model: (config as { model?: string | null }).model ?? null,
+                system_prompt: (config as { system_prompt?: string | null }).system_prompt ?? null,
+            };
+        } else if (!authenticatedProjectId) {
+            // Dashboard JWT auth is only supported for agent-scoped testing.
+            return respond(
+                NextResponse.json(
+                    { error: "Missing X-Agent-ID for dashboard token auth. Use an API key for generic OpenAI-compatible requests." },
+                    { status: 400 }
+                ),
+                'missing_agent_id_dashboard_auth',
+                'Missing X-Agent-ID for dashboard token auth'
             );
-            return respond(errResponse, 'agent_inactive', 'Agent is not active');
         }
-
-        const shadowMode = agentRecord.shadow_mode;
 
         // ── Parse Request Body ──
         const body = await req.json() as ChatRequestBody;
@@ -396,22 +410,28 @@ export async function POST(req: NextRequest) {
             return respond(new NextResponse("Missing messages", { status: 400 }), 'missing_messages', 'Missing messages');
         }
 
-        // Apply config model — dashboard config overrides client request
-        const configuredModel = config.model || body.model;
-        if (!configuredModel) {
+        // Resolve model: agent config overrides request model; non-agent mode uses request/default project model.
+        const configuredModel = agentConfig?.model || body.model || gatewayCtx?.defaultModel;
+        if (typeof configuredModel !== "string" || configuredModel.trim().length === 0) {
+            const isAgentMode = !!agentConfig;
             return respond(
-                new NextResponse("No model configured. Set a model in the agent dashboard.", { status: 400 }),
+                new NextResponse(
+                    isAgentMode
+                        ? "No model configured. Set a model in the agent dashboard."
+                        : "Missing model. Provide model in request body or set a default model in project settings.",
+                    { status: 400 }
+                ),
                 'missing_model_configuration',
-                'No model configured for agent'
+                'No model configured'
             );
         }
-        const model = normalizeGatewayModelId(configuredModel);
+        const model = normalizeGatewayModelId(configuredModel.trim());
 
-        // Inject system prompt from config
-        if (config.system_prompt) {
+        // Inject system prompt from agent config (agent mode only).
+        if (agentConfig?.system_prompt) {
             messages = messages.filter((m) => m.role !== "system");
             messages = [
-                { role: "system", content: config.system_prompt },
+                { role: "system", content: agentConfig.system_prompt },
                 ...messages
             ];
         }
@@ -665,7 +685,7 @@ export async function POST(req: NextRequest) {
                         // insert them as pending and send a custom event telling the agent to wait.
                         const toolCallValues = Object.values(collectedToolCalls);
 
-                        if (shadowMode && toolCallValues.length > 0) {
+                        if (shadowMode && agentId && toolCallValues.length > 0) {
                             const pendingActionIds: string[] = [];
 
                             for (const tc of toolCallValues) {
@@ -690,7 +710,7 @@ export async function POST(req: NextRequest) {
                                 const sse = `event: shadow_mode\ndata: ${JSON.stringify(shadowEvent)}\n\n`;
                                 controller.enqueue(new TextEncoder().encode(sse));
                             }
-                        } else if (!shadowMode && toolCallValues.length > 0) {
+                        } else if (!shadowMode && agentId && toolCallValues.length > 0) {
                             // Shadow mode OFF: log as executed (fire-and-forget)
                             for (const tc of toolCallValues) {
                                 createExecutedAction(adminClient, agentId, {
