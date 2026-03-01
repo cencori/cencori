@@ -68,6 +68,14 @@ function tryParseJson<T>(text: string): T | null {
     return null;
 }
 
+function conservativeVerdicts(issues: ScanIssue[]): Map<string, boolean> {
+    const verdictMap = new Map<string, boolean>();
+    for (const issue of issues) {
+        verdictMap.set(issueKey(issue), true);
+    }
+    return verdictMap;
+}
+
 async function validateFileIssues(
     filePath: string,
     fileContent: string,
@@ -123,9 +131,10 @@ Return JSON only, no markdown fences:
         const response = await generateWithFallback(prompt);
         if (!response) {
             if (enforce) {
-                throw new LlmFilterEnforcementError(
-                    `[LLM Filter] No AI provider response while validating ${filePath}`
+                console.warn(
+                    `[LLM Filter] No AI provider response while validating ${filePath}; keeping findings as real issues`
                 );
+                return conservativeVerdicts(issues);
             }
             return verdictMap;
         }
@@ -133,9 +142,10 @@ Return JSON only, no markdown fences:
         const parsed = tryParseJson<LlmFilterResponse>(response.text);
         if (!parsed || !Array.isArray(parsed.verdicts)) {
             if (enforce) {
-                throw new LlmFilterEnforcementError(
-                    `[LLM Filter] Invalid AI response format while validating ${filePath}`
+                console.warn(
+                    `[LLM Filter] Invalid AI response format while validating ${filePath}; keeping findings as real issues`
                 );
+                return conservativeVerdicts(issues);
             }
             return verdictMap;
         }
@@ -147,10 +157,11 @@ Return JSON only, no markdown fences:
         }
     } catch (err) {
         if (enforce) {
-            if (err instanceof LlmFilterEnforcementError) throw err;
-            throw new LlmFilterEnforcementError(
-                `[LLM Filter] Failed to validate issues for ${filePath}: ${err instanceof Error ? err.message : String(err)}`
+            console.warn(
+                `[LLM Filter] Failed to validate issues for ${filePath}; keeping findings as real issues`,
+                err instanceof Error ? err.message : err
             );
+            return conservativeVerdicts(issues);
         }
         console.warn("[LLM Filter] Failed to validate issues for", filePath, err instanceof Error ? err.message : err);
     }
@@ -244,8 +255,8 @@ export async function filterIssuesWithLLM(
 
                 if (verdict === undefined) {
                     if (enforce) {
-                        throw new LlmFilterEnforcementError(
-                            `[LLM Filter] Missing verdict for ${key} in strict mode`
+                        console.warn(
+                            `[LLM Filter] Missing verdict for ${key} in strict mode; keeping as real issue`
                         );
                     }
                     confirmed.push({ ...issue, confidence: "high" });

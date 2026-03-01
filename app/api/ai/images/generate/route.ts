@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import { decryptApiKey } from '@/lib/encryption';
+import { getGoogleApiKey } from '@/lib/providers/google-env';
 import {
     validateGatewayRequest,
     addGatewayHeaders,
@@ -99,7 +100,6 @@ async function generateWithOpenAI(client: OpenAI, request: ImageGenerationReques
 
 async function generateWithGoogle(apiKey: string, request: ImageGenerationRequest, apiModel: string): Promise<ImageGenerationResponse> {
     const genAI = new GoogleGenAI({ apiKey });
-    const aspectRatio = getSizeAsAspectRatio(request.size);
     const response = await genAI.models.generateContent({
         model: apiModel,
         contents: request.prompt,
@@ -121,14 +121,6 @@ async function generateWithGoogle(apiKey: string, request: ImageGenerationReques
         }
     }
     return { images, model: apiModel, provider: 'google' };
-}
-
-function getSizeAsAspectRatio(size?: string): '1:1' | '16:9' | '9:16' | '4:3' | '3:4' {
-    switch (size) {
-        case '1024x1792': case '1024x1536': return '9:16';
-        case '1792x1024': case '1536x1024': return '16:9';
-        default: return '1:1';
-    }
 }
 
 // Fixed image pricing (per image)
@@ -184,7 +176,7 @@ export async function POST(req: NextRequest) {
             providerApiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
         } else {
             if (provider === 'openai') providerApiKey = process.env.OPENAI_API_KEY;
-            else if (provider === 'google') providerApiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+            else if (provider === 'google') providerApiKey = getGoogleApiKey() || undefined;
         }
 
         if (!providerApiKey) {

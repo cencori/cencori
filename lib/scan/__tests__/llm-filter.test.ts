@@ -110,7 +110,7 @@ describe("filterIssuesWithLLM", () => {
         expect(result.enforced).toBe(true);
     });
 
-    test("throws in strict mode when any issue verdict is missing", async () => {
+    test("keeps issues in strict mode when any issue verdict is missing", async () => {
         process.env.GEMINI_API_KEY = "test-key";
 
         const issues = [
@@ -136,8 +136,32 @@ describe("filterIssuesWithLLM", () => {
             ["app/api/users/route.ts", "export async function GET() { return Response.json({ ok: true }); }"],
         ]);
 
-        await expect(
-            filterIssuesWithLLM(issues, fileContents, { enforce: true })
-        ).rejects.toBeInstanceOf(LlmFilterEnforcementError);
+        const result = await filterIssuesWithLLM(issues, fileContents, { enforce: true });
+        expect(result.suppressed).toHaveLength(0);
+        expect(result.filtered).toHaveLength(2);
+        expect(result.filtered.every((issue) => issue.confidence === "high")).toBe(true);
+    });
+
+    test("keeps issues in strict mode when AI response format is invalid", async () => {
+        process.env.GEMINI_API_KEY = "test-key";
+
+        const issues = [
+            buildIssue({ line: 42, name: "Route invalid format" }),
+        ];
+
+        mockedGenerateWithFallback.mockResolvedValue({
+            model: "gemini-2.5-flash",
+            provider: "gemini",
+            text: "Not JSON at all",
+        });
+
+        const fileContents = new Map<string, string>([
+            ["app/api/users/route.ts", "export async function GET() { return Response.json({ ok: true }); }"],
+        ]);
+
+        const result = await filterIssuesWithLLM(issues, fileContents, { enforce: true });
+        expect(result.suppressed).toHaveLength(0);
+        expect(result.filtered).toHaveLength(1);
+        expect(result.filtered[0]?.confidence).toBe("high");
     });
 });

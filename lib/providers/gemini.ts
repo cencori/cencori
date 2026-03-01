@@ -15,6 +15,7 @@ import {
 import { getPricingFromDB } from './pricing';
 import { toGeminiMessages } from './utils';
 import { normalizeProviderError } from './errors';
+import { getGoogleApiKey } from './google-env';
 
 export class GeminiProvider extends AIProvider {
     readonly providerName = 'google';
@@ -23,9 +24,9 @@ export class GeminiProvider extends AIProvider {
     constructor(apiKey?: string) {
         super();
 
-        const key = apiKey || process.env.GEMINI_API_KEY;
+        const key = apiKey || getGoogleApiKey();
         if (!key) {
-            throw new Error('Gemini API key is required - either pass it or set GEMINI_API_KEY env var');
+            throw new Error('Gemini API key is required. Set GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_AI_API_KEY, or GEMINI_API_KEY.');
         }
 
         this.client = new GoogleGenerativeAI(key);
