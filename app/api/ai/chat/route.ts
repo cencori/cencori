@@ -1307,10 +1307,32 @@ export async function POST(req: NextRequest) {
             ? deTokenize(response.content, requestTokenMap)
             : response.content;
 
+        // Keep legacy Cencori fields while adding OpenAI-compatible response shape.
+        const completionId = `chatcmpl-${crypto.randomUUID()}`;
+        const createdAt = Math.floor(Date.now() / 1000);
+        const openAiToolCalls = response.toolCalls?.map(tc => ({
+            id: tc.id,
+            type: tc.type,
+            function: tc.function,
+        }));
+
         return NextResponse.json({
+            id: completionId,
+            object: 'chat.completion',
+            created: createdAt,
+            choices: [{
+                index: 0,
+                message: {
+                    role: 'assistant',
+                    content: finalContent,
+                    ...(openAiToolCalls && openAiToolCalls.length > 0 ? { tool_calls: openAiToolCalls } : {}),
+                },
+                finish_reason: response.finishReason,
+            }],
             content: finalContent,
             model: actualModel,
             provider: actualProvider,
+            ...(openAiToolCalls && openAiToolCalls.length > 0 ? { tool_calls: openAiToolCalls } : {}),
             usage: {
                 prompt_tokens: response.usage.promptTokens,
                 completion_tokens: response.usage.completionTokens,
