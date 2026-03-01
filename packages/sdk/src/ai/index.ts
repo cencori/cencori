@@ -24,8 +24,18 @@ import type {
 
 // API Response types
 interface OpenAIChatResponse {
-    id: string;
-    model: string;
+    id?: string;
+    model?: string;
+    content?: string;
+    finish_reason?: string;
+    tool_calls?: Array<{
+        id: string;
+        type: 'function';
+        function: {
+            name: string;
+            arguments: string;
+        };
+    }>;
     choices?: Array<{
         message?: {
             content?: string;
@@ -112,7 +122,8 @@ export class AINamespace {
         const data = await response.json() as OpenAIChatResponse;
 
         const choice = data.choices?.[0];
-        const toolCalls = choice?.message?.tool_calls?.map(tc => ({
+        const rawToolCalls = data.tool_calls ?? choice?.message?.tool_calls;
+        const toolCalls = rawToolCalls?.map(tc => ({
             id: tc.id,
             type: tc.type as 'function',
             function: {
@@ -122,11 +133,11 @@ export class AINamespace {
         }));
 
         return {
-            id: data.id,
-            model: data.model,
-            content: choice?.message?.content ?? '',
+            id: data.id ?? `chatcmpl-${Date.now()}`,
+            model: data.model ?? request.model,
+            content: data.content ?? choice?.message?.content ?? '',
             toolCalls,
-            finishReason: choice?.finish_reason as ChatResponse['finishReason'],
+            finishReason: (data.finish_reason ?? choice?.finish_reason) as ChatResponse['finishReason'],
             usage: {
                 promptTokens: data.usage?.prompt_tokens ?? 0,
                 completionTokens: data.usage?.completion_tokens ?? 0,
@@ -328,7 +339,7 @@ export class AINamespace {
         }
 
         const data = await response.json() as OpenAIChatResponse;
-        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        const toolCall = data.tool_calls?.[0] ?? data.choices?.[0]?.message?.tool_calls?.[0];
 
         if (!toolCall) {
             throw new Error('Model did not return structured output');
