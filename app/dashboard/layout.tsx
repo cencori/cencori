@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Logo } from "@/components/logo";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { CircleUserRound, CreditCard, Settings, Users, UserPlus, HelpCircle, MessageSquarePlus, Book, Wrench, Activity, Mail, Command, Menu } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { CircleUserRound, CreditCard, Settings, HelpCircle, Book, Wrench, Activity, Mail, Command, Menu } from "lucide-react";
 import Link from "next/link";
 import {
   Breadcrumb,
@@ -28,18 +28,22 @@ import {
   SelectPrimitive,
 } from "@/components/ui/select";
 import { ChevronsUpDown, PlusCircle, Search } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { Toaster } from "@/components/ui/sonner";
 import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
-import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { UpdateToast } from "@/components/ui/update-toast";
 import posthog from "posthog-js";
+
+const CommandPalette = dynamic(
+  () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
+);
+const UpdateToast = dynamic(
+  () => import("@/components/ui/update-toast").then((mod) => mod.UpdateToast),
+  { ssr: false },
+);
 
 
 // Optional header/nav links later
@@ -51,20 +55,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     let mounted = true;
     async function check() {
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        router.push("/login");
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) {
+        router.replace("/login");
         return;
       }
+
+      const sessionUser = session.user;
+
       if (mounted) {
-        setUser(data.user);
+        setUser(sessionUser);
         setLoading(false);
         // Identify user in PostHog
         try {
-          posthog.identify(data.user.id, {
-            email: data.user.email,
-            name: data.user.user_metadata?.name ?? data.user.user_metadata?.full_name,
-            created_at: data.user.created_at,
+          posthog.identify(sessionUser.id, {
+            email: sessionUser.email,
+            name: sessionUser.user_metadata?.name ?? sessionUser.user_metadata?.full_name,
+            created_at: sessionUser.created_at,
           });
         } catch { /* non-critical */ }
       }
@@ -73,10 +80,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => {
       mounted = false;
     };
-  }, [router, supabase]);
+  }, [router]);
 
-  // while checking auth, render nothing or a simple skeleton to avoid flash
-  if (loading) return null;
+  // Keep shell visible while auth state resolves to reduce perceived lag.
+  if (loading) return <div className="min-h-screen bg-background" aria-busy="true" />;
 
   // Fix type issue: ensure 'user' is typed
   type UserType = {
@@ -115,20 +122,6 @@ type UserType = {
   user_metadata?: Record<string, unknown>;
 };
 
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  slug: string;
-  organization_id: string;
-  orgSlug?: string; // Optional, as it's added later
-}
-
 interface LayoutContentProps {
   user: UserType;
   avatar: string | null;
@@ -142,7 +135,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const { theme, setTheme } = useTheme();
 
   // Use context instead of local state
-  const { organizations, projects, loading: loadingOrgData } = useOrganizationProject();
+  const { organizations, projects } = useOrganizationProject();
   const { toggle } = useMobileSheet();
   const { setEnvironment, isTestMode } = useEnvironment();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -640,7 +633,6 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       <main className="p-4 md:p-6 pt-20 lg:pt-14">
         {children}
       </main>
-      <Toaster />
       <CommandPalette
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}

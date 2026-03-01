@@ -20,16 +20,14 @@ export default function HomePage() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (data?.session) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
         setIsAuthenticated(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const meta = user.user_metadata ?? {};
-          const avatar = meta.avatar_url ?? meta.picture ?? null;
-          const name = meta.name ?? user.email?.split("@")[0] ?? null;
-          setUserProfile({ name: name as string | null, avatar: avatar as string | null });
-        }
+        const user = session.user;
+        const meta = user.user_metadata ?? {};
+        const avatar = meta.avatar_url ?? meta.picture ?? null;
+        const name = meta.name ?? user.email?.split("@")[0] ?? null;
+        setUserProfile({ name: name as string | null, avatar: avatar as string | null });
       } else {
         setIsAuthenticated(false);
         setUserProfile({ name: null, avatar: null });
