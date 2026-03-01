@@ -14,6 +14,7 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { decryptApiKey } from '@/lib/encryption';
 import { getPricingFromDB } from '@/lib/providers/pricing';
+import { getGoogleApiKey } from '@/lib/providers/google-env';
 import {
     validateGatewayRequest,
     addGatewayHeaders,
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
         } else {
             switch (provider) {
                 case 'openai': providerApiKey = process.env.OPENAI_API_KEY ?? null; break;
-                case 'google': providerApiKey = process.env.GOOGLE_AI_API_KEY ?? null; break;
+                case 'google': providerApiKey = getGoogleApiKey(); break;
                 case 'cohere': providerApiKey = process.env.COHERE_API_KEY ?? null; break;
             }
         }
