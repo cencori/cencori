@@ -80,7 +80,10 @@ export function ScanUpgradePanel({
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data?.checkoutUrl) {
-                throw new Error(data?.error || "Failed to start checkout");
+                const message = data?.details
+                    ? `${data?.error || "Failed to start checkout"}: ${data.details}`
+                    : (data?.error || "Failed to start checkout");
+                throw new Error(message);
             }
 
             window.location.href = data.checkoutUrl;
