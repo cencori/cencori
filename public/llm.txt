@@ -115,8 +115,8 @@ The most feature-complete way to integrate, supporting all Cencori primitives (C
 
 ### 2. Framework Adapters
 Optimized providers for popular AI development frameworks.
-- **Vercel AI SDK**: `@cencori/ai-sdk`
-- **TanStack AI**: `@cencori/ai-sdk/tanstack`
+- **Vercel AI SDK**: `cencori` (Guide: https://cencori.com/docs/integrations/vercel-ai-sdk)
+- **TanStack AI**: `cencori/tanstack` (Guide: https://cencori.com/docs/integrations/tanstack)
 - **LangChain**: Works via the `ChatOpenAI` or `ChatAnthropic` adapters.
 
 ### 3. Native Proxy Support (Zero-Config)
@@ -233,15 +233,16 @@ func main() {
 
 ## Vercel AI SDK Integration
 
-Using Vercel AI SDK? Install `@cencori/ai-sdk` for drop-in compatibility:
+Using Vercel AI SDK? Install `cencori` for drop-in compatibility:
+Guide: https://cencori.com/docs/integrations/vercel-ai-sdk
 
 ```bash
-npm install @cencori/ai-sdk ai
+npm install cencori ai
 ```
 
 ```typescript
 // app/api/chat/route.ts
-import { cencori } from "@cencori/ai-sdk";
+import { cencori } from "cencori";
 import { streamText } from "ai";
 
 export async function POST(req: Request) {
@@ -260,14 +261,15 @@ Works with `streamText()`, `generateText()`, `useChat()`, and all Vercel AI SDK 
 
 ## TanStack AI Integration
 
-Using TanStack AI? Install `@cencori/ai-sdk` with the TanStack subpath:
+Using TanStack AI? Install `cencori` with the TanStack subpath:
+Guide: https://cencori.com/docs/integrations/tanstack
 
 ```bash
-npm install @cencori/ai-sdk @tanstack/ai
+npm install cencori @tanstack/ai
 ```
 
 ```typescript
-import { cencori } from "@cencori/ai-sdk/tanstack";
+import { cencori } from "cencori/tanstack";
 
 const adapter = cencori("gpt-4o");
 
@@ -290,7 +292,7 @@ Cencori supports tool calling across all providers with a unified interface.
 ### Vercel AI SDK Tool Calling
 
 ```typescript
-import { cencori } from "@cencori/ai-sdk";
+import { cencori } from "cencori";
 import { generateText, tool } from "ai";
 import { z } from "zod";
 
@@ -319,7 +321,7 @@ for (const toolCall of result.toolCalls) {
 ### TanStack AI Tool Calling
 
 ```typescript
-import { cencori } from "@cencori/ai-sdk/tanstack";
+import { cencori } from "cencori/tanstack";
 
 const adapter = cencori("gpt-4o");
 
@@ -1195,6 +1197,9 @@ After integration, visit your Cencori dashboard to see:
 
 - Dashboard: https://cencori.com
 - Full Docs: https://cencori.com/docs
+- SDK (NPM): https://www.npmjs.com/package/cencori
+- Vercel AI SDK Provider Listing: https://ai-sdk.dev/providers/community-providers/cencori
+- TanStack AI Adapter Listing: https://tanstack.com/ai/latest/docs/community-adapters/cencori
 - Pricing: https://cencori.com/pricing
 - Cencori Scan (CLI): https://www.npmjs.com/package/@cencori/scan
 - Cencori Scan (Web): https://scan.cencori.com
@@ -1258,4 +1263,3 @@ await cencori.workflows.trigger('daily-digest');
 - `cencori.workflows.waitFor(eventId)`: Pause and wait.
 - `cencori.steps.run(id, fn)`: Execute code with retries.
 - `cencori.ai.generate(config)`: LLM inference query.
-

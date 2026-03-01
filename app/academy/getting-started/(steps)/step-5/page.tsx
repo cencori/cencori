@@ -40,7 +40,7 @@ pnpm add cencori`}
                 <CodeBlock
                     language="bash"
                     filename="terminal"
-                    code={`npm install @cencori/ai-sdk ai`}
+                    code={`npm install cencori ai`}
                 />
             </div>
 

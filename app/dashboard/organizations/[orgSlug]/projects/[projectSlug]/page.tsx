@@ -93,6 +93,56 @@ function GettingStartedSection({
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const llmIntegrationPrompt = `Integrate Cencori into this project using the official \`cencori\` package.
+
+Before coding, read:
+- https://cencori.com/llm.txt
+- https://cencori.com/docs
+
+Requirements:
+1. Install only what is needed:
+   - \`cencori\`
+   - If Vercel AI SDK is already used, ensure \`ai\` is installed.
+   - Do not add unrelated packages.
+   - Do not upgrade unrelated dependencies.
+
+2. Reuse existing architecture:
+   - Detect framework/runtime and follow existing project conventions.
+   - Reuse existing API routes, auth, env patterns, and database setup.
+   - Do not scaffold a new auth/database system.
+   - Do not remove existing providers/integrations unless explicitly asked.
+
+3. Create or update a shared Cencori client setup (e.g. \`lib/cencori.ts\`):
+   - Use \`CENCORI_API_KEY\` from server env.
+   - Never expose secrets to the client bundle.
+   - Use \`https://api.cencori.com/v1\` unless project config already defines base URL.
+
+4. Wire AI endpoint(s) with minimal diff:
+   - Support both streaming and non-streaming flows where applicable.
+   - Preserve existing response contracts used by the app (including OpenAI-compatible shape if already expected).
+   - Do not run global search/replace across the repo unless explicitly requested.
+
+5. Framework adapter imports:
+   - Vercel AI SDK: \`import { cencori } from "cencori/vercel"\`
+   - TanStack AI: \`import { cencori } from "cencori/tanstack"\`
+
+6. Env setup:
+   - Add \`CENCORI_API_KEY\` if missing.
+   - Add optional vars only if required by this project (\`CENCORI_BASE_URL\`, \`X_AGENT_ID\`).
+   - Do not overwrite existing secrets.
+   - Never print or commit secrets.
+
+7. Validation:
+   - Run lint/typecheck/tests for changed files.
+   - Add one smoke test via SDK usage and one via curl.
+   - Verify both streaming and non-stream behavior if implemented.
+
+8. Final output:
+   - List files changed.
+   - List commands run.
+   - Summarize what was integrated and any assumptions.
+   - Include one copy-paste runnable snippet for this project's framework.
+   - If blocked, state exactly what is missing and the next action.`;
 
   if (loading || hasData === null || hasData === true) {
     return null;
@@ -101,9 +151,7 @@ function GettingStartedSection({
   const copyPrompt = async () => {
     try {
       setCopyingPrompt(true);
-      const response = await fetch('/llm.txt');
-      const llmContent = await response.text();
-      await navigator.clipboard.writeText(llmContent);
+      await navigator.clipboard.writeText(llmIntegrationPrompt);
       setCopiedPrompt(true);
       setTimeout(() => setCopiedPrompt(false), 2000);
     } catch (err) {

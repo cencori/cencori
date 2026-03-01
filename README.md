@@ -221,11 +221,11 @@ const response = await cencori.ai.rag({
 Using Vercel AI SDK (`ai` package)? Cencori is a drop-in provider:
 
 ```bash
-npm install @cencori/ai-sdk ai
+npm install cencori ai
 ```
 
 ```typescript
-import { cencori } from '@cencori/ai-sdk';
+import { cencori } from 'cencori';
 import { streamText } from 'ai';
 
 const result = await streamText({
@@ -661,7 +661,7 @@ View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)
 
 **Phase 3 ✅ (Complete)**
 - Bring Your Own Keys (BYOK)
-- Vercel AI SDK provider (`@cencori/ai-sdk`)
+- Vercel AI SDK provider (`cencori`)
 - Provider failover and circuit breaker
 - Enhanced analytics with provider breakdowns
 

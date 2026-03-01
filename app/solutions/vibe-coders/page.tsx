@@ -105,7 +105,7 @@ export default function VibeCodersPage() {
     ];
 
     const prompts = [
-        { title: "Bootstrap with Cencori", prompt: "Set up a Next.js app with Cencori AI Gateway. Install @cencori/ai-sdk and create a streaming chat endpoint." },
+        { title: "Bootstrap with Cencori", prompt: "Set up a Next.js app with Cencori AI Gateway. Install cencori and create a streaming chat endpoint." },
         { title: "Add security", prompt: "Add Cencori Edge middleware to protect /api/ai/* routes. Enable PII detection and prompt injection protection." },
     ];
 
@@ -255,7 +255,7 @@ export default function VibeCodersPage() {
                                     </div>
                                     <pre className="p-4 text-xs overflow-x-auto font-mono">
                                         <code className="text-foreground/90">
-                                            <span className="text-purple-400">import</span> {"{"} <span className="text-yellow-300">cencori</span> {"}"} <span className="text-purple-400">from</span> <span className="text-emerald-400">&apos;@cencori/ai-sdk&apos;</span>;{"\n"}
+                                            <span className="text-purple-400">import</span> {"{"} <span className="text-yellow-300">cencori</span> {"}"} <span className="text-purple-400">from</span> <span className="text-emerald-400">&apos;cencori&apos;</span>;{"\n"}
                                             <span className="text-purple-400">import</span> {"{"} <span className="text-yellow-300">streamText</span> {"}"} <span className="text-purple-400">from</span> <span className="text-emerald-400">&apos;ai&apos;</span>;{"\n\n"}
                                             <span className="text-purple-400">const</span> result = <span className="text-blue-400">streamText</span>({"{"}{"\n"}
                                             {"  "}model: <span className="text-blue-400">cencori</span>(<span className="text-emerald-400">&apos;gpt-4o&apos;</span>),{"\n"}
