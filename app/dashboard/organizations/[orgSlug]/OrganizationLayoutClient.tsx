@@ -143,7 +143,7 @@ export default function OrganizationLayoutClient({
                             <SidebarMenu>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Projects" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/projects`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/projects`} prefetch={false}>
                                             <LayersIcon animateOnHover />
                                             <span className="text-[13px]">Projects</span>
                                         </Link>
@@ -151,7 +151,7 @@ export default function OrganizationLayoutClient({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Billing" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/billing`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/billing`} prefetch={false}>
                                             <PanelTopIcon animateOnHover />
                                             <span className="text-[13px]">Billing</span>
                                         </Link>
@@ -159,7 +159,7 @@ export default function OrganizationLayoutClient({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Usage" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/usage`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/usage`} prefetch={false}>
                                             <ActivityIcon animateOnHover />
                                             <span className="text-[13px]">Usage</span>
                                         </Link>
@@ -168,7 +168,7 @@ export default function OrganizationLayoutClient({
 
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Integrations" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/integrations`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/integrations`} prefetch={false}>
                                             <UnplugIcon animateOnHover />
                                             <span className="text-[13px]">Integrations</span>
                                         </Link>
@@ -176,7 +176,7 @@ export default function OrganizationLayoutClient({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Teams" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/teams`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/teams`} prefetch={false}>
                                             <UserRoundIcon animateOnHover />
                                             <span className="text-[13px]">Teams</span>
                                         </Link>
@@ -184,7 +184,7 @@ export default function OrganizationLayoutClient({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Settings" size="sm">
-                                        <Link href={`/dashboard/organizations/${organization.slug}/settings`}>
+                                        <Link href={`/dashboard/organizations/${organization.slug}/settings`} prefetch={false}>
                                             <SettingsIcon animateOnHover />
                                             <span className="text-[13px]">Settings</span>
                                         </Link>
@@ -208,7 +208,7 @@ export default function OrganizationLayoutClient({
                                 <SidebarMenu>
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/projects`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/projects`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <LayersIcon animateOnHover />
                                                 <span className="text-[13px]">Projects</span>
                                             </Link>
@@ -216,7 +216,7 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/billing`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/billing`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <PanelTopIcon animateOnHover />
                                                 <span className="text-[13px]">Billing</span>
                                             </Link>
@@ -224,7 +224,7 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/usage`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/usage`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <ActivityIcon animateOnHover />
                                                 <span className="text-[13px]">Usage</span>
                                             </Link>
@@ -233,7 +233,7 @@ export default function OrganizationLayoutClient({
 
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/integrations`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/integrations`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <UnplugIcon animateOnHover />
                                                 <span className="text-[13px]">Integrations</span>
                                             </Link>
@@ -241,7 +241,7 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/teams`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/teams`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <UserRoundIcon animateOnHover />
                                                 <span className="text-[13px]">Teams</span>
                                             </Link>
@@ -249,7 +249,7 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuItem>
                                     <SidebarMenuItem>
                                         <SidebarMenuButton asChild size="sm">
-                                            <Link href={`/dashboard/organizations/${organization.slug}/settings`} onClick={() => setIsOpen(false)}>
+                                            <Link href={`/dashboard/organizations/${organization.slug}/settings`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <SettingsIcon animateOnHover />
                                                 <span className="text-[13px]">Settings</span>
                                             </Link>

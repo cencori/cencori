@@ -57,6 +57,31 @@ function isProtectedApiPath(pathname: string): boolean {
     );
 }
 
+function shouldRefreshAuthSession(
+    pathname: string,
+    isScanSubdomain: boolean,
+    needsApiAccessCheck: boolean,
+    isScanAuthPath: boolean,
+): boolean {
+    if (needsApiAccessCheck) {
+        return true;
+    }
+
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/internal')) {
+        return true;
+    }
+
+    if (pathname.startsWith('/scan')) {
+        return !isScanAuthPath;
+    }
+
+    if (isScanSubdomain && !isScanAuthPath) {
+        return true;
+    }
+
+    return false;
+}
+
 function extractProjectId(pathname: string): string | null {
     const match = pathname.match(/^\/api\/projects\/([^/]+)/);
     return match?.[1] || null;
@@ -222,41 +247,52 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // 3. Supabase Auth Session Refresh
-    // Determine cookie domain for cross-subdomain auth
-    const isProduction = domain.endsWith('.cencori.com') || domain === 'cencori.com';
-    const cookieDomain = isProduction ? '.cencori.com' : undefined;
-
-    const supabase = createServerClient(
-        supabaseUrl,
-        supabaseKey,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll()
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-                    response = rewriteUrl
-                        ? NextResponse.rewrite(rewriteUrl)
-                        : NextResponse.next({ request })
-
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, {
-                            ...options,
-                            domain: cookieDomain // Enable cross-subdomain auth
-                        })
-                    )
-                },
-            },
-        }
+    const shouldRefreshAuth = shouldRefreshAuthSession(
+        pathname,
+        isScanSubdomain,
+        needsApiAccessCheck,
+        isScanAuthPath,
     );
 
-    // Refresh auth token
-    const { data: { user } } = await supabase.auth.getUser();
+    let userId: string | null = null;
+
+    if (shouldRefreshAuth) {
+        // 3. Supabase Auth Session Refresh (only on auth-sensitive routes)
+        // Determine cookie domain for cross-subdomain auth
+        const isProduction = domain.endsWith('.cencori.com') || domain === 'cencori.com';
+        const cookieDomain = isProduction ? '.cencori.com' : undefined;
+
+        const supabase = createServerClient(
+            supabaseUrl,
+            supabaseKey,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll()
+                    },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+                        response = rewriteUrl
+                            ? NextResponse.rewrite(rewriteUrl)
+                            : NextResponse.next({ request })
+
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            response.cookies.set(name, value, {
+                                ...options,
+                                domain: cookieDomain // Enable cross-subdomain auth
+                            })
+                        )
+                    },
+                },
+            }
+        );
+
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id ?? null;
+    }
 
     if (needsApiAccessCheck) {
-        if (!user) {
+        if (!userId) {
             return applySecurityHeaders(
                 NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
             );
@@ -275,7 +311,7 @@ export async function middleware(request: NextRequest) {
 
         const projectId = extractProjectId(pathname);
         if (projectId) {
-            const access = await canAccessProject(adminClient, user.id, projectId);
+            const access = await canAccessProject(adminClient, userId, projectId);
             if (!access.allowed) {
                 return applySecurityHeaders(
                     NextResponse.json(
@@ -288,7 +324,7 @@ export async function middleware(request: NextRequest) {
 
         const orgSlug = extractOrgSlug(pathname);
         if (orgSlug) {
-            const access = await canAccessOrganization(adminClient, user.id, orgSlug);
+            const access = await canAccessOrganization(adminClient, userId, orgSlug);
             if (!access.allowed) {
                 return applySecurityHeaders(
                     NextResponse.json(

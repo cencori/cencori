@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
+  },
   // Configure images to allow all local paths (Next.js 16 requirement)
   images: {
     localPatterns: [

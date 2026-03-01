@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
 interface Organization {
@@ -38,21 +38,25 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+    const supabase = useMemo(
+        () =>
+            createBrowserClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+            ),
+        []
     );
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const {
-                data: { user },
-                error: userError,
-            } = await supabase.auth.getUser();
+                data: { session },
+                error: sessionError,
+            } = await supabase.auth.getSession();
 
-            if (userError || !user) {
-                console.error("User not logged in:", userError?.message);
+            if (sessionError || !session?.user) {
+                console.error("User not logged in:", sessionError?.message);
                 setLoading(false);
                 return;
             }
@@ -93,11 +97,11 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
         } finally {
             setLoading(false);
         }
-    };
+    }, [supabase]);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
 
     const updateOrganization = (id: string, updates: Partial<Organization>) => {
         setOrganizations((prev) =>
