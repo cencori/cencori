@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
-import { PlusIcon } from "@/components/ui/plus";
 import { Input } from "@/components/ui/input";
 import { Search, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +16,7 @@ interface OrganizationData {
   name: string;
   slug: string;
   description?: string;
+  subscription_tier?: 'free' | 'pro' | 'team' | 'enterprise' | null;
   plan_id: string;
   organization_plans: { name: string }[] | null;
   projects?: { count: number }[];
@@ -38,7 +38,7 @@ function useOrganizations() {
 
       const { data: orgsData, error: fetchError } = await supabase
         .from("organizations")
-        .select("id, name, slug, description, plan_id, organization_plans(name), projects(count)");
+        .select("id, name, slug, description, subscription_tier, plan_id, organization_plans(name), projects(count)");
 
       if (fetchError) throw new Error("Error loading organizations.");
 
@@ -165,9 +165,12 @@ export default function OrganizationsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredOrganizations.map((org) => {
           const projectCount = getProjectCount(org);
-          const planName = org.organization_plans?.[0]?.name
-            ? org.organization_plans[0].name.charAt(0).toUpperCase() + org.organization_plans[0].name.slice(1)
-            : "Free";
+          const planName =
+            org.subscription_tier
+              ? org.subscription_tier.charAt(0).toUpperCase() + org.subscription_tier.slice(1)
+              : org.organization_plans?.[0]?.name
+                ? org.organization_plans[0].name.charAt(0).toUpperCase() + org.organization_plans[0].name.slice(1)
+                : "Free";
 
           return (
             <div

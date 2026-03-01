@@ -3,7 +3,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +29,7 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+type CreatedOrg = { id: string; slug: string };
 
 // Helper to get monthly request limit based on tier
 function getRequestLimit(tier: string): number {
@@ -46,12 +47,17 @@ export default function NewOrganizationPage() {
   const [loading, setLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [createdOrg, setCreatedOrg] = useState<{ id: string; slug: string } | null>(null);
+  const [createdOrg, setCreatedOrg] = useState<CreatedOrg | null>(null);
   const { refetchData } = useOrganizationProject();
+  const paymentSucceededRef = useRef(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+  const supabase = useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+      ),
+    [],
   );
 
   const form = useForm<FormValues>({
@@ -79,18 +85,35 @@ export default function NewOrganizationPage() {
     initPolar();
   }, []);
 
+  const cleanupAbandonedOrganization = useCallback(async (orgId: string) => {
+    const { error } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("id", orgId);
+
+    if (error) {
+      console.error("[Checkout] Failed to cleanup abandoned organization:", error.message);
+      return false;
+    }
+
+    await refetchData();
+    return true;
+  }, [supabase, refetchData]);
+
   // Open Polar checkout as overlay modal
-  const openPolarCheckout = useCallback(async (checkoutUrl: string) => {
+  const openPolarCheckout = useCallback(async (checkoutUrl: string, org: CreatedOrg) => {
     try {
       const { PolarEmbedCheckout } = await import('@polar-sh/checkout/embed');
 
       console.log('[Checkout] Opening Polar overlay for:', checkoutUrl);
+      paymentSucceededRef.current = false;
 
       // This creates a fullscreen modal overlay
       const checkout = await PolarEmbedCheckout.create(checkoutUrl, 'dark');
 
       checkout.addEventListener('success', () => {
         console.log('[Checkout] Payment successful!');
+        paymentSucceededRef.current = true;
         setSuccess(true);
         toast.success('Payment successful!');
       });
@@ -98,18 +121,37 @@ export default function NewOrganizationPage() {
       checkout.addEventListener('close', () => {
         console.log('[Checkout] Modal closed');
         setCheckoutLoading(false);
-        // If successful, redirect. Otherwise stay on page.
-        if (success && createdOrg) {
-          router.push(`/dashboard/organizations/${createdOrg.slug}/projects`);
+
+        if (paymentSucceededRef.current) {
+          void refetchData();
+          router.push(`/dashboard/organizations/${org.slug}/projects`);
+          return;
         }
+
+        void (async () => {
+          const cleanedUp = await cleanupAbandonedOrganization(org.id);
+          if (!cleanedUp) {
+            toast.error("Checkout canceled. Please delete the unfinished organization from settings.");
+            return;
+          }
+
+          setCreatedOrg(null);
+          toast.info("Checkout canceled. Organization was not created.");
+        })();
       });
 
     } catch (err) {
       console.error('[Checkout] Error opening overlay:', err);
-      toast.error('Failed to open checkout. Please try again.');
       setCheckoutLoading(false);
+      const cleanedUp = await cleanupAbandonedOrganization(org.id);
+      setCreatedOrg(null);
+      if (!cleanedUp) {
+        toast.error('Failed to open checkout. Please delete the unfinished organization from settings.');
+      } else {
+        toast.error('Failed to open checkout. Organization was not created.');
+      }
     }
-  }, [success, createdOrg, router]);
+  }, [router, cleanupAbandonedOrganization, refetchData]);
 
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
@@ -145,12 +187,15 @@ export default function NewOrganizationPage() {
       return;
     }
 
-    const requestLimit = getRequestLimit(values.plan);
+    const requiresCheckout = values.plan === 'pro' || values.plan === 'team';
+    const initialTier = requiresCheckout ? 'free' : values.plan;
+    const requestLimit = getRequestLimit(initialTier);
 
     const { data: orgData, error } = await supabase.from("organizations").insert({
       name: values.name,
       slug: newSlug,
-      subscription_tier: values.plan,
+      // Paid plans remain free-tier until checkout is completed by webhook.
+      subscription_tier: initialTier,
       subscription_status: values.plan === 'free' ? 'active' : 'trialing',
       monthly_request_limit: requestLimit,
       monthly_requests_used: 0,
@@ -178,17 +223,18 @@ export default function NewOrganizationPage() {
 
     if (memberError) {
       console.error("Error adding organization owner:", memberError.message);
-      toast.error("Organization created but failed to add owner. Please contact support.");
+      await cleanupAbandonedOrganization(orgData.id);
+      toast.error("Failed to finalize organization setup. Please try again.");
       setLoading(false);
       return;
     }
 
     setCreatedOrg(orgData);
-    toast.success("Organization created!");
+    if (!requiresCheckout) {
+      toast.success("Organization created!");
+      await refetchData();
+    }
     setLoading(false);
-
-    // Refresh breadcrumb data
-    await refetchData();
 
     // Handle based on plan
     if (values.plan === 'enterprise') {
@@ -216,13 +262,19 @@ export default function NewOrganizationPage() {
         }
 
         // Open the overlay checkout
-        openPolarCheckout(data.checkoutUrl);
+        openPolarCheckout(data.checkoutUrl, orgData);
 
       } catch (err) {
         console.error("Error creating checkout:", err);
-        toast.error("Checkout failed. You can complete payment in billing settings.");
+        const cleanedUp = await cleanupAbandonedOrganization(orgData.id);
+        setCreatedOrg(null);
         setCheckoutLoading(false);
-        router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
+        if (!cleanedUp) {
+          toast.error("Checkout failed. Please delete the unfinished organization from settings.");
+          router.push(`/dashboard/organizations/${orgData.slug}/billing?upgrade=true`);
+          return;
+        }
+        toast.error("Checkout failed. Organization was not created.");
       }
     } else {
       // Free plan - go directly to projects
