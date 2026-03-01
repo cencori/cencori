@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
         const checkoutOptions: Parameters<typeof polarClient.checkouts.create>[0] = {
             products: [productId],
             successUrl: `${scanBaseUrl}/?success=true&scanUpgrade=true`,
-            customerEmail: user.email || undefined,
             customerName: (
                 (typeof user.user_metadata?.name === 'string' && user.user_metadata.name) ||
                 (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name) ||

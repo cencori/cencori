@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -84,7 +84,10 @@ export function ScanPaywallDialog({ open, onOpenChange, payload }: ScanPaywallDi
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data?.checkoutUrl) {
-                throw new Error(data?.error || "Failed to start checkout");
+                const message = data?.details
+                    ? `${data?.error || "Failed to start checkout"}: ${data.details}`
+                    : (data?.error || "Failed to start checkout");
+                throw new Error(message);
             }
 
             window.location.href = data.checkoutUrl;
@@ -179,4 +182,3 @@ export function ScanPaywallDialog({ open, onOpenChange, payload }: ScanPaywallDi
         </Dialog>
     );
 }
-
