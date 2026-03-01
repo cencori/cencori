@@ -739,6 +739,80 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleSelectScan = (scan: ScanRun) => {
+        setCurrentScan(scan);
+
+        // Populate scan log from this scan's logs or results
+        if (scan.logs && scan.logs.length > 0) {
+            setScanLog(scan.logs.map(log => ({
+                type: log.type,
+                message: log.message || '',
+                time: `${(log.time / 1000).toFixed(1)}s`,
+                severity: (log.data as { severity?: string })?.severity,
+                line: (log.data as { line?: number })?.line,
+            })));
+            return;
+        }
+
+        if (scan.results?.issues) {
+            // Fallback to results if logs not available
+            const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
+            const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
+            const issuesByFile: Record<string, ScanIssue[]> = {};
+
+            for (const issue of scan.results.issues) {
+                if (!issuesByFile[issue.file]) issuesByFile[issue.file] = [];
+                issuesByFile[issue.file].push(issue);
+            }
+
+            for (const [file, issues] of Object.entries(issuesByFile)) {
+                logEntries.push({ type: "file", message: file, time: timeStr });
+                for (const issue of issues) {
+                    logEntries.push({ type: "issue", message: `${issue.name}: ${issue.match}`, severity: issue.severity, line: issue.line });
+                }
+            }
+
+            logEntries.push({ type: "summary", message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`, time: timeStr });
+            setScanLog(logEntries);
+        }
+    };
+
+    const scanHistorySidebar = scans.length > 0 ? (
+        <div className="w-full sm:w-48 shrink-0 space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                Scan History
+            </div>
+            {scans.map((scan) => {
+                const isSelected = currentScan?.id === scan.id;
+                const date = new Date(scan.created_at);
+                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                return (
+                    <button
+                        key={scan.id}
+                        onClick={() => handleSelectScan(scan)}
+                        className={cn(
+                            "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
+                            isSelected
+                                ? "bg-secondary text-foreground"
+                                : "hover:bg-secondary/50 text-muted-foreground"
+                        )}
+                    >
+                        <div className="flex items-center gap-2">
+                            <span className={cn("size-1.5 rounded-full", scoreColors[scan.score || ""] || "bg-gray-500")} />
+                            <span className="font-medium">{dateStr}</span>
+                            <span className="text-muted-foreground/50">{timeStr}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                            {scan.slug || `scan-${scan.id.slice(0, 8)}`}
+                        </div>
+                    </button>
+                );
+            })}
+        </div>
+    ) : null;
+
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Back link */}
@@ -797,76 +871,13 @@ export default function ProjectDetailPage() {
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="scan" className="space-y-6">
+                <div className="flex flex-col sm:flex-row gap-4">
+                    {scanHistorySidebar}
 
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Scan history sidebar */}
-                        {scans.length > 0 && (
-                            <div className="w-full sm:w-48 shrink-0 space-y-1">
-                                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                                    Scan History
-                                </div>
-                                {scans.map((scan) => {
-                                    const isSelected = currentScan?.id === scan.id;
-                                    const date = new Date(scan.created_at);
-                                    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                    return (
-                                        <button
-                                            key={scan.id}
-                                            onClick={() => {
-                                                setCurrentScan(scan);
-                                                // Populate scan log from this scan's logs or results
-                                                if (scan.logs && scan.logs.length > 0) {
-                                                    setScanLog(scan.logs.map(log => ({
-                                                        type: log.type,
-                                                        message: log.message || '',
-                                                        time: `${(log.time / 1000).toFixed(1)}s`,
-                                                        severity: (log.data as { severity?: string })?.severity,
-                                                        line: (log.data as { line?: number })?.line,
-                                                    })));
-                                                } else if (scan.results?.issues) {
-                                                    // Fallback to results if logs not available
-                                                    const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
-                                                    const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
-                                                    const issuesByFile: Record<string, ScanIssue[]> = {};
-                                                    for (const issue of scan.results.issues) {
-                                                        if (!issuesByFile[issue.file]) issuesByFile[issue.file] = [];
-                                                        issuesByFile[issue.file].push(issue);
-                                                    }
-                                                    for (const [file, issues] of Object.entries(issuesByFile)) {
-                                                        logEntries.push({ type: "file", message: file, time: timeStr });
-                                                        for (const issue of issues) {
-                                                            logEntries.push({ type: "issue", message: `${issue.name}: ${issue.match}`, severity: issue.severity, line: issue.line });
-                                                        }
-                                                    }
-                                                    logEntries.push({ type: "summary", message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`, time: timeStr });
-                                                    setScanLog(logEntries);
-                                                }
-                                            }}
-                                            className={cn(
-                                                "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
-                                                isSelected
-                                                    ? "bg-secondary text-foreground"
-                                                    : "hover:bg-secondary/50 text-muted-foreground"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn("size-1.5 rounded-full", scoreColors[scan.score || ""] || "bg-gray-500")} />
-                                                <span className="font-medium">{dateStr}</span>
-                                                <span className="text-muted-foreground/50">{timeStr}</span>
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                                                {scan.slug || `scan-${scan.id.slice(0, 8)}`}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* Scan log */}
-                        <div className="flex-1 sm:mt-6 bg-card border border-border/40 rounded-md overflow-hidden">
+                    <div className="flex-1">
+                        <TabsContent value="scan" className="space-y-6">
+                            {/* Scan log */}
+                            <div className="sm:mt-6 bg-card border border-border/40 rounded-md overflow-hidden">
                             <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
@@ -1148,7 +1159,6 @@ export default function ProjectDetailPage() {
                                 </>
                             )}
                         </div>
-                    </div>
                 </TabsContent>
 
                 <TabsContent value="research" className="space-y-6">
@@ -1629,6 +1639,8 @@ export default function ProjectDetailPage() {
                         </div>
                     </div>
                 </TabsContent>
+                    </div>
+                </div>
             </Tabs>
         </div>
     );
