@@ -12,6 +12,8 @@ interface OrganizationRow {
     id: string;
     subscription_tier: string | null;
     subscription_status: string | null;
+    subscription_id?: string | null;
+    polar_customer_id?: string | null;
 }
 
 interface ScanSubscriptionRow {
@@ -62,18 +64,39 @@ function isActiveStatus(status: string | null | undefined): boolean {
     return ACTIVE_SUBSCRIPTION_STATUSES.has(normalizeStatus(status));
 }
 
+function hasBillingIdentity(org: OrganizationRow): boolean {
+    const hasSubscriptionId = typeof org.subscription_id === "string" && org.subscription_id.length > 0;
+    const hasPolarCustomerId = typeof org.polar_customer_id === "string" && org.polar_customer_id.length > 0;
+    return hasSubscriptionId || hasPolarCustomerId;
+}
+
+function hasEligiblePlatformAccess(org: OrganizationRow): boolean {
+    const tier = normalizePlatformTier(org.subscription_tier);
+    if (!tier || !PLATFORM_TIERS.has(tier)) {
+        return false;
+    }
+
+    if (!isActiveStatus(org.subscription_status)) {
+        return false;
+    }
+
+    if (tier === "enterprise") {
+        return true;
+    }
+
+    return hasBillingIdentity(org);
+}
+
 function highestPlatformTier(organizations: OrganizationRow[]): "pro" | "team" | "enterprise" | null {
     let best: "pro" | "team" | "enterprise" | null = null;
 
     for (const org of organizations) {
-        const tier = normalizePlatformTier(org.subscription_tier);
-        if (!tier || !PLATFORM_TIERS.has(tier)) {
+        if (!hasEligiblePlatformAccess(org)) {
             continue;
         }
 
-        if (!isActiveStatus(org.subscription_status)) {
-            continue;
-        }
+        const tier = normalizePlatformTier(org.subscription_tier);
+        if (!tier) continue;
 
         if (!best || PLATFORM_TIER_PRIORITY[tier] > PLATFORM_TIER_PRIORITY[best]) {
             best = tier;
@@ -109,7 +132,7 @@ export async function getScanEntitlementForUser(userId: string): Promise<ScanEnt
     const [{ data: ownedOrgs, error: ownedOrgsError }, { data: memberships, error: membershipsError }] = await Promise.all([
         supabaseAdmin
             .from("organizations")
-            .select("id, subscription_tier, subscription_status")
+            .select("id, subscription_tier, subscription_status, subscription_id, polar_customer_id")
             .eq("owner_id", userId),
         supabaseAdmin
             .from("organization_members")
@@ -136,7 +159,7 @@ export async function getScanEntitlementForUser(userId: string): Promise<ScanEnt
     if (membershipOrgIds.length > 0) {
         const { data: membershipOrgs, error: membershipOrgsError } = await supabaseAdmin
             .from("organizations")
-            .select("id, subscription_tier, subscription_status")
+            .select("id, subscription_tier, subscription_status, subscription_id, polar_customer_id")
             .in("id", membershipOrgIds);
 
         if (membershipOrgsError) {
