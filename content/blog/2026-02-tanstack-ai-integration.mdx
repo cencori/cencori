@@ -32,14 +32,14 @@ No need to manage multiple API keys or build your own safety layer—Cencori han
 It's two packages:
 
 ```bash
-npm install @cencori/ai-sdk @tanstack/ai
+npm install cencori @tanstack/ai
 ```
 
 And a few lines of code:
 
 ```typescript
 import { chat } from "@tanstack/ai";
-import { cencori } from "@cencori/ai-sdk/tanstack";
+import { cencori } from "cencori/tanstack";
 
 for await (const chunk of chat({
   adapter: cencori("gpt-4o"),
