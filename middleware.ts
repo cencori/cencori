@@ -31,6 +31,7 @@ const securityHeaders: Record<string, string> = {
         "img-src 'self' data: https: blob:",
         "font-src 'self' data:",
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://vercel.live wss://vercel.live",
+        "frame-src 'self' https://polar.sh https://sandbox.polar.sh",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",

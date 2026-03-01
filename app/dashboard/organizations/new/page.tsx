@@ -205,6 +205,7 @@ export default function NewOrganizationPage() {
             tier: values.plan,
             cycle: 'monthly',
             orgId: orgData.id,
+            embedOrigin: window.location.origin,
           }),
         });
 
