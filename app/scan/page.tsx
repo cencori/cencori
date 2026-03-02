@@ -10,6 +10,8 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
+import { supabase } from "@/lib/supabaseClient";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 // Heroicons archive-box-arrow-down icon
 const ArchiveBoxArrowDownIcon = ({ className }: { className?: string }) => (
@@ -65,29 +67,53 @@ export default function ScanDashboardPage() {
     const [hasScanAccess, setHasScanAccess] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchProjectsAndEntitlement = async () => {
             try {
                 const [projectsResponse, entitlementResponse] = await Promise.all([
-                    fetch('/api/scan/projects'),
-                    fetch('/api/scan/entitlement'),
+                    fetch('/api/scan/projects', { cache: "no-store" }),
+                    fetch('/api/scan/entitlement', { cache: "no-store" }),
                 ]);
 
-                if (projectsResponse.ok) {
+                if (projectsResponse.ok && isMounted) {
                     const projectData = await projectsResponse.json();
                     setProjects(projectData.projects || []);
                 }
 
-                if (entitlementResponse.ok) {
+                if (entitlementResponse.ok && isMounted) {
                     const entitlementData = await entitlementResponse.json() as ScanEntitlementPayload;
                     setHasScanAccess(Boolean(entitlementData.entitlement?.hasScanAccess));
                 }
             } catch (err) {
                 console.error('Error fetching projects:', err);
             } finally {
-                setIsLoading(false);
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
         };
-        fetchProjectsAndEntitlement();
+
+        const init = async () => {
+            // Let Supabase settle auth state before first protected API call.
+            await supabase.auth.getSession();
+            await fetchProjectsAndEntitlement();
+        };
+
+        void init();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event: AuthChangeEvent, session: Session | null) => {
+                if (session?.user) {
+                    void fetchProjectsAndEntitlement();
+                }
+            }
+        );
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const filteredProjects = projects.filter(project =>
