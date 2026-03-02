@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 import { openScanPaywallFromResponse } from "@/lib/scan/paywall-client";
 import { supabase } from "@/lib/supabaseClient";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
     Select,
     SelectContent,
@@ -150,11 +151,13 @@ export default function ImportRepoPage() {
 
         void init();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                void fetchRepos();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event: AuthChangeEvent, session: Session | null) => {
+                if (session?.user) {
+                    void fetchRepos();
+                }
             }
-        });
+        );
 
         return () => {
             isMounted = false;

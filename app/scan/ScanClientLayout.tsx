@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
     ExternalLink,
     LogOut,
@@ -64,13 +65,15 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         };
         checkAuth();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                setUser(session.user as User);
-            } else {
-                setUser(null);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event: AuthChangeEvent, session: Session | null) => {
+                if (session?.user) {
+                    setUser(session.user as User);
+                } else {
+                    setUser(null);
+                }
             }
-        });
+        );
 
         return () => {
             subscription.unsubscribe();

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import {
@@ -61,13 +62,15 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
         };
         checkAuth();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                setUser(session.user as User);
-            } else {
-                setUser(null);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event: AuthChangeEvent, session: Session | null) => {
+                if (session?.user) {
+                    setUser(session.user as User);
+                } else {
+                    setUser(null);
+                }
             }
-        });
+        );
 
         return () => {
             subscription.unsubscribe();
