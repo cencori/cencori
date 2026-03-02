@@ -61,6 +61,7 @@ interface ScanSummary {
     routes: number;
     config: number;
     vulnerabilities: number;
+    dependencies: number;
     critical: number;
     high: number;
     medium: number;
@@ -882,768 +883,768 @@ export default function ProjectDetailPage() {
                             </div>
                         </>
                     )}
-                            {/* Scan log */}
-                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
-                                        {currentScan && (
-                                            <span className="text-[10px] font-mono text-muted-foreground/60">
-                                                {currentScan.slug || `scan-${currentScan.id.slice(0, 8)}`}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {currentScan && (
-                                            <>
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-6 px-2 text-[10px]"
-                                                        onClick={() => {
-                                                            const data = {
-                                                                scanId: currentScan.id,
-                                                                slug: currentScan.slug,
-                                                                score: currentScan.score,
-                                                                filesScanned: currentScan.files_scanned,
-                                                                issuesFound: currentScan.issues_found,
-                                                                durationMs: currentScan.scan_duration_ms,
-                                                                createdAt: currentScan.created_at,
-                                                                logs: currentScan.logs || [],
-                                                                issues: currentScan.results?.issues || [],
-                                                                summary: currentScan.results?.summary || null,
-                                                                research: currentScan.results?.research || null,
-                                                                aiContext: currentScan.results?.ai_context || null,
-                                                            };
-                                                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                                                            const url = URL.createObjectURL(blob);
-                                                            const a = document.createElement('a');
-                                                            a.href = url;
-                                                            a.download = `${currentScan.slug || 'scan'}.json`;
-                                                            a.click();
-                                                            URL.revokeObjectURL(url);
-                                                        }}
-                                                    >
-                                                        <Download className="h-3 w-3 mr-1" />
-                                                        JSON
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-6 px-2 text-[10px]"
-                                                        onClick={() => {
-                                                            const lines = [
-                                                                `# Scan Report`,
-                                                                ``,
-                                                                `**ID:** ${currentScan.slug || currentScan.id}`,
-                                                                `**Date:** ${new Date(currentScan.created_at).toLocaleString()}`,
-                                                                `**Score:** ${currentScan.score}`,
-                                                                `**Files Scanned:** ${currentScan.files_scanned}`,
-                                                                `**Issues Found:** ${currentScan.issues_found}`,
-                                                                `**Duration:** ${(currentScan.scan_duration_ms / 1000).toFixed(1)}s`,
-                                                                ``,
-                                                            ];
-                                                            if (currentScan.results?.issues?.length) {
-                                                                lines.push(`## Issues`, ``);
-                                                                for (const issue of currentScan.results.issues) {
-                                                                    lines.push(`- **[${issue.severity.toUpperCase()}]** ${issue.name} in \`${issue.file}\` (line ${issue.line}): ${issue.match}`);
-                                                                }
-                                                            } else {
-                                                                lines.push(`## No Issues Found ✓`);
-                                                            }
-                                                            const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
-                                                            const url = URL.createObjectURL(blob);
-                                                            const a = document.createElement('a');
-                                                            a.href = url;
-                                                            a.download = `${currentScan.slug || 'scan'}.md`;
-                                                            a.click();
-                                                            URL.revokeObjectURL(url);
-                                                        }}
-                                                    >
-                                                        <Download className="h-3 w-3 mr-1" />
-                                                        MD
-                                                    </Button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
-                                    {scanLog.length > 0 ? (
-                                        scanLog.map((entry, index) => (
-                                            <div key={index} className="flex items-start gap-3 py-0.5">
-                                                {entry.type === "info" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <span className="text-muted-foreground">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "start" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <span className="text-blue-400">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "progress" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <span className="text-muted-foreground">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "success" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
-                                                        <span className="text-emerald-500">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "ai_context" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <Shield className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />
-                                                        <span className="text-blue-300">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "error" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
-                                                        <span className="text-red-500">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "file" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
-                                                        <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-                                                        <span className="text-yellow-500">{entry.message}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "issue" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
-                                                        <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
-                                                        <span className={cn("shrink-0", severityColors[entry.severity || "low"])}>
-                                                            [{(entry.severity || "low").toUpperCase()}]
-                                                        </span>
-                                                        <span className="text-muted-foreground">{entry.message}</span>
-                                                        <span className="text-muted-foreground/50">line {entry.line}</span>
-                                                    </>
-                                                )}
-                                                {entry.type === "summary" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <span className="text-foreground font-medium">✓ {entry.message}</span>
-                                                        {currentScan?.score && (
-                                                            <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0">
-                                                                <span className={cn("size-1 rounded-full", scoreColors[currentScan.score])} />
-                                                                {currentScan.score}
-                                                            </Badge>
-                                                        )}
-                                                    </>
-                                                )}
-                                                {entry.type === "complete" && (
-                                                    <>
-                                                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
-                                                        <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
-                                                        <span className="text-foreground font-medium">{entry.message}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-muted-foreground text-center py-8">
-                                            {project.last_scan_at
-                                                ? "Click 'Run Scan' to scan again"
-                                                : "No scans yet. Click 'Run Scan' to start."}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Suppressed false positives — collapsible */}
-                                {(() => {
-                                    const suppressed = currentScan?.results?.suppressed_issues;
-                                    if (!suppressed || suppressed.length === 0) return null;
-                                    return (
-                                        <>
-                                            <div className="border-t border-border/40" />
-                                            <button
-                                                onClick={() => setShowSuppressed(v => !v)}
-                                                className="w-full px-4 py-2 flex items-center gap-2 text-left hover:bg-secondary/30 transition-colors"
-                                            >
-                                                <span className="text-[11px] text-muted-foreground/60 flex-1">
-                                                    Filtered
-                                                </span>
-                                                <ChevronDown className={cn(
-                                                    "h-3 w-3 text-muted-foreground/40 transition-transform",
-                                                    showSuppressed && "rotate-180"
-                                                )} />
-                                            </button>
-                                            {showSuppressed && (
-                                                <div className="px-4 pb-3 font-mono text-xs space-y-0.5">
-                                                    {(() => {
-                                                        const byFile: Record<string, ScanIssue[]> = {};
-                                                        for (const issue of suppressed) {
-                                                            if (!byFile[issue.file]) byFile[issue.file] = [];
-                                                            byFile[issue.file].push(issue);
-                                                        }
-                                                        return Object.entries(byFile).map(([file, issues]) => (
-                                                            <div key={file} className="mt-1.5">
-                                                                <div className="flex items-center gap-2 text-muted-foreground/40">
-                                                                    <FileText className="h-3 w-3 shrink-0" />
-                                                                    <span>{file}</span>
-                                                                </div>
-                                                                {issues.map((issue, i) => (
-                                                                    <div key={i} className="flex items-start gap-3 py-0.5 pl-5">
-                                                                        <ChevronRight className="h-3 w-3 text-muted-foreground/20 shrink-0 mt-0.5" />
-                                                                        <span className="text-muted-foreground/30 shrink-0">
-                                                                            [{(issue.severity || "low").toUpperCase()}]
-                                                                        </span>
-                                                                        <span className="text-muted-foreground/40">{issue.name}</span>
-                                                                        <span className="text-muted-foreground/25">line {issue.line}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ));
-                                                    })()}
-                                                </div>
-                                            )}
-                                        </>
-                                    );
-                                })()}
-                                {canShowFixBanner && activeScan && (
+                    {/* Scan log */}
+                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                        <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Log</span>
+                                {currentScan && (
+                                    <span className="text-[10px] font-mono text-muted-foreground/60">
+                                        {currentScan.slug || `scan-${currentScan.id.slice(0, 8)}`}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {currentScan && (
                                     <>
-                                        <div className="border-t border-border/40" />
-                                        <div className="px-4 py-3 flex items-center justify-between gap-2">
-                                            {activeScan.fix_status === "pr_opened" ? (
-                                                <>
-                                                    {activeScan.fix_pr_url && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-7 text-xs px-3"
-                                                            onClick={() => window.open(activeScan.fix_pr_url as string, "_blank")}
-                                                        >
-                                                            <ExternalLink className="h-3 w-3 mr-1.5" />
-                                                            View PR
-                                                        </Button>
-                                                    )}
-                                                    <Button
-                                                        size="sm"
-                                                        className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                                        onClick={() => updateFixStatus("done")}
-                                                        disabled={isUpdatingFixStatus}
-                                                    >
-                                                        {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
-                                                    </Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-7 text-xs px-3"
-                                                        onClick={() => updateFixStatus("dismiss")}
-                                                        disabled={isUpdatingFixStatus}
-                                                    >
-                                                        {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                                        onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
-                                                    >
-                                                        Suggest Fix
-                                                    </Button>
-                                                </>
-                                            )}
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 px-2 text-[10px]"
+                                                onClick={() => {
+                                                    const data = {
+                                                        scanId: currentScan.id,
+                                                        slug: currentScan.slug,
+                                                        score: currentScan.score,
+                                                        filesScanned: currentScan.files_scanned,
+                                                        issuesFound: currentScan.issues_found,
+                                                        durationMs: currentScan.scan_duration_ms,
+                                                        createdAt: currentScan.created_at,
+                                                        logs: currentScan.logs || [],
+                                                        issues: currentScan.results?.issues || [],
+                                                        summary: currentScan.results?.summary || null,
+                                                        research: currentScan.results?.research || null,
+                                                        aiContext: currentScan.results?.ai_context || null,
+                                                    };
+                                                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `${currentScan.slug || 'scan'}.json`;
+                                                    a.click();
+                                                    URL.revokeObjectURL(url);
+                                                }}
+                                            >
+                                                <Download className="h-3 w-3 mr-1" />
+                                                JSON
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 px-2 text-[10px]"
+                                                onClick={() => {
+                                                    const lines = [
+                                                        `# Scan Report`,
+                                                        ``,
+                                                        `**ID:** ${currentScan.slug || currentScan.id}`,
+                                                        `**Date:** ${new Date(currentScan.created_at).toLocaleString()}`,
+                                                        `**Score:** ${currentScan.score}`,
+                                                        `**Files Scanned:** ${currentScan.files_scanned}`,
+                                                        `**Issues Found:** ${currentScan.issues_found}`,
+                                                        `**Duration:** ${(currentScan.scan_duration_ms / 1000).toFixed(1)}s`,
+                                                        ``,
+                                                    ];
+                                                    if (currentScan.results?.issues?.length) {
+                                                        lines.push(`## Issues`, ``);
+                                                        for (const issue of currentScan.results.issues) {
+                                                            lines.push(`- **[${issue.severity.toUpperCase()}]** ${issue.name} in \`${issue.file}\` (line ${issue.line}): ${issue.match}`);
+                                                        }
+                                                    } else {
+                                                        lines.push(`## No Issues Found ✓`);
+                                                    }
+                                                    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `${currentScan.slug || 'scan'}.md`;
+                                                    a.click();
+                                                    URL.revokeObjectURL(url);
+                                                }}
+                                            >
+                                                <Download className="h-3 w-3 mr-1" />
+                                                MD
+                                            </Button>
                                         </div>
                                     </>
                                 )}
                             </div>
-                        </TabsContent>
-
-                        <TabsContent value="research" className="space-y-6">
-                            {!currentScan ? (
-                                <div className="bg-card border border-border/40 rounded-md p-6 text-center text-sm text-muted-foreground">
-                                    Run a scan to build repository intelligence and compare against prior runs.
-                                </div>
+                        </div>
+                        <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
+                            {scanLog.length > 0 ? (
+                                scanLog.map((entry, index) => (
+                                    <div key={index} className="flex items-start gap-3 py-0.5">
+                                        {entry.type === "info" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <span className="text-muted-foreground">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "start" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <span className="text-blue-400">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "progress" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <span className="text-muted-foreground">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "success" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                                                <span className="text-emerald-500">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "ai_context" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <Shield className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />
+                                                <span className="text-blue-300">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "error" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
+                                                <span className="text-red-500">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "file" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
+                                                <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                                                <span className="text-yellow-500">{entry.message}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "issue" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
+                                                <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
+                                                <span className={cn("shrink-0", severityColors[entry.severity || "low"])}>
+                                                    [{(entry.severity || "low").toUpperCase()}]
+                                                </span>
+                                                <span className="text-muted-foreground">{entry.message}</span>
+                                                <span className="text-muted-foreground/50">line {entry.line}</span>
+                                            </>
+                                        )}
+                                        {entry.type === "summary" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <span className="text-foreground font-medium">✓ {entry.message}</span>
+                                                {currentScan?.score && (
+                                                    <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0">
+                                                        <span className={cn("size-1 rounded-full", scoreColors[currentScan.score])} />
+                                                        {currentScan.score}
+                                                    </Badge>
+                                                )}
+                                            </>
+                                        )}
+                                        {entry.type === "complete" && (
+                                            <>
+                                                <span className="text-muted-foreground/50 w-10 text-right shrink-0">{entry.time}</span>
+                                                <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                                                <span className="text-foreground font-medium">{entry.message}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                ))
                             ) : (
+                                <div className="text-muted-foreground text-center py-8">
+                                    {project.last_scan_at
+                                        ? "Click 'Run Scan' to scan again"
+                                        : "No scans yet. Click 'Run Scan' to start."}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Suppressed false positives — collapsible */}
+                        {(() => {
+                            const suppressed = currentScan?.results?.suppressed_issues;
+                            if (!suppressed || suppressed.length === 0) return null;
+                            return (
                                 <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <div className="bg-card border border-border/40 rounded-md p-4">
-                                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Files Indexed</p>
-                                            <p className="text-xl font-semibold mt-1">{currentResearch?.filesIndexed ?? 0}</p>
-                                        </div>
-                                        <div className="bg-card border border-border/40 rounded-md p-4">
-                                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Components Mapped</p>
-                                            <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.nodes.length ?? 0}</p>
-                                        </div>
-                                        <div className="bg-card border border-border/40 rounded-md p-4">
-                                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Interaction Edges</p>
-                                            <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.edges.length ?? 0}</p>
-                                        </div>
-                                        <div className="bg-card border border-border/40 rounded-md p-4">
-                                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Data Flow Traces</p>
-                                            <p className="text-xl font-semibold mt-1">{currentResearch?.dataFlows.traces.length ?? 0}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Live AI Context</p>
-                                            {currentAiContext && (
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    {currentAiContext.model} · {currentAiContext.snapshotsAnalyzed} snapshot{currentAiContext.snapshotsAnalyzed === 1 ? "" : "s"}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="p-4 space-y-2">
-                                            {currentAiContext ? (
-                                                <>
-                                                    <p className="text-xs text-foreground">{currentAiContext.summary}</p>
-                                                    {currentAiContext.riskThemes.length > 0 && (
-                                                        <p className="text-xs text-muted-foreground">
-                                                            <span className="font-medium text-foreground/90">Risk themes:</span> {currentAiContext.riskThemes.join(" · ")}
-                                                        </p>
-                                                    )}
-                                                    {currentAiContext.priorityFiles.length > 0 && (
-                                                        <p className="text-xs text-muted-foreground">
-                                                            <span className="font-medium text-foreground/90">Priority files:</span> {currentAiContext.priorityFiles.slice(0, 6).join(", ")}
-                                                        </p>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">
-                                                    AI context snapshots are stored when a live scan stream is running.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                        <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                            <div className="px-4 py-2.5 border-b border-border/40">
-                                                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Interaction Hotspots</p>
-                                            </div>
-                                            <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
-                                                {currentResearch?.interactionMap.hotspots.length ? (
-                                                    currentResearch.interactionMap.hotspots.map((hotspot) => (
-                                                        <div key={hotspot.file} className="rounded border border-border/40 p-3">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <p className="text-xs font-medium font-mono truncate">{hotspot.file}</p>
-                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                                                    score {hotspot.riskScore}
-                                                                </Badge>
-                                                            </div>
-                                                            <p className="text-[11px] text-muted-foreground mt-1">
-                                                                {hotspot.kind} · {hotspot.reason}
-                                                            </p>
+                                    <div className="border-t border-border/40" />
+                                    <button
+                                        onClick={() => setShowSuppressed(v => !v)}
+                                        className="w-full px-4 py-2 flex items-center gap-2 text-left hover:bg-secondary/30 transition-colors"
+                                    >
+                                        <span className="text-[11px] text-muted-foreground/60 flex-1">
+                                            Filtered
+                                        </span>
+                                        <ChevronDown className={cn(
+                                            "h-3 w-3 text-muted-foreground/40 transition-transform",
+                                            showSuppressed && "rotate-180"
+                                        )} />
+                                    </button>
+                                    {showSuppressed && (
+                                        <div className="px-4 pb-3 font-mono text-xs space-y-0.5">
+                                            {(() => {
+                                                const byFile: Record<string, ScanIssue[]> = {};
+                                                for (const issue of suppressed) {
+                                                    if (!byFile[issue.file]) byFile[issue.file] = [];
+                                                    byFile[issue.file].push(issue);
+                                                }
+                                                return Object.entries(byFile).map(([file, issues]) => (
+                                                    <div key={file} className="mt-1.5">
+                                                        <div className="flex items-center gap-2 text-muted-foreground/40">
+                                                            <FileText className="h-3 w-3 shrink-0" />
+                                                            <span>{file}</span>
                                                         </div>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground">No hotspots available for this scan.</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                            <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-2">
-                                                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data Flow Traces</p>
-                                                {currentResearch && (
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        {currentResearch.dataFlows.criticalCount} critical · {currentResearch.dataFlows.highCount} high
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
-                                                {currentResearch?.dataFlows.traces.length ? (
-                                                    currentResearch.dataFlows.traces.slice(0, 12).map((trace) => (
-                                                        <div key={trace.id} className="rounded border border-border/40 p-3">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <p className="text-xs font-medium truncate">{trace.summary}</p>
-                                                                <span className={cn("text-[11px] uppercase", severityColors[trace.severity])}>
-                                                                    {trace.severity}
+                                                        {issues.map((issue, i) => (
+                                                            <div key={i} className="flex items-start gap-3 py-0.5 pl-5">
+                                                                <ChevronRight className="h-3 w-3 text-muted-foreground/20 shrink-0 mt-0.5" />
+                                                                <span className="text-muted-foreground/30 shrink-0">
+                                                                    [{(issue.severity || "low").toUpperCase()}]
                                                                 </span>
+                                                                <span className="text-muted-foreground/40">{issue.name}</span>
+                                                                <span className="text-muted-foreground/25">line {issue.line}</span>
                                                             </div>
-                                                            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
-                                                                {trace.file}:{trace.line} · confidence {(trace.confidence * 100).toFixed(0)}%
-                                                            </p>
-                                                            <div className="mt-2 space-y-1">
-                                                                {trace.stages.map((stage, idx) => (
-                                                                    <p key={`${trace.id}-${idx}`} className="text-[11px] text-muted-foreground">
-                                                                        <span className="uppercase tracking-wide mr-2">{stage.kind}</span>
-                                                                        {stage.label}
-                                                                    </p>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground">No source-to-sink traces were identified in this run.</p>
-                                                )}
-                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ));
+                                            })()}
                                         </div>
-                                    </div>
-
-                                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Diff Viewer</p>
-                                            <select
-                                                className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                                                value={baselineScanId}
-                                                onChange={(event) => setBaselineScanId(event.target.value)}
-                                            >
-                                                <option value="">Select baseline run</option>
-                                                {scans
-                                                    .filter((scan) => scan.id !== currentScan.id)
-                                                    .map((scan) => (
-                                                        <option key={scan.id} value={scan.id}>
-                                                            {new Date(scan.created_at).toLocaleString()} · {scan.score || "?"}
-                                                        </option>
-                                                    ))}
-                                            </select>
-                                        </div>
-
-                                        {!baselineScan || !scanDiff ? (
-                                            <div className="p-4 text-xs text-muted-foreground">
-                                                Select a prior scan run to compare with the current run.
-                                            </div>
-                                        ) : (
-                                            <div className="p-4 space-y-4">
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                    <div className="rounded border border-border/40 p-3">
-                                                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Score Delta</p>
-                                                        <p className={cn("text-lg font-semibold mt-1", scanDiff.scoreDelta < 0 ? "text-red-500" : "text-emerald-500")}>
-                                                            {scanDiff.scoreDelta > 0 ? "+" : ""}{scanDiff.scoreDelta}
-                                                        </p>
-                                                    </div>
-                                                    <div className="rounded border border-border/40 p-3">
-                                                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Issue Delta</p>
-                                                        <p className={cn("text-lg font-semibold mt-1", scanDiff.issueDelta > 0 ? "text-red-500" : "text-emerald-500")}>
-                                                            {scanDiff.issueDelta > 0 ? "+" : ""}{scanDiff.issueDelta}
-                                                        </p>
-                                                    </div>
-                                                    <div className="rounded border border-border/40 p-3">
-                                                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">File Delta</p>
-                                                        <p className="text-lg font-semibold mt-1">
-                                                            {scanDiff.fileDelta > 0 ? "+" : ""}{scanDiff.fileDelta}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                                    <div className="rounded border border-border/40 p-3">
-                                                        <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
-                                                            Added Findings ({scanDiff.addedIssues.length})
-                                                        </p>
-                                                        <div className="space-y-1 max-h-[220px] overflow-y-auto">
-                                                            {scanDiff.addedIssues.length ? (
-                                                                scanDiff.addedIssues.map((issue) => (
-                                                                    <p key={`added-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
-                                                                        <span className={cn("mr-1", severityColors[issue.severity])}>
-                                                                            [{issue.severity.toUpperCase()}]
-                                                                        </span>
-                                                                        {issue.file}:{issue.line} {issue.name}
-                                                                    </p>
-                                                                ))
-                                                            ) : (
-                                                                <p className="text-xs text-muted-foreground">No new findings compared to baseline.</p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="rounded border border-border/40 p-3">
-                                                        <p className="text-[11px] font-medium text-red-400 uppercase tracking-wider mb-2">
-                                                            Resolved Findings ({scanDiff.removedIssues.length})
-                                                        </p>
-                                                        <div className="space-y-1 max-h-[220px] overflow-y-auto">
-                                                            {scanDiff.removedIssues.length ? (
-                                                                scanDiff.removedIssues.map((issue) => (
-                                                                    <p key={`removed-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
-                                                                        <span className={cn("mr-1", severityColors[issue.severity])}>
-                                                                            [{issue.severity.toUpperCase()}]
-                                                                        </span>
-                                                                        {issue.file}:{issue.line} {issue.name}
-                                                                    </p>
-                                                                ))
-                                                            ) : (
-                                                                <p className="text-xs text-muted-foreground">No findings were resolved in the current run.</p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                                        <div className="px-4 py-2.5 border-b border-border/40">
-                                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Research Notes</p>
-                                        </div>
-                                        <div className="p-4 space-y-2">
-                                            {currentResearch?.reasoningNotes.length ? (
-                                                currentResearch.reasoningNotes.map((note, index) => (
-                                                    <p key={`${index}-${note}`} className="text-xs text-muted-foreground">
-                                                        {index + 1}. {note}
-                                                    </p>
-                                                ))
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">
-                                                    This scan run has no generated research notes. Run a fresh scan to produce deeper analysis.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
+                                    )}
                                 </>
-                            )}
-                        </TabsContent>
-
-                        <TabsContent value="changelog">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                                <div>
-                                    <h2 className="text-[13px] font-medium">Changelog</h2>
-                                    <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <select
-                                        value={changelogTimeframe}
-                                        onChange={(e) => setChangelogTimeframe(e.target.value as '24h' | '7d' | '30d')}
-                                        className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-                                        disabled={isGeneratingChangelog}
-                                    >
-                                        <option value="24h">Last 24 hours</option>
-                                        <option value="7d">Last 7 days</option>
-                                        <option value="30d">Last 30 days</option>
-                                    </select>
-                                    <Button
-                                        size="sm"
-                                        className="h-7 text-xs px-3"
-                                        onClick={handleGenerateChangelog}
-                                        disabled={isGeneratingChangelog}
-                                    >
-                                        {isGeneratingChangelog ? (
-                                            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
-                                        ) : (
-                                            "Generate Changelog"
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {changelogs.length === 0 ? (
-                                <div className="text-center py-16 flex flex-col items-center justify-center">
-                                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                                        <GitBranch className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <p className="text-sm font-medium mb-1">No changelogs generated yet</p>
-                                    <p className="text-xs text-muted-foreground">Click &quot;Generate Changelog&quot; to create your first one</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {/* Changelog list */}
-                                    <div className="flex gap-4">
-                                        {/* Sidebar with changelog list */}
-                                        <div className="w-48 shrink-0 space-y-1">
-                                            {changelogs.map((changelog) => {
-                                                const isSelected = selectedChangelog?.id === changelog.id;
-                                                const date = new Date(changelog.created_at).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric',
-                                                });
-                                                return (
-                                                    <button
-                                                        key={changelog.id}
-                                                        onClick={() => setSelectedChangelog(changelog)}
-                                                        className={cn(
-                                                            "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
-                                                            isSelected
-                                                                ? "bg-secondary text-foreground"
-                                                                : "hover:bg-secondary/50 text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        <div className="font-medium">{date}</div>
-                                                        <div className="text-[10px] text-muted-foreground">
-                                                            {changelog.commit_count} commits
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Changelog content */}
-                                        <div className="flex-1 bg-card border border-border/40 rounded-md p-4 overflow-auto">
-                                            {selectedChangelog ? (
-                                                <div className="prose prose-sm prose-invert max-w-none">
-                                                    <pre className="whitespace-pre-wrap text-xs font-mono text-foreground p-0 m-0 bg-transparent">
-                                                        {selectedChangelog.markdown}
-                                                    </pre>
-                                                </div>
-                                            ) : (
-                                                <div className="text-xs text-muted-foreground text-center py-8">
-                                                    Select a changelog to view
-                                                </div>
+                            );
+                        })()}
+                        {canShowFixBanner && activeScan && (
+                            <>
+                                <div className="border-t border-border/40" />
+                                <div className="px-4 py-3 flex items-center justify-between gap-2">
+                                    {activeScan.fix_status === "pr_opened" ? (
+                                        <>
+                                            {activeScan.fix_pr_url && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-7 text-xs px-3"
+                                                    onClick={() => window.open(activeScan.fix_pr_url as string, "_blank")}
+                                                >
+                                                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                                                    View PR
+                                                </Button>
                                             )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </TabsContent>
-
-                        <TabsContent value="settings">
-                            <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
-
-                            <div className="space-y-6">
-                                {/* Project Details */}
-                                <div className="bg-card border border-border/40 rounded-md p-4">
-                                    <h3 className="text-xs font-medium mb-4">Project Details</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1.5">Project Name</label>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono">
-                                                    {project.github_repo_full_name}
-                                                </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-7 w-7 p-0 shrink-0"
-                                                    onClick={() => handleCopyToClipboard(project.github_repo_full_name, 'name')}
-                                                >
-                                                    {copiedField === 'name' ? (
-                                                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                                                    ) : (
-                                                        <Copy className="h-3 w-3" />
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1.5">Project ID</label>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-muted-foreground">
-                                                    {project.id}
-                                                </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-7 w-7 p-0 shrink-0"
-                                                    onClick={() => handleCopyToClipboard(project.id, 'id')}
-                                                >
-                                                    {copiedField === 'id' ? (
-                                                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                                                    ) : (
-                                                        <Copy className="h-3 w-3" />
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1.5">GitHub URL</label>
-                                            <div className="flex items-center gap-2">
-                                                <a
-                                                    href={project.github_repo_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-blue-400 hover:text-blue-300 hover:underline truncate"
-                                                >
-                                                    {project.github_repo_url}
-                                                </a>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-7 w-7 p-0 shrink-0"
-                                                    onClick={() => handleCopyToClipboard(project.github_repo_url, 'url')}
-                                                >
-                                                    {copiedField === 'url' ? (
-                                                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                                                    ) : (
-                                                        <Copy className="h-3 w-3" />
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Notifications */}
-                                <div className="bg-card border border-border/40 rounded-md p-4">
-                                    <h3 className="text-xs font-medium mb-4">Notifications</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1.5">Slack Webhook URL</label>
-                                            <input
-                                                type="text"
-                                                defaultValue={project.slack_webhook_url || ""}
-                                                placeholder="https://hooks.slack.com/services/..."
-                                                className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1.5">Discord Webhook URL</label>
-                                            <input
-                                                type="text"
-                                                defaultValue={project.discord_webhook_url || ""}
-                                                placeholder="https://discord.com/api/webhooks/..."
-                                                className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Button size="sm" className="h-7 text-xs px-3">
-                                    Save Settings
-                                </Button>
-
-                                {/* Danger Zone */}
-                                <div className="bg-red-500/5 border border-red-500/20 rounded-md p-4 mt-8">
-                                    <h3 className="text-xs font-medium text-red-400 mb-2">Danger Zone</h3>
-                                    <p className="text-[11px] text-muted-foreground mb-4">
-                                        Deleting this project will permanently remove all scan history and changelogs. This action cannot be undone.
-                                    </p>
-
-                                    {!showDeleteConfirm ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs px-3 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                                            onClick={() => setShowDeleteConfirm(true)}
-                                        >
-                                            <Trash2 className="h-3 w-3 mr-1.5" />
-                                            Delete Project
-                                        </Button>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
                                             <Button
                                                 size="sm"
-                                                className="h-7 text-xs px-3 bg-red-500 hover:bg-red-600 text-white"
-                                                onClick={handleDeleteProject}
-                                                disabled={isDeleting}
+                                                className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                                onClick={() => updateFixStatus("done")}
+                                                disabled={isUpdatingFixStatus}
                                             >
-                                                {isDeleting ? (
-                                                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Deleting...</>
-                                                ) : (
-                                                    <>Confirm Delete</>
-                                                )}
+                                                {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
                                             </Button>
+                                        </>
+                                    ) : (
+                                        <>
                                             <Button
                                                 size="sm"
                                                 variant="outline"
                                                 className="h-7 text-xs px-3"
-                                                onClick={() => setShowDeleteConfirm(false)}
-                                                disabled={isDeleting}
+                                                onClick={() => updateFixStatus("dismiss")}
+                                                disabled={isUpdatingFixStatus}
                                             >
-                                                Cancel
+                                                {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
                                             </Button>
+                                            <Button
+                                                size="sm"
+                                                className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                                                onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
+                                            >
+                                                Suggest Fix
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="research" className="space-y-6">
+                    {!currentScan ? (
+                        <div className="bg-card border border-border/40 rounded-md p-6 text-center text-sm text-muted-foreground">
+                            Run a scan to build repository intelligence and compare against prior runs.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Files Indexed</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.filesIndexed ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Components Mapped</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.nodes.length ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Interaction Edges</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.interactionMap.edges.length ?? 0}</p>
+                                </div>
+                                <div className="bg-card border border-border/40 rounded-md p-4">
+                                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Data Flow Traces</p>
+                                    <p className="text-xl font-semibold mt-1">{currentResearch?.dataFlows.traces.length ?? 0}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Live AI Context</p>
+                                    {currentAiContext && (
+                                        <p className="text-[10px] text-muted-foreground">
+                                            {currentAiContext.model} · {currentAiContext.snapshotsAnalyzed} snapshot{currentAiContext.snapshotsAnalyzed === 1 ? "" : "s"}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {currentAiContext ? (
+                                        <>
+                                            <p className="text-xs text-foreground">{currentAiContext.summary}</p>
+                                            {currentAiContext.riskThemes.length > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium text-foreground/90">Risk themes:</span> {currentAiContext.riskThemes.join(" · ")}
+                                                </p>
+                                            )}
+                                            {currentAiContext.priorityFiles.length > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium text-foreground/90">Priority files:</span> {currentAiContext.priorityFiles.slice(0, 6).join(", ")}
+                                                </p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            AI context snapshots are stored when a live scan stream is running.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-border/40">
+                                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Interaction Hotspots</p>
+                                    </div>
+                                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                                        {currentResearch?.interactionMap.hotspots.length ? (
+                                            currentResearch.interactionMap.hotspots.map((hotspot) => (
+                                                <div key={hotspot.file} className="rounded border border-border/40 p-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-xs font-medium font-mono truncate">{hotspot.file}</p>
+                                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                                            score {hotspot.riskScore}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                                        {hotspot.kind} · {hotspot.reason}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">No hotspots available for this scan.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data Flow Traces</p>
+                                        {currentResearch && (
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {currentResearch.dataFlows.criticalCount} critical · {currentResearch.dataFlows.highCount} high
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                                        {currentResearch?.dataFlows.traces.length ? (
+                                            currentResearch.dataFlows.traces.slice(0, 12).map((trace) => (
+                                                <div key={trace.id} className="rounded border border-border/40 p-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-xs font-medium truncate">{trace.summary}</p>
+                                                        <span className={cn("text-[11px] uppercase", severityColors[trace.severity])}>
+                                                            {trace.severity}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+                                                        {trace.file}:{trace.line} · confidence {(trace.confidence * 100).toFixed(0)}%
+                                                    </p>
+                                                    <div className="mt-2 space-y-1">
+                                                        {trace.stages.map((stage, idx) => (
+                                                            <p key={`${trace.id}-${idx}`} className="text-[11px] text-muted-foreground">
+                                                                <span className="uppercase tracking-wide mr-2">{stage.kind}</span>
+                                                                {stage.label}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">No source-to-sink traces were identified in this run.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Scan Diff Viewer</p>
+                                    <select
+                                        className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                        value={baselineScanId}
+                                        onChange={(event) => setBaselineScanId(event.target.value)}
+                                    >
+                                        <option value="">Select baseline run</option>
+                                        {scans
+                                            .filter((scan) => scan.id !== currentScan.id)
+                                            .map((scan) => (
+                                                <option key={scan.id} value={scan.id}>
+                                                    {new Date(scan.created_at).toLocaleString()} · {scan.score || "?"}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {!baselineScan || !scanDiff ? (
+                                    <div className="p-4 text-xs text-muted-foreground">
+                                        Select a prior scan run to compare with the current run.
+                                    </div>
+                                ) : (
+                                    <div className="p-4 space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Score Delta</p>
+                                                <p className={cn("text-lg font-semibold mt-1", scanDiff.scoreDelta < 0 ? "text-red-500" : "text-emerald-500")}>
+                                                    {scanDiff.scoreDelta > 0 ? "+" : ""}{scanDiff.scoreDelta}
+                                                </p>
+                                            </div>
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Issue Delta</p>
+                                                <p className={cn("text-lg font-semibold mt-1", scanDiff.issueDelta > 0 ? "text-red-500" : "text-emerald-500")}>
+                                                    {scanDiff.issueDelta > 0 ? "+" : ""}{scanDiff.issueDelta}
+                                                </p>
+                                            </div>
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">File Delta</p>
+                                                <p className="text-lg font-semibold mt-1">
+                                                    {scanDiff.fileDelta > 0 ? "+" : ""}{scanDiff.fileDelta}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
+                                                    Added Findings ({scanDiff.addedIssues.length})
+                                                </p>
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                                                    {scanDiff.addedIssues.length ? (
+                                                        scanDiff.addedIssues.map((issue) => (
+                                                            <p key={`added-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
+                                                                <span className={cn("mr-1", severityColors[issue.severity])}>
+                                                                    [{issue.severity.toUpperCase()}]
+                                                                </span>
+                                                                {issue.file}:{issue.line} {issue.name}
+                                                            </p>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground">No new findings compared to baseline.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded border border-border/40 p-3">
+                                                <p className="text-[11px] font-medium text-red-400 uppercase tracking-wider mb-2">
+                                                    Resolved Findings ({scanDiff.removedIssues.length})
+                                                </p>
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                                                    {scanDiff.removedIssues.length ? (
+                                                        scanDiff.removedIssues.map((issue) => (
+                                                            <p key={`removed-${issueFingerprint(issue)}`} className="text-xs text-muted-foreground">
+                                                                <span className={cn("mr-1", severityColors[issue.severity])}>
+                                                                    [{issue.severity.toUpperCase()}]
+                                                                </span>
+                                                                {issue.file}:{issue.line} {issue.name}
+                                                            </p>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground">No findings were resolved in the current run.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Research Notes</p>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {currentResearch?.reasoningNotes.length ? (
+                                        currentResearch.reasoningNotes.map((note, index) => (
+                                            <p key={`${index}-${note}`} className="text-xs text-muted-foreground">
+                                                {index + 1}. {note}
+                                            </p>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            This scan run has no generated research notes. Run a fresh scan to produce deeper analysis.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="changelog">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                        <div>
+                            <h2 className="text-[13px] font-medium">Changelog</h2>
+                            <p className="text-xs text-muted-foreground">Generate changelogs from your commit history</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={changelogTimeframe}
+                                onChange={(e) => setChangelogTimeframe(e.target.value as '24h' | '7d' | '30d')}
+                                className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                                disabled={isGeneratingChangelog}
+                            >
+                                <option value="24h">Last 24 hours</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                            </select>
+                            <Button
+                                size="sm"
+                                className="h-7 text-xs px-3"
+                                onClick={handleGenerateChangelog}
+                                disabled={isGeneratingChangelog}
+                            >
+                                {isGeneratingChangelog ? (
+                                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
+                                ) : (
+                                    "Generate Changelog"
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {changelogs.length === 0 ? (
+                        <div className="text-center py-16 flex flex-col items-center justify-center">
+                            <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                                <GitBranch className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm font-medium mb-1">No changelogs generated yet</p>
+                            <p className="text-xs text-muted-foreground">Click &quot;Generate Changelog&quot; to create your first one</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {/* Changelog list */}
+                            <div className="flex gap-4">
+                                {/* Sidebar with changelog list */}
+                                <div className="w-48 shrink-0 space-y-1">
+                                    {changelogs.map((changelog) => {
+                                        const isSelected = selectedChangelog?.id === changelog.id;
+                                        const date = new Date(changelog.created_at).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        });
+                                        return (
+                                            <button
+                                                key={changelog.id}
+                                                onClick={() => setSelectedChangelog(changelog)}
+                                                className={cn(
+                                                    "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
+                                                    isSelected
+                                                        ? "bg-secondary text-foreground"
+                                                        : "hover:bg-secondary/50 text-muted-foreground"
+                                                )}
+                                            >
+                                                <div className="font-medium">{date}</div>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    {changelog.commit_count} commits
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Changelog content */}
+                                <div className="flex-1 bg-card border border-border/40 rounded-md p-4 overflow-auto">
+                                    {selectedChangelog ? (
+                                        <div className="prose prose-sm prose-invert max-w-none">
+                                            <pre className="whitespace-pre-wrap text-xs font-mono text-foreground p-0 m-0 bg-transparent">
+                                                {selectedChangelog.markdown}
+                                            </pre>
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-muted-foreground text-center py-8">
+                                            Select a changelog to view
                                         </div>
                                     )}
                                 </div>
                             </div>
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="settings">
+                    <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
+
+                    <div className="space-y-6">
+                        {/* Project Details */}
+                        <div className="bg-card border border-border/40 rounded-md p-4">
+                            <h3 className="text-xs font-medium mb-4">Project Details</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Project Name</label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono">
+                                            {project.github_repo_full_name}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.github_repo_full_name, 'name')}
+                                        >
+                                            {copiedField === 'name' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Project ID</label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-muted-foreground">
+                                            {project.id}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.id, 'id')}
+                                        >
+                                            {copiedField === 'id' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">GitHub URL</label>
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={project.github_repo_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-blue-400 hover:text-blue-300 hover:underline truncate"
+                                        >
+                                            {project.github_repo_url}
+                                        </a>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 w-7 p-0 shrink-0"
+                                            onClick={() => handleCopyToClipboard(project.github_repo_url, 'url')}
+                                        >
+                                            {copiedField === 'url' ? (
+                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notifications */}
+                        <div className="bg-card border border-border/40 rounded-md p-4">
+                            <h3 className="text-xs font-medium mb-4">Notifications</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Slack Webhook URL</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={project.slack_webhook_url || ""}
+                                        placeholder="https://hooks.slack.com/services/..."
+                                        className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1.5">Discord Webhook URL</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={project.discord_webhook_url || ""}
+                                        placeholder="https://discord.com/api/webhooks/..."
+                                        className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button size="sm" className="h-7 text-xs px-3">
+                            Save Settings
+                        </Button>
+
+                        {/* Danger Zone */}
+                        <div className="bg-red-500/5 border border-red-500/20 rounded-md p-4 mt-8">
+                            <h3 className="text-xs font-medium text-red-400 mb-2">Danger Zone</h3>
+                            <p className="text-[11px] text-muted-foreground mb-4">
+                                Deleting this project will permanently remove all scan history and changelogs. This action cannot be undone.
+                            </p>
+
+                            {!showDeleteConfirm ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs px-3 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                >
+                                    <Trash2 className="h-3 w-3 mr-1.5" />
+                                    Delete Project
+                                </Button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="h-7 text-xs px-3 bg-red-500 hover:bg-red-600 text-white"
+                                        onClick={handleDeleteProject}
+                                        disabled={isDeleting}
+                                    >
+                                        {isDeleting ? (
+                                            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Deleting...</>
+                                        ) : (
+                                            <>Confirm Delete</>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs px-3"
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        disabled={isDeleting}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>

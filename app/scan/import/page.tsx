@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScanUpgradePanel } from "@/components/scan/ScanUpgradePanel";
 import { openScanPaywallFromResponse } from "@/lib/scan/paywall-client";
+import { supabase } from "@/lib/supabaseClient";
 import {
     Select,
     SelectContent,
@@ -63,10 +64,7 @@ export default function ImportRepoPage() {
     const [isConnectingGitHub, setIsConnectingGitHub] = useState(false);
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const scanSubdomainRedirect =
-        typeof window !== 'undefined'
-            ? `${window.location.origin}/import`
-            : 'https://scan.cencori.com/import';
+    const scanSubdomainRedirect = '/import';
     const isScanSubdomainHost =
         typeof window !== 'undefined'
             ? /^(scan|scaan)(\.|$)/i.test(window.location.hostname)
@@ -77,7 +75,10 @@ export default function ImportRepoPage() {
 
     // Fetch repos from GitHub installations
     useEffect(() => {
+        let isMounted = true;
+
         const fetchRepos = async () => {
+            if (!isMounted) return;
             setIsLoading(true);
             setError(null);
             try {
@@ -137,7 +138,28 @@ export default function ImportRepoPage() {
                 setIsLoading(false);
             }
         };
-        fetchRepos();
+
+        const init = async () => {
+            // When returning from OAuth callback (?code=...), let the auth client
+            // settle the browser session before first protected API call.
+            if (typeof window !== 'undefined' && window.location.search.includes('code=')) {
+                await supabase.auth.getSession();
+            }
+            await fetchRepos();
+        };
+
+        void init();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                void fetchRepos();
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const handleConnectGitHub = async (openInNewTab = false) => {
@@ -288,7 +310,7 @@ export default function ImportRepoPage() {
                     {error?.includes('Unauthorized') ? (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
                             <a href={isScanSubdomainHost
-                                ? `https://cencori.com/login?redirect=${encodeURIComponent(scanSubdomainRedirect)}`
+                                ? `/login?redirect=${encodeURIComponent(scanSubdomainRedirect)}`
                                 : '/login?redirect=/scan/import'}>
                                 Sign In
                             </a>

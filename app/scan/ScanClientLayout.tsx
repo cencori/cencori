@@ -58,9 +58,23 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
             const { data, error } = await supabase.auth.getUser();
             if (!error && data.user) {
                 setUser(data.user as User);
+            } else {
+                setUser(null);
             }
         };
         checkAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser(session.user as User);
+            } else {
+                setUser(null);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
@@ -102,9 +116,12 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
     const isScanSubdomainHost =
         typeof window !== "undefined" && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
-    const scanEntryUrl = typeof window !== "undefined" ? window.location.href : "/scan";
+    const scanEntryUrl =
+        typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+            : "/scan";
     const signInHref = isScanSubdomainHost
-        ? `https://cencori.com/login?redirect=${encodeURIComponent(scanEntryUrl)}`
+        ? `/login?redirect=${encodeURIComponent(scanEntryUrl)}`
         : "/login?redirect=/scan";
     const dashboardHref = isScanSubdomainHost
         ? "https://cencori.com/dashboard/organizations"
@@ -112,7 +129,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const docsHref = isScanSubdomainHost
         ? "https://cencori.com/docs/security/scan/web-dashboard"
         : "/docs/security/scan/web-dashboard";
-    const logoutHref = isScanSubdomainHost ? "https://cencori.com/login" : "/login";
+    const logoutHref = "/login";
 
     return (
         <div className="flex h-screen w-full flex-col">
@@ -193,10 +210,10 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                                 </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild className="text-xs py-1.5 cursor-pointer">
-                                <Link href="mailto:support@cencori.com" className="flex items-center gap-2">
+                                <a href="mailto:support@cencori.com" className="flex items-center gap-2">
                                     <Mail className="h-3.5 w-3.5" />
                                     Contact support
-                                </Link>
+                                </a>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -211,7 +228,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                                     aria-label="User menu"
                                 >
                                     {avatar ? (
-                                        <img src={avatar} alt={name || "User"} className="w-full h-full object-cover" />
+                                        <Image src={avatar} alt={name || "User"} width={28} height={28} className="w-full h-full object-cover" />
                                     ) : (
                                         <CircleUserRound className="h-4 w-4 text-muted-foreground" />
                                     )}

@@ -55,9 +55,23 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
             const { data, error } = await supabase.auth.getUser();
             if (!error && data.user) {
                 setUser(data.user as User);
+            } else {
+                setUser(null);
             }
         };
         checkAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser(session.user as User);
+            } else {
+                setUser(null);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
     // Extract current project from URL
@@ -86,9 +100,12 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
     const isScanSubdomainHost =
         typeof window !== "undefined" && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
-    const scanEntryUrl = typeof window !== "undefined" ? window.location.href : "/scan";
+    const scanEntryUrl =
+        typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+            : "/scan";
     const signInHref = isScanSubdomainHost
-        ? `https://cencori.com/login?redirect=${encodeURIComponent(scanEntryUrl)}`
+        ? `/login?redirect=${encodeURIComponent(scanEntryUrl)}`
         : "/login?redirect=/scan";
     const dashboardHref = isScanSubdomainHost
         ? "https://cencori.com/dashboard/organizations"
@@ -96,7 +113,7 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
     const docsHref = isScanSubdomainHost
         ? "https://cencori.com/docs/scan"
         : "/docs/scan";
-    const logoutHref = isScanSubdomainHost ? "https://cencori.com/login" : "/login";
+    const logoutHref = "/login";
 
     return (
         <div className={`${GeistSans.className} ${GeistMono.variable} antialiased selection:bg-foreground selection:text-background flex h-screen w-full flex-col`}>

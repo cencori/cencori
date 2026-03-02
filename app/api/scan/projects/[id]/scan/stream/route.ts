@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
@@ -222,6 +223,24 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                 const fileContentMap = new Map<string, string>(
                     scannedFiles.map(file => [file.path, file.content])
                 );
+
+                // Dependency scanning — detect lockfiles and query OSV for CVEs
+                const lockfiles = scannedFiles.filter(f => isLockfile(f.path));
+                if (lockfiles.length > 0) {
+                    sendEvent({ type: 'info', time: Date.now() - startTime, message: `Found ${lockfiles.length} lockfile(s), scanning dependencies...` });
+                    const depIssues = await scanDependencies(lockfiles);
+                    if (depIssues.length > 0) {
+                        rawIssues.push(...depIssues);
+                        sendEvent({
+                            type: 'info',
+                            time: Date.now() - startTime,
+                            message: `Found ${depIssues.length} vulnerable dependenc${depIssues.length === 1 ? 'y' : 'ies'}`,
+                        });
+                    } else {
+                        sendEvent({ type: 'success', time: Date.now() - startTime, message: 'No vulnerable dependencies found' });
+                    }
+                }
+
                 sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Running LLM false-positive filter...' });
 
                 const {
@@ -336,6 +355,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                         secrets_count: secretsCount,
                         pii_count: piiCount,
                         vulnerabilities_count: vulnsCount,
+                        dependencies_count: summary.dependencies,
                         fix_status: allIssues.length > 0 ? 'pending' : 'not_applicable',
                         fix_dismissed_at: null,
                         fix_pr_url: null,

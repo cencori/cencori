@@ -8,7 +8,7 @@ import {
     SCANNABLE_EXTENSIONS,
 } from './patterns';
 
-export type IssueType = 'secret' | 'pii' | 'route' | 'config' | 'vulnerability';
+export type IssueType = 'secret' | 'pii' | 'route' | 'config' | 'vulnerability' | 'dependency';
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type ScanScore = 'A' | 'B' | 'C' | 'D' | 'F';
 
@@ -33,6 +33,7 @@ export interface ScanSummary {
     routes: number;
     config: number;
     vulnerabilities: number;
+    dependencies: number;
     critical: number;
     high: number;
     medium: number;
@@ -310,9 +311,23 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
         });
     }
 
+    // ── cencori-ignore suppression ────────────────────────────────
+    const contentLines = content.split('\n');
+    const filtered = issues.filter(issue => {
+        const lineIndex = issue.line - 1;
+        const currentLine = contentLines[lineIndex] || '';
+        const prevLine = lineIndex > 0 ? contentLines[lineIndex - 1] : '';
+
+        const ignorePattern = /cencori-ignore/i;
+        if (ignorePattern.test(currentLine) || ignorePattern.test(prevLine)) {
+            return false;
+        }
+        return true;
+    });
+
     const seen = new Set<string>();
     const deduped: ScanIssue[] = [];
-    for (const issue of issues) {
+    for (const issue of filtered) {
         const key = `${issue.file}:${issue.line}:${issue.type}:${issue.name}`;
         if (!seen.has(key)) {
             seen.add(key);
@@ -354,6 +369,7 @@ export function summarizeIssues(issues: ScanIssue[]): ScanSummary {
         routes: issues.filter(issue => issue.type === 'route').length,
         config: issues.filter(issue => issue.type === 'config').length,
         vulnerabilities: issues.filter(issue => issue.type === 'vulnerability').length,
+        dependencies: issues.filter(issue => issue.type === 'dependency').length,
         critical: issues.filter(issue => issue.severity === 'critical').length,
         high: issues.filter(issue => issue.severity === 'high').length,
         medium: issues.filter(issue => issue.severity === 'medium').length,

@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
@@ -136,6 +137,13 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                 scannedFiles.map(f => [f.path, f.content])
             );
 
+            // Dependency scanning — detect lockfiles and query OSV for CVEs
+            const lockfiles = scannedFiles.filter(f => isLockfile(f.path));
+            const depIssues = await scanDependencies(lockfiles);
+            if (depIssues.length > 0) {
+                rawIssues.push(...depIssues);
+            }
+
             // LLM post-processing: filter false positives from route/vulnerability findings
             const {
                 filtered: allIssues,
@@ -209,6 +217,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                     secrets_count: secretsCount,
                     pii_count: piiCount,
                     vulnerabilities_count: vulnsCount,
+                    dependencies_count: summary.dependencies,
                     fix_status: allIssues.length > 0 ? 'pending' : 'not_applicable',
                     fix_dismissed_at: null,
                     fix_pr_url: null,
