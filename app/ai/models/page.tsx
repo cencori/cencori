@@ -37,13 +37,13 @@ export default function ModelsPage() {
             <AuthNavbar />
 
             <main className="flex-1 pt-20">
-                <div className="container mx-auto px-4 max-w-6xl py-12">
+                <div className="container mx-auto px-4 max-w-6xl py-8 sm:py-12">
                     {/* Header */}
-                    <div className="mb-10">
-                        <h1 className="text-3xl font-bold tracking-tight mb-3">
+                    <div className="mb-8 sm:mb-10">
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
                             AI Models
                         </h1>
-                        <p className="text-muted-foreground text-lg max-w-2xl">
+                        <p className="text-muted-foreground text-base sm:text-lg max-w-2xl">
                             Browse {totalModels}+ models from {totalProviders} providers. All accessible through a single API with built-in security, observability, and failover.
                         </p>
                     </div>
