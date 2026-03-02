@@ -118,6 +118,13 @@ const SOURCE_PATTERNS: SourcePattern[] = [
     { label: "Environment variable", pattern: /\bprocess\.env\.[A-Z0-9_]+/ },
     { label: "Cookie or session data", pattern: /\bcookies\(\)\.get\b|\bsession\b|\bauth\.getUser\b/ },
     { label: "Browser storage", pattern: /\blocalStorage\.getItem\s*\(/ },
+    // New source patterns
+    { label: "File read operation", pattern: /\b(?:readFile|readFileSync|createReadStream)\s*\(/ },
+    { label: "WebSocket message", pattern: /\bws\.on\s*\(\s*["']message["']|\bsocket\.on\s*\(\s*["'](?:message|data)["']/ },
+    { label: "FormData extraction", pattern: /\bformData\s*\.\s*get\s*\(|\bnew\s+FormData\s*\(/ },
+    { label: "Command-line arguments", pattern: /\bprocess\.argv\b/ },
+    { label: "HTTP request headers", pattern: /\breq\.headers\b|\brequest\.headers\.get\s*\(/ },
+    { label: "Database query result", pattern: /\.\.from\s*\([^)]+\)\s*\.select\b|\bprisma\.[a-z]+\.find/ },
 ];
 
 const SINK_PATTERNS: SinkPattern[] = [
@@ -135,6 +142,15 @@ const SINK_PATTERNS: SinkPattern[] = [
         pattern: /\bsupabase\b.{0,120}\.(insert|update|upsert|delete)\s*\(/,
         severity: "medium",
     },
+    // New sink patterns
+    { label: "File write operation", pattern: /\b(?:writeFile|writeFileSync|createWriteStream|appendFile)\s*\(/, severity: "high" },
+    { label: "HTTP redirect", pattern: /\bres\.redirect\s*\(|\brouter\.push\s*\(/, severity: "high" },
+    { label: "Child process spawn", pattern: /\b(?:spawn|spawnSync|execFile|execFileSync|fork)\s*\(/, severity: "critical" },
+    { label: "Template rendering", pattern: /\bres\.render\s*\(|\bcompile\s*\(/, severity: "high" },
+    { label: "HTTP response header", pattern: /\bres\.setHeader\s*\(|\bres\.header\s*\(/, severity: "medium" },
+    { label: "Cookie setting", pattern: /\bres\.cookie\s*\(|\bcookies\(\)\.set\s*\(/, severity: "medium" },
+    { label: "Dynamic require/import", pattern: /\brequire\s*\(\s*[^"'`]|\bimport\s*\(\s*[^"'`]/, severity: "critical" },
+    { label: "Logging sensitive data", pattern: /\bconsole\.(?:log|info|debug)\s*\([^)]*(?:password|secret|token|key|credential)/i, severity: "medium" },
 ];
 
 const SEVERITY_WEIGHT: Record<IssueSeverity | "none", number> = {
