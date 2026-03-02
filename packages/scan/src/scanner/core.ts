@@ -86,7 +86,7 @@ function isDocOrTestFile(filePath: string): boolean {
     );
 }
 
-function isLikelyFalsePositive(match: string, patternName: string): boolean {
+function isLikelyFalsePositive(match: string, patternName: string, filePath?: string): boolean {
     if (patternName === 'Email Address') {
         const falseDomains = ['example.com', 'example.org', 'test.com', 'localhost', 'placeholder.com'];
         if (falseDomains.some(domain => match.includes(domain))) {
@@ -112,6 +112,36 @@ function isLikelyFalsePositive(match: string, patternName: string): boolean {
 
     if (patternName.includes('Phone Number')) {
         if (match.includes('555') || match.includes('123-456') || match.includes('000-000')) {
+            return true;
+        }
+    }
+
+    // Skip Math.random findings in test/spec files — test randomness is fine
+    if (patternName === 'Math.random for Security Token' && filePath && isDocOrTestFile(filePath)) {
+        return true;
+    }
+
+    // Skip MD5/SHA1 findings when used in non-security contexts (cache keys, checksums, etags)
+    if (patternName === 'MD5 for Security' || patternName === 'SHA1 for Security') {
+        const lower = match.toLowerCase();
+        if (lower.includes('checksum') || lower.includes('cache') || lower.includes('etag') || lower.includes('content-hash') || lower.includes('file-hash')) {
+            return true;
+        }
+    }
+
+    // Skip insecure cookie config in doc/test files
+    if (patternName.startsWith('Cookie') && filePath && isDocOrTestFile(filePath)) {
+        return true;
+    }
+
+    // Skip sensitive logging patterns in test files
+    if (patternName === 'Password Logged' && filePath && isDocOrTestFile(filePath)) {
+        return true;
+    }
+
+    // Skip open redirect via window.location for static string assignments
+    if (patternName === 'Open Redirect via window.location') {
+        if (/['"]\/[^'"]*['"]/.test(match) || /['"]https?:\/\//.test(match)) {
             return true;
         }
     }
@@ -177,7 +207,7 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
             let match;
             while ((match = pattern.pattern.exec(content)) !== null) {
                 const matchStr = match[0];
-                if (isLikelyFalsePositive(matchStr, pattern.name)) {
+                if (isLikelyFalsePositive(matchStr, pattern.name, filePath)) {
                     continue;
                 }
 
@@ -227,8 +257,13 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
         });
     }
 
+    // Categories to skip entirely in doc/test files
+    const skipInDocsCategories = new Set([
+        'debug', 'sensitive-logging', 'insecure-cookie', 'timing-attack', 'weak-crypto',
+    ]);
+
     for (const pattern of VULNERABILITY_PATTERNS) {
-        if (pattern.category === 'debug' && isDocFile) {
+        if (isDocFile && skipInDocsCategories.has(pattern.category)) {
             continue;
         }
 
@@ -239,6 +274,11 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
                 if (match[0].includes('error') || match[0].includes('warn')) {
                     continue;
                 }
+            }
+
+            // Apply enhanced false-positive heuristic
+            if (isLikelyFalsePositive(match[0], pattern.name, filePath)) {
+                continue;
             }
 
             const pos = getPosition(content, match.index);
