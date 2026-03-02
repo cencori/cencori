@@ -25,7 +25,7 @@ interface ConnectionPathProps {
 
 export const Integrations = () => {
     return (
-        <section className="py-32 bg-background border-b border-border/40 overflow-hidden relative">
+        <section className="py-32 bg-background overflow-hidden relative">
             <div className="container mx-auto px-4 md:px-6 relative z-10">
                 <div className="text-center mb-20">
                     <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-4">
@@ -159,7 +159,11 @@ const ProviderItem = ({ name, Icon, color, borderColor, bg }: ProviderItemProps)
 );
 
 const ProviderItemMobileIconOnly = ({ name, Icon, color, borderColor, bg }: ProviderItemProps) => (
-    <div className={cn("flex items-center justify-center p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full aspect-square", borderColor, bg)}>
+    <div
+        className={cn("flex items-center justify-center p-3 rounded-xl border bg-background/50 backdrop-blur-sm w-full aspect-square", borderColor, bg)}
+        title={name}
+        aria-label={name}
+    >
         <Icon size={28} className={color} />
     </div>
 );

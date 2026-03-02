@@ -13,8 +13,8 @@ import {
     Perplexity, OpenRouter, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
 } from "@lobehub/icons";
-import { SUPPORTED_PROVIDERS, type AIProviderConfig, type AIModel } from "@/lib/providers/config";
-import { Search, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
+import { SUPPORTED_PROVIDERS, type AIModel } from "@/lib/providers/config";
+import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Provider icon mapping ──────────────────────────────────────────────────
@@ -95,7 +95,6 @@ export function ModelCatalog() {
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [sortKey, setSortKey] = useState<SortKey>("provider");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
-    const [showFilters, setShowFilters] = useState(false);
 
     // Unique types
     const types = useMemo(() => {
@@ -218,8 +217,56 @@ export function ModelCatalog() {
                 <span>{SUPPORTED_PROVIDERS.length} providers</span>
             </div>
 
+            {/* ── Mobile cards ── */}
+            <div className="md:hidden space-y-2">
+                {filtered.length === 0 ? (
+                    <div className="rounded-xl border border-border/40 py-10 px-4 text-center text-sm text-muted-foreground">
+                        No models found matching your filters.
+                    </div>
+                ) : (
+                    filtered.map((model) => (
+                        <div
+                            key={`${model.providerId}-${model.id}-mobile`}
+                            className="rounded-xl border border-border/40 bg-card/40 p-3"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                    <div className="shrink-0 w-5 h-5 flex items-center justify-center mt-0.5">
+                                        <ProviderIcon providerId={model.providerId} size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-medium text-foreground truncate">{model.name}</p>
+                                        <p className="text-[11px] text-muted-foreground/70 font-mono truncate">{model.id}</p>
+                                    </div>
+                                </div>
+
+                                <span
+                                    className={cn(
+                                        "inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0",
+                                        TYPE_COLORS[model.type] || "bg-muted text-muted-foreground border-border/20"
+                                    )}
+                                >
+                                    {model.type}
+                                </span>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{model.providerName}</span>
+                                <span className="font-mono">{formatContext(model.contextWindow)}</span>
+                            </div>
+
+                            {model.description && (
+                                <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                                    {model.description}
+                                </p>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+
             {/* ── Table ── */}
-            <div className="border border-border/40 rounded-xl overflow-hidden">
+            <div className="hidden md:block border border-border/40 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm min-w-[640px]">
                         <thead>

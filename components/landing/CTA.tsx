@@ -23,7 +23,7 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
                         </div>
 
                         <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-foreground">
-                            Ready to secure your AI?
+                            Ready to build AI?
                         </h2>
                         <p className="text-sm text-muted-foreground mb-6 max-w-lg leading-relaxed">
                             Join engineers building production-ready AI applications with Cencori.
