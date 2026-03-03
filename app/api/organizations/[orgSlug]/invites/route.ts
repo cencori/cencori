@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ORG_INVITE_FROM_EMAIL = process.env.RESEND_ORG_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -116,7 +117,7 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = resolvePublicOrigin(req);
     const inviteLink = `${baseUrl}/invite?token=${invite.invite_token}`;
 
     console.log('[Invites] Attempting to send email to:', normalizedEmail);
