@@ -7,6 +7,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBridge";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -244,6 +245,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <PostHogProvider>
             {children}
+            <SignupWelcomeEmailBridge />
             <CookieConsent />
             <Toaster />
           </PostHogProvider>

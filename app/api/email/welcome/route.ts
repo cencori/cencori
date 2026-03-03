@@ -1,8 +1,24 @@
 import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { createAdminClient } from '@/lib/supabaseAdmin';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const WELCOME_FROM_EMAIL = process.env.RESEND_WELCOME_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
+const WELCOME_REPLY_TO_EMAIL = process.env.RESEND_WELCOME_REPLY_TO_EMAIL || process.env.RESEND_REPLY_TO_EMAIL || '';
+
+function parseReplyTo(value: string): string | string[] | undefined {
+  const addresses = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (addresses.length === 0) {
+    return undefined;
+  }
+
+  return addresses.length === 1 ? addresses[0] : addresses;
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
@@ -13,27 +29,58 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email } = await request.json();
-
-    if (!email || typeof email !== 'string') {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+    let requestedEmail: string | null = null;
+    try {
+      const body = await request.json();
+      if (typeof body?.email === 'string') {
+        requestedEmail = body.email;
+      }
+    } catch {
+      // JSON body is optional.
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail !== user.email.toLowerCase()) {
+    const normalizedEmail = user.email.trim().toLowerCase();
+    if (requestedEmail && requestedEmail.trim().toLowerCase() !== normalizedEmail) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       );
     }
 
+    if (!RESEND_API_KEY) {
+      console.warn('[Welcome Email] RESEND_API_KEY not configured. Skipping send.');
+      return NextResponse.json({ success: false, skipped: true, reason: 'email_not_configured' }, { status: 202 });
+    }
+
+    if (!WELCOME_FROM_EMAIL) {
+      console.warn('[Welcome Email] RESEND_WELCOME_FROM_EMAIL/RESEND_FROM_EMAIL not configured. Skipping send.');
+      return NextResponse.json({ success: false, skipped: true, reason: 'from_email_not_configured' }, { status: 202 });
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    if (adminUserError || !adminUserData?.user) {
+      console.error('[Welcome Email] Failed to load user metadata:', adminUserError);
+      return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });
+    }
+
+    const currentUserMetadata = (adminUserData.user.user_metadata ?? {}) as Record<string, unknown>;
+    const existingWelcomeSentAt = currentUserMetadata.welcome_email_sent_at;
+    if (typeof existingWelcomeSentAt === 'string' && existingWelcomeSentAt.length > 0) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: 'already_sent',
+        sentAt: existingWelcomeSentAt,
+      });
+    }
+
+    const resend = new Resend(RESEND_API_KEY);
     const { data, error } = await resend.emails.send({
-      from: 'Cencori <welcome@cencori.com>',
+      from: WELCOME_FROM_EMAIL,
       to: normalizedEmail,
-      subject: 'Welcome to Cencori! 🚀',
+      replyTo: parseReplyTo(WELCOME_REPLY_TO_EMAIL),
+      subject: 'Welcome to Cencori!',
       html: `
         <!DOCTYPE html>
         <html>
@@ -85,6 +132,17 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to send welcome email' },
         { status: 500 }
       );
+    }
+
+    const { error: metadataUpdateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...currentUserMetadata,
+        welcome_email_sent_at: new Date().toISOString(),
+      },
+    });
+
+    if (metadataUpdateError) {
+      console.error('[Welcome Email] Failed to persist send marker:', metadataUpdateError);
     }
 
     return NextResponse.json({ success: true, id: data?.id });

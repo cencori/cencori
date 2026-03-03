@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const CONTACT_FROM_EMAIL = process.env.RESEND_CONTACT_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
 
 const emailRouting: Record<string, string> = {
     general: 'hello@cencori.com',
@@ -11,6 +12,14 @@ const emailRouting: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
     try {
+        if (!RESEND_API_KEY || !CONTACT_FROM_EMAIL) {
+            return NextResponse.json(
+                { error: 'Email not configured' },
+                { status: 500 }
+            );
+        }
+
+        const resend = new Resend(RESEND_API_KEY);
         const body = await request.json();
         const { name, email, company, type, subject, message } = body;
 
@@ -24,7 +33,7 @@ export async function POST(request: NextRequest) {
         const targetEmail = emailRouting[type] || emailRouting.general;
 
         const { data, error } = await resend.emails.send({
-            from: 'Cencori Contact <contact@cencori.com>',
+            from: CONTACT_FROM_EMAIL,
             to: [targetEmail],
             replyTo: email,
             subject: `[Contact Form] ${subject}`,

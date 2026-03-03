@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 
 type SignupFormProps = React.ComponentProps<"form">;
@@ -82,12 +83,8 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         return;
       }
 
-      // Send welcome email (fire and forget - don't block signup)
-      fetch('/api/email/welcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      }).catch(console.error);
+      // Queue welcome email to send once an authenticated session is established.
+      markSignupWelcomeEmailPending();
 
       navigateAfterAuth(navigationTarget);
     } catch (err) {
@@ -105,16 +102,21 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       const { oauthRedirectTo } = resolveAuthRedirectTargets(redirectParam, {
         defaultPath: "/dashboard/organizations",
       });
+
+      // OAuth flow leaves the page immediately; persist a marker for post-auth welcome send.
+      markSignupWelcomeEmailPending();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo: oauthRedirectTo },
       });
       if (oauthError) {
+        clearSignupWelcomeEmailPending();
         setError(oauthError.message);
         setLoading(false);
       }
       // Supabase handles the redirect; we don't navigate here.
     } catch (err) {
+      clearSignupWelcomeEmailPending();
       const msg = err instanceof Error ? err.message : "OAuth failed";
       setError(msg);
       setLoading(false);

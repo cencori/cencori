@@ -3,7 +3,22 @@ import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const ADMIN_INVITE_FROM_EMAIL = process.env.RESEND_ADMIN_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
+const ADMIN_INVITE_REPLY_TO_EMAIL = process.env.RESEND_ADMIN_INVITE_REPLY_TO_EMAIL || process.env.RESEND_REPLY_TO_EMAIL || '';
+
+function parseReplyTo(value: string): string | string[] | undefined {
+    const addresses = value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+    if (addresses.length === 0) {
+        return undefined;
+    }
+
+    return addresses.length === 1 ? addresses[0] : addresses;
+}
 
 const ALLOW_ALL_IN_DEV = true;
 
@@ -85,11 +100,16 @@ export async function POST(req: NextRequest) {
     const inviteLink = `${baseUrl}/internal/invite?token=${invite.invite_token}`;
 
     try {
-        const { error: emailError } = await resend.emails.send({
-            from: 'Cencori <team@cencori.com>',
-            to: email.toLowerCase(),
-            subject: "You're invited to join the Cencori team",
-            html: `
+        if (!RESEND_API_KEY || !ADMIN_INVITE_FROM_EMAIL) {
+            console.warn('[Admins] Resend sender not configured. Skipping invite email.');
+        } else {
+            const resend = new Resend(RESEND_API_KEY);
+            const { error: emailError } = await resend.emails.send({
+                from: ADMIN_INVITE_FROM_EMAIL,
+                to: email.toLowerCase(),
+                replyTo: parseReplyTo(ADMIN_INVITE_REPLY_TO_EMAIL),
+                subject: "You're invited to join the Cencori team",
+                html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -128,10 +148,11 @@ export async function POST(req: NextRequest) {
 </body>
 </html>
             `,
-        });
+            });
 
-        if (emailError) {
-            console.error('[Admins] Failed to send invite email:', emailError);
+            if (emailError) {
+                console.error('[Admins] Failed to send invite email:', emailError);
+            }
         }
     } catch (emailErr) {
         console.error('[Admins] Email sending error:', emailErr);
@@ -143,4 +164,3 @@ export async function POST(req: NextRequest) {
         message: `Invite sent to ${email}!`
     });
 }
-

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Cencori <alerts@cencori.com>';
+const FROM_EMAIL = process.env.RESEND_BUDGET_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
 
 interface BudgetAlertRequest {
     to: string[];
@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
 
         if (!RESEND_API_KEY) {
             console.warn('[Budget Alert] RESEND_API_KEY not configured');
+            return NextResponse.json({ error: 'Email not configured' }, { status: 500 });
+        }
+
+        if (!FROM_EMAIL) {
+            console.warn('[Budget Alert] RESEND_BUDGET_FROM_EMAIL/RESEND_FROM_EMAIL not configured');
             return NextResponse.json({ error: 'Email not configured' }, { status: 500 });
         }
 

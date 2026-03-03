@@ -3,7 +3,22 @@ import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const ORG_INVITE_FROM_EMAIL = process.env.RESEND_ORG_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
+const ORG_INVITE_REPLY_TO_EMAIL = process.env.RESEND_ORG_INVITE_REPLY_TO_EMAIL || process.env.RESEND_REPLY_TO_EMAIL || '';
+
+function parseReplyTo(value: string): string | string[] | undefined {
+    const addresses = value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+    if (addresses.length === 0) {
+        return undefined;
+    }
+
+    return addresses.length === 1 ? addresses[0] : addresses;
+}
 
 export async function POST(
     req: NextRequest,
@@ -106,11 +121,16 @@ export async function POST(
 
     console.log('[Invites] Attempting to send email to:', normalizedEmail);
     try {
-        const { data: emailData, error: emailError } = await resend.emails.send({
-            from: 'Cencori <team@mail.cencori.com>',
-            to: normalizedEmail,
-            subject: `You're invited to join ${org.name} on Cencori`,
-            html: `
+        if (!RESEND_API_KEY || !ORG_INVITE_FROM_EMAIL) {
+            console.warn('[Invites] Resend sender not configured. Skipping invite email.');
+        } else {
+            const resend = new Resend(RESEND_API_KEY);
+            const { data: emailData, error: emailError } = await resend.emails.send({
+                from: ORG_INVITE_FROM_EMAIL,
+                to: normalizedEmail,
+                replyTo: parseReplyTo(ORG_INVITE_REPLY_TO_EMAIL),
+                subject: `You're invited to join ${org.name} on Cencori`,
+                html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -152,12 +172,13 @@ export async function POST(
 </body>
 </html>
             `,
-        });
+            });
 
-        if (emailError) {
-            console.error('[Invites] Failed to send invite email:', emailError);
-        } else {
-            console.log('[Invites] Email sent successfully! ID:', emailData?.id);
+            if (emailError) {
+                console.error('[Invites] Failed to send invite email:', emailError);
+            } else {
+                console.log('[Invites] Email sent successfully! ID:', emailData?.id);
+            }
         }
     } catch (emailErr) {
         console.error('[Invites] Email sending error:', emailErr);
