@@ -5,14 +5,30 @@ import { supabase } from "@/lib/supabaseClient";
 import { clearSignupWelcomeEmailPending, isSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
+const NEW_SIGNUP_WINDOW_MS = 30 * 60 * 1000;
+
 export function SignupWelcomeEmailBridge() {
     useEffect(() => {
         let cancelled = false;
         let inFlight = false;
         let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-        const maybeSendWelcomeEmail = async (email: string | null | undefined) => {
-            if (!email || cancelled || inFlight || !isSignupWelcomeEmailPending()) {
+        const isRecentlyCreatedSession = (session: Session | null): boolean => {
+            const createdAt = session?.user?.created_at;
+            if (!createdAt) return false;
+            const createdTimestamp = new Date(createdAt).getTime();
+            if (Number.isNaN(createdTimestamp)) return false;
+            return Date.now() - createdTimestamp <= NEW_SIGNUP_WINDOW_MS;
+        };
+
+        const shouldAttemptForSession = (session: Session | null): boolean => {
+            if (isSignupWelcomeEmailPending()) return true;
+            return isRecentlyCreatedSession(session);
+        };
+
+        const maybeSendWelcomeEmail = async (session: Session | null) => {
+            const email = session?.user?.email;
+            if (!email || cancelled || inFlight || !shouldAttemptForSession(session)) {
                 return;
             }
 
@@ -38,7 +54,7 @@ export function SignupWelcomeEmailBridge() {
             const { data: { session } }: { data: { session: Session | null } } = await supabase.auth.getSession();
             if (cancelled) return;
 
-            await maybeSendWelcomeEmail(session?.user?.email);
+            await maybeSendWelcomeEmail(session);
 
             if (!isSignupWelcomeEmailPending() || attempt >= 5) {
                 return;
@@ -55,7 +71,7 @@ export function SignupWelcomeEmailBridge() {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
             if (session?.user?.email && event !== "SIGNED_OUT") {
-                void maybeSendWelcomeEmail(session?.user?.email);
+                void maybeSendWelcomeEmail(session);
             }
         });
 
