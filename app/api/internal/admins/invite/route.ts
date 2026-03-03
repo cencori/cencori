@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ADMIN_INVITE_FROM_EMAIL = process.env.RESEND_ADMIN_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = resolvePublicOrigin(req);
     const inviteLink = `${baseUrl}/internal/invite?token=${invite.invite_token}`;
 
     try {
