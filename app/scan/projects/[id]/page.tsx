@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -248,6 +248,30 @@ export default function ProjectDetailPage() {
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const [scanEntitlement, setScanEntitlement] = useState<ScanPaywallEntitlement | null>(null);
     const [liveAiContext, setLiveAiContext] = useState<RepositoryAiContext | null>(null);
+    const scanStreamRef = useRef<EventSource | null>(null);
+    const scanReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scanReconnectAttemptsRef = useRef(0);
+
+    const clearScanReconnectTimer = () => {
+        if (scanReconnectTimerRef.current) {
+            clearTimeout(scanReconnectTimerRef.current);
+            scanReconnectTimerRef.current = null;
+        }
+    };
+
+    const closeScanStream = () => {
+        if (scanStreamRef.current) {
+            scanStreamRef.current.close();
+            scanStreamRef.current = null;
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            clearScanReconnectTimer();
+            closeScanStream();
+        };
+    }, []);
 
     const handleCopyToClipboard = async (text: string, field: string) => {
         try {
@@ -542,109 +566,192 @@ export default function ProjectDetailPage() {
                 return;
             }
 
-            // Use SSE streaming endpoint
-            const eventSource = new EventSource(`/api/scan/projects/${projectId}/scan/stream`);
+            const MAX_RECONNECT_ATTEMPTS = 4;
+            const BASE_RECONNECT_DELAY_MS = 1200;
+            let hasCompleted = false;
 
-            eventSource.onmessage = (event) => {
+            const finalizeStream = () => {
+                clearScanReconnectTimer();
+                closeScanStream();
+                scanReconnectAttemptsRef.current = 0;
+            };
+
+            const refreshProjectData = async () => {
                 try {
-                    const data = JSON.parse(event.data);
-                    const timeStr = `${(data.time / 1000).toFixed(1)}s`;
-
-                    if (data.type === 'start') {
-                        setScanLog([{ type: "info", message: data.message, time: timeStr }]);
-                    } else if (data.type === 'success') {
-                        setScanLog(prev => [...prev, { type: "success", message: data.message, time: timeStr }]);
-                    } else if (data.type === 'info') {
-                        setScanLog(prev => [...prev, { type: "info", message: data.message, time: timeStr }]);
-                    } else if (data.type === 'progress') {
-                        // Update last progress entry or add new one
-                        setScanLog(prev => {
-                            const lastIndex = prev.findIndex(l => l.type === 'progress');
-                            if (lastIndex >= 0) {
-                                const updated = [...prev];
-                                updated[lastIndex] = { type: "info", message: data.message, time: timeStr };
-                                return updated;
-                            }
-                            return [...prev, { type: "info", message: data.message, time: timeStr }];
-                        });
-                    } else if (data.type === 'issue') {
-                        // Add file and issues to log
-                        const issueData = data.data;
-                        setScanLog(prev => [
-                            ...prev,
-                            { type: "file", message: issueData.file, time: timeStr },
-                            ...issueData.issues.map((issue: ScanIssue) => ({
-                                type: "issue",
-                                message: `${issue.name}: ${issue.match}`,
-                                severity: issue.severity,
-                                line: issue.line,
-                            }))
-                        ]);
-                    } else if (data.type === 'ai_context') {
-                        const aiContext = data.data as RepositoryAiContext | undefined;
-                        const summaryMessage = aiContext?.summary || data.message || 'AI context update';
-                        setScanLog(prev => [...prev, { type: "ai_context", message: summaryMessage, time: timeStr }]);
-                        setLiveAiContext(aiContext || null);
-                    } else if (data.type === 'complete') {
-                        const result = data.data;
-                        setScanLog(prev => [...prev, {
-                            type: "summary",
-                            message: `Complete: ${result.filesScanned} files scanned, ${result.issuesFound} issues found`,
-                            time: timeStr
-                        }]);
-
-                        // Update current scan with results
-                        setCurrentScan({
-                            id: result.scanId,
-                            status: 'completed',
-                            score: result.score,
-                            files_scanned: result.filesScanned,
-                            issues_found: result.issuesFound,
-                            scan_duration_ms: result.scanDurationMs,
-                            results: {
-                                issues: result.issues,
-                                summary: result.summary,
-                                research: result.research,
-                                ...(result.aiContext ? { ai_context: result.aiContext as RepositoryAiContext } : {}),
-                            },
-                            created_at: new Date().toISOString(),
-                            fix_status: result.issuesFound > 0 ? "pending" : "not_applicable",
-                            fix_pr_url: null,
-                            fix_pr_number: null,
-                            fix_branch_name: null,
-                        });
-
-                        // Refresh project data
-                        fetch(`/api/scan/projects/${projectId}`)
-                            .then(res => res.json())
-                            .then(projectData => {
-                                setProject(projectData.project);
-                                setScans(projectData.scans || []);
-                            });
-
-                        eventSource.close();
-                        setIsScanning(false);
-                        setLiveAiContext(null);
-                    } else if (data.type === 'error') {
-                        setScanLog(prev => [...prev, { type: "error", message: data.message, time: timeStr }]);
-                        eventSource.close();
-                        setIsScanning(false);
-                        setLiveAiContext(null);
-                    }
-                } catch (parseErr) {
-                    console.error('Error parsing SSE event:', parseErr);
+                    const response = await fetch(`/api/scan/projects/${projectId}`, { cache: "no-store" });
+                    if (!response.ok) return;
+                    const projectData = await response.json();
+                    setProject(projectData.project);
+                    setScans(projectData.scans || []);
+                } catch (refreshErr) {
+                    console.error('Failed to refresh project after scan stream event:', refreshErr);
                 }
             };
 
-            eventSource.onerror = () => {
-                setScanLog(prev => [...prev, { type: "error", message: "Connection lost" }]);
-                eventSource.close();
-                setIsScanning(false);
-                setLiveAiContext(null);
+            const connectStream = (reconnect = false) => {
+                clearScanReconnectTimer();
+                closeScanStream();
+
+                const streamUrl = reconnect
+                    ? `/api/scan/projects/${projectId}/scan/stream?reconnect=1`
+                    : `/api/scan/projects/${projectId}/scan/stream`;
+                const eventSource = new EventSource(streamUrl);
+                scanStreamRef.current = eventSource;
+
+                eventSource.onopen = () => {
+                    if (reconnect) {
+                        setScanLog(prev => [...prev, { type: "success", message: "Reconnected to scan stream" }]);
+                    }
+                    scanReconnectAttemptsRef.current = 0;
+                };
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data) as {
+                            type: string;
+                            time?: number;
+                            message?: string;
+                            data?: Record<string, unknown>;
+                        };
+                        const eventTimeMs = typeof data.time === "number" ? data.time : 0;
+                        const timeStr = `${(eventTimeMs / 1000).toFixed(1)}s`;
+
+                        if (data.type === 'start') {
+                            setScanLog([{ type: "info", message: data.message || "Starting security scan...", time: timeStr }]);
+                        } else if (data.type === 'success') {
+                            setScanLog(prev => [...prev, { type: "success", message: data.message || "Success", time: timeStr }]);
+                        } else if (data.type === 'info') {
+                            setScanLog(prev => [...prev, { type: "info", message: data.message || "Info", time: timeStr }]);
+                        } else if (data.type === 'progress') {
+                            setScanLog(prev => {
+                                const lastIndex = prev.findIndex(l => l.type === 'progress');
+                                if (lastIndex >= 0) {
+                                    const updated = [...prev];
+                                    updated[lastIndex] = { type: "info", message: data.message || "Scanning...", time: timeStr };
+                                    return updated;
+                                }
+                                return [...prev, { type: "info", message: data.message || "Scanning...", time: timeStr }];
+                            });
+                        } else if (data.type === 'issue') {
+                            const issueData = data.data as { file?: string; issues?: ScanIssue[] } | undefined;
+                            const issueFile = issueData?.file;
+                            const issueList = issueData?.issues;
+                            if (typeof issueFile !== "string" || !Array.isArray(issueList)) {
+                                return;
+                            }
+                            setScanLog(prev => [
+                                ...prev,
+                                { type: "file", message: issueFile, time: timeStr },
+                                ...issueList.map((issue: ScanIssue) => ({
+                                    type: "issue",
+                                    message: `${issue.name}: ${issue.match}`,
+                                    severity: issue.severity,
+                                    line: issue.line,
+                                }))
+                            ]);
+                        } else if (data.type === 'ai_context') {
+                            const aiContext = data.data as RepositoryAiContext | undefined;
+                            const summaryMessage = aiContext?.summary || data.message || 'AI context update';
+                            setScanLog(prev => [...prev, { type: "ai_context", message: summaryMessage, time: timeStr }]);
+                            setLiveAiContext(aiContext || null);
+                        } else if (data.type === 'complete') {
+                            const result = (data.data || {}) as {
+                                scanId: string;
+                                score: string | null;
+                                filesScanned: number;
+                                issuesFound: number;
+                                scanDurationMs: number;
+                                issues: ScanIssue[];
+                                summary?: ScanSummary;
+                                research?: RepositoryResearch;
+                                aiContext?: RepositoryAiContext;
+                            };
+                            hasCompleted = true;
+                            setScanLog(prev => [...prev, {
+                                type: "summary",
+                                message: `Complete: ${result.filesScanned} files scanned, ${result.issuesFound} issues found`,
+                                time: timeStr
+                            }]);
+
+                            setCurrentScan({
+                                id: result.scanId,
+                                status: 'completed',
+                                score: result.score,
+                                files_scanned: result.filesScanned,
+                                issues_found: result.issuesFound,
+                                scan_duration_ms: result.scanDurationMs,
+                                results: {
+                                    issues: result.issues || [],
+                                    summary: result.summary,
+                                    research: result.research,
+                                    ...(result.aiContext ? { ai_context: result.aiContext as RepositoryAiContext } : {}),
+                                },
+                                created_at: new Date().toISOString(),
+                                fix_status: result.issuesFound > 0 ? "pending" : "not_applicable",
+                                fix_pr_url: null,
+                                fix_pr_number: null,
+                                fix_branch_name: null,
+                            });
+
+                            void refreshProjectData();
+                            finalizeStream();
+                            setIsScanning(false);
+                            setLiveAiContext(null);
+                        } else if (data.type === 'error') {
+                            setScanLog(prev => [...prev, {
+                                type: "error",
+                                message: data.message || "Scan stream failed",
+                                time: timeStr,
+                            }]);
+                            finalizeStream();
+                            setIsScanning(false);
+                            setLiveAiContext(null);
+                        }
+                    } catch (parseErr) {
+                        console.error('Error parsing SSE event:', parseErr);
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    if (hasCompleted) {
+                        finalizeStream();
+                        return;
+                    }
+
+                    closeScanStream();
+                    const nextAttempt = scanReconnectAttemptsRef.current + 1;
+
+                    if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+                        setScanLog(prev => [...prev, {
+                            type: "error",
+                            message: "Connection interrupted and could not be restored. Please run scan again.",
+                        }]);
+                        finalizeStream();
+                        setIsScanning(false);
+                        setLiveAiContext(null);
+                        return;
+                    }
+
+                    scanReconnectAttemptsRef.current = nextAttempt;
+                    const retryDelay = Math.min(8000, BASE_RECONNECT_DELAY_MS * (2 ** (nextAttempt - 1)));
+                    setScanLog(prev => [...prev, {
+                        type: "info",
+                        message: `Connection interrupted. Retrying in ${(retryDelay / 1000).toFixed(1)}s (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS})...`,
+                    }]);
+
+                    scanReconnectTimerRef.current = setTimeout(() => {
+                        connectStream(true);
+                    }, retryDelay);
+                };
             };
+
+            connectStream(false);
 
         } catch (err) {
             console.error('Scan error:', err);
+            clearScanReconnectTimer();
+            closeScanStream();
+            scanReconnectAttemptsRef.current = 0;
             setScanLog(prev => [...prev, { type: "error", message: "Failed to run scan" }]);
             setIsScanning(false);
             setLiveAiContext(null);

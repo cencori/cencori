@@ -31,6 +31,19 @@ interface LlmFilterResponse {
     verdicts: LlmVerdict[];
 }
 
+export type LlmFilterWarningCode =
+    | "provider_unavailable"
+    | "invalid_format"
+    | "request_failed"
+    | "missing_verdict";
+
+export interface LlmFilterWarning {
+    code: LlmFilterWarningCode;
+    message: string;
+    filePath?: string;
+    issueKey?: string;
+}
+
 export interface LlmFilterOptions {
     enforce?: boolean;
 }
@@ -81,6 +94,7 @@ async function validateFileIssues(
     fileContent: string,
     issues: ScanIssue[],
     enforce: boolean,
+    recordWarning: (warning: LlmFilterWarning) => void,
 ): Promise<Map<string, boolean>> {
     const verdictMap = new Map<string, boolean>();
 
@@ -134,6 +148,11 @@ Return JSON only, no markdown fences:
                 console.warn(
                     `[LLM Filter] No AI provider response while validating ${filePath}; keeping findings as real issues`
                 );
+                recordWarning({
+                    code: "provider_unavailable",
+                    filePath,
+                    message: "AI validator was unavailable for some files, so findings were kept for safety.",
+                });
                 return conservativeVerdicts(issues);
             }
             return verdictMap;
@@ -145,6 +164,11 @@ Return JSON only, no markdown fences:
                 console.warn(
                     `[LLM Filter] Invalid AI response format while validating ${filePath}; keeping findings as real issues`
                 );
+                recordWarning({
+                    code: "invalid_format",
+                    filePath,
+                    message: "AI validator returned an unexpected format, so findings were kept for safety.",
+                });
                 return conservativeVerdicts(issues);
             }
             return verdictMap;
@@ -161,6 +185,11 @@ Return JSON only, no markdown fences:
                 `[LLM Filter] Failed to validate issues for ${filePath}; keeping findings as real issues`,
                 err instanceof Error ? err.message : err
             );
+            recordWarning({
+                code: "request_failed",
+                filePath,
+                message: "AI validator failed during analysis, so findings were kept for safety.",
+            });
             return conservativeVerdicts(issues);
         }
         console.warn("[LLM Filter] Failed to validate issues for", filePath, err instanceof Error ? err.message : err);
@@ -186,6 +215,8 @@ export interface LlmFilterResult {
     evaluated: number;
     /** Whether strict enforcement mode was enabled */
     enforced: boolean;
+    /** Non-fatal AI fallback warnings observed while filtering */
+    warnings: LlmFilterWarning[];
 }
 
 /**
@@ -205,7 +236,7 @@ export async function filterIssuesWithLLM(
     const keep = issues.filter(i => !FILTERABLE_TYPES.has(i.type));
 
     if (toFilter.length === 0) {
-        return { filtered: issues, suppressed: [], evaluated: 0, enforced: enforce };
+        return { filtered: issues, suppressed: [], evaluated: 0, enforced: enforce, warnings: [] };
     }
 
     if (enforce && !hasAiProviderConfigured()) {
@@ -227,7 +258,14 @@ export async function filterIssuesWithLLM(
 
     const confirmed: ScanIssue[] = [];
     const suppressed: ScanIssue[] = [];
+    const warningMap = new Map<string, LlmFilterWarning>();
     let evaluated = 0;
+    const recordWarning = (warning: LlmFilterWarning) => {
+        const key = `${warning.code}:${warning.filePath ?? ""}:${warning.issueKey ?? ""}`;
+        if (!warningMap.has(key)) {
+            warningMap.set(key, warning);
+        }
+    };
 
     const CONCURRENCY = 6;
     for (let i = 0; i < tasks.length; i += CONCURRENCY) {
@@ -247,7 +285,7 @@ export async function filterIssuesWithLLM(
             }
 
             evaluated += chunk.length;
-            const verdictMap = await validateFileIssues(filePath, content, chunk, enforce);
+            const verdictMap = await validateFileIssues(filePath, content, chunk, enforce, recordWarning);
 
             for (const issue of chunk) {
                 const key = issueKey(issue);
@@ -258,6 +296,12 @@ export async function filterIssuesWithLLM(
                         console.warn(
                             `[LLM Filter] Missing verdict for ${key} in strict mode; keeping as real issue`
                         );
+                        recordWarning({
+                            code: "missing_verdict",
+                            filePath,
+                            issueKey: key,
+                            message: "AI validator returned partial verdicts, so unmatched findings were kept for safety.",
+                        });
                     }
                     confirmed.push({ ...issue, confidence: "high" });
                     continue;
@@ -279,8 +323,9 @@ export async function filterIssuesWithLLM(
 
     console.log(
         `[LLM Filter] mode=${enforce ? "strict" : "best-effort"} evaluated=${evaluated} ` +
-        `files=${byFile.size} kept=${confirmed.length} suppressed=${suppressed.length}`
+        `files=${byFile.size} kept=${confirmed.length} suppressed=${suppressed.length} ` +
+        `warnings=${warningMap.size}`
     );
 
-    return { filtered, suppressed, evaluated, enforced: enforce };
+    return { filtered, suppressed, evaluated, enforced: enforce, warnings: Array.from(warningMap.values()) };
 }
