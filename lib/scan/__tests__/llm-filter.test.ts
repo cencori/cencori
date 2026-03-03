@@ -108,6 +108,7 @@ describe("filterIssuesWithLLM", () => {
         expect(result.filtered).toHaveLength(21);
         expect(result.filtered.some((issue) => issue.type === "secret")).toBe(true);
         expect(result.enforced).toBe(true);
+        expect(result.warnings).toHaveLength(0);
     });
 
     test("keeps issues in strict mode when any issue verdict is missing", async () => {
@@ -140,6 +141,7 @@ describe("filterIssuesWithLLM", () => {
         expect(result.suppressed).toHaveLength(0);
         expect(result.filtered).toHaveLength(2);
         expect(result.filtered.every((issue) => issue.confidence === "high")).toBe(true);
+        expect(result.warnings.some((warning) => warning.code === "missing_verdict")).toBe(true);
     });
 
     test("keeps issues in strict mode when AI response format is invalid", async () => {
@@ -163,5 +165,6 @@ describe("filterIssuesWithLLM", () => {
         expect(result.suppressed).toHaveLength(0);
         expect(result.filtered).toHaveLength(1);
         expect(result.filtered[0]?.confidence).toBe("high");
+        expect(result.warnings.some((warning) => warning.code === "invalid_format")).toBe(true);
     });
 });

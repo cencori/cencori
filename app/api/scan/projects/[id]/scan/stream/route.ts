@@ -6,7 +6,7 @@ import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
-import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { filterIssuesWithLLM, type LlmFilterWarning } from '@/lib/scan/llm-filter';
 import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
@@ -22,9 +22,89 @@ interface RouteParams {
     params: Promise<{ id: string }>;
 }
 
+// Allow up to 5 minutes — scan + LLM filter + AI insight can be slow on large repos
+export const maxDuration = 300;
+
+type ScanRunRow = {
+    id: string;
+    status: string;
+    score: string | null;
+    files_scanned: number | null;
+    issues_found: number | null;
+    scan_duration_ms: number | null;
+    results?: Record<string, unknown> | null;
+    error_message?: string | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+    return value as Record<string, unknown>;
+}
+
+function asArray<T = unknown>(value: unknown): T[] {
+    return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function buildCompletePayloadFromRun(scanRun: ScanRunRow): Record<string, unknown> {
+    const results = asRecord(scanRun.results) ?? {};
+    const issues = asArray(results.issues);
+    const summary = asRecord(results.summary) ?? null;
+    const research = asRecord(results.research) ?? null;
+    const aiContext = asRecord(results.ai_context) ?? null;
+
+    return {
+        scanId: scanRun.id,
+        score: scanRun.score,
+        filesScanned: asNumber(scanRun.files_scanned),
+        issuesFound: asNumber(scanRun.issues_found, issues.length),
+        scanDurationMs: asNumber(scanRun.scan_duration_ms),
+        summary,
+        research,
+        aiContext,
+        issues,
+    };
+}
+
+function toUserFacingErrorMessage(rawMessage: string): string {
+    if (
+        rawMessage.includes('[LLM Filter]') ||
+        rawMessage.includes('Invalid AI response format') ||
+        rawMessage.includes('No AI provider response')
+    ) {
+        return 'AI validation fallback triggered. Findings were kept for safety.';
+    }
+    return rawMessage;
+}
+
+function summarizeLlmWarnings(warnings: LlmFilterWarning[]): string | null {
+    if (warnings.length === 0) {
+        return null;
+    }
+
+    const hasInvalidFormat = warnings.some((warning) => warning.code === 'invalid_format');
+    if (hasInvalidFormat) {
+        return 'AI validator returned unexpected output for some files; findings were kept for safety.';
+    }
+
+    const hasProviderUnavailable = warnings.some((warning) => warning.code === 'provider_unavailable');
+    if (hasProviderUnavailable) {
+        return 'AI validator was temporarily unavailable for some files; findings were kept for safety.';
+    }
+
+    return 'AI validator fell back to safe mode for some files; findings were kept for safety.';
+}
+
 // GET /api/scan/projects/[id]/scan/stream - Stream scan events via SSE
-export async function GET(_req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
+    const requestUrl = new URL(req.url);
+    const reconnectMode = requestUrl.searchParams.get('reconnect') === '1';
     const supabase = await createServerClient();
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -56,9 +136,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         });
     }
 
-    const scanRunLimitResponse = await getScanRunPaywallForProject(user.id, id);
-    if (scanRunLimitResponse) {
-        return scanRunLimitResponse;
+    if (!reconnectMode) {
+        const scanRunLimitResponse = await getScanRunPaywallForProject(user.id, id);
+        if (scanRunLimitResponse) {
+            return scanRunLimitResponse;
+        }
     }
 
     const githubAccess = await verifyProjectGithubAccess(user, project);
@@ -78,14 +160,173 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
             const allLogs: Array<{ type: string; time: number; message?: string; data?: unknown }> = [];
             const strictEnforcement = isScanStrictEnforcementEnabled();
             let scanRunId: string | null = null;
+            let streamClosed = false;
+            let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+            const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
             const sendEvent = (event: { type: string; time: number; message?: string; data?: unknown }) => {
+                if (streamClosed) return;
                 allLogs.push(event);
                 const data = JSON.stringify(event);
                 controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             };
 
+            const closeStream = () => {
+                if (streamClosed) return;
+                streamClosed = true;
+                if (heartbeat) {
+                    clearInterval(heartbeat);
+                    heartbeat = null;
+                }
+                try {
+                    controller.close();
+                } catch {
+                    // no-op if stream already closed
+                }
+            };
+
+            const safeSendEvent = (event: { type: string; time: number; message?: string; data?: unknown }) => {
+                try {
+                    sendEvent(event);
+                    return true;
+                } catch {
+                    allLogs.push(event);
+                    closeStream();
+                    return false;
+                }
+            };
+
+            const streamScanRunStatus = async (existingScanRunId: string, reconnectLabel: string) => {
+                safeSendEvent({
+                    type: 'info',
+                    time: Date.now() - startTime,
+                    message: reconnectLabel,
+                    data: { scanId: existingScanRunId },
+                });
+
+                let lastProgressEventAt = 0;
+                while (!streamClosed) {
+                    const { data: scanRunSnapshot, error: scanRunSnapshotError } = await supabaseAdmin
+                        .from('scan_runs')
+                        .select('id,status,score,files_scanned,issues_found,scan_duration_ms,error_message,results')
+                        .eq('id', existingScanRunId)
+                        .single();
+
+                    if (scanRunSnapshotError || !scanRunSnapshot) {
+                        safeSendEvent({
+                            type: 'error',
+                            time: Date.now() - startTime,
+                            message: 'Unable to resume scan stream. Please run scan again.',
+                        });
+                        break;
+                    }
+
+                    if (scanRunSnapshot.status === 'completed') {
+                        safeSendEvent({
+                            type: 'complete',
+                            time: Date.now() - startTime,
+                            message: `Scan complete: ${scanRunSnapshot.files_scanned ?? 0} files scanned, ${scanRunSnapshot.issues_found ?? 0} issues found`,
+                            data: buildCompletePayloadFromRun(scanRunSnapshot as ScanRunRow),
+                        });
+                        break;
+                    }
+
+                    if (scanRunSnapshot.status === 'failed') {
+                        safeSendEvent({
+                            type: 'error',
+                            time: Date.now() - startTime,
+                            message: toUserFacingErrorMessage(
+                                scanRunSnapshot.error_message || 'Scan failed while reconnecting to stream'
+                            ),
+                        });
+                        break;
+                    }
+
+                    const now = Date.now();
+                    if (now - lastProgressEventAt > 5000) {
+                        safeSendEvent({
+                            type: 'progress',
+                            time: now - startTime,
+                            message: 'Reconnected to active scan stream. Waiting for next update...',
+                            data: { scanId: existingScanRunId },
+                        });
+                        lastProgressEventAt = now;
+                    }
+
+                    await sleep(1500);
+                }
+
+                closeStream();
+            };
+
+            heartbeat = setInterval(() => {
+                if (streamClosed) return;
+                try {
+                    controller.enqueue(encoder.encode(': heartbeat\n\n'));
+                } catch {
+                    closeStream();
+                }
+            }, 25000);
+
+            const onAbort = () => {
+                closeStream();
+            };
+            req.signal.addEventListener('abort', onAbort);
+
             try {
+                const { data: activeScanRun } = await supabaseAdmin
+                    .from('scan_runs')
+                    .select('id,status')
+                    .eq('project_id', id)
+                    .eq('status', 'running')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (activeScanRun?.id) {
+                    await streamScanRunStatus(
+                        activeScanRun.id,
+                        reconnectMode
+                            ? 'Reconnected to an active scan. Resuming updates...'
+                            : 'A scan is already running for this project. Streaming existing run...'
+                    );
+                    return;
+                }
+
+                if (reconnectMode) {
+                    const { data: latestScanRun } = await supabaseAdmin
+                        .from('scan_runs')
+                        .select('id,status,score,files_scanned,issues_found,scan_duration_ms,error_message,results')
+                        .eq('project_id', id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (latestScanRun?.status === 'completed') {
+                        safeSendEvent({
+                            type: 'complete',
+                            time: Date.now() - startTime,
+                            message: `Scan complete: ${latestScanRun.files_scanned ?? 0} files scanned, ${latestScanRun.issues_found ?? 0} issues found`,
+                            data: buildCompletePayloadFromRun(latestScanRun as ScanRunRow),
+                        });
+                    } else if (latestScanRun?.status === 'failed') {
+                        safeSendEvent({
+                            type: 'error',
+                            time: Date.now() - startTime,
+                            message: toUserFacingErrorMessage(latestScanRun.error_message || 'Scan failed'),
+                        });
+                    } else {
+                        safeSendEvent({
+                            type: 'error',
+                            time: Date.now() - startTime,
+                            message: 'Unable to resume scan stream. Please run scan again.',
+                        });
+                    }
+                    closeStream();
+                    return;
+                }
+
                 // Send initial event
                 sendEvent({ type: 'start', time: 0, message: 'Starting security scan...' });
 
@@ -248,6 +489,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                     suppressed: suppressedIssues,
                     evaluated: llmEvaluatedIssues,
                     enforced: llmEnforced,
+                    warnings: llmWarnings,
                 } = await filterIssuesWithLLM(rawIssues, fileContentMap, { enforce: strictEnforcement });
 
                 sendEvent({
@@ -260,6 +502,18 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                         filteredIssueCount: allIssues.length,
                     },
                 });
+                const llmWarningSummary = summarizeLlmWarnings(llmWarnings);
+                if (llmWarningSummary) {
+                    sendEvent({
+                        type: 'info',
+                        time: Date.now() - startTime,
+                        message: llmWarningSummary,
+                        data: {
+                            warningCount: llmWarnings.length,
+                            warnings: llmWarnings,
+                        },
+                    });
+                }
 
                 if (totalCandidateFiles === 0) {
                     sendEvent({
@@ -370,6 +624,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                                 enforced: llmEnforced,
                                 evaluated_issues: llmEvaluatedIssues,
                                 suppressed_count: suppressedIssues.length,
+                                warnings: llmWarnings,
                             },
                             summary,
                             research: enrichedResearch,
@@ -393,23 +648,19 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                     })
                     .eq('id', id);
 
-                controller.close();
+                closeStream();
 
             } catch (error) {
                 console.error('[Scan Stream] Error:', error);
-                const errorMessage = error instanceof Error ? error.message : 'Scan failed';
+                const technicalErrorMessage = error instanceof Error ? error.message : 'Scan failed';
+                const errorMessage = toUserFacingErrorMessage(technicalErrorMessage);
                 const errorEvent = {
                     type: 'error',
                     time: Date.now() - startTime,
                     message: errorMessage,
                 } as const;
 
-                try {
-                    sendEvent(errorEvent);
-                } catch {
-                    // Stream may already be closed; keep the error in persisted logs.
-                    allLogs.push(errorEvent);
-                }
+                safeSendEvent(errorEvent);
 
                 if (scanRunId) {
                     try {
@@ -417,7 +668,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                             .from('scan_runs')
                             .update({
                                 status: 'failed',
-                                error_message: errorMessage,
+                                error_message: technicalErrorMessage,
                                 scan_duration_ms: Date.now() - startTime,
                                 fix_status: 'not_applicable',
                                 logs: allLogs,
@@ -427,12 +678,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
                         console.error('[Scan Stream] Failed to persist failed scan status:', persistError);
                     }
                 }
-
-                try {
-                    controller.close();
-                } catch {
-                    // no-op if stream already closed
-                }
+            } finally {
+                req.signal.removeEventListener('abort', onAbort);
+                closeStream();
             }
         }
     });
@@ -440,8 +688,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     return new Response(stream, {
         headers: {
             'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-transform',
             'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
         },
     });
 }
