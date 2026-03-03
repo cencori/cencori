@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const BROADCAST_FROM_EMAIL =
@@ -13,8 +14,6 @@ const BROADCAST_REPLY_TO_EMAIL =
     process.env.RESEND_REPLY_TO_EMAIL ||
     '';
 
-const ALLOW_ALL_IN_DEV = true;
-const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 const USERS_PAGE_SIZE = 200;
 const SEND_CONCURRENCY = 5;
 const SEND_BATCH_PAUSE_MS = 120;
@@ -140,9 +139,9 @@ export async function POST(req: NextRequest) {
     }
 
     const isDev = process.env.NODE_ENV === 'development';
-    const isFounder = FOUNDER_EMAILS.includes((user.email || '').toLowerCase());
+    const isFounder = isFounderEmail(user.email);
     const admin = await getSuperAdminStatus(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
+    const isAllowed = (allowAllInternalInDev() && isDev) || isFounder || !!admin;
 
     if (!isAllowed) {
         return NextResponse.json(

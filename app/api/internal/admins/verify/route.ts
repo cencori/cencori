@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
-
-const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+import { isFounderEmail } from '@/lib/internal-admin-auth';
 
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (FOUNDER_EMAILS.includes(emailLower)) {
+    if (isFounderEmail(emailLower)) {
         return NextResponse.json({ authorized: true, role: 'founder' });
     }
     const supabaseAdmin = createAdminClient();
