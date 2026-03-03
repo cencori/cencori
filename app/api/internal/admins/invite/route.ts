@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ADMIN_INVITE_FROM_EMAIL = process.env.RESEND_ADMIN_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -19,10 +20,6 @@ function parseReplyTo(value: string): string | string[] | undefined {
 
     return addresses.length === 1 ? addresses[0] : addresses;
 }
-
-const ALLOW_ALL_IN_DEV = true;
-
-const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
 
 async function getSuperAdminStatus(userId: string) {
     const supabase = createAdminClient();
@@ -45,9 +42,9 @@ export async function POST(req: NextRequest) {
     }
 
     const isDev = process.env.NODE_ENV === 'development';
-    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
+    const isFounder = isFounderEmail(user.email);
     const admin = await getSuperAdminStatus(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
+    const isAllowed = (allowAllInternalInDev() && isDev) || isFounder || !!admin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden - Super admin access required' }, { status: 403 });

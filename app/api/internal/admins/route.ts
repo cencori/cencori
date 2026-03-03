@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-
-const ALLOW_ALL_IN_DEV = true;
-
-const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
 
 async function getAdminStatus(userId: string) {
     const supabase = createAdminClient();
@@ -26,9 +23,9 @@ export async function GET() {
     }
 
     const isDev = process.env.NODE_ENV === 'development';
-    const isFounder = FOUNDER_EMAILS.includes(user.email || '');
+    const isFounder = isFounderEmail(user.email);
     const admin = await getAdminStatus(user.id);
-    const isAllowed = (ALLOW_ALL_IN_DEV && isDev) || isFounder || !!admin;
+    const isAllowed = (allowAllInternalInDev() && isDev) || isFounder || !!admin;
 
     if (!isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -37,7 +34,8 @@ export async function GET() {
     const supabaseAdmin = createAdminClient();
     const { data: admins, error } = await supabaseAdmin
         .from('cencori_admins')
-        .select('id, email, role, status, created_at, accepted_at, invited_by')
+        // Keep projection minimal to avoid hard dependency on optional columns.
+        .select('id, email, role, status, created_at, accepted_at')
         .neq('status', 'revoked')
         .order('created_at', { ascending: false });
 

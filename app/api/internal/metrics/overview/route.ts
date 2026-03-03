@@ -12,11 +12,10 @@ import {
     getScanMetrics
 } from '@/internal/analytics/lib/queries';
 import type { TimePeriod } from '@/internal/analytics/lib/types';
-
-const FOUNDER_EMAILS = ['omogbolahanng@gmail.com'];
+import { isFounderEmail } from '@/lib/internal-admin-auth';
 
 async function isAuthorizedAdmin(email: string): Promise<boolean> {
-    if (FOUNDER_EMAILS.includes(email.toLowerCase())) {
+    if (isFounderEmail(email)) {
         return true;
     }
 

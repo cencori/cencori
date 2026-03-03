@@ -58,8 +58,11 @@ export default function AdminSettingsPage() {
         queryKey: ['admins'],
         queryFn: async () => {
             const res = await fetch('/api/internal/admins');
-            if (!res.ok) throw new Error('Failed to fetch admins');
-            return res.json();
+            const payload = await res.json().catch(() => ({} as { error?: string }));
+            if (!res.ok) {
+                throw new Error(payload.error || `Failed to fetch admins (${res.status})`);
+            }
+            return payload as { admins: Admin[]; currentUserRole: string };
         },
     });
 
