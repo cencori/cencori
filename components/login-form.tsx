@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 
 type LoginFormProps = React.ComponentProps<"form">;
@@ -82,16 +83,21 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       const { oauthRedirectTo } = resolveAuthRedirectTargets(redirectParam, {
         defaultPath: "/dashboard/organizations",
       });
+
+      // OAuth on login can still create a brand-new account; mark pending so welcome email can fire post-auth.
+      markSignupWelcomeEmailPending();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo: oauthRedirectTo },
       });
       if (oauthError) {
+        clearSignupWelcomeEmailPending();
         setError(oauthError.message);
         setLoading(false);
       }
       // Supabase handles the redirect for OAuth; we don't navigate here.
     } catch (err) {
+      clearSignupWelcomeEmailPending();
       const message = err instanceof Error ? err.message : "OAuth failed";
       setError(message);
       setLoading(false);

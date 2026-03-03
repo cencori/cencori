@@ -9,6 +9,7 @@ export function SignupWelcomeEmailBridge() {
     useEffect(() => {
         let cancelled = false;
         let inFlight = false;
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
         const maybeSendWelcomeEmail = async (email: string | null | undefined) => {
             if (!email || cancelled || inFlight || !isSignupWelcomeEmailPending()) {
@@ -33,21 +34,36 @@ export function SignupWelcomeEmailBridge() {
             }
         };
 
-        void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+        const trySessionSendWithRetry = async (attempt = 0) => {
+            const { data: { session } }: { data: { session: Session | null } } = await supabase.auth.getSession();
             if (cancelled) return;
-            void maybeSendWelcomeEmail(session?.user?.email);
-        });
+
+            await maybeSendWelcomeEmail(session?.user?.email);
+
+            if (!isSignupWelcomeEmailPending() || attempt >= 5) {
+                return;
+            }
+
+            retryTimer = setTimeout(() => {
+                void trySessionSendWithRetry(attempt + 1);
+            }, 1200);
+        };
+
+        void trySessionSendWithRetry();
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-            if (event === "SIGNED_IN") {
+            if (session?.user?.email && event !== "SIGNED_OUT") {
                 void maybeSendWelcomeEmail(session?.user?.email);
             }
         });
 
         return () => {
             cancelled = true;
+            if (retryTimer) {
+                clearTimeout(retryTimer);
+            }
             subscription.unsubscribe();
         };
     }, []);
