@@ -1,6 +1,7 @@
 // Platform Analytics Database Queries
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics } from './types';
+import type { User } from '@supabase/supabase-js';
 
 function getStartDate(period: TimePeriod): Date {
     const now = new Date();
@@ -43,9 +44,13 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
     }
 
     const totalRequests = requests.length;
-    const successfulRequests = requests.filter(r => r.status === 'success').length;
+    const successfulRequests = requests.filter(
+        (r) => r.status === 'success' || r.status === 'success_fallback'
+    ).length;
     const errorRequests = requests.filter(r => r.status === 'error').length;
-    const filteredRequests = requests.filter(r => r.status === 'filtered').length;
+    const filteredRequests = requests.filter(
+        (r) => r.status === 'filtered' || r.status === 'blocked'
+    ).length;
     const totalTokens = requests.reduce((sum, r) => sum + (r.total_tokens || 0), 0);
     const totalCost = requests.reduce((sum, r) => sum + (parseFloat(r.cost_usd) || 0), 0);
     const avgLatency = totalRequests > 0
@@ -130,8 +135,8 @@ export async function getOrganizationsMetrics(period: TimePeriod): Promise<Organ
     const supabase = createAdminClient();
     const startDate = getStartDate(period);
 
-    const { data: orgs } = await supabase.from('organizations').select('id, subscription_tier, created_at');
-    const { data: members } = await supabase.from('organization_members').select('id');
+    const { data: orgs } = await supabase.from('organizations').select('id, owner_id, subscription_tier, created_at');
+    const { data: members } = await supabase.from('organization_members').select('user_id');
     const { data: activeOrgs } = await supabase
         .from('ai_requests')
         .select('project_id, projects!inner(organization_id)')
@@ -148,13 +153,25 @@ export async function getOrganizationsMetrics(period: TimePeriod): Promise<Organ
         byTier[tier] = (byTier[tier] || 0) + 1;
     });
 
+    const memberIds = new Set<string>();
+    orgs?.forEach((org) => {
+        if (org.owner_id) {
+            memberIds.add(org.owner_id);
+        }
+    });
+    members?.forEach((member) => {
+        if (member.user_id) {
+            memberIds.add(member.user_id);
+        }
+    });
+
     const newThisPeriod = orgs?.filter(o => new Date(o.created_at) >= startDate).length || 0;
 
     return {
         total,
         active,
         byTier,
-        totalMembers: members?.length || 0,
+        totalMembers: memberIds.size,
         newThisPeriod,
     };
 }
@@ -193,9 +210,18 @@ export async function getApiKeysMetrics(period: TimePeriod): Promise<ApiKeysMetr
     const startDate = getStartDate(period);
 
     const { data: keys } = await supabase.from('api_keys').select('id, environment, created_at, last_used_at');
+    const { data: keyUsage } = await supabase
+        .from('ai_requests')
+        .select('api_key_id')
+        .gte('created_at', startDate.toISOString());
 
     const total = keys?.length || 0;
-    const active = keys?.filter(k => k.last_used_at && new Date(k.last_used_at) >= startDate).length || 0;
+    const activeKeyIds = new Set(
+        (keyUsage || [])
+            .map((request) => request.api_key_id)
+            .filter(Boolean)
+    );
+    const active = activeKeyIds.size;
 
     const byEnvironment = {
         production: keys?.filter(k => k.environment === 'production').length || 0,
@@ -207,27 +233,55 @@ export async function getApiKeysMetrics(period: TimePeriod): Promise<ApiKeysMetr
     return { total, active, byEnvironment, newThisPeriod };
 }
 
-export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics> {
+export async function getUsersMetrics(_period: TimePeriod): Promise<UsersMetrics> {
     const supabase = createAdminClient();
-    const startDate = getStartDate(period);
+    void _period;
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thisMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const activeWindowStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get users from auth.users via admin API
-    const { data: { users }, error } = await supabase.auth.admin.listUsers();
+    const listAllUsers = async (): Promise<User[] | null> => {
+        const allUsers: User[] = [];
+        let page = 1;
+        const perPage = 200;
 
-    if (error || !users) {
+        while (true) {
+            const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+            if (error) {
+                console.error('[Analytics] Error fetching users page:', error);
+                return null;
+            }
+
+            const users = data?.users ?? [];
+            if (users.length === 0) break;
+
+            allUsers.push(...users);
+
+            if (!data?.nextPage) break;
+            page = data.nextPage;
+        }
+
+        return allUsers;
+    };
+
+    // Get users from auth.users via admin API (all pages)
+    const users = await listAllUsers();
+
+    if (!users) {
         return { total: 0, active: 0, newToday: 0, newThisWeek: 0, newThisMonth: 0 };
     }
 
-    const total = users.length;
-    // Active users = signed in within the selected period
-    const active = users.filter(u => u.last_sign_in_at && new Date(u.last_sign_in_at) >= startDate).length;
-    const newToday = users.filter(u => new Date(u.created_at) >= today).length;
-    const newThisWeek = users.filter(u => new Date(u.created_at) >= thisWeek).length;
-    const newThisMonth = users.filter(u => new Date(u.created_at) >= thisMonth).length;
+    // Track only real signed-up users (exclude service/system rows without email).
+    const realUsers = users.filter((user) => Boolean(user.email));
+
+    const total = realUsers.length;
+    // Active users = signed in within the last 30 days (fixed window, independent from selected chart period).
+    const active = realUsers.filter((u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= activeWindowStart).length;
+    const newToday = realUsers.filter((u) => new Date(u.created_at) >= today).length;
+    const newThisWeek = realUsers.filter((u) => new Date(u.created_at) >= thisWeek).length;
+    const newThisMonth = realUsers.filter((u) => new Date(u.created_at) >= thisMonth).length;
 
     return { total, active, newToday, newThisWeek, newThisMonth };
 }
