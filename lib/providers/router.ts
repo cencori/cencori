@@ -7,6 +7,11 @@
 import { AIProvider } from './base';
 import { ProviderError } from './errors';
 
+const MODEL_ALIASES: Record<string, string> = {
+    'gpt-5.3-instant': 'gpt-5.3-chat-latest',
+    'gpt-5.3': 'gpt-5.3-chat-latest',
+};
+
 /**
  * Provider Router Class
  * Manages provider instances and routes requests to the correct provider
@@ -148,11 +153,8 @@ export class ProviderRouter {
      * If model has provider prefix, extract just the model name
      */
     normalizeModelName(modelName: string): string {
-        if (modelName.includes('/')) {
-            const [, model] = modelName.split('/');
-            return model;
-        }
-        return modelName;
+        const rawModel = modelName.includes('/') ? modelName.split('/').slice(1).join('/') : modelName;
+        return MODEL_ALIASES[rawModel] || rawModel;
     }
 }
 

@@ -33,6 +33,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // GPT-5 Series (latest)
+            { id: 'gpt-5.3-chat-latest', name: 'GPT-5.3 Instant', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.3 instant release' },
             { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: 'chat', contextWindow: 400000, description: 'Most capable GPT-5.2 variant' },
             { id: 'gpt-5.2', name: 'GPT-5.2', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.2 flagship' },
             { id: 'gpt-5.1', name: 'GPT-5.1', type: 'chat', contextWindow: 400000, description: 'Improved GPT-5 generation' },
