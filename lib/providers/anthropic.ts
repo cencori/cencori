@@ -20,7 +20,7 @@ export class AnthropicProvider extends AIProvider {
     readonly providerName = 'anthropic';
     private client: Anthropic;
 
-    constructor(apiKey?: string) {
+    constructor(apiKey?: string, options?: { baseURL?: string }) {
         super();
 
         const key = apiKey || process.env.ANTHROPIC_API_KEY;
@@ -29,7 +29,8 @@ export class AnthropicProvider extends AIProvider {
         }
 
         this.client = new Anthropic({
-            apiKey: key
+            apiKey: key,
+            ...(options?.baseURL ? { baseURL: options.baseURL } : {}),
         });
     }
 

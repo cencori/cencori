@@ -157,11 +157,10 @@ export default function ProvidersPage({ params }: PageProps) {
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                     <DialogTrigger asChild>
                         <Button size="sm" className="h-7 text-xs">
-                            <Plus className="h-3 w-3 mr-1.5" />
                             Add Provider
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[400px]">
+                    <DialogContent className="sm:max-w-[520px]">
                         <DialogHeader className="pb-2">
                             <DialogTitle className="text-sm">Add Custom Provider</DialogTitle>
                             <DialogDescription className="text-xs">Configure a new AI provider endpoint</DialogDescription>
