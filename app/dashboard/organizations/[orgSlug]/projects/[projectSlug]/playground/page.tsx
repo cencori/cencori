@@ -20,6 +20,7 @@ interface PlaygroundPageProps {
 
 const MODELS = [
     // OpenAI
+    { value: "gpt-5.3-chat-latest", label: "GPT-5.3 Instant", provider: "OpenAI" },
     { value: "gpt-5", label: "GPT-5", provider: "OpenAI" },
     { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
     { value: "o3", label: "o3 (Reasoning)", provider: "OpenAI" },

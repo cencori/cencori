@@ -362,6 +362,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all" className="text-xs">All models</SelectItem>
+                                        <SelectItem value="gpt-5.3-chat-latest" className="text-xs">gpt-5.3-chat-latest</SelectItem>
                                         <SelectItem value="gpt-5" className="text-xs">gpt-5</SelectItem>
                                         <SelectItem value="gpt-4o" className="text-xs">gpt-4o</SelectItem>
                                         <SelectItem value="claude-opus-4" className="text-xs">claude-opus-4</SelectItem>

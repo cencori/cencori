@@ -117,10 +117,16 @@ const calculateUsageAndCost = async (
 const normalizeGatewayModelId = (modelId: string): string => {
     // OpenClaw custom provider aliases may send "cencori/<model>".
     // Normalize to the actual upstream model ID used in provider configs.
-    if (modelId.startsWith("cencori/")) {
-        return modelId.slice("cencori/".length);
-    }
-    return modelId;
+    const strippedModel = modelId.startsWith("cencori/")
+        ? modelId.slice("cencori/".length)
+        : modelId;
+
+    const aliases: Record<string, string> = {
+        "gpt-5.3": "gpt-5.3-chat-latest",
+        "gpt-5.3-instant": "gpt-5.3-chat-latest",
+    };
+
+    return aliases[strippedModel] || strippedModel;
 };
 
 const extractOpenAIMessageText = (content: unknown): string => {
