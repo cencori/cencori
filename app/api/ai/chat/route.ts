@@ -12,6 +12,7 @@ import {
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { UnifiedMessage, ToolCall } from '@/lib/providers/base';
+import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import { processCustomRules, CustomDataRule, ProcessedContent, applyMask, applyRedact, applyTokenize, deTokenize } from '@/lib/safety/custom-data-rules';
 import { geolocation, ipAddress } from '@vercel/functions';
@@ -713,18 +714,52 @@ export async function POST(req: NextRequest) {
         }
 
         const requestedModel = model || project.default_model || 'gemini-2.0-flash';
-        const providerName = router.detectProvider(requestedModel);
-        const normalizedModel = router.normalizeModelName(requestedModel);
-        const byokResult = await initializeBYOKProviders(
+        const customProvider = await resolveCustomProviderForProject({
             supabase,
-            project.id,
+            projectId: project.id,
             organizationId,
-            providerName
-        );
+            requestedModel,
+        });
 
-        if (!byokResult.success) {
-            initializeDefaultProviders();
+        let providerName: string;
+        let normalizedModel: string;
+
+        if (customProvider) {
+            providerName = customProvider.providerTag;
+            normalizedModel = customProvider.upstreamModel;
+
+            if (customProvider.apiFormat === 'anthropic' && !(customProvider.apiKey || process.env.ANTHROPIC_API_KEY)) {
+                return NextResponse.json(
+                    {
+                        error: `Custom provider '${customProvider.name}' is missing an API key.`,
+                        message: 'Add the provider API key in Custom Providers before sending requests.',
+                    },
+                    { status: 400 }
+                );
+            }
+
+            if (!router.hasProvider(providerName)) {
+                const customProviderImpl = customProvider.apiFormat === 'anthropic'
+                    ? new AnthropicProvider(customProvider.apiKey || process.env.ANTHROPIC_API_KEY, { baseURL: customProvider.baseUrl })
+                    : new OpenAICompatibleProvider(providerName, customProvider.apiKey || 'cencori-no-key', customProvider.baseUrl);
+                router.registerProvider(providerName, customProviderImpl);
+            }
+        } else {
+            providerName = router.detectProvider(requestedModel);
+            normalizedModel = router.normalizeModelName(requestedModel);
+
+            const byokResult = await initializeBYOKProviders(
+                supabase,
+                project.id,
+                organizationId,
+                providerName
+            );
+
+            if (!byokResult.success) {
+                initializeDefaultProviders();
+            }
         }
+
         if (!router.hasProvider(providerName)) {
             return NextResponse.json(
                 {
@@ -736,7 +771,9 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const provider = router.getProviderForModel(requestedModel);
+        const provider = customProvider
+            ? router.getProvider(providerName)
+            : router.getProviderForModel(requestedModel);
 
         const chatRequest = {
             messages: unifiedMessages,

@@ -9,6 +9,7 @@ import { CohereProvider } from "@/lib/providers/cohere";
 import { OpenAIProvider } from "@/lib/providers/openai";
 import { GeminiProvider } from "@/lib/providers/gemini";
 import { getGoogleApiKey } from "@/lib/providers/google-env";
+import { resolveCustomProviderForProject } from "@/lib/providers/custom-provider-routing";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import {
@@ -474,7 +475,26 @@ export async function POST(req: NextRequest) {
         };
 
         // ── Provider Routing ──
-        const provider = detectProviderFromModel(model) || 'openai';
+        let customProvider: Awaited<ReturnType<typeof resolveCustomProviderForProject>> = null;
+        if (gatewayCtx) {
+            try {
+                customProvider = await resolveCustomProviderForProject({
+                    supabase: adminClient,
+                    projectId: gatewayCtx.projectId,
+                    organizationId: gatewayCtx.organizationId,
+                    requestedModel: model,
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to resolve custom provider';
+                return respondError(500, message, 'custom_provider_resolution_failed');
+            }
+        }
+
+        const routedModel = customProvider?.upstreamModel || model;
+        const provider = customProvider
+            ? (customProvider.apiFormat === "anthropic" ? "anthropic" : "openai")
+            : (detectProviderFromModel(model) || 'openai');
+        const providerLogName = customProvider?.providerTag || provider;
 
         if (provider === 'google') {
             // ── Gemini Adapter ──
@@ -487,7 +507,7 @@ export async function POST(req: NextRequest) {
                 );
             }
             const genAI = new GoogleGenerativeAI(geminiKey);
-            const geminiModel = genAI.getGenerativeModel({ model });
+            const geminiModel = genAI.getGenerativeModel({ model: routedModel });
 
             const systemInstruction = messages.find((m) => m.role === "system")?.content;
             const nonSystemMessages = messages.filter((m) => m.role !== "system");
@@ -632,8 +652,23 @@ export async function POST(req: NextRequest) {
 
         } else if (provider === "anthropic" || provider === "cohere") {
             // ── Non-OpenAI Native Adapters (Anthropic/Cohere) ──
+            const anthropicApiKey = customProvider?.apiFormat === "anthropic"
+                ? (customProvider.apiKey || process.env.ANTHROPIC_API_KEY)
+                : process.env.ANTHROPIC_API_KEY;
+            if (provider === "anthropic" && !anthropicApiKey) {
+                return respondError(
+                    500,
+                    customProvider?.apiFormat === "anthropic"
+                        ? `Custom provider '${customProvider.name}' is missing an API key.`
+                        : "Provider API key missing for 'anthropic'. Set ANTHROPIC_API_KEY on the server.",
+                    "provider_key_missing"
+                );
+            }
             const providerImpl = provider === "anthropic"
-                ? new AnthropicProvider(process.env.ANTHROPIC_API_KEY)
+                ? new AnthropicProvider(
+                    anthropicApiKey,
+                    customProvider?.apiFormat === "anthropic" ? { baseURL: customProvider.baseUrl } : undefined
+                )
                 : new CohereProvider(process.env.COHERE_API_KEY || "");
             const unifiedMessages = toUnifiedMessages(messages);
 
@@ -643,7 +678,7 @@ export async function POST(req: NextRequest) {
                         let fullResponseText = "";
                         try {
                             const stream = providerImpl.stream({
-                                model,
+                                model: routedModel,
                                 messages: unifiedMessages,
                             });
 
@@ -669,11 +704,11 @@ export async function POST(req: NextRequest) {
                             controller.close();
 
                             if (gatewayCtx) {
-                                const usageAndCost = await calculateUsageAndCost(providerImpl, model, messages, fullResponseText);
+                                const usageAndCost = await calculateUsageAndCost(providerImpl, routedModel, messages, fullResponseText);
                                 await logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
-                                    provider,
+                                    provider: providerLogName,
                                     status: 'success',
                                     promptTokens: usageAndCost.promptTokens,
                                     completionTokens: usageAndCost.completionTokens,
@@ -691,7 +726,7 @@ export async function POST(req: NextRequest) {
                                 void logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
-                                    provider,
+                                    provider: providerLogName,
                                     status: 'error',
                                     errorMessage: error instanceof Error ? error.message : `${provider} streaming failed`,
                                 });
@@ -709,7 +744,7 @@ export async function POST(req: NextRequest) {
 
             try {
                 const completion = await providerImpl.chat({
-                    model,
+                    model: routedModel,
                     messages: unifiedMessages,
                 });
                 const openAiToolCalls = completion.toolCalls?.map((tc) => ({
@@ -723,7 +758,7 @@ export async function POST(req: NextRequest) {
                     await logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
-                        provider,
+                        provider: providerLogName,
                         status: 'success',
                         promptTokens: completion.usage.promptTokens,
                         completionTokens: completion.usage.completionTokens,
@@ -764,7 +799,7 @@ export async function POST(req: NextRequest) {
                     void logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
-                        provider,
+                        provider: providerLogName,
                         status: 'error',
                         errorMessage: message,
                     });
@@ -773,8 +808,10 @@ export async function POST(req: NextRequest) {
             }
         } else {
             // ── OpenAI-compatible Path (OpenAI, Groq, Mistral, etc.) ──
-            const providerKeyEnv = OPENAI_COMPATIBLE_ENV_KEYS[provider];
-            const providerApiKey = providerKeyEnv ? process.env[providerKeyEnv] : undefined;
+            const providerKeyEnv = customProvider ? undefined : OPENAI_COMPATIBLE_ENV_KEYS[provider];
+            const providerApiKey = customProvider?.apiKey
+                || (providerKeyEnv ? process.env[providerKeyEnv] : undefined)
+                || (customProvider ? "cencori-no-key" : undefined);
             if (!providerApiKey) {
                 return respondError(
                     500,
@@ -783,19 +820,23 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            const providerEndpoint = provider === "openai" ? null : OPENAI_COMPATIBLE_ENDPOINTS[provider];
+            const providerEndpoint = customProvider
+                ? { baseURL: customProvider.baseUrl }
+                : (provider === "openai" ? null : OPENAI_COMPATIBLE_ENDPOINTS[provider]);
             const openai = new OpenAI({
                 apiKey: providerApiKey,
                 ...(providerEndpoint ? { baseURL: providerEndpoint.baseURL } : {}),
             });
-            const providerForMetrics: AIProvider = provider === "openai"
-                ? new OpenAIProvider(providerApiKey)
-                : new OpenAICompatibleProvider(provider, providerApiKey);
+            const providerForMetrics: AIProvider = customProvider
+                ? new OpenAICompatibleProvider(providerLogName, providerApiKey, customProvider.baseUrl)
+                : (provider === "openai"
+                    ? new OpenAIProvider(providerApiKey)
+                    : new OpenAICompatibleProvider(provider, providerApiKey));
             const openAiMessages = messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
 
             if (shouldStream) {
                 const stream = await openai.chat.completions.create({
-                    model,
+                    model: routedModel,
                     messages: openAiMessages,
                     stream: true,
                     tools,
@@ -884,11 +925,11 @@ export async function POST(req: NextRequest) {
 
                             // Usage tracking
                             if (gatewayCtx) {
-                                const usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, fullResponseText);
+                                const usageAndCost = await calculateUsageAndCost(providerForMetrics, routedModel, messages, fullResponseText);
                                 await logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
-                                    provider,
+                                    provider: providerLogName,
                                     status: 'success',
                                     promptTokens: usageAndCost.promptTokens,
                                     completionTokens: usageAndCost.completionTokens,
@@ -905,7 +946,7 @@ export async function POST(req: NextRequest) {
                                 void logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
-                                    provider,
+                                    provider: providerLogName,
                                     status: 'error',
                                     errorMessage: error instanceof Error ? error.message : 'OpenAI-compatible streaming failed',
                                 });
@@ -923,7 +964,7 @@ export async function POST(req: NextRequest) {
 
             try {
                 const completion = await openai.chat.completions.create({
-                    model,
+                    model: routedModel,
                     messages: openAiMessages,
                     stream: false,
                     tools,
@@ -973,7 +1014,7 @@ export async function POST(req: NextRequest) {
                         cencoriMarkupPercentage: 0,
                     };
                     try {
-                        pricing = await providerForMetrics.getPricing(model);
+                        pricing = await providerForMetrics.getPricing(routedModel);
                     } catch {
                         // Keep defaults; logging should never block request handling.
                     }
@@ -995,14 +1036,14 @@ export async function POST(req: NextRequest) {
                         markupPercentage: pricing.cencoriMarkupPercentage,
                     };
                 } else {
-                    usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, completionText);
+                    usageAndCost = await calculateUsageAndCost(providerForMetrics, routedModel, messages, completionText);
                 }
 
                 if (gatewayCtx) {
                     await logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
-                        provider,
+                        provider: providerLogName,
                         status: 'success',
                         promptTokens: usageAndCost.promptTokens,
                         completionTokens: usageAndCost.completionTokens,
@@ -1022,7 +1063,7 @@ export async function POST(req: NextRequest) {
                     void logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
-                        provider,
+                        provider: providerLogName,
                         status: 'error',
                         errorMessage: message,
                     });

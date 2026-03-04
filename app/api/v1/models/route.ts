@@ -142,12 +142,71 @@ export async function GET(req: NextRequest) {
         );
     }
 
+    // Include project custom providers/models for API-key scoped requests.
+    let customModels: typeof MODELS = [];
+    if (apiLogContext?.projectId) {
+        const supabase = createAdminClient();
+        const { data: projectCustomProviders, error: customProviderError } = await supabase
+            .from('custom_providers')
+            .select(`
+                id,
+                name,
+                custom_models(model_name, display_name, is_active)
+            `)
+            .eq('project_id', apiLogContext.projectId)
+            .eq('is_active', true);
+
+        if (!customProviderError && Array.isArray(projectCustomProviders)) {
+            const created = Math.floor(Date.now() / 1000);
+            const customRows = projectCustomProviders.flatMap((provider) => {
+                const providerTag = `custom:${provider.id}`;
+                const models = (provider.custom_models || [])
+                    .filter((model) => model.model_name && model.is_active !== false)
+                    .map((model) => ({
+                        id: model.model_name as string,
+                        object: 'model' as const,
+                        created,
+                        owned_by: providerTag,
+                        name: (model.display_name as string | null) || (model.model_name as string),
+                        type: 'chat' as const,
+                        context_window: 0,
+                        description: `Custom provider model (${provider.name})`,
+                    }));
+
+                const hasAliasModel = models.some((model) => model.id === provider.name);
+                const aliasModel = hasAliasModel
+                    ? []
+                    : [{
+                        id: provider.name,
+                        object: 'model' as const,
+                        created,
+                        owned_by: providerTag,
+                        name: provider.name,
+                        type: 'chat' as const,
+                        context_window: 0,
+                        description: `Custom provider alias (${provider.name})`,
+                    }];
+
+                return [...models, ...aliasModel];
+            });
+
+            const seen = new Set<string>();
+            customModels = customRows.filter((row) => {
+                if (!row.id || seen.has(row.id)) {
+                    return false;
+                }
+                seen.add(row.id);
+                return true;
+            });
+        }
+    }
+
     // Optional filtering by provider or type (Restored Feature)
     const url = new URL(req.url);
     const filterProvider = url.searchParams.get('provider');
     const filterType = url.searchParams.get('type');
 
-    let filteredModels = MODELS;
+    let filteredModels = [...MODELS, ...customModels];
     if (filterProvider) {
         filteredModels = filteredModels.filter(m => m.owned_by === filterProvider);
     }
@@ -159,11 +218,18 @@ export async function GET(req: NextRequest) {
         NextResponse.json({
             object: 'list',
             data: filteredModels,
-            providers: SUPPORTED_PROVIDERS.map(p => ({
-                id: p.id,
-                name: p.name,
-                model_count: p.models.length,
-            })),
+            providers: [
+                ...SUPPORTED_PROVIDERS.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    model_count: p.models.length,
+                })),
+                ...Array.from(new Set(customModels.map(model => model.owned_by))).map((providerId) => ({
+                    id: providerId,
+                    name: providerId,
+                    model_count: customModels.filter(model => model.owned_by === providerId).length,
+                })),
+            ],
         })
     );
 }
