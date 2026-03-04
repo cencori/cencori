@@ -1,0 +1,83 @@
+---
+title: "GPT-5.3 Instant Is Live on Cencori"
+slug: "gpt-5-3-instant-on-cencori"
+date: "2026-03-04"
+excerpt: "OpenAI released GPT-5.3 Instant on March 3, 2026. It is now available on Cencori with gpt-5.3-chat-latest."
+coverImage: "/blog/images/covers/chat.png"
+authors:
+  - bola
+tags: ["OpenAI", "GPT-5.3", "AI Models", "Update"]
+published: true
+---
+
+OpenAI announced **GPT-5.3 Instant** on **March 3, 2026**, and it is now available on Cencori.
+
+You can use it today with the canonical model ID:
+
+- `gpt-5.3-chat-latest`
+
+For compatibility, Cencori also accepts these aliases and normalizes them automatically:
+
+- `gpt-5.3`
+- `gpt-5.3-instant`
+
+## Why This Update Matters
+
+GPT-5.3 Instant gives teams access to OpenAI's newest GPT-5.3 line while keeping the same Cencori gateway workflow you already use for logging, security, and model routing.
+
+No API migration is required. If you already call Cencori chat endpoints, switch the model ID and go.
+
+## Use It Now
+
+### Cencori SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'gpt-5.3-chat-latest',
+  messages: [
+    { role: 'system', content: 'You are a senior engineer.' },
+    { role: 'user', content: 'Review this API design and suggest improvements.' }
+  ]
+});
+
+console.log(response.content);
+```
+
+### HTTP API
+
+```bash
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.3-chat-latest",
+    "messages": [
+      {"role": "user", "content": "Summarize the tradeoffs of this architecture."}
+    ]
+  }'
+```
+
+## What We Shipped in Cencori
+
+This rollout is live across the platform:
+
+- model catalog and `/api/v1/models`
+- OpenAI-compatible routing normalization for GPT-5.3 aliases
+- fallback mapping for cross-provider failover
+- dashboard model pickers (Playground and Logs)
+- docs and examples updated
+
+## Notes for Production Teams
+
+`gpt-5.3-chat-latest` is a latest-channel model ID. If you require strict model pinning behavior for long-running evaluations, keep a pinned fallback model in your rollout plan.
+
+## References
+
+- [OpenAI: Introducing GPT-5.3](https://openai.com/index/introducing-gpt-5-3/)
+- [OpenAI Help: GPT-5.3 release notes](https://help.openai.com/en/articles/9624314-model-release-notes)
+- [OpenAI API model docs: gpt-5.3-chat-latest](https://platform.openai.com/docs/models/gpt-5.3-chat-latest)
+- [Cencori Models Catalog](/docs/ai/models)
