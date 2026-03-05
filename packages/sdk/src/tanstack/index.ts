@@ -55,6 +55,8 @@ export interface CencoriModelOptions {
 // All models supported through Cencori Gateway
 export const CENCORI_CHAT_MODELS = [
     // OpenAI
+    'gpt-5.4',
+    'gpt-5.4-pro',
     'gpt-5.3-chat-latest',
     'gpt-5.2',
     'gpt-5.1',

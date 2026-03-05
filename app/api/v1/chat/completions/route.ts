@@ -122,6 +122,7 @@ const normalizeGatewayModelId = (modelId: string): string => {
         : modelId;
 
     const aliases: Record<string, string> = {
+        "gpt-5.4-thinking": "gpt-5.4",
         "gpt-5.3": "gpt-5.3-chat-latest",
         "gpt-5.3-instant": "gpt-5.3-chat-latest",
     };
