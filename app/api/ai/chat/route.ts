@@ -96,9 +96,10 @@ async function getAndProcessCustomRules(
 }
 
 function initializeDefaultProviders() {
-    if (!router.hasProvider('google') && process.env.GEMINI_API_KEY) {
+    const defaultGoogleApiKey = getGoogleApiKey();
+    if (!router.hasProvider('google') && defaultGoogleApiKey) {
         try {
-            router.registerProvider('google', new GeminiProvider());
+            router.registerProvider('google', new GeminiProvider(defaultGoogleApiKey));
         } catch (error) {
             console.warn('[API] Gemini provider not available:', error);
         }
