@@ -613,7 +613,14 @@ if errors.Is(err, cencori.ErrInvalidAPIKey) {
    # AI Providers
    OPENAI_API_KEY=sk-...
    ANTHROPIC_API_KEY=sk-ant-...
-   GOOGLE_AI_API_KEY=your_gemini_key
+   GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_key
+   # Optional aliases (same key):
+   # GOOGLE_AI_API_KEY=your_gemini_key
+   # GEMINI_API_KEY=your_gemini_key
+
+   # Cache infrastructure (required for semantic cache)
+   UPSTASH_REDIS_REST_URL=your_upstash_redis_rest_url
+   UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
    
    # Security
    ENCRYPTION_SECRET=your_32_byte_base64_key
