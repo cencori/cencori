@@ -2,6 +2,7 @@ import { Redis } from '@upstash/redis';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { getGoogleApiKey } from '@/lib/providers/google-env';
 
 // Initialize Redis 
 // (sharing the same instance as rate-limit, or new one - here we create new for modularity 
@@ -75,7 +76,7 @@ export async function saveCache(key: string, data: any, ttl: number = DEFAULT_TT
 // --- Vector Semantic Caching (Supabase pgvector) ---
 
 function getEmbeddingModel(apiKey?: string) {
-    const key = apiKey || process.env.GEMINI_API_KEY;
+    const key = apiKey || getGoogleApiKey();
     if (!key) throw new Error("No Gemini API Key provided for semantic cache");
     const genAI = new GoogleGenerativeAI(key);
     return genAI.getGenerativeModel({ model: "gemini-embedding-001" });
