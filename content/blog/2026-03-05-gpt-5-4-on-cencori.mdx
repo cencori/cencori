@@ -1,0 +1,80 @@
+---
+title: "GPT-5.4 and GPT-5.4 Pro Are Live on Cencori"
+slug: "gpt-5-4-on-cencori"
+date: "2026-03-05"
+excerpt: "OpenAI released GPT-5.4 and GPT-5.4 Pro on March 5, 2026. Both are now available on Cencori."
+coverImage: "/blog/images/covers/chat.png"
+authors:
+  - bola
+tags: ["Changelog", "OpenAI", "GPT-5.4", "AI Models", "Update"]
+published: true
+---
+
+OpenAI announced **GPT-5.4** and **GPT-5.4 Pro** on **March 5, 2026**, and both models are now available on Cencori.
+
+You can use them today with:
+
+- `gpt-5.4`
+- `gpt-5.4-pro`
+
+For compatibility, Cencori also accepts:
+
+- `gpt-5.4-thinking` -> normalized to `gpt-5.4`
+
+## Changelog
+
+### Added
+
+- OpenAI model catalog entries for `gpt-5.4` and `gpt-5.4-pro`
+- SDK model list support
+- Dashboard model selectors (Playground and Logs)
+- Docs updates across API and provider references
+
+### Updated
+
+- OpenAI-compatible alias normalization for `gpt-5.4-thinking`
+- Cross-provider failover mapping for `gpt-5.4` and `gpt-5.4-pro`
+
+## Use It Now
+
+### Cencori SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'gpt-5.4',
+  messages: [
+    { role: 'system', content: 'You are a senior engineer.' },
+    { role: 'user', content: 'Review this rollout plan and list risks.' }
+  ]
+});
+
+console.log(response.content);
+```
+
+### HTTP API
+
+```bash
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-pro",
+    "messages": [
+      {"role": "user", "content": "Give me a migration checklist for this architecture."}
+    ]
+  }'
+```
+
+## Notes
+
+- `gpt-5.4` is the canonical API model ID for GPT-5.4 Thinking.
+- If you rely on strict model pinning for evals, keep your own pinned fallback policy.
+
+## References
+
+- [OpenAI: Introducing GPT-5.4](https://openai.com/index/introducing-gpt-5-4/)
+- [Cencori Models Catalog](/docs/ai/models)
