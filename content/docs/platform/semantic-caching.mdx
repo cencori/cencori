@@ -51,18 +51,15 @@ You can verify the cache status of any response using the `X-Cencori-Cache` head
 
 Cached responses are stored for **1 hour** by default. After this period, the cache expires, and the next request will be treated as a fresh generation (MISS).
 
-## Required Environment Variables
+## Environment Configuration
 
-Semantic caching depends on both Redis and Supabase vector search.
+Semantic caching requires three internal integrations to be configured in your deployment environment:
 
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- One Google API key for embeddings:
-  - `GOOGLE_GENERATIVE_AI_API_KEY` (preferred)
-  - `GOOGLE_AI_API_KEY`
-  - `GEMINI_API_KEY`
+1. Redis for exact-match cache storage
+2. Vector database access for semantic lookup
+3. Embedding provider credentials
+
+Use your internal deployment template/runbook for the exact variable names and values.
 
 ## Disabling Caching
 
