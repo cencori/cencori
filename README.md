@@ -603,28 +603,11 @@ if errors.Is(err, cencori.ErrInvalidAPIKey) {
    ```
 
 3. Set up environment variables:
-   Create a `.env.local` file:
-   ```env
-   # Supabase
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-   
-   # AI Providers
-   OPENAI_API_KEY=sk-...
-   ANTHROPIC_API_KEY=sk-ant-...
-   GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_key
-   # Optional aliases (same key):
-   # GOOGLE_AI_API_KEY=your_gemini_key
-   # GEMINI_API_KEY=your_gemini_key
-
-   # Cache infrastructure (required for semantic cache)
-   UPSTASH_REDIS_REST_URL=your_upstash_redis_rest_url
-   UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
-   
-   # Security
-   ENCRYPTION_SECRET=your_32_byte_base64_key
-   ```
+   Create a `.env.local` file from your internal configuration template and provide:
+   - Supabase project credentials
+   - Provider API credentials (OpenAI, Anthropic, Google)
+   - Cache infrastructure credentials (Redis)
+   - Encryption secret
 
 4. Run database migrations:
    ```bash
