@@ -6,7 +6,7 @@ excerpt: "OpenAI released GPT-5.4 and GPT-5.4 Pro on March 5, 2026. Both are now
 coverImage: "/blog/images/covers/chat.png"
 authors:
   - bola
-tags: ["Changelog", "OpenAI", "GPT-5.4", "AI Models", "Update"]
+tags: ["OpenAI", "GPT-5.4", "AI Models", "Update"]
 published: true
 ---
 
@@ -21,19 +21,11 @@ For compatibility, Cencori also accepts:
 
 - `gpt-5.4-thinking` -> normalized to `gpt-5.4`
 
-## Changelog
+## Why This Update Matters
 
-### Added
+GPT-5.4 and GPT-5.4 Pro bring OpenAI's latest reasoning and coding improvements into the same Cencori gateway workflow you already use for security, observability, and model routing.
 
-- OpenAI model catalog entries for `gpt-5.4` and `gpt-5.4-pro`
-- SDK model list support
-- Dashboard model selectors (Playground and Logs)
-- Docs updates across API and provider references
-
-### Updated
-
-- OpenAI-compatible alias normalization for `gpt-5.4-thinking`
-- Cross-provider failover mapping for `gpt-5.4` and `gpt-5.4-pro`
+No API migration is required. If you already call Cencori chat endpoints, switch the model ID and go.
 
 ## Use It Now
 
@@ -62,17 +54,27 @@ curl -X POST https://cencori.com/api/ai/chat \
   -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-5.4-pro",
+    "model": "gpt-5.4",
     "messages": [
       {"role": "user", "content": "Give me a migration checklist for this architecture."}
     ]
   }'
 ```
 
-## Notes
+## What We Shipped in Cencori
+
+This rollout is live across the platform:
+
+- model catalog and `/api/v1/models`
+- OpenAI-compatible routing normalization for GPT-5.4 alias compatibility
+- fallback mapping for cross-provider failover
+- dashboard model pickers (Playground and Logs)
+- docs and examples updated
+
+## Notes for Production Teams
 
 - `gpt-5.4` is the canonical API model ID for GPT-5.4 Thinking.
-- If you rely on strict model pinning for evals, keep your own pinned fallback policy.
+- If you rely on strict model pinning for long-running evals, keep your own pinned fallback policy.
 
 ## References
 
