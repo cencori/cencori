@@ -410,7 +410,7 @@ function buildStarterN8nWorkflow(agentId: string, model: string) {
                 position: [560, 300],
                 parameters: {
                     method: "POST",
-                    url: "https://cencori.com/api/v1/chat/completions",
+                    url: "https://api.cencori.com/v1/chat/completions",
                     sendHeaders: true,
                     headerParameters: {
                         parameters: [

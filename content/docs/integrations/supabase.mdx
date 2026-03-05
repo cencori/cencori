@@ -38,7 +38,7 @@ serve(async (req) => {
   if (!authHeader) return new Response('Unauthorized', { status: 401 })
 
   // 2. Call Cencori API (Native Fetch)
-  const response = await fetch('https://cencori.com/api/v1/chat/completions', {
+  const response = await fetch('https://api.cencori.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${Deno.env.get('CENCORI_API_KEY')}`,
@@ -72,7 +72,7 @@ create trigger on_document_created
   after insert on public.documents
   for each row execute function
   supabase_functions.http_request(
-    'https://cencori.com/api/v1/memory',
+    'https://api.cencori.com/v1/memory',
     'POST',
     jsonb_build_object(
       'content', new.content,

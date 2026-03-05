@@ -46,7 +46,7 @@ Create or roll a key in the same Configuration page.
 ### 3. Connect OpenClaw using environment variables
 
 ```bash
-export OPENAI_BASE_URL=https://cencori.com/api/v1
+export OPENAI_BASE_URL=https://api.cencori.com/v1
 export OPENAI_API_KEY=cake_your_key_here
 # Optional: force a specific agent (multi-agent setups)
 export CENCORI_AGENT_ID=your_agent_id
@@ -67,7 +67,7 @@ If you prefer `~/.openclaw/openclaw.json`:
   "models": {
     "providers": {
       "cencori": {
-        "baseUrl": "https://cencori.com/api/v1",
+        "baseUrl": "https://api.cencori.com/v1",
         "apiKey": "cake_your_key_here",
         "api": "openai-completions"
       }

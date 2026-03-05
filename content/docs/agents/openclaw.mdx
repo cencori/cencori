@@ -81,7 +81,7 @@ curl -sSL https://openclaw.ai/install.sh | bash
 Set these environment variables so OpenClaw uses Cencori as its backend:
 
 ```bash
-export OPENAI_BASE_URL=https://cencori.com/api/v1
+export OPENAI_BASE_URL=https://api.cencori.com/v1
 export OPENAI_API_KEY=cake_your_key_here
 # Optional: override auto-detection for multi-agent setups
 export CENCORI_AGENT_ID=your_agent_id
@@ -108,7 +108,7 @@ If you prefer OpenClaw's provider config (`~/.openclaw/openclaw.json`) instead o
   "models": {
     "providers": {
       "cencori": {
-        "baseUrl": "https://cencori.com/api/v1",
+        "baseUrl": "https://api.cencori.com/v1",
         "apiKey": "cake_your_key_here",
         "api": "openai-completions"
       }
@@ -185,7 +185,7 @@ Each intercepted action appears in the Live Feed with **Approve** / **Reject** b
 
 ### Agent stuck on "Waiting for connection"
 - Verify your API key is correct and not expired
-- Check that your machine can reach `https://cencori.com/api/v1/`
+- Check that your machine can reach `https://api.cencori.com/v1/`
 - Regenerate the key from Configuration if needed
 - If using `CENCORI_AGENT_ID`, confirm it matches the agent shown in the Configuration tab
 

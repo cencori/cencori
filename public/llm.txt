@@ -1171,7 +1171,7 @@ Cencori supports two types of API keys:
 ```typescript
 import { createOpenAI } from '@ai-sdk/openai';
 export const cencori = createOpenAI({
-  baseURL: 'https://cencori.com/api/v1',
+  baseURL: 'https://api.cencori.com/v1',
   apiKey: process.env.CENCORI_API_KEY
 });
 ```
@@ -1181,7 +1181,7 @@ export const cencori = createOpenAI({
 import { ChatOpenAI } from "@langchain/openai";
 const chat = new ChatOpenAI({
   openAIApiKey: process.env.CENCORI_API_KEY,
-  configuration: { baseURL: "https://cencori.com/api/v1" },
+  configuration: { baseURL: "https://api.cencori.com/v1" },
 });
 ```
 

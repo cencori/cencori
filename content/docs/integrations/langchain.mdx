@@ -19,7 +19,7 @@ import { ChatOpenAI } from "@langchain/openai";
 const chat = new ChatOpenAI({
   openAIApiKey: process.env.CENCORI_API_KEY, // csk_...
   configuration: {
-    baseURL: "https://cencori.com/api/v1",
+    baseURL: "https://api.cencori.com/v1",
   },
   modelName: "gpt-4o",
 });
@@ -39,7 +39,7 @@ from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
     api_key="csk_...",
-    base_url="https://cencori.com/api/v1",
+    base_url="https://api.cencori.com/v1",
     model="gpt-4o"
 )
 
@@ -58,7 +58,7 @@ import { ChatOpenAI } from "@langchain/openai";
 // 1. Initialize Cencori LLM
 const llm = new ChatOpenAI({
   openAIApiKey: process.env.CENCORI_API_KEY,
-  configuration: { baseURL: "https://cencori.com/api/v1" },
+  configuration: { baseURL: "https://api.cencori.com/v1" },
   modelName: "gpt-4o",
 });
 

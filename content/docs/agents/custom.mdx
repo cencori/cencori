@@ -7,7 +7,7 @@ order: 7
 
 # Custom Agents
 
-Cencori's Gateway exposes a standard OpenAI-compatible API at `https://cencori.com/api/v1`. This means **any tool that lets you set a custom OpenAI base URL can connect to Cencori**.
+Cencori's Gateway exposes a standard OpenAI-compatible API at `https://api.cencori.com/v1`. This means **any tool that lets you set a custom OpenAI base URL can connect to Cencori**.
 
 ## Quick Start
 
@@ -23,19 +23,19 @@ Go to the agent's **Configuration** tab and click **Generate Key**.
 
 Look for settings in your tool related to "Custom API Endpoint", "OpenAI Proxy", or "Base URL". Set them as follows:
 
-- **API Base**: `https://cencori.com/api/v1`
+- **API Base**: `https://api.cencori.com/v1`
 - **API Key**: `cake_YOUR_KEY_HERE`
 - **Model Name**: Use any model ID supported in your Cencori dashboard (e.g., `gpt-4o`, `claude-3-5-sonnet-20240620`).
 
 > [!NOTE]
-> Some tools append `/chat/completions` automatically, while others expect you to include it in the base URL. If connections fail, try setting the URL to `https://cencori.com/api/v1/chat/completions`.
+> Some tools append `/chat/completions` automatically, while others expect you to include it in the base URL. If connections fail, try setting the URL to `https://api.cencori.com/v1/chat/completions`.
 
 ## Testing the Connection
 
 You can verify your agent is connected correctly by sending a raw `curl` request:
 
 ```bash
-curl -X POST https://cencori.com/api/v1/chat/completions \
+curl -X POST https://api.cencori.com/v1/chat/completions \
   -H "Authorization: Bearer cake_YOUR_KEY_HERE" \
   -H "Content-Type: application/json" \
   -d '{
@@ -62,7 +62,7 @@ This request will appear instantly in your Cencori **Logs** tab.
 
 In your IDE extension settings:
 1. Select "OpenAI Compatible" as the provider
-2. Base URL: `https://cencori.com/api/v1`
+2. Base URL: `https://api.cencori.com/v1`
 3. API Key: Your `cake_` key
 4. Model ID: e.g., `claude-3-5-sonnet-20240620`
 
@@ -71,7 +71,7 @@ In your IDE extension settings:
 Run Aider from the terminal using standard OpenAI environment variables:
 
 ```bash
-export OPENAI_API_BASE=https://cencori.com/api/v1
+export OPENAI_API_BASE=https://api.cencori.com/v1
 export OPENAI_API_KEY=cake_YOUR_KEY_HERE
 aider --openai-model gpt-4o
 ```
@@ -82,7 +82,7 @@ aider --openai-model gpt-4o
 from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    openai_api_base="https://cencori.com/api/v1",
+    openai_api_base="https://api.cencori.com/v1",
     openai_api_key="cake_YOUR_KEY_HERE",
     model_name="gpt-4o"
 )

@@ -18,7 +18,7 @@ import os
 from crewai import Agent, Task, Crew
 
 # 1. Point to Cencori
-os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_BASE"] = "https://api.cencori.com/v1"
 os.environ["OPENAI_API_KEY"] = "csk_..."
 os.environ["OPENAI_MODEL_NAME"] = "gpt-4o"
 
@@ -49,12 +49,12 @@ Microsoft AutoGen uses a config list to manage models. You can point this to Cen
     {
         "model": "gpt-4o",
         "api_key": "csk_...",
-        "base_url": "https://cencori.com/api/v1"
+        "base_url": "https://api.cencori.com/v1"
     },
     {
         "model": "claude-3-5-sonnet",
         "api_key": "csk_...",
-        "base_url": "https://cencori.com/api/v1"
+        "base_url": "https://api.cencori.com/v1"
     }
 ]
 ```
