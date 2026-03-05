@@ -17,7 +17,7 @@ import { useMutation } from '@tanstack/react-query';
 function AIComponent() {
   const mutation = useMutation({
     mutationFn: async (prompt: string) => {
-      const response = await fetch('https://cencori.com/api/v1/chat/completions', {
+      const response = await fetch('https://api.cencori.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

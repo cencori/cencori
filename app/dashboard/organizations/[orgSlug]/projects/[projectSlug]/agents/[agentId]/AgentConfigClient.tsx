@@ -492,7 +492,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
     const keyDisplay = isMaskedKey ? '<YOUR_KEY>' : (apiKey || '<YOUR_KEY>');
 
     const getBlueprintSetup = (blueprint: string) => {
-        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${keyDisplay}\nexport CENCORI_AGENT_ID=${agent.id}`;
+        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://api.cencori.com/v1\nexport OPENAI_API_KEY=${keyDisplay}\nexport CENCORI_AGENT_ID=${agent.id}`;
         switch (blueprint) {
             case "openclaw":
                 return {
@@ -503,8 +503,8 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
             case "n8n":
                 return {
                     subtitle: "Workflow Automation Agent",
-                    keyHelp: "Use this key in n8n OpenAI credentials (Base URL: https://cencori.com/api/v1).",
-                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://cencori.com/api/v1\n# API Key: ${keyDisplay}\n\n# Step 3: In OpenAI Chat Model node\n# Model: ${selectedModel}\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agent.id}`,
+                    keyHelp: "Use this key in n8n OpenAI credentials (Base URL: https://api.cencori.com/v1).",
+                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://api.cencori.com/v1\n# API Key: ${keyDisplay}\n\n# Step 3: In OpenAI Chat Model node\n# Model: ${selectedModel}\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agent.id}`,
                 };
             case "autogpt":
                 return {
@@ -1283,7 +1283,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                                     mode: "merge",
                                                     providers: {
                                                         cencori: {
-                                                            baseUrl: "https://cencori.com/api/v1",
+                                                            baseUrl: "https://api.cencori.com/v1",
                                                             apiKey: isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>"),
                                                             api: "openai-completions",
                                                             models: [{
@@ -1315,7 +1315,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                                 mode: "merge",
                                                 providers: {
                                                     cencori: {
-                                                        baseUrl: "https://cencori.com/api/v1",
+                                                        baseUrl: "https://api.cencori.com/v1",
                                                         apiKey: isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>"),
                                                         api: "openai-completions",
                                                         models: [{ id: selectedModel, name: selectedModel }],
@@ -1351,7 +1351,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                         className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                                         onClick={() => {
                                             const env = [
-                                                `OPENAI_API_BASE=https://cencori.com/api/v1`,
+                                                `OPENAI_API_BASE=https://api.cencori.com/v1`,
                                                 `OPENAI_API_KEY=${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}`,
                                                 `SMART_LLM=${selectedModel}`,
                                                 `FAST_LLM=${selectedModel}`,
@@ -1365,7 +1365,7 @@ export default function AgentConfigClient({ agent, apiKey: initialKey, orgSlug, 
                                 </div>
                                 <div className="px-4 py-3">
                                     <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
-                                        {`OPENAI_API_BASE=https://cencori.com/api/v1
+                                        {`OPENAI_API_BASE=https://api.cencori.com/v1
 OPENAI_API_KEY=${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}
 SMART_LLM=${selectedModel}
 FAST_LLM=${selectedModel}`}
@@ -1396,7 +1396,7 @@ FAST_LLM=${selectedModel}`}
                                         className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                                         onClick={() => {
                                             const code = `import os
-os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_BASE"] = "https://api.cencori.com/v1"
 os.environ["OPENAI_API_KEY"] = "${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}"
 os.environ["OPENAI_MODEL_NAME"] = "${selectedModel}"
 
@@ -1422,7 +1422,7 @@ result = crew.kickoff()`;
                                 <div className="px-4 py-3">
                                     <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
                                         {`import os
-os.environ["OPENAI_API_BASE"] = "https://cencori.com/api/v1"
+os.environ["OPENAI_API_BASE"] = "https://api.cencori.com/v1"
 os.environ["OPENAI_API_KEY"] = "${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}"
 os.environ["OPENAI_MODEL_NAME"] = "${selectedModel}"
 
@@ -1467,7 +1467,7 @@ result = crew.kickoff()`}
                                             const code = `from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://cencori.com/api/v1",
+    base_url="https://api.cencori.com/v1",
     api_key="${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}",
     default_headers={"X-Agent-ID": "${agent.id}"},
 )
@@ -1489,7 +1489,7 @@ print(response.choices[0].message.content)`;
                                         {`from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://cencori.com/api/v1",
+    base_url="https://api.cencori.com/v1",
     api_key="${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}",
     default_headers={"X-Agent-ID": "${agent.id}"},
 )
@@ -1525,7 +1525,7 @@ print(response.choices[0].message.content)`}
                                         size="sm"
                                         className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                                         onClick={() => {
-                                            const curl = `curl -X POST https://cencori.com/api/v1/chat/completions \\
+                                            const curl = `curl -X POST https://api.cencori.com/v1/chat/completions \\
   -H "Authorization: Bearer ${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1542,7 +1542,7 @@ print(response.choices[0].message.content)`}
                                 </div>
                                 <div className="px-4 py-3">
                                     <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-950 rounded-md p-3 border border-zinc-800 overflow-x-auto whitespace-pre">
-                                        {`curl -X POST https://cencori.com/api/v1/chat/completions \\
+                                        {`curl -X POST https://api.cencori.com/v1/chat/completions \\
   -H "Authorization: Bearer ${isMaskedKey ? "<YOUR_CAKE_KEY>" : (apiKey || "<YOUR_CAKE_KEY>")}" \\
   -H "Content-Type: application/json" \\
   -d '{

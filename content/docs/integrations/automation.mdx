@@ -39,7 +39,7 @@ In manual mode, one-click install/publish and execution health sync are disabled
 1.  Add an **HTTP Request** node to your workflow.
 2.  In the node settings, configure the following:
     -   **Method**: Select `POST`.
-    -   **URL**: Enter `https://cencori.com/api/v1/chat/completions`.
+    -   **URL**: Enter `https://api.cencori.com/v1/chat/completions`.
     -   **Authentication**: Select `Generic Credential Type`.
     -   **Generic Credential Type**: Select `Header Auth`.
 3.  Create a new Credential:
@@ -68,7 +68,7 @@ In manual mode, one-click install/publish and execution health sync are disabled
 Use this to validate your Cencori key outside n8n:
 
 ```bash
-curl -sS https://cencori.com/api/v1/chat/completions \
+curl -sS https://api.cencori.com/v1/chat/completions \
   -H "Authorization: Bearer cake_your_api_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -101,7 +101,7 @@ The template includes:
 
 ### n8n hardening notes
 
-- Keep `baseUrl` as `https://cencori.com/api/v1` and call `/chat/completions` from n8n.
+- Keep `baseUrl` as `https://api.cencori.com/v1` and call `/chat/completions` from n8n.
 - Use raw model IDs like `gemini-2.5-flash` or `llama-3.3-70b-versatile`.
 - `CENCORI_AGENT_ID` is optional for OpenAI-compatible clients. Cencori can derive the agent from the API key.
 
@@ -114,7 +114,7 @@ Use the native **HTTP** app to make requests to Cencori.
 1.  Add a new module and search for **HTTP**.
 2.  Select the **Make a request** action.
 3.  Configure the module as follows:
-    -   **URL**: `https://cencori.com/api/v1/chat/completions`
+    -   **URL**: `https://api.cencori.com/v1/chat/completions`
     -   **Method**: `POST`
     -   **Headers**: Add a new header:
         -   **Name**: `Authorization`
@@ -146,7 +146,7 @@ Use the **Webhooks by Zapier** action to connect Cencori to thousands of apps.
 2.  Select **Custom Request** as the event.
 3.  Configure the action:
     -   **Method**: `POST`
-    -   **URL**: `https://cencori.com/api/v1/chat/completions`
+    -   **URL**: `https://api.cencori.com/v1/chat/completions`
     -   **Data Pass-Through?**: `No`
     -   **Data**:
         ```json

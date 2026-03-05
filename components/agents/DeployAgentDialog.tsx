@@ -82,7 +82,7 @@ export function DeployAgentDialog({
     };
 
     const getBlueprintSetup = (blueprint: string, apiKey: string, agentId: string) => {
-        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://cencori.com/api/v1\nexport OPENAI_API_KEY=${apiKey}\nexport CENCORI_AGENT_ID=${agentId}`;
+        const envVars = `# Connect to Cencori\nexport OPENAI_BASE_URL=https://api.cencori.com/v1\nexport OPENAI_API_KEY=${apiKey}\nexport CENCORI_AGENT_ID=${agentId}`;
         switch (blueprint) {
             case "openclaw":
                 return {
@@ -105,7 +105,7 @@ export function DeployAgentDialog({
                         "Use Cencori as OpenAI-compatible backend",
                         "Select any model from your Cencori agent config",
                     ],
-                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://cencori.com/api/v1\n# API Key: ${apiKey}\n\n# Step 3: In OpenAI Chat Model node\n# Model: gpt-4o-mini (or your configured Cencori model)\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agentId}`,
+                    command: `# Step 1: Start n8n\nnpx n8n start\n\n# Step 2: In n8n, create OpenAI credential\n# Base URL: https://api.cencori.com/v1\n# API Key: ${apiKey}\n\n# Step 3: In OpenAI Chat Model node\n# Model: gpt-4o-mini (or your configured Cencori model)\n\n# Optional: set routing override in n8n host env\nexport CENCORI_AGENT_ID=${agentId}`,
                     helpText: "Use the Base URL and API key above in n8n OpenAI credentials.",
                 };
             case "autogpt":

@@ -61,7 +61,7 @@ npx n8n start
 In your n8n instance:
 
 1. Go to **Settings → Credentials → Add Credential → OpenAI API**
-2. Set **Base URL** to: `https://cencori.com/api/v1`
+2. Set **Base URL** to: `https://api.cencori.com/v1`
 3. Set **API Key** to your `cake_` key from Step 2
 4. Save the credential
 
@@ -103,7 +103,7 @@ When enabled, any tool calls returned by the LLM are held as **pending** in the 
 ## Troubleshooting
 
 ### n8n credential test fails
-- Verify the Base URL is `https://cencori.com/api/v1` (not `/v1/chat/completions`)
+- Verify the Base URL is `https://api.cencori.com/v1` (not `/v1/chat/completions`)
 - Check that your `cake_` key is correct and not revoked
 - Ensure your Cencori project has remaining spend allowance
 
