@@ -26,6 +26,8 @@ import { handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { deductCredits } from '@/lib/credits';
+import { computeCacheKey, getCache, getSemanticCache, saveCache, saveSemanticCache } from '@/lib/cache';
+import { getGoogleApiKey } from '@/lib/providers/google-env';
 
 
 const router = new ProviderRouter();
@@ -323,6 +325,102 @@ async function chargeUsageCredits(
 
     if (!charged) {
         console.warn(`[Billing] Failed to deduct credits for org=${organizationId} endpoint=${endpoint} amount=${amount}`);
+    }
+}
+
+function parseCachedPayload(rawPayload: unknown): Record<string, unknown> | null {
+    if (!rawPayload) return null;
+    if (typeof rawPayload === 'object') {
+        return rawPayload as Record<string, unknown>;
+    }
+    if (typeof rawPayload === 'string') {
+        try {
+            const parsed = JSON.parse(rawPayload);
+            return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+        } catch {
+            return null;
+        }
+    }
+    return null;
+}
+
+function getCachedContent(payload: Record<string, unknown>): string {
+    if (typeof payload.content === 'string') {
+        return payload.content;
+    }
+
+    const choices = payload.choices;
+    if (!Array.isArray(choices) || choices.length === 0) {
+        return '';
+    }
+
+    const firstChoice = choices[0];
+    if (!firstChoice || typeof firstChoice !== 'object') {
+        return '';
+    }
+
+    const choiceRecord = firstChoice as Record<string, unknown>;
+    const message = choiceRecord.message;
+    if (!message || typeof message !== 'object') {
+        return '';
+    }
+
+    const messageRecord = message as Record<string, unknown>;
+    return typeof messageRecord.content === 'string' ? messageRecord.content : '';
+}
+
+function getCachedUsage(payload: Record<string, unknown>): {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+} {
+    const usageRaw = payload.usage;
+    const usage = usageRaw && typeof usageRaw === 'object'
+        ? usageRaw as Record<string, unknown>
+        : {};
+
+    const parseNumber = (value: unknown): number => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const promptTokens = parseNumber(usage.prompt_tokens ?? usage.promptTokens);
+    const completionTokens = parseNumber(usage.completion_tokens ?? usage.completionTokens);
+    const totalTokens = parseNumber(usage.total_tokens ?? usage.totalTokens);
+
+    return {
+        promptTokens,
+        completionTokens,
+        totalTokens: totalTokens > 0 ? totalTokens : promptTokens + completionTokens,
+    };
+}
+
+async function resolveSemanticEmbeddingApiKey(
+    supabase: ReturnType<typeof createAdminClient>,
+    projectId: string,
+    organizationId: string
+): Promise<string | undefined> {
+    const envGoogleKey = getGoogleApiKey();
+    if (envGoogleKey) {
+        return envGoogleKey;
+    }
+
+    const { data: providerKey, error } = await supabase
+        .from('provider_keys')
+        .select('encrypted_key, is_active')
+        .eq('project_id', projectId)
+        .eq('provider', 'google')
+        .single();
+
+    if (error || !providerKey || !providerKey.is_active) {
+        return undefined;
+    }
+
+    try {
+        return decryptApiKey(providerKey.encrypted_key, organizationId);
+    } catch (error) {
+        console.warn('[Semantic Cache] Failed to decrypt Google provider key:', error);
+        return undefined;
     }
 }
 
@@ -784,6 +882,191 @@ export async function POST(req: NextRequest) {
             tools,
             toolChoice,
         };
+
+        const cacheEligible = stream !== true && (!Array.isArray(tools) || tools.length === 0);
+        const cacheMaxTokens = typeof maxTokens === 'number'
+            ? maxTokens
+            : (typeof max_tokens === 'number' ? max_tokens : undefined);
+        const cacheTemperature = typeof temperature === 'number' ? temperature : undefined;
+        const cachePromptPayload = JSON.stringify(
+            unifiedMessages.map((message) => ({
+                role: message.role,
+                content: message.content,
+            }))
+        );
+        const exactCacheKey = computeCacheKey({
+            projectId: project.id,
+            model: normalizedModel,
+            prompt: cachePromptPayload,
+            temperature: cacheTemperature,
+            maxTokens: cacheMaxTokens,
+        });
+        const semanticCachePrompt = JSON.stringify({
+            projectId: project.id,
+            model: normalizedModel,
+            temperature: cacheTemperature ?? 0,
+            maxTokens: cacheMaxTokens ?? 0,
+            messages: unifiedMessages,
+        });
+
+        let semanticEmbeddingForSave: number[] | null = null;
+        let semanticCacheApiKey: string | undefined;
+
+        const maybeReturnCachedResponse = async (
+            rawCachedPayload: unknown,
+            cacheType: 'exact' | 'semantic'
+        ): Promise<NextResponse | null> => {
+            const cachedPayload = parseCachedPayload(rawCachedPayload);
+            if (!cachedPayload) {
+                return null;
+            }
+
+            const cachedContent = getCachedContent(cachedPayload);
+            if (!cachedContent) {
+                return null;
+            }
+
+            const finalCachedContent = requestTokenMap
+                ? deTokenize(cachedContent, requestTokenMap)
+                : cachedContent;
+
+            const cachedOutputSecurity = checkOutputSecurity(finalCachedContent, {
+                inputText,
+                inputSecurityResult: inputSecurity,
+                conversationHistory: unifiedMessages
+            });
+            if (!cachedOutputSecurity.safe) {
+                console.warn(`[Cache] Ignoring ${cacheType} cache hit because output failed current policy checks`);
+                return null;
+            }
+
+            const cachedUsage = getCachedUsage(cachedPayload);
+            const cachedProvider = typeof cachedPayload.provider === 'string'
+                ? cachedPayload.provider
+                : providerName;
+            const cachedModel = typeof cachedPayload.model === 'string'
+                ? cachedPayload.model
+                : normalizedModel;
+            const cachedFinishReason = typeof cachedPayload.finish_reason === 'string'
+                ? cachedPayload.finish_reason
+                : (typeof cachedPayload.finishReason === 'string' ? cachedPayload.finishReason : null);
+
+            const toolCallsCandidate = cachedPayload.tool_calls ?? cachedPayload.toolCalls;
+            const cachedToolCalls = Array.isArray(toolCallsCandidate) ? toolCallsCandidate : null;
+
+            const { error: cacheLogError } = await supabase
+                .from('ai_requests')
+                .insert({
+                    project_id: project.id,
+                    api_key_id: keyData.id,
+                    provider: cachedProvider,
+                    model: cachedModel,
+                    prompt_tokens: cachedUsage.promptTokens,
+                    completion_tokens: cachedUsage.completionTokens,
+                    total_tokens: cachedUsage.totalTokens,
+                    cost_usd: 0,
+                    provider_cost_usd: 0,
+                    cencori_charge_usd: 0,
+                    markup_percentage: 0,
+                    latency_ms: Date.now() - startTime,
+                    status: 'success',
+                    end_user_id: userId,
+                    request_payload: {
+                        messages,
+                        model,
+                        temperature,
+                        maxTokens,
+                        max_tokens,
+                        stream,
+                        cache_hit: true,
+                        cache_type: cacheType,
+                    },
+                    response_payload: {
+                        content: finalCachedContent,
+                        finishReason: cachedFinishReason,
+                        cache_hit: true,
+                        cache_type: cacheType,
+                    },
+                    ip_address: clientIp,
+                    country_code: countryCode,
+                })
+                .select('id')
+                .single();
+
+            if (cacheLogError) {
+                console.error('[AI Chat] Failed to log cached request:', cacheLogError);
+            }
+
+            await incrementMonthlyUsage(supabase, organizationId, currentUsage);
+
+            checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
+                console.error('[Budget] Failed to check budget alerts:', err);
+            });
+
+            const completionId = `chatcmpl-${crypto.randomUUID()}`;
+            const createdAt = Math.floor(Date.now() / 1000);
+
+            const responseBody: Record<string, unknown> = {
+                id: completionId,
+                object: 'chat.completion',
+                created: createdAt,
+                choices: [{
+                    index: 0,
+                    message: {
+                        role: 'assistant',
+                        content: finalCachedContent,
+                        ...(cachedToolCalls && cachedToolCalls.length > 0 ? { tool_calls: cachedToolCalls } : {}),
+                    },
+                    finish_reason: cachedFinishReason,
+                }],
+                content: finalCachedContent,
+                model: cachedModel,
+                provider: cachedProvider,
+                ...(cachedToolCalls && cachedToolCalls.length > 0 ? { tool_calls: cachedToolCalls } : {}),
+                toolCalls: cachedToolCalls ?? null,
+                usage: {
+                    prompt_tokens: cachedUsage.promptTokens,
+                    completion_tokens: cachedUsage.completionTokens,
+                    total_tokens: cachedUsage.totalTokens,
+                },
+                cost_usd: 0,
+                finish_reason: cachedFinishReason,
+                cache_hit: true,
+                cache_type: cacheType,
+            };
+
+            if (cachedPayload.fallback_used === true) {
+                responseBody.fallback_used = true;
+                if (typeof cachedPayload.original_model === 'string') {
+                    responseBody.original_model = cachedPayload.original_model;
+                }
+                if (typeof cachedPayload.original_provider === 'string') {
+                    responseBody.original_provider = cachedPayload.original_provider;
+                }
+            }
+
+            const cacheResponse = NextResponse.json(responseBody);
+            cacheResponse.headers.set('X-Cencori-Cache', cacheType === 'semantic' ? 'SEMANTIC-HIT' : 'HIT');
+            return cacheResponse;
+        };
+
+        if (cacheEligible) {
+            const exactCached = await getCache(exactCacheKey);
+            const exactHit = await maybeReturnCachedResponse(exactCached, 'exact');
+            if (exactHit) {
+                return exactHit;
+            }
+
+            semanticCacheApiKey = await resolveSemanticEmbeddingApiKey(supabase, project.id, organizationId);
+            if (semanticCacheApiKey) {
+                const { response: semanticCached, embedding } = await getSemanticCache(semanticCachePrompt, semanticCacheApiKey);
+                semanticEmbeddingForSave = embedding;
+                const semanticHit = await maybeReturnCachedResponse(semanticCached, 'semantic');
+                if (semanticHit) {
+                    return semanticHit;
+                }
+            }
+        }
 
         if (stream === true) {
             const encoder = new TextEncoder();
@@ -1352,8 +1635,7 @@ export async function POST(req: NextRequest) {
             type: tc.type,
             function: tc.function,
         }));
-
-        return NextResponse.json({
+        const responseBody: Record<string, unknown> = {
             id: completionId,
             object: 'chat.completion',
             created: createdAt,
@@ -1383,7 +1665,28 @@ export async function POST(req: NextRequest) {
                 original_model: normalizedModel,
                 original_provider: providerName,
             }),
-        });
+        };
+
+        if (cacheEligible) {
+            // Save exact cache entry keyed by scoped chat payload.
+            saveCache(exactCacheKey, responseBody).catch(error => {
+                console.error('[Cache] Failed to save exact cache entry:', error);
+            });
+
+            if (semanticCacheApiKey) {
+                // Save semantic cache entry keyed by project/model-scoped payload representation.
+                const embeddingToSave = semanticEmbeddingForSave || undefined;
+                saveSemanticCache(semanticCachePrompt, responseBody, semanticCacheApiKey, embeddingToSave).catch(error => {
+                    console.error('[Cache] Failed to save semantic cache entry:', error);
+                });
+            }
+        }
+
+        const finalResponse = NextResponse.json(responseBody);
+        if (cacheEligible) {
+            finalResponse.headers.set('X-Cencori-Cache', 'MISS');
+        }
+        return finalResponse;
 
     } catch (error: unknown) {
         console.error('[API] Error:', error);
