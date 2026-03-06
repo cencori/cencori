@@ -1,13 +1,22 @@
 import { NextRequest } from "next/server";
+import { getInstallationOctokit } from "@/lib/github";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { streamWithReasoning } from "@/lib/scan/ai-client";
 import { getScanPaywallForUser } from "@/lib/scan/entitlements";
+import { verifyProjectGithubAccess } from "@/lib/scan/github-access";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
 import { ScanMemoryError, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isValidUUID(v: string): boolean { return UUID_RE.test(v); }
+const MAX_EVIDENCE_FILES = 5;
+const MAX_EVIDENCE_ITEMS = 8;
+const SNIPPET_RADIUS = 4;
+const MAX_SNIPPET_CHARS = 1400;
+
+function isValidUUID(value: string): boolean {
+    return UUID_RE.test(value);
+}
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -34,40 +43,458 @@ interface ChatMessage {
     content: string;
 }
 
+interface InteractionHotspotLike {
+    file?: string;
+    riskScore?: number;
+    reason?: string;
+}
+
+interface DataFlowTraceLike {
+    file?: string;
+    line?: number;
+    severity?: string;
+    summary?: string;
+}
+
+interface ScanResearchLike {
+    filesIndexed?: number;
+    interactionMap?: {
+        nodes?: unknown[];
+        edges?: unknown[];
+        hotspots?: InteractionHotspotLike[];
+    };
+    dataFlows?: {
+        traces?: DataFlowTraceLike[];
+    };
+}
+
+interface RepositoryAiContextLike {
+    summary?: string;
+    architectureFindings?: string[];
+    riskThemes?: string[];
+    priorityFiles?: string[];
+    suggestedChecks?: string[];
+}
+
 interface ScanRunResultsLike {
     issues?: IssueContext[];
     ai?: {
         summary?: string;
     };
+    research?: ScanResearchLike;
+    ai_context?: RepositoryAiContextLike;
 }
 
-function buildFallbackAnswer(question: string, issue?: IssueContext, fix?: FixContext): string {
-    const lc = question.toLowerCase().trim();
-    const isGreeting = /^(hey|hi|hello|sup|yo|what'?s up|howdy|hiya)[\s!?.]*$/.test(lc);
+interface EvidenceCandidate {
+    file: string;
+    line: number;
+    reason: string;
+}
 
-    if (isGreeting) {
-        return "Hey! I'm Cencori — your senior security engineer. Ask me anything about the findings, how to fix them, or anything else on your mind.";
+interface CodeEvidence {
+    id: string;
+    file: string;
+    startLine: number;
+    endLine: number;
+    reason: string;
+    source: "github" | "scan";
+    excerpt: string;
+}
+
+function shortText(value: string, maxLength: number): string {
+    const normalized = value.trim();
+    if (!normalized) return "";
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function toSafeLine(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 1;
+    return Math.max(1, Math.floor(value));
+}
+
+function isLikelyBinary(value: string): boolean {
+    return /[\u0000-\u0008\u000E-\u001A]/.test(value);
+}
+
+function isCasualQuestion(question: string): boolean {
+    const normalized = question.toLowerCase().trim();
+    if (!normalized) return false;
+    const simpleGreeting = /^(hey|hi|hello|sup|yo|howdy|hiya|thanks|thank you|nice|cool)[\s!?.]*$/.test(normalized);
+    if (simpleGreeting) return true;
+    const words = normalized.split(/\s+/g).length;
+    return words <= 3 && !/[/?]/.test(normalized);
+}
+
+function renderSnippetWindow(content: string, focusLine: number): { startLine: number; endLine: number; excerpt: string } {
+    const lines = content.split("\n");
+    if (lines.length === 0) {
+        return { startLine: 1, endLine: 1, excerpt: "" };
     }
 
-    const parts: string[] = [];
+    const line = Math.max(1, Math.min(focusLine, lines.length));
+    const startLine = Math.max(1, line - SNIPPET_RADIUS);
+    const endLine = Math.min(lines.length, line + SNIPPET_RADIUS);
+    const excerpt = lines
+        .slice(startLine - 1, endLine)
+        .map((entry, index) => `${startLine + index}: ${entry}`)
+        .join("\n");
 
-    if (issue?.name) {
-        parts.push(`**${issue.name}** (${issue.severity || "unknown severity"}) in \`${issue.file || "unknown file"}${issue.line ? `:${issue.line}` : ""}\`.`);
+    const clipped = excerpt.length > MAX_SNIPPET_CHARS
+        ? `${excerpt.slice(0, MAX_SNIPPET_CHARS)}\n... [truncated]`
+        : excerpt;
+
+    return { startLine, endLine, excerpt: clipped };
+}
+
+function buildGraphContextSection(
+    repository: string,
+    research?: ScanResearchLike,
+    aiContext?: RepositoryAiContextLike,
+    aiSummary?: string
+): string {
+    const lines: string[] = [];
+    lines.push(`Repository: ${repository}`);
+
+    if (aiSummary) {
+        lines.push(`Repo AI summary: ${shortText(aiSummary, 300)}`);
+    }
+    if (aiContext?.summary) {
+        lines.push(`Live context summary: ${shortText(aiContext.summary, 300)}`);
     }
 
-    if (issue?.description) {
-        parts.push(issue.description);
+    const indexed = research?.filesIndexed;
+    const nodeCount = research?.interactionMap?.nodes?.length ?? 0;
+    const edgeCount = research?.interactionMap?.edges?.length ?? 0;
+    if (typeof indexed === "number") {
+        lines.push(`Graph coverage: ${indexed} files indexed, ${nodeCount} nodes, ${edgeCount} edges`);
     }
 
-    if (fix?.explanation) {
-        parts.push(`**Suggested fix:** ${fix.explanation}`);
+    const hotspots = Array.isArray(research?.interactionMap?.hotspots)
+        ? research?.interactionMap?.hotspots.slice(0, 4)
+        : [];
+    if (hotspots.length > 0) {
+        lines.push("Hotspots:");
+        for (const hotspot of hotspots) {
+            lines.push(
+                `- ${hotspot.file || "unknown"} (risk ${hotspot.riskScore ?? "?"}): ${shortText(hotspot.reason || "n/a", 160)}`
+            );
+        }
     }
 
-    if (parts.length === 0) {
-        parts.push("I'm here to help with your security scan findings. What would you like to know?");
+    const traces = Array.isArray(research?.dataFlows?.traces)
+        ? research?.dataFlows?.traces.slice(0, 4)
+        : [];
+    if (traces.length > 0) {
+        lines.push("Data-flow traces:");
+        for (const trace of traces) {
+            lines.push(
+                `- ${trace.severity || "unknown"} at ${trace.file || "unknown"}:${trace.line || 1} - ${shortText(trace.summary || "n/a", 180)}`
+            );
+        }
     }
 
-    return parts.join("\n\n");
+    const findings = Array.isArray(aiContext?.architectureFindings)
+        ? aiContext?.architectureFindings.slice(0, 4)
+        : [];
+    if (findings.length > 0) {
+        lines.push("Architecture findings:");
+        for (const finding of findings) {
+            lines.push(`- ${shortText(finding, 180)}`);
+        }
+    }
+
+    const themes = Array.isArray(aiContext?.riskThemes)
+        ? aiContext?.riskThemes.slice(0, 4)
+        : [];
+    if (themes.length > 0) {
+        lines.push("Risk themes:");
+        for (const theme of themes) {
+            lines.push(`- ${shortText(theme, 160)}`);
+        }
+    }
+
+    return lines.join("\n");
+}
+
+function buildEvidenceCandidates(input: {
+    issue?: IssueContext;
+    relatedIssues: IssueContext[];
+    research?: ScanResearchLike;
+    aiContext?: RepositoryAiContextLike;
+}): EvidenceCandidate[] {
+    const candidates: EvidenceCandidate[] = [];
+    const seen = new Set<string>();
+
+    const pushCandidate = (file?: string, line?: number, reason?: string) => {
+        const normalizedFile = typeof file === "string" ? file.trim() : "";
+        if (!normalizedFile) return;
+        const safeLine = toSafeLine(line);
+        const safeReason = reason?.trim() || "code context";
+        const key = `${normalizedFile}:${safeLine}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        candidates.push({ file: normalizedFile, line: safeLine, reason: safeReason });
+    };
+
+    if (input.issue?.file) {
+        pushCandidate(
+            input.issue.file,
+            input.issue.line,
+            `selected issue: ${input.issue.name || input.issue.type || "issue"}`
+        );
+    }
+
+    for (const related of input.relatedIssues.slice(0, 4)) {
+        pushCandidate(
+            related.file,
+            related.line,
+            `related issue: ${related.name || related.type || "issue"}`
+        );
+    }
+
+    const hotspots = Array.isArray(input.research?.interactionMap?.hotspots)
+        ? input.research?.interactionMap?.hotspots.slice(0, 3)
+        : [];
+    for (const hotspot of hotspots) {
+        pushCandidate(hotspot.file, 1, `architecture hotspot: ${hotspot.reason || "high risk coupling"}`);
+    }
+
+    const traces = Array.isArray(input.research?.dataFlows?.traces)
+        ? input.research?.dataFlows?.traces.slice(0, 3)
+        : [];
+    for (const trace of traces) {
+        pushCandidate(trace.file, trace.line, `data flow trace: ${trace.summary || trace.severity || "runtime flow risk"}`);
+    }
+
+    const priorityFiles = Array.isArray(input.aiContext?.priorityFiles)
+        ? input.aiContext?.priorityFiles.slice(0, 3)
+        : [];
+    for (const priorityFile of priorityFiles) {
+        pushCandidate(priorityFile, 1, "AI-prioritized architecture file");
+    }
+
+    return candidates.slice(0, MAX_EVIDENCE_FILES);
+}
+
+async function fetchCodeEvidenceFromGithub(input: {
+    user: {
+        id: string;
+        identities?: Array<{
+            provider?: string;
+            identity_data?: {
+                user_name?: string;
+                preferred_username?: string;
+            } | null;
+        }> | null;
+    };
+    project: {
+        github_installation_id: unknown;
+        github_repo_id: unknown;
+    };
+    candidates: EvidenceCandidate[];
+}): Promise<CodeEvidence[]> {
+    const githubAccess = await verifyProjectGithubAccess(input.user, input.project);
+    if (!githubAccess) {
+        return [];
+    }
+
+    const [owner, repo] = githubAccess.repository.fullName.split("/");
+    if (!owner || !repo) {
+        return [];
+    }
+
+    const octokit = await getInstallationOctokit(githubAccess.installationId);
+    const evidence: CodeEvidence[] = [];
+
+    for (const candidate of input.candidates) {
+        try {
+            const { data } = await octokit.request("GET /repos/{owner}/{repo}/contents/{path}", {
+                owner,
+                repo,
+                path: candidate.file,
+                ref: "HEAD",
+            });
+
+            if (Array.isArray(data)) {
+                continue;
+            }
+
+            const payload = data as { content?: string; encoding?: string };
+            if (typeof payload.content !== "string") {
+                continue;
+            }
+
+            const decoded = payload.encoding === "base64"
+                ? Buffer.from(payload.content, "base64").toString("utf-8")
+                : payload.content;
+            if (!decoded || isLikelyBinary(decoded)) {
+                continue;
+            }
+
+            const window = renderSnippetWindow(decoded, candidate.line);
+            if (!window.excerpt.trim()) {
+                continue;
+            }
+
+            evidence.push({
+                id: "",
+                file: candidate.file,
+                startLine: window.startLine,
+                endLine: window.endLine,
+                reason: shortText(candidate.reason, 120),
+                source: "github",
+                excerpt: window.excerpt,
+            });
+        } catch (error) {
+            console.warn(
+                `[Fix Chat] Failed to fetch snippet for ${candidate.file}:`,
+                error instanceof Error ? error.message : error
+            );
+        }
+    }
+
+    return evidence;
+}
+
+function buildFallbackEvidence(issue?: IssueContext, relatedIssues: IssueContext[] = []): CodeEvidence[] {
+    const evidence: CodeEvidence[] = [];
+
+    if (issue?.file && issue.match) {
+        evidence.push({
+            id: "",
+            file: issue.file,
+            startLine: toSafeLine(issue.line),
+            endLine: toSafeLine(issue.line),
+            reason: `selected issue: ${issue.name || issue.type || "issue"}`,
+            source: "scan",
+            excerpt: `${toSafeLine(issue.line)}: ${shortText(issue.match, 220)}`,
+        });
+    }
+
+    for (const related of relatedIssues.slice(0, 3)) {
+        if (!related.file || !related.match) continue;
+        evidence.push({
+            id: "",
+            file: related.file,
+            startLine: toSafeLine(related.line),
+            endLine: toSafeLine(related.line),
+            reason: `related issue: ${related.name || related.type || "issue"}`,
+            source: "scan",
+            excerpt: `${toSafeLine(related.line)}: ${shortText(related.match, 220)}`,
+        });
+    }
+
+    return evidence;
+}
+
+function assignEvidenceIds(items: CodeEvidence[]): CodeEvidence[] {
+    return items.slice(0, MAX_EVIDENCE_ITEMS).map((item, index) => ({
+        ...item,
+        id: `E${index + 1}`,
+    }));
+}
+
+function formatEvidenceForPrompt(evidence: CodeEvidence[]): string {
+    if (evidence.length === 0) {
+        return "No code evidence was collected for this request.";
+    }
+
+    return evidence
+        .map((entry) => (
+            `[${entry.id}] ${entry.file}:${entry.startLine}-${entry.endLine} | ${entry.reason} | source=${entry.source}\n${entry.excerpt}`
+        ))
+        .join("\n\n");
+}
+
+function formatRelatedIssues(relatedIssues: IssueContext[]): string {
+    if (relatedIssues.length === 0) return "";
+    return relatedIssues
+        .slice(0, 8)
+        .map((item) => (
+            `- ${item.name || "unknown"} (${item.severity || "unknown"}) at ${item.file || "unknown"}:${toSafeLine(item.line)}`
+        ))
+        .join("\n");
+}
+
+function buildFallbackAnswer(input: {
+    question: string;
+    issue?: IssueContext;
+    fix?: FixContext;
+    evidence: CodeEvidence[];
+    technicalMode: boolean;
+}): string {
+    if (isCasualQuestion(input.question)) {
+        return "Hey! I am Cencori. Ask me anything about your findings or what to fix next.";
+    }
+
+    const evidenceLines = input.evidence.length > 0
+        ? input.evidence.slice(0, 3).map((entry) => (
+            `- [${entry.id}] \`${entry.file}:${entry.startLine}\` - ${entry.reason}`
+        ))
+        : ["- No direct code evidence available in this response."];
+
+    const answer = input.issue?.name
+        ? `I am looking at **${input.issue.name}** in \`${input.issue.file || "unknown"}${input.issue.line ? `:${input.issue.line}` : ""}\`. ${input.issue.description || ""}`.trim()
+        : "I can help you reason through your scan findings, architecture risks, and fix strategy.";
+
+    const fixLine = input.fix?.explanation
+        ? `\n\nSuggested fix direction: ${input.fix.explanation}`
+        : "";
+
+    if (!input.technicalMode) {
+        return `${answer}${fixLine}`;
+    }
+
+    return [
+        "### Answer",
+        `${answer}${fixLine}`,
+        "",
+        "### Evidence",
+        ...evidenceLines,
+        "",
+        "### Confidence",
+        "Low - I returned a fallback summary instead of a full model-generated analysis.",
+        "",
+        "### Follow-up",
+        "Can you point me to the specific file/function you want me to analyze first?",
+    ].join("\n");
+}
+
+function buildComplianceAddendum(input: {
+    response: string;
+    technicalMode: boolean;
+    evidence: CodeEvidence[];
+}): string {
+    if (!input.technicalMode) {
+        return "";
+    }
+
+    const hasCitation = /\[E\d+\]/.test(input.response);
+    const hasConfidence = /###\s*Confidence/i.test(input.response);
+    const hasFollowUp = /###\s*Follow-up/i.test(input.response);
+
+    if (hasCitation && hasConfidence && hasFollowUp) {
+        return "";
+    }
+
+    const evidenceLines = input.evidence.length > 0
+        ? input.evidence.slice(0, 3).map((entry) => (
+            `- [${entry.id}] \`${entry.file}:${entry.startLine}-${entry.endLine}\` - ${entry.reason}`
+        ))
+        : ["- No direct code evidence was available for this addendum."];
+
+    const sections: string[] = [];
+    sections.push("");
+    sections.push("");
+    sections.push("### Evidence");
+    sections.push(...evidenceLines);
+    sections.push("");
+    sections.push("### Confidence");
+    sections.push("Low - I could not fully verify all claims from the available evidence pack.");
+    sections.push("");
+    sections.push("### Follow-up");
+    sections.push("Can you share the exact function or file path you want me to validate next?");
+    return sections.join("\n");
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
@@ -88,7 +515,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const supabaseAdmin = createAdminClient();
     const { data: project, error: projectError } = await supabaseAdmin
         .from("scan_projects")
-        .select("id")
+        .select("id, github_repo_full_name, github_installation_id, github_repo_id")
         .eq("id", id)
         .eq("user_id", user.id)
         .single();
@@ -98,13 +525,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const body = await req.json().catch(() => ({}));
-    // Strip null bytes and ASCII control characters before processing
     const rawQuestion = typeof body.question === "string" ? body.question : "";
     const question = rawQuestion.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
     const scanRunId = typeof body.scanRunId === "string" ? body.scanRunId : undefined;
     const issue = (body.issue || {}) as IssueContext;
     const fix = (body.fix || {}) as FixContext;
     const history = Array.isArray(body.history) ? (body.history as ChatMessage[]) : [];
+    const technicalMode = !isCasualQuestion(question);
 
     if (!question) {
         return new Response(JSON.stringify({ error: "question is required" }), { status: 400 });
@@ -120,6 +547,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     let relatedIssues: IssueContext[] = [];
     let aiSummary: string | undefined;
+    let researchContext: ScanResearchLike | undefined;
+    let aiContext: RepositoryAiContextLike | undefined;
+    let evidence: CodeEvidence[] = [];
 
     if (scanRunId) {
         const { data: scanRun } = await supabaseAdmin
@@ -136,10 +566,39 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         const results = (scanRun.results || {}) as ScanRunResultsLike;
         const runIssues = Array.isArray(results.issues) ? results.issues : [];
         relatedIssues = runIssues
-            .filter((scanIssue) => scanIssue.file === issue.file && !(scanIssue.line === issue.line && scanIssue.name === issue.name))
+            .filter((item) => item.file === issue.file && !(item.line === issue.line && item.name === issue.name))
             .slice(0, 8);
+
         aiSummary = typeof results.ai?.summary === "string" ? results.ai.summary : undefined;
+        researchContext = results.research;
+        aiContext = results.ai_context;
+
+        const candidates = buildEvidenceCandidates({
+            issue,
+            relatedIssues,
+            research: researchContext,
+            aiContext,
+        });
+        if (candidates.length > 0) {
+            try {
+                evidence = await fetchCodeEvidenceFromGithub({
+                    user,
+                    project,
+                    candidates,
+                });
+            } catch (error) {
+                console.warn(
+                    "[Fix Chat] Unable to collect GitHub evidence snippets:",
+                    error instanceof Error ? error.message : error
+                );
+            }
+        }
     }
+
+    if (evidence.length === 0) {
+        evidence = buildFallbackEvidence(issue, relatedIssues);
+    }
+    evidence = assignEvidenceIds(evidence);
 
     let memoryContext = "";
     try {
@@ -158,57 +617,66 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         );
     }
 
-    const recentHistory = history.slice(-8)
-        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    const recentHistory = history
+        .slice(-8)
+        .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
         .join("\n");
 
-    const relatedIssueContext = relatedIssues.length > 0
-        ? relatedIssues
-            .map((si) => `- ${si.name || "unknown"} (${si.severity || "unknown"}) at ${si.file || "unknown"}:${si.line || 0}`)
-            .join("\n")
-        : "";
-
-    const hasIssueContext = !!(issue.name || issue.file || issue.type);
-
+    const relatedIssueContext = formatRelatedIssues(relatedIssues);
+    const hasIssueContext = Boolean(issue.name || issue.file || issue.type);
     const issueSection = hasIssueContext ? `
 Currently selected issue:
 - Name: ${issue.name || "unknown"}
 - Type: ${issue.type || "unknown"}
 - Severity: ${issue.severity || "unknown"}
-- Location: ${issue.file || "unknown"}${issue.line ? `:${issue.line}` : ""}
+- Location: ${issue.file || "unknown"}:${toSafeLine(issue.line)}
 - Description: ${issue.description || "n/a"}
-- Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${aiSummary ? `\n- Repo AI summary: ${aiSummary}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
+- Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
     const memorySection = memoryContext
         ? `\n\n## Relevant context from this project's history\n${memoryContext}`
         : "";
 
-    const prompt = `You are Cencori — a sharp, senior security engineer embedded in a code scanning product.
+    const graphSection = buildGraphContextSection(
+        project.github_repo_full_name || "unknown repository",
+        researchContext,
+        aiContext,
+        aiSummary
+    );
+    const evidenceSection = formatEvidenceForPrompt(evidence);
+    const outputRules = technicalMode
+        ? `Technical response contract:
+1. Use these exact sections in order: "### Answer", "### Evidence", "### Confidence", "### Follow-up".
+2. Every substantive technical claim must cite at least one evidence ID from the evidence pack (for example: [E1]).
+3. Under "### Evidence", include bullet points with citation ID and \`file:start-end\`.
+4. Under "### Confidence", pick exactly one level: High, Medium, or Low, then one sentence explaining why.
+5. If confidence is Medium or Low, "### Follow-up" must ask exactly one targeted question to reduce uncertainty.
+6. Never invent files, lines, or evidence IDs that are not in the evidence pack.`
+        : `Casual response mode:
+- Keep the response short and conversational.
+- Do not force checklist formatting.`;
 
-Your role is twofold:
-1. Help users understand and remediate security vulnerabilities found in their code.
-2. Have normal, helpful conversations — answer questions, explain concepts, or just chat.
+    const systemPrompt = `You are Cencori, a senior security and architecture engineer embedded in this repository.
+You provide direct, practical answers grounded in concrete evidence.
+CRITICAL: Speak in first-person singular ("I", "my", "me"). Never refer to yourself in third person or plural.
+CRITICAL: Never use emojis.
+When technical mode is active, follow the response contract exactly and do not skip evidence citations.`;
 
-Personality: confident, approachable, concise, occasionally witty. Read the room — if someone greets you or asks something casual, respond like a person, not a security lecture. If the question is technical, be precise and actionable.
-CRITICAL: You are an individual engineer, not an abstract AI. During both your internal reasoning/thought process and your final response, you MUST use first-person singular pronouns ("I", "my", "me"). NEVER refer to yourself in the third person (e.g., "The assistant should", "The AI will").
+    const prompt = `Task mode: ${technicalMode ? "technical" : "casual"}
 
-For security questions:
-- Lead with the most useful insight
-- Be concrete and code-focused
-- Use markdown when it helps readability (bold key terms, code blocks, short lists)
-- Skip unnecessary preamble
-- Include a code snippet only when it genuinely helps
+${outputRules}
 
-CRITICAL AESTHETIC RULES:
-- NEVER use emojis — not in headings, bullet points, or anywhere in the response.
-- NEVER output a "Remediation Brief" or heavy checklist format in this chat unless explicitly asked.
-- If the user says something simple (e.g., "PR merged", "thanks", "hello"), just reply naturally and conversationally. Do NOT launch into a multi-point plan or security review. Keep it brief.
-- Match the user's length and energy. Short inputs get short, friendly outputs.${issueSection}${memorySection}
+## Architecture graph context
+${graphSection}
+
+## Code evidence pack
+${evidenceSection}${issueSection}${memorySection}
 
 Conversation so far:
 ${recentHistory || "(none yet)"}
 
-User: ${question}`;
+User question:
+${question}`;
 
     const encoder = new TextEncoder();
 
@@ -223,20 +691,40 @@ User: ${question}`;
             try {
                 await streamWithReasoning(
                     question,
-                    prompt, // System prompt
+                    `${systemPrompt}\n\n${prompt}`,
                     controller,
                     encoder,
-                    buildFallbackAnswer(question, issue, fix),
-                    (chunk) => { accumulatedResponse += chunk; },
+                    buildFallbackAnswer({
+                        question,
+                        issue,
+                        fix,
+                        evidence,
+                        technicalMode,
+                    }),
+                    (chunk) => {
+                        accumulatedResponse += chunk;
+                    },
                     { emitDone: false, closeController: false },
                 );
                 finishedStreaming = true;
 
-                // Persist memory before terminating the stream so strict mode can enforce it.
+                const addendum = buildComplianceAddendum({
+                    response: accumulatedResponse,
+                    technicalMode,
+                    evidence,
+                });
+                if (addendum) {
+                    enqueue(JSON.stringify({ type: "content", content: addendum }));
+                    accumulatedResponse += addendum;
+                }
+
                 const memoryText = [
                     `Q: ${question.slice(0, 500)}`,
                     `A: ${accumulatedResponse.slice(0, 1500)}`,
                     issue.name ? `(Issue: ${issue.name}${issue.file ? ` in ${issue.file}` : ""})` : "",
+                    evidence.length > 0
+                        ? `Evidence: ${evidence.slice(0, 3).map((item) => `${item.id}:${item.file}:${item.startLine}`).join(", ")}`
+                        : "",
                 ].filter(Boolean).join("\n");
 
                 await writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId, {
@@ -247,7 +735,16 @@ User: ${question}`;
             } catch (error) {
                 console.error("[Fix Chat] Streaming or memory persistence failed:", error);
                 if (!finishedStreaming) {
-                    enqueue(JSON.stringify({ type: "content", content: buildFallbackAnswer(question, issue, fix) }));
+                    enqueue(JSON.stringify({
+                        type: "content",
+                        content: buildFallbackAnswer({
+                            question,
+                            issue,
+                            fix,
+                            evidence,
+                            technicalMode,
+                        }),
+                    }));
                     enqueue("[DONE]");
                     controller.close();
                 } else {

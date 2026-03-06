@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM, type LlmFilterWarning } from '@/lib/scan/llm-filter';
+import { generateAiCodeQualityIssues } from '@/lib/scan/ai-quality';
 import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
@@ -328,7 +329,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 }
 
                 // Send initial event
-                sendEvent({ type: 'start', time: 0, message: 'Starting security scan...' });
+                sendEvent({ type: 'start', time: 0, message: 'Starting security + code quality scan...' });
 
                 // Create scan run record
                 const { data: scanRun, error: runError } = await supabaseAdmin
@@ -485,12 +486,13 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Running LLM false-positive filter...' });
 
                 const {
-                    filtered: allIssues,
+                    filtered: filteredIssues,
                     suppressed: suppressedIssues,
                     evaluated: llmEvaluatedIssues,
                     enforced: llmEnforced,
                     warnings: llmWarnings,
                 } = await filterIssuesWithLLM(rawIssues, fileContentMap, { enforce: strictEnforcement });
+                let allIssues = filteredIssues;
 
                 sendEvent({
                     type: 'success',
@@ -511,6 +513,34 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         data: {
                             warningCount: llmWarnings.length,
                             warnings: llmWarnings,
+                        },
+                    });
+                }
+
+                sendEvent({ type: 'info', time: Date.now() - startTime, message: 'Running AI code-quality review...' });
+                const aiCodeQuality = await generateAiCodeQualityIssues({
+                    repository: githubAccess.repository.fullName,
+                    scannedFiles,
+                    existingIssues: allIssues,
+                });
+                if (aiCodeQuality.warning) {
+                    sendEvent({
+                        type: 'info',
+                        time: Date.now() - startTime,
+                        message: aiCodeQuality.warning,
+                    });
+                }
+                if (aiCodeQuality.issues.length > 0) {
+                    allIssues = [...allIssues, ...aiCodeQuality.issues];
+                    sendEvent({
+                        type: 'success',
+                        time: Date.now() - startTime,
+                        message: `AI code-quality review added ${aiCodeQuality.issues.length} issue(s)`,
+                        data: {
+                            addedCount: aiCodeQuality.issues.length,
+                            evaluatedFiles: aiCodeQuality.evaluatedFiles,
+                            ...(aiCodeQuality.provider ? { provider: aiCodeQuality.provider } : {}),
+                            ...(aiCodeQuality.model ? { model: aiCodeQuality.model } : {}),
                         },
                     });
                 }
@@ -625,6 +655,14 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 evaluated_issues: llmEvaluatedIssues,
                                 suppressed_count: suppressedIssues.length,
                                 warnings: llmWarnings,
+                            },
+                            ai_code_quality: {
+                                enabled: true,
+                                evaluated_files: aiCodeQuality.evaluatedFiles,
+                                added_count: aiCodeQuality.issues.length,
+                                ...(aiCodeQuality.provider ? { provider: aiCodeQuality.provider } : {}),
+                                ...(aiCodeQuality.model ? { model: aiCodeQuality.model } : {}),
+                                ...(aiCodeQuality.warning ? { warning: aiCodeQuality.warning } : {}),
                             },
                             summary,
                             research: enrichedResearch,

@@ -43,6 +43,7 @@ const typeLabels: Record<string, string> = {
     route: 'ROUTES',
     config: 'CONFIG',
     vulnerability: 'VULNERABILITIES',
+    code_quality: 'CODE QUALITY',
 };
 
 /**
@@ -143,6 +144,9 @@ function printSummary(result: ScanResult): void {
     if (summary.low > 0) {
         console.log(`    ${chalk.blue('   LOW    ')} ${summary.low} issues`);
     }
+    if (summary.codeQuality > 0) {
+        console.log(`    ${chalk.magenta(' QUALITY  ')} ${summary.codeQuality} issues`);
+    }
     console.log();
 }
 
@@ -160,6 +164,7 @@ function printRecommendations(issues: ScanIssue[]): void {
     const hasXSS = issues.some(i => i.category === 'xss');
     const hasInjection = issues.some(i => i.category === 'injection');
     const hasCORS = issues.some(i => i.category === 'cors');
+    const hasCodeQuality = issues.some(i => i.type === 'code_quality');
 
     if (hasSecrets) {
         console.log(chalk.gray('    - Use environment variables for secrets'));
@@ -179,6 +184,10 @@ function printRecommendations(issues: ScanIssue[]): void {
     }
     if (hasCORS) {
         console.log(chalk.gray('    - Configure CORS with specific allowed origins'));
+    }
+    if (hasCodeQuality) {
+        console.log(chalk.gray('    - Refactor long functions and reduce deep nesting for maintainability'));
+        console.log(chalk.gray('    - Resolve TODO/FIXME notes and replace broad any/ignore directives where possible'));
     }
 
     console.log();
@@ -565,7 +574,7 @@ async function handleAutoFix(
 async function main(): Promise<void> {
     program
         .name('cencori-scan')
-        .description('Security scanner for AI apps. Detect secrets, PII, and exposed routes.')
+        .description('Security + code quality scanner for AI apps.')
         .version(VERSION)
         .argument('[path]', 'Path to scan', '.')
         .option('-j, --json', 'Output results as JSON')
