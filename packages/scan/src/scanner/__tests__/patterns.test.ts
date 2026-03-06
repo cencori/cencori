@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { scanFileContent, shouldScanFile, calculateScore } from '../core';
+import { scanFileContent, shouldScanFile, calculateScore, summarizeIssues } from '../core';
 
 // ─── Secret Pattern Tests ───────────────────────────────────────────
 
@@ -294,6 +294,47 @@ describe('False Positive Heuristics', () => {
         const code = 'const host = "127.0.0.1";';
         const issues = scanFileContent('config.ts', code);
         expect(issues.some(i => i.name === 'IP Address')).toBe(false);
+    });
+});
+
+// ─── Code Quality Detection ──────────────────────────────────────────
+
+describe('Code Quality Detection', () => {
+    test('detects TODO/FIXME comments as code quality issues', () => {
+        const code = `
+// TODO: split this into smaller helpers
+export function buildReport() {
+  return "ok";
+}
+        `;
+        const issues = scanFileContent('src/report.ts', code);
+        expect(issues.some(i => i.type === 'code_quality' && i.name === 'TODO/FIXME Comment')).toBe(true);
+    });
+
+    test('detects long functions and many parameters', () => {
+        const body = Array.from({ length: 85 })
+            .map((_, idx) => `  const v${idx} = ${idx};`)
+            .join('\n');
+        const code = `
+export function giantFunction(a, b, c, d, e, f) {
+${body}
+  return a + b;
+}
+        `;
+        const issues = scanFileContent('src/giant.ts', code);
+        expect(issues.some(i => i.type === 'code_quality' && i.name === 'Long Function (80+ lines)')).toBe(true);
+        expect(issues.some(i => i.type === 'code_quality' && i.name === 'Too Many Function Parameters')).toBe(true);
+    });
+
+    test('summary includes code quality counts', () => {
+        const issues = scanFileContent('src/types.ts', 'const x: any = 1; // TODO fix typing');
+        const summary = summarizeIssues(issues);
+        expect(summary.codeQuality).toBeGreaterThan(0);
+    });
+
+    test('score remains A when only code quality issues exist', () => {
+        const issues = scanFileContent('src/types.ts', 'const x: any = 1; // TODO fix typing');
+        expect(calculateScore(issues)).toBe('A');
     });
 });
 

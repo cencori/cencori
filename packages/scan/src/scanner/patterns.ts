@@ -851,6 +851,48 @@ export const VULNERABILITY_PATTERNS: VulnerabilityPattern[] = [
 ];
 
 /**
+ * Code quality patterns
+ */
+export interface CodeQualityPattern {
+    name: string;
+    category: 'maintainability' | 'reliability' | 'type-safety' | 'complexity';
+    pattern: RegExp;
+    severity: 'medium' | 'low';
+    description: string;
+}
+
+export const CODE_QUALITY_PATTERNS: CodeQualityPattern[] = [
+    {
+        name: 'TODO/FIXME Comment',
+        category: 'maintainability',
+        pattern: /(?:\/\/|#|\/\*+|\*)\s*(?:TODO|FIXME|HACK|XXX)\b[^\n]*/g,
+        severity: 'low',
+        description: 'Outstanding TODO/FIXME note found. Track and resolve before release.',
+    },
+    {
+        name: 'TypeScript Ignore Directive',
+        category: 'type-safety',
+        pattern: /@ts-ignore\b/g,
+        severity: 'medium',
+        description: 'Type checking is being bypassed. Prefer fixing types directly.',
+    },
+    {
+        name: 'Explicit any Type',
+        category: 'type-safety',
+        pattern: /:\s*any\b/g,
+        severity: 'low',
+        description: 'Explicit any weakens type safety. Prefer precise types or generics.',
+    },
+    {
+        name: 'Empty Catch Block',
+        category: 'reliability',
+        pattern: /catch\s*\([^)]*\)\s*\{\s*\}/g,
+        severity: 'medium',
+        description: 'Errors are swallowed silently. Add handling, logging, or rethrow.',
+    },
+];
+
+/**
  * Files/patterns to ignore
  */
 export const IGNORE_PATTERNS = [

@@ -4,11 +4,12 @@ import {
     PII_PATTERNS,
     ROUTE_PATTERNS,
     VULNERABILITY_PATTERNS,
+    CODE_QUALITY_PATTERNS,
     IGNORE_PATTERNS,
     SCANNABLE_EXTENSIONS,
 } from './patterns';
 
-export type IssueType = 'secret' | 'pii' | 'route' | 'config' | 'vulnerability' | 'dependency';
+export type IssueType = 'secret' | 'pii' | 'route' | 'config' | 'vulnerability' | 'dependency' | 'code_quality';
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type ScanScore = 'A' | 'B' | 'C' | 'D' | 'F';
 
@@ -34,6 +35,7 @@ export interface ScanSummary {
     config: number;
     vulnerabilities: number;
     dependencies: number;
+    codeQuality: number;
     critical: number;
     high: number;
     medium: number;
@@ -180,6 +182,220 @@ function detectExposedRouteFromPath(filePath: string): { framework: string; rout
     return null;
 }
 
+function shortMatch(raw: string, maxLength: number = 100): string {
+    const normalized = raw.trim();
+    if (!normalized) return '';
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function lineIndent(line: string): number {
+    const match = line.match(/^(\s*)/);
+    return match ? match[1].length : 0;
+}
+
+function countParams(rawParams: string, filePath: string): number {
+    const lowerPath = filePath.toLowerCase();
+    const parts = rawParams
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    if (parts.length === 0) return 0;
+    if (lowerPath.endsWith('.py')) {
+        return parts.filter((part) => part !== 'self' && part !== 'cls').length;
+    }
+    return parts.length;
+}
+
+function findJsBlockEnd(lines: string[], startLine: number): number {
+    let depth = 0;
+    for (let i = startLine; i < lines.length; i += 1) {
+        const line = lines[i];
+        const opens = (line.match(/\{/g) || []).length;
+        const closes = (line.match(/\}/g) || []).length;
+        depth += opens - closes;
+        if (i > startLine && depth <= 0) {
+            return i;
+        }
+    }
+    return lines.length - 1;
+}
+
+function findPythonBlockEnd(lines: string[], startLine: number): number {
+    const baseIndent = lineIndent(lines[startLine] || '');
+    let lastLine = startLine;
+    for (let i = startLine + 1; i < lines.length; i += 1) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed) {
+            continue;
+        }
+        if (trimmed.startsWith('#')) {
+            lastLine = i;
+            continue;
+        }
+        const indent = lineIndent(line);
+        if (indent <= baseIndent) {
+            return lastLine;
+        }
+        lastLine = i;
+    }
+    return lastLine;
+}
+
+function scanCodeQuality(filePath: string, content: string, isDocFile: boolean): ScanIssue[] {
+    if (isDocFile) {
+        return [];
+    }
+
+    const issues: ScanIssue[] = [];
+    const lines = content.split('\n');
+    const maxIssuesPerFile = 30;
+    const pushIssue = (issue: ScanIssue) => {
+        if (issues.length < maxIssuesPerFile) {
+            issues.push(issue);
+        }
+    };
+
+    for (const pattern of CODE_QUALITY_PATTERNS) {
+        pattern.pattern.lastIndex = 0;
+        let match;
+        while ((match = pattern.pattern.exec(content)) !== null) {
+            const pos = getPosition(content, match.index);
+            pushIssue({
+                type: 'code_quality',
+                category: pattern.category,
+                severity: pattern.severity,
+                name: pattern.name,
+                file: filePath,
+                line: pos.line,
+                column: pos.column,
+                match: shortMatch(match[0]),
+                description: pattern.description,
+            });
+        }
+    }
+
+    const lineCount = lines.length;
+    if (lineCount >= 600) {
+        pushIssue({
+            type: 'code_quality',
+            category: 'maintainability',
+            severity: 'medium',
+            name: 'Large File (600+ lines)',
+            file: filePath,
+            line: 1,
+            column: 1,
+            match: `${lineCount} lines`,
+            description: 'Large files are harder to review and maintain. Consider splitting into smaller modules.',
+        });
+    }
+
+    const jsFunctionStart = /^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)?\s*\(([^)]*)\)\s*\{/;
+    const jsArrowFunctionStart = /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>\s*\{/;
+    const jsMethodStart = /^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/;
+    const reservedMethodWords = new Set(['if', 'for', 'while', 'switch', 'catch', 'try']);
+    const pythonFunctionStart = /^\s*def\s+([A-Za-z_][\w]*)\s*\(([^)]*)\)\s*:/;
+
+    for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
+        const lineNum = i + 1;
+        const nestedControl = /^\s*(if|for|while|switch|try|catch|elif|else\s+if)\b/.test(line);
+        if (nestedControl && lineIndent(line) >= 24) {
+            pushIssue({
+                type: 'code_quality',
+                category: 'complexity',
+                severity: 'low',
+                name: 'Deep Nesting',
+                file: filePath,
+                line: lineNum,
+                column: 1,
+                match: shortMatch(line),
+                description: 'Deeply nested control flow reduces readability. Extract smaller functions or early returns.',
+            });
+        }
+
+        const jsFunctionMatch = line.match(jsFunctionStart) || line.match(jsArrowFunctionStart);
+        const jsMethodMatch = !jsFunctionMatch ? line.match(jsMethodStart) : null;
+        const isValidMethod = Boolean(jsMethodMatch && !reservedMethodWords.has(jsMethodMatch[1] || ''));
+        const functionMatch = jsFunctionMatch || (isValidMethod ? jsMethodMatch : null);
+
+        if (functionMatch) {
+            const paramsRaw = functionMatch[2] || '';
+            const paramCount = countParams(paramsRaw, filePath);
+            if (paramCount >= 6) {
+                pushIssue({
+                    type: 'code_quality',
+                    category: 'complexity',
+                    severity: 'low',
+                    name: 'Too Many Function Parameters',
+                    file: filePath,
+                    line: lineNum,
+                    column: 1,
+                    match: shortMatch(line),
+                    description: `Function has ${paramCount} parameters. Consider using an options object or splitting responsibilities.`,
+                });
+            }
+
+            const endLine = findJsBlockEnd(lines, i);
+            const span = endLine - i + 1;
+            if (span >= 80) {
+                pushIssue({
+                    type: 'code_quality',
+                    category: 'complexity',
+                    severity: 'medium',
+                    name: 'Long Function (80+ lines)',
+                    file: filePath,
+                    line: lineNum,
+                    column: 1,
+                    match: shortMatch(line),
+                    description: `Function spans ${span} lines. Break into smaller focused functions.`,
+                });
+            }
+            continue;
+        }
+
+        const pythonMatch = line.match(pythonFunctionStart);
+        if (!pythonMatch) {
+            continue;
+        }
+
+        const paramsRaw = pythonMatch[2] || '';
+        const paramCount = countParams(paramsRaw, filePath);
+        if (paramCount >= 6) {
+            pushIssue({
+                type: 'code_quality',
+                category: 'complexity',
+                severity: 'low',
+                name: 'Too Many Function Parameters',
+                file: filePath,
+                line: lineNum,
+                column: 1,
+                match: shortMatch(line),
+                description: `Function has ${paramCount} parameters. Consider grouping related inputs into a dataclass or object.`,
+            });
+        }
+
+        const endLine = findPythonBlockEnd(lines, i);
+        const span = endLine - i + 1;
+        if (span >= 80) {
+            pushIssue({
+                type: 'code_quality',
+                category: 'complexity',
+                severity: 'medium',
+                name: 'Long Function (80+ lines)',
+                file: filePath,
+                line: lineNum,
+                column: 1,
+                match: shortMatch(line),
+                description: `Function spans ${span} lines. Break into smaller focused functions.`,
+            });
+        }
+    }
+
+    return issues;
+}
+
 export function scanFileContent(filePath: string, content: string): ScanIssue[] {
     const issues: ScanIssue[] = [];
     const isDocFile = isDocOrTestFile(filePath);
@@ -311,6 +527,8 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
         });
     }
 
+    issues.push(...scanCodeQuality(filePath, content, isDocFile));
+
     // ── cencori-ignore suppression ────────────────────────────────
     const contentLines = content.split('\n');
     const filtered = issues.filter(issue => {
@@ -339,23 +557,24 @@ export function scanFileContent(filePath: string, content: string): ScanIssue[] 
 }
 
 export function calculateScore(issues: ScanIssue[]): ScanScore {
-    const critical = issues.filter(issue => issue.severity === 'critical').length;
-    const high = issues.filter(issue => issue.severity === 'high').length;
-    const medium = issues.filter(issue => issue.severity === 'medium').length;
+    const securityIssues = issues.filter((issue) => issue.type !== 'code_quality');
+    const critical = securityIssues.filter(issue => issue.severity === 'critical').length;
+    const high = securityIssues.filter(issue => issue.severity === 'high').length;
+    const medium = securityIssues.filter(issue => issue.severity === 'medium').length;
 
     if (critical > 0) return 'F';
     if (high >= 3) return 'F';
     if (high >= 2) return 'D';
     if (high >= 1 || medium >= 5) return 'C';
     if (medium >= 2) return 'B';
-    if (issues.length === 0) return 'A';
+    if (securityIssues.length === 0) return 'A';
     return 'B';
 }
 
 export function getTierDescription(score: ScanScore): string {
     switch (score) {
-        case 'A': return 'Excellent! No security issues detected.';
-        case 'B': return 'Good, but minor improvements recommended.';
+        case 'A': return 'Excellent! No critical security issues detected.';
+        case 'B': return 'Good security posture, with minor improvements recommended.';
         case 'C': return 'Fair. Some security concerns need attention.';
         case 'D': return 'Poor. Significant security issues detected.';
         case 'F': return 'Critical! Major security vulnerabilities found.';
@@ -370,6 +589,7 @@ export function summarizeIssues(issues: ScanIssue[]): ScanSummary {
         config: issues.filter(issue => issue.type === 'config').length,
         vulnerabilities: issues.filter(issue => issue.type === 'vulnerability').length,
         dependencies: issues.filter(issue => issue.type === 'dependency').length,
+        codeQuality: issues.filter(issue => issue.type === 'code_quality').length,
         critical: issues.filter(issue => issue.severity === 'critical').length,
         high: issues.filter(issue => issue.severity === 'high').length,
         medium: issues.filter(issue => issue.severity === 'medium').length,

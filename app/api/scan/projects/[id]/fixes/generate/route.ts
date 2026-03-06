@@ -284,6 +284,18 @@ function buildManualGuidance(issue: ScanIssue): ManualGuidance {
         };
     }
 
+    if (issue.type === 'code_quality') {
+        return {
+            ...shared,
+            summary: issue.description || 'Code quality issue detected.',
+            steps: [
+                'Simplify the affected function or module to reduce complexity.',
+                'Prefer explicit types and remove broad suppression directives.',
+                'Add or update tests to preserve behavior during refactoring.',
+            ],
+        };
+    }
+
     return {
         ...shared,
         summary: issue.description || 'Manual security review is recommended for this finding.',

@@ -263,6 +263,13 @@ interface ScanResult {
   filesScanned: number;
   scanDuration: number;
   summary: {
+    secrets: number;
+    pii: number;
+    routes: number;
+    config: number;
+    vulnerabilities: number;
+    dependencies: number;
+    codeQuality: number;
     critical: number;
     high: number;
     medium: number;
@@ -271,7 +278,7 @@ interface ScanResult {
 }
 
 interface ScanIssue {
-  type: 'secret' | 'pii' | 'route' | 'config' | 'vulnerability';
+  type: 'secret' | 'pii' | 'route' | 'config' | 'vulnerability' | 'dependency' | 'code_quality';
   severity: 'critical' | 'high' | 'medium' | 'low';
   name: string;
   match: string;

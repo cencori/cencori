@@ -63,6 +63,7 @@ const severityDescription: Record<string, string> = {
     dependency: '**Vulnerable dependency** — upgrade to the patched version.',
     config: '**Insecure configuration** — review and harden this setting.',
     route: '**Exposed route** — ensure proper authentication and authorization.',
+    code_quality: '**Code quality issue** — refactor for readability, maintainability, and reliability.',
 };
 
 // ── Inline Review Comments ───────────────────────────────────────────

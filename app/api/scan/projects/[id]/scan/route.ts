@@ -7,6 +7,7 @@ import { analyzeRepositoryResearch } from '@/lib/scan/research';
 import { generateRepositoryAiInsight } from '@/lib/scan/gemini';
 import { scanGithubRepository } from '@/lib/scan/repository-scan';
 import { filterIssuesWithLLM } from '@/lib/scan/llm-filter';
+import { generateAiCodeQualityIssues } from '@/lib/scan/ai-quality';
 import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
@@ -146,7 +147,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
 
             // LLM post-processing: filter false positives from route/vulnerability findings
             const {
-                filtered: allIssues,
+                filtered: filteredIssues,
                 suppressed: suppressedIssues,
                 evaluated: llmEvaluatedIssues,
                 enforced: llmEnforced,
@@ -155,6 +156,19 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                 fileContentMap,
                 { enforce: strictEnforcement },
             );
+
+            let allIssues = filteredIssues;
+            const aiCodeQuality = await generateAiCodeQualityIssues({
+                repository: githubAccess.repository.fullName,
+                scannedFiles,
+                existingIssues: allIssues,
+            });
+            if (aiCodeQuality.warning) {
+                console.warn("[Scan] AI code-quality review warning:", aiCodeQuality.warning);
+            }
+            if (aiCodeQuality.issues.length > 0) {
+                allIssues = [...allIssues, ...aiCodeQuality.issues];
+            }
 
             const scanDuration = Date.now() - startTime;
             const score = calculateScore(allIssues);
@@ -232,6 +246,14 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                             enforced: llmEnforced,
                             evaluated_issues: llmEvaluatedIssues,
                             suppressed_count: suppressedIssues.length,
+                        },
+                        ai_code_quality: {
+                            enabled: true,
+                            evaluated_files: aiCodeQuality.evaluatedFiles,
+                            added_count: aiCodeQuality.issues.length,
+                            ...(aiCodeQuality.provider ? { provider: aiCodeQuality.provider } : {}),
+                            ...(aiCodeQuality.model ? { model: aiCodeQuality.model } : {}),
+                            ...(aiCodeQuality.warning ? { warning: aiCodeQuality.warning } : {}),
                         },
                         summary,
                         research: enrichedResearch,

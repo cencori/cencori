@@ -62,6 +62,7 @@ interface ScanSummary {
     config: number;
     vulnerabilities: number;
     dependencies: number;
+    codeQuality: number;
     critical: number;
     high: number;
     medium: number;
