@@ -101,7 +101,7 @@ interface GenerateFixesResponse {
 interface ChatMessage {
     role: "user" | "assistant";
     content: string;
-    reasoning?: string;
+    analysis?: string;
     isStreaming?: boolean;
     isError?: boolean;
 }
@@ -231,7 +231,7 @@ export default function FixWorkspacePage() {
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
     const [chatPending, setChatPending] = useState(false);
-    const [reasoningText, setReasoningText] = useState("");
+    const [analysisText, setAnalysisText] = useState("");
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const hasGeneratedFixes = useRef(false);
     const suggestionsAbortRef = useRef<AbortController | null>(null);
@@ -271,6 +271,7 @@ export default function FixWorkspacePage() {
             suggestionsAbortRef.current?.abort();
             const controller = new AbortController();
             suggestionsAbortRef.current = controller;
+            setAnalysisText("");
 
             // Inject streaming assistant placeholder as first chat message
             setChatMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
@@ -308,7 +309,7 @@ export default function FixWorkspacePage() {
 
                 const decoder = new TextDecoder();
                 let fullContent = "";
-                let localReasoning = "";
+                let localAnalysis = "";
                 let buffer = "";
 
                 while (true) {
@@ -327,10 +328,9 @@ export default function FixWorkspacePage() {
                             try {
                                 const parsed = JSON.parse(data);
                                 // Route by event type
-                                if (parsed.type === "reasoning" && typeof parsed.content === "string") {
-                                    // Live reasoning from gpt-oss-120b → thinking indicator
-                                    localReasoning += parsed.content;
-                                    setReasoningText((prev) => prev + parsed.content);
+                                if (parsed.type === "analysis" && typeof parsed.content === "string") {
+                                    localAnalysis += parsed.content;
+                                    setAnalysisText((prev) => prev + parsed.content);
                                 } else if (typeof parsed.content === "string" && parsed.content.length > 0) {
                                     // content event (or legacy untyped) → chat message
                                     // First real chunk — clear the pending state
@@ -350,7 +350,7 @@ export default function FixWorkspacePage() {
                     }
                 }
 
-                // Mark streaming done — persist reasoning so 'Complete' badge stays visible
+                // Persist investigation steps so the completed message can still be expanded.
                 setChatMessages((prev) => {
                     const next = [...prev];
                     const last = next[next.length - 1];
@@ -358,7 +358,7 @@ export default function FixWorkspacePage() {
                         next[next.length - 1] = {
                             ...last,
                             isStreaming: false,
-                            reasoning: localReasoning || last.reasoning,
+                            analysis: localAnalysis || last.analysis,
                         };
                     }
                     return next;
@@ -564,7 +564,7 @@ export default function FixWorkspacePage() {
         setChatMessages((prev) => [...prev, userMessage]);
         setChatInput("");
         setChatLoading(true);
-        setReasoningText("");
+        setAnalysisText("");
 
         // Add streaming assistant placeholder
         setChatMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
@@ -612,7 +612,7 @@ export default function FixWorkspacePage() {
 
             const decoder = new TextDecoder();
             let fullContent = "";
-            let fullReasoning = "";
+            let fullAnalysis = "";
             let buffer = "";
 
             while (true) {
@@ -628,12 +628,12 @@ export default function FixWorkspacePage() {
                         if (!data || data === "[DONE]") continue;
                         try {
                             const parsed = JSON.parse(data);
-                            if (parsed.type === "reasoning" && typeof parsed.content === "string") {
-                                fullReasoning += parsed.content;
+                            if (parsed.type === "analysis" && typeof parsed.content === "string") {
+                                fullAnalysis += parsed.content;
                                 setChatMessages((prev) => {
                                     const next = [...prev];
                                     const last = next[next.length - 1];
-                                    if (last?.role === "assistant") next[next.length - 1] = { ...last, reasoning: fullReasoning };
+                                    if (last?.role === "assistant") next[next.length - 1] = { ...last, analysis: fullAnalysis };
                                     return next;
                                 });
                             } else if (parsed.type === "content" && typeof parsed.content === "string") {
@@ -781,7 +781,7 @@ export default function FixWorkspacePage() {
 
                     {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
                     {(loading || loadingFixes || chatPending) && !aiHasStarted && (
-                        <ScanThinkingIndicator finished={false} liveText={reasoningText || undefined} />
+                        <ScanThinkingIndicator finished={false} liveText={analysisText || undefined} />
                     )}
 
                     {/* AI messages */}
@@ -795,11 +795,11 @@ export default function FixWorkspacePage() {
                         ) : (
                             <div key={`msg-${idx}`} className="w-full max-w-none space-y-1.5">
                                 <div className="mb-2">
-                                    {/* Show while streaming (even without reasoning yet) or after if reasoning exists */}
-                                    {(message.isStreaming || message.reasoning) && (
+                                    {/* Show while streaming or after if investigation steps were captured */}
+                                    {(message.isStreaming || message.analysis) && (
                                         <ScanThinkingIndicator
                                             finished={!!message.content}
-                                            liveText={message.reasoning || undefined}
+                                            liveText={message.analysis || undefined}
                                         />
                                     )}
                                 </div>
