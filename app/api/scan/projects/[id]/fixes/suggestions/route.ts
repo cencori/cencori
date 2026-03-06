@@ -44,6 +44,8 @@ interface ScanIssueInput {
     description?: string;
 }
 
+type ConfidenceLevel = "High" | "Medium" | "Low";
+
 function sanitizeFixes(value: unknown): SuggestionFixInput[] {
     if (!Array.isArray(value)) return [];
     return value
@@ -102,6 +104,102 @@ function sanitizeIssues(value: unknown): ScanIssueInput[] {
         .slice(0, 240);
 }
 
+function uniqueStrings(items: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const item of items) {
+        const normalized = item.trim();
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        result.push(normalized);
+    }
+
+    return result;
+}
+
+function joinList(items: string[]): string {
+    if (items.length === 0) return "";
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return `${items[0]} and ${items[1]}`;
+    return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function summarizeFixTarget(fix?: SuggestionFixInput | ManualGuidanceInput): string {
+    if (!fix?.file) {
+        return fix?.issueName || "security finding";
+    }
+
+    return `${fix.issueName || "security finding"} in ${fix.file}:${fix.line || 1}`;
+}
+
+function inferSuggestionConfidence(input: {
+    selectedFixes: SuggestionFixInput[];
+    manualGuidance: ManualGuidanceInput[];
+}): { level: ConfidenceLevel; rationale: string } {
+    const fileCount = new Set(
+        input.selectedFixes
+            .map((fix) => fix.file)
+            .filter((file): file is string => typeof file === "string" && file.length > 0)
+    ).size;
+
+    let score = 0;
+    if (input.selectedFixes.length >= 1) score += 1;
+    if (input.selectedFixes.length >= 3) score += 1;
+    if (fileCount >= 2) score += 1;
+    if (input.manualGuidance.length === 0) score += 1;
+    if (input.manualGuidance.length >= 3) score -= 1;
+
+    if (score >= 3) {
+        return {
+            level: "High",
+            rationale: "multiple file-specific fixes are selected and the manual review queue is limited",
+        };
+    }
+
+    if (score >= 1) {
+        return {
+            level: "Medium",
+            rationale: "the remediation plan is grounded in selected fixes but still depends on manual review",
+        };
+    }
+
+    return {
+        level: "Low",
+        rationale: "the plan depends heavily on manual validation or has too little selected fix coverage",
+    };
+}
+
+function buildSuggestionFinalAnalysisStep(input: {
+    initialConfidence: ConfidenceLevel;
+    selectedFixes: SuggestionFixInput[];
+    manualGuidance: ManualGuidanceInput[];
+    usedFallback: boolean;
+}): string {
+    const finalConfidence: ConfidenceLevel = input.usedFallback
+        ? "Low"
+        : input.manualGuidance.length >= 3
+            ? "Medium"
+            : input.selectedFixes.length > 0
+                ? input.initialConfidence
+                : "Low";
+
+    const coverageTargets = uniqueStrings(
+        input.selectedFixes
+            .slice(0, 2)
+            .map((fix) => summarizeFixTarget(fix))
+    );
+    const coverage = coverageTargets.length > 0
+        ? ` for ${joinList(coverageTargets)}`
+        : "";
+
+    if (finalConfidence === input.initialConfidence) {
+        return `Confidence holds at ${finalConfidence.toLowerCase()} for the remediation brief${coverage}`;
+    }
+
+    return `Confidence shifted from ${input.initialConfidence.toLowerCase()} to ${finalConfidence.toLowerCase()} for the remediation brief${coverage}`;
+}
+
 function buildFallbackSuggestions(input: {
     repository: string;
     issues: ScanIssueInput[];
@@ -148,9 +246,45 @@ function buildFallbackSuggestions(input: {
     return lines.join("\n");
 }
 
+function buildSuggestionAnalysisPlan(input: {
+    selectedFixes: SuggestionFixInput[];
+    manualGuidance: ManualGuidanceInput[];
+    repository: string;
+    initialConfidence: { level: ConfidenceLevel; rationale: string };
+}): string[] {
+    const fileCount = new Set(
+        input.selectedFixes
+            .map((fix) => fix.file)
+            .filter((file): file is string => typeof file === "string" && file.length > 0)
+    ).size;
+    const highlightedFixes = uniqueStrings(
+        input.selectedFixes
+            .slice(0, 2)
+            .map((fix) => summarizeFixTarget(fix))
+    );
+    const highlightedManual = uniqueStrings(
+        input.manualGuidance
+            .slice(0, 2)
+            .map((guidance) => summarizeFixTarget(guidance))
+    );
+
+    const steps = [
+        `Reviewing ${input.selectedFixes.length} selected auto-fix candidate(s) in ${fileCount} file(s) for ${input.repository}`,
+        highlightedFixes.length > 0
+            ? `Focusing on ${joinList(highlightedFixes)}`
+            : `Checking ${input.manualGuidance.length} manual-review finding(s) that still need human validation`,
+        `Starting at ${input.initialConfidence.level.toLowerCase()} confidence because ${input.initialConfidence.rationale}`,
+        highlightedManual.length > 0
+            ? `Leaving manual validation for ${joinList(highlightedManual)}`
+            : `Checking ${input.manualGuidance.length} manual-review finding(s) that still need human validation`,
+    ];
+
+    return steps.slice(0, 6);
+}
+
 const SYSTEM_PROMPT = `You are Cencori, a senior security engineer embedded in the codebase.
 Be direct, practical, and opinionated. You can use light humor sparingly, but stay technical.
-CRITICAL: You are an individual engineer, not an abstract AI. During both your internal reasoning/thought process and your final response, you MUST use first-person singular pronouns ("I", "my", "me"). NEVER refer to yourself in the third person (e.g., "The assistant should", "The AI will") or plural ("we", "our").
+CRITICAL: You are an individual engineer, not an abstract AI. In your final response, use first-person singular pronouns ("I", "my", "me"). Never refer to yourself in the third person (e.g., "The assistant should", "The AI will") or plural ("we", "our").
 NEVER use emojis — not in headings, bullet points, or anywhere else. Use plain text and markdown only.
 Always provide remediation guidance grounded in the provided scan data.`;
 
@@ -216,6 +350,16 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     });
 
     const selectedFixes = fixes.filter((fix) => fix.selected !== false);
+    const initialConfidence = inferSuggestionConfidence({
+        selectedFixes,
+        manualGuidance,
+    });
+    const analysisSteps = buildSuggestionAnalysisPlan({
+        selectedFixes,
+        manualGuidance,
+        repository: project.github_repo_full_name,
+        initialConfidence,
+    });
 
     const prompt = `Repository: ${project.github_repo_full_name}
 
@@ -253,7 +397,23 @@ Constraints:
             };
 
             try {
-                await streamWithReasoning(prompt, SYSTEM_PROMPT, controller, encoder, fallbackResponse);
+                await streamWithReasoning(prompt, SYSTEM_PROMPT, controller, encoder, fallbackResponse, undefined, {
+                    analysisSteps,
+                    draftAnalysisStep: selectedFixes.length > 0
+                        ? `Assembling the remediation brief around ${joinList(uniqueStrings(selectedFixes.slice(0, 2).map((fix) => summarizeFixTarget(fix))))}`
+                        : "Assembling the remediation brief from the available scan findings",
+                    firstContentAnalysisStep: manualGuidance.length > 0
+                        ? `Balancing auto-fix recommendations against ${manualGuidance.length} manual validation item(s)`
+                        : "Turning the selected findings into a merge-ready remediation brief",
+                    buildFinalAnalysis: ({ usedFallback }) => [
+                        buildSuggestionFinalAnalysisStep({
+                            initialConfidence: initialConfidence.level,
+                            selectedFixes,
+                            manualGuidance,
+                            usedFallback,
+                        }),
+                    ],
+                });
             } catch (error) {
                 console.error("[Fix Suggestions] Stream failed:", error);
                 sendData(JSON.stringify({ type: "content", content: fallbackResponse }));

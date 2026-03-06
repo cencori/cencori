@@ -45,6 +45,33 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     ]);
 }
 
+function normalizeAnalysisSteps(steps?: string[]): string[] {
+    if (!Array.isArray(steps)) {
+        return [];
+    }
+
+    return steps
+        .map((step) => (typeof step === "string" ? step.trim() : ""))
+        .filter((step) => step.length > 0)
+        .slice(0, 8);
+}
+
+function sanitizeReasoningForReuse(reasoning: string): string {
+    const metaPattern = /(first-person|third-person|emoji|system prompt|follow all personality|the user asks|need to respond as|must use|no emojis|casual messages short|prompt|respond conversationally|let'?s craft|speak as cencori|use \".*\"|should be brief|just answer)/i;
+    const cleanedLines = reasoning
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .filter((line) => !metaPattern.test(line));
+
+    const cleaned = cleanedLines.join("\n");
+    if (!cleaned) {
+        return "";
+    }
+
+    return cleaned.length > 2000 ? cleaned.slice(0, 2000) : cleaned;
+}
+
 /**
  * Call a single OpenAI-compatible provider (non-streaming).
  */
@@ -248,12 +275,14 @@ export async function streamWithFallback(
  * Dual-model reasoning stream:
  *
  * Phase 1 — gpt-oss-120b (Cerebras reasoning model)
- *   Streams delta.reasoning tokens → SSE: {"type":"reasoning","content":"..."}
- *   Frontend pipes these to ScanThinkingIndicator as live thought text.
+ *   Keeps raw delta.reasoning tokens private for internal answer drafting.
  *
  * Phase 2 — content generation with fallback chain:
  *   Cerebras llama3.1-8b → Groq llama-3.3-70b-versatile → Gemini
  *   Streams delta.content → SSE: {"type":"content","content":"..."}
+ *
+ * Visible investigation state:
+ *   Emits curated SSE analysis updates → {"type":"analysis","content":"..."}
  *
  * Completion: data: [DONE]
  */
@@ -267,11 +296,25 @@ export async function streamWithReasoning(
     options?: {
         emitDone?: boolean;
         closeController?: boolean;
+        analysisSteps?: string[];
+        draftAnalysisStep?: string;
+        firstContentAnalysisStep?: string;
+        buildFinalAnalysis?: (input: {
+            response: string;
+            contentEmitted: boolean;
+            usedFallback: boolean;
+        }) => string[];
     },
 ): Promise<void> {
     const cerebrasKey = process.env.CEREBRAS_API_KEY;
     const cerebrasBase = "https://api.cerebras.ai/v1";
     let contentEmitted = false;
+    let usedFallback = false;
+    let assembledResponse = "";
+    const analysisSteps = normalizeAnalysisSteps(options?.analysisSteps);
+    let analysisIndex = 0;
+    let firstContentAnalysisEmitted = false;
+    const emittedAnalysis = new Set<string>();
 
     const enqueue = (payload: string) =>
         controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
@@ -282,13 +325,56 @@ export async function streamWithReasoning(
         if (closeController) controller.close();
     };
 
-    const emitReasoning = (text: string) =>
-        enqueue(JSON.stringify({ type: "reasoning", content: text }));
+    const emitAnalysisStep = (text: string) => {
+        const normalized = text.trim();
+        if (!normalized || emittedAnalysis.has(normalized)) {
+            return;
+        }
+        emittedAnalysis.add(normalized);
+        enqueue(JSON.stringify({ type: "analysis", content: `${normalized}\n` }));
+    };
+
+    const advanceAnalysis = (fallbackStep?: string) => {
+        const nextStep = analysisSteps[analysisIndex] || fallbackStep;
+        if (!nextStep) {
+            return;
+        }
+        analysisIndex += analysisSteps[analysisIndex] ? 1 : 0;
+        emitAnalysisStep(nextStep);
+    };
+
+    const flushRemainingAnalysis = () => {
+        while (analysisIndex < analysisSteps.length) {
+            emitAnalysisStep(analysisSteps[analysisIndex]);
+            analysisIndex += 1;
+        }
+    };
 
     const emitContent = (text: string) => {
+        if (!firstContentAnalysisEmitted && options?.firstContentAnalysisStep) {
+            emitAnalysisStep(options.firstContentAnalysisStep);
+            firstContentAnalysisEmitted = true;
+        }
         enqueue(JSON.stringify({ type: "content", content: text }));
         contentEmitted = true;
+        assembledResponse += text;
         onContentChunk?.(text);
+    };
+
+    const emitFinalAnalysis = () => {
+        flushRemainingAnalysis();
+
+        const finalSteps = normalizeAnalysisSteps(
+            options?.buildFinalAnalysis?.({
+                response: assembledResponse,
+                contentEmitted,
+                usedFallback,
+            })
+        );
+
+        for (const step of finalSteps) {
+            emitAnalysisStep(step);
+        }
     };
 
     // Helper: read a streaming OpenAI-compatible response and emit content chunks
@@ -344,9 +430,11 @@ export async function streamWithReasoning(
 
     // ── Phase 1: reasoning with gpt-oss-120b ─────────────────────────────────
     let reasoningOutput = "";
+    advanceAnalysis("Reviewing the available security context and code evidence");
 
     if (cerebrasKey) {
         try {
+            advanceAnalysis("Running deeper security reasoning on the gathered evidence");
             console.log("[AI Client] Phase 1: gpt-oss-120b reasoning...");
             const res = await withTimeout(
                 fetch(`${cerebrasBase}/chat/completions`, {
@@ -389,7 +477,6 @@ export async function streamWithReasoning(
                             };
                             const delta = parsed.choices?.[0]?.delta;
                             if (delta?.reasoning) {
-                                emitReasoning(delta.reasoning);
                                 reasoningOutput += delta.reasoning;
                             }
                             if (delta?.content) {
@@ -409,12 +496,19 @@ export async function streamWithReasoning(
     }
 
     // ── Phase 2: content generation with fallback chain ───────────────────────
+    const reusableReasoning = sanitizeReasoningForReuse(reasoningOutput);
+    advanceAnalysis();
+    if (options?.draftAnalysisStep) {
+        emitAnalysisStep(options.draftAnalysisStep);
+    } else {
+        advanceAnalysis("Drafting a response grounded in the collected evidence");
+    }
     const contentMessages = [
         { role: "system", content: systemPrompt },
         {
             role: "user",
-            content: reasoningOutput
-                ? `Use this reasoning to inform your reply, but follow all personality and format instructions exactly — including keeping casual messages short and conversational:\n\n<reasoning>\n${reasoningOutput.slice(0, 3000)}\n</reasoning>\n\n${prompt}`
+            content: reusableReasoning
+                ? `Use this internal security analysis to improve your reply. Do not quote it, mention it, or repeat prompt instructions back to the user.\n\n<analysis>\n${reusableReasoning}\n</analysis>\n\n${prompt}`
                 : prompt,
         },
     ];
@@ -425,6 +519,7 @@ export async function streamWithReasoning(
             console.log("[AI Client] Phase 2: llama3.1-8b...");
             const ok = await streamOpenAIContent(cerebrasBase, cerebrasKey, FAST_MODEL, contentMessages);
             if (ok) {
+                emitFinalAnalysis();
                 console.log("[AI Client] ✓ Phase 2 via Cerebras llama");
                 finalizeStream();
                 return;
@@ -446,6 +541,7 @@ export async function streamWithReasoning(
                 contentMessages,
             );
             if (ok) {
+                emitFinalAnalysis();
                 console.log("[AI Client] ✓ Phase 2 via Groq");
                 finalizeStream();
                 return;
@@ -469,6 +565,7 @@ export async function streamWithReasoning(
                 const text = chunk.text();
                 if (text) emitContent(text);
             }
+            emitFinalAnalysis();
             console.log("[AI Client] ✓ Phase 2 via Gemini");
         } catch (err) {
             console.warn("[AI Client] Phase 2 Gemini failed:", err instanceof Error ? err.message : err);
@@ -478,11 +575,12 @@ export async function streamWithReasoning(
     // If nothing was emitted at all — emit fallback so the message is never blank
     if (!contentEmitted && fallbackContent) {
         console.log("[AI Client] All providers failed — emitting fallback content");
+        usedFallback = true;
         emitContent(fallbackContent);
     } else if (!contentEmitted) {
         console.warn("[AI Client] All providers failed and no fallback provided — stream is empty");
     }
 
+    emitFinalAnalysis();
     finalizeStream();
 }
-

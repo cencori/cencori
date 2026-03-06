@@ -101,10 +101,129 @@ interface CodeEvidence {
     excerpt: string;
 }
 
+type ConfidenceLevel = "High" | "Medium" | "Low";
+
 function shortText(value: string, maxLength: number): string {
     const normalized = value.trim();
     if (!normalized) return "";
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function uniqueStrings(items: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const item of items) {
+        const normalized = item.trim();
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        result.push(normalized);
+    }
+
+    return result;
+}
+
+function joinList(items: string[]): string {
+    if (items.length === 0) return "";
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return `${items[0]} and ${items[1]}`;
+    return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function summarizeIssueTarget(issue?: IssueContext): string {
+    if (!issue?.file) {
+        return issue?.name || issue?.type || "the latest repository findings";
+    }
+
+    const title = issue.name || issue.type || "selected finding";
+    return `${title} in ${issue.file}:${toSafeLine(issue.line)}`;
+}
+
+function summarizeEvidenceTargets(evidence: CodeEvidence[]): string {
+    const targets = uniqueStrings(
+        evidence
+            .slice(0, 3)
+            .map((entry) => `${entry.id} ${entry.file}:${entry.startLine}-${entry.endLine}`)
+    );
+
+    return targets.length > 0 ? joinList(targets) : "the available repository evidence";
+}
+
+function inferChatConfidence(input: {
+    issue?: IssueContext;
+    relatedIssues: IssueContext[];
+    evidence: CodeEvidence[];
+    hasMemoryContext: boolean;
+    hasGraphContext: boolean;
+}): { level: ConfidenceLevel; rationale: string } {
+    let score = 0;
+
+    if (input.issue?.file) score += 1;
+    if (input.relatedIssues.length > 0) score += 1;
+    if (input.evidence.length >= 2) score += 1;
+    if (input.evidence.length >= 4) score += 1;
+    if (input.hasMemoryContext) score += 1;
+    if (input.hasGraphContext) score += 1;
+    if (input.evidence.length === 0) score -= 2;
+
+    if (score >= 5) {
+        return {
+            level: "High",
+            rationale: "multiple code excerpts, related findings, and repository context are available",
+        };
+    }
+
+    if (score >= 2) {
+        return {
+            level: "Medium",
+            rationale: "the answer is grounded in partial code evidence and repository context",
+        };
+    }
+
+    return {
+        level: "Low",
+        rationale: "the available evidence is thin or incomplete for a full verification pass",
+    };
+}
+
+function extractConfidenceLevel(response: string): ConfidenceLevel | undefined {
+    const confidenceSectionMatch = response.match(/###\s*Confidence\s*([\s\S]*?)(?:\n###\s|$)/i);
+    if (!confidenceSectionMatch) return undefined;
+
+    const levelMatch = confidenceSectionMatch[1].match(/\b(High|Medium|Low)\b/i);
+    if (!levelMatch) return undefined;
+
+    const normalized = levelMatch[1].toLowerCase();
+    if (normalized === "high") return "High";
+    if (normalized === "medium") return "Medium";
+    return "Low";
+}
+
+function buildChatFinalAnalysisStep(input: {
+    initialConfidence: ConfidenceLevel;
+    issue?: IssueContext;
+    evidence: CodeEvidence[];
+    response: string;
+    technicalMode: boolean;
+}): string {
+    const finalConfidence =
+        (input.technicalMode ? extractConfidenceLevel(input.response) : undefined) ||
+        input.initialConfidence;
+    const target = summarizeIssueTarget(input.issue);
+    const citedEvidence = uniqueStrings(
+        Array.from(input.response.matchAll(/\[(E\d+)\]/g)).map((match) => match[1])
+    ).slice(0, 3);
+    const evidenceSummary = citedEvidence.length > 0
+        ? ` using ${joinList(citedEvidence)}`
+        : input.evidence.length > 0
+            ? ` using ${joinList(input.evidence.slice(0, 2).map((entry) => entry.id))}`
+            : "";
+
+    if (finalConfidence === input.initialConfidence) {
+        return `Confidence holds at ${finalConfidence.toLowerCase()} for ${target}${evidenceSummary}`;
+    }
+
+    return `Confidence shifted from ${input.initialConfidence.toLowerCase()} to ${finalConfidence.toLowerCase()} for ${target}${evidenceSummary}`;
 }
 
 function toSafeLine(value: unknown): number {
@@ -416,6 +535,54 @@ function formatRelatedIssues(relatedIssues: IssueContext[]): string {
         .join("\n");
 }
 
+function buildChatAnalysisPlan(input: {
+    issue?: IssueContext;
+    relatedIssues: IssueContext[];
+    evidence: CodeEvidence[];
+    hasMemoryContext: boolean;
+    hasGraphContext: boolean;
+    initialConfidence: { level: ConfidenceLevel; rationale: string };
+}): string[] {
+    const steps: string[] = [];
+
+    if (input.issue?.file) {
+        steps.push(`Reviewing ${summarizeIssueTarget(input.issue)}`);
+    } else {
+        steps.push("Reviewing the latest repository security context for this question");
+    }
+
+    if (input.evidence.length > 0) {
+        steps.push(`Inspecting code evidence: ${summarizeEvidenceTargets(input.evidence)}`);
+    }
+
+    steps.push(
+        `Starting at ${input.initialConfidence.level.toLowerCase()} confidence because ${input.initialConfidence.rationale}`
+    );
+
+    if (input.relatedIssues.length > 0) {
+        const relatedTargets = uniqueStrings(
+            input.relatedIssues
+                .slice(0, 2)
+                .map((related) => summarizeIssueTarget(related))
+        );
+        steps.push(
+            relatedTargets.length > 0
+                ? `Checking related findings: ${joinList(relatedTargets)}`
+                : `Checking ${input.relatedIssues.length} related finding(s) in the same code path`
+        );
+    }
+
+    if (input.hasMemoryContext) {
+        steps.push("Comparing the current question against prior scan memory");
+    }
+
+    if (input.hasGraphContext) {
+        steps.push("Using repository graph and data-flow context to judge impact");
+    }
+
+    return steps.slice(0, 6);
+}
+
 function buildFallbackAnswer(input: {
     question: string;
     issue?: IssueContext;
@@ -636,6 +803,21 @@ Currently selected issue:
     const memorySection = memoryContext
         ? `\n\n## Relevant context from this project's history\n${memoryContext}`
         : "";
+    const initialConfidence = inferChatConfidence({
+        issue,
+        relatedIssues,
+        evidence,
+        hasMemoryContext: Boolean(memoryContext),
+        hasGraphContext: Boolean(researchContext || aiContext || aiSummary),
+    });
+    const analysisSteps = buildChatAnalysisPlan({
+        issue,
+        relatedIssues,
+        evidence,
+        hasMemoryContext: Boolean(memoryContext),
+        hasGraphContext: Boolean(researchContext || aiContext || aiSummary),
+        initialConfidence,
+    });
 
     const graphSection = buildGraphContextSection(
         project.github_repo_full_name || "unknown repository",
@@ -658,7 +840,7 @@ Currently selected issue:
 
     const systemPrompt = `You are Cencori, a senior security and architecture engineer embedded in this repository.
 You provide direct, practical answers grounded in concrete evidence.
-CRITICAL: Speak in first-person singular ("I", "my", "me"). Never refer to yourself in third person or plural.
+CRITICAL: In your final response, speak in first-person singular ("I", "my", "me"). Never refer to yourself in third person or plural.
 CRITICAL: Never use emojis.
 When technical mode is active, follow the response contract exactly and do not skip evidence citations.`;
 
@@ -704,7 +886,26 @@ ${question}`;
                     (chunk) => {
                         accumulatedResponse += chunk;
                     },
-                    { emitDone: false, closeController: false },
+                    {
+                        emitDone: false,
+                        closeController: false,
+                        analysisSteps,
+                        draftAnalysisStep: technicalMode
+                            ? `Assembling the answer around ${summarizeIssueTarget(issue)}`
+                            : "Assembling a concise reply from the repository context",
+                        firstContentAnalysisStep: technicalMode
+                            ? `Weighing evidence citations from ${summarizeEvidenceTargets(evidence)}`
+                            : "Grounding the reply in the strongest repository signals",
+                        buildFinalAnalysis: ({ response, usedFallback }) => [
+                            buildChatFinalAnalysisStep({
+                                initialConfidence: usedFallback ? "Low" : initialConfidence.level,
+                                issue,
+                                evidence,
+                                response,
+                                technicalMode,
+                            }),
+                        ],
+                    },
                 );
                 finishedStreaming = true;
 

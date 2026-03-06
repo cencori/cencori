@@ -7,7 +7,7 @@ import { useState } from "react";
 
 interface ScanThinkingIndicatorProps {
     finished?: boolean;
-    /** Live reasoning text streamed from gpt-oss-120b. */
+    /** Live investigation text streamed from the backend. */
     liveText?: string;
 }
 
@@ -15,7 +15,7 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
     const [isExpanded, setIsExpanded] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom while reasoning is streaming
+    // Auto-scroll to bottom while investigation steps are streaming
     useEffect(() => {
         if (!finished && scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -28,20 +28,22 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
     }, [finished]);
 
     const isRunning = !finished;
+    const analysisLines = liveText
+        ? liveText
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .map((line) => line.replace(/^[*-]\s*/, ""))
+        : [];
 
     const label = finished
-        ? "Complete"
-        : liveText && liveText.length > 0
+        ? "Investigation complete"
+        : analysisLines.length > 0
             ? (() => {
-                // Show the last non-empty line of reasoning
-                const lines = liveText.trimEnd().split("\n");
-                for (let i = lines.length - 1; i >= 0; i--) {
-                    const line = lines[i].trim();
-                    if (line.length > 0) return line.replace(/<\/?think>/g, "").slice(-70);
-                }
-                return "Thinking...";
+                const lastLine = analysisLines[analysisLines.length - 1] || "";
+                return lastLine.slice(0, 90);
             })()
-            : "Thinking...";
+            : "Investigating security context...";
 
     return (
         <div className="w-full">
@@ -66,18 +68,28 @@ export function ScanThinkingIndicator({ finished = false, liveText }: ScanThinki
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden border-l border-border/40 ml-2 pl-4 mb-2"
                     >
-                        {liveText && liveText.length > 0 ? (
+                        {analysisLines.length > 0 ? (
                             <div
                                 ref={scrollRef}
-                                className="max-h-56 overflow-y-auto text-[11px] font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap py-1"
+                                className="max-h-56 overflow-y-auto py-1"
                             >
-                                {liveText.replace(/<\/?think>/g, "")}
+                                <div className="space-y-2">
+                                    {analysisLines.map((line, index) => (
+                                        <div key={`${line}-${index}`} className="flex items-start gap-2 text-[11px] font-mono text-muted-foreground leading-relaxed">
+                                            <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400/70" />
+                                            <span>{line}</span>
+                                        </div>
+                                    ))}
+                                </div>
                                 {!finished && (
-                                    <span className="inline-block w-1.5 h-3 bg-emerald-400/70 animate-pulse ml-0.5 align-middle" />
+                                    <div className="flex items-center gap-2 pt-2 text-[10px] font-mono text-muted-foreground/60">
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400/70 animate-pulse" />
+                                        Continuing investigation...
+                                    </div>
                                 )}
                             </div>
                         ) : (
-                            // No reasoning yet — simple waiting state
+                            // No analysis yet — simple waiting state
                             <div className="flex items-center gap-2 py-2 text-[10px] font-mono text-muted-foreground/50">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-pulse" />
                                 Cencori is thinking...
