@@ -164,6 +164,13 @@ interface ScanResultPayload {
     suppressed_issues?: ScanIssue[];
     raw_issue_count?: number;
     message?: string;
+    progress?: {
+        processedFiles?: number;
+        totalFiles?: number;
+        currentFile?: string | null;
+        issuesFound?: number;
+        updatedAt?: string | null;
+    };
     summary?: ScanSummary;
     research?: RepositoryResearch;
     ai_context?: RepositoryAiContext;
@@ -174,6 +181,7 @@ interface ScanRun {
     slug?: string;
     created_at: string;
     status: string;
+    error_message?: string | null;
     score: string | null;
     files_scanned: number;
     issues_found: number;
@@ -258,8 +266,17 @@ function formatTimeAgo(dateString: string | null): string {
 function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
     if (!scan) return [];
 
-    if (scan.logs && scan.logs.length > 0) {
-        return scan.logs.map((log) => ({
+    const persistedLogs = (scan.logs || []).filter((log) => {
+        const message = log.message || "";
+        return !(
+            message.includes("Previous running scan appears stalled. Resetting state") ||
+            message.includes("Another scan is already running for this project. Attaching to its live log") ||
+            message.includes("Resuming the active scan")
+        );
+    });
+
+    if (persistedLogs.length > 0) {
+        return persistedLogs.map((log) => ({
             type: log.type,
             message: log.message || "",
             time: `${(log.time / 1000).toFixed(1)}s`,
@@ -314,7 +331,24 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
     if (scan.status === "failed") {
         return [{
             type: "error",
-            message: "Scan failed",
+            message: scan.error_message || "Scan failed",
+            time: timeStr,
+        }];
+    }
+
+    if (scan.status === "running") {
+        const progress = scan.results?.progress;
+        if (progress?.totalFiles) {
+            return [{
+                type: "progress",
+                message: `Still scanning... (${progress.processedFiles || 0}/${progress.totalFiles} files)`,
+                time: timeStr,
+            }];
+        }
+
+        return [{
+            type: "info",
+            message: "This scan is still marked as running.",
             time: timeStr,
         }];
     }

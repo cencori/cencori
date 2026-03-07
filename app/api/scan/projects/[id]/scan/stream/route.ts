@@ -250,8 +250,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                             status: 'failed',
                             error_message: errorMessage,
                             fix_status: 'not_applicable',
-                            scan_duration_ms: Math.max(0, Date.now() - startTime),
-                            logs: allLogs,
                         })
                         .eq('id', existingScanRunId);
                 } catch (persistError) {
