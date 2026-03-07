@@ -8,6 +8,7 @@ export interface ScanIssueLike {
     name: string;
     type: string;
     line: number;
+    description?: string;
 }
 
 export interface ScannedRepositoryFile {
