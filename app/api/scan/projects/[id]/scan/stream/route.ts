@@ -26,9 +26,12 @@ interface RouteParams {
 
 // Allow up to 5 minutes — scan + LLM filter + AI insight can be slow on large repos
 export const maxDuration = 300;
+const RUNNING_SCAN_STALE_MS = (maxDuration + 60) * 1000;
+const RUNNING_SCAN_PROGRESS_STALE_MS = 45_000;
 
 type ScanRunRow = {
     id: string;
+    created_at?: string | null;
     status: string;
     score: string | null;
     files_scanned: number | null;
@@ -36,6 +39,14 @@ type ScanRunRow = {
     scan_duration_ms: number | null;
     results?: Record<string, unknown> | null;
     error_message?: string | null;
+};
+
+type RunningScanProgress = {
+    processedFiles: number;
+    totalFiles: number;
+    currentFile: string | null;
+    issuesFound: number;
+    updatedAt: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -51,6 +62,38 @@ function asArray<T = unknown>(value: unknown): T[] {
 
 function asNumber(value: unknown, fallback = 0): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function asString(value: unknown): string | null {
+    return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function getAgeMs(timestamp: string | null | undefined): number | null {
+    if (!timestamp) return null;
+    const parsed = Date.parse(timestamp);
+    if (!Number.isFinite(parsed)) return null;
+    return Date.now() - parsed;
+}
+
+function getRunningScanProgress(scanRun: ScanRunRow): RunningScanProgress | null {
+    const results = asRecord(scanRun.results);
+    const progress = asRecord(results?.progress);
+    if (!progress) return null;
+
+    return {
+        processedFiles: asNumber(progress.processedFiles),
+        totalFiles: asNumber(progress.totalFiles),
+        currentFile: asString(progress.currentFile),
+        issuesFound: asNumber(progress.issuesFound),
+        updatedAt: asString(progress.updatedAt),
+    };
+}
+
+function buildResumeProgressMessage(progress: RunningScanProgress | null): string {
+    if (progress && progress.totalFiles > 0) {
+        return `Still scanning... (${progress.processedFiles}/${progress.totalFiles} files)`;
+    }
+    return 'Waiting for the active scan to report progress...';
 }
 
 function buildCompletePayloadFromRun(scanRun: ScanRunRow): Record<string, unknown> {
@@ -199,6 +242,23 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 }
             };
 
+            const markScanRunFailed = async (existingScanRunId: string, errorMessage: string) => {
+                try {
+                    await supabaseAdmin
+                        .from('scan_runs')
+                        .update({
+                            status: 'failed',
+                            error_message: errorMessage,
+                            fix_status: 'not_applicable',
+                            scan_duration_ms: Math.max(0, Date.now() - startTime),
+                            logs: allLogs,
+                        })
+                        .eq('id', existingScanRunId);
+                } catch (persistError) {
+                    console.error('[Scan Stream] Failed to mark stale scan as failed:', persistError);
+                }
+            };
+
             const streamScanRunStatus = async (existingScanRunId: string, reconnectLabel: string) => {
                 safeSendEvent({
                     type: 'info',
@@ -211,7 +271,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 while (!streamClosed) {
                     const { data: scanRunSnapshot, error: scanRunSnapshotError } = await supabaseAdmin
                         .from('scan_runs')
-                        .select('id,status,score,files_scanned,issues_found,scan_duration_ms,error_message,results')
+                        .select('id,created_at,status,score,files_scanned,issues_found,scan_duration_ms,error_message,results')
                         .eq('id', existingScanRunId)
                         .single();
 
@@ -220,6 +280,23 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                             type: 'error',
                             time: Date.now() - startTime,
                             message: 'Unable to resume scan stream. Please run scan again.',
+                        });
+                        break;
+                    }
+
+                    const runningProgress = getRunningScanProgress(scanRunSnapshot as ScanRunRow);
+                    const progressAgeMs = getAgeMs(runningProgress?.updatedAt);
+                    const runAgeMs = getAgeMs((scanRunSnapshot as ScanRunRow).created_at);
+                    const isProgressStale = progressAgeMs !== null && progressAgeMs > RUNNING_SCAN_PROGRESS_STALE_MS;
+                    const isRunStale = progressAgeMs === null && runAgeMs !== null && runAgeMs > RUNNING_SCAN_STALE_MS;
+
+                    if (scanRunSnapshot.status === 'running' && (isProgressStale || isRunStale)) {
+                        const staleMessage = 'Scan stalled before completion. Start a fresh scan.';
+                        await markScanRunFailed(existingScanRunId, staleMessage);
+                        safeSendEvent({
+                            type: 'error',
+                            time: Date.now() - startTime,
+                            message: staleMessage,
                         });
                         break;
                     }
@@ -250,8 +327,16 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         safeSendEvent({
                             type: 'progress',
                             time: now - startTime,
-                            message: 'Reconnected to active scan stream. Waiting for next update...',
-                            data: { scanId: existingScanRunId },
+                            message: buildResumeProgressMessage(runningProgress),
+                            data: {
+                                scanId: existingScanRunId,
+                                ...(runningProgress ? {
+                                    processedFiles: runningProgress.processedFiles,
+                                    totalFiles: runningProgress.totalFiles,
+                                    currentFile: runningProgress.currentFile,
+                                    issuesFound: runningProgress.issuesFound,
+                                } : {}),
+                            },
                         });
                         lastProgressEventAt = now;
                     }
@@ -279,7 +364,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             try {
                 const { data: activeScanRun } = await supabaseAdmin
                     .from('scan_runs')
-                    .select('id,status')
+                    .select('id,created_at,status,results')
                     .eq('project_id', id)
                     .eq('status', 'running')
                     .order('created_at', { ascending: false })
@@ -287,13 +372,28 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     .maybeSingle();
 
                 if (activeScanRun?.id) {
+                    const runningProgress = getRunningScanProgress(activeScanRun as ScanRunRow);
+                    const progressAgeMs = getAgeMs(runningProgress?.updatedAt);
+                    const runAgeMs = getAgeMs((activeScanRun as ScanRunRow).created_at);
+                    const isProgressStale = progressAgeMs !== null && progressAgeMs > RUNNING_SCAN_PROGRESS_STALE_MS;
+                    const isRunStale = progressAgeMs === null && runAgeMs !== null && runAgeMs > RUNNING_SCAN_STALE_MS;
+
+                    if (isProgressStale || isRunStale) {
+                        safeSendEvent({
+                            type: 'info',
+                            time: Date.now() - startTime,
+                            message: 'Previous running scan appears stalled. Resetting state...',
+                        });
+                        await markScanRunFailed(activeScanRun.id, 'Scan stalled before completion. Start a fresh scan.');
+                    } else {
                     await streamScanRunStatus(
                         activeScanRun.id,
                         reconnectMode
-                            ? 'Reconnected to an active scan. Resuming updates...'
-                            : 'A scan is already running for this project. Streaming existing run...'
+                            ? 'Resuming the active scan...'
+                            : 'Another scan is already running for this project. Attaching to its live log...'
                     );
                     return;
+                    }
                 }
 
                 if (reconnectMode) {
@@ -383,6 +483,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 }
 
                 let lastProgressUpdate = 0;
+                let lastPersistedProgressUpdate = 0;
                 const {
                     allIssues: rawIssues,
                     scannedFiles,
@@ -445,6 +546,35 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                                 }
                             });
                             lastProgressUpdate = now;
+                        }
+
+                        if (
+                            progress.processedFiles === progress.totalFiles ||
+                            progress.processedFiles % 10 === 0 ||
+                            now - lastPersistedProgressUpdate > 4000
+                        ) {
+                            try {
+                                await supabaseAdmin
+                                    .from('scan_runs')
+                                    .update({
+                                        files_scanned: progress.processedFiles,
+                                        issues_found: progress.issuesFound,
+                                        scan_duration_ms: now - startTime,
+                                        results: {
+                                            progress: {
+                                                processedFiles: progress.processedFiles,
+                                                totalFiles: progress.totalFiles,
+                                                currentFile: progress.currentFile,
+                                                issuesFound: progress.issuesFound,
+                                                updatedAt: new Date(now).toISOString(),
+                                            },
+                                        },
+                                    })
+                                    .eq('id', scanRun.id);
+                                lastPersistedProgressUpdate = now;
+                            } catch (persistProgressError) {
+                                console.error('[Scan Stream] Failed to persist running scan progress:', persistProgressError);
+                            }
                         }
                     },
                 });
