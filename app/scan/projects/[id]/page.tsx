@@ -688,13 +688,8 @@ export default function ProjectDetailPage() {
                             setScanLog(prev => [...prev, { type: "info", message: data.message || "Info", time: timeStr }]);
                         } else if (data.type === 'progress') {
                             setScanLog(prev => {
-                                const lastIndex = prev.findIndex(l => l.type === 'progress');
-                                if (lastIndex >= 0) {
-                                    const updated = [...prev];
-                                    updated[lastIndex] = { type: "info", message: data.message || "Scanning...", time: timeStr };
-                                    return updated;
-                                }
-                                return [...prev, { type: "info", message: data.message || "Scanning...", time: timeStr }];
+                                const nextEntry = { type: "progress", message: data.message || "Scanning...", time: timeStr };
+                                return [...prev.filter((entry) => entry.type !== "progress"), nextEntry];
                             });
                         } else if (data.type === 'issue') {
                             const issueData = data.data as { file?: string; issues?: ScanIssue[] } | undefined;
