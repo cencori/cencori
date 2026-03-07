@@ -163,6 +163,7 @@ interface ScanResultPayload {
     issues: ScanIssue[];
     suppressed_issues?: ScanIssue[];
     raw_issue_count?: number;
+    message?: string;
     summary?: ScanSummary;
     research?: RepositoryResearch;
     ai_context?: RepositoryAiContext;
@@ -203,6 +204,14 @@ interface Changelog {
     commit_count: number;
     created_at: string;
 }
+
+type ScanLogEntry = {
+    type: string;
+    message: string;
+    time?: string;
+    severity?: string;
+    line?: number;
+};
 
 const scoreColors: Record<string, string> = {
     A: "bg-emerald-500",
@@ -246,6 +255,73 @@ function formatTimeAgo(dateString: string | null): string {
     return `${diffDays}d ago`;
 }
 
+function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
+    if (!scan) return [];
+
+    if (scan.logs && scan.logs.length > 0) {
+        return scan.logs.map((log) => ({
+            type: log.type,
+            message: log.message || "",
+            time: `${(log.time / 1000).toFixed(1)}s`,
+            severity: (log.data as { severity?: string } | undefined)?.severity,
+            line: (log.data as { line?: number } | undefined)?.line,
+        }));
+    }
+
+    const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
+    const issues = scan.results?.issues || [];
+
+    if (issues.length > 0) {
+        const logEntries: ScanLogEntry[] = [];
+        const issuesByFile: Record<string, ScanIssue[]> = {};
+
+        for (const issue of issues) {
+            if (!issuesByFile[issue.file]) {
+                issuesByFile[issue.file] = [];
+            }
+            issuesByFile[issue.file].push(issue);
+        }
+
+        for (const [file, fileIssues] of Object.entries(issuesByFile)) {
+            logEntries.push({ type: "file", message: file, time: timeStr });
+            for (const issue of fileIssues) {
+                logEntries.push({
+                    type: "issue",
+                    message: `${issue.name}: ${issue.match}`,
+                    severity: issue.severity,
+                    line: issue.line,
+                });
+            }
+        }
+
+        logEntries.push({
+            type: "summary",
+            message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`,
+            time: timeStr,
+        });
+
+        return logEntries;
+    }
+
+    if (scan.status === "completed") {
+        return [{
+            type: "summary",
+            message: scan.results?.message || `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`,
+            time: timeStr,
+        }];
+    }
+
+    if (scan.status === "failed") {
+        return [{
+            type: "error",
+            message: "Scan failed",
+            time: timeStr,
+        }];
+    }
+
+    return [];
+}
+
 export default function ProjectDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -262,7 +338,7 @@ export default function ProjectDetailPage() {
     const [scans, setScans] = useState<ScanRun[]>([]);
     const [currentScan, setCurrentScan] = useState<ScanRun | null>(null);
     const [baselineScanId, setBaselineScanId] = useState<string>("");
-    const [scanLog, setScanLog] = useState<Array<{ type: string; message: string; time?: string; severity?: string; line?: number }>>([]);
+    const [scanLog, setScanLog] = useState<ScanLogEntry[]>([]);
     const [showSuppressed, setShowSuppressed] = useState(false);
     const [changelogs, setChangelogs] = useState<Changelog[]>([]);
     const [isUpdatingFixStatus, setIsUpdatingFixStatus] = useState(false);
@@ -379,51 +455,7 @@ export default function ProjectDetailPage() {
                         if (fetchedScans.length > 1) {
                             setBaselineScanId(fetchedScans[1].id);
                         }
-
-                        // Populate scan log from last scan's results
-                        if (lastScan.results?.issues && lastScan.results.issues.length > 0) {
-                            const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
-                            const timeStr = `${(lastScan.scan_duration_ms / 1000).toFixed(1)}s`;
-
-                            // Group issues by file
-                            const issuesByFile: Record<string, ScanIssue[]> = {};
-                            for (const issue of lastScan.results.issues) {
-                                if (!issuesByFile[issue.file]) {
-                                    issuesByFile[issue.file] = [];
-                                }
-                                issuesByFile[issue.file].push(issue);
-                            }
-
-                            // Add file and issue entries
-                            for (const [file, issues] of Object.entries(issuesByFile)) {
-                                logEntries.push({ type: "file", message: file, time: timeStr });
-                                for (const issue of issues) {
-                                    logEntries.push({
-                                        type: "issue",
-                                        message: `${issue.name}: ${issue.match}`,
-                                        severity: issue.severity,
-                                        line: issue.line,
-                                    });
-                                }
-                            }
-
-                            // Add summary
-                            logEntries.push({
-                                type: "summary",
-                                message: `Complete: ${lastScan.files_scanned} files scanned, ${lastScan.issues_found} issues found`,
-                                time: timeStr,
-                            });
-
-                            setScanLog(logEntries);
-                        } else if (lastScan.status === 'completed') {
-                            // No issues found, show success
-                            const timeStr = `${(lastScan.scan_duration_ms / 1000).toFixed(1)}s`;
-                            setScanLog([{
-                                type: "summary",
-                                message: `Complete: ${lastScan.files_scanned} files scanned, 0 issues found`,
-                                time: timeStr,
-                            }]);
-                        }
+                        setScanLog(buildScanLogEntries(lastScan));
                     }
                 }
             } catch (err) {
@@ -471,6 +503,13 @@ export default function ProjectDetailPage() {
         if (!baselineScanId) return null;
         return scans.find((scan) => scan.id === baselineScanId) || null;
     }, [baselineScanId, scans]);
+
+    const displayedScanLog = useMemo(() => {
+        if (scanLog.length > 0 || isScanning) {
+            return scanLog;
+        }
+        return buildScanLogEntries(currentScan);
+    }, [currentScan, isScanning, scanLog]);
 
     const currentResearch = currentScan?.results?.research || null;
     const currentAiContext = (isScanning ? liveAiContext : null) || currentScan?.results?.ai_context || null;
@@ -874,38 +913,7 @@ export default function ProjectDetailPage() {
 
     const handleSelectScan = (scan: ScanRun) => {
         setCurrentScan(scan);
-
-        if (scan.logs && scan.logs.length > 0) {
-            setScanLog(scan.logs.map(log => ({
-                type: log.type,
-                message: log.message || '',
-                time: `${(log.time / 1000).toFixed(1)}s`,
-                severity: (log.data as { severity?: string })?.severity,
-                line: (log.data as { line?: number })?.line,
-            })));
-            return;
-        }
-
-        if (scan.results?.issues) {
-            const logEntries: Array<{ type: string; message: string; time?: string; severity?: string; line?: number }> = [];
-            const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
-            const issuesByFile: Record<string, ScanIssue[]> = {};
-
-            for (const issue of scan.results.issues) {
-                if (!issuesByFile[issue.file]) issuesByFile[issue.file] = [];
-                issuesByFile[issue.file].push(issue);
-            }
-
-            for (const [file, issues] of Object.entries(issuesByFile)) {
-                logEntries.push({ type: "file", message: file, time: timeStr });
-                for (const issue of issues) {
-                    logEntries.push({ type: "issue", message: `${issue.name}: ${issue.match}`, severity: issue.severity, line: issue.line });
-                }
-            }
-
-            logEntries.push({ type: "summary", message: `Complete: ${scan.files_scanned} files scanned, ${scan.issues_found} issues found`, time: timeStr });
-            setScanLog(logEntries);
-        }
+        setScanLog(buildScanLogEntries(scan));
     };
 
     const scanHistorySidebar = scans.length > 0 ? (
@@ -1119,8 +1127,8 @@ export default function ProjectDetailPage() {
                             </div>
                         </div>
                         <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
-                            {scanLog.length > 0 ? (
-                                scanLog.map((entry, index) => (
+                            {displayedScanLog.length > 0 ? (
+                                displayedScanLog.map((entry, index) => (
                                     <div key={index} className="flex items-start gap-3 py-0.5">
                                         {entry.type === "info" && (
                                             <>
@@ -1645,7 +1653,7 @@ export default function ProjectDetailPage() {
 
                             <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                                 <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Continuity Memory</p>
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Memory</p>
                                     <p className="text-[10px] text-muted-foreground">
                                         {continuityMemory.length} remembered item{continuityMemory.length === 1 ? "" : "s"}
                                     </p>
