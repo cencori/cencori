@@ -992,7 +992,13 @@ export default function ProjectDetailPage() {
                     className="h-7 text-xs px-3"
                 >
                     {isScanning ? (
-                        <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Scanning...</>
+                        <>
+                            <span
+                                aria-hidden="true"
+                                className="mr-1.5 h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
+                            />
+                            Scanning...
+                        </>
                     ) : (
                         "Run Scan"
                     )}
