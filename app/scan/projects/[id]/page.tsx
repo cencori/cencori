@@ -266,25 +266,6 @@ function formatTimeAgo(dateString: string | null): string {
 function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
     if (!scan) return [];
 
-    const persistedLogs = (scan.logs || []).filter((log) => {
-        const message = log.message || "";
-        return !(
-            message.includes("Previous running scan appears stalled. Resetting state") ||
-            message.includes("Another scan is already running for this project. Attaching to its live log") ||
-            message.includes("Resuming the active scan")
-        );
-    });
-
-    if (persistedLogs.length > 0) {
-        return persistedLogs.map((log) => ({
-            type: log.type,
-            message: log.message || "",
-            time: `${(log.time / 1000).toFixed(1)}s`,
-            severity: (log.data as { severity?: string } | undefined)?.severity,
-            line: (log.data as { line?: number } | undefined)?.line,
-        }));
-    }
-
     const timeStr = `${(scan.scan_duration_ms / 1000).toFixed(1)}s`;
     const issues = scan.results?.issues || [];
 
@@ -334,6 +315,25 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
             message: scan.error_message || "Scan failed",
             time: timeStr,
         }];
+    }
+
+    const persistedLogs = (scan.logs || []).filter((log) => {
+        const message = log.message || "";
+        return !(
+            message.includes("Previous running scan appears stalled. Resetting state") ||
+            message.includes("Another scan is already running for this project. Attaching to its live log") ||
+            message.includes("Resuming the active scan")
+        );
+    });
+
+    if (persistedLogs.length > 0) {
+        return persistedLogs.map((log) => ({
+            type: log.type,
+            message: log.message || "",
+            time: `${(log.time / 1000).toFixed(1)}s`,
+            severity: (log.data as { severity?: string } | undefined)?.severity,
+            line: (log.data as { line?: number } | undefined)?.line,
+        }));
     }
 
     if (scan.status === "running") {
