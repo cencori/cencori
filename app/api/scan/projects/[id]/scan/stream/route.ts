@@ -12,6 +12,7 @@ import { scanDependencies, isLockfile } from '@/lib/scan/dependency-scanner';
 import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
+import { persistScanContinuity } from '@/lib/scan/continuity';
 import {
     calculateScore,
     scanFileContent,
@@ -570,6 +571,15 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     })),
                     research: {
                         filesIndexed: research.filesIndexed,
+                        projectBrief: {
+                            summary: research.projectBrief.summary,
+                            appPurpose: research.projectBrief.appPurpose,
+                            authModel: research.projectBrief.authModel,
+                            deploymentShape: research.projectBrief.deploymentShape,
+                            trustBoundaries: research.projectBrief.trustBoundaries,
+                            sensitiveFlows: research.projectBrief.sensitiveFlows,
+                            criticalModules: research.projectBrief.criticalModules,
+                        },
                         interactionHotspots: research.interactionMap.hotspots.map((hotspot) => ({
                             file: hotspot.file,
                             name: hotspot.name,
@@ -685,6 +695,22 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         last_scan_files: filesScanned,
                     })
                     .eq('id', id);
+
+                try {
+                    await persistScanContinuity({
+                        projectId: id,
+                        userId: user.id,
+                        repository: githubAccess.repository.fullName,
+                        scanRunId: scanRun.id,
+                        score,
+                        issues: allIssues,
+                        summary,
+                        research: enrichedResearch,
+                        supabase: supabaseAdmin,
+                    });
+                } catch (continuityError) {
+                    console.error('[Scan Stream] Failed to persist continuity memory:', continuityError);
+                }
 
                 closeStream();
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getInstallationOctokit } from '@/lib/github';
+import { listContinuityMemoryEntries } from '@/lib/scan/scan-memory';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -40,7 +40,14 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             .order('created_at', { ascending: false })
             .limit(10);
 
-        return NextResponse.json({ project, scans: scans || [] });
+        let continuity: Awaited<ReturnType<typeof listContinuityMemoryEntries>> = [];
+        try {
+            continuity = await listContinuityMemoryEntries(id, user.id, supabaseAdmin, { limit: 12 });
+        } catch (continuityError) {
+            console.error('[Scan Project] Failed to load continuity memory:', continuityError);
+        }
+
+        return NextResponse.json({ project, scans: scans || [], continuity });
     } catch (error) {
         console.error('[Scan Project] Unexpected error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

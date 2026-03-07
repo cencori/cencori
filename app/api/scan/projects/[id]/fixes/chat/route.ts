@@ -6,7 +6,7 @@ import { streamWithReasoning } from "@/lib/scan/ai-client";
 import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 import { verifyProjectGithubAccess } from "@/lib/scan/github-access";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
-import { ScanMemoryError, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
+import { ScanMemoryError, getContinuityMemoryContext, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_EVIDENCE_FILES = 5;
@@ -58,6 +58,17 @@ interface DataFlowTraceLike {
 
 interface ScanResearchLike {
     filesIndexed?: number;
+    projectBrief?: {
+        summary?: string;
+        appPurpose?: string;
+        authModel?: string;
+        deploymentShape?: string;
+        trustBoundaries?: string[];
+        sensitiveFlows?: string[];
+        criticalModules?: string[];
+        externalServices?: string[];
+        confidence?: number;
+    };
     interactionMap?: {
         nodes?: unknown[];
         edges?: unknown[];
@@ -273,6 +284,22 @@ function buildGraphContextSection(
 ): string {
     const lines: string[] = [];
     lines.push(`Repository: ${repository}`);
+
+    if (research?.projectBrief?.summary) {
+        lines.push(`Project brief: ${shortText(research.projectBrief.summary, 320)}`);
+    }
+    if (research?.projectBrief?.authModel) {
+        lines.push(`Auth model: ${shortText(research.projectBrief.authModel, 220)}`);
+    }
+    if (research?.projectBrief?.deploymentShape) {
+        lines.push(`Deployment shape: ${shortText(research.projectBrief.deploymentShape, 220)}`);
+    }
+    if (Array.isArray(research?.projectBrief?.trustBoundaries) && research.projectBrief.trustBoundaries.length > 0) {
+        lines.push(`Trust boundaries: ${research.projectBrief.trustBoundaries.slice(0, 3).map((item) => shortText(item, 120)).join(" | ")}`);
+    }
+    if (Array.isArray(research?.projectBrief?.sensitiveFlows) && research.projectBrief.sensitiveFlows.length > 0) {
+        lines.push(`Sensitive flows: ${research.projectBrief.sensitiveFlows.slice(0, 3).map((item) => shortText(item, 120)).join(" | ")}`);
+    }
 
     if (aiSummary) {
         lines.push(`Repo AI summary: ${shortText(aiSummary, 300)}`);
@@ -767,7 +794,22 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
     evidence = assignEvidenceIds(evidence);
 
+    let continuityContext = "";
     let memoryContext = "";
+    try {
+        continuityContext = await getContinuityMemoryContext(id, user.id, supabaseAdmin, { enforce: strictEnforcement });
+    } catch (err) {
+        const details = err instanceof Error ? err.message : "Unknown continuity retrieval error";
+        console.error("[Fix Chat] Continuity memory retrieval failed:", details);
+        if (strictEnforcement) {
+            const code = err instanceof ScanMemoryError ? err.code : "search_failed";
+            return new Response(JSON.stringify({
+                error: "Continuity memory retrieval failed",
+                code,
+                details,
+            }), { status: 503 });
+        }
+    }
     try {
         memoryContext = await searchMemory(id, user.id, question, supabaseAdmin, { enforce: strictEnforcement });
     } catch (err) {
@@ -800,21 +842,28 @@ Currently selected issue:
 - Description: ${issue.description || "n/a"}
 - Match excerpt: ${issue.match || "n/a"}${relatedIssueContext ? `\n- Related issues in same file:\n${relatedIssueContext}` : ""}${fix.explanation ? `\n- Proposed fix: ${fix.explanation}` : ""}` : "";
 
-    const memorySection = memoryContext
-        ? `\n\n## Relevant context from this project's history\n${memoryContext}`
-        : "";
+    const memorySection = [
+        continuityContext
+            ? `## Long-term project continuity\n${continuityContext}`
+            : "",
+        memoryContext
+            ? `## Relevant context from this project's history\n${memoryContext}`
+            : "",
+    ]
+        .filter(Boolean)
+        .join("\n\n");
     const initialConfidence = inferChatConfidence({
         issue,
         relatedIssues,
         evidence,
-        hasMemoryContext: Boolean(memoryContext),
+        hasMemoryContext: Boolean(continuityContext || memoryContext),
         hasGraphContext: Boolean(researchContext || aiContext || aiSummary),
     });
     const analysisSteps = buildChatAnalysisPlan({
         issue,
         relatedIssues,
         evidence,
-        hasMemoryContext: Boolean(memoryContext),
+        hasMemoryContext: Boolean(continuityContext || memoryContext),
         hasGraphContext: Boolean(researchContext || aiContext || aiSummary),
         initialConfidence,
     });
@@ -852,7 +901,7 @@ ${outputRules}
 ${graphSection}
 
 ## Code evidence pack
-${evidenceSection}${issueSection}${memorySection}
+${evidenceSection}${issueSection}${memorySection ? `\n\n${memorySection}` : ""}
 
 Conversation so far:
 ${recentHistory || "(none yet)"}

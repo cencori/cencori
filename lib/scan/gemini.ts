@@ -16,6 +16,15 @@ export interface AiIssueInput {
 
 export interface AiResearchInput {
     filesIndexed: number;
+    projectBrief?: {
+        summary: string;
+        appPurpose: string;
+        authModel: string;
+        deploymentShape: string;
+        trustBoundaries: string[];
+        sensitiveFlows: string[];
+        criticalModules: string[];
+    };
     interactionHotspots: Array<{ file: string; name: string; riskScore: number; reason: string }>;
     dataFlowTraces: Array<{ file: string; line: number; severity: string; summary: string }>;
 }
@@ -153,6 +162,9 @@ Analyze this repository scan (regex + static graph/dataflow extraction) and prod
 
 Repository: ${input.repository}
 Files indexed: ${input.research.filesIndexed}
+
+Project brief:
+${JSON.stringify(input.research.projectBrief || null, null, 2)}
 
 Top hotspots:
 ${JSON.stringify(input.research.interactionHotspots.slice(0, 8), null, 2)}

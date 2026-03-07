@@ -64,9 +64,22 @@ export interface DataFlowTrace {
     stages: DataFlowStage[];
 }
 
+export interface ProjectBrief {
+    summary: string;
+    appPurpose: string;
+    authModel: string;
+    deploymentShape: string;
+    trustBoundaries: string[];
+    sensitiveFlows: string[];
+    criticalModules: string[];
+    externalServices: string[];
+    confidence: number;
+}
+
 export interface RepositoryResearch {
     generatedAt: string;
     filesIndexed: number;
+    projectBrief: ProjectBrief;
     interactionMap: {
         nodes: InteractionNode[];
         edges: InteractionEdge[];
@@ -161,8 +174,56 @@ const SEVERITY_WEIGHT: Record<IssueSeverity | "none", number> = {
     critical: 10,
 };
 
+const SERVICE_DETECTORS = [
+    { label: "Supabase", packagePattern: /@supabase\/supabase-js|supabase/i, filePattern: /supabase/i, contentPattern: /\bsupabase\b/i },
+    { label: "Stripe", packagePattern: /\bstripe\b|@stripe\//i, filePattern: /stripe|billing|checkout/i, contentPattern: /\bstripe\b/i },
+    { label: "GitHub", packagePattern: /\boctokit\b|github/i, filePattern: /github/i, contentPattern: /\boctokit\b|\bgithub\b/i },
+    { label: "OpenAI", packagePattern: /\bopenai\b/i, filePattern: /openai/i, contentPattern: /\bOpenAI\b|\bopenai\b/i },
+    { label: "Gemini", packagePattern: /gemini|@google\/generative-ai/i, filePattern: /gemini/i, contentPattern: /\bgemini\b|GoogleGenerativeAI/i },
+    { label: "Slack", packagePattern: /\bslack\b/i, filePattern: /slack/i, contentPattern: /\bslack\b/i },
+    { label: "Discord", packagePattern: /\bdiscord\b/i, filePattern: /discord/i, contentPattern: /\bdiscord\b/i },
+    { label: "Postgres", packagePattern: /\bpg\b|postgres|prisma/i, filePattern: /db|prisma|postgres/i, contentPattern: /\bpostgres\b|\bprisma\b/i },
+    { label: "Redis", packagePattern: /\bredis\b/i, filePattern: /redis|cache/i, contentPattern: /\bredis\b/i },
+];
+
+interface PackageMetadata {
+    name?: string;
+    description?: string;
+    dependencyNames: string[];
+    scripts: string[];
+}
+
+function clampConfidence(value: number): number {
+    return Math.max(0.2, Math.min(0.98, value));
+}
+
 function normalizePath(filePath: string): string {
     return filePath.replace(/\\/g, "/");
+}
+
+function uniqueStrings(values: string[]): string[] {
+    return Array.from(
+        new Set(
+            values
+                .map((value) => value.trim())
+                .filter((value) => value.length > 0)
+        )
+    );
+}
+
+function joinList(values: string[]): string {
+    if (values.length === 0) return "";
+    if (values.length === 1) return values[0];
+    if (values.length === 2) return `${values[0]} and ${values[1]}`;
+    return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
+}
+
+function tryParseJson<T>(value: string): T | null {
+    try {
+        return JSON.parse(value) as T;
+    } catch {
+        return null;
+    }
 }
 
 function escapeRegex(value: string): string {
@@ -172,6 +233,352 @@ function escapeRegex(value: string): string {
 function containsIdentifier(haystack: string, identifier: string): boolean {
     const regex = new RegExp(`\\b${escapeRegex(identifier)}\\b`);
     return regex.test(haystack);
+}
+
+function findFile(files: ScannedRepositoryFile[], filePath: string): ScannedRepositoryFile | null {
+    const normalizedTarget = normalizePath(filePath);
+    return files.find((file) => normalizePath(file.path) === normalizedTarget) || null;
+}
+
+function parsePackageMetadata(files: ScannedRepositoryFile[]): PackageMetadata {
+    const packageFile = findFile(files, "package.json");
+    if (!packageFile) {
+        return { dependencyNames: [], scripts: [] };
+    }
+
+    const parsed = tryParseJson<{
+        name?: unknown;
+        description?: unknown;
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
+        scripts?: Record<string, unknown>;
+    }>(packageFile.content);
+
+    if (!parsed) {
+        return { dependencyNames: [], scripts: [] };
+    }
+
+    const dependencies = {
+        ...(parsed.dependencies || {}),
+        ...(parsed.devDependencies || {}),
+    };
+
+    return {
+        name: typeof parsed.name === "string" ? parsed.name : undefined,
+        description: typeof parsed.description === "string" ? parsed.description : undefined,
+        dependencyNames: Object.keys(dependencies),
+        scripts: Object.keys(parsed.scripts || {}),
+    };
+}
+
+function extractReadmeSummary(files: ScannedRepositoryFile[]): string | null {
+    const readmeFile = files.find((file) => /(^|\/)readme\.md$/i.test(normalizePath(file.path)));
+    if (!readmeFile) {
+        return null;
+    }
+
+    const paragraphs = readmeFile.content
+        .split(/\n\s*\n/g)
+        .map((paragraph) => paragraph.trim())
+        .filter((paragraph) => paragraph.length > 0)
+        .map((paragraph) => paragraph.replace(/^#+\s*/gm, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim())
+        .filter((paragraph) => paragraph.length > 20 && !/^\[!\[/.test(paragraph));
+
+    return paragraphs[0] || null;
+}
+
+function repositoryHasContent(files: ScannedRepositoryFile[], pattern: RegExp): boolean {
+    return files.some((file) => pattern.test(file.content));
+}
+
+function repositoryHasPath(files: ScannedRepositoryFile[], pattern: RegExp): boolean {
+    return files.some((file) => pattern.test(normalizePath(file.path)));
+}
+
+function detectFrameworks(files: ScannedRepositoryFile[], packageMetadata: PackageMetadata): string[] {
+    const frameworks: string[] = [];
+    const deps = packageMetadata.dependencyNames.join(" ");
+
+    if (/\bnext\b/i.test(deps) || repositoryHasPath(files, /(^|\/)next\.config\.(js|mjs|ts)$/i)) {
+        frameworks.push("Next.js");
+    }
+    if (/\breact\b/i.test(deps)) {
+        frameworks.push("React");
+    }
+    if (/\bexpress\b/i.test(deps)) {
+        frameworks.push("Express");
+    }
+    if (/\bfastify\b/i.test(deps)) {
+        frameworks.push("Fastify");
+    }
+    if (/\bhono\b/i.test(deps)) {
+        frameworks.push("Hono");
+    }
+    if (/\bnestjs\b|@nestjs\//i.test(deps)) {
+        frameworks.push("NestJS");
+    }
+    if (repositoryHasPath(files, /^supabase\/functions\//i)) {
+        frameworks.push("Supabase Edge Functions");
+    }
+
+    return uniqueStrings(frameworks);
+}
+
+function detectExternalServices(files: ScannedRepositoryFile[], packageMetadata: PackageMetadata): string[] {
+    const deps = packageMetadata.dependencyNames.join(" ");
+
+    return uniqueStrings(
+        SERVICE_DETECTORS
+            .filter((detector) =>
+                detector.packagePattern.test(deps) ||
+                repositoryHasPath(files, detector.filePattern) ||
+                repositoryHasContent(files, detector.contentPattern)
+            )
+            .map((detector) => detector.label)
+    ).slice(0, 8);
+}
+
+function inferAppPurpose(input: {
+    readmeSummary: string | null;
+    packageMetadata: PackageMetadata;
+    frameworks: string[];
+    apiRouteCount: number;
+    componentCount: number;
+    services: string[];
+    files: ScannedRepositoryFile[];
+}): string {
+    if (input.readmeSummary) {
+        return input.readmeSummary;
+    }
+
+    if (input.packageMetadata.description) {
+        return input.packageMetadata.description;
+    }
+
+    const purposeTags: string[] = [];
+    const joinedPaths = input.files.map((file) => normalizePath(file.path)).join(" ");
+
+    const tagMatchers = [
+        { tag: "security scanning", pattern: /\bscan|security|vulnerability\b/i },
+        { tag: "phishing detection", pattern: /\bphish|phishing\b/i },
+        { tag: "authentication", pattern: /\bauth|login|session\b/i },
+        { tag: "payments", pattern: /\bpayment|billing|checkout|stripe\b/i },
+        { tag: "analytics", pattern: /\banalytics|metrics|telemetry\b/i },
+        { tag: "AI assistance", pattern: /\bai|assistant|chat|gemini|openai\b/i },
+    ];
+
+    for (const matcher of tagMatchers) {
+        if (matcher.pattern.test(joinedPaths)) {
+            purposeTags.push(matcher.tag);
+        }
+    }
+
+    const frameworkSummary = input.frameworks.length > 0
+        ? `${joinList(input.frameworks)} application`
+        : input.apiRouteCount > 0
+            ? "Web application"
+            : "Repository";
+
+    const focus = purposeTags.length > 0
+        ? ` focused on ${joinList(purposeTags.slice(0, 2))}`
+        : input.services.length > 0
+            ? ` integrated with ${joinList(input.services.slice(0, 2))}`
+            : "";
+
+    const topology = input.apiRouteCount > 0
+        ? ` with ${input.apiRouteCount} API route${input.apiRouteCount === 1 ? "" : "s"}`
+        : input.componentCount > 0
+            ? ` with ${input.componentCount} mapped UI component${input.componentCount === 1 ? "" : "s"}`
+            : "";
+
+    return `${frameworkSummary}${focus}${topology}.`;
+}
+
+function inferAuthModel(files: ScannedRepositoryFile[], packageMetadata: PackageMetadata): string {
+    const deps = packageMetadata.dependencyNames.join(" ");
+
+    if (/\bclerk\b|@clerk\//i.test(deps) || repositoryHasContent(files, /\bClerkProvider\b|\buseAuth\b/i)) {
+        return "Clerk-managed authentication is present across browser and server flows.";
+    }
+    if (/\bnext-auth\b|@auth\//i.test(deps) || repositoryHasContent(files, /\bgetServerSession\b|\bauth\(\)\b/)) {
+        return "NextAuth-style session authentication gates server and route access.";
+    }
+    if (/@supabase\/supabase-js/i.test(deps) || repositoryHasContent(files, /\bsupabase\.auth\b|\bauth\.getUser\b/)) {
+        return "Supabase-backed authentication and user/session checks are present.";
+    }
+    if (/\bauth0\b/i.test(deps) || repositoryHasContent(files, /\bAuth0\b/i)) {
+        return "Auth0-backed authentication appears to protect at least part of the app.";
+    }
+    if (/\bfirebase\b/i.test(deps) || repositoryHasContent(files, /\bfirebase\.auth\b/i)) {
+        return "Firebase authentication flows are present.";
+    }
+    if (repositoryHasContent(files, /\bjsonwebtoken\b|\bjwt\.sign\b|\bjwt\.verify\b/)) {
+        return "Custom token or JWT-based authentication appears in the codebase.";
+    }
+    if (repositoryHasContent(files, /\bcookies\(\)\.get\b|\bsession\b/i)) {
+        return "Cookie or session-based access checks are present, but the primary auth provider is unclear.";
+    }
+
+    return "No strong authentication provider was inferred from the scanned files.";
+}
+
+function inferDeploymentShape(input: {
+    files: ScannedRepositoryFile[];
+    frameworks: string[];
+    apiRouteCount: number;
+    services: string[];
+}): string {
+    const labels: string[] = [];
+
+    if (input.frameworks.includes("Next.js")) {
+        labels.push(
+            input.apiRouteCount > 0
+                ? "Next.js web app with server-rendered routes and API handlers"
+                : "Next.js web app"
+        );
+    } else if (input.apiRouteCount > 0) {
+        labels.push("application with dedicated server/API handlers");
+    }
+
+    if (repositoryHasPath(input.files, /^supabase\/functions\//i)) {
+        labels.push("Supabase Edge Functions");
+    }
+    if (repositoryHasPath(input.files, /(^|\/)vercel\.json$/i)) {
+        labels.push("Vercel-style deployment config");
+    }
+    if (repositoryHasPath(input.files, /(^|\/)dockerfile/i) || repositoryHasPath(input.files, /docker-compose/i)) {
+        labels.push("container deployment support");
+    }
+    if (repositoryHasPath(input.files, /(^|\/)netlify\.toml$/i)) {
+        labels.push("Netlify deployment config");
+    }
+    if (repositoryHasPath(input.files, /(^|\/)fly\.toml$/i)) {
+        labels.push("Fly.io deployment config");
+    }
+
+    if (labels.length === 0 && input.services.length > 0) {
+        labels.push(`application relying on ${joinList(input.services.slice(0, 2))}`);
+    }
+
+    return labels.length > 0
+        ? `${joinList(uniqueStrings(labels))}.`
+        : "Deployment shape could not be inferred beyond the scanned repository files.";
+}
+
+function buildTrustBoundaries(input: {
+    files: ScannedRepositoryFile[];
+    nodes: InteractionNode[];
+    traces: DataFlowTrace[];
+    services: string[];
+}): string[] {
+    const boundaries: string[] = [];
+    const apiRouteCount = input.nodes.filter((node) => node.kind === "api-route").length;
+
+    if (apiRouteCount > 0) {
+        boundaries.push(`Client-side flows cross into ${apiRouteCount} server or API handler(s).`);
+    }
+    if (input.traces.some((trace) => /HTTP request body|URL query params|Route params/i.test(trace.source))) {
+        boundaries.push("User-controlled request input reaches server-side code paths.");
+    }
+    if (input.traces.some((trace) => /Cookie or session data/i.test(trace.source))) {
+        boundaries.push("Session or cookie state influences privileged application behavior.");
+    }
+    if (input.traces.some((trace) => /Environment variable/i.test(trace.source)) || repositoryHasContent(input.files, /\bprocess\.env\.[A-Z0-9_]+/)) {
+        boundaries.push("Runtime secrets and deployment configuration enter through environment variables.");
+    }
+    if (input.traces.some((trace) => /Outbound network request/i.test(trace.sink)) || input.services.length > 0) {
+        boundaries.push(`The repository exchanges data with external services such as ${joinList(input.services.slice(0, 3))}.`);
+    }
+
+    return uniqueStrings(boundaries).slice(0, 5);
+}
+
+function buildSensitiveFlows(traces: DataFlowTrace[], issues: ScanIssueLike[]): string[] {
+    const flowLines = traces
+        .slice(0, 6)
+        .map((trace) => `${trace.source} reaches ${trace.sink} in ${trace.file}:${trace.line}`);
+
+    const issueFlows = issues
+        .filter((issue) => /secret|token|password|email|auth|cors|html|query|credential/i.test(`${issue.type} ${issue.name} ${issue.description || ""}`))
+        .slice(0, 4)
+        .map((issue) => `${issue.name} in ${issue.file}:${issue.line}`);
+
+    return uniqueStrings([...flowLines, ...issueFlows]).slice(0, 6);
+}
+
+function buildCriticalModules(hotspots: InteractionHotspot[]): string[] {
+    return hotspots
+        .slice(0, 5)
+        .map((hotspot) => `${hotspot.file} (${hotspot.kind}, score ${hotspot.riskScore})`)
+        .filter(Boolean);
+}
+
+function buildProjectBrief(input: {
+    files: ScannedRepositoryFile[];
+    issues: ScanIssueLike[];
+    nodes: InteractionNode[];
+    hotspots: InteractionHotspot[];
+    traces: DataFlowTrace[];
+}): ProjectBrief {
+    const packageMetadata = parsePackageMetadata(input.files);
+    const readmeSummary = extractReadmeSummary(input.files);
+    const frameworks = detectFrameworks(input.files, packageMetadata);
+    const services = detectExternalServices(input.files, packageMetadata);
+    const apiRouteCount = input.nodes.filter((node) => node.kind === "api-route").length;
+    const componentCount = input.nodes.filter((node) => node.kind === "component").length;
+
+    const appPurpose = inferAppPurpose({
+        readmeSummary,
+        packageMetadata,
+        frameworks,
+        apiRouteCount,
+        componentCount,
+        services,
+        files: input.files,
+    });
+    const authModel = inferAuthModel(input.files, packageMetadata);
+    const deploymentShape = inferDeploymentShape({
+        files: input.files,
+        frameworks,
+        apiRouteCount,
+        services,
+    });
+    const trustBoundaries = buildTrustBoundaries({
+        files: input.files,
+        nodes: input.nodes,
+        traces: input.traces,
+        services,
+    });
+    const sensitiveFlows = buildSensitiveFlows(input.traces, input.issues);
+    const criticalModules = buildCriticalModules(input.hotspots);
+
+    let confidenceScore = 0.45;
+    if (readmeSummary) confidenceScore += 0.12;
+    if (packageMetadata.description) confidenceScore += 0.08;
+    if (frameworks.length > 0) confidenceScore += 0.08;
+    if (services.length > 0) confidenceScore += 0.06;
+    if (!/No strong authentication provider/i.test(authModel)) confidenceScore += 0.08;
+    if (trustBoundaries.length >= 2) confidenceScore += 0.06;
+    if (sensitiveFlows.length >= 2) confidenceScore += 0.06;
+    if (criticalModules.length >= 2) confidenceScore += 0.05;
+
+    const summaryParts = [
+        appPurpose.replace(/\.$/, ""),
+        authModel.replace(/\.$/, ""),
+        deploymentShape.replace(/\.$/, ""),
+    ].filter(Boolean);
+
+    return {
+        summary: summaryParts.slice(0, 3).join(" "),
+        appPurpose,
+        authModel,
+        deploymentShape,
+        trustBoundaries,
+        sensitiveFlows,
+        criticalModules,
+        externalServices: services,
+        confidence: clampConfidence(confidenceScore),
+    };
 }
 
 function detectSource(line: string): string | null {
@@ -539,11 +946,19 @@ export function analyzeRepositoryResearch(input: {
     const criticalCount = traces.filter(trace => trace.severity === "critical").length;
     const highCount = traces.filter(trace => trace.severity === "high").length;
     const mediumCount = traces.filter(trace => trace.severity === "medium").length;
+    const projectBrief = buildProjectBrief({
+        files: normalizedFiles,
+        issues: input.issues,
+        nodes,
+        hotspots,
+        traces,
+    });
 
     const reasoningNotes: string[] = [];
     const apiRouteCount = nodes.filter(node => node.kind === "api-route").length;
     const componentCount = nodes.filter(node => node.kind === "component").length;
     reasoningNotes.push(`Indexed ${nodes.length} files: ${apiRouteCount} API routes and ${componentCount} UI components.`);
+    reasoningNotes.push(`Project brief confidence ${(projectBrief.confidence * 100).toFixed(0)}%: ${projectBrief.summary}`);
 
     if (hotspots.length > 0) {
         const topHotspot = hotspots[0];
@@ -565,6 +980,7 @@ export function analyzeRepositoryResearch(input: {
     return {
         generatedAt: new Date().toISOString(),
         filesIndexed: normalizedFiles.length,
+        projectBrief,
         interactionMap: {
             nodes,
             edges,
