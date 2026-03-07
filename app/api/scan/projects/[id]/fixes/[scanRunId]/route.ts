@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
 import { ScanMemoryError, writeMemory } from "@/lib/scan/scan-memory";
+import { buildAcceptedRiskMemory } from "@/lib/scan/continuity";
+import type { ProjectBrief, ScanIssueLike } from "@/lib/scan/research";
 
 interface RouteParams {
     params: Promise<{ id: string; scanRunId: string }>;
@@ -129,13 +131,18 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     // Persist memory context for RAG so follow-up chat can use user decisions.
     const { project } = auth;
     const repo = project.github_repo_full_name ?? id;
-    const issueCount = Array.isArray(scanRun.results?.issues) ? scanRun.results.issues.length : 0;
+    const issues = Array.isArray(scanRun.results?.issues) ? scanRun.results.issues as ScanIssueLike[] : [];
+    const projectBrief = (scanRun.results as { research?: { projectBrief?: ProjectBrief } } | null)?.research?.projectBrief;
 
     if (action === "dismiss") {
-        const memoryContent = `User dismissed scan run ${scanRunId.slice(0, 8)} for ${repo}. ` +
-            `${issueCount > 0 ? `${issueCount} issue(s) were found.` : ""} Marked as not applicable.`;
+        const memoryContent = buildAcceptedRiskMemory({
+            repository: repo,
+            scanRunId,
+            issues,
+            projectBrief,
+        });
         try {
-            await writeMemory(id, auth.user.id, memoryContent, "dismiss", supabaseAdmin, scanRunId, {
+            await writeMemory(id, auth.user.id, memoryContent, "accepted_risk", supabaseAdmin, scanRunId, {
                 enforce: strictEnforcement,
             });
         } catch (err) {

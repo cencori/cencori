@@ -20,7 +20,15 @@ const MAX_LEXICAL_CANDIDATES = 30;
 // Hard cap on stored memory content length
 const MAX_CONTENT_CHARS = 2000;
 
-export type MemorySource = 'chat' | 'dismiss' | 'pr_merged' | 'done';
+export type MemorySource =
+    | 'chat'
+    | 'dismiss'
+    | 'pr_merged'
+    | 'done'
+    | 'project_brief'
+    | 'scan_summary'
+    | 'accepted_risk'
+    | 'weak_spot';
 
 export interface MemoryEntry {
     id: string;
@@ -28,6 +36,14 @@ export interface MemoryEntry {
     source: MemorySource;
     similarity: number;
     created_at: string;
+}
+
+export interface ContinuityMemoryEntry {
+    id: string;
+    content: string;
+    source: MemorySource;
+    created_at: string;
+    scan_run_id?: string | null;
 }
 
 export type ScanMemoryErrorCode =
@@ -72,16 +88,20 @@ function extractQueryTokens(query: string): string[] {
     return tokens;
 }
 
-function formatSourceLabel(source: MemorySource | string): string {
+export function formatMemorySourceLabel(source: MemorySource | string): string {
     return source === 'chat' ? 'Past conversation' :
         source === 'dismiss' ? 'Previously dismissed' :
             source === 'pr_merged' ? 'PR merged' :
                 source === 'done' ? 'Marked as done' :
+                    source === 'project_brief' ? 'Project brief' :
+                        source === 'scan_summary' ? 'Prior scan' :
+                            source === 'accepted_risk' ? 'Accepted risk' :
+                                source === 'weak_spot' ? 'Recurring weak spot' :
                     'Note';
 }
 
 function formatMemoryEntries(entries: MemoryEntry[]): string {
-    return entries.map((entry) => `- [${formatSourceLabel(entry.source)}] ${entry.content}`).join('\n');
+    return entries.map((entry) => `- [${formatMemorySourceLabel(entry.source)}] ${entry.content}`).join('\n');
 }
 
 async function lexicalSearchMemory(
@@ -223,6 +243,104 @@ export async function searchMemory(
         console.warn('[Scan Memory] Search failed:', lexicalMessage);
         return '';
     }
+}
+
+export async function getContinuityMemoryContext(
+    projectId: string,
+    userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase: SupabaseClient<any>,
+    options?: ScanMemoryOptions,
+): Promise<string> {
+    const enforce = options?.enforce ?? false;
+
+    try {
+        const { data, error } = await supabase
+            .from('scan_chat_memory')
+            .select('id, content, source, created_at')
+            .eq('project_id', projectId)
+            .eq('user_id', userId)
+            .in('source', ['project_brief', 'scan_summary', 'accepted_risk', 'weak_spot'])
+            .order('created_at', { ascending: false })
+            .limit(12);
+
+        if (error) {
+            throw new ScanMemoryError('search_failed', `[Scan Memory] Continuity query failed: ${error.message}`);
+        }
+
+        const entries = Array.isArray(data) ? data as MemoryEntry[] : [];
+        if (entries.length === 0) return '';
+
+        const grouped: MemoryEntry[] = [];
+        const sourceLimits: Partial<Record<MemorySource, number>> = {
+            project_brief: 1,
+            scan_summary: 2,
+            accepted_risk: 2,
+            weak_spot: 2,
+        };
+        const counts = new Map<string, number>();
+
+        for (const entry of entries) {
+            const source = entry.source as MemorySource;
+            const limit = sourceLimits[source] ?? 0;
+            if (limit === 0) continue;
+            const nextCount = (counts.get(source) || 0) + 1;
+            if (nextCount > limit) continue;
+            counts.set(source, nextCount);
+            grouped.push(entry);
+        }
+
+        return formatMemoryEntries(grouped);
+    } catch (err) {
+        if (enforce) {
+            if (err instanceof ScanMemoryError) throw err;
+            throw new ScanMemoryError(
+                'search_failed',
+                `[Scan Memory] Continuity retrieval failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
+        console.warn('[Scan Memory] Continuity retrieval failed:', err instanceof Error ? err.message : err);
+        return '';
+    }
+}
+
+export async function listContinuityMemoryEntries(
+    projectId: string,
+    userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase: SupabaseClient<any>,
+    options?: {
+        limit?: number;
+    },
+): Promise<ContinuityMemoryEntry[]> {
+    const limit = Math.max(1, Math.min(options?.limit ?? 12, 24));
+
+    const { data, error } = await supabase
+        .from('scan_chat_memory')
+        .select('id, content, source, created_at, scan_run_id')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .in('source', ['project_brief', 'scan_summary', 'accepted_risk', 'weak_spot'])
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        throw new ScanMemoryError('search_failed', `[Scan Memory] Continuity listing failed: ${error.message}`);
+    }
+
+    if (!Array.isArray(data)) {
+        return [];
+    }
+
+    return data
+        .map((row) => ({
+            id: String(row.id),
+            content: typeof row.content === 'string' ? row.content : '',
+            source: typeof row.source === 'string' ? row.source as MemorySource : 'chat',
+            created_at: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+            scan_run_id: typeof row.scan_run_id === 'string' ? row.scan_run_id : null,
+        }))
+        .filter((entry) => entry.content.length > 0);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ScanMemoryError, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
+import { ScanMemoryError, getContinuityMemoryContext, listContinuityMemoryEntries, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
 
 const ENV_BACKUP = { ...process.env };
 
@@ -129,5 +129,80 @@ describe("scan-memory strict enforcement", () => {
         await expect(
             writeMemory("project-id", "user-id", "memory content", "chat", supabase, undefined, { enforce: true })
         ).rejects.toBeInstanceOf(ScanMemoryError);
+    });
+
+    test("getContinuityMemoryContext returns latest continuity entries grouped by source", async () => {
+        const queryBuilder = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({
+                data: [
+                    {
+                        id: "mem-brief",
+                        content: "Project brief for cencori/demo. Next.js security app.",
+                        source: "project_brief",
+                        created_at: "2026-03-06T10:00:00.000Z",
+                    },
+                    {
+                        id: "mem-scan",
+                        content: "Scan summary for cencori/demo (run abcd1234). Score B.",
+                        source: "scan_summary",
+                        created_at: "2026-03-06T09:00:00.000Z",
+                    },
+                    {
+                        id: "mem-risk",
+                        content: "Accepted risk recorded for cencori/demo on scan run abcd1234.",
+                        source: "accepted_risk",
+                        created_at: "2026-03-06T08:00:00.000Z",
+                    },
+                ],
+                error: null,
+            }),
+        };
+
+        const supabase = {
+            from: vi.fn(() => queryBuilder),
+        } as unknown as Parameters<typeof getContinuityMemoryContext>[2];
+
+        const result = await getContinuityMemoryContext("project-id", "user-id", supabase, { enforce: true });
+
+        expect(result).toContain("[Project brief]");
+        expect(result).toContain("[Prior scan]");
+        expect(result).toContain("[Accepted risk]");
+    });
+
+    test("listContinuityMemoryEntries returns structured continuity memory rows", async () => {
+        const queryBuilder = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({
+                data: [
+                    {
+                        id: "mem-1",
+                        content: "Recurring weak spot for cencori/demo.",
+                        source: "weak_spot",
+                        created_at: "2026-03-06T10:00:00.000Z",
+                        scan_run_id: "run-1",
+                    },
+                ],
+                error: null,
+            }),
+        };
+
+        const supabase = {
+            from: vi.fn(() => queryBuilder),
+        } as unknown as Parameters<typeof listContinuityMemoryEntries>[2];
+
+        const result = await listContinuityMemoryEntries("project-id", "user-id", supabase, { limit: 5 });
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+            source: "weak_spot",
+            scan_run_id: "run-1",
+        });
     });
 });

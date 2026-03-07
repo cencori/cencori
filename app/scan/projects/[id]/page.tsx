@@ -114,9 +114,22 @@ interface DataFlowTrace {
     stages: DataFlowStage[];
 }
 
+interface ProjectBrief {
+    summary: string;
+    appPurpose: string;
+    authModel: string;
+    deploymentShape: string;
+    trustBoundaries: string[];
+    sensitiveFlows: string[];
+    criticalModules: string[];
+    externalServices: string[];
+    confidence: number;
+}
+
 interface RepositoryResearch {
     generatedAt: string;
     filesIndexed: number;
+    projectBrief?: ProjectBrief;
     interactionMap: {
         nodes: InteractionNode[];
         edges: InteractionEdge[];
@@ -170,6 +183,14 @@ interface ScanRun {
     fix_pr_url?: string | null;
     fix_pr_number?: number | null;
     fix_branch_name?: string | null;
+}
+
+interface ContinuityMemoryEntry {
+    id: string;
+    content: string;
+    source: "project_brief" | "scan_summary" | "accepted_risk" | "weak_spot";
+    created_at: string;
+    scan_run_id?: string | null;
 }
 
 interface Changelog {
@@ -249,6 +270,7 @@ export default function ProjectDetailPage() {
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const [scanEntitlement, setScanEntitlement] = useState<ScanPaywallEntitlement | null>(null);
     const [liveAiContext, setLiveAiContext] = useState<RepositoryAiContext | null>(null);
+    const [continuityMemory, setContinuityMemory] = useState<ContinuityMemoryEntry[]>([]);
     const scanStreamRef = useRef<EventSource | null>(null);
     const scanReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scanReconnectAttemptsRef = useRef(0);
@@ -349,6 +371,7 @@ export default function ProjectDetailPage() {
                     const data = await response.json();
                     setProject(data.project);
                     const fetchedScans: ScanRun[] = data.scans || [];
+                    setContinuityMemory(data.continuity || []);
                     setScans(fetchedScans);
                     if (fetchedScans.length > 0) {
                         const lastScan = fetchedScans[0];
@@ -584,6 +607,7 @@ export default function ProjectDetailPage() {
                     const projectData = await response.json();
                     setProject(projectData.project);
                     setScans(projectData.scans || []);
+                    setContinuityMemory(projectData.continuity || []);
                 } catch (refreshErr) {
                     console.error('Failed to refresh project after scan stream event:', refreshErr);
                 }
@@ -918,6 +942,13 @@ export default function ProjectDetailPage() {
             })}
         </div>
     ) : null;
+
+    const continuitySourceLabels: Record<ContinuityMemoryEntry["source"], string> = {
+        project_brief: "Project brief",
+        scan_summary: "Prior scan",
+        accepted_risk: "Accepted risk",
+        weak_spot: "Recurring weak spot",
+    };
 
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
@@ -1304,6 +1335,103 @@ export default function ProjectDetailPage() {
 
                             <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                                 <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Project Brief</p>
+                                    {currentResearch?.projectBrief && (
+                                        <p className="text-[10px] text-muted-foreground">
+                                            confidence {(currentResearch.projectBrief.confidence * 100).toFixed(0)}%
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    {currentResearch?.projectBrief ? (
+                                        <>
+                                            <p className="text-sm text-foreground">{currentResearch.projectBrief.summary}</p>
+
+                                            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">App Purpose</p>
+                                                    <p className="text-xs text-muted-foreground">{currentResearch.projectBrief.appPurpose}</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Auth Model</p>
+                                                    <p className="text-xs text-muted-foreground">{currentResearch.projectBrief.authModel}</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Deployment Shape</p>
+                                                    <p className="text-xs text-muted-foreground">{currentResearch.projectBrief.deploymentShape}</p>
+                                                </div>
+                                            </div>
+
+                                            {currentResearch.projectBrief.externalServices.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">External Services</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {currentResearch.projectBrief.externalServices.map((service) => (
+                                                            <Badge key={service} variant="outline" className="text-[10px] px-1.5 py-0">
+                                                                {service}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                                                <div className="space-y-2">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Trust Boundaries</p>
+                                                    <div className="space-y-1.5">
+                                                        {currentResearch.projectBrief.trustBoundaries.length > 0 ? (
+                                                            currentResearch.projectBrief.trustBoundaries.map((boundary) => (
+                                                                <p key={boundary} className="text-xs text-muted-foreground">
+                                                                    {boundary}
+                                                                </p>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground">No clear trust boundaries were inferred from this run.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Sensitive Flows</p>
+                                                    <div className="space-y-1.5">
+                                                        {currentResearch.projectBrief.sensitiveFlows.length > 0 ? (
+                                                            currentResearch.projectBrief.sensitiveFlows.map((flow) => (
+                                                                <p key={flow} className="text-xs text-muted-foreground">
+                                                                    {flow}
+                                                                </p>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground">No sensitive flows were summarized from this run.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Critical Modules</p>
+                                                    <div className="space-y-1.5">
+                                                        {currentResearch.projectBrief.criticalModules.length > 0 ? (
+                                                            currentResearch.projectBrief.criticalModules.map((module) => (
+                                                                <p key={module} className="text-xs text-muted-foreground font-mono">
+                                                                    {module}
+                                                                </p>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground">No critical modules were ranked for this run.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            Run a fresh scan to generate a project brief.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
                                     <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Live AI Context</p>
                                     {currentAiContext && (
                                         <p className="text-[10px] text-muted-foreground">
@@ -1504,6 +1632,41 @@ export default function ProjectDetailPage() {
                                     ) : (
                                         <p className="text-xs text-muted-foreground">
                                             This scan run has no generated research notes. Run a fresh scan to produce deeper analysis.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Continuity Memory</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {continuityMemory.length} remembered item{continuityMemory.length === 1 ? "" : "s"}
+                                    </p>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    {continuityMemory.length > 0 ? (
+                                        continuityMemory.map((entry) => (
+                                            <div key={entry.id} className="rounded border border-border/40 p-3 space-y-2">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                                        {continuitySourceLabels[entry.source] || entry.source}
+                                                    </Badge>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {new Date(entry.created_at).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground leading-relaxed">{entry.content}</p>
+                                                {entry.scan_run_id && (
+                                                    <p className="text-[10px] text-muted-foreground/70 font-mono">
+                                                        scan {entry.scan_run_id.slice(0, 8)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            Cencori has not accumulated continuity memory for this project yet. Run a fresh scan or mark a scan as dismissed/done to start building long-term context.
                                         </p>
                                     )}
                                 </div>
