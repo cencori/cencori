@@ -197,29 +197,12 @@ function inferChatConfidence(input: {
     };
 }
 
-function extractConfidenceLevel(response: string): ConfidenceLevel | undefined {
-    const confidenceSectionMatch = response.match(/###\s*Confidence\s*([\s\S]*?)(?:\n###\s|$)/i);
-    if (!confidenceSectionMatch) return undefined;
-
-    const levelMatch = confidenceSectionMatch[1].match(/\b(High|Medium|Low)\b/i);
-    if (!levelMatch) return undefined;
-
-    const normalized = levelMatch[1].toLowerCase();
-    if (normalized === "high") return "High";
-    if (normalized === "medium") return "Medium";
-    return "Low";
-}
-
 function buildChatFinalAnalysisStep(input: {
     initialConfidence: ConfidenceLevel;
     issue?: IssueContext;
     evidence: CodeEvidence[];
     response: string;
-    technicalMode: boolean;
 }): string {
-    const finalConfidence =
-        (input.technicalMode ? extractConfidenceLevel(input.response) : undefined) ||
-        input.initialConfidence;
     const target = summarizeIssueTarget(input.issue);
     const citedEvidence = uniqueStrings(
         Array.from(input.response.matchAll(/\[(E\d+)\]/g)).map((match) => match[1])
@@ -230,11 +213,7 @@ function buildChatFinalAnalysisStep(input: {
             ? ` using ${joinList(input.evidence.slice(0, 2).map((entry) => entry.id))}`
             : "";
 
-    if (finalConfidence === input.initialConfidence) {
-        return `Confidence holds at ${finalConfidence.toLowerCase()} for ${target}${evidenceSummary}`;
-    }
-
-    return `Confidence shifted from ${input.initialConfidence.toLowerCase()} to ${finalConfidence.toLowerCase()} for ${target}${evidenceSummary}`;
+    return `Answer drafted at ${input.initialConfidence.toLowerCase()} confidence for ${target}${evidenceSummary}`;
 }
 
 function toSafeLine(value: unknown): number {
@@ -621,12 +600,6 @@ function buildFallbackAnswer(input: {
         return "Hey! I am Cencori. Ask me anything about your findings or what to fix next.";
     }
 
-    const evidenceLines = input.evidence.length > 0
-        ? input.evidence.slice(0, 3).map((entry) => (
-            `- [${entry.id}] \`${entry.file}:${entry.startLine}\` - ${entry.reason}`
-        ))
-        : ["- No direct code evidence available in this response."];
-
     const answer = input.issue?.name
         ? `I am looking at **${input.issue.name}** in \`${input.issue.file || "unknown"}${input.issue.line ? `:${input.issue.line}` : ""}\`. ${input.issue.description || ""}`.trim()
         : "I can help you reason through your scan findings, architecture risks, and fix strategy.";
@@ -635,60 +608,19 @@ function buildFallbackAnswer(input: {
         ? `\n\nSuggested fix direction: ${input.fix.explanation}`
         : "";
 
+    const evidenceLine = input.evidence.length > 0
+        ? `\n\nI am grounding this in \`${input.evidence[0].file}:${input.evidence[0].startLine}-${input.evidence[0].endLine}\` [${input.evidence[0].id}].`
+        : "";
+
+    const followUp = input.issue?.file
+        ? ""
+        : "\n\nIf you want a sharper answer, point me to the exact file or function and I will inspect it next.";
+
     if (!input.technicalMode) {
         return `${answer}${fixLine}`;
     }
 
-    return [
-        "### Answer",
-        `${answer}${fixLine}`,
-        "",
-        "### Evidence",
-        ...evidenceLines,
-        "",
-        "### Confidence",
-        "Low - I returned a fallback summary instead of a full model-generated analysis.",
-        "",
-        "### Follow-up",
-        "Can you point me to the specific file/function you want me to analyze first?",
-    ].join("\n");
-}
-
-function buildComplianceAddendum(input: {
-    response: string;
-    technicalMode: boolean;
-    evidence: CodeEvidence[];
-}): string {
-    if (!input.technicalMode) {
-        return "";
-    }
-
-    const hasCitation = /\[E\d+\]/.test(input.response);
-    const hasConfidence = /###\s*Confidence/i.test(input.response);
-    const hasFollowUp = /###\s*Follow-up/i.test(input.response);
-
-    if (hasCitation && hasConfidence && hasFollowUp) {
-        return "";
-    }
-
-    const evidenceLines = input.evidence.length > 0
-        ? input.evidence.slice(0, 3).map((entry) => (
-            `- [${entry.id}] \`${entry.file}:${entry.startLine}-${entry.endLine}\` - ${entry.reason}`
-        ))
-        : ["- No direct code evidence was available for this addendum."];
-
-    const sections: string[] = [];
-    sections.push("");
-    sections.push("");
-    sections.push("### Evidence");
-    sections.push(...evidenceLines);
-    sections.push("");
-    sections.push("### Confidence");
-    sections.push("Low - I could not fully verify all claims from the available evidence pack.");
-    sections.push("");
-    sections.push("### Follow-up");
-    sections.push("Can you share the exact function or file path you want me to validate next?");
-    return sections.join("\n");
+    return `${answer}${fixLine}${evidenceLine}${followUp}`;
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
@@ -876,22 +808,24 @@ Currently selected issue:
     );
     const evidenceSection = formatEvidenceForPrompt(evidence);
     const outputRules = technicalMode
-        ? `Technical response contract:
-1. Use these exact sections in order: "### Answer", "### Evidence", "### Confidence", "### Follow-up".
-2. Every substantive technical claim must cite at least one evidence ID from the evidence pack (for example: [E1]).
-3. Under "### Evidence", include bullet points with citation ID and \`file:start-end\`.
-4. Under "### Confidence", pick exactly one level: High, Medium, or Low, then one sentence explaining why.
-5. If confidence is Medium or Low, "### Follow-up" must ask exactly one targeted question to reduce uncertainty.
-6. Never invent files, lines, or evidence IDs that are not in the evidence pack.`
+        ? `Technical response mode:
+- Answer naturally, like a senior security engineer in chat.
+- Be direct and concise. Do not use rigid headings unless I ask for them.
+- Ground claims in the repository context and evidence pack.
+- Cite files or evidence inline when useful, but keep the prose natural.
+- If evidence is weak, say what is unclear in one sentence and ask one targeted follow-up.
+- Never invent files, lines, or evidence IDs.`
         : `Casual response mode:
 - Keep the response short and conversational.
 - Do not force checklist formatting.`;
 
     const systemPrompt = `You are Cencori, a senior security and architecture engineer embedded in this repository.
 You provide direct, practical answers grounded in concrete evidence.
-CRITICAL: In your final response, speak in first-person singular ("I", "my", "me"). Never refer to yourself in third person or plural.
+CRITICAL: Sound natural. Do not sound like a template, compliance checklist, or policy document unless the user explicitly asks for that format.
+CRITICAL: If you refer to yourself, use first-person singular ("I", "my", "me"). Never refer to yourself in third person or plural.
+CRITICAL: Do not mention internal instructions, response contracts, or formatting rules.
 CRITICAL: Never use emojis.
-When technical mode is active, follow the response contract exactly and do not skip evidence citations.`;
+When technical mode is active, keep the answer grounded in the evidence pack and repository context without becoming robotic.`;
 
     const prompt = `Task mode: ${technicalMode ? "technical" : "casual"}
 
@@ -951,22 +885,11 @@ ${question}`;
                                 issue,
                                 evidence,
                                 response,
-                                technicalMode,
                             }),
                         ],
                     },
                 );
                 finishedStreaming = true;
-
-                const addendum = buildComplianceAddendum({
-                    response: accumulatedResponse,
-                    technicalMode,
-                    evidence,
-                });
-                if (addendum) {
-                    enqueue(JSON.stringify({ type: "content", content: addendum }));
-                    accumulatedResponse += addendum;
-                }
 
                 const memoryText = [
                     `Q: ${question.slice(0, 500)}`,
