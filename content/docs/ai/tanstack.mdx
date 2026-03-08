@@ -1,93 +1,75 @@
 ---
 title: "TanStack AI"
-description: "Integration with TanStack AI for React, Vue, and Solid. Framework-agnostic adapter."
+description: "Use Cencori's TanStack adapter for streaming and model routing in TanStack AI."
 section: "AI"
 order: 5
 ---
 
-TanStack AI provides framework-agnostic primitives for building AI applications. Cencori integrates as a backend adapter.
+Cencori ships a first-party adapter for `@tanstack/ai`. Use it when you want TanStack's framework-agnostic AI primitives with Cencori's routing, security, and observability.
 
 ## Installation
 
 ```bash
-npm install @tanstack/ai cencori
+npm install cencori @tanstack/ai
 ```
 
-## Setup
-
-Create the Cencori adapter:
+## Default Adapter
 
 ```typescript
-import { createCencoriAdapter } from 'cencori/tanstack';
+import { cencori } from 'cencori/tanstack';
 
-const adapter = createCencoriAdapter({
-  apiKey: process.env.CENCORI_API_KEY,
-});
+const adapter = cencori('gpt-4o');
 ```
 
-## Basic Usage
+The default adapter reads `CENCORI_API_KEY` from the environment.
+
+## Custom Provider
 
 ```typescript
-import { generateText } from '@tanstack/ai';
+import { createCencori } from 'cencori/tanstack';
 
-const result = await generateText({
-  adapter,
-  model: 'gpt-4o',
-  prompt: 'Write a haiku about coding',
+const provider = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
 });
 
-console.log(result.text);
+const adapter = provider('gpt-4o');
 ```
 
-## Streaming
+## Basic Streaming
 
 ```typescript
-import { streamText } from '@tanstack/ai';
+import { chat } from '@tanstack/ai';
+import { cencori } from 'cencori/tanstack';
 
-const stream = await streamText({
-  adapter,
-  model: 'claude-opus-4',
-  prompt: 'Explain machine learning',
-});
-
-for await (const chunk of stream) {
-  process.stdout.write(chunk);
+for await (const chunk of chat({
+  adapter: cencori('gpt-4o'),
+  messages: [{ role: 'user', content: 'Write a haiku about coding.' }],
+})) {
+  if (chunk.type === 'content') {
+    process.stdout.write(chunk.delta);
+  }
 }
 ```
 
-## React Integration
-
-```tsx
-import { useChat } from '@tanstack/ai/react';
-
-function ChatComponent() {
-  const { messages, input, setInput, send } = useChat({
-    adapter,
-    model: 'gpt-4o',
-  });
-
-  return (
-    <div>
-      {messages.map((m, i) => (
-        <div key={i}>{m.role}: {m.content}</div>
-      ))}
-      <input 
-        value={input} 
-        onChange={(e) => setInput(e.target.value)} 
-      />
-      <button onClick={() => send()}>Send</button>
-    </div>
-  );
-}
-```
-
-## Multi-Provider Support
-
-Switch between any supported provider:
+## Switching Models
 
 ```typescript
-// Use different models with the same adapter
-await generateText({ adapter, model: 'gpt-4o', prompt: '...' });
-await generateText({ adapter, model: 'claude-opus-4', prompt: '...' });
-await generateText({ adapter, model: 'gemini-2.5-pro', prompt: '...' });
+await chat({
+  adapter: cencori('gpt-4o'),
+  messages,
+});
+
+await chat({
+  adapter: cencori('claude-sonnet-4.5'),
+  messages,
+});
+
+await chat({
+  adapter: cencori('gemini-2.5-flash'),
+  messages,
+});
 ```
+
+## Structured Output And Tools
+
+The adapter forwards tool definitions and structured output requests through Cencori, so TanStack AI workflows still benefit from gateway policies and logging.

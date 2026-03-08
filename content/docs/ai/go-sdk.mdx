@@ -1,6 +1,6 @@
 ---
 title: "Go SDK"
-description: "Official Go client for Cencori. Idiomatic Go with context support, strong typing, and efficient streaming."
+description: "Official Go client for Cencori. Idiomatic Go with context support, typed responses, and streaming."
 section: "AI"
 order: 2.2
 ---
@@ -22,19 +22,21 @@ import (
 	"os"
 
 	"github.com/cencori/cencori-go"
-	"github.com/cencori/cencori-go/option"
 )
 
 func main() {
-	client := cencori.NewClient(
-		option.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+	client, err := cencori.NewClient(
+		cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
 	)
+	if err != nil {
+		panic(err)
+	}
 
-	resp, err := client.Chat.Completions.New(context.TODO(), cencori.ChatCompletionNewParams{
-		Model: cencori.F(cencori.ChatModelGPT4o),
-		Messages: cencori.F([]cencori.ChatCompletionMessageParam{
-			cencori.UserMessage("Hello from Go!"),
-		}),
+	resp, err := client.Chat.Create(context.TODO(), cencori.ChatParams{
+		Model: "gpt-4o",
+		Messages: []cencori.Message{
+			{Role: "user", Content: "Hello from Go!"},
+		},
 	})
 	if err != nil {
 		panic(err)
@@ -44,16 +46,13 @@ func main() {
 }
 ```
 
-## Context & Cancellation
-
-The Go SDK relies heavily on `context.Context` for cancellation and timeouts.
+## Context And Cancellation
 
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 defer cancel()
 
-// If the API takes > 5s, this will error with context.DeadlineExceeded
-resp, err := client.Chat.Completions.New(ctx, params)
+resp, err := client.Chat.Create(ctx, params)
 if err != nil {
     // Handle error
 }
@@ -61,45 +60,43 @@ if err != nil {
 
 ## Error Handling
 
-Errors are typed and allow you to inspect the status code.
-
 ```go
 if err != nil {
-    var apierr *cencori.Error
-    if errors.As(err, &apierr) {
-        fmt.Printf("Error: %s\n", apierr.Message)
-        fmt.Printf("Status: %d\n", apierr.StatusCode) // e.g. 429
-    }
+    fmt.Println(err)
 }
 ```
 
 ## Streaming
 
-The SDK uses an iterator pattern for streaming.
-
 ```go
-stream := client.Chat.Completions.NewStreaming(context.TODO(), params)
-
-for stream.Next() {
-    chunk := stream.Current()
-    fmt.Print(chunk.Choices[0].Delta.Content)
+stream, err := client.Chat.Stream(context.TODO(), cencori.ChatParams{
+    Model: "gpt-4o",
+    Messages: []cencori.Message{
+        {Role: "user", Content: "Tell me a story"},
+    },
+})
+if err != nil {
+    panic(err)
 }
 
-if err := stream.Err(); err != nil {
-    // Handle stream error
+for chunk := range stream {
+    if chunk.Err != nil {
+        panic(chunk.Err)
+    }
+    if len(chunk.Choices) > 0 {
+        fmt.Print(chunk.Choices[0].Delta.Content)
+    }
 }
 ```
 
 ## Configuration
 
-You can customize the underlying HTTP client or base URL.
+You can override the base URL or timeout if needed.
 
 ```go
-client := cencori.NewClient(
-    option.WithBaseURL("https://cencori.com/v1"),
-    option.WithMaxRetries(3),
-    option.WithHTTPClient(&http.Client{
-        Timeout: 30 * time.Second,
-    }),
+client, err := cencori.NewClient(
+    cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    cencori.WithBaseURL("https://cencori.com"),
+    cencori.WithTimeout(30*time.Second),
 )
 ```

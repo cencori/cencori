@@ -29,19 +29,19 @@ For a typical CI/CD workflow, we recommend this project structure:
 2. **my-app-prod**: Connect to your production deployment. Use strict **Allowed Domains** and stricter **Spend Caps**.
 
 ### Test vs Production Keys
-- **Production keys** (`cen_...`) - use these in live applications.
-- **Test keys** (`cen_test_...`) - use these during development. Test keys have lower rate limits and don't incur charges.
+- **Production keys** (`csk_...`) - use these in live applications.
+- **Test keys** (`csk_test_...`) - use these during development. Test keys have lower rate limits and don't incur charges.
 
 ### Environment Configuration
 
 ```bash
 # .env.development
-CENCORI_API_KEY=cen_test_abc123xyz456
+CENCORI_API_KEY=csk_test_abc123xyz456
 ```
 
 ```bash
 # .env.production
-CENCORI_API_KEY=cen_prod_xyz789abc123
+CENCORI_API_KEY=csk_live_xyz789abc123
 ```
 
 ## Project Settings

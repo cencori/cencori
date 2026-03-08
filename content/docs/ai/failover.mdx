@@ -1,100 +1,70 @@
 ---
 title: "Failover"
-description: "Automatic retries, provider fallback, and circuit breaker for reliable AI requests."
+description: "How Cencori handles retries, fallback routing, and circuit breaking at the gateway layer."
 section: "AI"
 order: 7
 ---
 
-Cencori provides automatic failover to keep your AI applications reliable, even when providers have outages.
+Cencori handles failover in the gateway, not through per-request SDK flags. When a provider or model path is degraded, Cencori can retry, route to a fallback path, and open a circuit breaker to protect future traffic.
 
-## How It Works
+## What Happens Automatically
 
-When a request fails, Cencori automatically:
+When a supported request fails, Cencori can:
 
-1. **Retries** the same provider (with exponential backoff)
-2. **Falls back** to equivalent models on other providers
-3. **Opens circuit breaker** if a provider is consistently failing
+1. retry transient upstream failures
+2. fall back to another provider or equivalent route
+3. stop sending traffic to a failing path until it recovers
 
-## Configuration
+## SDK Usage
+
+You do not need special failover options in the TypeScript SDK:
 
 ```typescript
+import { Cencori } from 'cencori';
+
 const cencori = new Cencori({
-  apiKey: 'csk_...',
-  failover: {
-    enabled: true,
-    maxRetries: 3,
-    fallbackModels: {
-      'gpt-4o': ['claude-3-opus-latest', 'gemini-1.5-pro'],
-      'claude-3-opus-latest': ['gpt-4o', 'gemini-1.5-pro'],
-    }
-  }
+  apiKey: process.env.CENCORI_API_KEY,
 });
-```
 
-## Automatic Fallback
-
-When configured, a failed request to one provider automatically falls back:
-
-```typescript
-// If gpt-4o fails, automatically tries claude-3-opus-latest
 const response = await cencori.ai.chat({
   model: 'gpt-4o',
   messages: [{ role: 'user', content: 'Hello!' }],
-  failover: true
 });
 
-// Response includes which model was actually used
-console.log(response.model); // 'gpt-4o' or 'claude-3-opus-latest'
+console.log(response.model);
 ```
 
-## Manual Fallback Chain
+## OpenAI-Compatible Usage
 
-Specify explicit fallback order:
+The same applies if you use the OpenAI-compatible endpoint:
 
-```typescript
-const response = await cencori.ai.chat({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello!' }],
-  fallbackModels: ['claude-3-opus-latest', 'gemini-1.5-pro', 'grok-2']
-});
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer csk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
 ```
 
-## Circuit Breaker
+## What Cencori Retries
 
-The circuit breaker prevents cascading failures:
+| Error Type | Retry | Fallback |
+|------------|-------|----------|
+| 429 / rate limit | Yes | Yes |
+| 5xx / upstream server error | Yes | Yes |
+| upstream timeout | Yes | Yes |
+| 401 / invalid provider credentials | No | No |
+| 400 / invalid request | No | No |
 
-| State | Behavior |
-|-------|----------|
-| Closed | Normal operation, requests go through |
-| Open | Provider is failing, skip and use fallback |
-| Half-Open | Testing if provider recovered |
+## Monitoring Failover
 
-```typescript
-// Circuit breaker settings
-const cencori = new Cencori({
-  apiKey: 'csk_...',
-  circuitBreaker: {
-    failureThreshold: 5,     // Open after 5 failures
-    resetTimeout: 30000,     // Try again after 30s
-  }
-});
-```
+Use the Cencori dashboard and request logs to inspect:
 
-## Retry Behavior
+- fallback events
+- provider reliability
+- latency spikes
+- circuit breaker activity
 
-| Error Type | Retry? | Fallback? |
-|------------|--------|-----------|
-| Rate limit (429) | Yes (with backoff) | Yes |
-| Server error (500+) | Yes | Yes |
-| Timeout | Yes | Yes |
-| Auth error (401) | No | No |
-| Bad request (400) | No | No |
-
-## Monitoring
-
-Track failover events in the dashboard:
-
-- Total failovers per day
-- Fallback success rate
-- Provider reliability scores
-- Circuit breaker triggers
+Failover is most useful when your application already sends every model call through Cencori. That makes Cencori the single control point for resilience.

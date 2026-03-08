@@ -1,11 +1,11 @@
 ---
 title: "Vercel AI SDK"
-description: "Drop-in integration with Vercel AI SDK. Works with streamText(), generateText(), and useChat()."
+description: "Use Cencori's first-party provider with streamText(), generateText(), and useChat()."
 section: "AI"
 order: 4
 ---
 
-Cencori integrates seamlessly with Vercel AI SDK. Use the same familiar API with added security, multi-provider routing, and observability.
+Cencori ships a first-party provider for the [Vercel AI SDK](https://sdk.vercel.ai/docs). Use it when you want Vercel's chat and streaming primitives with Cencori's routing, security, and observability behind the model call.
 
 ## Installation
 
@@ -13,47 +13,35 @@ Cencori integrates seamlessly with Vercel AI SDK. Use the same familiar API with
 npm install ai cencori
 ```
 
-## Setup
+## Environment
 
-Create the Cencori provider:
+```bash
+# .env.local
+CENCORI_API_KEY=csk_live_...
+```
+
+## Recommended Setup
+
+Create a shared provider export for your server code:
 
 ```typescript
-import { createCencoriProvider } from 'cencori/vercel';
+// lib/cencori.ts
+import { cencori } from 'cencori/vercel';
 
-const cencori = createCencoriProvider({
-  apiKey: process.env.CENCORI_API_KEY,
+export { cencori };
+```
+
+If you need custom provider settings, use `createCencori()` instead:
+
+```typescript
+import { createCencori } from 'cencori/vercel';
+
+export const cencori = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
 });
 ```
 
-## Text Generation
-
-```typescript
-import { generateText } from 'ai';
-
-const result = await generateText({
-  model: cencori('gpt-4o'),
-  prompt: 'Write a haiku about AI',
-});
-
-console.log(result.text);
-```
-
-## Streaming
-
-```typescript
-import { streamText } from 'ai';
-
-const result = await streamText({
-  model: cencori('claude-opus-4'),
-  prompt: 'Explain quantum computing',
-});
-
-for await (const textPart of result.textStream) {
-  process.stdout.write(textPart);
-}
-```
-
-## Chat (React)
+## Route Handler
 
 ```typescript
 // app/api/chat/route.ts
@@ -61,10 +49,10 @@ import { streamText } from 'ai';
 import { cencori } from '@/lib/cencori';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, model = 'gpt-4o' } = await req.json();
 
-  const result = await streamText({
-    model: cencori('gpt-4o'),
+  const result = streamText({
+    model: cencori(model),
     messages,
   });
 
@@ -72,21 +60,30 @@ export async function POST(req: Request) {
 }
 ```
 
+## React Chat UI
+
 ```tsx
 // app/page.tsx
 'use client';
+
 import { useChat } from 'ai/react';
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/chat',
+    body: {
+      model: 'gpt-4o',
+    },
+  });
 
   return (
     <div>
-      {messages.map(m => (
-        <div key={m.id}>
-          {m.role}: {m.content}
+      {messages.map((message) => (
+        <div key={message.id}>
+          {message.role}: {message.content}
         </div>
       ))}
+
       <form onSubmit={handleSubmit}>
         <input value={input} onChange={handleInputChange} />
       </form>
@@ -95,28 +92,44 @@ export default function Chat() {
 }
 ```
 
-## Switching Providers
-
-The power of Cencori is easy provider switching. Just change the model:
+## Text Generation
 
 ```typescript
-// Use OpenAI
-const openai = await generateText({
+import { generateText } from 'ai';
+import { cencori } from '@/lib/cencori';
+
+const result = await generateText({
+  model: cencori('gemini-2.5-flash'),
+  prompt: 'Write a haiku about AI infrastructure.',
+});
+
+console.log(result.text);
+```
+
+## Switching Models
+
+```typescript
+await generateText({
   model: cencori('gpt-4o'),
   prompt: 'Hello',
 });
 
-// Use Anthropic
-const anthropic = await generateText({
-  model: cencori('claude-opus-4'),
+await generateText({
+  model: cencori('claude-sonnet-4.5'),
   prompt: 'Hello',
 });
 
-// Use Google
-const google = await generateText({
+await generateText({
   model: cencori('gemini-2.5-flash'),
   prompt: 'Hello',
 });
 ```
 
-All requests are logged, secured, and tracked automatically.
+## When To Use The OpenAI-Compatible Base URL
+
+If a library expects an OpenAI-compatible `baseURL` and `apiKey` instead of a first-party provider, use:
+
+- `baseURL`: `https://api.cencori.com/v1`
+- `apiKey`: your Cencori project key (`csk_...`)
+
+Use `cencori/vercel` when you are already inside the Vercel AI SDK.

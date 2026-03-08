@@ -11,7 +11,7 @@ Cencori acts as a drop-in replacement for OpenAI. Any SDK that supports a custom
 
 For any OpenAI-compatible library, make two changes:
 1.  **API Key**: Use your Cencori Project Key (`csk_...`).
-2.  **Base URL**: Set to `https://cencori.com/v1`.
+2.  **Base URL**: Set to `https://api.cencori.com/v1`.
 
 That's it. You now get logs, security scanning, and multi-provider routing for free.
 
@@ -25,7 +25,7 @@ using OpenAI;
 
 // 1. Configure the client
 var client = new OpenAIClient(
-    new Uri("https://cencori.com/v1"),
+    new Uri("https://api.cencori.com/v1"),
     new AzureKeyCredential("csk_live_...")
 );
 
@@ -50,7 +50,7 @@ Compatible with the popular `openai-php/client` library.
 
 ```php
 $client = OpenAI::factory()
-    ->withBaseUri('https://cencori.com/v1')
+    ->withBaseUri('https://api.cencori.com/v1')
     ->withApiKey('csk_live_...')
     ->make();
 
@@ -71,7 +71,7 @@ Compatible with the `ruby-openai` gem.
 ```ruby
 client = OpenAI::Client.new(
     access_token: "csk_live_...",
-    uri_base: "https://cencori.com/v1",
+    uri_base: "https://api.cencori.com/v1",
     request_timeout: 240 # Optional
 )
 
@@ -88,7 +88,7 @@ puts response.dig("choices", 0, "message", "content")
 ## Java (theokanning/openai-java)
 
 ```java
-OpenAiService service = new OpenAiService("csk_live_...", Duration.ofSeconds(30), "https://cencori.com/v1/");
+OpenAiService service = new OpenAiService("csk_live_...", Duration.ofSeconds(30), "https://api.cencori.com/v1/");
 
 ChatCompletionRequest completionRequest = ChatCompletionRequest.builder()
         .messages(List.of(new ChatMessage("user", "Hello from Java!")))
@@ -102,5 +102,5 @@ service.createChatCompletion(completionRequest).getChoices().forEach(System.out:
 
 If your language isn't listed, the pattern is always the same:
 1.  Find the `base_url` or `api_base` parameter in your SDK initialization.
-2.  Set it to `https://cencori.com/v1`.
+2.  Set it to `https://api.cencori.com/v1`.
 3.  Pass your Cencori key as the API Key.

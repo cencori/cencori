@@ -1,942 +1,414 @@
-# Cencori - LLM.txt Documentation
-> One API for every AI provider with built-in security, observability, and cost control.
-> Use this document to quickly integrate Cencori into your project.
+# Cencori - Integration Contract for Code Agents
 
-## What is Cencori?
+This file is a strict integration guide for code agents and automation tools.
 
-Cencori is the unified AI infrastructure for production applications. Instead of integrating with OpenAI, Anthropic, and Google separately, you integrate once with Cencori and get:
-- **Unified SDK Support**: 3 Official SDKs + Native Proxy support for 10+ AI libraries
-- **Automatic security** - PII detection (25+ entities), prompt injection protection, content filtering
-- **Complete observability** - audit logs, traces, analytics, cost tracking
-- **Multi-provider flexibility** - switch models with one parameter
+Use it as the source of truth for:
+- package names
+- import paths
+- environment variables
+- base URLs
+- request/response shapes
+- stable public APIs
 
-## Core Architecture (CIP)
+Do not treat this file as a product roadmap.
+Only use the APIs and patterns documented here.
 
-Cencori acts as a **Cloud Intelligence Provider**, not just a proxy.
-- **Global Edge Network**: deployed across 35+ regions for <10ms latency.
-- **Zero Cold Starts**: Warm execution environments for all requests.
-- **Data Residency**: Logs stored in US-East (N. Virginia) by default; EU options available.
-- **Stateful Intelligence**: Maintains context (Memory) and Security (Scan) before provider processing.
+## What Cencori Is
 
-## Gateway Features
+Cencori is the runtime control layer for production AI.
+Your application sends AI traffic to Cencori, and Cencori handles routing, security enforcement, observability, and cost tracking.
 
-- **Smart Routing**: Route to "lowest cost" or "fastest" provider dynamically.
-- **Failover**: Automatically retry on 429/503 errors.
-- **Caching**: Semantic & Exact Match caching to reduce costs by 30-60%.
-- **Observability**: Full request logging and trace visualization.
+## Stable Public Surfaces
 
-## Memory & RAG
+Use one of these integration paths:
 
-- **Vector Database**: Built-in (no Pinecone needed). Uses `text-embedding-3-small` (1536 dims).
-- **Auto-Indexing**: <500ms latency from store to search availability.
-- **Advanced Filtering**: Support for `$eq`, `$in`, `$gt`, `$lt` operators on metadata.
-- **Hybrid Search**: Combine semantic search with keyword matching (BM25).
-- **TTL**: Auto-expire memories (e.g., session history).
+1. Official TypeScript SDK
+- Package: `cencori`
+- Best for: server routes, backend services, direct SDK usage
 
-## Security Features (Scan)
+2. Vercel AI SDK provider
+- Import: `cencori/vercel`
+- Best for: `streamText()`, `generateText()`, `useChat()`
 
-- **PII Detection**: Detects SSN, Credit Cards, Secrets, Emails. Modes: `mask`, `redact`, `block`.
-- **Prompt Injection**: Uses Heuristics + VectorDB + Llama Guard (Zero-Trust).
-- **Content Filtering**: Unified thresholds (0.0-1.0) for Hate, Violence, Sexual content.
+3. TanStack AI adapter
+- Import: `cencori/tanstack`
+- Best for: `@tanstack/ai`
 
-## SDK Configuration
+4. OpenAI-compatible endpoint
+- Base URL: `https://api.cencori.com/v1`
+- Best for: OpenAI-compatible SDKs, agent frameworks, desktop tools
 
-- **Timeouts**: Default read timeout is 60s. Increase this for `o1` or `claude-opus`.
-- **Retries**: Default 2 retries with exponential backoff (max delay 60s).
-- **Edge Runtime**: Official Node.js SDK is fully compatible with Vercel Edge & Cloudflare Workers.
-- **Telemetry**: SDK collects anonymous latency & OS version. Disable with `CENCORI_TELEMETRY=0`.
-- **Web Telemetry**: Report web traffic from your app to the Cencori dashboard via `cencori.telemetry.reportWebRequest()`.
+5. Native Cencori HTTP endpoints
+- Base URL: `https://cencori.com`
+- Best for: direct calls to `/api/ai/*` or `/api/v1/telemetry/web`
 
-## Web Telemetry
+## Do Not Use These As Public Contract Yet
 
-Report web traffic from your application to the Cencori dashboard. Logs appear under Logs → Web Gateway with your app's real domain as the host.
+Avoid generating code against these surfaces unless the target project already implements and verifies them:
 
-### SDK Usage
+- `cencori.compute.*`
+- `cencori.workflow.*`
+- `cencori.workflows.*`
+- `cencori.steps.*`
+- `cencori.storage.*`
+- speculative workflow APIs like `waitFor()`, `define()`, `sendEvent()`, `transferToHuman()`
+- unsupported TypeScript SDK config fields like `timeout`, `retries`, `maxRetries`, `failover`, `fallbackModels`, `circuitBreaker`
+- undocumented SDK telemetry flags like `CENCORI_TELEMETRY=0`
+- public memory-search/filter/hybrid-search assumptions unless verified in the target project
 
-```typescript
-const cencori = new Cencori({ apiKey: 'csk_...' });
+## Security Rules
 
-// In your middleware or API handler:
-await cencori.telemetry.reportWebRequest({
-  host: 'dochat-zeta.vercel.app',
-  method: 'GET',
-  path: '/api/chat',
-  statusCode: 200,
-  latencyMs: 42,
-  userAgent: req.headers.get('user-agent') || undefined,
-});
-```
+- Use `CENCORI_API_KEY` for server-side secrets.
+- Project secret keys use the `csk_...` prefix.
+- Never expose `csk_...` keys in client-side code.
+- Do not use `NEXT_PUBLIC_*` env vars for secret Cencori keys.
+- Use `https://api.cencori.com/v1` only for OpenAI-compatible clients.
+- Use the SDK default base URL unless you intentionally need to override it.
 
-### API Endpoint
+## Recommended Next.js Setup
 
-```
-POST /api/v1/telemetry/web
-Headers: { "CENCORI_API_KEY": "csk_..." }
-Body: {
-  "host": "dochat-zeta.vercel.app",
-  "method": "GET",
-  "path": "/api/chat",
-  "statusCode": 200,
-  "latencyMs": 42,
-  "userAgent": "Mozilla/5.0 ...",
-  "ipAddress": "1.2.3.4",
-  "countryCode": "US"
-}
-```
+Assumption: Next.js App Router with Vercel AI SDK.
 
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `host` | string | Yes | Your app's hostname (e.g. "dochat-zeta.vercel.app") |
-| `method` | string | Yes | HTTP method (GET, POST, etc.) |
-| `path` | string | Yes | Request path (e.g. "/api/chat") |
-| `statusCode` | number | Yes | HTTP status code |
-| `requestId` | string | No | Unique request ID for tracing |
-| `queryString` | string | No | Query string without leading "?" |
-| `message` | string | No | Human-readable log message |
-| `userAgent` | string | No | Client User-Agent |
-| `referer` | string | No | Referer header |
-| `ipAddress` | string | No | Client IP address |
-| `countryCode` | string | No | ISO 3166-1 alpha-2 country code |
-| `latencyMs` | number | No | Request latency in ms |
-
-Fire-and-forget — the SDK method never throws and never blocks your app.
-
-## Supported SDKs & Integrations
-
-Cencori provides multiple ways to integrate, ranging from official dedicated libraries to complete drop-in compatibility for existing AI SDKs.
-
-### 1. Official Cencori SDKs (3)
-The most feature-complete way to integrate, supporting all Cencori primitives (Chat, Images, Memory, Security).
-- **TypeScript/Node.js**: `npm install cencori`
-- **Python**: `pip install cencori`
-- **Go**: `go get github.com/cencori/cencori-go`
-
-### 2. Framework Adapters
-Optimized providers for popular AI development frameworks.
-- **Vercel AI SDK**: `cencori` (Guide: https://cencori.com/docs/integrations/vercel-ai-sdk)
-- **TanStack AI**: `cencori/tanstack` (Guide: https://cencori.com/docs/integrations/tanstack)
-- **LangChain**: Works via the `ChatOpenAI` or `ChatAnthropic` adapters.
-
-### 3. Native Proxy Support (Zero-Config)
-Cencori is 100% compatible with existing AI SDKs. Just point the `base_url` to `https://cencori.com/v1`.
-
-**PHP (openai-php/client):**
-```php
-$client = OpenAI::factory()
-    ->withBaseUri('https://cencori.com/v1')
-    ->withApiKey('csk_...')
-    ->make();
-```
-
-**Ruby (ruby-openai):**
-```ruby
-client = OpenAI::Client.new(
-    access_token: "csk_...",
-    uri_base: "https://cencori.com/v1"
-)
-```
-
-- **OpenAI SDK** (All languages: Python, Node, Java, .NET)
-- **Anthropic SDK** (All languages)
-- **Mistral SDK**
-- **CrewAI / AutoGen / LangGraph**
-
-### 1. Install the SDK
-
-**JavaScript/TypeScript:**
-```bash
-npm install cencori
-# or: yarn add cencori
-# or: pnpm add cencori
-```
-
-**Python:**
-```bash
-pip install cencori
-```
-
-**Go:**
-```bash
-go get github.com/cencori/cencori-go
-```
-
-### 2. Set Environment Variables
-
-```bash
-# .env
-CENCORI_API_KEY=csk_your_secret_key_here  # Server-side (csk_ prefix)
-```
-
-### 3. Initialize the Client
-
-```typescript
-// lib/cencori.ts
-import { Cencori } from "cencori";
-
-export const cencori = new Cencori({
-  apiKey: process.env.CENCORI_API_KEY!,
-});
-```
-
-### 4. Make Your First Request
-
-```typescript
-// app/api/chat/route.ts
-import { cencori } from "@/lib/cencori";
-
-export async function POST(req: Request) {
-  const { messages } = await req.json();
-
-  const response = await cencori.ai.chat({
-    model: "gpt-4o", // or "claude-3-opus", "gemini-2.5-flash"
-    messages: messages,
-    temperature: 0.7,
-    maxTokens: 1000,
-  });
-
-  return Response.json({
-    content: response.content,
-    usage: response.usage,
-  });
-}
-```
-
-**Go:**
-```go
-// main.go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    "github.com/cencori/cencori-go"
-)
-
-func main() {
-    client, _ := cencori.NewClient(
-        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
-    )
-
-    resp, _ := client.Chat.Create(context.Background(), &cencori.ChatParams{
-        Model: "gpt-4o",
-        Messages: []cencori.Message{
-            {Role: "user", Content: "Hello!"},
-        },
-    })
-
-    fmt.Println(resp.Choices[0].Message.Content)
-}
-```
-
-## Vercel AI SDK Integration
-
-Using Vercel AI SDK? Install `cencori` for drop-in compatibility:
-Guide: https://cencori.com/docs/integrations/vercel-ai-sdk
+### Install
 
 ```bash
 npm install cencori ai
 ```
 
+### Environment
+
+```bash
+# .env.local
+CENCORI_API_KEY=csk_live_...
+```
+
+### Shared Cencori Setup
+
+```typescript
+// lib/cencori.ts
+import { Cencori } from 'cencori';
+import { cencori } from 'cencori/vercel';
+
+export const cencoriClient = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+});
+
+export { cencori };
+```
+
+### Streaming Chat Route
+
 ```typescript
 // app/api/chat/route.ts
-import { cencori } from "cencori";
-import { streamText } from "ai";
+import { streamText } from 'ai';
+import { cencori } from '@/lib/cencori';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, model = 'gpt-4o' } = await req.json();
 
-  const result = await streamText({
-    model: cencori("gemini-2.5-flash"),
+  const result = streamText({
+    model: cencori(model),
     messages,
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toDataStreamResponse();
 }
 ```
 
-Works with `streamText()`, `generateText()`, `useChat()`, and all Vercel AI SDK features.
+### Client Chat UI
 
-## TanStack AI Integration
+```tsx
+// app/page.tsx
+'use client';
 
-Using TanStack AI? Install `cencori` with the TanStack subpath:
-Guide: https://cencori.com/docs/integrations/tanstack
+import { useChat } from 'ai/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/chat',
+    body: { model: 'gpt-4o' },
+  });
+
+  return (
+    <div>
+      {messages.map((message) => (
+        <div key={message.id}>{message.content}</div>
+      ))}
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+      </form>
+    </div>
+  );
+}
+```
+
+### Optional Web Telemetry
+
+```typescript
+// proxy.ts
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import { cencoriClient } from '@/lib/cencori';
+
+export async function middleware(request: NextRequest) {
+  const startedAt = Date.now();
+  const response = NextResponse.next();
+
+  void cencoriClient.telemetry.reportWebRequest({
+    host: request.headers.get('host') || 'unknown',
+    method: request.method,
+    path: request.nextUrl.pathname,
+    queryString: request.nextUrl.search ? request.nextUrl.search.slice(1) : undefined,
+    statusCode: response.status,
+    userAgent: request.headers.get('user-agent') || undefined,
+    referer: request.headers.get('referer') || undefined,
+    latencyMs: Date.now() - startedAt,
+  });
+
+  return response;
+}
+```
+
+## Official TypeScript SDK
+
+### Install
+
+```bash
+npm install cencori
+```
+
+### Initialize
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+```
+
+### Supported Client Configuration
+
+The TypeScript SDK currently supports only:
+- `apiKey`
+- `baseUrl`
+- `headers`
+
+Example:
+
+```typescript
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+  baseUrl: 'https://cencori.com',
+  headers: {
+    'X-Trace-ID': 'req_123',
+  },
+});
+```
+
+Do not generate SDK code using extra config fields that are not listed above.
+
+## Core SDK Methods
+
+### Chat
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Hello!' },
+  ],
+  temperature: 0.2,
+  maxTokens: 300,
+});
+
+console.log(response.content);
+console.log(response.toolCalls);
+console.log(response.usage.totalTokens);
+```
+
+### Chat Streaming
+
+```typescript
+const stream = cencori.ai.chatStream({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Tell me a story.' }],
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+### Structured Output
+
+```typescript
+const response = await cencori.ai.generateObject({
+  model: 'gpt-4o',
+  prompt: 'Generate a fictional user profile.',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      age: { type: 'number' },
+    },
+    required: ['name', 'age'],
+  },
+});
+
+console.log(response.object);
+```
+
+### Embeddings
+
+```typescript
+const response = await cencori.ai.embeddings({
+  model: 'text-embedding-3-small',
+  input: 'Hello world',
+});
+
+console.log(response.embeddings[0]);
+```
+
+### Image Generation
+
+```typescript
+const response = await cencori.ai.generateImage({
+  prompt: 'A futuristic city at sunset',
+  model: 'gpt-image-1.5',
+  size: '1024x1024',
+});
+
+console.log(response.images[0].url);
+```
+
+### RAG
+
+```typescript
+const response = await cencori.ai.rag({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is our refund policy?' }],
+  namespace: 'docs',
+  limit: 5,
+});
+
+console.log(response.message.content);
+console.log(response.sources);
+```
+
+### Web Telemetry
+
+```typescript
+await cencori.telemetry.reportWebRequest({
+  host: 'app.example.com',
+  method: 'GET',
+  path: '/api/chat',
+  statusCode: 200,
+  latencyMs: 42,
+});
+```
+
+## SDK Chat Response Shape
+
+`cencori.ai.chat()` returns a TypeScript SDK response with camelCase usage fields:
+
+```json
+{
+  "id": "chatcmpl_123",
+  "model": "gpt-4o",
+  "content": "Hello! How can I help?",
+  "toolCalls": null,
+  "finishReason": "stop",
+  "usage": {
+    "promptTokens": 13,
+    "completionTokens": 7,
+    "totalTokens": 20
+  }
+}
+```
+
+## Vercel AI SDK
+
+### Install
+
+```bash
+npm install cencori ai
+```
+
+### Default Provider
+
+```typescript
+import { cencori } from 'cencori/vercel';
+import { generateText } from 'ai';
+
+const result = await generateText({
+  model: cencori('gpt-4o'),
+  prompt: 'Write a haiku about AI infrastructure.',
+});
+
+console.log(result.text);
+```
+
+### Custom Provider
+
+```typescript
+import { createCencori } from 'cencori/vercel';
+
+export const cencori = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+});
+```
+
+Preferred import path for Vercel AI SDK is `cencori/vercel`.
+Do not prefer the root-package re-export in generated examples.
+
+## TanStack AI
+
+### Install
 
 ```bash
 npm install cencori @tanstack/ai
 ```
 
+### Default Adapter
+
 ```typescript
-import { cencori } from "cencori/tanstack";
+import { chat } from '@tanstack/ai';
+import { cencori } from 'cencori/tanstack';
 
-const adapter = cencori("gpt-4o");
-
-// Streaming
-for await (const chunk of adapter.chatStream({
-  messages: [{ role: "user", content: "Hello!" }]
+for await (const chunk of chat({
+  adapter: cencori('gpt-4o'),
+  messages: [{ role: 'user', content: 'Hello world' }],
 })) {
-  if (chunk.type === "content") {
+  if (chunk.type === 'content') {
     console.log(chunk.delta);
   }
 }
 ```
 
-Works with `chatStream()`, structured output, and all TanStack AI features.
-
-## Tool Calling / Function Calling
-
-Cencori supports tool calling across all providers with a unified interface.
-
-### Vercel AI SDK Tool Calling
+### Custom Adapter Factory
 
 ```typescript
-import { cencori } from "cencori";
-import { generateText, tool } from "ai";
-import { z } from "zod";
+import { createCencori } from 'cencori/tanstack';
 
-const result = await generateText({
-  model: cencori("gpt-4o"),
-  prompt: "What is the weather in San Francisco?",
-  tools: {
-    getWeather: tool({
-      description: "Get the current weather for a location",
-      parameters: z.object({
-        location: z.string().describe("The city name"),
-      }),
-      execute: async ({ location }) => {
-        return { temperature: 72, condition: "sunny" };
-      },
-    }),
-  },
+const provider = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
 });
 
-// Access tool calls
-for (const toolCall of result.toolCalls) {
-  console.log(`Called ${toolCall.toolName} with args:`, toolCall.args);
-}
+const adapter = provider('gpt-4o');
 ```
 
-### TanStack AI Tool Calling
+## OpenAI-Compatible Clients
 
-```typescript
-import { cencori } from "cencori/tanstack";
+Use this mode when a tool already expects an OpenAI-compatible client.
 
-const adapter = cencori("gpt-4o");
+### Required Settings
 
-for await (const chunk of adapter.chatStream({
-  messages: [{ role: "user", content: "Get weather for NYC" }],
-  tools: {
-    getWeather: {
-      name: "getWeather",
-      description: "Get weather for a location",
-      inputSchema: { type: "object", properties: { location: { type: "string" } } },
-    },
-  },
-})) {
-  if (chunk.type === "tool_call") {
-    console.log("Tool call:", chunk.toolCall);
-    // { id: "call_123", type: "function", function: { name: "getWeather", arguments: '{"location":"NYC"}' } }
-  }
-}
+- `api_key`: your Cencori project key (`csk_...`)
+- `base_url`: `https://api.cencori.com/v1`
 
-## Chat API Reference
-
-### Basic Usage
-
-```typescript
-const response = await cencori.ai.chat({
-  model: "gpt-4o",
-  messages: [
-    { role: "system", content: "You are a helpful assistant." },
-    { role: "user", content: "Hello!" }
-  ],
-  temperature: 0.7,
-  maxTokens: 1000,
-});
-
-console.log(response.content);
-```
-
-**Python:**
-```python
-from cencori import Cencori
-
-cencori = Cencori(api_key="your-api-key")
-
-response = cencori.ai.chat(
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hello!"}
-    ],
-    model="gpt-4o",
-    temperature=0.7,
-    max_tokens=1000,
-)
-
-print(response.content)
-```
-
-**Go:**
-```go
-resp, _ := client.Chat.Create(ctx, &cencori.ChatParams{
-    Model: "gpt-4o",
-    Messages: []cencori.Message{
-        {Role: "system", Content: "You are a helpful assistant."},
-        {Role: "user", Content: "Hello!"},
-    },
-    Temperature: cencori.Float64(0.7),
-    MaxTokens:   cencori.Int(1000),
-})
-fmt.Println(resp.Choices[0].Message.Content)
-```
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model` | string | No | AI model (default: gemini-2.5-flash) |
-| `messages` | array | Yes | Conversation history with role and content |
-| `temperature` | number | No | Randomness (0-1) |
-| `maxTokens` | number | No | Max response tokens |
-| `userId` | string | No | User ID for rate limiting |
-
-### Response Format
-
-```typescript
-{
-  content: "Hello! How can I help?",
-  model: "gpt-4o",
-  provider: "openai",
-  usage: {
-    prompt_tokens: 13,
-    completion_tokens: 7,
-    total_tokens: 20
-  },
-  cost_usd: 0.0003,
-  finish_reason: "stop"
-}
-```
-
-## Streaming
-
-Stream responses for better UX using `chatStream()`:
-
-```typescript
-// Server route
-import { Cencori } from "cencori";
-
-export async function POST(req: Request) {
-  const { messages } = await req.json();
-  
-  const cencori = new Cencori({
-    apiKey: process.env.CENCORI_API_KEY!,
-  });
-
-  const stream = cencori.ai.chatStream({
-    model: "gpt-4o",
-    messages,
-  });
-
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        // chunk.delta contains the streamed text
-        controller.enqueue(encoder.encode(chunk.delta));
-      }
-      controller.close();
-    },
-  });
-
-  return new Response(readableStream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-    },
-  });
-}
-```
-
-### Stream Chunk Format
-
-```typescript
-{
-  delta: "Hello",           // The text chunk
-  finish_reason?: "stop",   // Only on last chunk: 'stop' | 'length' | 'content_filter' | 'error'
-  error?: "Rate limit exceeded"  // Error message if stream failed
-}
-```
-
-### Handling Stream Errors
-
-```typescript
-for await (const chunk of stream) {
-  // Check for errors in stream
-  if (chunk.error) {
-    console.error('Stream error:', chunk.error);
-    break;
-  }
-  controller.enqueue(encoder.encode(chunk.delta));
-}
-```
-
-Client-side streaming:
-
-```typescript
-const res = await fetch('/api/chat', {
-  method: 'POST',
-  body: JSON.stringify({ messages }),
-});
-
-const reader = res.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  const chunk = decoder.decode(value);
-  setResponse(prev => prev + chunk);
-}
-```
-
-**Go (Client, Streaming):**
-```go
-stream, _ := client.Chat.Stream(context.Background(), &cencori.ChatParams{
-    Model: "claude-3-opus",
-    Messages: []cencori.Message{
-        {Role: "user", Content: "Tell me a story"},
-    },
-})
-
-for chunk := range stream {
-    if len(chunk.Choices) > 0 {
-        fmt.Print(chunk.Choices[0].Delta.Content)
-    }
-}
-```
-
-## Supported Models (14+ Providers)
-
-### OpenAI
-| Model | Context | Description |
-|-------|---------|-------------|
-| `gpt-5` | 256K | Latest flagship model |
-| `gpt-4o` | 128K | Omni-modal model |
-| `gpt-4o-mini` | 128K | Fast and cost-effective |
-| `o3` | 200K | Most advanced reasoning |
-| `o1` | 128K | Advanced reasoning model |
-
-### Anthropic
-| Model | Context | Description |
-|-------|---------|-------------|
-| `claude-opus-4` | 200K | Most capable Claude |
-| `claude-sonnet-4` | 200K | Balanced speed & capability |
-| `claude-3-5-sonnet` | 200K | Balance of speed and capability |
-| `claude-3-5-haiku` | 200K | Fast and efficient |
-
-### Google Gemini
-| Model | Context | Description |
-|-------|---------|-------------|
-| `gemini-3-pro` | 2M | Most powerful Gemini |
-| `gemini-2.5-flash` | 1M | Thinking capabilities |
-| `gemini-2.0-flash` | 1M | Fast model |
-
-### xAI (Grok)
-| Model | Context | Description |
-|-------|---------|-------------|
-| `grok-4` | 256K | Enhanced reasoning |
-| `grok-4.1` | 256K | Improved multimodal |
-| `grok-3` | 128K | DeepSearch, Big Brain Mode |
-
-### Additional Providers
-- **Mistral**: mistral-large-3, codestral, devstral
-- **DeepSeek**: deepseek-v3.2, deepseek-reasoner
-- **Meta (Llama)**: llama-4-maverick, llama-3.3-70b
-- **Groq**: Fast inference for Llama models
-- **Cohere**: command-a, command-r+
-- **Perplexity**: sonar-pro, sonar-reasoning-pro
-- **Together AI**: Access to 100+ open models
-- **OpenRouter**: Meta-provider for all models
-
-### Model Selection Guide
-- **Chat/General**: `gemini-2.5-flash` (fast, cheap, good quality)
-- **Code**: `gpt-4o` or `codestral` (best coding)
-- **Reasoning**: `o3` or `deepseek-reasoner`
-- **Documents**: `claude-opus-4` (200K context, strong reasoning)
-- **Search**: `sonar-pro` (web-connected)
-
-## Multi-Provider Switching
-
-Switch providers with one parameter:
-
-```typescript
-// OpenAI
-await cencori.ai.chat({ model: "gpt-4o", messages });
-
-// Anthropic
-await cencori.ai.chat({ model: "claude-3-opus", messages });
-
-// Google
-await cencori.ai.chat({ model: "gemini-2.5-flash", messages });
-```
-
-All responses have the same format regardless of provider!
-
-## Image Generation
-
-Generate images from text prompts using multiple AI providers with a unified API.
-
-### Supported Models
-
-| Provider | Model | Description |
-|----------|-------|-------------|
-| **OpenAI** | `gpt-image-1.5` | Best text rendering, top ELO rating |
-| **OpenAI** | `gpt-image-1` | ChatGPT image generation |
-| **OpenAI** | `dall-e-3` | High quality, creative |
-| **OpenAI** | `dall-e-2` | Fast, cost-effective |
-| **Google** | `gemini-3-pro-image` | High photorealism, fast |
-| **Google** | `imagen-3` | Google Imagen 3 |
-
-### Basic Usage
-
-```typescript
-const response = await cencori.ai.generateImage({
-  prompt: "A futuristic city at sunset with flying cars",
-  model: "gpt-image-1.5",  // or "dall-e-3", "gemini-3-pro-image"
-  size: "1024x1024",
-  quality: "hd"
-});
-
-console.log(response.images[0].url);  // URL to the generated image
-```
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `prompt` | string | Yes | Text description of the image |
-| `model` | string | No | Image model (default: dall-e-3) |
-| `size` | string | No | Image size (1024x1024, 1792x1024, etc.) |
-| `n` | number | No | Number of images (1-4, varies by model) |
-| `quality` | string | No | 'standard' or 'hd' (DALL-E 3/GPT Image only) |
-| `style` | string | No | 'vivid' or 'natural' (DALL-E 3 only) |
-| `responseFormat` | string | No | 'url' or 'b64_json' |
-
-### Response Format
-
-```typescript
-{
-  images: [
-    {
-      url: "https://...",        // Image URL (if responseFormat='url')
-      b64Json: "...",            // Base64 data (if responseFormat='b64_json')
-      revisedPrompt: "..."       // Model's revised prompt
-    }
-  ],
-  model: "gpt-image-1.5",
-  provider: "openai"
-}
-```
-
-## Embeddings
-
-Generate vector embeddings for text using multiple providers.
-
-### Supported Models
-
-| Provider | Model | Dimensions | Description |
-|----------|-------|------------|-------------|
-| **OpenAI** | `text-embedding-3-large` | 3072 | Best quality |
-| **OpenAI** | `text-embedding-3-small` | 1536 | Fast and efficient |
-| **OpenAI** | `text-embedding-ada-002` | 1536 | Legacy model |
-| **Google** | `text-embedding-004` | 768 | Google embedding model |
-| **Cohere** | `embed-english-v3.0` | 1024 | English optimized |
-| **Cohere** | `embed-multilingual-v3.0` | 1024 | Multilingual support |
-
-### Usage
-
-```typescript
-const response = await cencori.ai.embeddings({
-  model: 'text-embedding-3-small',
-  input: 'Hello world'
-});
-
-console.log(response.embeddings[0]); // [0.1, 0.2, ...]
-```
-
-### API Request
-
-```typescript
-POST /api/ai/embeddings
-Headers: { "CENCORI_API_KEY": "csk_..." }
-Body: {
-  "model": "text-embedding-3-small",
-  "input": "Hello world",
-  "dimensions": 1536  // optional, for variable dimension models
-}
-```
-
-## Audio
-
-Cencori supports audio transcription and text-to-speech.
-
-### Transcriptions
-
-Convert audio to text using Whisper models.
-
-```typescript
-POST /api/ai/audio/transcriptions
-Headers: { "CENCORI_API_KEY": "csk_..." }
-Body: FormData with 'file' (audio file) and optional 'model', 'language', 'prompt'
-```
-
-### Text-to-Speech
-
-Generate audio from text.
-
-```typescript
-POST /api/ai/audio/speech
-Headers: { "CENCORI_API_KEY": "csk_..." }
-Body: {
-  "input": "Hello, welcome to Cencori!",
-  "model": "tts-1",  // or "tts-1-hd"
-  "voice": "alloy"   // alloy, echo, fable, onyx, nova, shimmer
-}
-```
-
-## Moderation
-
-Detect harmful content in text before it reaches your application.
-
-### Supported Models
-
-| Model | Description |
-|-------|-------------|
-| `text-moderation-latest` | Latest moderation model |
-| `text-moderation-stable` | Stable moderation model |
-| `omni-moderation-latest` | Multimodal (text + images) |
-
-### Usage
-
-```typescript
-POST /api/ai/moderation
-Headers: { "CENCORI_API_KEY": "csk_..." }
-Body: {
-  "input": "Text to check for harmful content",
-  "model": "text-moderation-latest"
-}
-```
-
-### Categories Detected
-
-- hate, hate/threatening
-- harassment, harassment/threatening
-- self-harm, self-harm/intent, self-harm/instructions
-- sexual, sexual/minors
-- violence, violence/graphic
-
-### Response
-
-```typescript
-{
-  "id": "modr-...",
-  "model": "text-moderation-latest",
-  "results": [{
-    "flagged": false,
-    "categories": { "hate": false, "violence": false, ... },
-    "category_scores": { "hate": 0.001, "violence": 0.002, ... }
-  }]
-}
-```
-
-## AI Memory (Context Store)
-
-Vector storage for RAG, conversation history, and semantic search. Store and retrieve memories with automatic embedding generation.
-
-### Quick Start
-
-```typescript
-import { Cencori } from 'cencori';
-
-const cencori = new Cencori({ apiKey: 'csk_...' });
-
-// Store a memory
-await cencori.memory.store({
-  namespace: 'company-docs',
-  content: 'Our refund policy allows returns within 30 days',
-  metadata: { category: 'policy', source: 'handbook' }
-});
-
-// Semantic search
-const results = await cencori.memory.search({
-  namespace: 'company-docs',
-  query: 'what is our return policy?',
-  limit: 5
-});
-
-console.log(results.results[0].content);
-// "Our refund policy allows returns within 30 days"
-```
-
-### SDK Methods
-
-| Method | Description |
-|--------|-------------|
-| `memory.store(options)` | Store a memory with auto-embedding |
-| `memory.search(options)` | Semantic search across memories |
-| `memory.get(id)` | Get memory by ID |
-| `memory.delete(id)` | Delete a memory |
-| `memory.storeBatch(namespace, items)` | Store multiple memories |
-| `memory.createNamespace(options)` | Create a namespace |
-| `memory.listNamespaces()` | List all namespaces |
-
-### Store Memory
-
-```typescript
-await cencori.memory.store({
-  namespace: 'conversations',
-  content: 'User asked about pricing plans',
-  metadata: {
-    userId: 'user_123',
-    sessionId: 'sess_456',
-    timestamp: new Date().toISOString()
-  },
-  expiresAt: '2024-12-31T23:59:59Z' // optional TTL
-});
-```
-
-### Search Memories
-
-```typescript
-const results = await cencori.memory.search({
-  namespace: 'conversations',
-  query: 'what did we discuss about pricing?',
-  limit: 5,           // max results
-  threshold: 0.7,     // similarity threshold (0-1)
-  filter: {           // metadata filters
-    userId: 'user_123'
-  }
-});
-
-// Response format
-{
-  results: [
-    {
-      id: 'mem_...',
-      content: 'User asked about pricing plans',
-      metadata: { userId: 'user_123', ... },
-      similarity: 0.92,
-      createdAt: '2024-01-15T...'
-    }
-  ],
-  query: 'what did we discuss about pricing?',
-  namespace: 'conversations',
-  count: 1,
-  latencyMs: 45
-}
-```
-
-### RAG (Retrieval-Augmented Generation)
-
-Combine memory search with AI chat for context-aware responses:
-
-```typescript
-// Method 1: Use the RAG helper
-const response = await cencori.ai.rag({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'What is our refund policy?' }],
-  namespace: 'company-docs',
-  limit: 5
-});
-
-console.log(response.message.content);
-console.log(response.sources); // retrieved memories
-
-// Method 2: Manual RAG
-const memories = await cencori.memory.search({
-  namespace: 'company-docs',
-  query: 'refund policy'
-});
-
-const context = memories.results.map(m => m.content).join('\n\n');
-
-const chat = await cencori.ai.chat({
-  model: 'gpt-4o',
-  messages: [
-    { role: 'system', content: `Use this context:\n${context}` },
-    { role: 'user', content: 'What is our refund policy?' }
-  ]
-});
-```
-
-### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/memory/namespaces` | GET | List namespaces |
-| `/api/memory/namespaces` | POST | Create namespace |
-| `/api/memory/store` | POST | Store memory |
-| `/api/memory/search` | POST | Search memories |
-| `/api/memory/{id}` | GET | Get memory |
-| `/api/memory/{id}` | DELETE | Delete memory |
-
-### Dashboard
-
-Manage memories visually at `/dashboard/[org]/[project]/memory`:
-- Create and manage namespaces
-- Browse memories with pagination
-- Test semantic search
-- View memory metadata and similarity scores
-
-## Agent Frameworks
-
-Cencori works with any OpenAI-compatible agent framework. Just point your `base_url` to Cencori:
-
-**Prerequisite:** Add your provider API keys (OpenAI, Anthropic, Google) in your Cencori project settings first. Cencori routes requests to providers using your keys.
-
-### CrewAI
-
-```bash
-export OPENAI_API_KEY=your_cencori_api_key
-export OPENAI_API_BASE=https://api.cencori.com/v1
-```
-
-```python
-from crewai import Agent, Task, Crew
-
-researcher = Agent(role='Research Analyst', goal='Find insights')
-crew = Crew(agents=[researcher], tasks=[...])
-result = crew.kickoff()
-# Every LLM call logged in Cencori!
-```
-
-### AutoGen
-
-```python
-config_list = [{
-    "model": "gpt-4o",
-    "api_key": "your_cencori_api_key",
-    "base_url": "https://api.cencori.com/v1"
-}]
-
-assistant = AssistantAgent(name="assistant", llm_config={"config_list": config_list})
-```
-
-### LangChain
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(
-    model="gpt-4o",
-    api_key="your_cencori_api_key",
-    base_url="https://api.cencori.com/v1"
-)
-```
-
-### OpenAI SDK (Direct)
+### Python
 
 ```python
 from openai import OpenAI
@@ -945,321 +417,185 @@ client = OpenAI(
     api_key="your_cencori_api_key",
     base_url="https://api.cencori.com/v1"
 )
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)
 ```
 
-**Benefits:** Full observability, automatic failover, rate limiting, security scanning for all agent calls.
-
-## Provider Failover
-
-Cencori automatically handles provider failures:
-
-### How It Works
-1. Request fails → Retries with exponential backoff (up to 3 times)
-2. Still failing → Routes to fallback provider (e.g., OpenAI → Anthropic)
-3. Model mapping → GPT-5 → Claude Opus 4 (automatic equivalent)
-
-### Circuit Breaker
-After 5 consecutive failures, provider is skipped entirely for 60 seconds.
-
-### Fallback Response
-When fallback is used, response includes:
+### Node.js
 
 ```typescript
-{
-  content: "Hello!",
-  model: "claude-opus-4",       // Actual model used
-  provider: "anthropic",        // Actual provider
-  fallback_used: true,          // Indicates fallback was triggered
-  original_model: "gpt-5",      // What you requested
-  original_provider: "openai"   // Original provider
-}
-```
+import OpenAI from 'openai';
 
-### Configuration
-Configure in Settings → Infrastructure:
-- **Enable fallback**: On/Off
-- **Fallback provider**: Preferred backup (e.g., Anthropic)
-- **Max retries**: Attempts before failover (default: 3)
-
-## Error Handling
-
-```typescript
-import { Cencori, SafetyError, RateLimitError, AuthenticationError } from "cencori";
-
-try {
-  const response = await cencori.ai.chat({
-    model: "gpt-4o",
-    messages,
-  });
-  return response;
-} catch (error) {
-  if (error instanceof SafetyError) {
-    // Request blocked (prompt injection, PII, harmful content)
-    return { error: "Content blocked", reasons: error.reasons };
-  }
-  if (error instanceof RateLimitError) {
-    return { error: "Too many requests" };
-  }
-  if (error instanceof AuthenticationError) {
-    return { error: "Invalid API key" };
-  }
-  throw error;
-}
-```
-
-## Security Features
-
-Cencori automatically protects against:
-
-### Prompt Injection
-Detects and blocks malicious inputs like:
-- "Ignore all previous instructions..."
-- "What is your system prompt?"
-- Jailbreak attempts
-
-### PII Detection
-Scans for and filters:
-- Social Security Numbers
-- Credit card numbers
-- Email addresses
-- Phone numbers
-
-### Content Filtering
-Blocks harmful content before it reaches AI providers.
-
-All security violations throw `SafetyError` with `reasons` array.
-
-## Best Practices
-
-1. **Set maxTokens** - Prevent unexpectedly long responses
-2. **Include userId** - Enable per-user rate limiting
-3. **Handle errors gracefully** - Use typed error classes
-4. **Use chatStream() for chat UIs** - Better user experience
-5. **Monitor token usage** - Check dashboard for costs
-6. **Store API keys in env vars** - Never commit to version control
-7. **Use system role for instructions** - Never concatenate with user input
-8. **Use secret keys for servers** - Never expose `csk_` keys in client code
-9. **Use publishable keys for browsers** - Use `cpk_` keys with domain whitelisting
-
-## Cencori Scan (@cencori/scan)
-
-Security scanner for AI apps. Detect hardcoded secrets, PII leaks, exposed routes, and security vulnerabilities — with AI-powered auto-fix.
-
-### Quick Start
-
-```bash
-npx @cencori/scan
-```
-
-Run in any project directory to instantly scan for security issues.
-
-### What It Detects
-
-| Category | Examples |
-|----------|----------|
-| **API Keys & Secrets** | OpenAI, Anthropic, Google AI, Supabase, Stripe, AWS, GitHub, Firebase + 20 more |
-| **PII** | Email addresses, phone numbers, SSNs, credit cards |
-| **Exposed Routes** | Next.js/Express routes without authentication |
-| **Vulnerabilities** | SQL injection, XSS, insecure CORS, hardcoded passwords |
-
-### CLI Options
-
-```bash
-npx @cencori/scan            # Scan current directory
-npx @cencori/scan ./path     # Scan specific path
-npx @cencori/scan --json     # Output JSON (for CI/CD)
-npx @cencori/scan --quiet    # Score only
-npx @cencori/scan --no-prompt # Non-interactive mode
-```
-
-### AI Auto-Fix (Pro)
-
-After scanning, enter `y` when prompted to auto-fix issues:
-
-```
-? Would you like Cencori to auto-fix these issues? (y/n)
-> y
-
-? Enter your Cencori API key: ************************
-  (Get one at https://cencori.com/dashboard)
-
-✔ API key saved to ~/.cencorirc
-✔ Analyzing with AI...
-✔ Applied 10 fixes
-```
-
-The AI will:
-1. Analyze each issue for false positives
-2. Generate secure code fixes
-3. Apply fixes automatically
-
-Your API key is saved for future scans.
-
-### Programmatic Usage
-
-```typescript
-import { scan } from '@cencori/scan';
-
-const result = await scan('./my-project');
-
-console.log(result.score);        // 'A' | 'B' | 'C' | 'D' | 'F'
-console.log(result.issues);       // Array of detected issues
-console.log(result.filesScanned); // Number of files scanned
-```
-
-### Security Score
-
-| Score | Meaning |
-|-------|---------|
-| **A-Tier** | Excellent - No issues |
-| **B-Tier** | Good - Minor improvements |
-| **C-Tier** | Fair - Some concerns |
-| **D-Tier** | Poor - Significant issues |
-| **F-Tier** | Critical - Secrets exposed |
-
-### CI/CD Integration (GitHub Actions)
-
-```yaml
-name: Security Scan
-on: [push, pull_request]
-jobs:
-  scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run Cencori Scan
-        run: npx @cencori/scan --json > scan-results.json
-      - name: Check for failures
-        run: |
-          SCORE=$(jq -r '.score' scan-results.json)
-          if [[ "$SCORE" == "F" ]]; then
-            echo "Security scan failed"
-            exit 1
-          fi
-```
-
-## API Key Types
-
-Cencori supports two types of API keys:
-
-### Secret Keys (`csk_`)
-- For **server-side use only**
-- Full access to all features
-- Never expose in browser or client code
-- Example: `csk_abc123...`
-
-### Publishable Keys (`cpk_`)
-- Safe for **browser/client-side use**
-- Requires domain whitelisting
-- Only works from allowed domains
-- Example: `cpk_xyz789...`
-
-### Legacy Keys (`cen_`)
-- Existing keys created before key types
-- Treated as secret keys
-- Still fully functional
-
-## Pricing & Limits
-- **Free**: 1k requests/mo, 1 project.
-- **Pro**: 50k requests/mo, unlimited projects.
-- **Team**: 250k requests/mo, 10 members.
-- **Token Markup**: 50% on OpenAI/Anthropic, 0% on Google. Covers security & logging costs.
-
-## Integrations
-
-### Vercel AI SDK
-```typescript
-import { createOpenAI } from '@ai-sdk/openai';
-export const cencori = createOpenAI({
+const client = new OpenAI({
+  apiKey: process.env.CENCORI_API_KEY,
   baseURL: 'https://api.cencori.com/v1',
-  apiKey: process.env.CENCORI_API_KEY
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello!' }],
 });
 ```
 
-### LangChain
+### Agent Frameworks And Desktop Tools
+
+For OpenAI-compatible frameworks and tools, set:
+
+```bash
+OPENAI_BASE_URL=https://api.cencori.com/v1
+OPENAI_API_BASE=https://api.cencori.com/v1
+OPENAI_API_KEY=$CENCORI_API_KEY
+```
+
+This applies to tools such as:
+- Continue
+- CrewAI
+- LangChain `ChatOpenAI`
+- AutoGen
+- other OpenAI-compatible agent runtimes
+
+## Native Cencori HTTP Endpoints
+
+Base origin:
+- `https://cencori.com`
+
+Common endpoints:
+- `POST /api/ai/chat`
+- `POST /api/ai/embeddings`
+- `POST /api/ai/images/generate`
+- `POST /api/ai/rag`
+- `POST /api/memory/store`
+- `GET /api/memory/namespaces`
+- `POST /api/memory/namespaces`
+- `GET /api/memory/{id}`
+- `DELETE /api/memory/{id}`
+- `POST /api/v1/telemetry/web`
+
+### Native Chat Example
+
+```bash
+curl https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: csk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "stream": false
+  }'
+```
+
+### Native Chat Response
+
+The native chat endpoint includes an OpenAI-compatible `choices[0].message` shape and Cencori convenience fields such as `content`, `toolCalls`, `cost_usd`, and `finish_reason`.
+
+## OpenAI-Compatible HTTP Endpoint
+
+Base origin:
+- `https://api.cencori.com/v1`
+
+### Chat Completions Example
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer csk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### OpenAI-Compatible Response Shape
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 13,
+    "completion_tokens": 7,
+    "total_tokens": 20
+  }
+}
+```
+
+## Authentication Rules
+
+### Use `CENCORI_API_KEY` Header For
+- `https://cencori.com/api/ai/*`
+- `https://cencori.com/api/memory/*`
+- `https://cencori.com/api/v1/telemetry/web`
+
+### Use `Authorization: Bearer ...` For
+- `https://api.cencori.com/v1/*`
+
+## Model Selection
+
+One Cencori project key can be used across many models.
+Choose the model per request:
+
 ```typescript
-import { ChatOpenAI } from "@langchain/openai";
-const chat = new ChatOpenAI({
-  openAIApiKey: process.env.CENCORI_API_KEY,
-  configuration: { baseURL: "https://api.cencori.com/v1" },
-});
+await cencori.ai.chat({ model: 'gpt-4o', messages });
+await cencori.ai.chat({ model: 'claude-sonnet-4.5', messages });
+await cencori.ai.chat({ model: 'gemini-2.5-flash', messages });
 ```
 
-## Dashboard
+## Memory Guidance
 
-After integration, visit your Cencori dashboard to see:
-- Request logs with full prompts and responses
-- Security incidents (blocked attacks)
-- Usage analytics and costs
-- Rate limit status
+Public memory flows that are safe to generate today:
+- create namespace
+- list namespaces
+- store memory
+- get/delete memory by ID
+- use `cencori.ai.rag()` or `POST /api/ai/rag` for retrieval-backed generation
 
-## Links
+Do not assume advanced public memory features like hybrid search, BM25, metadata-operator filtering, import/export CLI, or TTL-specific helper fields unless the target project already verifies them.
 
-- Dashboard: https://cencori.com
-- Full Docs: https://cencori.com/docs
-- SDK (NPM): https://www.npmjs.com/package/cencori
-- Vercel AI SDK Provider Listing: https://ai-sdk.dev/providers/community-providers/cencori
-- TanStack AI Adapter Listing: https://tanstack.com/ai/latest/docs/community-adapters/cencori
-- Pricing: https://cencori.com/pricing
-- Cencori Scan (CLI): https://www.npmjs.com/package/@cencori/scan
-- Cencori Scan (Web): https://scan.cencori.com
+If you store memories directly, use `expiresAt` when you need expiry:
 
-## Agentic Engineering
-
-When building with AI Agents (Cursor, Windsurf, Replit, Lovable):
-
-1. **Context**: Agents should ingest this file (`llm.txt`) to learn the Cencori SDK.
-2. **Infrastructure**: Delegate Memory (RAG) and Security (PII) to Cencori instead of implementing custom logic.
-3. **Integration Guides**:
-   - Cursor: https://cencori.com/docs/agentic-engineering/desktop/cursor
-   - VS Code (Continue): https://cencori.com/docs/agentic-engineering/desktop/continue
-   - Replit: https://cencori.com/docs/agentic-engineering/web/replit
-   - Lovable: https://cencori.com/docs/agentic-engineering/web/lovable
-   - Vercel v0: https://cencori.com/docs/agentic-engineering/web/v0
-   - Trae: https://cencori.com/docs/agentic-engineering/desktop/trae
-   - CodeSandbox: https://cencori.com/docs/agentic-engineering/web/codesandbox
-## Workflows (Agents & Pipelines)
-
-Cencori Workflows allow you to build autonomous agents and background pipelines that react to events.
-
-### Concepts
-- **Triggers**: Events that start a workflow (`chat.message`, `schedule.cron`, `user.signup`).
-- **Steps**: Atomic units of work (`steps.run`, `ai.generate`,`workflows.waitFor`).
-- **State**: Persistent data that survives retries and pauses.
-- **Visual Editor**: Bidirectional sync between Code and Canvas (Coming Soon).
-
-### Quick Start
 ```typescript
-// Define a workflow
-cencori.workflows.define('daily-digest', async (ctx) => {
-  // 1. Fetch data
-  const news = await cencori.steps.run('fetch-news', () => fetchNews());
-  
-  // 2. Summarize with AI
-  const summary = await cencori.ai.generate({
-    model: 'gpt-4o',
-    prompt: `Summarize this: ${news}`
-  });
-  
-  // 3. Email users
-  await cencori.steps.run('send-email', () => sendEmail(summary));
+await cencori.memory.store({
+  namespace: 'session-123',
+  content: 'User is interested in pricing',
+  expiresAt: '2026-12-31T23:59:59Z',
 });
-
-// Trigger it
-await cencori.workflows.trigger('daily-digest');
 ```
 
-### Key Patterns
-1.  **Adaptive Memory**: Build a "Living Profile" of users by observing chat history in the background.
-    - `cencori.on('chat.message', ...)` -> Extract Facts -> Update Profile.
-2.  **RAG Ingestion**: Automatically chunk and embed files when uploaded.
-    - `cencori.on('file.uploaded', ...)` -> Extract Text -> Vector Store.
-3.  **Human-in-the-Loop**: Pause execution to wait for human approval.
-    - `await cencori.workflows.waitFor('approval', { timeout: '24h' })`
-4.  **Self-Healing Code**: Detect errors, analyze stack traces with AI, and propose fixes.
+## Decision Rules For Code Agents
 
-### Reference
-- `cencori.workflows.trigger(id, payload)`: Start a workflow.
-- `cencori.workflows.waitFor(eventId)`: Pause and wait.
-- `cencori.steps.run(id, fn)`: Execute code with retries.
-- `cencori.ai.generate(config)`: LLM inference query.
+When integrating Cencori into a project:
+
+1. Prefer the smallest working integration.
+2. Reuse existing routes, auth, and env patterns.
+3. Keep `CENCORI_API_KEY` on the server.
+4. Prefer `cencori/vercel` when the project already uses Vercel AI SDK.
+5. Prefer the OpenAI-compatible base URL only when a framework expects it.
+6. Preserve the app's existing response contract when replacing another provider.
+7. Do not generate code against `compute`, `workflow`, or speculative deployment APIs.
+8. Do not assume undocumented routing, failover, or evaluation settings are user-configurable.
+
+## Documentation Links
+
+- Docs: https://cencori.com/docs
+- Vercel AI SDK: https://cencori.com/docs/integrations/vercel-ai-sdk
+- TanStack AI: https://cencori.com/docs/integrations/tanstack
+- Authentication: https://cencori.com/docs/api/authentication
+- Chat API: https://cencori.com/docs/api/chat
+- Continue: https://cencori.com/docs/agentic-engineering/desktop/continue

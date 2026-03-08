@@ -225,7 +225,7 @@ npm install cencori ai
 ```
 
 ```typescript
-import { cencori } from 'cencori';
+import { cencori } from 'cencori/vercel';
 import { streamText } from 'ai';
 
 const result = await streamText({

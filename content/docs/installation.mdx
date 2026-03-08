@@ -39,10 +39,10 @@ import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
-  // Optional configuration
-  baseUrl: 'https://cencori.com',  // Default
-  timeout: 30000,                       // 30 seconds
-  retries: 3                            // Retry failed requests
+  baseUrl: 'https://cencori.com', // optional override
+  headers: {
+    'X-Trace-ID': 'req_123',
+  },
 });
 ```
 
@@ -53,10 +53,9 @@ const cencori = new Cencori({
 CENCORI_API_KEY=csk_live_...
 ```
 
-The SDK automatically reads `CENCORI_API_KEY` if no apiKey is provided:
+The SDK automatically reads `CENCORI_API_KEY` if no `apiKey` is provided:
 
 ```typescript
-// Uses CENCORI_API_KEY from environment
 const cencori = new Cencori();
 ```
 
@@ -67,9 +66,11 @@ The SDK is written in TypeScript and includes full type definitions:
 ```typescript
 import { Cencori, ChatRequest, ChatResponse } from 'cencori';
 
+const cencori = new Cencori();
+
 const request: ChatRequest = {
   model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello' }]
+  messages: [{ role: 'user', content: 'Hello' }],
 };
 
 const response: ChatResponse = await cencori.ai.chat(request);

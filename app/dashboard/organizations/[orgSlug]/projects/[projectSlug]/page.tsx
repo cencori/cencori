@@ -1,7 +1,6 @@
 "use client";
 
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
-import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,26 +55,6 @@ interface ChartDataPoint {
   tokens: number;
 }
 
-interface DotProps {
-  key?: string;
-  cx?: number;
-  cy?: number;
-  r?: number;
-  stroke?: string;
-  strokeWidth?: number;
-  fill?: string;
-  index?: number;
-  value?: number;
-  dataKey?: string;
-  payload?: ChartDataPoint;
-  [key: string]: unknown;
-}
-
-const CustomizedDot = (props: DotProps) => {
-  const { cx, cy, stroke } = props;
-  return <circle cx={cx} cy={cy} r={2.5} fill={stroke} />;
-};
-
 // Getting Started Section Component - Compact
 function GettingStartedSection({
   orgSlug,
@@ -115,7 +94,8 @@ Requirements:
 3. Create or update a shared Cencori client setup (e.g. \`lib/cencori.ts\`):
    - Use \`CENCORI_API_KEY\` from server env.
    - Never expose secrets to the client bundle.
-   - Use \`https://api.cencori.com/v1\` unless project config already defines base URL.
+   - For the official SDK, use Cencori's default base URL.
+   - Use \`https://api.cencori.com/v1\` only for OpenAI-compatible clients.
 
 4. Wire AI endpoint(s) with minimal diff:
    - Support both streaming and non-streaming flows where applicable.
@@ -168,17 +148,20 @@ Requirements:
   };
 
   const copyEnv = async () => {
-    await navigator.clipboard.writeText("CENCORI_API_KEY=cen_your_api_key_here");
+    await navigator.clipboard.writeText("CENCORI_API_KEY=csk_your_api_key_here");
     setCopiedEnv(true);
     setTimeout(() => setCopiedEnv(false), 2000);
   };
 
   const copyCode = async () => {
     await navigator.clipboard.writeText(`import { Cencori } from "cencori";
+import { cencori } from "cencori";
 
-export const cencori = new Cencori({
+export const cencoriClient = new Cencori({
   apiKey: process.env.CENCORI_API_KEY!,
-});`);
+});
+
+export { cencori };`);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
@@ -219,7 +202,7 @@ export const cencori = new Cencori({
             </Button>
           </div>
           <div className="px-3 py-1.5 bg-zinc-950">
-            <code className="text-[11px] text-emerald-400 font-mono">npm install cencori</code>
+            <code className="text-[11px] text-emerald-400 font-mono">npm install cencori ai</code>
           </div>
         </div>
 
@@ -237,7 +220,7 @@ export const cencori = new Cencori({
             </Button>
           </div>
           <div className="px-3 py-1.5 bg-zinc-950">
-            <code className="text-[11px] font-mono"><span className="text-blue-400">CENCORI_API_KEY</span><span className="text-zinc-500">=cen_your_api_key_here</span></code>
+            <code className="text-[11px] font-mono"><span className="text-blue-400">CENCORI_API_KEY</span><span className="text-zinc-500">=csk_your_api_key_here</span></code>
           </div>
         </div>
 
@@ -245,7 +228,7 @@ export const cencori = new Cencori({
           <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
             <div className="flex items-center gap-2">
               <span className="w-4 h-4 rounded-full border border-muted-foreground/30 text-muted-foreground flex items-center justify-center text-[9px] font-medium">3</span>
-              <span className="text-xs font-medium text-muted-foreground">Create client</span>
+              <span className="text-xs font-medium text-muted-foreground">Create shared client</span>
             </div>
             <Button variant="ghost" size="icon" className="h-5 w-5" onClick={copyCode}>
               {copiedCode ? <Check className="h-2.5 w-2.5 text-emerald-500" /> : <Copy className="h-2.5 w-2.5 text-muted-foreground" />}
@@ -253,10 +236,12 @@ export const cencori = new Cencori({
           </div>
           <div className="px-3 py-2 bg-zinc-950 space-y-0.5">
             <code className="text-[11px] font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori&quot;</span><span className="text-zinc-400">;</span></code>
+            <code className="text-[11px] font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-blue-300">cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori/vercel&quot;</span><span className="text-zinc-400">;</span></code>
             <code className="text-[11px] font-mono block text-zinc-600">&nbsp;</code>
-            <code className="text-[11px] font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencori</span> <span className="text-zinc-400">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
+            <code className="text-[11px] font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencoriClient</span> <span className="text-zinc-400">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
             <code className="text-[11px] font-mono block">  <span className="text-zinc-300">apiKey:</span> <span className="text-blue-400">process.env</span><span className="text-zinc-400">.</span><span className="text-zinc-100">CENCORI_API_KEY</span><span className="text-zinc-400">!,</span></code>
             <code className="text-[11px] font-mono block"><span className="text-zinc-300">{"})"}</span><span className="text-zinc-400">;</span></code>
+            <code className="text-[11px] font-mono block"><span className="text-purple-400">export</span> <span className="text-zinc-300">{"{"}</span> <span className="text-blue-300">cencori</span> <span className="text-zinc-300">{"}"}</span><span className="text-zinc-400">;</span></code>
           </div>
         </div>
       </div>
