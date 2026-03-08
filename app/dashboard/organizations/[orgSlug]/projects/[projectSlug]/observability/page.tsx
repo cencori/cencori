@@ -16,7 +16,13 @@ import { TokenUsageChart } from '@/components/analytics/TokenUsageChart';
 import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ChartBarIcon, CurrencyDollarIcon, ClockIcon, BoltIcon, ShieldExclamationIcon } from '@heroicons/react/24/outline';
+import {
+    ChartBarIcon,
+    CurrencyDollarIcon,
+    ClockIcon,
+    BoltIcon,
+    ShieldExclamationIcon,
+} from '@heroicons/react/24/outline';
 import { ArrowRight } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +42,7 @@ interface TrendData {
     avg_latency: number;
 }
 
-interface GatewayTrendData {
+interface HttpTrendData {
     timestamp: string;
     total: number;
     success: number;
@@ -82,9 +88,9 @@ interface PageProps {
     }>;
 }
 
-type ObservabilitySection = 'overview' | 'ai' | 'api' | 'web' | 'reliability' | 'security';
+type ObservabilitySection = 'overview' | 'ai' | 'http' | 'reliability' | 'security';
 
-type GatewayMetricKey = 'total' | 'success' | 'filtered' | 'error';
+type HttpMetricKey = 'total' | 'success' | 'filtered' | 'error';
 
 interface SectionDefinition {
     id: ObservabilitySection;
@@ -94,8 +100,7 @@ interface SectionDefinition {
 const sections: SectionDefinition[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'ai', label: 'AI Gateway' },
-    { id: 'api', label: 'API Gateway' },
-    { id: 'web', label: 'Web Gateway' },
+    { id: 'http', label: 'HTTP Traffic' },
     { id: 'reliability', label: 'Reliability' },
     { id: 'security', label: 'Security' },
 ];
@@ -103,8 +108,7 @@ const sections: SectionDefinition[] = [
 function isObservabilitySection(value: string | null): value is ObservabilitySection {
     return value === 'overview'
         || value === 'ai'
-        || value === 'api'
-        || value === 'web'
+        || value === 'http'
         || value === 'reliability'
         || value === 'security';
 }
@@ -149,7 +153,7 @@ function formatTimestamp(timestamp: string): string {
     if (timestamp.includes(' ')) {
         const [datePart, timePart] = timestamp.split(' ');
         const date = new Date(datePart);
-        const hours = parseInt(timePart.split(':')[0], 10);
+        const hours = Number.parseInt(timePart.split(':')[0], 10);
         const period = hours >= 12 ? 'pm' : 'am';
         const hour12 = hours % 12 || 12;
         return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${hour12}:00${period}`;
@@ -160,7 +164,7 @@ function formatTimestamp(timestamp: string): string {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function summarizeGatewayTrends(trends: GatewayTrendData[]) {
+function summarizeHttpTrends(trends: HttpTrendData[]) {
     const totals = trends.reduce(
         (acc, point) => {
             acc.total += point.total || 0;
@@ -191,9 +195,9 @@ function getLastUpdateTime<T extends { timestamp: string }>(
     return lastWithData ? formatTimestamp(lastWithData.timestamp) : undefined;
 }
 
-function toGatewayMetricSeries(
-    trends: GatewayTrendData[],
-    key: GatewayMetricKey
+function toHttpMetricSeries(
+    trends: HttpTrendData[],
+    key: HttpMetricKey
 ): Array<{ label: string; value: number }> {
     return trends.map((trend) => ({
         label: formatTimestamp(trend.timestamp),
@@ -210,8 +214,13 @@ export default function ObservabilityPage({ params }: PageProps) {
 
     const [timeRange, setTimeRange] = useState('7d');
 
-    const sectionParam = searchParams.get('section');
-    const section: ObservabilitySection = isObservabilitySection(sectionParam) ? sectionParam : 'overview';
+    const rawSectionParam = searchParams.get('section');
+    const normalizedSectionParam = rawSectionParam === 'api' || rawSectionParam === 'web'
+        ? 'http'
+        : rawSectionParam;
+    const section: ObservabilitySection = isObservabilitySection(normalizedSectionParam)
+        ? normalizedSectionParam
+        : 'overview';
 
     const setSection = (nextSection: ObservabilitySection) => {
         const nextParams = new URLSearchParams(searchParams.toString());
@@ -250,22 +259,11 @@ export default function ObservabilityPage({ params }: PageProps) {
         staleTime: 30 * 1000,
     });
 
-    const { data: apiGatewayTrendsData } = useQuery<{ trends: GatewayTrendData[] }>({
-        queryKey: ['gatewayTimeline', 'api', projectId, timeRange, environment],
+    const { data: httpTrendsData } = useQuery<{ trends: HttpTrendData[] }>({
+        queryKey: ['gatewayTimeline', 'http', projectId, timeRange, environment],
         queryFn: async () => {
-            const res = await fetch(`/api/projects/${projectId}/logs/gateway/timeline?time_range=${timeRange}&environment=${environment}`);
-            if (!res.ok) throw new Error('Failed to fetch API gateway timeline');
-            return res.json();
-        },
-        enabled: !!projectId,
-        staleTime: 30 * 1000,
-    });
-
-    const { data: webGatewayTrendsData } = useQuery<{ trends: GatewayTrendData[] }>({
-        queryKey: ['gatewayTimeline', 'web', projectId, timeRange],
-        queryFn: async () => {
-            const res = await fetch(`/api/projects/${projectId}/logs/web/timeline?time_range=${timeRange}`);
-            if (!res.ok) throw new Error('Failed to fetch web gateway timeline');
+            const res = await fetch(`/api/projects/${projectId}/logs/http/timeline?time_range=${timeRange}&environment=${environment}`);
+            if (!res.ok) throw new Error('Failed to fetch HTTP traffic timeline');
             return res.json();
         },
         enabled: !!projectId,
@@ -275,28 +273,18 @@ export default function ObservabilityPage({ params }: PageProps) {
     const trends = useMemo(() => trendsData?.trends || [], [trendsData?.trends]);
     const groupBy: 'hour' | 'day' = trendsData?.group_by || 'day';
 
-    const apiGatewayTrends = useMemo(
-        () => apiGatewayTrendsData?.trends || [],
-        [apiGatewayTrendsData?.trends]
-    );
-    const webGatewayTrends = useMemo(
-        () => webGatewayTrendsData?.trends || [],
-        [webGatewayTrendsData?.trends]
+    const httpTrends = useMemo(
+        () => httpTrendsData?.trends || [],
+        [httpTrendsData?.trends]
     );
 
-    const apiGatewaySummary = useMemo(
-        () => summarizeGatewayTrends(apiGatewayTrends),
-        [apiGatewayTrends]
-    );
-
-    const webGatewaySummary = useMemo(
-        () => summarizeGatewayTrends(webGatewayTrends),
-        [webGatewayTrends]
+    const httpSummary = useMemo(
+        () => summarizeHttpTrends(httpTrends),
+        [httpTrends]
     );
 
     const aiLastUpdate = getLastUpdateTime(trends, (point) => point.total > 0);
-    const apiLastUpdate = getLastUpdateTime(apiGatewayTrends, (point) => point.total > 0);
-    const webLastUpdate = getLastUpdateTime(webGatewayTrends, (point) => point.total > 0);
+    const httpLastUpdate = getLastUpdateTime(httpTrends, (point) => point.total > 0);
 
     if (projectLoading) {
         return (
@@ -307,7 +295,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                 </div>
                 <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
                     <div className="mb-4 lg:mb-0">
-                        <Skeleton className="h-36 w-full max-w-[180px]" />
+                        <Skeleton className="h-28 w-full max-w-[180px]" />
                     </div>
                     <div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -337,8 +325,7 @@ export default function ObservabilityPage({ params }: PageProps) {
 
     const emptyOverall = !overview || (
         overview.overview.total_requests === 0
-        && apiGatewaySummary.total === 0
-        && webGatewaySummary.total === 0
+        && httpSummary.total === 0
     );
 
     return (
@@ -346,7 +333,7 @@ export default function ObservabilityPage({ params }: PageProps) {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-base font-medium">Observability</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">Real-time observability across AI, API, and Web gateways</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Real-time observability across AI and HTTP traffic</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <ExportDialog projectId={projectId} type="analytics" environment={environment} />
@@ -446,20 +433,22 @@ export default function ObservabilityPage({ params }: PageProps) {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <MetricCardWithChart
-                                    title="API Gateway"
-                                    subtitle="HTTP requests"
+                                    title="HTTP Traffic"
+                                    subtitle="API + web requests"
                                     icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={apiGatewaySummary.total}
-                                    lastUpdate={apiLastUpdate}
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'total')}
+                                    value={httpSummary.total}
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'total')}
                                 />
-                                <MetricCardWithChart
-                                    title="Web Gateway"
-                                    subtitle="Dashboard traffic"
-                                    icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={webGatewaySummary.total}
-                                    lastUpdate={webLastUpdate}
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'total')}
+                                <MetricCardWithLineChart
+                                    title="HTTP Health"
+                                    subtitle="Success rate"
+                                    icon={<BoltIcon className="h-5 w-5" />}
+                                    value={httpSummary.successRate}
+                                    format="percentage"
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'success')}
+                                    lineColor="hsl(142, 71%, 45%)"
                                 />
                             </div>
 
@@ -482,7 +471,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                                     </div>
                                     <p className="text-sm font-medium mb-1">No data yet</p>
                                     <p className="text-xs text-muted-foreground max-w-[320px]">
-                                        Make AI, API, or dashboard web requests to populate observability metrics.
+                                        Make AI or HTTP requests to populate observability metrics.
                                     </p>
                                 </div>
                             )}
@@ -526,16 +515,16 @@ export default function ObservabilityPage({ params }: PageProps) {
                         </>
                     )}
 
-                    {section === 'api' && (
+                    {section === 'http' && (
                         <>
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 className="text-sm font-medium">API Gateway</h2>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Inbound API request health and gateway error profile.</p>
+                                    <h2 className="text-sm font-medium">HTTP Traffic</h2>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Unified API and web request health, status mix, and request volume.</p>
                                 </div>
                                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-                                    <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs?source=api`}>
-                                        Open API Logs
+                                    <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs?source=http`}>
+                                        Open HTTP Logs
                                         <ArrowRight className="h-3.5 w-3.5 ml-1" />
                                     </Link>
                                 </Button>
@@ -546,37 +535,37 @@ export default function ObservabilityPage({ params }: PageProps) {
                                     title="Requests"
                                     subtitle="Total volume"
                                     icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={apiGatewaySummary.total}
-                                    lastUpdate={apiLastUpdate}
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'total')}
+                                    value={httpSummary.total}
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'total')}
                                 />
                                 <MetricCardWithLineChart
                                     title="Success"
                                     subtitle="2xx/3xx"
                                     icon={<BoltIcon className="h-5 w-5" />}
-                                    value={apiGatewaySummary.successRate}
+                                    value={httpSummary.successRate}
                                     format="percentage"
-                                    lastUpdate={apiLastUpdate}
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'success')}
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'success')}
                                     lineColor="hsl(142, 71%, 45%)"
                                 />
                                 <MetricCardWithLineChart
                                     title="Errors"
                                     subtitle="4xx/5xx"
                                     icon={<ShieldExclamationIcon className="h-5 w-5" />}
-                                    value={apiGatewaySummary.errorRate}
+                                    value={httpSummary.errorRate}
                                     format="percentage"
-                                    lastUpdate={apiLastUpdate}
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'error')}
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'error')}
                                     lineColor="hsl(0, 84%, 60%)"
                                 />
                                 <MetricCardWithLineChart
                                     title="Rate Limited"
                                     subtitle="429 responses"
                                     icon={<ClockIcon className="h-5 w-5" />}
-                                    value={apiGatewaySummary.filtered}
-                                    lastUpdate={apiLastUpdate}
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'filtered')}
+                                    value={httpSummary.filtered}
+                                    lastUpdate={httpLastUpdate}
+                                    chartData={toHttpMetricSeries(httpTrends, 'filtered')}
                                     lineColor="hsl(24, 96%, 53%)"
                                 />
                             </div>
@@ -585,70 +574,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 projectId={projectId}
                                 timeRange={timeRange}
                                 environment={environment}
-                                source="api"
-                            />
-                        </>
-                    )}
-
-                    {section === 'web' && (
-                        <>
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h2 className="text-sm font-medium">Web Gateway</h2>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Dashboard route traffic, status mix, and client-side request health.</p>
-                                </div>
-                                <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-                                    <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs?source=web`}>
-                                        Open Web Logs
-                                        <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                                    </Link>
-                                </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                                <MetricCardWithChart
-                                    title="Requests"
-                                    subtitle="Total volume"
-                                    icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={webGatewaySummary.total}
-                                    lastUpdate={webLastUpdate}
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'total')}
-                                />
-                                <MetricCardWithLineChart
-                                    title="Success"
-                                    subtitle="2xx/3xx"
-                                    icon={<BoltIcon className="h-5 w-5" />}
-                                    value={webGatewaySummary.successRate}
-                                    format="percentage"
-                                    lastUpdate={webLastUpdate}
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'success')}
-                                    lineColor="hsl(142, 71%, 45%)"
-                                />
-                                <MetricCardWithLineChart
-                                    title="Errors"
-                                    subtitle="4xx/5xx"
-                                    icon={<ShieldExclamationIcon className="h-5 w-5" />}
-                                    value={webGatewaySummary.errorRate}
-                                    format="percentage"
-                                    lastUpdate={webLastUpdate}
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'error')}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                />
-                                <MetricCardWithLineChart
-                                    title="Rate Limited"
-                                    subtitle="429 responses"
-                                    icon={<ClockIcon className="h-5 w-5" />}
-                                    value={webGatewaySummary.filtered}
-                                    lastUpdate={webLastUpdate}
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'filtered')}
-                                    lineColor="hsl(24, 96%, 53%)"
-                                />
-                            </div>
-
-                            <LogsBarChart
-                                projectId={projectId}
-                                timeRange={timeRange}
-                                source="web"
+                                source="http"
                             />
                         </>
                     )}
@@ -657,7 +583,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                         <>
                             <div className="mb-4">
                                 <h2 className="text-sm font-medium">Reliability</h2>
-                                <p className="text-xs text-muted-foreground mt-0.5">Failover behavior, gateway failure rates, and request stability signals.</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Failover behavior, request error rates, and system stability signals.</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -667,22 +593,21 @@ export default function ObservabilityPage({ params }: PageProps) {
                                     timeRange={timeRange}
                                 />
                                 <MetricCardWithLineChart
-                                    title="API Gateway Errors"
+                                    title="HTTP Errors"
                                     subtitle="4xx/5xx rate"
-                                    value={apiGatewaySummary.errorRate}
+                                    value={httpSummary.errorRate}
                                     format="percentage"
-                                    chartData={toGatewayMetricSeries(apiGatewayTrends, 'error')}
+                                    chartData={toHttpMetricSeries(httpTrends, 'error')}
                                     lineColor="hsl(0, 84%, 60%)"
-                                    lastUpdate={apiLastUpdate}
+                                    lastUpdate={httpLastUpdate}
                                 />
                                 <MetricCardWithLineChart
-                                    title="Web Gateway Errors"
-                                    subtitle="4xx/5xx rate"
-                                    value={webGatewaySummary.errorRate}
-                                    format="percentage"
-                                    chartData={toGatewayMetricSeries(webGatewayTrends, 'error')}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                    lastUpdate={webLastUpdate}
+                                    title="HTTP Throttles"
+                                    subtitle="429 spikes"
+                                    value={httpSummary.filtered}
+                                    chartData={toHttpMetricSeries(httpTrends, 'filtered')}
+                                    lineColor="hsl(24, 96%, 53%)"
+                                    lastUpdate={httpLastUpdate}
                                 />
                             </div>
 
@@ -713,20 +638,20 @@ export default function ObservabilityPage({ params }: PageProps) {
                                         lastUpdate={aiLastUpdate}
                                     />
                                     <MetricCardWithLineChart
-                                        title="API Throttles"
-                                        subtitle="429 spikes"
-                                        value={apiGatewaySummary.filtered}
-                                        chartData={toGatewayMetricSeries(apiGatewayTrends, 'filtered')}
-                                        lineColor="hsl(24, 96%, 53%)"
-                                        lastUpdate={apiLastUpdate}
+                                        title="HTTP Success Rate"
+                                        subtitle="API + web"
+                                        value={httpSummary.successRate}
+                                        format="percentage"
+                                        chartData={toHttpMetricSeries(httpTrends, 'success')}
+                                        lineColor="hsl(142, 71%, 45%)"
+                                        lastUpdate={httpLastUpdate}
                                     />
-                                    <MetricCardWithLineChart
-                                        title="Web Throttles"
-                                        subtitle="429 spikes"
-                                        value={webGatewaySummary.filtered}
-                                        chartData={toGatewayMetricSeries(webGatewayTrends, 'filtered')}
-                                        lineColor="hsl(24, 96%, 53%)"
-                                        lastUpdate={webLastUpdate}
+                                    <MetricCardWithChart
+                                        title="HTTP Volume"
+                                        subtitle="Traffic stability"
+                                        value={httpSummary.total}
+                                        chartData={toHttpMetricSeries(httpTrends, 'total')}
+                                        lastUpdate={httpLastUpdate}
                                     />
                                 </div>
                             )}

@@ -5,8 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
-import { ApiGatewayLogsTable } from '@/components/audit/ApiGatewayLogsTable';
-import { WebRequestLogsTable } from '@/components/audit/WebRequestLogsTable';
+import { HttpRequestLogsTable } from '@/components/audit/HttpRequestLogsTable';
 import { LogsBarChart } from '@/components/audit/LogsBarChart';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { ExportButton } from '@/components/audit/ExportButton';
@@ -38,9 +37,8 @@ interface ApiKey {
     environment: string | null;
 }
 
-type LogSource = 'ai' | 'api' | 'web';
+type LogSource = 'ai' | 'http';
 
-// Hook to get projectId from slugs (with caching)
 function useProjectId(orgSlug: string, projectSlug: string) {
     return useQuery({
         queryKey: ['projectId', orgSlug, projectSlug],
@@ -63,7 +61,7 @@ function useProjectId(orgSlug: string, projectSlug: string) {
             if (!projectData) throw new Error('Project not found');
             return projectData.id;
         },
-        staleTime: 5 * 60 * 1000, // IDs rarely change
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -75,7 +73,9 @@ export default function RequestLogsPage({ params }: PageProps) {
     const { environment } = useEnvironment();
 
     const sourceParam = searchParams.get('source');
-    const source: LogSource = sourceParam === 'api' || sourceParam === 'web' ? sourceParam : 'ai';
+    const source: LogSource = sourceParam === 'api' || sourceParam === 'web' || sourceParam === 'http'
+        ? 'http'
+        : 'ai';
 
     const [aiFilters, setAiFilters] = useState({
         status: 'all',
@@ -84,28 +84,20 @@ export default function RequestLogsPage({ params }: PageProps) {
         search: '',
         api_key_id: 'all',
     });
-    const [apiFilters, setApiFilters] = useState({
+    const [httpFilters, setHttpFilters] = useState({
+        kind: 'all',
         status: 'all',
         method: 'all',
         time_range: '7d',
         search: '',
         api_key_id: 'all',
     });
-    const [webFilters, setWebFilters] = useState({
-        status: 'all',
-        method: 'all',
-        time_range: '7d',
-        search: '',
-    });
 
     const [aiSearchInput, setAiSearchInput] = useState('');
-    const [apiSearchInput, setApiSearchInput] = useState('');
-    const [webSearchInput, setWebSearchInput] = useState('');
+    const [httpSearchInput, setHttpSearchInput] = useState('');
 
-    // Get projectId with caching - INSTANT ON REVISIT!
     const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
 
-    // Fetch API keys for dropdown filter
     const { data: apiKeys } = useQuery<ApiKey[]>({
         queryKey: ['api-keys-filter', projectId, environment],
         queryFn: async () => {
@@ -133,14 +125,13 @@ export default function RequestLogsPage({ params }: PageProps) {
         router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
     };
 
-    // Filter API keys by current environment
     const filteredApiKeys = apiKeys?.filter((key) => {
         if (key.environment) {
             return environment === 'production'
                 ? key.environment === 'production'
                 : key.environment === 'test';
         }
-        // Legacy keys without explicit environment
+
         const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
         return environment === 'production' ? !isTestKey : isTestKey;
     });
@@ -150,14 +141,9 @@ export default function RequestLogsPage({ params }: PageProps) {
         setAiFilters((prev) => ({ ...prev, search: aiSearchInput }));
     };
 
-    const handleApiSearchSubmit = (e: React.FormEvent) => {
+    const handleHttpSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setApiFilters((prev) => ({ ...prev, search: apiSearchInput }));
-    };
-
-    const handleWebSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setWebFilters((prev) => ({ ...prev, search: webSearchInput }));
+        setHttpFilters((prev) => ({ ...prev, search: httpSearchInput }));
     };
 
     const handleClearAiFilters = () => {
@@ -171,25 +157,16 @@ export default function RequestLogsPage({ params }: PageProps) {
         setAiSearchInput('');
     };
 
-    const handleClearApiFilters = () => {
-        setApiFilters({
+    const handleClearHttpFilters = () => {
+        setHttpFilters({
+            kind: 'all',
             status: 'all',
             method: 'all',
             time_range: '7d',
             search: '',
             api_key_id: 'all',
         });
-        setApiSearchInput('');
-    };
-
-    const handleClearWebFilters = () => {
-        setWebFilters({
-            status: 'all',
-            method: 'all',
-            time_range: '7d',
-            search: '',
-        });
-        setWebSearchInput('');
+        setHttpSearchInput('');
     };
 
     const hasActiveAiFilters =
@@ -199,18 +176,13 @@ export default function RequestLogsPage({ params }: PageProps) {
         || aiFilters.time_range !== '7d'
         || aiFilters.api_key_id !== 'all';
 
-    const hasActiveApiFilters =
-        apiFilters.status !== 'all'
-        || apiFilters.method !== 'all'
-        || apiFilters.search.length > 0
-        || apiFilters.time_range !== '7d'
-        || apiFilters.api_key_id !== 'all';
-
-    const hasActiveWebFilters =
-        webFilters.status !== 'all'
-        || webFilters.method !== 'all'
-        || webFilters.search.length > 0
-        || webFilters.time_range !== '7d';
+    const hasActiveHttpFilters =
+        httpFilters.kind !== 'all'
+        || httpFilters.status !== 'all'
+        || httpFilters.method !== 'all'
+        || httpFilters.search.length > 0
+        || httpFilters.time_range !== '7d'
+        || httpFilters.api_key_id !== 'all';
 
     if (isLoading) {
         return (
@@ -221,11 +193,10 @@ export default function RequestLogsPage({ params }: PageProps) {
                 </div>
                 <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
                     <div className="mb-4 lg:mb-0">
-                        <Skeleton className="h-28 w-full max-w-[180px]" />
+                        <Skeleton className="h-20 w-full max-w-[180px]" />
                     </div>
                     <div>
                         <div className="flex items-center gap-3 mb-6">
-                            <Skeleton className="h-7 w-28" />
                             <Skeleton className="h-7 w-28" />
                             <Skeleton className="h-7 w-28" />
                             <Skeleton className="h-7 w-40" />
@@ -276,11 +247,9 @@ export default function RequestLogsPage({ params }: PageProps) {
                 <p className="text-xs text-muted-foreground mt-0.5">
                     {source === 'ai'
                         ? 'View and monitor all AI requests for this project.'
-                        : source === 'api'
-                            ? 'Track HTTP traffic to API gateway endpoints separately from AI token logs.'
-                            : 'Monitor dashboard web gateway requests (host/path/status/message) for this project.'}
+                        : 'Monitor unified HTTP traffic across API and web requests for this project.'}
                 </p>
-              </div>
+            </div>
 
             <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
                 <aside className="mb-4 lg:mb-0 lg:-ml-2">
@@ -299,27 +268,15 @@ export default function RequestLogsPage({ params }: PageProps) {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setLogSource('api')}
+                            onClick={() => setLogSource('http')}
                             className={cn(
                                 'flex items-center gap-2 h-8 px-2.5 rounded text-xs text-left transition-colors',
-                                source === 'api'
+                                source === 'http'
                                     ? 'bg-secondary text-foreground font-medium'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
                             )}
                         >
-                            API Gateway
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setLogSource('web')}
-                            className={cn(
-                                'flex items-center gap-2 h-8 px-2.5 rounded text-xs text-left transition-colors',
-                                source === 'web'
-                                    ? 'bg-secondary text-foreground font-medium'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-                            )}
-                        >
-                            Web Gateway
+                            HTTP Traffic
                         </button>
                     </nav>
                 </aside>
@@ -425,108 +382,37 @@ export default function RequestLogsPage({ params }: PageProps) {
 
                             <RequestLogsTable projectId={projectId} filters={aiFilters} environment={environment} />
                         </>
-                    ) : source === 'api' ? (
-                        <>
-                            <LogsBarChart
-                                projectId={projectId}
-                                timeRange={apiFilters.time_range}
-                                environment={environment}
-                                source="api"
-                            />
-
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <Select
-                                    value={apiFilters.status}
-                                    onValueChange={(value) => setApiFilters((prev) => ({ ...prev, status: value }))}
-                                >
-                                    <SelectTrigger className="w-[138px] h-7 text-xs">
-                                        <SelectValue placeholder="All statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                                        <SelectItem value="2xx" className="text-xs">2xx Success</SelectItem>
-                                        <SelectItem value="4xx" className="text-xs">4xx Client</SelectItem>
-                                        <SelectItem value="5xx" className="text-xs">5xx Server</SelectItem>
-                                        <SelectItem value="429" className="text-xs">429 Rate Limited</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={apiFilters.method}
-                                    onValueChange={(value) => setApiFilters((prev) => ({ ...prev, method: value }))}
-                                >
-                                    <SelectTrigger className="w-[130px] h-7 text-xs whitespace-nowrap">
-                                        <SelectValue placeholder="Method" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All methods</SelectItem>
-                                        <SelectItem value="GET" className="text-xs">GET</SelectItem>
-                                        <SelectItem value="POST" className="text-xs">POST</SelectItem>
-                                        <SelectItem value="PUT" className="text-xs">PUT</SelectItem>
-                                        <SelectItem value="PATCH" className="text-xs">PATCH</SelectItem>
-                                        <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <TimeRangeSelector
-                                    value={apiFilters.time_range}
-                                    onChange={(value) => setApiFilters((prev) => ({ ...prev, time_range: value }))}
-                                />
-
-                                <Select
-                                    value={apiFilters.api_key_id}
-                                    onValueChange={(value) => setApiFilters((prev) => ({ ...prev, api_key_id: value }))}
-                                >
-                                    <SelectTrigger className="w-[190px] h-7 text-xs">
-                                        <SelectValue placeholder="All API keys" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All API keys</SelectItem>
-                                        {filteredApiKeys?.map((key) => (
-                                            <SelectItem key={key.id} value={key.id} className="text-xs">
-                                                {key.name} ({key.key_prefix}...)
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <form onSubmit={handleApiSearchSubmit} className="relative">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search paths, caller domain, request ID, or errors..."
-                                        value={apiSearchInput}
-                                        onChange={(e) => setApiSearchInput(e.target.value)}
-                                        className="w-48 sm:w-64 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
-                                    />
-                                </form>
-
-                                {hasActiveApiFilters && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-xs px-2"
-                                        onClick={handleClearApiFilters}
-                                    >
-                                        <X className="h-3 w-3 mr-1" />
-                                        Clear
-                                    </Button>
-                                )}
-                            </div>
-
-                            <ApiGatewayLogsTable projectId={projectId} filters={apiFilters} environment={environment} />
-                        </>
                     ) : (
                         <>
                             <LogsBarChart
                                 projectId={projectId}
-                                timeRange={webFilters.time_range}
-                                source="web"
+                                timeRange={httpFilters.time_range}
+                                environment={environment}
+                                source="http"
                             />
 
                             <div className="flex flex-wrap items-center gap-3 mb-4">
                                 <Select
-                                    value={webFilters.status}
-                                    onValueChange={(value) => setWebFilters((prev) => ({ ...prev, status: value }))}
+                                    value={httpFilters.kind}
+                                    onValueChange={(value) => setHttpFilters((prev) => ({
+                                        ...prev,
+                                        kind: value,
+                                        api_key_id: value === 'web' ? 'all' : prev.api_key_id,
+                                    }))}
+                                >
+                                    <SelectTrigger className="w-[138px] h-7 text-xs">
+                                        <SelectValue placeholder="All traffic" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all" className="text-xs">All traffic</SelectItem>
+                                        <SelectItem value="api" className="text-xs">API only</SelectItem>
+                                        <SelectItem value="web" className="text-xs">Web only</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={httpFilters.status}
+                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, status: value }))}
                                 >
                                     <SelectTrigger className="w-[138px] h-7 text-xs">
                                         <SelectValue placeholder="All statuses" />
@@ -537,12 +423,13 @@ export default function RequestLogsPage({ params }: PageProps) {
                                         <SelectItem value="3xx" className="text-xs">3xx Redirect</SelectItem>
                                         <SelectItem value="4xx" className="text-xs">4xx Client</SelectItem>
                                         <SelectItem value="5xx" className="text-xs">5xx Server</SelectItem>
+                                        <SelectItem value="429" className="text-xs">429 Rate Limited</SelectItem>
                                     </SelectContent>
                                 </Select>
 
                                 <Select
-                                    value={webFilters.method}
-                                    onValueChange={(value) => setWebFilters((prev) => ({ ...prev, method: value }))}
+                                    value={httpFilters.method}
+                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, method: value }))}
                                 >
                                     <SelectTrigger className="w-[130px] h-7 text-xs whitespace-nowrap">
                                         <SelectValue placeholder="Method" />
@@ -559,26 +446,44 @@ export default function RequestLogsPage({ params }: PageProps) {
                                 </Select>
 
                                 <TimeRangeSelector
-                                    value={webFilters.time_range}
-                                    onChange={(value) => setWebFilters((prev) => ({ ...prev, time_range: value }))}
+                                    value={httpFilters.time_range}
+                                    onChange={(value) => setHttpFilters((prev) => ({ ...prev, time_range: value }))}
                                 />
 
-                                <form onSubmit={handleWebSearchSubmit} className="relative">
+                                <Select
+                                    value={httpFilters.api_key_id}
+                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, api_key_id: value }))}
+                                    disabled={httpFilters.kind === 'web'}
+                                >
+                                    <SelectTrigger className="w-[190px] h-7 text-xs">
+                                        <SelectValue placeholder="All API keys" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all" className="text-xs">All API keys</SelectItem>
+                                        {filteredApiKeys?.map((key) => (
+                                            <SelectItem key={key.id} value={key.id} className="text-xs">
+                                                {key.name} ({key.key_prefix}...)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <form onSubmit={handleHttpSearchSubmit} className="relative">
                                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search host, path, message..."
-                                        value={webSearchInput}
-                                        onChange={(e) => setWebSearchInput(e.target.value)}
-                                        className="w-48 sm:w-64 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
+                                        placeholder="Search paths, hosts, caller domains, messages, or request IDs..."
+                                        value={httpSearchInput}
+                                        onChange={(e) => setHttpSearchInput(e.target.value)}
+                                        className="w-56 sm:w-72 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
                                     />
                                 </form>
 
-                                {hasActiveWebFilters && (
+                                {hasActiveHttpFilters && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         className="h-7 text-xs px-2"
-                                        onClick={handleClearWebFilters}
+                                        onClick={handleClearHttpFilters}
                                     >
                                         <X className="h-3 w-3 mr-1" />
                                         Clear
@@ -586,7 +491,11 @@ export default function RequestLogsPage({ params }: PageProps) {
                                 )}
                             </div>
 
-                            <WebRequestLogsTable projectId={projectId} filters={webFilters} />
+                            <HttpRequestLogsTable
+                                projectId={projectId}
+                                environment={environment}
+                                filters={httpFilters}
+                            />
                         </>
                     )}
                 </div>

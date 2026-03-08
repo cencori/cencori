@@ -8,7 +8,7 @@ interface LogsBarChartProps {
     projectId: string;
     timeRange: string;
     environment?: 'production' | 'test';
-    source?: 'ai' | 'api' | 'web';
+    source?: 'ai' | 'http' | 'api' | 'web';
 }
 
 interface LogBucket {
@@ -39,13 +39,15 @@ export function LogsBarChart({
             setLoading(true);
             try {
                 const params = new URLSearchParams({ time_range: timeRange });
-                if ((source === 'ai' || source === 'api') && environment) {
+                if ((source === 'ai' || source === 'http' || source === 'api') && environment) {
                     params.set('environment', environment);
                 }
 
                 const endpoint =
                     source === 'ai'
                         ? `/api/projects/${projectId}/analytics/trends`
+                        : source === 'http'
+                            ? `/api/projects/${projectId}/logs/http/timeline`
                         : source === 'api'
                             ? `/api/projects/${projectId}/logs/gateway/timeline`
                             : `/api/projects/${projectId}/logs/web/timeline`;
