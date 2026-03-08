@@ -212,7 +212,8 @@ Rules:
 
 function normalizeAiIssues(
     rawIssues: AiIssueCandidate[],
-    availableFiles: Map<string, string>,
+    allFiles: Map<string, string>,
+    promptFiles: Map<string, string>,
     existingIssues: ScanIssue[]
 ): ScanIssue[] {
     const normalized: ScanIssue[] = [];
@@ -221,11 +222,11 @@ function normalizeAiIssues(
 
     for (const raw of rawIssues.slice(0, MAX_AI_ISSUES)) {
         const filePath = typeof raw.file === "string" ? raw.file.trim() : "";
-        if (!filePath || !availableFiles.has(filePath)) {
+        if (!filePath || !allFiles.has(filePath)) {
             continue;
         }
 
-        const fileContent = availableFiles.get(filePath) || "";
+        const fileContent = allFiles.get(filePath) || promptFiles.get(filePath) || "";
         const lines = fileContent.split("\n");
         const lineRaw = typeof raw.line === "number" && Number.isFinite(raw.line) ? Math.floor(raw.line) : 1;
         const line = Math.max(1, Math.min(lineRaw, Math.max(lines.length, 1)));
@@ -315,8 +316,9 @@ export async function generateAiCodeQualityIssues(input: {
         };
     }
 
-    const availableFiles = new Map(filesForPrompt.map((file) => [file.path, file.content]));
-    const issues = normalizeAiIssues(parsed.issues, availableFiles, input.existingIssues);
+    const promptFileMap = new Map(filesForPrompt.map((file) => [file.path, file.content]));
+    const allFileMap = new Map(input.scannedFiles.map((file) => [file.path, file.content]));
+    const issues = normalizeAiIssues(parsed.issues, allFileMap, promptFileMap, input.existingIssues);
     return {
         issues,
         evaluatedFiles: filesForPrompt.length,

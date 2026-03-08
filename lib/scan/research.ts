@@ -871,10 +871,31 @@ export function analyzeRepositoryResearch(input: {
     files: ScannedRepositoryFile[];
     issues: ScanIssueLike[];
 }): RepositoryResearch {
-    const normalizedFiles = input.files.map(file => ({
+    const MAX_RESEARCH_FILES = 300;
+    const normalizedAllFiles = input.files.map(file => ({
         path: normalizePath(file.path),
         content: file.content,
     }));
+
+    // For interaction map and data-flow tracing, cap to the top files by issue density
+    // to prevent CPU-heavy analysis from timing out on very large repos.
+    let normalizedFiles: ScannedRepositoryFile[];
+    if (normalizedAllFiles.length > MAX_RESEARCH_FILES) {
+        const issueCountByFile = new Map<string, number>();
+        for (const issue of input.issues) {
+            issueCountByFile.set(issue.file, (issueCountByFile.get(issue.file) ?? 0) + 1);
+        }
+        normalizedFiles = normalizedAllFiles
+            .map(file => ({
+                ...file,
+                _score: (issueCountByFile.get(file.path) ?? 0) * 100 + Math.min(file.content.length, 30_000) / 300,
+            }))
+            .sort((a, b) => b._score - a._score)
+            .slice(0, MAX_RESEARCH_FILES)
+            .map(({ _score, ...file }) => file);
+    } else {
+        normalizedFiles = normalizedAllFiles;
+    }
 
     const availableFiles = new Set(normalizedFiles.map(file => file.path));
     const issueMap = new Map<string, ScanIssueLike[]>();
