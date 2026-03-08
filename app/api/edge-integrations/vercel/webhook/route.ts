@@ -327,13 +327,40 @@ async function processIntegrationWebhook(
 }
 
 export async function POST(req: NextRequest) {
-    const secret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET?.trim();
-    if (!secret) {
+    const clientSecret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET?.trim();
+    if (!clientSecret) {
         return NextResponse.json({ error: 'Vercel integration secret is not configured' }, { status: 503 });
     }
 
     const rawBody = await req.text();
-    if (!verifyVercelSignature(rawBody, req.headers.get('x-vercel-signature'), secret)) {
+    const signature = req.headers.get('x-vercel-signature');
+
+    // Try client secret first (marketplace-installed webhooks use this)
+    let signatureVerified = verifyVercelSignature(rawBody, signature, clientSecret);
+
+    // If that fails, try per-integration webhook secrets (API-created webhooks)
+    if (!signatureVerified) {
+        let event: VercelWebhookEnvelope;
+        try {
+            event = JSON.parse(rawBody) as VercelWebhookEnvelope;
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+        }
+
+        const payload = isRecord(event.payload) ? event.payload : undefined;
+        if (payload) {
+            const { integrations } = await resolveIntegrations(payload);
+            for (const integration of integrations) {
+                const creds = await getEdgeIntegrationCredentials(integration.id);
+                if (creds?.webhookSecret && verifyVercelSignature(rawBody, signature, creds.webhookSecret)) {
+                    signatureVerified = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!signatureVerified) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

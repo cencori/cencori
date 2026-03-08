@@ -124,22 +124,22 @@ drop policy if exists "Service role can manage edge integrations" on public.edge
 create policy "Service role can manage edge integrations"
     on public.edge_integrations
     for all
-    using (true)
-    with check (true);
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');
 
 drop policy if exists "Service role can manage edge domains" on public.edge_integration_domains;
 create policy "Service role can manage edge domains"
     on public.edge_integration_domains
     for all
-    using (true)
-    with check (true);
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');
 
 drop policy if exists "Service role can manage edge deployments" on public.edge_deployments;
 create policy "Service role can manage edge deployments"
     on public.edge_deployments
     for all
-    using (true)
-    with check (true);
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');
 
 comment on table public.edge_integrations is 'Project-scoped deployment platform connections used for zero-code traffic and deployment sync';
 comment on table public.edge_integration_domains is 'Normalized domains discovered from connected edge integrations';

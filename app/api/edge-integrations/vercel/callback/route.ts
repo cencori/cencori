@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
 import { saveEdgeIntegrationCredentials } from '@/lib/edge-integrations/credentials';
 import {
     getEdgeIntegrationRecordById,
@@ -9,8 +10,10 @@ import {
 } from '@/lib/edge-integrations/repository';
 import {
     buildVercelLogIngestUrl,
+    buildVercelWebhookUrl,
     createVercelLogIngestSecret,
     createVercelLogDrain,
+    createVercelWebhook,
     exchangeVercelCodeForToken,
     getVercelIntegrationConfiguration,
     getVercelProject,
@@ -108,6 +111,13 @@ export async function GET(req: NextRequest) {
             }));
         }
 
+        const access = await getProjectAccessContext(project.id, payload.userId);
+        if (!access || !canManageProjectIntegrations(access)) {
+            return NextResponse.redirect(buildRedirectUrl(req, redirectPath, {
+                vercel: 'forbidden',
+            }));
+        }
+
         const tokenResponse = await exchangeVercelCodeForToken({
             code,
             teamId,
@@ -186,16 +196,25 @@ export async function GET(req: NextRequest) {
             ingestSecret,
         });
 
+        const webhook = await createVercelWebhook({
+            accessToken: tokenResponse.access_token,
+            teamId: resolvedTeamId,
+            projectId: vercelProject.id,
+            url: buildVercelWebhookUrl(integration.id, req.nextUrl.origin),
+        });
+
         await saveEdgeIntegrationCredentials({
             integrationId: integration.id,
             projectId: project.id,
             organizationId: project.organization_id,
             provider: 'vercel',
             accessToken: tokenResponse.access_token,
+            webhookSecret: webhook.secret || null,
             metadata: {
                 teamId: resolvedTeamId,
                 configurationId,
                 drainId: drain.id,
+                webhookId: webhook.id,
             },
         });
 

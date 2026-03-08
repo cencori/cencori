@@ -19,7 +19,7 @@ drop policy if exists "Service role can manage edge integration credentials" on 
 create policy "Service role can manage edge integration credentials"
     on public.edge_integration_credentials
     for all
-    using (true)
-    with check (true);
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');
 
 comment on table public.edge_integration_credentials is 'Private provider credentials and webhook secrets for connected edge integrations';

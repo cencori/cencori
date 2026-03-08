@@ -45,6 +45,11 @@ export interface VercelProjectDomain {
     updatedAt?: number | null;
 }
 
+export interface VercelWebhook {
+    id: string;
+    secret?: string | null;
+}
+
 export interface VercelLogDrain {
     id: string;
 }
@@ -266,6 +271,46 @@ export function buildVercelLogIngestUrl(integrationId: string, originFallback?: 
     }
 
     return `${baseUrl}/api/internal/edge-integrations/vercel/logs/${integrationId}`;
+}
+
+export function buildVercelWebhookUrl(integrationId: string, originFallback?: string): string {
+    const baseUrl = getAppBaseUrl(originFallback);
+    if (!baseUrl) {
+        throw new Error('Public app URL is not configured');
+    }
+
+    return `${baseUrl}/api/edge-integrations/vercel/webhook`;
+}
+
+export async function createVercelWebhook(input: {
+    accessToken: string;
+    teamId?: string | null;
+    projectId: string;
+    url: string;
+}): Promise<VercelWebhook> {
+    return vercelApiRequest<VercelWebhook>({
+        accessToken: input.accessToken,
+        path: '/v1/webhooks',
+        method: 'POST',
+        teamId: input.teamId,
+        body: {
+            name: 'Cencori Deployments',
+            url: input.url,
+            projectIds: [input.projectId],
+            events: [
+                'deployment.created',
+                'deployment.succeeded',
+                'deployment.error',
+                'deployment.canceled',
+                'deployment.promoted',
+                'project.domain-created',
+                'project.domain-updated',
+                'project.domain-deleted',
+                'project.domain-verified',
+                'project.domain-unverified',
+            ],
+        },
+    });
 }
 
 function mapDeploymentEnvironment(target?: string | null): EdgeEnvironment {
