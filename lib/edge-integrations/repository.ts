@@ -290,14 +290,11 @@ export async function listEdgeIntegrationRecordsByProviderAndConfigurationId(
         .select('*')
         .eq('provider', provider)
         .neq('status', 'disconnected')
+        .filter('metadata->>configurationId', 'eq', configurationId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    return ((data as EdgeIntegrationRecord[] | null) || []).filter((record) => {
-        const metadata = normalizeMetadata(record.metadata);
-        return metadata.configurationId === configurationId;
-    });
+    return (data as EdgeIntegrationRecord[] | null) || [];
 }
 
 export async function updateEdgeIntegrationById(
