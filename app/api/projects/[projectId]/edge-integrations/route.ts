@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
 import { listProjectEdgeIntegrations, upsertProjectEdgeIntegration } from '@/lib/edge-integrations/repository';
-import type { EdgeProvider } from '@/lib/edge-integrations/types';
+import type { EdgeEnvironment, EdgeProvider } from '@/lib/edge-integrations/types';
 
 function isEdgeProvider(value: unknown): value is EdgeProvider {
     return value === 'vercel'
@@ -89,10 +89,11 @@ export async function POST(
             .filter((item: unknown): item is Record<string, unknown> => typeof item === 'object' && item !== null)
             .map((domain: Record<string, unknown>) => ({
                 domain: typeof domain.domain === 'string' ? domain.domain.trim() : '',
-                environment:
+                environment: (
                     domain.environment === 'preview' || domain.environment === 'development'
                         ? domain.environment
-                        : 'production',
+                        : 'production'
+                ) as EdgeEnvironment,
                 isPrimary: domain.isPrimary === true,
                 metadata: typeof domain.metadata === 'object' && domain.metadata !== null ? domain.metadata as Record<string, unknown> : {},
             }))
