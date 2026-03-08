@@ -7,6 +7,7 @@ import { getScanPaywallForUser } from "@/lib/scan/entitlements";
 import { verifyProjectGithubAccess } from "@/lib/scan/github-access";
 import { isScanStrictEnforcementEnabled } from "@/lib/scan/policy";
 import { ScanMemoryError, getContinuityMemoryContext, searchMemory, writeMemory } from "@/lib/scan/scan-memory";
+import { rateLimitOrNull, SCAN_RATE_LIMITS } from "@/lib/scan/rate-limit";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_EVIDENCE_FILES = 5;
@@ -636,6 +637,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const paywallResponse = await getScanPaywallForUser(user.id);
     if (paywallResponse) {
         return paywallResponse;
+    }
+
+    const rateLimitResponse = rateLimitOrNull(user.id, 'scan:chat', SCAN_RATE_LIMITS.chat);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
     }
 
     const supabaseAdmin = createAdminClient();

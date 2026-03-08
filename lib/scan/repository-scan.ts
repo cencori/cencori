@@ -30,6 +30,8 @@ export interface ScanRepositoryOptions {
     shouldScanFile: (filePath: string) => boolean;
     scanFileContent: (filePath: string, content: string) => ScanIssue[];
     onProgress?: (progress: RepositoryScanProgress) => void | Promise<void>;
+    /** When signaled, workers stop fetching new files and the scan returns early. */
+    abortSignal?: AbortSignal;
 }
 
 export interface RepositoryScanResult {
@@ -206,6 +208,7 @@ export async function scanGithubRepository(options: ScanRepositoryOptions): Prom
         scanFileContent,
         onProgress,
         collectScannedFiles = true,
+        abortSignal,
     } = options;
 
     const maxConcurrency = Math.max(1, Math.min(options.maxConcurrency ?? 8, 20));
@@ -225,6 +228,10 @@ export async function scanGithubRepository(options: ScanRepositoryOptions): Prom
 
     const runWorker = async () => {
         while (true) {
+            if (abortSignal?.aborted) {
+                return;
+            }
+
             const currentIndex = cursor;
             cursor += 1;
 

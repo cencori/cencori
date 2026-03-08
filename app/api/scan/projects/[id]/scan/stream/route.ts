@@ -13,6 +13,7 @@ import { createRepositoryAiContextTracker } from '@/lib/scan/llm-context';
 import { isScanStrictEnforcementEnabled } from '@/lib/scan/policy';
 import { getScanPaywallForUser, getScanRunPaywallForProject } from '@/lib/scan/entitlements';
 import { persistScanContinuity } from '@/lib/scan/continuity';
+import { rateLimitOrNull, SCAN_RATE_LIMITS } from '@/lib/scan/rate-limit';
 import {
     calculateScore,
     scanFileContent,
@@ -164,6 +165,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const paywallResponse = await getScanPaywallForUser(user.id);
     if (paywallResponse) {
         return paywallResponse;
+    }
+
+    const rateLimitResponse = rateLimitOrNull(user.id, 'scan:stream', SCAN_RATE_LIMITS.scan);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
     }
 
     const supabaseAdmin = createAdminClient();
@@ -395,10 +401,12 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 }
 
                 if (reconnectMode) {
+                    const reconnectCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
                     const { data: latestScanRun } = await supabaseAdmin
                         .from('scan_runs')
                         .select('id,status,score,files_scanned,issues_found,scan_duration_ms,error_message,results')
                         .eq('project_id', id)
+                        .gte('created_at', reconnectCutoff)
                         .order('created_at', { ascending: false })
                         .limit(1)
                         .maybeSingle();
@@ -495,6 +503,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                     shouldScanFile,
                     scanFileContent,
                     collectScannedFiles: true,
+                    abortSignal: req.signal,
                     onProgress: async (progress) => {
                         aiContextTracker.ingest({
                             filePath: progress.currentFile,
