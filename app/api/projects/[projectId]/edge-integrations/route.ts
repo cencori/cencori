@@ -69,7 +69,7 @@ export async function POST(
             return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
         }
 
-        const body = await req.json();
+        const body = await req.json() as Record<string, unknown>;
         const provider = body.provider;
         const externalProjectId = typeof body.externalProjectId === 'string' ? body.externalProjectId.trim() : '';
         const externalProjectName = typeof body.externalProjectName === 'string' ? body.externalProjectName.trim() : '';
@@ -84,10 +84,10 @@ export async function POST(
             return NextResponse.json({ error: 'externalProjectId and externalProjectName are required' }, { status: 400 });
         }
 
-        const rawDomains = Array.isArray(body.domains) ? body.domains : [];
+        const rawDomains: unknown[] = Array.isArray(body.domains) ? body.domains : [];
         const domains = rawDomains
-            .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-            .map((domain) => ({
+            .filter((item: unknown): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+            .map((domain: Record<string, unknown>) => ({
                 domain: typeof domain.domain === 'string' ? domain.domain.trim() : '',
                 environment:
                     domain.environment === 'preview' || domain.environment === 'development'
@@ -96,7 +96,7 @@ export async function POST(
                 isPrimary: domain.isPrimary === true,
                 metadata: typeof domain.metadata === 'object' && domain.metadata !== null ? domain.metadata as Record<string, unknown> : {},
             }))
-            .filter((domain) => domain.domain.length > 0);
+            .filter((domain: { domain: string }) => domain.domain.length > 0);
 
         const integration = await upsertProjectEdgeIntegration({
             projectId,
