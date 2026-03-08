@@ -853,58 +853,7 @@ export default function FixWorkspacePage() {
                         )
                     )}
 
-                    {/* Post-AI actions: Create PR + Show Diffs — appear after stream completes */}
-                    {aiIsDone && lastIsAssistant && fixes.length > 0 && (
-                        <div className="flex items-center gap-3 pt-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs px-4 gap-1.5"
-                                onClick={() => setDiffDialogOpen(true)}
-                            >
-                                Diffs
-                                {(() => {
-                                    const t = fixes.reduce(
-                                        (acc, fix) => {
-                                            const s = computeDiffStats(fix.originalCode, fix.fixedCode);
-                                            return { added: acc.added + s.added, removed: acc.removed + s.removed };
-                                        },
-                                        { added: 0, removed: 0 }
-                                    );
-                                    return (
-                                        <>
-                                            <span className="text-emerald-400">+{t.added}</span>
-                                            <span className="text-red-400">-{t.removed}</span>
-                                        </>
-                                    );
-                                })()}
-                            </Button>
-                            {scanRun?.fix_status === "pr_opened" && scanRun?.fix_pr_url ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs px-4"
-                                    onClick={() => window.open(scanRun?.fix_pr_url as string, "_blank")}
-                                >
-                                    Open PR
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="sm"
-                                    className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600"
-                                    onClick={handleCreatePr}
-                                    disabled={creatingPr || selectedFixes.length === 0}
-                                >
-                                    {creatingPr ? (
-                                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                    ) : (
-                                        <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
-                                    )}
-                                    Create PR
-                                </Button>
-                            )}
-                        </div>
-                    )}
+
 
                     <div ref={messagesEndRef} />
                 </div>
@@ -951,6 +900,61 @@ export default function FixWorkspacePage() {
             {/* ── Fixed bottom input bar ──────────────────────────────── */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm pb-8">
                 <div className="max-w-3xl mx-auto">
+                    {/* ── Persistent Diff + PR buttons ──────────────────── */}
+                    {(fixes.length > 0 || prInfo || scanRun?.fix_status === "pr_opened") && (
+                        <div className="flex items-center justify-center gap-3 mb-3">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs px-4 gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                onClick={() => setDiffDialogOpen(true)}
+                                disabled={fixes.length === 0 || !aiIsDone}
+                            >
+                                Diffs
+                                {fixes.length > 0 && (() => {
+                                    const t = fixes.reduce(
+                                        (acc, fix) => {
+                                            const s = computeDiffStats(fix.originalCode, fix.fixedCode);
+                                            return { added: acc.added + s.added, removed: acc.removed + s.removed };
+                                        },
+                                        { added: 0, removed: 0 }
+                                    );
+                                    return (
+                                        <>
+                                            <span className="text-emerald-400">+{t.added}</span>
+                                            <span className="text-red-400">-{t.removed}</span>
+                                        </>
+                                    );
+                                })()}
+                            </Button>
+                            {scanRun?.fix_status === "pr_opened" && scanRun?.fix_pr_url ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs px-4"
+                                    onClick={() => window.open(scanRun?.fix_pr_url as string, "_blank")}
+                                >
+                                    Open PR
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    className="h-8 text-xs px-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    onClick={handleCreatePr}
+                                    disabled={creatingPr || selectedFixes.length === 0 || !aiIsDone}
+                                    title={selectedFixes.length === 0 ? "Select at least one fix to create a PR" : !aiIsDone ? "Wait for the AI response to complete" : undefined}
+                                >
+                                    {creatingPr ? (
+                                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    ) : (
+                                        <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
+                                    )}
+                                    Create PR
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
                     <div className="relative flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 px-2.5 pl-4 py-2 transition-all hover:bg-muted/30 hover:border-border/80 focus-within:border-white/20 focus-within:bg-muted/30">
                         <textarea
                             value={chatInput}
