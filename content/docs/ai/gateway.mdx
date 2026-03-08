@@ -1,56 +1,53 @@
 ---
 title: "AI Gateway"
-description: "The secure, unified API layer for all your AI requests. Route to 14+ providers with built-in security, observability, and cost tracking."
+description: "The secure, unified API layer for your AI requests across models, providers, and runtime policies."
 section: "AI"
 order: 2
 ---
 
-The AI Gateway acts as a transparent proxy between your application and AI providers. Instead of integrating with OpenAI, Anthropic, and Google separately, you integrate once with Cencori and get:
-
-- **Multi-Provider Routing:** Switch between providers with a single parameter
-- **Automatic Security:** PII detection, prompt injection protection, content filtering
-- **Complete Observability:** Every request logged with full prompts, responses, and costs
-- **Failover & Reliability:** Automatic retries and provider fallback
-- **Cost Tracking:** Real-time usage and spend per project
+The AI Gateway is Cencori's runtime control point. Your application sends AI traffic to Cencori once, and Cencori handles provider routing, security enforcement, observability, and cost tracking.
 
 ## Available Endpoints
 
 | Endpoint | Description | Providers |
 |----------|-------------|-----------|
-| `/api/ai/chat` | Chat completions (streaming) | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek, Meta |
+| `/api/ai/chat` | Chat completions | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek, Meta |
 | `/api/ai/embeddings` | Vector embeddings | OpenAI, Google, Cohere |
 | `/api/ai/images/generate` | Image generation | OpenAI, Google |
-| `/api/ai/audio/transcriptions` | Speech-to-text | OpenAI (Whisper) |
-| `/api/ai/audio/speech` | Text-to-speech | OpenAI (TTS) |
+| `/api/ai/audio/transcriptions` | Speech-to-text | OpenAI |
+| `/api/ai/audio/speech` | Text-to-speech | OpenAI |
 | `/api/ai/moderation` | Content moderation | OpenAI |
+| `https://api.cencori.com/v1/chat/completions` | OpenAI-compatible chat endpoint | OpenAI-compatible clients |
 
-## Chat Completions
-
-The primary endpoint for conversational AI. Supports streaming, tool calling, and structured output.
-
-### SDK Usage
+## SDK Usage
 
 ```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
 const response = await cencori.ai.chat({
   model: 'gpt-4o',
   messages: [
     { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: 'Hello!' }
+    { role: 'user', content: 'Hello!' },
   ],
   temperature: 0.7,
-  maxTokens: 1000
+  maxTokens: 1000,
 });
 
 console.log(response.content);
-console.log(response.usage); // { prompt_tokens, completion_tokens, total_tokens }
+console.log(response.usage); // { promptTokens, completionTokens, totalTokens }
 ```
 
-### Streaming
+## Streaming
 
 ```typescript
 const stream = cencori.ai.chatStream({
   model: 'claude-opus-4',
-  messages: [{ role: 'user', content: 'Tell me a story' }]
+  messages: [{ role: 'user', content: 'Tell me a story' }],
 });
 
 for await (const chunk of stream) {
@@ -58,34 +55,34 @@ for await (const chunk of stream) {
 }
 ```
 
-### Tool Calling
+## Tool Calling
 
 ```typescript
 const response = await cencori.ai.chat({
   model: 'gpt-4o',
   messages: [{ role: 'user', content: 'What is the weather in Tokyo?' }],
-  tools: [{
-    type: 'function',
-    function: {
-      name: 'get_weather',
-      description: 'Get weather for a location',
-      parameters: {
-        type: 'object',
-        properties: { location: { type: 'string' } },
-        required: ['location']
-      }
-    }
-  }]
+  tools: [
+    {
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        description: 'Get weather for a location',
+        parameters: {
+          type: 'object',
+          properties: { location: { type: 'string' } },
+          required: ['location'],
+        },
+      },
+    },
+  ],
 });
 
-if (response.toolCalls) {
-  console.log(response.toolCalls);
-}
+console.log(response.toolCalls);
 ```
 
 ## Direct API Usage
 
-If you prefer making direct HTTP requests:
+### Native Cencori Endpoint
 
 ```bash
 curl -X POST https://cencori.com/api/ai/chat \
@@ -98,10 +95,22 @@ curl -X POST https://cencori.com/api/ai/chat \
   }'
 ```
 
+### OpenAI-Compatible Endpoint
+
+```bash
+curl -X POST https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
 ## Authentication
 
-Every request requires an API key:
-- **Preferred:** `CENCORI_API_KEY: csk_...`
-- **Also accepted:** `Authorization: Bearer csk_...`
+Every request requires a project API key:
+- **Preferred for `/api/ai/*`:** `CENCORI_API_KEY: csk_...`
+- **Required for `https://api.cencori.com/v1/*`:** `Authorization: Bearer csk_...`
 
-API keys are scoped to projects. Create and manage them in the [dashboard](/dashboard).
+Create and manage project keys in the [dashboard](/dashboard).

@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
                 <CodeBlock
                     language="typescript"
                     filename="app/api/chat/route.ts"
-                    code={`import { cencori } from 'cencori';
+                    code={`import { cencori } from 'cencori/vercel';
 import { streamText } from 'ai';
 
 export async function POST(req: Request) {

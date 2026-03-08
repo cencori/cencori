@@ -1,15 +1,38 @@
 ---
 title: "TanStack AI"
-description: "Integrate Cencori with TanStack Query and TanStack Start."
+description: "Integrate Cencori with TanStack Query, TanStack Start, and the first-party TanStack AI adapter."
 section: "Integrations"
 order: 6
 ---
 
-Cencori works perfectly with the TanStack ecosystem, allowing you to build AI applications with full control over data fetching and caching.
+Cencori works with the TanStack ecosystem in two common ways:
 
-## TanStack Query (React Query)
+1. use the first-party `cencori/tanstack` adapter with `@tanstack/ai`
+2. keep your Cencori API key on the server and call your own route from TanStack Query or TanStack Start
 
-You can use `useMutation` to handle streaming AI responses while maintaining fine-grained control over the request lifecycle.
+## TanStack AI Adapter
+
+```bash
+npm install cencori @tanstack/ai
+```
+
+```typescript
+import { chat } from '@tanstack/ai';
+import { cencori } from 'cencori/tanstack';
+
+for await (const chunk of chat({
+  adapter: cencori('gpt-4o'),
+  messages: [{ role: 'user', content: 'Hello world' }],
+})) {
+  if (chunk.type === 'content') {
+    console.log(chunk.delta);
+  }
+}
+```
+
+## TanStack Query
+
+Keep the API key on your server and call your own application route from the client:
 
 ```tsx
 import { useMutation } from '@tanstack/react-query';
@@ -17,64 +40,65 @@ import { useMutation } from '@tanstack/react-query';
 function AIComponent() {
   const mutation = useMutation({
     mutationFn: async (prompt: string) => {
-      const response = await fetch('https://api.cencori.com/v1/chat/completions', {
+      const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CENCORI_KEY}`
         },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          stream: true
-        })
+        body: JSON.stringify({ prompt }),
       });
 
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
       return response.body;
     },
-    onSuccess: async (stream) => {
-        if (!stream) return;
-        // Handle stream reading here
-        const reader = stream.getReader();
-        const decoder = new TextDecoder();
-        // ...
-    }
   });
 
-  return (
-    <button onClick={() => mutation.mutate("Hello world")}>
-      Generate
-    </button>
-  );
+  return <button onClick={() => mutation.mutate('Hello world')}>Generate</button>;
 }
 ```
 
 ## TanStack Start
 
-For server-side usage in TanStack Start, you can use Cencori as your fetcher.
-
 ```typescript
 // app/routes/api/ai.ts
-import { createAPIFileRoute } from '@tanstack/start/api'
+import { createAPIFileRoute } from '@tanstack/start/api';
 import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
-    apiKey: process.env.CENCORI_API_KEY
+  apiKey: process.env.CENCORI_API_KEY,
 });
 
 export const Route = createAPIFileRoute('/api/ai')({
   POST: async ({ request }) => {
-    const { message } = await request.json();
-    
-    const stream = await cencori.ai.chatStream({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: message }]
+    const { prompt } = await request.json();
+
+    const stream = cencori.ai.chatStream({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    return new Response(stream, {
-        headers: { 'Content-Type': 'text/event-stream' }
-    });
+    const encoder = new TextEncoder();
+
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          for await (const chunk of stream) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          }
+          controller.close();
+        },
+      }),
+      {
+        headers: { 'Content-Type': 'text/event-stream' },
+      },
+    );
   },
-})
+});
 ```
+
+## Security
+
+Do not expose `CENCORI_API_KEY` through `NEXT_PUBLIC_*` variables. Use server routes or server functions for any request that requires a project secret key.

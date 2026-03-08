@@ -1,56 +1,56 @@
 ---
 title: "Vercel AI SDK"
-description: "Build AI-powered user interfaces with the Vercel AI SDK and Cencori."
+description: "Build AI UIs with the Vercel AI SDK and Cencori's first-party provider."
 section: "Integrations"
 order: 1
 ---
 
-The [Vercel AI SDK](https://sdk.vercel.ai/docs) is the standard for building AI UIs in React, Vue, Svelte, and more. Cencori acts as a drop-in replacement for OpenAI in the SDK, giving you observability, caching, and security automatically.
+Cencori works directly with the [Vercel AI SDK](https://sdk.vercel.ai/docs). The recommended path is the first-party `cencori/vercel` provider so you do not have to wire an OpenAI-compatible client manually.
 
-## Configuration
-
-Since Cencori is API-compatible with OpenAI, you can use the standard `createOpenAI` provider.
+## Recommended Path
 
 ### 1. Install Dependencies
 
 ```bash
-npm install ai @ai-sdk/openai
+npm install ai cencori
 ```
 
-### 2. Configure the Provider
+### 2. Set Your API Key
 
-Point the `baseURL` to Cencori's gateway and use your Cencori API key.
-
-```typescript
-import { createOpenAI } from '@ai-sdk/openai';
-
-export const cencori = createOpenAI({
-  baseURL: 'https://api.cencori.com/v1',
-  apiKey: process.env.CENCORI_API_KEY, // csk_...
-});
+```bash
+# .env.local
+CENCORI_API_KEY=csk_live_...
 ```
 
-## Usage
-
-### Server Action (Streaming)
+### 3. Export The Provider
 
 ```typescript
-'use server';
+// lib/cencori.ts
+import { cencori } from 'cencori/vercel';
 
+export { cencori };
+```
+
+### 4. Stream In Your Route Handler
+
+```typescript
+// app/api/chat/route.ts
 import { streamText } from 'ai';
-import { cencori } from '@/lib/ai';
+import { cencori } from '@/lib/cencori';
 
-export async function continueConversation(history: Message[]) {
-  const result = await streamText({
-    model: cencori('gpt-4o'), // Use Cencori provider
-    messages: history,
+export async function POST(req: Request) {
+  const { messages, model = 'gpt-4o' } = await req.json();
+
+  const result = streamText({
+    model: cencori(model),
+    messages,
   });
 
   return result.toDataStreamResponse();
 }
 ```
 
-### useChat (Client)
+### 5. Use `useChat()` In The Client
 
 ```tsx
 'use client';
@@ -58,16 +58,16 @@ export async function continueConversation(history: Message[]) {
 import { useChat } from 'ai/react';
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/chat',
+    body: { model: 'gpt-4o' },
+  });
 
   return (
     <div>
-      {messages.map(m => (
-        <div key={m.id}>
-          {m.role}: {m.content}
-        </div>
+      {messages.map((message) => (
+        <div key={message.id}>{message.content}</div>
       ))}
- 
       <form onSubmit={handleSubmit}>
         <input value={input} onChange={handleInputChange} />
       </form>
@@ -76,29 +76,21 @@ export default function Chat() {
 }
 ```
 
-## TanStack Start / React Query
+## Alternative: OpenAI-Compatible Mode
 
-You can also use Cencori with `@tanstack/react-query` for streaming capabilities outside of Next.js.
+If you must use `@ai-sdk/openai`, point it to Cencori's OpenAI-compatible base URL:
 
 ```typescript
-import { useMutation } from '@tanstack/react-query';
+import { createOpenAI } from '@ai-sdk/openai';
 
-const mutation = useMutation({
-  mutationFn: async (prompt) => {
-    const response = await fetch('https://api.cencori.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CENCORI_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
-        stream: true
-      })
-    });
-    
-    // Handle stream...
-  }
+export const cencori = createOpenAI({
+  baseURL: 'https://api.cencori.com/v1',
+  apiKey: process.env.CENCORI_API_KEY,
 });
 ```
+
+Use this mode only when a project already depends on the OpenAI provider abstraction. For new Cencori integrations, prefer `cencori/vercel`.
+
+## Security
+
+Keep `CENCORI_API_KEY` on the server. Do not expose it through `NEXT_PUBLIC_*` environment variables or browser-side fetch calls.

@@ -1,104 +1,82 @@
 ---
 title: "SDK Configuration"
-description: "Advanced SDK configuration: Timeouts, Retries, Edge Runtime, and Telemetry."
+description: "Base URL, custom headers, edge runtime compatibility, and web telemetry."
 section: "AI"
 order: 5
 ---
 
-## Timeouts
+## TypeScript SDK
 
-By default, the Cencori SDKs have a **60-second** read timeout. You should increase this for long-running chain-of-thought models (like `o1` or `claude-opus`).
-
-### TypeScript
+The TypeScript SDK currently supports three client configuration fields:
 
 ```typescript
+import { Cencori } from 'cencori';
+
 const cencori = new Cencori({
-  apiKey: '...',
-  timeout: 300000 // 5 minutes (in ms)
+  apiKey: process.env.CENCORI_API_KEY,
+  baseUrl: 'https://cencori.com',
+  headers: {
+    'X-Trace-ID': 'req_123',
+  },
 });
 ```
 
-### Python
+### What Each Option Does
 
-```python
-client = Cencori(
-    timeout=300.0 # 5 minutes (in seconds)
-)
-```
+- `apiKey`: your project secret key (`csk_...`)
+- `baseUrl`: override the default Cencori API origin
+- `headers`: attach custom headers to every request
 
-### Go
+## Vercel AI SDK Provider
 
-```go
-client := cencori.NewClient(
-    option.WithHTTPClient(&http.Client{
-        Timeout: 5 * time.Minute,
-    }),
-)
-```
-
-## Retries
-
-The SDKs automatically retry failed requests (status 408, 409, 429, 5xx) with exponential backoff.
-
-- **Default Retries**: 2
-- **Max Delay**: 60 seconds
-
-To customize:
+Use `createCencori()` when you need explicit configuration for the Vercel AI SDK provider:
 
 ```typescript
-const cencori = new Cencori({
-  maxRetries: 5 // Retry up to 5 times
+import { createCencori } from 'cencori/vercel';
+
+export const cencori = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+  baseUrl: 'https://cencori.com',
+  headers: {
+    'X-Trace-ID': 'req_123',
+  },
 });
 ```
 
-## Edge Compatibility (Vercel / Cloudflare)
+## TanStack AI Adapter
 
-The Cencori TypeScript SDK (`npm install cencori`) is fully compatible with Edge Runtimes.
-
-- **Zero dependencies** on Node.js-only APIs (like `fs` or `net`).
-- Uses the standard `fetch` API.
-- Works in **Cloudflare Workers**, **Vercel Edge Functions**, and **Deno**.
+The TanStack adapter exposes the same configuration surface:
 
 ```typescript
-// pages/api/edge.ts
+import { createCencori } from 'cencori/tanstack';
+
+const provider = createCencori({
+  apiKey: process.env.CENCORI_API_KEY!,
+  baseUrl: 'https://cencori.com',
+});
+
+const adapter = provider('gpt-4o');
+```
+
+## Gateway Reliability vs SDK Configuration
+
+Retries, failover, and circuit breaking are gateway behaviors handled inside Cencori. They are not configured through extra TypeScript SDK flags today.
+
+## Edge Compatibility
+
+The TypeScript SDK and framework adapters use `fetch` and work in Edge runtimes such as Vercel Edge Functions, Cloudflare Workers, and Deno.
+
+```typescript
 export const config = {
   runtime: 'edge',
 };
-
-export default async function handler(req) {
-  // Works natively in Edge
-  const response = await cencori.ai.chat(...) 
-  return new Response(...)
-}
 ```
 
-## Telemetry & Privacy
+## Web Telemetry
 
-The Cencori SDK collects minimal, **anonymous** metadata to help us improve performance and debug issues.
-
-**We Collect:**
-- SDK Version (e.g., `1.2.0`)
-- Language & Runtime Version (e.g., `Node v18.16.0`, `Python 3.11`)
-- Platform OS (e.g., `darwin`, `linux`)
-- Latency (Client-side measured duration)
-
-**We Do NOT Collect:**
-- Environment variables (other than `CENCORI_API_KEY`)
-- File system paths
-- IP Addresses (these are visible to the gateway, but not collected by the SDK logic itself)
-
-To opt-out of telemetry headers:
-
-```bash
-export CENCORI_TELEMETRY=0
-```
-
-## Web Telemetry (App Traffic)
-
-Separately from anonymous SDK telemetry, you can report **web traffic from your app** to the Cencori dashboard. This populates the **Logs → Web Gateway** tab with your app's real domain.
+You can report web traffic from your application to the Cencori dashboard:
 
 ```typescript
-// In your middleware or API route handler:
 await cencori.telemetry.reportWebRequest({
   host: req.headers.get('host') || 'unknown',
   method: req.method,
@@ -108,4 +86,4 @@ await cencori.telemetry.reportWebRequest({
 });
 ```
 
-This is fire-and-forget — it never throws and never blocks your application.
+This is best-effort telemetry. It does not block your request path.

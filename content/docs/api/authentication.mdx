@@ -19,6 +19,12 @@ Cencori uses API keys to authenticate requests. Your API key identifies your pro
 > [!CAUTION]
 > API keys are sensitive credentials. Never commit them to version control or expose them in client-side code.
 
+## Key Types
+
+- **Project keys:** `csk_...` or `csk_test_...`
+- **Publishable keys:** `cpk_...` or `cpk_test_...`
+- **Agent-scoped keys:** `cake_...` for agent runtime flows
+
 ## Using API Keys
 
 Include your API key when initializing the Cencori SDK. The SDK automatically adds the necessary authentication headers to all requests.
@@ -59,7 +65,7 @@ Store your API keys in environment variables to keep them secure.
 
 ### Local Development (`.env`)
 ```bash
-CENCORI_API_KEY=cen_your_api_key_here
+CENCORI_API_KEY=csk_your_api_key_here
 ```
 Make sure to add `.env` to your `.gitignore` file.
 

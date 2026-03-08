@@ -194,7 +194,7 @@ export default function PlaygroundPage({ params }: PlaygroundPageProps) {
                     <div className="relative flex-1">
                         <Input
                             type={apiKeyVisible ? "text" : "password"}
-                            placeholder={`cen_${environment === "test" ? "test_" : ""}...`}
+                            placeholder={`csk_${environment === "test" ? "test_" : "live_"}...`}
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
                             className="h-8 text-xs font-mono pr-14"

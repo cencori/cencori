@@ -38,7 +38,7 @@ console.log(response.content);
 // "Hello! I'm an AI assistant that can help you with..."
 
 console.log(response.usage);
-// { prompt_tokens: 12, completion_tokens: 45, total_tokens: 57 }`}
+// { promptTokens: 12, completionTokens: 45, totalTokens: 57 }`}
                 />
             </div>
 
