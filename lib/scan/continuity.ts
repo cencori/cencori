@@ -211,6 +211,20 @@ export async function persistScanContinuity(input: {
         previousRuns: (previousRuns || []) as PreviousScanRunRow[],
     });
 
+    // Fetch existing continuity entries to avoid duplicates
+    const { data: existingEntries } = await input.supabase
+        .from("scan_chat_memory")
+        .select("id, content, source")
+        .eq("project_id", input.projectId)
+        .eq("user_id", input.userId)
+        .in("source", ["project_brief", "scan_summary", "accepted_risk", "weak_spot"])
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+    const existingContentSet = new Set(
+        (existingEntries || []).map((entry: { content: string }) => entry.content)
+    );
+
     const continuityMemories = [
         {
             content: buildProjectBriefMemory(input.repository, input.research.projectBrief),
@@ -234,6 +248,9 @@ export async function persistScanContinuity(input: {
     ];
 
     for (const memory of continuityMemories) {
+        // Skip if identical content already stored (dedup)
+        if (existingContentSet.has(memory.content)) continue;
+
         await writeMemory(
             input.projectId,
             input.userId,
@@ -244,4 +261,18 @@ export async function persistScanContinuity(input: {
             { enforce: false }
         );
     }
+
+    // Prune old scan_summary entries beyond the latest 3 to prevent unbounded growth
+    const existingSummaries = (existingEntries || [])
+        .filter((entry: { source: string }) => entry.source === "scan_summary")
+        .map((entry: { id: string }) => entry.id);
+
+    if (existingSummaries.length > 3) {
+        const staleIds = existingSummaries.slice(3);
+        await input.supabase
+            .from("scan_chat_memory")
+            .delete()
+            .in("id", staleIds);
+    }
 }
+

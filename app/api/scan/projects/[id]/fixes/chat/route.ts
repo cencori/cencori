@@ -747,15 +747,17 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     } catch (err) {
         const details = err instanceof Error ? err.message : "Unknown memory retrieval error";
         console.error("[Fix Chat] RAG memory retrieval failed:", details);
-        const code = err instanceof ScanMemoryError ? err.code : "search_failed";
-        return new Response(
-            JSON.stringify({
-                error: "RAG memory retrieval failed",
-                code,
-                details,
-            }),
-            { status: 503, headers: { "Content-Type": "application/json" } }
-        );
+        if (strictEnforcement) {
+            const code = err instanceof ScanMemoryError ? err.code : "search_failed";
+            return new Response(
+                JSON.stringify({
+                    error: "RAG memory retrieval failed",
+                    code,
+                    details,
+                }),
+                { status: 503, headers: { "Content-Type": "application/json" } }
+            );
+        }
     }
 
     const recentHistory = history
@@ -891,6 +893,10 @@ ${question}`;
                 );
                 finishedStreaming = true;
 
+                // Emit completion before memory write so clients get a clean boundary
+                enqueue("[DONE]");
+                controller.close();
+
                 const memoryText = [
                     `Q: ${question.slice(0, 500)}`,
                     `A: ${accumulatedResponse.slice(0, 1500)}`,
@@ -900,11 +906,11 @@ ${question}`;
                         : "",
                 ].filter(Boolean).join("\n");
 
-                await writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId, {
-                    enforce: strictEnforcement,
+                writeMemory(id, user.id, memoryText, "chat", supabaseAdmin, scanRunId, {
+                    enforce: false,
+                }).catch((memErr) => {
+                    console.warn("[Fix Chat] Post-stream memory write failed:", memErr instanceof Error ? memErr.message : memErr);
                 });
-                enqueue("[DONE]");
-                controller.close();
             } catch (error) {
                 console.error("[Fix Chat] Streaming or memory persistence failed:", error);
                 if (!finishedStreaming) {

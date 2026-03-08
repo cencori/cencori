@@ -384,13 +384,13 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         });
                         await markScanRunFailed(activeScanRun.id, 'Scan stalled before completion. Start a fresh scan.');
                     } else {
-                    await streamScanRunStatus(
-                        activeScanRun.id,
-                        reconnectMode
-                            ? 'Resuming the active scan...'
-                            : 'Another scan is already running for this project. Attaching to its live log...'
-                    );
-                    return;
+                        await streamScanRunStatus(
+                            activeScanRun.id,
+                            reconnectMode
+                                ? 'Resuming the active scan...'
+                                : 'Another scan is already running for this project. Attaching to its live log...'
+                        );
+                        return;
                     }
                 }
 
@@ -437,7 +437,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                         project_id: id,
                         status: 'running',
                     })
-                    .select()
+                    .select('id')
                     .single();
 
                 if (runError || !scanRun) {

@@ -79,7 +79,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
                 project_id: id,
                 status: 'running',
             })
-            .select()
+            .select('id')
             .single();
 
         if (runError || !scanRun) {
