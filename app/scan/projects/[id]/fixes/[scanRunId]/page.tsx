@@ -14,6 +14,7 @@ import {
     DialogContent,
 } from "@/components/ui/dialog";
 import {
+    AlertTriangle,
     ArrowLeft,
     ArrowUp,
     ChevronDown,
@@ -233,6 +234,8 @@ export default function FixWorkspacePage() {
     const [chatPending, setChatPending] = useState(false);
     const [analysisText, setAnalysisText] = useState("");
     const [hasScanAccess, setHasScanAccess] = useState(true);
+    const [manualGuidance, setManualGuidance] = useState<ManualGuidance[]>([]);
+    const [noFixesMessage, setNoFixesMessage] = useState("");
     const hasGeneratedFixes = useRef(false);
     const suggestionsAbortRef = useRef<AbortController | null>(null);
     const chatAbortRef = useRef<AbortController | null>(null);
@@ -415,6 +418,8 @@ export default function FixWorkspacePage() {
             const generatedFixes = data.fixes || [];
             const generatedGuidance = data.manualGuidance || [];
             setFixes(generatedFixes);
+            setManualGuidance(generatedGuidance);
+            setNoFixesMessage(data.message || "");
             setSelectedFixIds(new Set(generatedFixes.map((fix) => fix.id)));
             setChatPending(true);
             void streamFixSuggestions(generatedFixes, generatedGuidance);
@@ -782,6 +787,46 @@ export default function FixWorkspacePage() {
                     {/* Combined ThinkingIndicator — runs while loading or generating, before AI starts */}
                     {(loading || loadingFixes || chatPending) && !aiHasStarted && (
                         <ScanThinkingIndicator finished={false} liveText={analysisText || undefined} />
+                    )}
+
+                    {/* Manual guidance cards — shown when AI fixes failed but issues exist */}
+                    {!loading && !loadingFixes && fixes.length === 0 && manualGuidance.length > 0 && !aiHasStarted && (
+                        <div className="space-y-4">
+                            {noFixesMessage && (
+                                <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300 flex items-center gap-2">
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                    {noFixesMessage}
+                                </div>
+                            )}
+                            <div className="space-y-3">
+                                {manualGuidance.map((guidance) => (
+                                    <div key={guidance.issueKey} className="rounded-md border border-border/40 bg-card p-4 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn(
+                                                    "text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded",
+                                                    guidance.severity === "critical" && "bg-red-500/20 text-red-400",
+                                                    guidance.severity === "high" && "bg-orange-500/20 text-orange-400",
+                                                    guidance.severity === "medium" && "bg-yellow-500/20 text-yellow-400",
+                                                    guidance.severity === "low" && "bg-blue-500/20 text-blue-400",
+                                                )}>{guidance.severity}</span>
+                                                <span className="text-sm font-medium text-foreground">{guidance.issueName}</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground font-mono">{guidance.file}:{guidance.line}</p>
+                                        <p className="text-xs text-foreground/80">{guidance.summary}</p>
+                                        <div className="space-y-1 pt-1">
+                                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Remediation Steps</p>
+                                            <ol className="list-decimal list-inside space-y-0.5">
+                                                {guidance.steps.map((step, idx) => (
+                                                    <li key={idx} className="text-xs text-foreground/70">{step}</li>
+                                                ))}
+                                            </ol>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
 
                     {/* AI messages */}
