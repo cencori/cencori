@@ -41,7 +41,11 @@ export async function GET(req: NextRequest) {
   const setupAction = setupActionParam || (parsedInstallationId ? 'install' : null);
 
   // Helper to build redirect URL
-  const buildRedirect = (path: string) => new URL(path, req.url);
+  // When source is 'scan', redirect to the scan subdomain instead of the callback domain
+  const redirectBase = isScanSource && process.env.NEXT_PUBLIC_SCAN_URL
+    ? process.env.NEXT_PUBLIC_SCAN_URL
+    : req.url;
+  const buildRedirect = (path: string) => new URL(path, redirectBase);
   const appendQueryParam = (path: string, key: string, value: string) => {
     const url = buildRedirect(path);
     url.searchParams.set(key, value);
