@@ -946,7 +946,7 @@ export default function FixWorkspacePage() {
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm pb-8">
                 <div className="max-w-3xl mx-auto">
                     {/* ── Persistent Diff + PR buttons ──────────────────── */}
-                    <div className="flex items-center justify-center gap-3 mb-3">
+                    <div className="flex items-center justify-center gap-4 mb-5">
                         <Button
                             size="sm"
                             variant="outline"
