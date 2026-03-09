@@ -40,6 +40,35 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             .order('created_at', { ascending: false })
             .limit(10);
 
+        // Auto-recover stale "running" scans — if a scan has been "running" for more
+        // than 6 minutes it almost certainly lost its connection before the DB update.
+        const STALE_RUNNING_MS = 6 * 60 * 1000;
+        if (scans) {
+            const now = Date.now();
+            for (const scan of scans) {
+                if (scan.status !== 'running') continue;
+                const ageMs = now - new Date(scan.created_at).getTime();
+                if (ageMs > STALE_RUNNING_MS) {
+                    scan.status = 'failed';
+                    scan.error_message = 'Scan was interrupted before it could finish. Please run a new scan.';
+                    // Fire-and-forget DB fix so the stale row doesn't persist
+                    void supabaseAdmin
+                        .from('scan_runs')
+                        .update({
+                            status: 'failed',
+                            error_message: scan.error_message,
+                            fix_status: 'not_applicable',
+                        })
+                        .eq('id', scan.id)
+                        .then(({ error: updateErr }) => {
+                            if (updateErr) {
+                                console.error('[Scan Project] Failed to auto-recover stale scan:', updateErr);
+                            }
+                        });
+                }
+            }
+        }
+
         let continuity: Awaited<ReturnType<typeof listContinuityMemoryEntries>> = [];
         try {
             continuity = await listContinuityMemoryEntries(id, user.id, supabaseAdmin, { limit: 12 });

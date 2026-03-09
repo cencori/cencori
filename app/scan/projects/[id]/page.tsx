@@ -337,6 +337,18 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
     }
 
     if (scan.status === "running") {
+        // Detect stale "running" scans — if it's been more than 6 minutes,
+        // the scan was interrupted before it could update its status.
+        const scanAgeMs = Date.now() - new Date(scan.created_at).getTime();
+        const STALE_THRESHOLD_MS = 6 * 60 * 1000;
+        if (scanAgeMs > STALE_THRESHOLD_MS) {
+            return [{
+                type: "error",
+                message: "Scan was interrupted before it could finish. Please run a new scan.",
+                time: timeStr,
+            }];
+        }
+
         const progress = scan.results?.progress;
         if (progress?.totalFiles) {
             return [{
