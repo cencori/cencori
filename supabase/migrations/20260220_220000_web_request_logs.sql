@@ -52,6 +52,6 @@ drop policy if exists "Service role can insert web logs" on public.web_request_l
 create policy "Service role can insert web logs"
     on public.web_request_logs
     for insert
-    with check (true);
+    with check (auth.role() = 'service_role');
 
 comment on table public.web_request_logs is 'HTTP request logs for dashboard web traffic scoped to projects';
