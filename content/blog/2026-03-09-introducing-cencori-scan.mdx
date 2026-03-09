@@ -1,0 +1,121 @@
+---
+title: "Introducing Cencori Scan"
+slug: "introducing-cencori-scan"
+date: "2026-03-09"
+excerpt: "An AI-powered application security scanner that finds real vulnerabilities, filters out false positives with AI, and generates one-click PRs to fix what it finds."
+coverImage: "/blog/images/covers/scan.png"
+authors:
+  - bola
+tags: ["Security", "AI", "Scan", "Launch", "CI/CD"]
+published: true
+---
+
+Today we're introducing **Cencori Scan**, an AI-powered application security scanner. It analyzes your codebase to find real vulnerabilities — secrets, PII exposure, insecure routes, dependency risks, and code quality issues — then uses AI to filter out false positives and generate fixes you can land as a pull request in one click.
+
+Security tooling has a noise problem. Most scanners bury developers under hundreds of findings, the majority of which are false positives or low-impact issues. Teams spend hours triaging instead of fixing what matters. Meanwhile, AI-assisted development is accelerating how fast code ships, making security review an increasingly critical bottleneck.
+
+Cencori Scan addresses both problems. By combining pattern-based detection with AI verification, it delivers high-confidence findings and actionable fixes — so you can focus on the vulnerabilities that actually matter and ship secure code faster.
+
+## How Cencori Scan Works
+
+Cencori Scan combines a multi-layered scanning engine with AI reasoning to move from detection to remediation in a single workflow.
+
+### Scan and Detect
+
+The core engine runs a comprehensive pattern library covering secrets, PII, exposed routes, security vulnerabilities, and code quality issues across 26 file types — including TypeScript, Python, Go, Java, PHP, Ruby, Vue, and Svelte.
+
+In parallel, the dependency scanner performs **software composition analysis (SCA)**, parsing lockfiles from npm, yarn, pnpm, pip, and Go modules and querying the OSV.dev vulnerability database for known CVEs. Findings include CVSS severity, fixed versions, and reference links so you can act immediately.
+
+All of this runs as a real-time stream. You see files scanned, issues found, and AI analysis updating live in the dashboard — not a loading spinner followed by a wall of results.
+
+### Understand Your Codebase
+
+Before triaging findings, Cencori Scan builds deep context about your project:
+
+- **Project Brief** — Automatically detects your app's purpose, authentication model, deployment architecture, trust boundaries, sensitive data flows, and external service dependencies.
+- **Interaction Map** — Constructs a dependency graph across your files, identifying risk-scored hotspots where issues cluster.
+- **Data Flow Tracing** — Tracks data from untrusted sources (request bodies, query parameters, file uploads, form data) through your code to dangerous sinks (eval, exec, SQL queries, innerHTML), flagging flows with critical, high, or medium severity.
+
+This context is what separates Cencori from tools that scan files in isolation. When the AI evaluates whether a finding is real, it knows what your app does and how data moves through it.
+
+### Filter Out the Noise with AI
+
+After the pattern scan completes, every route and vulnerability finding is sent to AI alongside the full file context. The AI acts as a second reviewer — confirming genuine issues and suppressing false positives.
+
+This runs through a multi-model fallback chain for reliability. If one provider is unavailable, the system seamlessly falls back to the next.
+
+The result: findings you can trust. No more triaging 50 flagged patterns only to discover they all have proper authentication.
+
+### Fix What You Find — In One Click
+
+Cencori Scan doesn't stop at detection. For every issue found, it can generate a fix:
+
+- **Deterministic fixes** for well-understood patterns like exposed secrets and missing environment variables
+- **AI-generated fixes** for more complex issues, with full awareness of surrounding code and system context
+
+Fixes are presented in a side-by-side diff view. You toggle on the ones you want, and Cencori creates a GitHub pull request with all accepted changes — ready to review and merge.
+
+For CI/CD workflows, fixes are also posted as GitHub suggestion blocks directly on the PR diff, so your team can apply them with a single click without ever leaving the review.
+
+### Scan Every PR Automatically
+
+Cencori Scan integrates directly into your CI/CD pipeline via GitHub webhooks. When a pull request is opened:
+
+1. It scans only the changed files in the diff
+2. Compares findings against the base branch to surface only **new** issues
+3. Creates a GitHub Check Run with pass/fail status based on your configured severity thresholds
+4. Posts inline review comments on the exact lines where issues appear — each with an AI-generated fix suggestion
+5. Posts a summary comment with a security scorecard and findings breakdown
+
+The behavior is fully configurable via a `.cencori.yml` file in your repository:
+
+```yaml
+version: 1
+ignore:
+  - "tests/**"
+  - "docs/**"
+fail_on:
+  - critical
+  - high
+```
+
+You can also suppress individual findings inline with `// cencori-ignore` comments.
+
+### Learn and Improve Over Time
+
+Cencori Scan remembers. Every scan persists context so the AI builds on previous runs:
+
+- **Project context** carries forward so the AI doesn't re-learn what your app does on every scan
+- **Scan summaries** are stored to enable trend analysis across runs
+- **Accepted risks** are tracked so dismissed findings don't resurface
+- **Recurring weak spots** are automatically detected — if the same type of issue keeps appearing in the same area of your codebase, Cencori flags the pattern
+
+This means your second scan is smarter than your first, and your tenth is smarter still.
+
+## Beyond the Dashboard
+
+### CLI
+
+Run Cencori Scan from your terminal with a single command:
+
+```bash
+npx cencori-scan
+```
+
+The CLI provides colorized output, an A–F security score, issues grouped by type and severity, and an interactive AI auto-fix flow that generates patches file-by-file. JSON output is available for pipeline integration.
+
+The CLI also includes a `changelog` command that generates AI-powered changelogs from your git history — useful for release notes and team updates.
+
+### Integrations
+
+- **GitHub App** — Full OAuth-based integration with webhook listeners for automated PR scanning
+- **Slack & Discord** — Post scan results directly to your team's channels
+- **Configurable notifications** — Get alerted when scans complete or when critical issues are found
+
+## Get Started
+
+Cencori Scan is available today. Import a GitHub repository, run your first scan, and see results in under a minute.
+
+The free tier includes 5 projects with 2 scans each — enough to evaluate the product on real code. Pro and Team tiers unlock unlimited scans, full AI features, and CI/CD integration.
+
+[Get started at scan.cencori.com →](https://scan.cencori.com)
