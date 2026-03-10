@@ -34,6 +34,7 @@ import {
     PenLine,
     Eye,
     UserCircle,
+    Camera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ interface SenderProfile {
     display_name: string;
     email_handle: string;
     is_default: boolean;
+    avatar_url: string | null;
     created_at: string;
 }
 
@@ -292,6 +294,28 @@ export default function InternalEmailsPage() {
             alert('Failed to save profile');
         } finally {
             setSavingProfile(false);
+        }
+    };
+
+    // Upload avatar for a profile
+    const handleAvatarUpload = async (profileId: string, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('profileId', profileId);
+
+        try {
+            const res = await fetch('/api/internal/emails/sender-profiles/avatar', {
+                method: 'POST',
+                body: formData,
+            });
+            if (res.ok) {
+                fetchProfiles();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to upload avatar');
+            }
+        } catch {
+            alert('Failed to upload avatar');
         }
     };
 
@@ -753,9 +777,33 @@ export default function InternalEmailsPage() {
                                         className="rounded-lg border border-border/40 bg-card/30 px-4 py-3 flex items-center justify-between"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-medium">
-                                                {profile.display_name.charAt(0).toUpperCase()}
-                                            </div>
+                                            {/* Avatar with upload */}
+                                            <label className="relative h-9 w-9 rounded-full shrink-0 cursor-pointer group">
+                                                {profile.avatar_url ? (
+                                                    <img
+                                                        src={profile.avatar_url}
+                                                        alt={profile.display_name}
+                                                        className="h-9 w-9 rounded-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="h-9 w-9 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-medium">
+                                                        {profile.display_name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Camera className="h-3.5 w-3.5 text-white" />
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleAvatarUpload(profile.id, file);
+                                                        e.target.value = '';
+                                                    }}
+                                                />
+                                            </label>
                                             <div>
                                                 <p className="text-sm font-medium">{profile.display_name}</p>
                                                 <p className="text-xs text-muted-foreground">{profile.email_handle}@{EMAIL_DOMAIN}</p>
