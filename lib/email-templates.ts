@@ -69,7 +69,7 @@ function wrapInContainer(content: string, preheader?: string): string {
     body, .body {
       margin: 0 !important;
       padding: 0 !important;
-      background-color: #f6f8fc !important;
+      background-color: #ffffff !important;
       color: #202124 !important;
     }
     table, td { color: #202124; }
@@ -79,9 +79,9 @@ function wrapInContainer(content: string, preheader?: string): string {
     h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
 
     /* Gmail-like (Google Material) light tokens */
-    .bg { background-color: #f6f8fc !important; }
-    .frame { background-color: #ffffff !important; border: 1px solid #dadce0 !important; border-radius: 16px !important; }
-    .frame-pad { padding: 32px 28px !important; }
+    .bg { background-color: #ffffff !important; }
+    .frame { background-color: #ffffff !important; border: 0 !important; border-radius: 0 !important; }
+    .frame-pad { padding: 24px 18px !important; }
     .text { color: #202124 !important; }
     .muted { color: #5f6368 !important; }
     .accent { color: #1a73e8 !important; }
@@ -95,7 +95,7 @@ function wrapInContainer(content: string, preheader?: string): string {
     .logo-light { display: block !important; }
 
     @media (max-width: 600px) {
-      .frame-pad { padding: 24px 18px !important; }
+      .frame-pad { padding: 18px 14px !important; }
     }
 
     @media (prefers-color-scheme: dark) {
@@ -103,7 +103,7 @@ function wrapInContainer(content: string, preheader?: string): string {
       body, .body { background-color: #202124 !important; color: #e8eaed !important; }
       table, td { color: #e8eaed !important; }
       .bg { background-color: #202124 !important; }
-      .frame { background-color: #303134 !important; border-color: #3c4043 !important; }
+      .frame { background-color: #202124 !important; border: 0 !important; border-radius: 0 !important; }
       .text { color: #e8eaed !important; }
       .muted { color: #9aa0a6 !important; }
       .accent { color: #8ab4f8 !important; }
@@ -121,7 +121,7 @@ function wrapInContainer(content: string, preheader?: string): string {
 
     /* Outlook.com / Office 365 dark mode hooks */
     [data-ogsc] body, [data-ogsc] .body, [data-ogsc] .bg { background-color: #202124 !important; }
-    [data-ogsc] .frame { background-color: #303134 !important; border-color: #3c4043 !important; }
+    [data-ogsc] .frame { background-color: #202124 !important; border: 0 !important; border-radius: 0 !important; }
     [data-ogsc] .text { color: #e8eaed !important; }
     [data-ogsc] .muted { color: #9aa0a6 !important; }
     [data-ogsc] .accent, [data-ogsc] a { color: #8ab4f8 !important; }
@@ -135,14 +135,14 @@ function wrapInContainer(content: string, preheader?: string): string {
     [data-ogsc] .footer { border-top-color: #3c4043 !important; }
   </style>
 </head>
-<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.6;color:#202124;background-color:#f6f8fc;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
-  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bg" style="background-color:#f6f8fc;background:#f6f8fc;" bgcolor="#f6f8fc">
+<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.6;color:#202124;background-color:#ffffff;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bg" style="background-color:#ffffff;background:#ffffff;" bgcolor="#ffffff">
     <tr>
-      <td align="center" class="bg" style="background-color:#f6f8fc;background:#f6f8fc;padding:24px 12px;" bgcolor="#f6f8fc">
+      <td align="center" class="bg" style="background-color:#ffffff;background:#ffffff;padding:0;" bgcolor="#ffffff">
         ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>` : ''}
-        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" class="frame" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #dadce0;border-radius:16px;overflow:hidden;" bgcolor="#ffffff">
+        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" class="frame" style="max-width:600px;width:100%;background-color:#ffffff;border:0;border-radius:0;overflow:hidden;" bgcolor="#ffffff">
           <tr>
-            <td class="frame-pad" style="padding:32px 28px;text-align:left;">
+            <td class="frame-pad" style="padding:24px 18px;text-align:left;">
               ${content}
             </td>
           </tr>
