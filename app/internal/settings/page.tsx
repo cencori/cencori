@@ -174,23 +174,10 @@ export default function AdminSettingsPage() {
         <div className="w-full max-w-4xl mx-auto px-6 py-8 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link href="/internal/analytics">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-lg font-semibold">Team Settings</h1>
-                        <p className="text-[10px] text-muted-foreground">Manage who has access to internal dashboards</p>
-                    </div>
+                <div>
+                    <h1 className="text-lg font-semibold">Team Settings</h1>
+                    <p className="text-[10px] text-muted-foreground">Manage who has access to internal dashboards</p>
                 </div>
-                <Link href="/internal/analytics">
-                    <Button variant="outline" size="sm" className="h-8 text-xs rounded-full">
-                        <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-                        Analytics
-                    </Button>
-                </Link>
             </div>
 
             {isLoading ? (

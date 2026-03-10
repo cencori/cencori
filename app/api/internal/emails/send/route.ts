@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
+import { checkInternalAccess } from '@/lib/internal-access';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
@@ -26,20 +26,6 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function checkAdminAccess(userId: string, userEmail: string | undefined) {
-    const isDev = process.env.NODE_ENV === 'development';
-    if (allowAllInternalInDev() && isDev) return true;
-    if (isFounderEmail(userEmail)) return true;
-
-    const supabase = createAdminClient();
-    const { data: admin } = await supabase
-        .from('cencori_admins')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single();
-    return !!admin;
-}
 
 interface SendEmailRequest {
     subject: string;
@@ -106,7 +92,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!(await checkAdminAccess(user.id, user.email))) {
+    if (!(await checkInternalAccess(user.id, user.email))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

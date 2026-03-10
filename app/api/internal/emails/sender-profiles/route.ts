@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
-
-async function checkAdminAccess(userId: string, userEmail: string | undefined) {
-    const isDev = process.env.NODE_ENV === 'development';
-    if (allowAllInternalInDev() && isDev) return true;
-    if (isFounderEmail(userEmail)) return true;
-
-    const supabase = createAdminClient();
-    const { data: admin } = await supabase
-        .from('cencori_admins')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single();
-    return !!admin;
-}
+import { checkInternalAccess } from '@/lib/internal-access';
 
 // GET — list sender profiles
 export async function GET() {
@@ -26,7 +11,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!(await checkAdminAccess(user.id, user.email))) {
+    if (!(await checkInternalAccess(user.id, user.email))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -51,7 +36,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!(await checkAdminAccess(user.id, user.email))) {
+    if (!(await checkInternalAccess(user.id, user.email))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -130,7 +115,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!(await checkAdminAccess(user.id, user.email))) {
+    if (!(await checkInternalAccess(user.id, user.email))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

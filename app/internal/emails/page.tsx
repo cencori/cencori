@@ -369,21 +369,13 @@ export default function InternalEmailsPage() {
         : 'Default sender';
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="text-foreground">
             {/* Header */}
             <div className="border-b border-border/40 bg-card/30">
                 <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => router.push('/internal/settings')}
-                            className="p-1.5 rounded hover:bg-secondary/60 transition-colors"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                        </button>
-                        <div>
-                            <h1 className="text-lg font-semibold">Email Center</h1>
-                            <p className="text-xs text-muted-foreground">Internal email management</p>
-                        </div>
+                    <div>
+                        <h1 className="text-lg font-semibold">Email Center</h1>
+                        <p className="text-xs text-muted-foreground">Compose and manage internal emails</p>
                     </div>
 
                     {/* Tabs */}
