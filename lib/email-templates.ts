@@ -22,8 +22,8 @@ export interface EmailTemplateOptions {
   footerText?: string;
 }
 
-const LOGO_DARK_THEME = 'https://cencori.com/clight.png'; // White logo for dark mode
-const LOGO_LIGHT_THEME = 'https://cencori.com/cdark.png'; // Dark logo for light mode
+const LOGO_DARK_THEME = '/public/clight.png'; // White logo for dark mode
+const LOGO_LIGHT_THEME = '/public/cdark.png'; // Dark logo for light mode
 const CURRENT_YEAR = new Date().getFullYear();
 
 function baseFooter(extra?: string): string {
@@ -197,7 +197,7 @@ export function announcementTemplate(options: EmailTemplateOptions): string {
     <div style="text-align:center;margin-bottom:24px;">
       <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a>
       <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a></div>
-      <h1 class="text" style="color:#202124;font-size:30px;font-weight:800;margin:0 0 10px;letter-spacing:-0.6px;line-height:1.15;">${subject}</h1>
+
     </div>
     <div class="text" style="font-size:16px;color:#202124;line-height:1.8;">
       ${body}
