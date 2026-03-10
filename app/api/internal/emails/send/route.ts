@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
+import { renderTemplate } from '@/lib/email-templates';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
@@ -122,6 +123,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'No sender email configured' }, { status: 500 });
     }
 
+    // Wrap the editor HTML in the branded email template
+    const styledHtml = renderTemplate(category || 'transactional', {
+        subject: subject.trim(),
+        body: htmlBody,
+    });
+
     const admin = createAdminClient();
     const resend = new Resend(RESEND_API_KEY);
 
@@ -160,7 +167,7 @@ export async function POST(req: NextRequest) {
                 to: recipient,
                 replyTo: validReplyTo(),
                 subject: subject.trim(),
-                html: htmlBody,
+                html: styledHtml,
                 text: textBody || undefined,
             });
 
@@ -238,7 +245,7 @@ export async function POST(req: NextRequest) {
                     to: recipient,
                     replyTo: validReplyTo(),
                     subject: subject.trim(),
-                    html: htmlBody,
+                    html: styledHtml,
                     text: textBody || undefined,
                 });
                 return { ok: !error, email: recipient };
