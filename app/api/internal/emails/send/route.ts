@@ -54,10 +54,16 @@ async function getSenderFrom(profileId?: string): Promise<string> {
     return `${data.display_name} <${data.email_handle}@${EMAIL_DOMAIN}>`;
 }
 
-async function getAllRecipients(maxRecipients: number): Promise<string[]> {
+interface Recipient {
+    email: string;
+    fullName: string;
+    firstName: string;
+}
+
+async function getAllRecipients(maxRecipients: number): Promise<Recipient[]> {
     const supabaseAdmin = createAdminClient();
     const dedupe = new Set<string>();
-    const recipients: string[] = [];
+    const recipients: Recipient[] = [];
     let page = 1;
 
     while (recipients.length < maxRecipients) {
@@ -74,8 +80,12 @@ async function getAllRecipients(maxRecipients: number): Promise<string[]> {
             if (!email || dedupe.has(email)) continue;
             if (!user.email_confirmed_at) continue;
 
+            const meta = user.user_metadata || {};
+            const fullName = (meta.full_name || meta.name || '').trim();
+            const firstName = fullName.split(/\s+/)[0] || email.split('@')[0];
+
             dedupe.add(email);
-            recipients.push(email);
+            recipients.push({ email, fullName, firstName });
             if (recipients.length >= maxRecipients) break;
         }
 
@@ -84,6 +94,17 @@ async function getAllRecipients(maxRecipients: number): Promise<string[]> {
     }
 
     return recipients;
+}
+
+/**
+ * Replace merge tags in content.
+ * Supported: {first_name}, {full_name}, {email}
+ */
+function personalize(content: string, recipient: Recipient): string {
+    return content
+        .replace(/\{first_name\}/gi, recipient.firstName)
+        .replace(/\{full_name\}/gi, recipient.fullName || recipient.firstName)
+        .replace(/\{email\}/gi, recipient.email);
 }
 
 export async function POST(req: NextRequest) {
@@ -134,23 +155,38 @@ export async function POST(req: NextRequest) {
 
     // === Single Send (test / individual) ===
     if (audienceType === 'single') {
-        const recipient = singleRecipient?.trim().toLowerCase();
-        if (!recipient || !recipient.includes('@')) {
+        const recipientEmail = singleRecipient?.trim().toLowerCase();
+        if (!recipientEmail || !recipientEmail.includes('@')) {
             return NextResponse.json({ error: 'Valid recipient email is required for single send' }, { status: 400 });
         }
+
+        // Try to find the user's name for personalization
+        const recipient: Recipient = { email: recipientEmail, fullName: '', firstName: recipientEmail.split('@')[0] };
+        try {
+            const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 });
+            const found = users?.find(u => u.email?.toLowerCase() === recipientEmail);
+            if (found) {
+                const meta = found.user_metadata || {};
+                recipient.fullName = (meta.full_name || meta.name || '').trim();
+                recipient.firstName = recipient.fullName.split(/\s+/)[0] || recipient.firstName;
+            }
+        } catch { /* fallback to email-based name */ }
+
+        const personalizedHtml = personalize(styledHtml, recipient);
+        const personalizedSubject = personalize(subject.trim(), recipient);
 
         // Record in DB
         const { data: sendRecord, error: insertError } = await admin
             .from('email_sends')
             .insert({
                 category: category || 'transactional',
-                subject: subject.trim(),
+                subject: personalizedSubject,
                 html_body: htmlBody,
                 text_body: textBody || null,
                 sender_profile_id: senderProfileId || null,
                 sent_by: user.id,
                 audience_type: 'single',
-                single_recipient: recipient,
+                single_recipient: recipientEmail,
                 recipient_count: 1,
                 status: 'sending',
             })
@@ -164,10 +200,10 @@ export async function POST(req: NextRequest) {
         try {
             const { error: sendError } = await resend.emails.send({
                 from: fromAddress,
-                to: recipient,
+                to: recipientEmail,
                 replyTo: validReplyTo(),
-                subject: subject.trim(),
-                html: styledHtml,
+                subject: personalizedSubject,
+                html: personalizedHtml,
                 text: textBody || undefined,
             });
 
@@ -186,7 +222,7 @@ export async function POST(req: NextRequest) {
                 }).eq('id', sendRecord.id);
             }
 
-            return NextResponse.json({ success: true, recipient, mode: 'single' });
+            return NextResponse.json({ success: true, recipient: recipientEmail, mode: 'single' });
         } catch (err) {
             if (sendRecord?.id) {
                 await admin.from('email_sends').update({
@@ -204,7 +240,7 @@ export async function POST(req: NextRequest) {
         HARD_MAX_RECIPIENTS
     );
 
-    let recipients: string[];
+    let recipients: Recipient[];
     try {
         recipients = await getAllRecipients(maxRecipients);
     } catch (err) {
@@ -240,15 +276,17 @@ export async function POST(req: NextRequest) {
         const slice = recipients.slice(i, i + SEND_CONCURRENCY);
         const results = await Promise.all(
             slice.map(async (recipient) => {
+                const personalizedHtml = personalize(styledHtml, recipient);
+                const personalizedSubject = personalize(subject.trim(), recipient);
                 const { error } = await resend.emails.send({
                     from: fromAddress,
-                    to: recipient,
+                    to: recipient.email,
                     replyTo: validReplyTo(),
-                    subject: subject.trim(),
-                    html: styledHtml,
+                    subject: personalizedSubject,
+                    html: personalizedHtml,
                     text: textBody || undefined,
                 });
-                return { ok: !error, email: recipient };
+                return { ok: !error, email: recipient.email };
             })
         );
 

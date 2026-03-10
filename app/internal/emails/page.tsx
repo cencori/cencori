@@ -37,6 +37,8 @@ import {
     Camera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 // —— Types ——————————————————————————————————————————
@@ -84,19 +86,63 @@ const EMAIL_DOMAIN = process.env.NEXT_PUBLIC_EMAIL_DOMAIN || 'send.cencori.com';
 
 // —— TipTap Toolbar ——————————————————————————————————
 function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null }) {
+    const [linkUrl, setLinkUrl] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
+    const [isLinkOpen, setIsLinkOpen] = useState(false);
+    const [isImageOpen, setIsImageOpen] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
     if (!editor) return null;
 
-    const addLink = () => {
-        const url = window.prompt('Enter URL:');
-        if (url) {
-            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    const addLink = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (linkUrl) {
+            editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run();
+            setLinkUrl('');
+            setIsLinkOpen(false);
         }
     };
 
-    const addImage = () => {
-        const url = window.prompt('Enter image URL:');
-        if (url) {
-            editor.chain().focus().setImage({ src: url }).run();
+    const addImage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (imageUrl) {
+            editor.chain().focus().setImage({ src: imageUrl }).run();
+            setImageUrl('');
+            setIsImageOpen(false);
+        }
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingImage(true);
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/internal/emails/upload-image', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                editor.chain().focus().setImage({ src: data.url }).run();
+                setIsImageOpen(false);
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to upload image');
+            }
+        } catch (err) {
+            console.error('Image upload failed:', err);
+            alert('Failed to upload image');
+        } finally {
+            setIsUploadingImage(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 
@@ -111,12 +157,10 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
         { icon: AlignLeft, action: () => editor.chain().focus().setTextAlign('left').run(), active: editor.isActive({ textAlign: 'left' }), title: 'Align Left' },
         { icon: AlignCenter, action: () => editor.chain().focus().setTextAlign('center').run(), active: editor.isActive({ textAlign: 'center' }), title: 'Align Center' },
         { separator: true },
-        { icon: LinkIcon, action: addLink, active: editor.isActive('link'), title: 'Add Link' },
-        { icon: ImageIcon, action: addImage, active: false, title: 'Add Image' },
     ];
 
     return (
-        <div className="flex items-center gap-0.5 border-b border-border/40 px-3 py-1.5">
+        <div className="flex items-center gap-0.5 border-b border-border/40 px-3 py-1.5 flex-wrap">
             <select
                 className="h-7 rounded bg-secondary/50 border border-border/30 text-xs text-foreground px-2 mr-2 focus:outline-none"
                 value={
@@ -156,6 +200,86 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
                     </button>
                 );
             })}
+
+            <Popover open={isLinkOpen} onOpenChange={setIsLinkOpen}>
+                <PopoverTrigger asChild>
+                    <button
+                        type="button"
+                        className={cn(
+                            "p-1.5 rounded hover:bg-secondary/60 transition-colors",
+                            editor.isActive('link') && "bg-secondary text-foreground"
+                        )}
+                        title="Add Link"
+                    >
+                        <LinkIcon className="h-3.5 w-3.5" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                    <form onSubmit={addLink} className="flex gap-2">
+                        <Input
+                            placeholder="https://example.com"
+                            value={linkUrl}
+                            onChange={(e) => setLinkUrl(e.target.value)}
+                            className="h-8 text-xs"
+                            autoFocus
+                        />
+                        <Button type="submit" size="sm" className="h-8 py-0 px-3 text-xs font-medium">Add Link</Button>
+                    </form>
+                </PopoverContent>
+            </Popover>
+
+            <Popover open={isImageOpen} onOpenChange={setIsImageOpen}>
+                <PopoverTrigger asChild>
+                    <button
+                        type="button"
+                        className={cn(
+                            "p-1.5 rounded hover:bg-secondary/60 transition-colors",
+                            isImageOpen && "bg-secondary text-foreground"
+                        )}
+                        title="Add Image"
+                    >
+                        <ImageIcon className="h-3.5 w-3.5" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4 space-y-4" align="start">
+                    <div className="space-y-2">
+                        <label className="text-xs font-medium text-foreground">Upload from computer</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={handleImageUpload}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full text-xs font-medium gap-2"
+                            disabled={isUploadingImage}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                            {isUploadingImage ? 'Uploading...' : 'Choose Image File'}
+                        </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <div className="h-px flex-1 bg-border/40" />
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or URL</span>
+                        <div className="h-px flex-1 bg-border/40" />
+                    </div>
+
+                    <form onSubmit={addImage} className="flex gap-2">
+                        <Input
+                            placeholder="https://example.com/image.png"
+                            value={imageUrl}
+                            onChange={(e) => setImageUrl(e.target.value)}
+                            className="h-8 text-xs"
+                        />
+                        <Button type="submit" size="sm" className="h-8 py-0 px-3 text-xs font-medium">Add</Button>
+                    </form>
+                </PopoverContent>
+            </Popover>
         </div>
     );
 }
@@ -500,6 +624,25 @@ export default function InternalEmailsPage() {
                                 <div className="rounded-lg border border-border/40 bg-card/30 overflow-hidden">
                                     <EditorToolbar editor={editor} />
                                     <EditorContent editor={editor} />
+                                </div>
+
+                                {/* Merge Tags */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Personalize:</span>
+                                    {[
+                                        { tag: '{first_name}', label: 'First Name' },
+                                        { tag: '{full_name}', label: 'Full Name' },
+                                        { tag: '{email}', label: 'Email' },
+                                    ].map((item) => (
+                                        <button
+                                            key={item.tag}
+                                            type="button"
+                                            onClick={() => editor?.chain().focus().insertContent(item.tag).run()}
+                                            className="text-[10px] px-2 py-0.5 rounded-full border border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                                        >
+                                            {item.tag}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
