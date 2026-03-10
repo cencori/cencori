@@ -1,23 +1,11 @@
 import { createServerClient } from "@/lib/supabaseServer";
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
 
 export default async function InternalKPIDashboard() {
     const supabase = await createServerClient();
 
-    // Check authentication
+    // User is already authenticated via /internal/layout.tsx
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        redirect("/internal/kpi/login");
-    }
-
-    // Verify @cencori.com email
-    const email = user.email || '';
-    if (!email.endsWith('@cencori.com')) {
-        redirect("/internal/kpi/login");
-    }
 
     // Fetch KPI data
     const now = new Date();
@@ -67,27 +55,6 @@ export default async function InternalKPIDashboard() {
 
     return (
         <div className="min-h-svh bg-background">
-            {/* Header - Cenpact style */}
-            <header className="border-b border-border/40 bg-card/50 sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link href="/">
-                            <Logo variant="full" className="h-4" />
-                        </Link>
-                        <span className="text-muted-foreground text-[10px]">/</span>
-                        <span className="text-xs font-medium">Internal KPIs</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-muted-foreground">{user.email}</span>
-                        <form action="/api/auth/signout" method="POST">
-                            <button type="submit" className="text-[10px] text-muted-foreground hover:text-foreground">
-                                Sign out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </header>
-
             <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
                 {/* Title */}
                 <div className="space-y-1">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
+import { checkInternalAccess } from '@/lib/internal-access';
 
 const USERS_PAGE_SIZE = 200;
 
@@ -12,18 +12,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const isDev = process.env.NODE_ENV === 'development';
-    if (!((allowAllInternalInDev() && isDev) || isFounderEmail(user.email))) {
-        const admin = createAdminClient();
-        const { data: adminRow } = await admin
-            .from('cencori_admins')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .single();
-        if (!adminRow) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
+    if (!(await checkInternalAccess(user.id, user.email))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await req.json();
