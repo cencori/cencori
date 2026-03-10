@@ -28,15 +28,15 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function baseFooter(extra?: string): string {
   return `
-    <div style="text-align:center;margin-top:48px;padding-top:32px;border-top:1px solid #222;">
-      ${extra ? `<p style="color:#888;font-size:13px;margin-bottom:16px;line-height:1.5;">${extra}</p>` : ''}
-      <p style="color:#555;font-size:11px;margin:0;letter-spacing:0.5px;text-transform:uppercase;">
-        © ${CURRENT_YEAR} Cencori · <a href="https://cencori.com" style="color:#777;text-decoration:none;">cencori.com</a>
+    <div class="footer" style="text-align:center;margin-top:40px;padding-top:24px;border-top:1px solid #dadce0;">
+      ${extra ? `<p class="muted" style="color:#5f6368;font-size:13px;margin:0 0 12px;line-height:1.5;">${extra}</p>` : ''}
+      <p class="muted" style="color:#5f6368;font-size:11px;margin:0;letter-spacing:0.3px;text-transform:uppercase;">
+        © ${CURRENT_YEAR} Cencori · <a href="https://cencori.com" class="muted" style="color:#5f6368;text-decoration:underline;">cencori.com</a>
       </p>
-      <div style="margin-top:16px;">
-        <a href="https://cencori.com/dashboard" style="color:#555;font-size:11px;text-decoration:none;margin:0 8px;">Dashboard</a>
-        <a href="https://cencori.com/docs" style="color:#555;font-size:11px;text-decoration:none;margin:0 8px;">Documentation</a>
-        <a href="https://cencori.com/blog" style="color:#555;font-size:11px;text-decoration:none;margin:0 8px;">Security Research</a>
+      <div style="margin-top:12px;">
+        <a href="https://cencori.com/dashboard" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Dashboard</a>
+        <a href="https://cencori.com/docs" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Documentation</a>
+        <a href="https://cencori.com/blog" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Security Research</a>
       </div>
     </div>`;
 }
@@ -47,8 +47,9 @@ function wrapInContainer(content: string, preheader?: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="dark only">
-  <meta name="supported-color-schemes" content="dark only">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
   <title>Cencori</title>
   <!--[if mso]>
   <style>
@@ -65,36 +66,87 @@ function wrapInContainer(content: string, preheader?: string): string {
   </noscript>
   <![endif]-->
   <style>
-    :root {
-      color-scheme: dark only;
-      supported-color-schemes: dark only;
+    body, .body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background-color: #f6f8fc !important;
+      color: #202124 !important;
     }
-    body, .body { 
-      margin: 0 !important; 
-      padding: 0 !important; 
-      background-color: #000000 !important; 
-      background: #000000 !important;
-      color: #e5e5e5 !important;
-    }
-    table, td { color: #e5e5e5; }
-    a { color: #10b981; text-decoration: none; }
+    table, td { color: #202124; }
+    a { color: #1a73e8; text-decoration: underline; }
     img { border: 0; display: block; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
-    p, h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; padding: 32px 20px; }
-    @media (prefers-color-scheme: light) {
+    p { margin: 0 0 16px; }
+    h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
+
+    /* Gmail-like (Google Material) light tokens */
+    .bg { background-color: #f6f8fc !important; }
+    .frame { background-color: #ffffff !important; border: 1px solid #dadce0 !important; border-radius: 16px !important; }
+    .frame-pad { padding: 32px 28px !important; }
+    .text { color: #202124 !important; }
+    .muted { color: #5f6368 !important; }
+    .accent { color: #1a73e8 !important; }
+    .divider { border-top: 1px solid #dadce0 !important; }
+    .callout { background-color: #f1f3f4 !important; border: 1px solid #dadce0 !important; border-radius: 12px !important; }
+    .btn { background: #1a73e8 !important; color: #ffffff !important; text-decoration: none !important; border-radius: 999px !important; display: inline-block !important; font-weight: 700 !important; }
+    .btn-outline { background: transparent !important; border: 1px solid #1a73e8 !important; color: #1a73e8 !important; text-decoration: none !important; border-radius: 999px !important; display: inline-block !important; font-weight: 600 !important; }
+    .check { color: #188038 !important; font-weight: bold !important; }
+
+    .logo-dark { display: none !important; }
+    .logo-light { display: block !important; }
+
+    @media (max-width: 600px) {
+      .frame-pad { padding: 24px 18px !important; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      /* Gmail-like (Google Material) dark tokens */
+      body, .body { background-color: #202124 !important; color: #e8eaed !important; }
+      table, td { color: #e8eaed !important; }
+      .bg { background-color: #202124 !important; }
+      .frame { background-color: #303134 !important; border-color: #3c4043 !important; }
+      .text { color: #e8eaed !important; }
+      .muted { color: #9aa0a6 !important; }
+      .accent { color: #8ab4f8 !important; }
+      .divider { border-top-color: #3c4043 !important; }
+      .callout { background-color: #2b2c2f !important; border-color: #3c4043 !important; }
+      a { color: #8ab4f8 !important; }
+      .btn { background: #8ab4f8 !important; color: #202124 !important; }
+      .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
+      .check { color: #81c995 !important; }
+
       .logo-dark { display: block !important; }
       .logo-light { display: none !important; }
+      .footer { border-top-color: #3c4043 !important; }
     }
+
+    /* Outlook.com / Office 365 dark mode hooks */
+    [data-ogsc] body, [data-ogsc] .body, [data-ogsc] .bg { background-color: #202124 !important; }
+    [data-ogsc] .frame { background-color: #303134 !important; border-color: #3c4043 !important; }
+    [data-ogsc] .text { color: #e8eaed !important; }
+    [data-ogsc] .muted { color: #9aa0a6 !important; }
+    [data-ogsc] .accent, [data-ogsc] a { color: #8ab4f8 !important; }
+    [data-ogsc] .divider { border-top-color: #3c4043 !important; }
+    [data-ogsc] .callout { background-color: #2b2c2f !important; border-color: #3c4043 !important; }
+    [data-ogsc] .btn { background: #8ab4f8 !important; color: #202124 !important; }
+    [data-ogsc] .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
+    [data-ogsc] .check { color: #81c995 !important; }
+    [data-ogsc] .logo-dark { display: block !important; }
+    [data-ogsc] .logo-light { display: none !important; }
+    [data-ogsc] .footer { border-top-color: #3c4043 !important; }
   </style>
 </head>
-<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.6;color:#e5e5e5;background-color:#000000;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#000000;background:#000000;" bgcolor="#000000">
+<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.6;color:#202124;background-color:#f6f8fc;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bg" style="background-color:#f6f8fc;background:#f6f8fc;" bgcolor="#f6f8fc">
     <tr>
-      <td align="center" style="background-color:#000000;background:#000000;" bgcolor="#000000">
+      <td align="center" class="bg" style="background-color:#f6f8fc;background:#f6f8fc;padding:24px 12px;" bgcolor="#f6f8fc">
         ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>` : ''}
-        <div class="container" style="max-width:600px;margin:0 auto;padding:32px 20px;text-align:left;">
-          ${content}
-        </div>
+        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" class="frame" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #dadce0;border-radius:16px;overflow:hidden;" bgcolor="#ffffff">
+          <tr>
+            <td class="frame-pad" style="padding:32px 28px;text-align:left;">
+              ${content}
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
@@ -110,17 +162,17 @@ export function minimalTemplate(options: EmailTemplateOptions): string {
   const { body, preheader, ctaText, ctaUrl, footerText } = options;
 
   const ctaBlock = ctaText && ctaUrl
-    ? `<div style="text-align:center;margin:32px 0;">
-        <a href="${ctaUrl}" style="display:inline-block;background:#10b981;color:#fff;padding:12px 32px;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;letter-spacing:0.3px;">${ctaText}</a>
+    ? `<div style="text-align:center;margin:24px 0 0;">
+        <a href="${ctaUrl}" class="btn" style="padding:12px 28px;font-size:14px;letter-spacing:0.2px;">${ctaText}</a>
       </div>`
     : '';
 
   return wrapInContainer(`
-    <div style="text-align:center;margin-bottom:32px;">
-      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a>
-      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a></div>
+    <div style="text-align:center;margin-bottom:24px;">
+      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a>
+      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a></div>
     </div>
-    <div style="font-size:15px;color:#d4d4d4;line-height:1.7;">
+    <div class="text" style="font-size:15px;color:#202124;line-height:1.7;">
       ${body}
     </div>
     ${ctaBlock}
@@ -136,47 +188,45 @@ export function announcementTemplate(options: EmailTemplateOptions): string {
   const { subject, body, preheader, ctaText, ctaUrl, footerText } = options;
 
   const ctaBlock = ctaText && ctaUrl
-    ? `<div style="text-align:center;margin:32px 0;">
-        <a href="${ctaUrl}" style="display:inline-block;background:#10b981;color:#fff;padding:14px 40px;text-decoration:none;border-radius:100px;font-weight:700;font-size:15px;box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">${ctaText}</a>
+    ? `<div style="text-align:center;margin:28px 0 0;">
+        <a href="${ctaUrl}" class="btn" style="padding:14px 36px;font-size:15px;letter-spacing:0.2px;">${ctaText}</a>
       </div>`
     : '';
 
   return wrapInContainer(`
-    <div style="text-align:center;margin-bottom:40px;">
-      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:32px;margin:0 auto 24px;" /></a>
-      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:32px;margin:0 auto 24px;" /></a></div>
-      <h1 style="color:#fff;font-size:32px;font-weight:800;margin:0 0 12px;letter-spacing:-1px;line-height:1.2;">${subject}</h1>
-      <p style="color:#10b981;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0;">Intelligence-Driven Security</p>
+    <div style="text-align:center;margin-bottom:24px;">
+      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a>
+      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a></div>
+      <h1 class="text" style="color:#202124;font-size:30px;font-weight:800;margin:0 0 10px;letter-spacing:-0.6px;line-height:1.15;">${subject}</h1>
+      <p class="accent" style="color:#1a73e8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0;">Intelligence-Driven Security</p>
     </div>
-    <div style="background:linear-gradient(180deg, #111 0%, #080808 100%);border-radius:16px;padding:40px;border:1px solid #222;box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-      <div style="font-size:16px;color:#d4d4d4;line-height:1.8;">
-        ${body}
-      </div>
-      <div style="margin-top:40px;padding-top:24px;border-top:1px solid #222;">
-        <p style="color:#fff;font-size:14px;font-weight:600;margin-bottom:16px;">Core Platform Capabilities:</p>
-        <table width="100%" border="0" cellspacing="0" cellpadding="0">
-          <tr>
-            <td style="padding-bottom:12px;">
-              <span style="color:#10b981;font-weight:bold;margin-right:8px;">✓</span>
-              <span style="color:#eee;font-size:13px;"><strong style="color:#fff;">Advanced SAST:</strong> Real-time detection of 1,000+ secret types and vulns.</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:12px;">
-              <span style="color:#10b981;font-weight:bold;margin-right:8px;">✓</span>
-              <span style="color:#eee;font-size:13px;"><strong style="color:#fff;">Deep SCA:</strong> Semantic dependency audits via OSV.dev integration.</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:12px;">
-              <span style="color:#10b981;font-weight:bold;margin-right:8px;">✓</span>
-              <span style="color:#eee;font-size:13px;"><strong style="color:#fff;">AI Memory Layer:</strong> Context-aware security that learns from your code.</span>
-            </td>
-          </tr>
-        </table>
-      </div>
-      ${ctaBlock}
+    <div class="text" style="font-size:16px;color:#202124;line-height:1.8;">
+      ${body}
     </div>
+    <div class="callout" style="margin-top:22px;padding:18px 18px 6px;border-radius:12px;border:1px solid #dadce0;background:#f1f3f4;">
+      <p class="text" style="color:#202124;font-size:13px;font-weight:800;margin:0 0 12px;letter-spacing:0.2px;">Core Platform Capabilities</p>
+      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <td style="padding-bottom:12px;">
+            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
+            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">Advanced SAST:</strong> Real-time detection of 1,000+ secret types and vulns.</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-bottom:12px;">
+            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
+            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">Deep SCA:</strong> Semantic dependency audits via OSV.dev integration.</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-bottom:0;">
+            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
+            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">AI Memory Layer:</strong> Context-aware security that learns from your code.</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+    ${ctaBlock}
     ${baseFooter(footerText)}
   `, preheader);
 }
@@ -189,30 +239,30 @@ export function newsletterTemplate(options: EmailTemplateOptions): string {
   const { subject, body, preheader, ctaText, ctaUrl, footerText } = options;
 
   const ctaBlock = ctaText && ctaUrl
-    ? `<div style="text-align:center;margin:32px 0 0;">
-        <a href="${ctaUrl}" style="display:inline-block;background:transparent;color:#10b981;padding:10px 24px;text-decoration:none;border:1px solid #10b981;border-radius:100px;font-weight:600;font-size:13px;">${ctaText}</a>
+    ? `<div style="text-align:center;margin:22px 0 0;">
+        <a href="${ctaUrl}" class="btn-outline" style="padding:10px 22px;font-size:13px;letter-spacing:0.2px;">${ctaText}</a>
       </div>`
     : '';
 
   return wrapInContainer(`
     <div style="text-align:center;margin-bottom:16px;">
-      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a>
-      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a></div>
+      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a>
+      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a></div>
     </div>
-    <div style="text-align:center;margin-bottom:40px;">
-      <p style="color:#10b981;font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:700;margin:0 0 8px;">Weekly Intelligence</p>
-      <h1 style="color:#fff;font-size:28px;font-weight:800;margin:0;letter-spacing:-0.5px;line-height:1.1;">${subject}</h1>
+    <div style="text-align:center;margin-bottom:26px;">
+      <p class="accent" style="color:#1a73e8;font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:800;margin:0 0 8px;">Weekly Intelligence</p>
+      <h1 class="text" style="color:#202124;font-size:26px;font-weight:900;margin:0;letter-spacing:-0.4px;line-height:1.15;">${subject}</h1>
     </div>
-    <div style="border-top:1px solid #222;padding-top:32px;">
-      <div style="font-size:15px;color:#d4d4d4;line-height:1.7;">
+    <div class="divider" style="border-top:1px solid #dadce0;padding-top:22px;">
+      <div class="text" style="font-size:15px;color:#202124;line-height:1.75;">
         ${body}
       </div>
       ${ctaBlock}
     </div>
-    <div style="margin-top:40px;background:#111;padding:24px;border-radius:12px;border:1px solid #222;text-align:center;">
-       <p style="color:#fff;font-size:14px;font-weight:600;margin-bottom:8px;">Securing your infrastructure?</p>
-       <p style="color:#888;font-size:13px;margin-bottom:16px;">Deploy Cencori scans to detect vulnerabilities before they hit production.</p>
-       <a href="https://cencori.com/scan/import" style="color:#10b981;font-size:13px;font-weight:700;text-decoration:none;">Import Repository →</a>
+    <div class="callout" style="margin-top:28px;background:#f1f3f4;padding:18px;border-radius:12px;border:1px solid #dadce0;text-align:center;">
+       <p class="text" style="color:#202124;font-size:14px;font-weight:800;margin:0 0 8px;">Securing your infrastructure?</p>
+       <p class="muted" style="color:#5f6368;font-size:13px;margin:0 0 14px;">Deploy Cencori scans to detect vulnerabilities before they hit production.</p>
+       <a href="https://cencori.com/scan/import" class="accent" style="color:#1a73e8;font-size:13px;font-weight:800;text-decoration:underline;">Import Repository →</a>
     </div>
     ${baseFooter(footerText || 'You received this because you are part of the Cencori developer network.')}
   `, preheader);
