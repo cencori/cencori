@@ -260,8 +260,6 @@ export { cencori };`);
           </Link>
         </Button>
       </div>
-
-      {/* Example Projects Section */}
       <div className="mt-8 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium">Example projects</h3>
