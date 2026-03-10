@@ -9,6 +9,14 @@ const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
 const FALLBACK_REPLY_TO = process.env.RESEND_REPLY_TO_EMAIL || '';
 const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN || 'cencori.com';
 
+function validReplyTo(): string | string[] | undefined {
+    const value = FALLBACK_REPLY_TO.trim();
+    if (!value) return undefined;
+    const addresses = value.split(',').map((s) => s.trim()).filter((s) => s.includes('@'));
+    if (addresses.length === 0) return undefined;
+    return addresses.length === 1 ? addresses[0] : addresses;
+}
+
 const SEND_CONCURRENCY = 5;
 const SEND_BATCH_PAUSE_MS = 120;
 const USERS_PAGE_SIZE = 200;
@@ -164,7 +172,7 @@ export async function POST(req: NextRequest) {
             const { error: sendError } = await resend.emails.send({
                 from: fromAddress,
                 to: recipient,
-                replyTo: FALLBACK_REPLY_TO || undefined,
+                replyTo: validReplyTo(),
                 subject: subject.trim(),
                 html: htmlBody,
                 text: textBody || undefined,
@@ -242,7 +250,7 @@ export async function POST(req: NextRequest) {
                 const { error } = await resend.emails.send({
                     from: fromAddress,
                     to: recipient,
-                    replyTo: FALLBACK_REPLY_TO || undefined,
+                    replyTo: validReplyTo(),
                     subject: subject.trim(),
                     html: htmlBody,
                     text: textBody || undefined,
