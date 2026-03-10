@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS email_sends (
   subject TEXT NOT NULL,
   html_body TEXT NOT NULL,
   text_body TEXT,
-  sender_profile_id UUID REFERENCES email_sender_profiles(id) ON SET NULL,
+  sender_profile_id UUID REFERENCES email_sender_profiles(id) ON DELETE SET NULL,
   sent_by UUID REFERENCES auth.users(id),
   audience_type TEXT NOT NULL DEFAULT 'bulk',
   single_recipient TEXT,
