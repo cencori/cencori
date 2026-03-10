@@ -198,7 +198,6 @@ export function announcementTemplate(options: EmailTemplateOptions): string {
       <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a>
       <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:32px;margin:0 auto 18px;" /></a></div>
       <h1 class="text" style="color:#202124;font-size:30px;font-weight:800;margin:0 0 10px;letter-spacing:-0.6px;line-height:1.15;">${subject}</h1>
-      <p class="accent" style="color:#1a73e8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0;">Intelligence-Driven Security</p>
     </div>
     <div class="text" style="font-size:16px;color:#202124;line-height:1.8;">
       ${body}
