@@ -194,8 +194,6 @@ export function announcementTemplate(options: EmailTemplateOptions): string {
     : '';
 
   return wrapInContainer(`
-    <div style="text-align:center;margin-bottom:24px;">
-    </div>
     <div class="text" style="font-size:16px;color:#202124;line-height:1.8;">
       ${body}
     </div>
