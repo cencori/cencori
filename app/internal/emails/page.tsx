@@ -78,7 +78,7 @@ const EMAIL_CATEGORIES = [
     { value: 'transactional', label: 'Transactional' },
 ];
 
-const EMAIL_DOMAIN = 'cencori.com';
+const EMAIL_DOMAIN = process.env.NEXT_PUBLIC_EMAIL_DOMAIN || 'send.cencori.com';
 
 // —— TipTap Toolbar ——————————————————————————————————
 function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null }) {

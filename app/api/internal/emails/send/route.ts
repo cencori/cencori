@@ -7,7 +7,7 @@ import { checkInternalAccess } from '@/lib/internal-access';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
 const FALLBACK_REPLY_TO = process.env.RESEND_REPLY_TO_EMAIL || '';
-const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN || 'cencori.com';
+const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN || 'send.cencori.com';
 
 function validReplyTo(): string | string[] | undefined {
     const value = FALLBACK_REPLY_TO.trim();
