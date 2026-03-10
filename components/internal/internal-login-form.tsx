@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Lock, CheckCircle } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 
 export function InternalLoginForm() {
     const router = useRouter();
@@ -14,7 +14,6 @@ export function InternalLoginForm() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
-    const [signUpSuccess, setSignUpSuccess] = useState(false);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -31,19 +30,33 @@ export function InternalLoginForm() {
             }
 
             if (isSignUp) {
-                const { error: signUpError } = await supabase.auth.signUp({
-                    email: trimmedEmail,
-                    password,
+                // Use server-side signup (auto-confirms the account)
+                const res = await fetch('/api/internal/auth/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: trimmedEmail, password }),
                 });
+                const data = await res.json();
 
-                if (signUpError) {
-                    setError(signUpError.message);
+                if (!res.ok) {
+                    setError(data.error || 'Failed to create account');
                     setLoading(false);
                     return;
                 }
 
-                setSignUpSuccess(true);
-                setLoading(false);
+                // Account created — sign in immediately
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: trimmedEmail,
+                    password,
+                });
+
+                if (signInError) {
+                    setError(signInError.message);
+                    setLoading(false);
+                    return;
+                }
+
+                router.refresh();
                 return;
             }
 
@@ -66,28 +79,6 @@ export function InternalLoginForm() {
         }
     }
 
-    if (signUpSuccess) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center px-4">
-                <div className="w-full max-w-sm text-center space-y-4">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mb-2">
-                        <CheckCircle className="h-5 w-5 text-emerald-400" />
-                    </div>
-                    <h1 className="text-lg font-semibold">Check your email</h1>
-                    <p className="text-sm text-muted-foreground">
-                        We sent a confirmation link to <strong>{email}</strong>.
-                        Click it to activate your account, then come back here to sign in.
-                    </p>
-                    <button
-                        onClick={() => { setSignUpSuccess(false); setIsSignUp(false); }}
-                        className="text-xs text-muted-foreground hover:text-foreground underline"
-                    >
-                        Back to sign in
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center px-4">
