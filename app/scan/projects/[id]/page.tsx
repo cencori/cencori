@@ -317,6 +317,43 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
         }];
     }
 
+    if (scan.status === "running") {
+        // Detect stale "running" scans — if it's been more than 6 minutes,
+        // the scan was interrupted before it could update its status.
+        const scanAgeMs = Date.now() - new Date(scan.created_at).getTime();
+        const STALE_THRESHOLD_MS = 6 * 60 * 1000;
+        if (scanAgeMs > STALE_THRESHOLD_MS) {
+            return [{
+                type: "error",
+                message: "Scan was interrupted before it could finish. Please run a new scan.",
+                time: timeStr,
+            }];
+        }
+
+        const progress = scan.results?.progress;
+        if (progress?.totalFiles) {
+            // All files processed but scan never completed — likely timed out saving results
+            if ((progress.processedFiles || 0) >= progress.totalFiles) {
+                return [{
+                    type: "error",
+                    message: "Scan finished processing but failed to save results. Please run a new scan.",
+                    time: timeStr,
+                }];
+            }
+            return [{
+                type: "progress",
+                message: `Still scanning... (${progress.processedFiles || 0}/${progress.totalFiles} files)`,
+                time: timeStr,
+            }];
+        }
+
+        return [{
+            type: "info",
+            message: "This scan is still marked as running.",
+            time: timeStr,
+        }];
+    }
+
     const persistedLogs = (scan.logs || []).filter((log) => {
         const message = log.message || "";
         return !(
@@ -334,35 +371,6 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
             severity: (log.data as { severity?: string } | undefined)?.severity,
             line: (log.data as { line?: number } | undefined)?.line,
         }));
-    }
-
-    if (scan.status === "running") {
-        // Detect stale "running" scans — if it's been more than 6 minutes,
-        // the scan was interrupted before it could update its status.
-        const scanAgeMs = Date.now() - new Date(scan.created_at).getTime();
-        const STALE_THRESHOLD_MS = 6 * 60 * 1000;
-        if (scanAgeMs > STALE_THRESHOLD_MS) {
-            return [{
-                type: "error",
-                message: "Scan was interrupted before it could finish. Please run a new scan.",
-                time: timeStr,
-            }];
-        }
-
-        const progress = scan.results?.progress;
-        if (progress?.totalFiles) {
-            return [{
-                type: "progress",
-                message: `Still scanning... (${progress.processedFiles || 0}/${progress.totalFiles} files)`,
-                time: timeStr,
-            }];
-        }
-
-        return [{
-            type: "info",
-            message: "This scan is still marked as running.",
-            time: timeStr,
-        }];
     }
 
     return [];
