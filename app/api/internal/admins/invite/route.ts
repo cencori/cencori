@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { renderTemplate } from '@/lib/email-templates';
 import { allowAllInternalInDev, isFounderEmail } from '@/lib/internal-admin-auth';
 import { resolvePublicOrigin } from '@/lib/public-origin';
 
@@ -102,54 +103,30 @@ export async function POST(req: NextRequest) {
             console.warn('[Admins] Resend sender not configured. Skipping invite email.');
         } else {
             const resend = new Resend(RESEND_API_KEY);
-            const { error: emailError } = await resend.emails.send({
+            const html = renderTemplate('announcement', {
+                subject: "You're invited to join the Cencori team",
+                body: `
+                    <p style="margin-bottom: 24px;">
+                        <strong style="color: #fff;">${user.email?.split('@')[0] || 'A team member'}</strong> has invited you to join the Cencori elite as a 
+                        <span style="color: ${role === 'super_admin' ? '#10b981' : '#eee'}; font-weight: bold;">${role === 'super_admin' ? 'Super Admin' : 'Admin'}</span>.
+                    </p>
+                    <p style="margin-bottom: 0;">As part of the team, you'll help manage our intelligence-driven security infrastructure and RAG-based scanning engine.</p>
+                `,
+                ctaText: 'Accept Invite',
+                ctaUrl: inviteLink,
+                footerText: "If you weren't expecting this, you can safely ignore this email.",
+            });
+
+            const { error: sendError } = await resend.emails.send({
                 from: ADMIN_INVITE_FROM_EMAIL,
                 to: email.toLowerCase(),
                 replyTo: parseReplyTo(ADMIN_INVITE_REPLY_TO_EMAIL),
                 subject: "You're invited to join the Cencori team",
-                html: `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #fafafa; max-width: 480px; margin: 0 auto; padding: 24px; background: #0a0a0a;">
-    <div style="background: #141414; border-radius: 12px; padding: 32px; border: 1px solid rgba(255,255,255,0.08);">
-        <div style="text-align: center; margin-bottom: 24px;">
-            <img src="https://cencori.com/clight.png" alt="Cencori" style="height: 28px; margin-bottom: 20px; opacity: 0.9;" />
-            <p style="color: #888; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; margin: 0 0 6px 0;">Team Invite</p>
-            <h1 style="color: #fafafa; margin: 0; font-size: 18px; font-weight: 600;">You're Invited</h1>
-        </div>
-        
-        <div style="background: #1a1a1a; border-radius: 8px; padding: 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
-            <p style="margin: 0; color: #a1a1a1; font-size: 13px; text-align: center;">
-                <span style="color: #fafafa;">${user.email?.split('@')[0] || 'A team member'}</span> invited you to join Cencori as
-            </p>
-            <p style="margin: 8px 0 0 0; text-align: center;">
-                <span style="display: inline-block; background: ${role === 'super_admin' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.08)'}; color: ${role === 'super_admin' ? '#10b981' : '#fafafa'}; padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 500;">${role === 'super_admin' ? 'Super Admin' : 'Admin'}</span>
-            </p>
-        </div>
-        
-        <div style="text-align: center; margin-bottom: 20px;">
-            <a href="${inviteLink}" style="display: inline-block; background: #fafafa; color: #0a0a0a; padding: 10px 28px; text-decoration: none; border-radius: 100px; font-weight: 500; font-size: 13px;">Accept Invite</a>
-        </div>
-        
-        <p style="font-size: 11px; color: #555; text-align: center; margin: 0;">
-            If you weren't expecting this, ignore this email.
-        </p>
-    </div>
-    
-    <div style="text-align: center; margin-top: 16px; color: #444; font-size: 10px;">
-        <p style="margin: 0;">© ${new Date().getFullYear()} Cencori</p>
-    </div>
-</body>
-</html>
-            `,
+                html,
             });
 
-            if (emailError) {
-                console.error('[Admins] Failed to send invite email:', emailError);
+            if (sendError) {
+                console.error('[Admins] Failed to send invite email:', sendError);
             }
         }
     } catch (emailErr) {
