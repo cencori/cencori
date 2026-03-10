@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, CheckCircle } from 'lucide-react';
 
 export function InternalLoginForm() {
     const router = useRouter();
@@ -13,6 +13,8 @@ export function InternalLoginForm() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [signUpSuccess, setSignUpSuccess] = useState(false);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -24,6 +26,23 @@ export function InternalLoginForm() {
 
             if (!trimmedEmail.endsWith('@cencori.com')) {
                 setError('Only @cencori.com email addresses are allowed');
+                setLoading(false);
+                return;
+            }
+
+            if (isSignUp) {
+                const { error: signUpError } = await supabase.auth.signUp({
+                    email: trimmedEmail,
+                    password,
+                });
+
+                if (signUpError) {
+                    setError(signUpError.message);
+                    setLoading(false);
+                    return;
+                }
+
+                setSignUpSuccess(true);
                 setLoading(false);
                 return;
             }
@@ -41,10 +60,33 @@ export function InternalLoginForm() {
 
             router.refresh();
         } catch {
-            setError('Failed to sign in');
+            setError(isSignUp ? 'Failed to create account' : 'Failed to sign in');
         } finally {
             setLoading(false);
         }
+    }
+
+    if (signUpSuccess) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center px-4">
+                <div className="w-full max-w-sm text-center space-y-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mb-2">
+                        <CheckCircle className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <h1 className="text-lg font-semibold">Check your email</h1>
+                    <p className="text-sm text-muted-foreground">
+                        We sent a confirmation link to <strong>{email}</strong>.
+                        Click it to activate your account, then come back here to sign in.
+                    </p>
+                    <button
+                        onClick={() => { setSignUpSuccess(false); setIsSignUp(false); }}
+                        className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                        Back to sign in
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -56,7 +98,9 @@ export function InternalLoginForm() {
                     </div>
                     <h1 className="text-lg font-semibold">Internal Panel</h1>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Sign in with your @cencori.com email
+                        {isSignUp
+                            ? 'Create an account with your @cencori.com email'
+                            : 'Sign in with your @cencori.com email'}
                     </p>
                 </div>
 
@@ -73,12 +117,12 @@ export function InternalLoginForm() {
                         />
                         <Input
                             type="password"
-                            placeholder="Password"
+                            placeholder={isSignUp ? 'Create a password' : 'Password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className="h-10 text-sm"
                             required
-                            autoComplete="current-password"
+                            autoComplete={isSignUp ? 'new-password' : 'current-password'}
                         />
                     </div>
 
@@ -94,15 +138,39 @@ export function InternalLoginForm() {
                         {loading ? (
                             <>
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                Signing in...
+                                {isSignUp ? 'Creating account...' : 'Signing in...'}
                             </>
                         ) : (
-                            'Sign In'
+                            isSignUp ? 'Create Account' : 'Sign In'
                         )}
                     </Button>
                 </form>
 
-                <p className="text-[10px] text-muted-foreground text-center mt-8">
+                <p className="text-xs text-muted-foreground text-center mt-6">
+                    {isSignUp ? (
+                        <>
+                            Already have an account?{' '}
+                            <button
+                                onClick={() => { setIsSignUp(false); setError(''); }}
+                                className="text-foreground hover:underline"
+                            >
+                                Sign in
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            Need an account?{' '}
+                            <button
+                                onClick={() => { setIsSignUp(true); setError(''); }}
+                                className="text-foreground hover:underline"
+                            >
+                                Create one
+                            </button>
+                        </>
+                    )}
+                </p>
+
+                <p className="text-[10px] text-muted-foreground text-center mt-4">
                     Only authorized team members can access this area
                 </p>
             </div>
