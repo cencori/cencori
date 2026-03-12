@@ -35,8 +35,8 @@ export async function getProjectSecurityConfig(
         }
 
         const safetyThreshold = settings.safety_threshold ?? 0.7;
-        const inputThreshold = 1 - safetyThreshold;
-        const outputThreshold = Math.max(0.1, inputThreshold - 0.1);
+        const inputThreshold = safetyThreshold; // Strictly follow the UI value
+        const outputThreshold = Math.max(0.1, inputThreshold - 0.1); // Slightly more lenient output check
         const jailbreakThreshold = Math.max(0.2, inputThreshold);
 
         return {

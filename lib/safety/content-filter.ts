@@ -19,8 +19,29 @@ const PII_PATTERNS = {
     emailObfuscated: /\b[A-Za-z0-9]+\s*(?:dot|\[dot\]|\(dot\)|\.)\s*[A-Za-z0-9]+\s*(?:at|\[at\]|\(at\)|@)\s*[A-Za-z0-9.-]+\s*(?:dot|\[dot\]|\(dot\)|\.)\s*[A-Za-z]{2,}\b/i,
     phone: /\b(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/,
     ssn: /\b\d{3}-\d{2}-\d{4}\b/,
-    creditCard: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/,
+    creditCard: /\b(?:\d[ -]*?){13,19}\b/g,
 };
+
+/**
+ * Luhn algorithm check for credit card validity
+ */
+function isLuhnValid(cardNumber: string): boolean {
+    const digits = cardNumber.replace(/\D/g, '');
+    if (digits.length < 13 || digits.length > 19) return false;
+
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+        let digit = parseInt(digits[i]);
+        if (shouldDouble) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+}
 
 // Expanded harmful keywords
 const HARMFUL_KEYWORDS = [
@@ -115,9 +136,20 @@ export function checkContent(text: string, config?: ContentFilterConfig): Safety
         reasons.push('Potential SSN detected');
         score -= 0.5; // High risk
     }
-    if (PII_PATTERNS.creditCard.test(text)) {
+
+    // Check for credit card with Luhn validation
+    const ccMatches = text.match(PII_PATTERNS.creditCard) || [];
+    let foundValidCC = false;
+    for (const match of ccMatches) {
+        if (isLuhnValid(match)) {
+            foundValidCC = true;
+            break;
+        }
+    }
+
+    if (foundValidCC) {
         reasons.push('Potential credit card number detected');
-        score -= 0.5; // High risk
+        score -= 0.5;
     }
 
     // Check for harmful keywords / injection attempts
