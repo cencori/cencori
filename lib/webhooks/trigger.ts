@@ -121,4 +121,31 @@ export async function triggerQuotaWarningWebhook(
     return triggerWebhooks(projectId, WEBHOOK_EVENTS.QUOTA_WARNING, quotaData);
 }
 
+/**
+ * Helper to trigger anomaly detection webhooks
+ */
+export async function triggerAnomalyWebhook(
+    projectId: string,
+    anomalyData: {
+        alerts: Array<{
+            alert_type: string;
+            severity: string;
+            message: string;
+            metric_name: string;
+            current_value: number;
+            baseline_value: number;
+            deviation_percent: number;
+        }>;
+        summary: {
+            total: number;
+            critical: number;
+            warning: number;
+        };
+        environment: string;
+        detected_at: string;
+    }
+) {
+    return triggerWebhooks(projectId, WEBHOOK_EVENTS.ANOMALY_DETECTED, anomalyData);
+}
+
 export { WEBHOOK_EVENTS };
