@@ -110,6 +110,7 @@ export const WEBHOOK_EVENTS = {
     SECURITY_INCIDENT: 'security.incident',
     QUOTA_WARNING: 'quota.warning',
     QUOTA_EXCEEDED: 'quota.exceeded',
+    ANOMALY_DETECTED: 'anomaly.detected',
 } as const;
 
 export type WebhookEventType = typeof WEBHOOK_EVENTS[keyof typeof WEBHOOK_EVENTS];
