@@ -1,124 +1,93 @@
 'use client';
 
-import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
-import {
-    ChartConfig,
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-} from '@/components/ui/chart';
+import { cn } from '@/lib/utils';
 
 interface CostByProviderChartProps {
     data: Record<string, number>;
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
-    openai: 'hsl(142, 71%, 45%)',     // Green
-    anthropic: 'hsl(24, 96%, 53%)',    // Orange
-    google: 'hsl(217, 91%, 60%)',      // Blue
-    gemini: 'hsl(217, 91%, 60%)',      // Blue
-    cohere: 'hsl(262, 83%, 58%)',      // Purple
-    mistral: 'hsl(340, 82%, 52%)',     // Pink
-    groq: 'hsl(48, 96%, 53%)',         // Yellow
-    deepseek: 'hsl(187, 100%, 42%)',   // Cyan
-    unknown: 'hsl(0, 0%, 50%)',        // Gray
+    openai: 'bg-emerald-500',
+    anthropic: 'bg-orange-500',
+    google: 'bg-blue-500',
+    gemini: 'bg-blue-500',
+    cohere: 'bg-purple-500',
+    mistral: 'bg-pink-500',
+    groq: 'bg-yellow-500',
+    deepseek: 'bg-cyan-500',
+    together: 'bg-indigo-500',
+    perplexity: 'bg-teal-500',
+    xai: 'bg-slate-400',
 };
 
-const chartConfig = {
-    cost: {
-        label: 'Cost',
-    },
-} satisfies ChartConfig;
+function formatCost(v: number): string {
+    if (v === 0) return '$0';
+    if (v < 0.001) return `$${v.toFixed(6)}`;
+    if (v < 0.01) return `$${v.toFixed(4)}`;
+    if (v < 1) return `$${v.toFixed(3)}`;
+    return `$${v.toFixed(2)}`;
+}
 
 export function CostByProviderChart({ data }: CostByProviderChartProps) {
-    const chartData = Object.entries(data)
+    const items = Object.entries(data)
         .map(([name, value]) => ({
             name: name.charAt(0).toUpperCase() + name.slice(1),
-            value: value,
-            fill: PROVIDER_COLORS[name.toLowerCase()] || PROVIDER_COLORS.unknown,
+            key: name.toLowerCase(),
+            value,
         }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6); // Top 6 providers
+        .filter(item => item.value > 0)
+        .sort((a, b) => b.value - a.value);
 
-    const total = chartData.reduce((sum, item) => sum + item.value, 0);
-
-    if (total === 0) {
-        return (
-            <div className="rounded-lg border border-border/40 bg-card p-4">
-                <div className="mb-3">
-                    <h3 className="text-xs font-medium">Cost by Provider</h3>
-                    <p className="text-[10px] text-muted-foreground">Spending breakdown</p>
-                </div>
-                <div className="h-[180px] flex items-center justify-center">
-                    <p className="text-xs text-muted-foreground">No data</p>
-                </div>
-            </div>
-        );
-    }
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+    const maxValue = items[0]?.value || 0;
 
     return (
-        <div className="rounded-lg border border-border/40 bg-card p-4">
+        <div className="rounded-xl border border-border/30 bg-card p-4">
             <div className="mb-3">
-                <h3 className="text-xs font-medium">Cost by Provider</h3>
-                <p className="text-[10px] text-muted-foreground">
-                    Total: <span className="font-mono font-medium">${total.toFixed(2)}</span>
+                <p className="text-xs font-medium text-muted-foreground">Cost by Provider</p>
+                <p className="text-lg font-semibold tabular-nums tracking-tight mt-0.5">
+                    {formatCost(total)}
                 </p>
             </div>
 
-            <div className="h-[180px]">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                            data={chartData}
-                            layout="vertical"
-                            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-                        >
-                            <XAxis type="number" hide />
-                            <YAxis
-                                type="category"
-                                dataKey="name"
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 10 }}
-                                width={60}
-                            />
-                            <ChartTooltip
-                                cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                                content={
-                                    <ChartTooltipContent
-                                        formatter={(value) => (
-                                            <span className="font-mono font-medium">
-                                                ${Number(value).toFixed(4)}
-                                            </span>
-                                        )}
-                                    />
-                                }
-                            />
-                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </ChartContainer>
-            </div>
+            {items.length === 0 ? (
+                <div className="py-6 text-center">
+                    <p className="text-[11px] text-muted-foreground/30">No spend data</p>
+                </div>
+            ) : (
+                <div className="space-y-2.5">
+                    {items.map(item => {
+                        const pct = total > 0 ? (item.value / total) * 100 : 0;
+                        const barWidth = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                        const colorClass = PROVIDER_COLORS[item.key] || 'bg-muted-foreground/50';
 
-            {/* Cost labels */}
-            <div className="mt-2 space-y-1">
-                {chartData.slice(0, 4).map((item, index) => (
-                    <div key={index} className="flex items-center justify-between text-[10px]">
-                        <div className="flex items-center gap-1.5">
-                            <div
-                                className="h-2 w-2 rounded-sm shrink-0"
-                                style={{ backgroundColor: item.fill }}
-                            />
-                            <span className="text-muted-foreground">{item.name}</span>
-                        </div>
-                        <span className="font-mono">${item.value.toFixed(4)}</span>
-                    </div>
-                ))}
-            </div>
+                        return (
+                            <div key={item.key}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', colorClass)} />
+                                        <span className="text-xs">{item.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                                            {pct.toFixed(0)}%
+                                        </span>
+                                        <span className="text-xs font-medium tabular-nums font-mono">
+                                            {formatCost(item.value)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="h-1 rounded-full bg-secondary overflow-hidden">
+                                    <div
+                                        className={cn('h-full rounded-full transition-all', colorClass)}
+                                        style={{ width: `${barWidth}%`, opacity: 0.7 }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

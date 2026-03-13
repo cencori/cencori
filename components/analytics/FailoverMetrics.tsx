@@ -1,8 +1,9 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { RefreshCw, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowRight, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface FailoverMetricsProps {
     projectId: string;
@@ -22,6 +23,15 @@ interface FailoverStats {
         reason: string;
         count: number;
     }>;
+    provider_health?: Record<string, {
+        requests: number;
+        errors: number;
+        fallbacks: number;
+    }>;
+}
+
+function capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function FailoverMetrics({ projectId, environment, timeRange }: FailoverMetricsProps) {
@@ -39,116 +49,123 @@ export function FailoverMetrics({ projectId, environment, timeRange }: FailoverM
 
     if (isLoading) {
         return (
-            <Card className="border-border/40">
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Failover Metrics</span>
-                    </div>
-                    <div className="h-20 flex items-center justify-center">
-                        <div className="animate-pulse flex space-x-4">
-                            <div className="h-8 w-16 bg-secondary rounded"></div>
-                            <div className="h-8 w-24 bg-secondary rounded"></div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="rounded-xl border border-border/30 bg-card p-4">
+                <Skeleton className="h-3.5 w-32 mb-3" />
+                <Skeleton className="h-6 w-20 mb-4" />
+                <div className="space-y-2">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+            </div>
         );
     }
 
-    if (!stats || stats.total_fallbacks === 0) {
-        return (
-            <Card className="border-border/40">
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <RefreshCw className="h-4 w-4 text-emerald-500" />
-                        <span className="text-sm font-medium">Failover Metrics</span>
-                    </div>
-                    <div className="text-center py-4">
-                        <p className="text-2xl font-semibold text-emerald-500">0</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            No fallbacks triggered • All providers stable
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
+    const hasFallbacks = stats && stats.total_fallbacks > 0;
+    const flows = hasFallbacks
+        ? Object.entries(stats.by_provider)
+            .flatMap(([, f]) => f)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5)
+        : [];
+
+    // Derive provider list from failover routes or show empty
+    const providerSet = new Set<string>();
+    if (stats) {
+        for (const [, f] of Object.entries(stats.by_provider)) {
+            for (const flow of f) {
+                providerSet.add(flow.original.toLowerCase());
+                providerSet.add(flow.fallback.toLowerCase());
+            }
+        }
     }
 
     return (
-        <Card className="border-border/40">
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm font-medium">Failover Metrics</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{timeRange}</span>
-                </div>
+        <div className="rounded-xl border border-border/30 bg-card p-4">
+            <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-medium text-muted-foreground">Provider Failover</p>
+                {hasFallbacks && (
+                    <span className="text-[10px] text-muted-foreground/50">{timeRange}</span>
+                )}
+            </div>
 
-                {/* Main stats */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <p className="text-2xl font-semibold">{stats.total_fallbacks}</p>
-                        <p className="text-xs text-muted-foreground">Fallbacks triggered</p>
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-1">
-                            <p className="text-2xl font-semibold">{stats.fallback_rate.toFixed(1)}%</p>
-                            {stats.fallback_rate > 5 ? (
-                                <TrendingUp className="h-4 w-4 text-red-500" />
-                            ) : (
-                                <TrendingDown className="h-4 w-4 text-emerald-500" />
-                            )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">of all requests</p>
-                    </div>
-                </div>
+            {/* Status headline */}
+            <div className="flex items-center gap-2 mb-4">
+                {hasFallbacks ? (
+                    <>
+                        <span className="text-lg font-semibold tabular-nums tracking-tight">
+                            {stats.total_fallbacks}
+                        </span>
+                        <span className="text-xs text-muted-foreground/50">
+                            fallbacks
+                        </span>
+                        <span className="text-[10px] text-amber-500 font-medium ml-auto tabular-nums">
+                            {stats.fallback_rate.toFixed(1)}% of requests
+                        </span>
+                    </>
+                ) : (
+                    <>
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                        <span className="text-sm font-medium text-emerald-500">All providers stable</span>
+                    </>
+                )}
+            </div>
 
-                {/* Provider flows */}
-                {Object.entries(stats.by_provider).length > 0 && (
-                    <div className="border-t border-border/40 pt-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
-                            Failover Routes
-                        </p>
-                        <div className="space-y-2">
-                            {Object.entries(stats.by_provider)
-                                .flatMap(([, flows]) => flows)
-                                .sort((a, b) => b.count - a.count)
-                                .slice(0, 3)
-                                .map((flow, i) => (
-                                    <div key={i} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-muted-foreground">{flow.original}</span>
-                                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                            <span className="text-foreground">{flow.fallback}</span>
+            {hasFallbacks ? (
+                <>
+                    {/* Failover routes */}
+                    <div className="space-y-1.5">
+                        {flows.map((flow, i) => {
+                            const maxCount = flows[0]?.count || 1;
+                            const barWidth = (flow.count / maxCount) * 100;
+
+                            return (
+                                <div key={i} className="group">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <span className="text-muted-foreground">{capitalize(flow.original)}</span>
+                                            <ArrowRight className="h-2.5 w-2.5 text-muted-foreground/40" />
+                                            <span className="font-medium">{capitalize(flow.fallback)}</span>
                                         </div>
-                                        <span className="text-muted-foreground">{flow.count}x</span>
+                                        <span className="text-[10px] text-muted-foreground/50 tabular-nums font-mono">
+                                            {flow.count}x
+                                        </span>
+                                    </div>
+                                    <div className="h-1 rounded-full bg-secondary overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-amber-500 transition-all"
+                                            style={{ width: `${barWidth}%`, opacity: 0.5 }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Top reasons */}
+                    {stats.top_reasons.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-border/20">
+                            <p className="text-[10px] text-muted-foreground/40 uppercase tracking-wider mb-2">Reasons</p>
+                            <div className="space-y-1">
+                                {stats.top_reasons.slice(0, 3).map((reason, i) => (
+                                    <div key={i} className="flex items-center justify-between">
+                                        <span className="text-[11px] text-muted-foreground truncate max-w-[70%]">
+                                            {reason.reason}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono">
+                                            {reason.count}x
+                                        </span>
                                     </div>
                                 ))}
+                            </div>
                         </div>
-                    </div>
-                )}
-
-                {/* Top reasons */}
-                {stats.top_reasons.length > 0 && (
-                    <div className="border-t border-border/40 pt-3 mt-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
-                            Common Reasons
-                        </p>
-                        <div className="space-y-1.5">
-                            {stats.top_reasons.slice(0, 3).map((reason, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground truncate max-w-[160px]">
-                                        {reason.reason}
-                                    </span>
-                                    <span className="text-muted-foreground">{reason.count}x</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                    )}
+                </>
+            ) : (
+                <div className="space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground/40">
+                        No provider failovers triggered in this period. All requests routed to their primary provider successfully.
+                    </p>
+                </div>
+            )}
+        </div>
     );
 }

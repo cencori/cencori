@@ -1,12 +1,6 @@
 'use client';
 
-import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
-import {
-    ChartConfig,
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-} from '@/components/ui/chart';
+import { cn } from '@/lib/utils';
 
 interface LatencyHistogramProps {
     data: {
@@ -18,114 +12,71 @@ interface LatencyHistogramProps {
     };
 }
 
-const chartConfig = {
-    latency: {
-        label: 'Latency',
-    },
-} satisfies ChartConfig;
-
-// Color gradient from green (fast) to red (slow)
-const getLatencyColor = (percentile: string): string => {
-    switch (percentile) {
-        case 'P50': return 'hsl(142, 71%, 45%)'; // Green
-        case 'P75': return 'hsl(82, 71%, 45%)';  // Yellow-green
-        case 'P90': return 'hsl(48, 96%, 53%)';  // Yellow
-        case 'P95': return 'hsl(24, 96%, 53%)';  // Orange
-        case 'P99': return 'hsl(0, 84%, 60%)';   // Red
-        default: return 'hsl(217, 91%, 60%)';
-    }
-};
+function formatLatency(ms: number): string {
+    if (ms === 0) return '0ms';
+    if (ms >= 10000) return `${(ms / 1000).toFixed(1)}s`;
+    if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
+    return `${Math.round(ms)}ms`;
+}
 
 export function LatencyHistogram({ data }: LatencyHistogramProps) {
-    const chartData = [
-        { name: 'P50', value: data.p50, fill: getLatencyColor('P50') },
-        { name: 'P75', value: data.p75, fill: getLatencyColor('P75') },
-        { name: 'P90', value: data.p90, fill: getLatencyColor('P90') },
-        { name: 'P95', value: data.p95, fill: getLatencyColor('P95') },
-        { name: 'P99', value: data.p99, fill: getLatencyColor('P99') },
+    const percentiles = [
+        { label: 'P50', value: data.p50, desc: 'Median' },
+        { label: 'P75', value: data.p75, desc: '75th' },
+        { label: 'P90', value: data.p90, desc: '90th' },
+        { label: 'P95', value: data.p95, desc: '95th' },
+        { label: 'P99', value: data.p99, desc: '99th' },
     ];
 
-    const hasData = chartData.some(item => item.value > 0);
-
-    if (!hasData) {
-        return (
-            <div className="rounded-lg border border-border/40 bg-card p-4">
-                <div className="mb-3">
-                    <h3 className="text-xs font-medium">Latency Distribution</h3>
-                    <p className="text-[10px] text-muted-foreground">Response time percentiles</p>
-                </div>
-                <div className="h-[180px] flex items-center justify-center">
-                    <p className="text-xs text-muted-foreground">No data</p>
-                </div>
-            </div>
-        );
-    }
+    const maxValue = Math.max(...percentiles.map(p => p.value), 1);
+    const hasData = percentiles.some(p => p.value > 0);
 
     return (
-        <div className="rounded-lg border border-border/40 bg-card p-4">
+        <div className="rounded-xl border border-border/30 bg-card p-4">
             <div className="mb-3">
-                <h3 className="text-xs font-medium">Latency Distribution</h3>
-                <p className="text-[10px] text-muted-foreground">
-                    P50: <span className="font-mono font-medium">{data.p50}ms</span>
-                    {' • '}
-                    P95: <span className="font-mono font-medium">{data.p95}ms</span>
+                <p className="text-xs font-medium text-muted-foreground">Latency Distribution</p>
+                <p className="text-lg font-semibold tabular-nums tracking-tight mt-0.5">
+                    {formatLatency(data.p50)}
+                    <span className="text-xs font-normal text-muted-foreground/50 ml-1.5">median</span>
                 </p>
             </div>
 
-            <div className="h-[140px]">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                            data={chartData}
-                            margin={{ top: 8, right: 0, bottom: 0, left: 0 }}
-                        >
-                            <XAxis
-                                dataKey="name"
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 10 }}
-                            />
-                            <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fontSize: 10 }}
-                                width={35}
-                                tickFormatter={(value) => `${value}`}
-                            />
-                            <ChartTooltip
-                                cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                                content={
-                                    <ChartTooltipContent
-                                        formatter={(value, name) => (
-                                            <span className="font-mono font-medium">
-                                                {name}: {value}ms
-                                            </span>
-                                        )}
-                                    />
-                                }
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </ChartContainer>
-            </div>
+            {!hasData ? (
+                <div className="py-6 text-center">
+                    <p className="text-[11px] text-muted-foreground/30">No latency data</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {percentiles.map(p => {
+                        const barWidth = maxValue > 0 ? (p.value / maxValue) * 100 : 0;
+                        const isHigh = p.label === 'P99' || p.label === 'P95';
+                        const isMid = p.label === 'P90' || p.label === 'P75';
 
-            {/* Percentile labels */}
-            <div className="mt-3 flex justify-between text-[10px]">
-                {chartData.map((item, index) => (
-                    <div key={index} className="text-center">
-                        <div
-                            className="w-2 h-2 rounded-full mx-auto mb-0.5"
-                            style={{ backgroundColor: item.fill }}
-                        />
-                        <span className="font-mono text-muted-foreground">{item.value}ms</span>
-                    </div>
-                ))}
-            </div>
+                        return (
+                            <div key={p.label}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] text-muted-foreground/60 font-mono w-7">{p.label}</span>
+                                    <span className={cn(
+                                        'text-xs font-medium tabular-nums font-mono',
+                                        isHigh && p.value > 0 ? 'text-orange-400' : ''
+                                    )}>
+                                        {formatLatency(p.value)}
+                                    </span>
+                                </div>
+                                <div className="h-1 rounded-full bg-secondary overflow-hidden">
+                                    <div
+                                        className={cn(
+                                            'h-full rounded-full transition-all',
+                                            isHigh ? 'bg-orange-500' : isMid ? 'bg-amber-500' : 'bg-emerald-500'
+                                        )}
+                                        style={{ width: `${barWidth}%`, opacity: 0.6 }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
