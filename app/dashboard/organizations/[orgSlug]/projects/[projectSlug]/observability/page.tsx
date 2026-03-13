@@ -14,6 +14,7 @@ import { CostByProviderChart } from '@/components/analytics/CostByProviderChart'
 import { LatencyHistogram } from '@/components/analytics/LatencyHistogram';
 import { TokenUsageChart } from '@/components/analytics/TokenUsageChart';
 import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
+import { ObservabilityChartCard, ObservabilityChartCardSkeleton } from '@/components/analytics/ObservabilityChartCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +29,7 @@ import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryKeys } from '@/lib/hooks/useQueries';
 import { ExportDialog } from '@/components/dashboard/ExportDialog';
+import { IntelligencePanel } from '@/components/analytics/intelligence/IntelligencePanel';
 import { cn } from '@/lib/utils';
 
 interface TrendData {
@@ -88,7 +90,7 @@ interface PageProps {
     }>;
 }
 
-type ObservabilitySection = 'overview' | 'ai' | 'http' | 'reliability' | 'security';
+type ObservabilitySection = 'overview' | 'ai' | 'http' | 'reliability' | 'security' | 'intelligence';
 
 type HttpMetricKey = 'total' | 'success' | 'filtered' | 'error';
 
@@ -103,6 +105,7 @@ const sections: SectionDefinition[] = [
     { id: 'http', label: 'HTTP Traffic' },
     { id: 'reliability', label: 'Reliability' },
     { id: 'security', label: 'Security' },
+    { id: 'intelligence', label: 'Intelligence' },
 ];
 
 function isObservabilitySection(value: string | null): value is ObservabilitySection {
@@ -110,7 +113,8 @@ function isObservabilitySection(value: string | null): value is ObservabilitySec
         || value === 'ai'
         || value === 'http'
         || value === 'reliability'
-        || value === 'security';
+        || value === 'security'
+        || value === 'intelligence';
 }
 
 function useProjectId(orgSlug: string, projectSlug: string) {
@@ -289,21 +293,21 @@ export default function ObservabilityPage({ params }: PageProps) {
     if (projectLoading) {
         return (
             <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
-                <div className="mb-8">
-                    <Skeleton className="h-5 w-28" />
-                    <Skeleton className="h-3 w-52 mt-1" />
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <Skeleton className="h-5 w-28" />
+                        <Skeleton className="h-3 w-52 mt-1" />
+                    </div>
+                    <Skeleton className="h-8 w-32" />
                 </div>
                 <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
-                    <div className="mb-4 lg:mb-0">
-                        <Skeleton className="h-28 w-full max-w-[180px]" />
+                    <div className="mb-4 lg:mb-0 space-y-0.5">
+                        {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full max-w-[180px] rounded-lg" />)}
                     </div>
-                    <div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                            {[1, 2, 3, 4].map((i) => (
-                                <Skeleton key={i} className="h-40" />
-                            ))}
-                        </div>
-                        <Skeleton className="h-[260px]" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {[1,2,3,4,5].map(i => (
+                            <ObservabilityChartCardSkeleton key={i} />
+                        ))}
                     </div>
                 </div>
             </div>
@@ -354,18 +358,18 @@ export default function ObservabilityPage({ params }: PageProps) {
             </div>
 
             <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
-                <aside className="mb-4 lg:mb-0 lg:-ml-2">
-                    <nav className="flex lg:flex-col gap-2 rounded-md">
+                <aside className="mb-4 lg:mb-0">
+                    <nav className="flex lg:flex-col gap-0.5 overflow-x-auto lg:overflow-visible">
                         {sections.map((item) => (
                             <button
                                 key={item.id}
                                 type="button"
                                 onClick={() => setSection(item.id)}
                                 className={cn(
-                                    'flex items-center gap-2 h-8 px-2.5 rounded text-xs text-left transition-colors',
+                                    'h-8 px-2.5 rounded-lg text-xs text-left transition-all whitespace-nowrap',
                                     section === item.id
                                         ? 'bg-secondary text-foreground font-medium'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                                 )}
                             >
                                 {item.label}
@@ -377,101 +381,169 @@ export default function ObservabilityPage({ params }: PageProps) {
                 <div className="min-w-0">
                     {section === 'overview' && (
                         <>
-                            {overview && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                                    <MetricCardWithChart
-                                        title="AI Edge Requests"
-                                        subtitle="REST Requests"
-                                        icon={<ChartBarIcon className="h-5 w-5" />}
-                                        value={overview.overview.total_requests}
-                                        lastUpdate={aiLastUpdate}
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.total,
-                                        }))}
-                                    />
-                                    <MetricCardWithLineChart
-                                        title="Auth"
-                                        subtitle="Success Rate"
-                                        icon={<BoltIcon className="h-5 w-5" />}
-                                        value={overview.overview.success_rate}
-                                        format="percentage"
-                                        lastUpdate={aiLastUpdate}
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.total > 0 ? Math.round((point.success / point.total) * 100) : 0,
-                                        }))}
-                                    />
-                                    <MetricCardWithLineChart
-                                        title="Billing"
-                                        subtitle="Total Cost"
-                                        icon={<CurrencyDollarIcon className="h-5 w-5" />}
-                                        value={overview.overview.total_cost}
-                                        format="currency"
-                                        lastUpdate={aiLastUpdate}
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.cost,
-                                        }))}
-                                        lineColor="hsl(217, 91%, 60%)"
-                                    />
-                                    <MetricCardWithLineChart
-                                        title="Performance"
-                                        subtitle="Avg Latency"
-                                        icon={<ClockIcon className="h-5 w-5" />}
-                                        value={overview.overview.avg_latency}
-                                        format="ms"
-                                        lastUpdate={aiLastUpdate}
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.avg_latency,
-                                        }))}
-                                        lineColor="hsl(24, 96%, 53%)"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <MetricCardWithChart
-                                    title="HTTP Traffic"
-                                    subtitle="API + web requests"
-                                    icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={httpSummary.total}
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'total')}
-                                />
-                                <MetricCardWithLineChart
-                                    title="HTTP Health"
-                                    subtitle="Success rate"
-                                    icon={<BoltIcon className="h-5 w-5" />}
-                                    value={httpSummary.successRate}
-                                    format="percentage"
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'success')}
-                                    lineColor="hsl(142, 71%, 45%)"
-                                />
+                            {/* AI Charts grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-2.5">
+                                {!overview ? (
+                                    <>
+                                        <ObservabilityChartCardSkeleton />
+                                        <ObservabilityChartCardSkeleton />
+                                        <ObservabilityChartCardSkeleton />
+                                        <ObservabilityChartCardSkeleton />
+                                    </>
+                                ) : (
+                                    <>
+                                        <ObservabilityChartCard
+                                            title="AI Requests"
+                                            href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`}
+                                            series={[
+                                                {
+                                                    key: 'success',
+                                                    label: 'Success',
+                                                    color: 'hsl(142, 71%, 45%)',
+                                                    total: overview.overview.total_requests,
+                                                    format: 'number',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.success })),
+                                                },
+                                                {
+                                                    key: 'error',
+                                                    label: 'Error',
+                                                    color: 'hsl(0, 84%, 60%)',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.error })),
+                                                },
+                                                {
+                                                    key: 'filtered',
+                                                    label: 'Filtered',
+                                                    color: 'hsl(24, 96%, 53%)',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.filtered })),
+                                                },
+                                            ]}
+                                        />
+                                        <ObservabilityChartCard
+                                            title="Cost"
+                                            series={[
+                                                {
+                                                    key: 'cost',
+                                                    label: 'Total spend',
+                                                    color: 'hsl(217, 91%, 60%)',
+                                                    total: overview.overview.total_cost,
+                                                    format: 'currency',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.cost })),
+                                                },
+                                            ]}
+                                        />
+                                        <ObservabilityChartCard
+                                            title="Success Rate"
+                                            series={[
+                                                {
+                                                    key: 'rate',
+                                                    label: 'Success',
+                                                    color: 'hsl(142, 71%, 45%)',
+                                                    total: overview.overview.success_rate,
+                                                    format: 'percentage',
+                                                    data: trends.map(p => ({
+                                                        timestamp: p.timestamp,
+                                                        value: p.total > 0 ? Math.round((p.success / p.total) * 100) : 0,
+                                                    })),
+                                                },
+                                            ]}
+                                        />
+                                        <ObservabilityChartCard
+                                            title="Latency"
+                                            series={[
+                                                {
+                                                    key: 'latency',
+                                                    label: 'Avg response',
+                                                    color: 'hsl(24, 96%, 53%)',
+                                                    total: overview.overview.avg_latency,
+                                                    format: 'ms',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.avg_latency })),
+                                                },
+                                            ]}
+                                        />
+                                        <ObservabilityChartCard
+                                            title="Tokens"
+                                            series={[
+                                                {
+                                                    key: 'tokens',
+                                                    label: 'Total tokens',
+                                                    color: 'hsl(280, 65%, 60%)',
+                                                    total: overview.overview.total_tokens,
+                                                    format: 'number',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.tokens })),
+                                                },
+                                            ]}
+                                        />
+                                        <ObservabilityChartCard
+                                            title="Security"
+                                            href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/security`}
+                                            series={[
+                                                {
+                                                    key: 'incidents',
+                                                    label: 'Incidents',
+                                                    color: 'hsl(280, 65%, 60%)',
+                                                    total: overview.overview.total_incidents,
+                                                    format: 'number',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.filtered + p.blocked_output })),
+                                                },
+                                                {
+                                                    key: 'blocked',
+                                                    label: 'Blocked',
+                                                    color: 'hsl(0, 84%, 60%)',
+                                                    data: trends.map(p => ({ timestamp: p.timestamp, value: p.blocked_output })),
+                                                },
+                                            ]}
+                                        />
+                                    </>
+                                )}
                             </div>
 
-                            {trends.length > 0 && (
-                                <div className="mb-6">
-                                    <RequestsAreaChart data={trends} groupBy={groupBy} />
-                                </div>
-                            )}
-
-                            {trends.length > 0 && (
-                                <div className="mb-6">
-                                    <TokenUsageChart data={trends} groupBy={groupBy} />
+                            {/* HTTP section — only show when there's actual HTTP data */}
+                            {httpSummary.total > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2.5">
+                                    <ObservabilityChartCard
+                                        title="HTTP Traffic"
+                                        type="bar"
+                                        series={[
+                                            {
+                                                key: 'total',
+                                                label: 'Requests',
+                                                color: 'hsl(217, 91%, 60%)',
+                                                total: httpSummary.total,
+                                                format: 'number',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.total })),
+                                            },
+                                            {
+                                                key: 'error',
+                                                label: 'Errors',
+                                                color: 'hsl(0, 84%, 60%)',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.error })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="HTTP Success Rate"
+                                        series={[
+                                            {
+                                                key: 'success',
+                                                label: 'Success',
+                                                color: 'hsl(142, 71%, 45%)',
+                                                total: httpSummary.successRate,
+                                                format: 'percentage',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.success })),
+                                            },
+                                        ]}
+                                    />
                                 </div>
                             )}
 
                             {emptyOverall && (
-                                <div className="text-center py-16 flex flex-col items-center rounded-lg border border-border/40 bg-card mt-6">
-                                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                                        <BoltIcon className="h-6 w-6 text-primary" />
+                                <div className="text-center py-14 flex flex-col items-center rounded-xl border border-border/30 bg-card mt-4">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center mb-3">
+                                        <BoltIcon className="h-5 w-5 text-primary/70" />
                                     </div>
-                                    <p className="text-sm font-medium mb-1">No data yet</p>
-                                    <p className="text-xs text-muted-foreground max-w-[320px]">
-                                        Make AI or HTTP requests to populate observability metrics.
+                                    <p className="text-sm font-medium mb-0.5">No data yet</p>
+                                    <p className="text-xs text-muted-foreground/60 max-w-[280px]">
+                                        Make your first AI request to see metrics here.
                                     </p>
                                 </div>
                             )}
@@ -493,20 +565,77 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 </Button>
                             </div>
 
-                            {trends.length > 0 && (
-                                <div className="mb-6">
-                                    <RequestsAreaChart data={trends} groupBy={groupBy} />
-                                </div>
-                            )}
-
-                            {trends.length > 0 && (
-                                <div className="mb-6">
-                                    <TokenUsageChart data={trends} groupBy={groupBy} />
+                            {overview && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-4">
+                                    <ObservabilityChartCard
+                                        title="Requests"
+                                        series={[
+                                            {
+                                                key: 'success',
+                                                label: 'Success',
+                                                color: 'hsl(142, 71%, 45%)',
+                                                total: overview.overview.total_requests,
+                                                format: 'number',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.success })),
+                                            },
+                                            {
+                                                key: 'filtered',
+                                                label: 'Filtered',
+                                                color: 'hsl(24, 96%, 53%)',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.filtered })),
+                                            },
+                                            {
+                                                key: 'error',
+                                                label: 'Error',
+                                                color: 'hsl(0, 84%, 60%)',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.error })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Tokens"
+                                        series={[
+                                            {
+                                                key: 'tokens',
+                                                label: 'Total tokens',
+                                                color: 'hsl(280, 65%, 60%)',
+                                                total: overview.overview.total_tokens,
+                                                format: 'number',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.tokens })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Cost"
+                                        series={[
+                                            {
+                                                key: 'cost',
+                                                label: 'Total spend',
+                                                color: 'hsl(217, 91%, 60%)',
+                                                total: overview.overview.total_cost,
+                                                format: 'currency',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.cost })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Latency"
+                                        series={[
+                                            {
+                                                key: 'latency',
+                                                label: 'Avg response',
+                                                color: 'hsl(24, 96%, 53%)',
+                                                total: overview.overview.avg_latency,
+                                                format: 'ms',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.avg_latency })),
+                                            },
+                                        ]}
+                                    />
                                 </div>
                             )}
 
                             {overview && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                                     <ModelUsageChart data={overview.breakdown.model_usage} />
                                     <CostByProviderChart data={overview.breakdown.cost_by_provider} />
                                     <LatencyHistogram data={overview.breakdown.latency_percentiles} />
@@ -520,7 +649,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h2 className="text-sm font-medium">HTTP Traffic</h2>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Unified API and web request health, status mix, and request volume.</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">API gateway and web request health, status mix, and volume.</p>
                                 </div>
                                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                                     <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs?source=http`}>
@@ -530,52 +659,92 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 </Button>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                                <MetricCardWithChart
-                                    title="Requests"
-                                    subtitle="Total volume"
-                                    icon={<ChartBarIcon className="h-5 w-5" />}
-                                    value={httpSummary.total}
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'total')}
-                                />
-                                <MetricCardWithLineChart
-                                    title="Success"
-                                    subtitle="2xx/3xx"
-                                    icon={<BoltIcon className="h-5 w-5" />}
-                                    value={httpSummary.successRate}
-                                    format="percentage"
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'success')}
-                                    lineColor="hsl(142, 71%, 45%)"
-                                />
-                                <MetricCardWithLineChart
-                                    title="Errors"
-                                    subtitle="4xx/5xx"
-                                    icon={<ShieldExclamationIcon className="h-5 w-5" />}
-                                    value={httpSummary.errorRate}
-                                    format="percentage"
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'error')}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                />
-                                <MetricCardWithLineChart
-                                    title="Rate Limited"
-                                    subtitle="429 responses"
-                                    icon={<ClockIcon className="h-5 w-5" />}
-                                    value={httpSummary.filtered}
-                                    lastUpdate={httpLastUpdate}
-                                    chartData={toHttpMetricSeries(httpTrends, 'filtered')}
-                                    lineColor="hsl(24, 96%, 53%)"
-                                />
-                            </div>
+                            {httpSummary.total > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                    <ObservabilityChartCard
+                                        title="Requests"
+                                        type="bar"
+                                        series={[
+                                            {
+                                                key: 'total',
+                                                label: 'Total',
+                                                color: 'hsl(217, 91%, 60%)',
+                                                total: httpSummary.total,
+                                                format: 'number',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.total })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Success Rate"
+                                        series={[
+                                            {
+                                                key: 'success',
+                                                label: 'Success',
+                                                color: 'hsl(142, 71%, 45%)',
+                                                total: httpSummary.successRate,
+                                                format: 'percentage',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.success })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Errors"
+                                        series={[
+                                            {
+                                                key: 'error',
+                                                label: '4xx/5xx',
+                                                color: 'hsl(0, 84%, 60%)',
+                                                total: httpSummary.errorRate,
+                                                format: 'percentage',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.error })),
+                                            },
+                                        ]}
+                                    />
+                                    <ObservabilityChartCard
+                                        title="Rate Limited"
+                                        series={[
+                                            {
+                                                key: 'filtered',
+                                                label: '429 responses',
+                                                color: 'hsl(24, 96%, 53%)',
+                                                total: httpSummary.filtered,
+                                                format: 'number',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.filtered })),
+                                            },
+                                        ]}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="rounded-xl border border-border/30 bg-card px-5 py-4">
+                                        <p className="text-sm font-medium mb-1">Connect Vercel to see HTTP traffic</p>
+                                        <p className="text-xs text-muted-foreground/60 max-w-[480px] mb-4">
+                                            Install the Vercel integration to automatically stream every request to your observability dashboard — no SDK or code changes needed.
+                                        </p>
+                                        <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+                                            <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/edge`}>
+                                                Set up Vercel Integration
+                                                <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                                            </Link>
+                                        </Button>
+                                    </div>
 
-                            <LogsBarChart
-                                projectId={projectId}
-                                timeRange={timeRange}
-                                environment={environment}
-                                source="http"
-                            />
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                                        {[
+                                            { label: 'Request Volume', desc: 'Total requests, methods, and paths across all routes' },
+                                            { label: 'Success Rate', desc: '2xx/3xx vs 4xx/5xx breakdown over time' },
+                                            { label: 'Error Tracking', desc: 'Spot failing endpoints and status code spikes' },
+                                            { label: 'Rate Limiting', desc: '429 responses and throttle patterns per route' },
+                                        ].map(card => (
+                                            <div key={card.label} className="rounded-xl border border-dashed border-border/30 bg-card/50 px-4 py-3.5">
+                                                <p className="text-xs font-medium text-muted-foreground/70 mb-1">{card.label}</p>
+                                                <p className="text-[10px] text-muted-foreground/40 leading-relaxed">{card.desc}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -586,72 +755,71 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 <p className="text-xs text-muted-foreground mt-0.5">Failover behavior, request error rates, and system stability signals.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            {/* Failover card — keeps its own data fetching */}
+                            <div className="mb-4">
                                 <FailoverMetrics
                                     projectId={projectId}
                                     environment={environment}
                                     timeRange={timeRange}
                                 />
-                                <MetricCardWithLineChart
-                                    title="HTTP Errors"
-                                    subtitle="4xx/5xx rate"
-                                    value={httpSummary.errorRate}
-                                    format="percentage"
-                                    chartData={toHttpMetricSeries(httpTrends, 'error')}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                    lastUpdate={httpLastUpdate}
-                                />
-                                <MetricCardWithLineChart
-                                    title="HTTP Throttles"
-                                    subtitle="429 spikes"
-                                    value={httpSummary.filtered}
-                                    chartData={toHttpMetricSeries(httpTrends, 'filtered')}
-                                    lineColor="hsl(24, 96%, 53%)"
-                                    lastUpdate={httpLastUpdate}
-                                />
                             </div>
 
                             {overview && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <MetricCardWithLineChart
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                    <ObservabilityChartCard
                                         title="AI Success Rate"
-                                        subtitle="Request reliability"
-                                        value={overview.overview.success_rate}
-                                        format="percentage"
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.total > 0 ? Math.round((point.success / point.total) * 100) : 0,
-                                        }))}
-                                        lineColor="hsl(142, 71%, 45%)"
-                                        lastUpdate={aiLastUpdate}
+                                        series={[
+                                            {
+                                                key: 'rate',
+                                                label: 'Success',
+                                                color: 'hsl(142, 71%, 45%)',
+                                                total: overview.overview.success_rate,
+                                                format: 'percentage',
+                                                data: trends.map(p => ({
+                                                    timestamp: p.timestamp,
+                                                    value: p.total > 0 ? Math.round((p.success / p.total) * 100) : 0,
+                                                })),
+                                            },
+                                        ]}
                                     />
-                                    <MetricCardWithLineChart
+                                    <ObservabilityChartCard
                                         title="Average Latency"
-                                        subtitle="AI request response"
-                                        value={overview.overview.avg_latency}
-                                        format="ms"
-                                        chartData={trends.map((point) => ({
-                                            label: formatTimestamp(point.timestamp),
-                                            value: point.avg_latency,
-                                        }))}
-                                        lineColor="hsl(24, 96%, 53%)"
-                                        lastUpdate={aiLastUpdate}
+                                        series={[
+                                            {
+                                                key: 'latency',
+                                                label: 'Avg response',
+                                                color: 'hsl(24, 96%, 53%)',
+                                                total: overview.overview.avg_latency,
+                                                format: 'ms',
+                                                data: trends.map(p => ({ timestamp: p.timestamp, value: p.avg_latency })),
+                                            },
+                                        ]}
                                     />
-                                    <MetricCardWithLineChart
-                                        title="HTTP Success Rate"
-                                        subtitle="API + web"
-                                        value={httpSummary.successRate}
-                                        format="percentage"
-                                        chartData={toHttpMetricSeries(httpTrends, 'success')}
-                                        lineColor="hsl(142, 71%, 45%)"
-                                        lastUpdate={httpLastUpdate}
+                                    <ObservabilityChartCard
+                                        title="HTTP Errors"
+                                        series={[
+                                            {
+                                                key: 'error',
+                                                label: '4xx/5xx rate',
+                                                color: 'hsl(0, 84%, 60%)',
+                                                total: httpSummary.errorRate,
+                                                format: 'percentage',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.error })),
+                                            },
+                                        ]}
                                     />
-                                    <MetricCardWithChart
-                                        title="HTTP Volume"
-                                        subtitle="Traffic stability"
-                                        value={httpSummary.total}
-                                        chartData={toHttpMetricSeries(httpTrends, 'total')}
-                                        lastUpdate={httpLastUpdate}
+                                    <ObservabilityChartCard
+                                        title="HTTP Throttles"
+                                        series={[
+                                            {
+                                                key: 'filtered',
+                                                label: '429 responses',
+                                                color: 'hsl(24, 96%, 53%)',
+                                                total: httpSummary.filtered,
+                                                format: 'number',
+                                                data: httpTrends.map(p => ({ timestamp: p.timestamp, value: p.filtered })),
+                                            },
+                                        ]}
                                     />
                                 </div>
                             )}
@@ -665,50 +833,56 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 <p className="text-xs text-muted-foreground mt-0.5">Incident severity, filtered patterns, and safety-related request behavior.</p>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                                <MetricCardWithLineChart
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-6">
+                                <ObservabilityChartCard
                                     title="Security Incidents"
-                                    subtitle="Total detected"
-                                    value={overview.overview.total_incidents}
-                                    chartData={trends.map((point) => ({
-                                        label: formatTimestamp(point.timestamp),
-                                        value: point.filtered + point.blocked_output,
-                                    }))}
-                                    lineColor="hsl(280, 65%, 60%)"
-                                    lastUpdate={aiLastUpdate}
+                                    series={[
+                                        {
+                                            key: 'incidents',
+                                            label: 'Incidents',
+                                            color: 'hsl(280, 65%, 60%)',
+                                            data: trends.map(p => ({ timestamp: p.timestamp, value: p.filtered + p.blocked_output })),
+                                            total: overview.overview.total_incidents,
+                                        },
+                                    ]}
                                 />
-                                <MetricCardWithLineChart
-                                    title="Critical"
-                                    subtitle="Severity level"
-                                    value={overview.breakdown.incidents_by_severity.critical}
-                                    chartData={trends.map((point) => ({
-                                        label: formatTimestamp(point.timestamp),
-                                        value: point.error,
-                                    }))}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                    lastUpdate={aiLastUpdate}
+                                <ObservabilityChartCard
+                                    title="Critical Severity"
+                                    series={[
+                                        {
+                                            key: 'critical',
+                                            label: 'Critical',
+                                            color: 'hsl(0, 84%, 60%)',
+                                            data: trends.map(p => ({ timestamp: p.timestamp, value: p.filtered + p.blocked_output })),
+                                            total: overview.breakdown.incidents_by_severity.critical,
+                                        },
+                                    ]}
                                 />
-                                <MetricCardWithLineChart
+                                <ObservabilityChartCard
                                     title="High Priority"
-                                    subtitle="Needs attention"
-                                    value={overview.breakdown.incidents_by_severity.high}
-                                    chartData={trends.map((point) => ({
-                                        label: formatTimestamp(point.timestamp),
-                                        value: point.filtered,
-                                    }))}
-                                    lineColor="hsl(24, 96%, 53%)"
-                                    lastUpdate={aiLastUpdate}
+                                    series={[
+                                        {
+                                            key: 'high',
+                                            label: 'High',
+                                            color: 'hsl(24, 96%, 53%)',
+                                            data: overview.breakdown.incidents_by_severity.high > 0
+                                                ? trends.map(p => ({ timestamp: p.timestamp, value: p.filtered }))
+                                                : [],
+                                            total: overview.breakdown.incidents_by_severity.high,
+                                        },
+                                    ]}
                                 />
-                                <MetricCardWithLineChart
+                                <ObservabilityChartCard
                                     title="Blocked Output"
-                                    subtitle="Output protections"
-                                    value={trends.reduce((sum, point) => sum + (point.blocked_output || 0), 0)}
-                                    chartData={trends.map((point) => ({
-                                        label: formatTimestamp(point.timestamp),
-                                        value: point.blocked_output || 0,
-                                    }))}
-                                    lineColor="hsl(0, 84%, 60%)"
-                                    lastUpdate={aiLastUpdate}
+                                    series={[
+                                        {
+                                            key: 'blocked',
+                                            label: 'Blocked',
+                                            color: 'hsl(0, 84%, 60%)',
+                                            data: trends.map(p => ({ timestamp: p.timestamp, value: p.blocked_output || 0 })),
+                                            total: trends.reduce((sum, p) => sum + (p.blocked_output || 0), 0),
+                                        },
+                                    ]}
                                 />
                             </div>
 
@@ -721,6 +895,9 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 </Button>
                             </div>
                         </>
+                    )}
+                    {section === 'intelligence' && projectId && (
+                        <IntelligencePanel projectId={projectId} environment={environment} />
                     )}
                 </div>
             </div>
