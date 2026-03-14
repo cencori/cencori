@@ -96,8 +96,8 @@ interface SectionDefinition {
 
 const sections: SectionDefinition[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'ai', label: 'AI Gateway' },
-    { id: 'http', label: 'HTTP Traffic' },
+    { id: 'ai', label: 'AI' },
+    { id: 'http', label: 'HTTP' },
     { id: 'reliability', label: 'Reliability' },
     { id: 'security', label: 'Security' },
     { id: 'intelligence', label: 'Intelligence' },
@@ -297,10 +297,10 @@ export default function ObservabilityPage({ params }: PageProps) {
                 </div>
                 <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
                     <div className="mb-4 lg:mb-0 space-y-0.5">
-                        {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full max-w-[180px] rounded-lg" />)}
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-8 w-full max-w-[180px] rounded-lg" />)}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                        {[1,2,3,4,5].map(i => (
+                        {[1, 2, 3, 4, 5].map(i => (
                             <ObservabilityChartCardSkeleton key={i} />
                         ))}
                     </div>
@@ -342,10 +342,10 @@ export default function ObservabilityPage({ params }: PageProps) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
-                            <SelectItem value="24h" className="text-xs">Last 24 Hours</SelectItem>
-                            <SelectItem value="7d" className="text-xs">Last 7 Days</SelectItem>
-                            <SelectItem value="30d" className="text-xs">Last 30 Days</SelectItem>
-                            <SelectItem value="90d" className="text-xs">Last 90 Days</SelectItem>
+                            <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
+                            <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
+                            <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
+                            <SelectItem value="90d" className="text-xs">90 Days</SelectItem>
                             <SelectItem value="all" className="text-xs">All Time</SelectItem>
                         </SelectContent>
                     </Select>
@@ -549,7 +549,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                         <>
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 className="text-sm font-medium">AI Gateway</h2>
+                                    <h2 className="text-sm font-medium">AI</h2>
                                     <p className="text-xs text-muted-foreground mt-0.5">Model traffic, token usage, provider cost, and latency.</p>
                                 </div>
                                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
@@ -643,8 +643,8 @@ export default function ObservabilityPage({ params }: PageProps) {
                         <>
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 className="text-sm font-medium">HTTP Traffic</h2>
-                                    <p className="text-xs text-muted-foreground mt-0.5">API gateway and web request health, status mix, and volume.</p>
+                                    <h2 className="text-sm font-medium">HTTP</h2>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Unified API and web request health, status mix, and request volume.</p>
                                 </div>
                                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                                     <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs?source=http`}>
