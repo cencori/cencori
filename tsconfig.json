@@ -38,6 +38,8 @@
   "exclude": [
     "node_modules",
     "packages",
-    "examples"
+    "examples",
+    "tmp",
+    ".claude"
   ]
 }
