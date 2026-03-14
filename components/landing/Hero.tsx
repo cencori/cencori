@@ -18,7 +18,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
 
                 {/* Announcement Badge */}
                 <div className="mb-8 animate-appear">
-                    <Link href="/changelog" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
+                    <Link href="/login" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
                         <span className="mr-2">Try AI Gateway for free.</span>
                     </Link>
@@ -26,12 +26,12 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
 
                 {/* Headline */}
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-                    The Infrastructure <span className="italic">for</span> AI Production
+                    Every AI request, under your control.
                 </h1>
 
                 {/* Subheadline */}
                 <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
-                    Ship AI with built-in security, observability, and scale. One platform for everything.
+                    The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.
                 </p>
 
                 {/* CTAs */}

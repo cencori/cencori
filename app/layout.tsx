@@ -95,10 +95,10 @@ const keywords = [
 export const metadata: Metadata = {
   metadataBase: new URL('https://cencori.com'),
   title: {
-    default: "Cencori | The Infrastructure for AI Production.",
+    default: "Cencori | Every AI request, under your control.",
     template: "%s - Cencori",
   },
-  description: "Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
+  description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
   keywords: keywords,
   authors: [{ name: "Cencori" }],
   creator: "Cencori",
@@ -110,14 +110,14 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://cencori.com",
     siteName: "Cencori",
-    title: "Cencori | The Infrastructure for AI Production",
-    description: "Ship AI with built-in security, observability, and scale — all in one platform.",
+    title: "Cencori | Every AI request, under your control.",
+    description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Cencori — The Infrastructure for AI Production",
+        alt: "Cencori — Every AI request, under your control.",
       },
     ],
   },
@@ -127,8 +127,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@cencori",
     creator: "@cencori",
-    title: "Cencori | The Infrastructure for AI Production",
-    description: "Ship AI with built-in security, observability, and scale — all in one platform.",
+    title: "Cencori | Every AI request, under your control.",
+    description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: ["/og.png"],
   },
 

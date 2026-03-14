@@ -148,4 +148,20 @@ export async function triggerAnomalyWebhook(
     return triggerWebhooks(projectId, WEBHOOK_EVENTS.ANOMALY_DETECTED, anomalyData);
 }
 
+/**
+ * Helper to trigger cost threshold webhooks
+ */
+export async function triggerCostThresholdWebhook(
+    projectId: string,
+    costData: {
+        threshold_percent: number;
+        current_spend: number;
+        monthly_budget: number;
+        percent_used: number;
+        is_cap_reached: boolean;
+    }
+) {
+    return triggerWebhooks(projectId, WEBHOOK_EVENTS.COST_THRESHOLD, costData);
+}
+
 export { WEBHOOK_EVENTS };

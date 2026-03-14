@@ -1,10 +1,11 @@
 /**
  * Budget Management for Projects
- * 
+ *
  * Handles budget alerts and spend caps for AI Gateway usage.
  */
 
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { triggerCostThresholdWebhook } from '@/lib/webhooks/trigger';
 
 // Alert thresholds (percentage of budget)
 const ALERT_THRESHOLDS = [50, 80, 100];
@@ -205,6 +206,8 @@ async function sendBudgetAlert(
         sent_to: emails,
     });
 
+    const percentUsed = (currentSpend / budget) * 100;
+
     // Send email via internal API
     try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/email/budget-alert`, {
@@ -216,7 +219,7 @@ async function sendBudgetAlert(
                 threshold,
                 currentSpend,
                 budget,
-                percentUsed: (currentSpend / budget) * 100,
+                percentUsed,
             }),
         });
 
@@ -227,6 +230,97 @@ async function sendBudgetAlert(
         }
     } catch (error) {
         console.error('[Budget] Error sending alert email:', error);
+    }
+
+    // Trigger cost.threshold webhook
+    void triggerCostThresholdWebhook(projectId, {
+        threshold_percent: threshold,
+        current_spend: currentSpend,
+        monthly_budget: budget,
+        percent_used: percentUsed,
+        is_cap_reached: threshold >= 100,
+    });
+
+    // Send Slack/Discord notifications if configured
+    void sendSlackDiscordBudgetAlert(projectId, projectName, threshold, currentSpend, budget, percentUsed);
+}
+
+/**
+ * Send budget alert to Slack/Discord webhooks configured on the project
+ */
+async function sendSlackDiscordBudgetAlert(
+    projectId: string,
+    projectName: string,
+    threshold: number,
+    currentSpend: number,
+    budget: number,
+    percentUsed: number,
+): Promise<void> {
+    const supabase = createAdminClient();
+
+    // Check for Slack/Discord webhook URLs in project settings
+    const { data: project } = await supabase
+        .from('projects')
+        .select('slack_webhook_url, discord_webhook_url')
+        .eq('id', projectId)
+        .single();
+
+    if (!project) return;
+
+    const isOverBudget = threshold >= 100;
+    const emoji = isOverBudget ? '🚨' : threshold >= 80 ? '⚠️' : '📊';
+    const title = isOverBudget
+        ? `Budget exceeded for ${projectName}`
+        : `Budget alert: ${projectName} at ${threshold}%`;
+
+    // Slack
+    if (project.slack_webhook_url) {
+        try {
+            await fetch(project.slack_webhook_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: `${emoji} *${title}*`,
+                    blocks: [
+                        {
+                            type: 'section',
+                            text: {
+                                type: 'mrkdwn',
+                                text: `${emoji} *${title}*\n\n*Current spend:* $${currentSpend.toFixed(2)}\n*Monthly budget:* $${budget.toFixed(2)}\n*Usage:* ${Math.round(percentUsed)}%`,
+                            },
+                        },
+                    ],
+                }),
+                signal: AbortSignal.timeout(5000),
+            });
+        } catch (error) {
+            console.error('[Budget] Slack notification failed:', error);
+        }
+    }
+
+    // Discord
+    if (project.discord_webhook_url) {
+        try {
+            await fetch(project.discord_webhook_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    embeds: [{
+                        title: `${emoji} ${title}`,
+                        color: isOverBudget ? 0xDC2626 : threshold >= 80 ? 0xF59E0B : 0x3B82F6,
+                        fields: [
+                            { name: 'Current Spend', value: `$${currentSpend.toFixed(2)}`, inline: true },
+                            { name: 'Monthly Budget', value: `$${budget.toFixed(2)}`, inline: true },
+                            { name: 'Usage', value: `${Math.round(percentUsed)}%`, inline: true },
+                        ],
+                        timestamp: new Date().toISOString(),
+                    }],
+                }),
+                signal: AbortSignal.timeout(5000),
+            });
+        } catch (error) {
+            console.error('[Budget] Discord notification failed:', error);
+        }
     }
 }
 

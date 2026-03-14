@@ -22,6 +22,17 @@ import {
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import type { AIProvider } from "@/lib/providers/base";
+import {
+    computeExactCacheKey,
+    getProjectCacheConfig,
+    lookupCache,
+    storeInCache,
+    recordCacheHit,
+    logCacheEvent,
+} from "@/lib/cache/prompt-cache";
+import type { CacheConfig, CacheLookupResult } from "@/lib/cache/types";
+import { resolvePrompt, logPromptUsage } from "@/lib/prompts/registry";
+import type { ResolvedPrompt } from "@/lib/prompts/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -47,6 +58,12 @@ type ChatRequestBody = {
     tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
     tool_choice?: OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
     stream?: boolean;
+    temperature?: number;
+    max_tokens?: number;
+    prompt?: {
+        name: string;
+        variables?: Record<string, string>;
+    };
 };
 
 type UsageAndCost = {
@@ -474,6 +491,32 @@ export async function POST(req: NextRequest) {
             ];
         }
 
+        // ── Prompt Registry resolution (if no agent system_prompt) ──
+        let resolvedPrompt: ResolvedPrompt | null = null;
+        const promptRef = body.prompt?.name || req.headers.get("X-Cencori-Prompt");
+        if (promptRef && gatewayCtx && !agentConfig?.system_prompt) {
+            try {
+                const varsHeader = req.headers.get("X-Cencori-Prompt-Vars");
+                const variables = body.prompt?.variables
+                    || (varsHeader ? JSON.parse(varsHeader) : undefined);
+
+                resolvedPrompt = await resolvePrompt(gatewayCtx.projectId, promptRef, variables);
+                if (!resolvedPrompt) {
+                    return respondError(404, `Prompt "${promptRef}" not found or has no active version`, 'prompt_not_found');
+                }
+
+                // Inject as system message
+                messages = messages.filter((m) => m.role !== "system");
+                messages = [
+                    { role: "system", content: resolvedPrompt.content },
+                    ...messages,
+                ];
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : 'Prompt resolution failed';
+                return respondError(400, msg, 'prompt_resolution_failed');
+            }
+        }
+
         const toUnifiedMessages = (items: ChatMessage[]): UnifiedMessage[] => {
             return items.map((m) => ({
                 role: (m.role === "system" || m.role === "assistant" || m.role === "tool") ? m.role : "user",
@@ -502,6 +545,145 @@ export async function POST(req: NextRequest) {
             ? (customProvider.apiFormat === "anthropic" ? "anthropic" : "openai")
             : (detectProviderFromModel(model) || 'openai');
         const providerLogName = customProvider?.providerTag || provider;
+
+        // ── Prompt Cache Intercept ──
+        let cacheConfig: CacheConfig | null = null;
+        let cacheResult: CacheLookupResult | null = null;
+        let cacheKey: string | null = null;
+        let promptTextForCache: string | null = null;
+
+        if (gatewayCtx && !shouldStream && !tools) {
+            try {
+                cacheConfig = await getProjectCacheConfig(gatewayCtx.projectId);
+
+                if (cacheConfig.cacheEnabled && !cacheConfig.excludedModels.includes(model)) {
+                    const requestTemp = body.temperature ?? 0;
+
+                    if (requestTemp <= cacheConfig.maxCacheableTemperature) {
+                        const normalizedMsgs = messages.map(m => ({
+                            role: String(m.role),
+                            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+                        }));
+
+                        cacheKey = computeExactCacheKey({
+                            projectId: gatewayCtx.projectId,
+                            model,
+                            temperature: requestTemp,
+                            maxTokens: body.max_tokens,
+                            messages: normalizedMsgs,
+                        });
+
+                        promptTextForCache = normalizedMsgs.map(m => `${m.role}: ${m.content}`).join('\n');
+
+                        cacheResult = await lookupCache({
+                            projectId: gatewayCtx.projectId,
+                            cacheKey,
+                            promptText: promptTextForCache,
+                            model,
+                            config: cacheConfig,
+                        });
+
+                        if (cacheResult.hit && cacheResult.response) {
+                            // Track hit
+                            const estimatedTokens = cacheResult.response?.usage?.total_tokens || 0;
+                            const estimatedCost = 0; // Cache hits are free
+                            if (cacheResult.entryId) {
+                                void recordCacheHit(cacheResult.entryId, estimatedTokens, estimatedCost);
+                            }
+                            void logCacheEvent({
+                                projectId: gatewayCtx.projectId,
+                                entryId: cacheResult.entryId,
+                                eventType: cacheResult.hitType === 'exact' ? 'hit_exact' : 'hit_semantic',
+                                model,
+                                similarityScore: cacheResult.similarityScore ?? undefined,
+                                latencySavedMs: Date.now() - startedAt,
+                                tokensSaved: estimatedTokens,
+                                requestId: gatewayCtx.requestId,
+                            });
+
+                            // Log as cached request (zero cost)
+                            await logGatewayRequest(gatewayCtx, {
+                                endpoint: '/v1/chat/completions',
+                                model,
+                                provider: 'cache',
+                                status: 'success',
+                                promptTokens: 0,
+                                completionTokens: 0,
+                                totalTokens: 0,
+                                costUsd: 0,
+                                providerCostUsd: 0,
+                                cencoriChargeUsd: 0,
+                                markupPercentage: 0,
+                            });
+                            await incrementUsage(gatewayCtx);
+
+                            const cachedResponse = NextResponse.json(cacheResult.response);
+                            cachedResponse.headers.set('X-Cache', cacheResult.hitType === 'exact' ? 'HIT-EXACT' : 'HIT-SEMANTIC');
+                            if (cacheResult.similarityScore) {
+                                cachedResponse.headers.set('X-Cache-Similarity', String(cacheResult.similarityScore.toFixed(4)));
+                            }
+                            return respond(cachedResponse);
+                        } else {
+                            void logCacheEvent({
+                                projectId: gatewayCtx.projectId,
+                                entryId: null,
+                                eventType: 'miss',
+                                model,
+                                requestId: gatewayCtx.requestId,
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                // Cache failures should never block requests
+                console.error('[Cache] Intercept failed:', error);
+            }
+        }
+
+        // Helper: store response in cache after successful non-streaming completion
+        const maybeCacheResponse = (responseJson: any, tokens: number, costUsd: number) => {
+            if (cacheConfig?.cacheEnabled && cacheKey && gatewayCtx && !shouldStream && promptTextForCache) {
+                void storeInCache({
+                    projectId: gatewayCtx.projectId,
+                    cacheKey,
+                    promptText: promptTextForCache,
+                    model,
+                    temperature: body.temperature,
+                    maxTokens: body.max_tokens,
+                    response: responseJson,
+                    embedding: cacheResult?.embedding ?? null,
+                    ttlSeconds: cacheConfig.ttlSeconds,
+                    estimatedTokens: tokens,
+                    estimatedCostUsd: costUsd,
+                }).then(() => {
+                    void logCacheEvent({
+                        projectId: gatewayCtx!.projectId,
+                        entryId: null,
+                        eventType: 'store',
+                        model,
+                        tokensSaved: tokens,
+                        costSavedUsd: costUsd,
+                        requestId: gatewayCtx!.requestId,
+                    });
+                });
+            }
+        };
+
+        // Helper: log prompt usage after successful completion
+        const maybeLogPromptUsage = () => {
+            if (resolvedPrompt && gatewayCtx) {
+                void logPromptUsage({
+                    projectId: gatewayCtx.projectId,
+                    promptId: resolvedPrompt.promptId,
+                    versionId: resolvedPrompt.versionId,
+                    model,
+                    apiKeyId: gatewayCtx.apiKeyId,
+                    requestId: gatewayCtx.requestId,
+                    variablesUsed: body.prompt?.variables || null,
+                    latencyMs: Date.now() - startedAt,
+                });
+            }
+        };
 
         if (provider === 'google') {
             // ── Gemini Adapter ──
@@ -625,7 +807,7 @@ export async function POST(req: NextRequest) {
                     await incrementUsage(gatewayCtx);
                 }
 
-                return respond(NextResponse.json({
+                const googleResponseJson = {
                     id: "chatcmpl-" + Math.random().toString(36).slice(2, 11),
                     object: "chat.completion",
                     created: Math.floor(Date.now() / 1000),
@@ -642,7 +824,10 @@ export async function POST(req: NextRequest) {
                         completion_tokens: usageAndCost.completionTokens,
                         total_tokens: usageAndCost.totalTokens,
                     },
-                }));
+                };
+                maybeCacheResponse(googleResponseJson, usageAndCost.totalTokens, usageAndCost.cencoriChargeUsd);
+                maybeLogPromptUsage();
+                return respond(NextResponse.json(googleResponseJson));
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "Google completion failed";
                 if (gatewayCtx) {
@@ -778,7 +963,7 @@ export async function POST(req: NextRequest) {
                     await incrementUsage(gatewayCtx);
                 }
 
-                return respond(NextResponse.json({
+                const adapterResponseJson = {
                     id: "chatcmpl-" + Math.random().toString(36).slice(2, 11),
                     object: "chat.completion",
                     created: Math.floor(Date.now() / 1000),
@@ -799,7 +984,10 @@ export async function POST(req: NextRequest) {
                         completion_tokens: completion.usage.completionTokens,
                         total_tokens: completion.usage.totalTokens,
                     },
-                }));
+                };
+                maybeCacheResponse(adapterResponseJson, completion.usage.totalTokens, completion.cost.cencoriChargeUsd);
+                maybeLogPromptUsage();
+                return respond(NextResponse.json(adapterResponseJson));
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : `${provider} completion failed`;
                 if (gatewayCtx) {
@@ -1063,6 +1251,8 @@ export async function POST(req: NextRequest) {
                     await incrementUsage(gatewayCtx);
                 }
 
+                maybeCacheResponse(completion, usageAndCost.totalTokens, usageAndCost.cencoriChargeUsd);
+                maybeLogPromptUsage();
                 return respond(NextResponse.json(completion));
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : 'OpenAI-compatible completion failed';

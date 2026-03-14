@@ -11,7 +11,7 @@ const faqData = [
     {
         id: "how-it-works",
         question: "How does Cencori actually work?",
-        answer: "Cencori is a complete platform for shipping AI to production. It includes an AI gateway for routing and security, compute for running models, and tools for workflows and observability. You integrate once with Cencori, and we handle infrastructure (security checks, compute, cost tracking) so you can focus on your product."
+        answer: "Cencori sits between your app and every AI provider. Every request goes through Cencori first — where it's checked for security threats, routed to the right model, logged for compliance, and tracked for cost. The response comes back through the same layer, filtered and audited. You get full visibility and control without changing how you call the AI."
     },
     {
         id: "supported-models",
@@ -58,7 +58,7 @@ const faqData = [
     {
         id: "vs-openai",
         question: "How is Cencori different from using OpenAI directly?",
-        answer: "OpenAI gives you the model. Cencori gives you everything else — the infrastructure for AI production. This includes security (prompt injection, PII detection, content filtering), multi-provider routing (switch between GPT-4, Claude, Gemini), audit logs and compliance (SOC 2, GDPR), cost tracking (spend per user/feature), plus compute and workflow capabilities. Think of it as the difference between renting a database vs. using Supabase.",
+        answer: "OpenAI gives you the model. Cencori gives you control over what happens with it. Security (prompt injection, PII detection, content filtering), multi-provider routing (switch between GPT-4, Claude, Gemini without code changes), audit logs and compliance (SOC 2, GDPR), and cost tracking per user or feature. Think of it as the difference between a raw database and Supabase — same power, but with everything production actually needs built in.",
         content: (
             <>
                 <p className="mb-2">OpenAI gives you the model. Cencori gives you production-ready AI infrastructure:</p>
@@ -76,7 +76,7 @@ const faqData = [
     {
         id: "what-is-cencori",
         question: "What is Cencori?",
-        answer: "Cencori is the infrastructure for AI production. We provide a complete platform for shipping AI — from an API gateway with multi-provider routing and security, to compute, workflows, and observability. Whether you're building a chatbot or orchestrating agents, Cencori handles infrastructure so you can focus on your product."
+        answer: "Cencori is the control layer for AI in production. The moment you ship AI to real users, you need to know what data is leaving your system, who's trying to manipulate your AI, how much it's costing per user, and what to do when a provider goes down. Cencori answers all of those questions — automatically, from your first request."
     },
 ];
 

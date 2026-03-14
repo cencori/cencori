@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabaseAdmin';
+import { invalidateCache } from '@/lib/cache/prompt-cache';
+
+export async function GET(
+    req: NextRequest,
+    { params }: { params: Promise<{ projectId: string }> }
+) {
+    const { projectId } = await params;
+    const url = new URL(req.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+    const model = url.searchParams.get('model');
+    const offset = (page - 1) * limit;
+
+    const supabase = createAdminClient();
+
+    let query = supabase
+        .from('prompt_cache_entries')
+        .select('id, cache_key, prompt_text, model, temperature, hit_count, tokens_saved, cost_saved_usd, last_hit_at, created_at, expires_at', { count: 'exact' })
+        .eq('project_id', projectId)
+        .gt('expires_at', new Date().toISOString())
+        .order('hit_count', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+    if (model) {
+        query = query.eq('model', model);
+    }
+
+    const { data, count, error } = await query;
+
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+        entries: (data || []).map(e => ({
+            ...e,
+            prompt_preview: e.prompt_text.slice(0, 200),
+            prompt_text: undefined,
+        })),
+        total: count || 0,
+        page,
+        limit,
+    });
+}
+
+export async function DELETE(
+    req: NextRequest,
+    { params }: { params: Promise<{ projectId: string }> }
+) {
+    const { projectId } = await params;
+    const body = await req.json();
+
+    const result = await invalidateCache({
+        projectId,
+        cacheKey: body.cache_key,
+        model: body.model,
+        all: body.all,
+    });
+
+    return NextResponse.json({ deleted: result.deletedCount });
+}

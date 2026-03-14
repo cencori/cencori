@@ -19,14 +19,14 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
 
                     <div className="relative z-10 flex flex-col items-center max-w-2xl mx-auto">
                         <div className="mb-4 inline-flex items-center justify-center rounded-full border border-border/40 bg-muted/30 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                            <span>Start building today</span>
+                            <span>Free to start</span>
                         </div>
 
                         <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-foreground">
-                            Ready to build AI?
+                            Your AI is live. Do you know what&apos;s happening inside it?
                         </h2>
                         <p className="text-sm text-muted-foreground mb-6 max-w-lg leading-relaxed">
-                            Join engineers building production-ready AI applications with Cencori.
+                            Add Cencori to your first project in minutes. Security, visibility, and cost control from your very first request.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-2 justify-center">

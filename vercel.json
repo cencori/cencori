@@ -102,6 +102,14 @@
         {
             "path": "/api/cron/reset-usage",
             "schedule": "0 0 1 * *"
+        },
+        {
+            "path": "/api/cron/anomaly-alerts",
+            "schedule": "*/30 * * * *"
+        },
+        {
+            "path": "/api/cron/cache-cleanup",
+            "schedule": "0 * * * *"
         }
     ]
 }

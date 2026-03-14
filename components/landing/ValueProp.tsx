@@ -13,11 +13,11 @@ export const ValueProp = () => {
                     {/* Left: Content */}
                     <div className="flex flex-col gap-8">
                         <h2 className="text-3xl md:text-5xl font-bold tracking-tighter">
-                            Everything you need <br />
-                            <span className="text-muted-foreground">to ship AI</span>
+                            Everything that breaks <br />
+                            <span className="text-muted-foreground">the moment you go live</span>
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed">
-                            From gateway to compute to workflows. Cencori handles infrastructure so you can focus on your product — with security, logging, and cost tracking built-in.
+                            Real users expose everything you didn&apos;t think about. Data leaks. Runaway costs. Zero visibility. Cencori sits between your app and every AI provider — catching it all automatically.
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
