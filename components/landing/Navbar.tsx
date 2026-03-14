@@ -139,12 +139,9 @@ export default function Navbar({
         {
             title: "Products", sublinks: [
                 { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
-                { title: "Compute", href: "/compute" },
-                { title: "Workflow", href: "/workflow" },
-                { title: "Integration", href: "/integration" },
-                { title: "Data Storage", href: "/storage" },
-                { title: "Edge", href: "/edge" },
+                { title: "Memory & RAG", href: "/storage" },
                 { title: "Scan", href: "https://scan.cencori.com" },
+                { title: "Enterprise", href: "/enterprise" },
             ]
         },
         {
@@ -200,16 +197,11 @@ export default function Navbar({
         columns: [
             [
                 { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API for every provider with security and observability." },
-                { title: "Compute", href: "/compute", description: "Serverless functions & GPU access." },
+                { title: "Memory & RAG", href: "/storage", description: "Vector database & semantic search." },
             ],
             [
-                { title: "Workflow", href: "/workflow", description: "Visual AI pipeline builder." },
-                { title: "Integration", href: "/integration", description: "SDKs & platform connectors." },
-            ],
-            [
-                { title: "Data Storage", href: "/storage", description: "Vector database & RAG." },
-                { title: "Edge", href: "/edge", description: "Platform integrations & edge middleware." },
                 { title: "Scan", href: "https://scan.cencori.com", description: "Security scanning & vulnerability detection." },
+                { title: "Enterprise", href: "/enterprise", description: "Compliance, audit, and governance." },
             ],
         ],
     };

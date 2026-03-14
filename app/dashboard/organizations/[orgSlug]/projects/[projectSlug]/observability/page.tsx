@@ -5,14 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { MetricCardWithChart } from '@/components/audit/MetricCardWithChart';
-import { MetricCardWithLineChart } from '@/components/audit/MetricCardWithLineChart';
-import { RequestsAreaChart } from '@/components/audit/RequestsAreaChart';
-import { LogsBarChart } from '@/components/audit/LogsBarChart';
 import { ModelUsageChart } from '@/components/analytics/ModelUsageChart';
 import { CostByProviderChart } from '@/components/analytics/CostByProviderChart';
 import { LatencyHistogram } from '@/components/analytics/LatencyHistogram';
-import { TokenUsageChart } from '@/components/analytics/TokenUsageChart';
 import { FailoverMetrics } from '@/components/analytics/FailoverMetrics';
 import { ObservabilityChartCard, ObservabilityChartCardSkeleton } from '@/components/analytics/ObservabilityChartCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -241,7 +236,7 @@ export default function ObservabilityPage({ params }: PageProps) {
 
     const { data: projectId, isLoading: projectLoading } = useProjectId(orgSlug, projectSlug);
 
-    const { data: overview } = useQuery<OverviewData>({
+    const { data: overview, isLoading: overviewLoading } = useQuery<OverviewData>({
         queryKey: queryKeys.analytics(projectId || '', timeRange),
         queryFn: async () => {
             const res = await fetch(`/api/projects/${projectId}/analytics/overview?time_range=${timeRange}&environment=${environment}`);
@@ -536,7 +531,7 @@ export default function ObservabilityPage({ params }: PageProps) {
                                 </div>
                             )}
 
-                            {emptyOverall && (
+                            {emptyOverall && !overviewLoading && (
                                 <div className="text-center py-14 flex flex-col items-center rounded-xl border border-border/30 bg-card mt-4">
                                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center mb-3">
                                         <BoltIcon className="h-5 w-5 text-primary/70" />

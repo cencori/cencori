@@ -15,7 +15,7 @@ export const Footer = () => {
                             <Logo variant="mark" className="h-4 w-4" />
                         </Link>
                         <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-                            The security layer for AI development.
+                            Every AI request, under your control.
                         </p>
                         <div className="text-[10px] text-muted-foreground/60 font-mono">
                             © 2026 FohnAI
@@ -28,11 +28,7 @@ export const Footer = () => {
                         <ul className="space-y-1.5">
                             <li><Link href="/ai-gateway" className="text-xs text-muted-foreground hover:text-foreground transition-colors">AI Gateway</Link></li>
                             <li><Link href="/ai/models" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Models</Link></li>
-                            <li><Link href="/compute" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Compute</Link></li>
-                            <li><Link href="/workflow" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Workflow</Link></li>
-                            <li><Link href="/integration" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Integration</Link></li>
-                            <li><Link href="/storage" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Data Storage</Link></li>
-                            <li><Link href="/edge" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Edge</Link></li>
+                            <li><Link href="/storage" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Memory & RAG</Link></li>
                             <li><Link href="/enterprise" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Enterprise</Link></li>
                             <li><a href="https://scan.cencori.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Scan</a></li>
                         </ul>
@@ -90,7 +86,7 @@ export const Footer = () => {
                 {/* Bottom bar with social links */}
                 <div className="border-t border-border/20 pt-4 flex flex-col sm:flex-row items-center justify-between mb-6 gap-3">
                     <div className="text-[10px] text-muted-foreground/50">
-                        Built for AI developers who care about infrastructure.
+                        Every AI request, under your control.
                     </div>
                     <div className="flex items-center gap-3">
                         <Link href={siteConfig.links.github} className="text-muted-foreground/50 hover:text-foreground transition-colors">

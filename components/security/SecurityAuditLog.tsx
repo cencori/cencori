@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Key, Shield, Settings, Webhook, AlertTriangle, UserX as X } from 'lucide-react';
+import { FileText, Key, Shield, Settings, Webhook, AlertTriangle, UserX as X, Download } from 'lucide-react';
 import { ShieldCheckIcon, EyeSlashIcon, NoSymbolIcon, WrenchScrewdriverIcon, ArrowPathRoundedSquareIcon } from '@heroicons/react/24/outline';
 
 interface SecurityAuditLogProps {
@@ -118,8 +118,33 @@ export function SecurityAuditLog({ projectId }: SecurityAuditLogProps) {
     const [page, setPage] = useState(1);
     const [eventType, setEventType] = useState('all');
     const [timeRange, setTimeRange] = useState('7d');
+    const [isExporting, setIsExporting] = useState(false);
 
     const { data, isLoading } = useAuditLog(projectId, page, eventType, timeRange);
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const params = new URLSearchParams({ time_range: timeRange });
+            if (eventType !== 'all') params.set('event_type', eventType);
+            const res = await fetch(`/api/projects/${projectId}/security/export?${params}`);
+            if (!res.ok) throw new Error('Export failed');
+            const blob = await res.blob();
+            const disposition = res.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename="([^"]+)"/);
+            const filename = match?.[1] || 'security-audit.csv';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            // silently fail — user can retry
+        } finally {
+            setIsExporting(false);
+        }
+    };
     const logs = data?.logs || [];
     const pagination = data?.pagination || { page: 1, total_pages: 1, total: 0 };
 
@@ -149,7 +174,7 @@ export function SecurityAuditLog({ projectId }: SecurityAuditLogProps) {
     return (
         <div className="space-y-4">
             {/* Filters */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
                 <Select value={eventType} onValueChange={setEventType}>
                     <SelectTrigger className="w-[160px] h-7 text-xs">
                         <SelectValue placeholder="All events" />
@@ -183,6 +208,17 @@ export function SecurityAuditLog({ projectId }: SecurityAuditLogProps) {
                         <SelectItem value="all" className="text-xs">All Time</SelectItem>
                     </SelectContent>
                 </Select>
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs ml-auto"
+                    onClick={handleExport}
+                    disabled={isExporting}
+                >
+                    <Download className="h-3 w-3 mr-1.5" />
+                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                </Button>
             </div>
 
             {/* Log Table */}

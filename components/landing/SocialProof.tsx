@@ -58,7 +58,7 @@ export const SocialProof = () => {
         <section className="py-6 bg-background overflow-hidden">
             <div className="max-w-2xl mx-auto px-4 md:px-6">
                 <p className="text-center text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-4">
-                    Works with your favorite AI providers
+                    Works with every major AI provider
                 </p>
 
                 {/* Marquee animation */}

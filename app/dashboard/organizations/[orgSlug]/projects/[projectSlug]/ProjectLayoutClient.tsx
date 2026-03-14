@@ -20,11 +20,12 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot } from "lucide-react";
+import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot, DatabaseZap, FileText } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { BudgetAlertBanner } from "@/components/dashboard/BudgetAlertBanner";
 
 interface ProjectData {
     id: string;
@@ -240,6 +241,7 @@ export default function ProjectLayoutClient({
     const coreItems: NavItem[] = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
         { href: `${basePath}/agents`, icon: Bot, label: "Agents" },
+        { href: `${basePath}/prompts`, icon: FileText, label: "Prompts" },
         { href: `${basePath}/observability`, icon: ObservabilityIcon, label: "Observability", prefetch: createPrefetch("observability") },
         { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
     ];
@@ -248,6 +250,7 @@ export default function ProjectLayoutClient({
         { href: `${basePath}/providers`, icon: Cpu, label: "Providers", prefetch: createPrefetch("providers") },
         { href: `${basePath}/models`, icon: Boxes, label: "Models" },
         { href: `${basePath}/custom-providers`, icon: Server, label: "Custom Providers" },
+        { href: `${basePath}/cache`, icon: DatabaseZap, label: "Cache" },
         { href: `${basePath}/playground`, icon: BeakerIcon, label: "Playground" },
     ];
 
@@ -298,6 +301,12 @@ export default function ProjectLayoutClient({
             </Sheet>
 
             <main className="flex w-full flex-1 flex-col overflow-hidden">
+                {project && (
+                    <BudgetAlertBanner
+                        projectId={project.id}
+                        settingsHref={`${basePath}/settings`}
+                    />
+                )}
                 {children}
             </main>
         </SidebarProvider>

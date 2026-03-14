@@ -30,6 +30,7 @@ const SECURITY_EVENTS = [
     { value: 'security.violation', label: 'Security Violation', desc: 'When content is blocked' },
     { value: 'security.critical', label: 'Critical Threat', desc: 'Critical severity incidents' },
     { value: 'security.high', label: 'High Threat', desc: 'High severity incidents' },
+    { value: 'anomaly.detected', label: 'Anomaly Detected', desc: 'Cost, latency, or volume spikes vs. baseline' },
 ];
 
 function useWebhooks(projectId: string) {
