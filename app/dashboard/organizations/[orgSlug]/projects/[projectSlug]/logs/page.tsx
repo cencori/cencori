@@ -264,7 +264,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
                             )}
                         >
-                            AI Gateway Logs
+                            AI
                         </button>
                         <button
                             type="button"
@@ -276,7 +276,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
                             )}
                         >
-                            HTTP Traffic
+                            HTTP
                         </button>
                     </nav>
                 </aside>
