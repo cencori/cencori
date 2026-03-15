@@ -15,10 +15,22 @@ interface CircuitState {
     lastSuccess: number;
 }
 
-// Configuration
-const FAILURE_THRESHOLD = 5;       // Failures before circuit opens
-const TIMEOUT_MS = 60 * 1000;      // 60 seconds circuit open time
+// Default configuration
+const DEFAULT_FAILURE_THRESHOLD = 5;       // Failures before circuit opens
+const DEFAULT_TIMEOUT_MS = 60 * 1000;      // 60 seconds circuit open time
 const CIRCUIT_PREFIX = 'circuit:'; // Redis key prefix
+
+export interface CircuitBreakerConfig {
+    failureThreshold: number;
+    timeoutMs: number;
+    enabled: boolean;
+}
+
+const DEFAULT_CONFIG: CircuitBreakerConfig = {
+    failureThreshold: DEFAULT_FAILURE_THRESHOLD,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    enabled: true,
+};
 
 // In-memory fallback (used when Redis is not configured)
 const memoryCircuits: Map<string, CircuitState> = new Map();
@@ -117,14 +129,17 @@ async function saveCircuitState(provider: string, state: CircuitState): Promise<
 /**
  * Check if the circuit is open (provider should not be used)
  */
-export async function isCircuitOpen(provider: string): Promise<boolean> {
+export async function isCircuitOpen(provider: string, config?: Partial<CircuitBreakerConfig>): Promise<boolean> {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
+    if (!cfg.enabled) return false;
+
     const circuit = await getCircuitState(provider);
 
     // If circuit is open, check if timeout has passed
     if (circuit.state === 'open') {
         const timeSinceFailure = Date.now() - circuit.lastFailure;
 
-        if (timeSinceFailure >= TIMEOUT_MS) {
+        if (timeSinceFailure >= cfg.timeoutMs) {
             // Transition to half-open (allow one test request)
             circuit.state = 'half-open';
             await saveCircuitState(provider, circuit);
@@ -158,7 +173,8 @@ export async function recordSuccess(provider: string): Promise<void> {
 /**
  * Record a failed request to a provider
  */
-export async function recordFailure(provider: string): Promise<void> {
+export async function recordFailure(provider: string, config?: Partial<CircuitBreakerConfig>): Promise<void> {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
     const circuit = await getCircuitState(provider);
 
     circuit.failures++;
@@ -168,7 +184,7 @@ export async function recordFailure(provider: string): Promise<void> {
         // Test request failed, reopen circuit
         circuit.state = 'open';
         console.log(`[CircuitBreaker] ${provider}: Half-Open → Open (test failed)`);
-    } else if (circuit.failures >= FAILURE_THRESHOLD) {
+    } else if (circuit.failures >= cfg.failureThreshold) {
         // Threshold reached, open circuit
         circuit.state = 'open';
         console.log(`[CircuitBreaker] ${provider}: Closed → Open (${circuit.failures} failures)`);
@@ -210,13 +226,16 @@ export async function resetCircuit(provider: string): Promise<void> {
 }
 
 // Backwards compatibility - synchronous versions use memory only
-export function isCircuitOpenSync(provider: string): boolean {
+export function isCircuitOpenSync(provider: string, config?: Partial<CircuitBreakerConfig>): boolean {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
+    if (!cfg.enabled) return false;
+
     const circuit = memoryCircuits.get(provider);
     if (!circuit) return false;
 
     if (circuit.state === 'open') {
         const timeSinceFailure = Date.now() - circuit.lastFailure;
-        if (timeSinceFailure >= TIMEOUT_MS) {
+        if (timeSinceFailure >= cfg.timeoutMs) {
             circuit.state = 'half-open';
             return false;
         }
@@ -241,7 +260,8 @@ export function recordSuccessSync(provider: string): void {
     memoryCircuits.set(provider, circuit);
 }
 
-export function recordFailureSync(provider: string): void {
+export function recordFailureSync(provider: string, config?: Partial<CircuitBreakerConfig>): void {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
     const circuit = memoryCircuits.get(provider) || {
         failures: 0,
         lastFailure: 0,
@@ -254,7 +274,7 @@ export function recordFailureSync(provider: string): void {
 
     if (circuit.state === 'half-open') {
         circuit.state = 'open';
-    } else if (circuit.failures >= FAILURE_THRESHOLD) {
+    } else if (circuit.failures >= cfg.failureThreshold) {
         circuit.state = 'open';
     }
     memoryCircuits.set(provider, circuit);

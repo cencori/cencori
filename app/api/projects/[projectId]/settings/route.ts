@@ -17,6 +17,9 @@ interface ProviderSettings {
     enable_fallback?: boolean;
     fallback_provider?: string;
     max_retries_before_fallback?: number;
+    circuit_breaker_enabled?: boolean;
+    circuit_breaker_failure_threshold?: number;
+    circuit_breaker_timeout_seconds?: number;
 }
 
 export async function PATCH(
@@ -58,6 +61,9 @@ export async function PATCH(
                     enable_fallback: body.enable_fallback,
                     fallback_provider: body.fallback_provider,
                     max_retries_before_fallback: body.max_retries_before_fallback,
+                    circuit_breaker_enabled: body.circuit_breaker_enabled,
+                    circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold,
+                    circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds,
                     updated_at: new Date().toISOString(),
                 })
                 .eq("project_id", projectId);
@@ -82,6 +88,9 @@ export async function PATCH(
                     enable_fallback: body.enable_fallback ?? true,
                     fallback_provider: body.fallback_provider || "anthropic",
                     max_retries_before_fallback: body.max_retries_before_fallback || 3,
+                    circuit_breaker_enabled: body.circuit_breaker_enabled ?? true,
+                    circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold || 5,
+                    circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds || 60,
                 });
 
             if (insertError) {
@@ -133,6 +142,9 @@ export async function GET(
                 enable_fallback: true,
                 fallback_provider: "anthropic",
                 max_retries_before_fallback: 3,
+                circuit_breaker_enabled: true,
+                circuit_breaker_failure_threshold: 5,
+                circuit_breaker_timeout_seconds: 60,
             },
         });
     } catch (error) {
