@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { resolvePublicOrigin } from '@/lib/public-origin';
+import { trackEvent } from '@/lib/track-event';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ORG_INVITE_FROM_EMAIL = process.env.RESEND_ORG_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -184,6 +185,8 @@ export async function POST(
     } catch (emailErr) {
         console.error('[Invites] Email sending error:', emailErr);
     }
+
+    trackEvent({ event_type: 'org.invite_sent', product: 'dashboard', user_id: user.id, organization_id: org.id, metadata: { invited_email: normalizedEmail, role } });
 
     return NextResponse.json({
         success: true,

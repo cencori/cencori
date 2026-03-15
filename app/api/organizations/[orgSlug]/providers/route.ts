@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
+import { trackEvent } from '@/lib/track-event';
 
 export async function GET(
     req: NextRequest,
@@ -159,6 +160,8 @@ export async function POST(
 
             await supabaseAdmin.from('custom_models').insert(modelsToInsert);
         }
+
+        trackEvent({ event_type: 'org.provider_added', product: 'gateway', user_id: user.id, organization_id: org.id, metadata: { provider_name: name } });
 
         return NextResponse.json({ provider }, { status: 201 });
     } catch (error) {

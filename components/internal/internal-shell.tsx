@@ -11,12 +11,14 @@ import {
     TrendingUp,
     LayoutDashboard,
     LogOut,
+    Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
     { href: '/internal', label: 'Overview', icon: LayoutDashboard, exact: true },
     { href: '/internal/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/internal/events', label: 'Events', icon: Activity },
     { href: '/internal/kpi', label: 'KPIs', icon: TrendingUp },
     { href: '/internal/emails', label: 'Emails', icon: Mail },
     { href: '/internal/settings', label: 'Settings', icon: Settings },
@@ -35,7 +37,7 @@ export function InternalShell({
         <ReactQueryProvider>
             <div className="min-h-screen bg-background flex">
                 {/* Sidebar */}
-                <aside className="w-56 shrink-0 border-r border-border/40 bg-card/30 flex flex-col">
+                <aside className="w-56 shrink-0 border-r border-border/40 bg-card/30 flex flex-col sticky top-0 h-screen">
                     {/* Logo / Title */}
                     <div className="px-4 py-4 border-b border-border/30">
                         <Link href="/internal" className="flex items-center gap-2">

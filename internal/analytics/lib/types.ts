@@ -102,6 +102,25 @@ export interface ScanMetrics {
     };
 }
 
+export interface PlatformEventEntry {
+    id: string;
+    event_type: string;
+    product: string;
+    user_id: string | null;
+    organization_id: string | null;
+    project_id: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+}
+
+export interface PlatformEventsMetrics {
+    totalEvents: number;
+    eventsByProduct: Record<string, number>;
+    eventsByType: Record<string, number>;
+    recentEvents: PlatformEventEntry[];
+    eventsToday: number;
+}
+
 export interface PlatformOverviewMetrics {
     aiGateway: AIGatewayMetrics;
     security: SecurityMetrics;
@@ -111,6 +130,7 @@ export interface PlatformOverviewMetrics {
     users: UsersMetrics;
     billing: BillingMetrics;
     scan: ScanMetrics;
+    platformEvents: PlatformEventsMetrics;
     period: TimePeriod;
     generatedAt: string;
 }

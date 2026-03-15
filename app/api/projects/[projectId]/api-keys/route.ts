@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import crypto from "crypto";
+import { trackEvent } from "@/lib/track-event";
 
 export async function GET(
     request: NextRequest,
@@ -148,6 +149,8 @@ export async function POST(
             console.error("Error creating API key:", createError);
             return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
         }
+
+        trackEvent({ event_type: 'api_key.generated', product: 'gateway', user_id: user.id, project_id: projectId, organization_id: project.organization_id, metadata: { environment, key_type, key_name: name.trim() } });
 
         return NextResponse.json({
             apiKey: {

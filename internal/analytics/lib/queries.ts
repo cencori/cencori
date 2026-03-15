@@ -1,6 +1,6 @@
 // Platform Analytics Database Queries
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics } from './types';
+import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, PlatformEventsMetrics } from './types';
 import type { User } from '@supabase/supabase-js';
 
 function getStartDate(period: TimePeriod): Date {
@@ -413,5 +413,53 @@ export async function getScanMetrics(period: TimePeriod): Promise<ScanMetrics> {
         scoreBreakdown,
         issueBreakdown,
         platformBreakdown,
+    };
+}
+
+export async function getPlatformEventsMetrics(period: TimePeriod): Promise<PlatformEventsMetrics> {
+    const supabase = createAdminClient();
+    const startDate = getStartDate(period);
+
+    const { data: events, error } = await supabase
+        .from('platform_events')
+        .select('id, event_type, product, user_id, organization_id, project_id, metadata, created_at')
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
+
+    if (error || !events) {
+        console.error('[Analytics] Error fetching platform events:', error);
+        return {
+            totalEvents: 0,
+            eventsByProduct: {},
+            eventsByType: {},
+            recentEvents: [],
+            eventsToday: 0,
+        };
+    }
+
+    const totalEvents = events.length;
+
+    const eventsByProduct: Record<string, number> = {};
+    events.forEach(e => {
+        eventsByProduct[e.product] = (eventsByProduct[e.product] || 0) + 1;
+    });
+
+    const eventsByType: Record<string, number> = {};
+    events.forEach(e => {
+        eventsByType[e.event_type] = (eventsByType[e.event_type] || 0) + 1;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventsToday = events.filter(e => new Date(e.created_at) >= today).length;
+
+    const recentEvents = events.slice(0, 50);
+
+    return {
+        totalEvents,
+        eventsByProduct,
+        eventsByType,
+        recentEvents,
+        eventsToday,
     };
 }

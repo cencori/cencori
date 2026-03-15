@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings, ScanSearch } from 'lucide-react';
+import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings, ScanSearch, Radio } from 'lucide-react';
 import { usePlatformMetrics } from '../hooks/useMetrics';
 import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
@@ -222,6 +222,50 @@ export function AdminDashboard() {
                                 }
                             />
                         </MetricsGrid>
+                    </MetricsSection>
+
+                    {/* Platform Events Section */}
+                    <MetricsSection
+                        title="Platform Events"
+                        description="Cross-platform user activity tracking"
+                    >
+                        <MetricsGrid columns={4}>
+                            <MetricsCard
+                                title="Total Events"
+                                value={data.platformEvents.totalEvents}
+                                subtitle={`${data.platformEvents.eventsToday} today`}
+                                subtitleColor={data.platformEvents.eventsToday > 0 ? 'success' : 'default'}
+                                icon={<Radio className="h-4 w-4" />}
+                            />
+                            <MetricsCard
+                                title="Top Product"
+                                value={Object.entries(data.platformEvents.eventsByProduct).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'}
+                                subtitle={`${Object.entries(data.platformEvents.eventsByProduct).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} events`}
+                            />
+                            <MetricsCard
+                                title="Top Event Type"
+                                value={Object.entries(data.platformEvents.eventsByType).sort((a, b) => b[1] - a[1])[0]?.[0]?.split('.')[1] || 'N/A'}
+                                subtitle={`${Object.entries(data.platformEvents.eventsByType).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} occurrences`}
+                            />
+                            <MetricsCard
+                                title="Event Types"
+                                value={Object.keys(data.platformEvents.eventsByType).length}
+                                subtitle="unique types tracked"
+                            />
+                        </MetricsGrid>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <BreakdownCard
+                                title="By Product"
+                                data={data.platformEvents.eventsByProduct}
+                                total={data.platformEvents.totalEvents}
+                            />
+                            <BreakdownCard
+                                title="By Event Type"
+                                data={data.platformEvents.eventsByType}
+                                total={data.platformEvents.totalEvents}
+                            />
+                        </div>
                     </MetricsSection>
 
                     {/* Cencori Scan Section */}

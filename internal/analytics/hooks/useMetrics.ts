@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { PlatformOverviewMetrics, TimePeriod } from '../lib/types';
+import type { PlatformOverviewMetrics, PlatformEventEntry, TimePeriod } from '../lib/types';
 
 // Helper to get admin email from sessionStorage
 function getAdminEmail(): string | null {
@@ -97,5 +97,46 @@ export function useUsersMetrics() {
             return response.json();
         },
         staleTime: 60 * 1000,
+    });
+}
+
+interface PlatformEventsFilters {
+    product?: string;
+    event_type?: string;
+    user_id?: string;
+    org_id?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+}
+
+interface PlatformEventsResponse {
+    events: PlatformEventEntry[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export function usePlatformEvents(filters: PlatformEventsFilters = {}) {
+    return useQuery<PlatformEventsResponse>({
+        queryKey: ['platformEvents', filters],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (filters.product) params.set('product', filters.product);
+            if (filters.event_type) params.set('event_type', filters.event_type);
+            if (filters.user_id) params.set('user_id', filters.user_id);
+            if (filters.org_id) params.set('org_id', filters.org_id);
+            if (filters.from) params.set('from', filters.from);
+            if (filters.to) params.set('to', filters.to);
+            if (filters.page) params.set('page', String(filters.page));
+            if (filters.limit) params.set('limit', String(filters.limit));
+
+            const response = await fetch(`/api/internal/events?${params.toString()}`);
+            if (!response.ok) throw new Error('Failed to fetch platform events');
+            return response.json();
+        },
+        staleTime: 5 * 1000,
+        refetchInterval: 5 * 1000,
     });
 }
