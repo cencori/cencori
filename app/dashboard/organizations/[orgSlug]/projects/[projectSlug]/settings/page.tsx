@@ -182,6 +182,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [enableFallback, setEnableFallback] = useState(true);
   const [fallbackProvider, setFallbackProvider] = useState('anthropic');
   const [maxRetriesBeforeFallback, setMaxRetriesBeforeFallback] = useState('3');
+  const [circuitBreakerEnabled, setCircuitBreakerEnabled] = useState(true);
+  const [circuitBreakerFailureThreshold, setCircuitBreakerFailureThreshold] = useState('5');
+  const [circuitBreakerTimeoutSeconds, setCircuitBreakerTimeoutSeconds] = useState('60');
   const [isSavingProviders, setIsSavingProviders] = useState(false);
   const [providerSettingsDirty, setProviderSettingsDirty] = useState(false);
 
@@ -263,6 +266,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     enable_fallback: boolean;
     fallback_provider: string;
     max_retries_before_fallback: number;
+    circuit_breaker_enabled: boolean;
+    circuit_breaker_failure_threshold: number;
+    circuit_breaker_timeout_seconds: number;
   }
 
   const { data: providerSettings } = useQuery<{ settings: ProviderSettingsData }>({
@@ -288,6 +294,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       setEnableFallback(s.enable_fallback ?? true);
       setFallbackProvider(s.fallback_provider || 'anthropic');
       setMaxRetriesBeforeFallback(String(s.max_retries_before_fallback || 3));
+      setCircuitBreakerEnabled(s.circuit_breaker_enabled ?? true);
+      setCircuitBreakerFailureThreshold(String(s.circuit_breaker_failure_threshold || 5));
+      setCircuitBreakerTimeoutSeconds(String(s.circuit_breaker_timeout_seconds || 60));
       setProviderSettingsDirty(false);
     }
   }, [providerSettings]);
@@ -1424,6 +1433,57 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
           </section >
 
+          {/* Circuit Breaker Configuration */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Circuit Breaker</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic provider isolation when failures are detected.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Enable circuit breaker</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Automatically isolate failing providers to prevent cascading failures.</p>
+                </div>
+                <Checkbox
+                  checked={circuitBreakerEnabled}
+                  onCheckedChange={(checked) => { setCircuitBreakerEnabled(!!checked); setProviderSettingsDirty(true); }}
+                  className="h-5 w-5 md:h-4 md:w-4"
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Failure threshold</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Consecutive failures before circuit opens.</p>
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={circuitBreakerFailureThreshold}
+                  onChange={(e) => { setCircuitBreakerFailureThreshold(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                  disabled={!circuitBreakerEnabled}
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Recovery timeout</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Seconds before retrying a failed provider.</p>
+                </div>
+                <Input
+                  type="number"
+                  min="10"
+                  max="600"
+                  value={circuitBreakerTimeoutSeconds}
+                  onChange={(e) => { setCircuitBreakerTimeoutSeconds(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                  disabled={!circuitBreakerEnabled}
+                />
+              </div>
+            </div>
+          </section>
+
           {/* Save Button */}
           < div className="flex items-center justify-between pt-2" >
             <p className="text-xs text-muted-foreground">
@@ -1448,6 +1508,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                       enable_fallback: enableFallback,
                       fallback_provider: fallbackProvider,
                       max_retries_before_fallback: parseInt(maxRetriesBeforeFallback),
+                      circuit_breaker_enabled: circuitBreakerEnabled,
+                      circuit_breaker_failure_threshold: parseInt(circuitBreakerFailureThreshold),
+                      circuit_breaker_timeout_seconds: parseInt(circuitBreakerTimeoutSeconds),
                     }),
                   });
                   if (!response.ok) throw new Error('Failed to save settings');
