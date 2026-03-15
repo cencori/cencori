@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { trackEvent } from '@/lib/track-event';
 import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -483,6 +484,8 @@ ${issuesSummary}
             .eq('project_id', id);
 
         console.log(`[Fix Apply] ✓ PR #${pr.number} created: ${pr.html_url}`);
+
+        trackEvent({ event_type: 'scan.fixes_applied', product: 'scan_web', user_id: user.id, metadata: { project_id: id, pr_number: pr.number, pr_url: pr.html_url, fixes_applied: fixes.length, files_changed: filesChanged } });
 
         return NextResponse.json({
             prUrl: pr.html_url,

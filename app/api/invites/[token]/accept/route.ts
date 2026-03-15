@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { trackEvent } from '@/lib/track-event';
 
 export async function POST(
     req: NextRequest,
@@ -96,6 +97,8 @@ export async function POST(
         .from('organization_invites')
         .update({ accepted_at: new Date().toISOString() })
         .eq('id', invite.id);
+
+    trackEvent({ event_type: 'user.invite_accepted', product: 'dashboard', user_id: user.id, organization_id: invite.organization_id, metadata: { role: invite.role, org_name: org?.name } });
 
     return NextResponse.json({
         success: true,

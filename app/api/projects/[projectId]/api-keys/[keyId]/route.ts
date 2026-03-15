@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
+import { trackEvent } from "@/lib/track-event";
 
 export async function PATCH(
     request: NextRequest,
@@ -44,6 +45,8 @@ export async function PATCH(
             console.error("Error revoking API key:", revokeError);
             return NextResponse.json({ error: "Failed to revoke API key" }, { status: 500 });
         }
+
+        trackEvent({ event_type: 'api_key.revoked', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { key_id: keyId } });
 
         return NextResponse.json({
             message: "API key revoked successfully",
@@ -97,6 +100,8 @@ export async function DELETE(
             console.error("Error deleting API key:", deleteError);
             return NextResponse.json({ error: "Failed to delete API key" }, { status: 500 });
         }
+
+        trackEvent({ event_type: 'api_key.deleted', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { key_id: keyId } });
 
         return NextResponse.json({
             message: "API key deleted successfully",

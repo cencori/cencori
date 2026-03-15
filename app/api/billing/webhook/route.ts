@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { addCredits } from '@/lib/credits';
+import { trackEvent } from '@/lib/track-event';
 import {
     getCreditTopupCreditsByProductId,
     getLimitForTier,
@@ -355,6 +356,8 @@ export async function POST(req: NextRequest) {
                     throw error;
                 }
 
+                trackEvent({ event_type: 'subscription.created', product: 'billing', organization_id: orgId, metadata: { tier, subscription_id: payload.id } });
+
                 console.log(`[Polar Webhook] ✓ Updated org ${orgId} to ${tier} tier`);
                 break;
             }
@@ -399,6 +402,8 @@ export async function POST(req: NextRequest) {
                     console.error('[Polar Webhook] Database update error:', error);
                     throw error;
                 }
+
+                trackEvent({ event_type: 'subscription.canceled', product: 'billing', organization_id: orgId, metadata: { subscription_id: payload.id } });
 
                 console.log(`[Polar Webhook] ✓ Reverted org ${orgId} to free tier`);
                 break;
@@ -462,6 +467,8 @@ export async function POST(req: NextRequest) {
                         .update({ polar_customer_id: payload.customerId })
                         .eq('id', orgId);
                 }
+
+                trackEvent({ event_type: 'credits.topup', product: 'billing', organization_id: orgId, metadata: { order_id: payload.id, credits_amount: creditsToAdd } });
 
                 console.log(`[Polar Webhook] ✓ Credited org ${orgId} with $${creditsToAdd.toFixed(2)} from order ${payload.id}`);
                 break;

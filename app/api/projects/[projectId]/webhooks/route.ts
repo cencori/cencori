@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import crypto from 'crypto';
+import { trackEvent } from '@/lib/track-event';
 
 interface WebhookBody {
     name: string;
@@ -96,6 +97,8 @@ export async function POST(
         console.error('Error creating webhook:', createError);
         return NextResponse.json({ error: 'Failed to create webhook' }, { status: 500 });
     }
+
+    trackEvent({ event_type: 'webhook.created', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { webhook_name: body.name, events: body.events } });
 
     return NextResponse.json({ webhook }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getScanPaywallForUser, getScanProjectImportPaywallForUser } from '@/lib/scan/entitlements';
+import { trackEvent } from '@/lib/track-event';
 
 // GET /api/scan/projects - List user's scan projects
 export async function GET() {
@@ -107,6 +108,8 @@ export async function POST(req: NextRequest) {
         }
 
         console.log('[Scan Projects] Created project:', project.id, github_repo_full_name);
+
+        trackEvent({ event_type: 'scan.project_imported', product: 'scan_web', user_id: user.id, metadata: { repo_name: github_repo_full_name, project_id: project.id } });
 
         return NextResponse.json({ project }, { status: 201 });
     } catch (error) {

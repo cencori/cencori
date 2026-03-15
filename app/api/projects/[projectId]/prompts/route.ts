@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { slugify, extractVariableNames } from '@/lib/prompts/registry';
+import { trackEvent } from '@/lib/track-event';
 
 export async function GET(
     req: NextRequest,
@@ -117,6 +118,8 @@ export async function POST(
         .from('prompt_registry')
         .update({ active_version_id: version.id, updated_at: new Date().toISOString() })
         .eq('id', prompt.id);
+
+    trackEvent({ event_type: 'prompt.created', product: 'gateway', project_id: projectId, metadata: { prompt_name: name.trim(), slug } });
 
     return NextResponse.json({ prompt: { ...prompt, active_version_id: version.id }, version }, { status: 201 });
 }

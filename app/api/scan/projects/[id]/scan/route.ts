@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { trackEvent } from '@/lib/track-event';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
 import { analyzeRepositoryResearch } from '@/lib/scan/research';
@@ -86,6 +87,8 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
             console.error('[Scan] Error creating scan run:', runError);
             return NextResponse.json({ error: 'Failed to start scan' }, { status: 500 });
         }
+
+        trackEvent({ event_type: 'scan.triggered', product: 'scan_web', user_id: user.id, metadata: { project_id: id, scan_run_id: scanRun.id } });
 
         const startTime = Date.now();
 
@@ -302,6 +305,8 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
             } catch (continuityError) {
                 console.error('[Scan] Failed to persist continuity memory:', continuityError);
             }
+
+            trackEvent({ event_type: 'scan.completed', product: 'scan_web', user_id: user.id, metadata: { project_id: id, scan_run_id: scanRun.id, score, issues_found: allIssues.length, files_scanned: filesScanned } });
 
             return NextResponse.json({
                 scan: {

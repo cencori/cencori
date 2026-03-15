@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit } from '@/lib/github';
 import { verifyProjectGithubAccess } from '@/lib/scan/github-access';
+import { trackEvent } from '@/lib/track-event';
 import { generateFileFixWithGemini } from '@/lib/scan/gemini';
 import { getScanPaywallForUser } from '@/lib/scan/entitlements';
 import { randomUUID } from 'crypto';
@@ -692,6 +693,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         console.log(
             `[Fix Gen] Complete in ${totalTime}ms: ${fixes.length} fixes (${deterministicCount} deterministic, ${aiCount} AI, ${unfixableIssues.length} manual review)`
         );
+
+        trackEvent({ event_type: 'scan.fixes_generated', product: 'scan_web', user_id: user.id, metadata: { project_id: id, fix_count: fixes.length, deterministic: deterministicCount, ai: aiCount } });
 
         return NextResponse.json({
             fixes,

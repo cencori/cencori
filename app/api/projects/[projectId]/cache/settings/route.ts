@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { trackEvent } from '@/lib/track-event';
 
 export async function GET(
     req: NextRequest,
@@ -70,6 +71,8 @@ export async function PATCH(
         console.warn('[Cache Settings] Upsert error:', error.code, error.message);
         return NextResponse.json({ error: 'Cache tables not yet migrated. Run the prompt_cache migration first.' }, { status: 503 });
     }
+
+    trackEvent({ event_type: 'cache.settings_changed', product: 'gateway', project_id: projectId, metadata: updates });
 
     return NextResponse.json(data);
 }

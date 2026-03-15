@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { isCencoriEmail } from '@/lib/internal-access';
+import { trackEvent } from '@/lib/track-event';
 
 export async function POST(req: NextRequest) {
     const { email, password } = await req.json();
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    trackEvent({ event_type: 'user.signup', product: 'dashboard', user_id: data.user.id, metadata: { email: trimmed } });
 
     return NextResponse.json({ success: true, userId: data.user.id });
 }
