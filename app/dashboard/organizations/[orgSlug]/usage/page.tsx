@@ -6,7 +6,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/lib/supabaseClient';
-import { Activity, Zap, DollarSign, Clock, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Activity, Zap, DollarSign, Clock, TrendingUp, AlertTriangle, Download, Loader2, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Organization {
     id: string;
@@ -177,6 +185,60 @@ const PROVIDER_COLORS: Record<string, string> = {
 export default function UsagePage({ params }: PageProps) {
     const { orgSlug } = use(params);
     const [timeRange, setTimeRange] = React.useState('7d');
+    const [isExporting, setIsExporting] = React.useState(false);
+    const [exportFormat, setExportFormat] = React.useState<'csv' | 'json'>('csv');
+
+    const handleExport = async (format: 'csv' | 'json') => {
+        setIsExporting(true);
+        setExportFormat(format);
+        try {
+            const now = new Date();
+            let from: string | undefined;
+            switch (timeRange) {
+                case '24h':
+                    from = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case '7d':
+                    from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+                    break;
+                case '30d':
+                    from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+                    break;
+            }
+
+            let url = `/api/organizations/${orgSlug}/export?format=${format}`;
+            if (from) url += `&from=${from}`;
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Export failed');
+            }
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `usage-export.${format}`;
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="(.+)"/);
+                if (match) filename = match[1];
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            toast.success(`Usage data exported as ${format.toUpperCase()}`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Export failed');
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const { data: org, isLoading: orgLoading } = useOrganization(orgSlug);
     const { data: stats, isLoading: statsLoading } = useUsageStats(org?.id, timeRange);
@@ -231,6 +293,28 @@ export default function UsagePage({ params }: PageProps) {
                 <div>
                     <h1 className="text-base font-medium">Usage</h1>
                 </div>
+                <div className="flex items-center gap-2">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px] px-2.5"
+                            disabled={isExporting}
+                        >
+                            {isExporting && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                            Export
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleExport('csv')}>
+                            CSV
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('json')}>
+                            JSON
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="flex bg-muted/50 p-0.5 rounded-lg border border-border/40">
                     {['24h', '7d', '30d'].map((range) => (
                         <button
@@ -244,6 +328,7 @@ export default function UsagePage({ params }: PageProps) {
                             {range}
                         </button>
                     ))}
+                </div>
                 </div>
             </div>
 

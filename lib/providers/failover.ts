@@ -75,11 +75,57 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'deepseek-reasoner': { 'openai': 'o1', 'anthropic': 'claude-opus-4', 'google': 'gemini-3-deep-think' },
 };
 
+// In-memory cache for DB mappings
+let dbMappingsCache: Record<string, Record<string, string>> | null = null;
+let dbMappingsCacheTime = 0;
+const CACHE_TTL_MS = 60 * 1000; // 1 minute
+
+/**
+ * Load model mappings from DB (cached)
+ * Falls back to hardcoded MODEL_MAPPINGS if DB is unavailable
+ */
+async function loadDbMappings(): Promise<Record<string, Record<string, string>>> {
+    if (dbMappingsCache && Date.now() - dbMappingsCacheTime < CACHE_TTL_MS) {
+        return dbMappingsCache;
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabaseAdmin');
+        const supabase = createAdminClient();
+        const { data, error } = await supabase
+            .from('model_mappings')
+            .select('source_model, target_provider, target_model');
+
+        if (error || !data || data.length === 0) {
+            return MODEL_MAPPINGS;
+        }
+
+        const mappings: Record<string, Record<string, string>> = {};
+        for (const row of data) {
+            if (!mappings[row.source_model]) mappings[row.source_model] = {};
+            mappings[row.source_model][row.target_provider] = row.target_model;
+        }
+
+        dbMappingsCache = mappings;
+        dbMappingsCacheTime = Date.now();
+        return mappings;
+    } catch {
+        return MODEL_MAPPINGS;
+    }
+}
+
+/** Invalidate the DB mappings cache (call after writes) */
+export function invalidateMappingsCache() {
+    dbMappingsCache = null;
+    dbMappingsCacheTime = 0;
+}
+
 /**
  * Get fallback model for a given model on a fallback provider
  */
-export function getFallbackModel(originalModel: string, fallbackProvider: string): string {
-    const mappings = MODEL_MAPPINGS[originalModel];
+export async function getFallbackModel(originalModel: string, fallbackProvider: string): Promise<string> {
+    const allMappings = await loadDbMappings();
+    const mappings = allMappings[originalModel];
 
     if (mappings && mappings[fallbackProvider]) {
         return mappings[fallbackProvider];

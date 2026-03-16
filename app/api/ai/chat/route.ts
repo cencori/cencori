@@ -1161,7 +1161,7 @@ export async function POST(req: NextRequest) {
 
                         try {
                             const fallbackProvider = router.getProvider(fallbackProviderName);
-                            const fallbackModel = fallbackDefaultModel || getFallbackModel(normalizedModel, fallbackProviderName);
+                            const fallbackModel = fallbackDefaultModel || await getFallbackModel(normalizedModel, fallbackProviderName);
 
                             console.log(`[Failover/Stream] Trying ${fallbackProviderName} with model ${fallbackModel} (User Preference: ${!!fallbackDefaultModel})`);
 
@@ -1453,7 +1453,7 @@ export async function POST(req: NextRequest) {
 
                 try {
                     const fallbackProvider = router.getProvider(fallbackProviderName);
-                    const fallbackModel = getFallbackModel(normalizedModel, fallbackProviderName);
+                    const fallbackModel = await getFallbackModel(normalizedModel, fallbackProviderName);
 
                     console.log(`[Failover] Trying ${fallbackProviderName} with model ${fallbackModel}`);
 

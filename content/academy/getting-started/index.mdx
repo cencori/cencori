@@ -1,0 +1,85 @@
+---
+title: Getting Started with Cencori
+description: Build your first AI-powered application using Cencori's unified infrastructure. From zero to production in 15 minutes.
+---
+
+Every AI application starts the same way: you pick a model, get an API key, write some glue code, and hope it works. Then reality sets in. Your provider has an outage. Your costs spike because you forgot to track token usage. A user figures out how to make your chatbot leak its system prompt. You realize you have no logs, no fallback, and no idea what's happening in production.
+
+Cencori exists to solve all of that. It sits between your application and the AI providers — OpenAI, Anthropic, Google, Mistral, and 10 others — and handles routing, security, logging, failover, and cost tracking automatically. You write one integration, and Cencori handles the rest.
+
+This course walks you through the entire setup process, step by step. By the end, you'll have a working AI integration with streaming responses, full request logging, and built-in security protections. Let's build it.
+
+## How this course teaches
+
+This is a hands-on course. Every lesson has real code you can copy and run immediately. We don't believe in theory-first learning — you'll learn by building, and we'll explain the "why" as we go.
+
+- **Start with setup** — Before writing a single line of code, you'll create your Cencori account, set up a project, and connect your AI provider keys. This is the foundation everything else builds on. We'll explain what each step does and why it matters.
+
+- **Layer in complexity** — You'll start with a basic chat request (the "hello world" of AI), then add streaming for real-time responses, then explore your logs and analytics dashboard. Each step builds on the last, so nothing feels like a jump.
+
+- **Use real code** — Every code example in this course is copy-pasteable and runs as-is. We show both TypeScript and Python examples where applicable, so you can use whichever language you're comfortable with.
+
+- **See the results** — After every request you make, you'll be able to see it in your Cencori dashboard — the model used, tokens consumed, latency, cost, and whether any security rules were triggered. This visibility is what separates production AI from toy demos.
+
+- **Deploy working code** — By the end of this course, you won't just understand how Cencori works — you'll have a working integration you can drop into any project. The code you write here is production-ready.
+
+## What you'll build and learn in this course
+
+This course is split into three sections across 9 lessons. The total time is about 15 minutes, but take as long as you need — every lesson is self-contained, and your progress is saved automatically.
+
+### Section 1: Setup
+
+Get your environment ready. You'll create a Cencori account, set up a project (which acts as a container for your API keys, settings, and usage data), and connect at least one AI provider. Cencori supports 14 providers out of the box — OpenAI, Anthropic, Google, Mistral, Groq, Cohere, xAI, DeepSeek, and more. You only need one to get started, but you can add more later for failover and cost optimization.
+
+- **Create Your Account**: Sign up, verify your email, and land on the dashboard
+- **Create a Project**: Projects isolate your API keys, rate limits, and usage tracking. Think of them like environments (dev, staging, prod)
+- **Add Provider Keys**: Bring your own API keys from OpenAI, Anthropic, or Google. Cencori encrypts them at rest and never exposes them in logs
+
+### Section 2: SDK Integration
+
+Install the Cencori SDK in your project and make your first AI request. You'll generate a Cencori API key (different from your provider keys — this is what your application uses to authenticate with Cencori), install the SDK with a single command, and send a chat completion request. The response comes back in the same format you're used to from OpenAI or Anthropic, so there's no new API to learn.
+
+- **Generate API Key**: Create a project-scoped API key that your application will use to authenticate
+- **Install the SDK**: One command — `npm install cencori` or `pip install cencori`. That's it
+- **Make Your First Request**: Send a chat message to any model through Cencori and get a response. We'll explain what happens behind the scenes — routing, logging, security checks, and cost calculation
+
+### Section 3: Production Features
+
+Take your integration from "it works" to "it's production-ready." You'll enable streaming for real-time responses (essential for chat UIs), explore your request logs to see exactly what's happening with every API call, and learn about Cencori's built-in security features — PII detection, prompt injection protection, and content filtering.
+
+- **Enable Streaming**: Get token-by-token responses in real-time. We'll show you how to render streaming text in both terminal and browser environments
+- **View Your Logs**: Every request through Cencori is logged with full metadata — model, provider, tokens, cost, latency, and status. You'll learn to use the Observability dashboard to debug and monitor
+- **Explore Security**: See how Cencori automatically scrubs PII, detects jailbreak attempts, and validates outputs — all without any configuration from you
+
+Each lesson builds on the previous one. By the end, you'll have a complete, working AI integration with logging, streaming, and security — the same infrastructure that powers production applications serving thousands of users.
+
+## Prerequisites
+
+Before diving in, make sure you have the following. Don't worry if you're not an expert — basic familiarity is all you need:
+
+- **Node.js 18+** or **Python 3.8+** installed on your machine. If you're not sure, run `node --version` or `python --version` in your terminal.
+- **An API key from at least one AI provider.** We recommend starting with OpenAI, but Anthropic and Google work just as well. You'll need a few cents of credit for the API calls we'll make during this course.
+- **Basic familiarity with JavaScript/TypeScript or Python.** You should be comfortable reading code and running commands in a terminal. We'll explain everything else as we go.
+- **A code editor.** VS Code, Cursor, or anything you like. You'll be writing a few short files.
+
+## Overview of the course
+
+### Section 1: Setup
+
+1. Create Your Account — 2 min
+2. Create a Project — 2 min
+3. Add Provider Keys — 2 min
+
+### Section 2: SDK Integration
+
+4. Generate API Key — 1 min
+5. Install the SDK — 2 min
+6. Make Your First Request — 3 min
+
+### Section 3: Production Features
+
+7. Enable Streaming — 2 min
+8. View Your Logs — 1 min
+9. Explore Security — 2 min
+
+By the end of this course, you'll know how to set up Cencori, route AI requests through it, stream responses in real-time, and use the dashboard to monitor everything. You'll also understand how Cencori's security pipeline protects your application automatically. Ready to start? Let's build it.

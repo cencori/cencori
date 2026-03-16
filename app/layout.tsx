@@ -11,7 +11,7 @@ import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBr
 
 const montserrat = Montserrat({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-montserrat",
   weight: ["300", "400", "500", "600", "700"]
 });
 
@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-geist",
+  variable: "--font-sans",
 });
 
 // Aggressive keyword targeting

@@ -25,6 +25,47 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   const redirectParam = searchParams.get("redirect");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ssoInfo, setSsoInfo] = useState<{ sso: boolean; enforce?: boolean; organization?: string; domain?: string } | null>(null);
+  const [checkingSSO, setCheckingSSO] = useState(false);
+
+  // Check if email domain has SSO configured
+  const checkSSO = async (email: string) => {
+    const domain = email.split("@")[1];
+    if (!domain || domain.length < 3) {
+      setSsoInfo(null);
+      return;
+    }
+    setCheckingSSO(true);
+    try {
+      const res = await fetch("/api/auth/sso/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setSsoInfo(data);
+    } catch {
+      setSsoInfo(null);
+    }
+    setCheckingSSO(false);
+  };
+
+  const handleSSOLogin = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const domain = email.split("@")[1];
+      const { error: ssoError } = await supabase.auth.signInWithSSO({ domain });
+      if (ssoError) {
+        setError(ssoError.message);
+        setLoading(false);
+      }
+      // Supabase handles the redirect
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "SSO login failed");
+      setLoading(false);
+    }
+  };
 
   const navigateAfterAuth = (target: string) => {
     if (/^https?:\/\//i.test(target)) {
@@ -47,6 +88,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     if (!email) {
       setError("Please provide a valid email.");
       setLoading(false);
+      return;
+    }
+
+    // If SSO is enforced for this domain, redirect to SSO
+    if (ssoInfo?.sso && ssoInfo.enforce) {
+      await handleSSOLogin(email);
       return;
     }
 
@@ -122,28 +169,66 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
-          <Input id="email" name="email" type="email" placeholder="bola@example.com" required />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="bola@example.com"
+            required
+            onBlur={(e) => checkSSO(e.target.value)}
+          />
         </Field>
 
-        <Field>
-          <div className="flex items-center">
-            <FieldLabel htmlFor="password">Password</FieldLabel>
-            <a
-              href="/forgot"
-              className="ml-auto text-sm underline-offset-4 hover:underline"
-              aria-label="Forgot password"
+        {/* SSO detected banner */}
+        {ssoInfo?.sso && (
+          <div className="rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2.5">
+            <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+              SSO is {ssoInfo.enforce ? "required" : "available"} for {ssoInfo.organization}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {ssoInfo.enforce
+                ? "Your organization requires SSO login. Click below to continue."
+                : "You can log in with SSO or use your password."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 h-7 text-xs gap-1.5 w-full"
+              onClick={() => {
+                const emailInput = document.getElementById("email") as HTMLInputElement;
+                if (emailInput?.value) handleSSOLogin(emailInput.value);
+              }}
+              disabled={loading}
             >
-              Forgot your password?
-            </a>
+              {loading ? "Redirecting..." : `Log in with ${ssoInfo.organization} SSO`}
+            </Button>
           </div>
-          <Input id="password" name="password" type="password" />
-        </Field>
+        )}
 
-        <Field>
-          <Button type="submit" disabled={loading}>
-            {loading ? "Working…" : "Login"}
-          </Button>
-        </Field>
+        {(!ssoInfo?.enforce) && (
+          <>
+            <Field>
+              <div className="flex items-center">
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <a
+                  href="/forgot"
+                  className="ml-auto text-sm underline-offset-4 hover:underline"
+                  aria-label="Forgot password"
+                >
+                  Forgot your password?
+                </a>
+              </div>
+              <Input id="password" name="password" type="password" />
+            </Field>
+
+            <Field>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Working…" : "Login"}
+              </Button>
+            </Field>
+          </>
+        )}
 
         <FieldSeparator>Or continue with</FieldSeparator>
 

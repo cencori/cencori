@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
-import { ChartBarIcon, CurrencyDollarIcon, ClockIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { EXAMPLE_PROJECTS } from "@/config/examples";
 import { Bar, BarChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -45,6 +45,8 @@ interface AIStats {
   filteredRequests: number;
   totalCost: string;
   totalTokens: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
   avgLatency: number;
 }
 
@@ -53,6 +55,8 @@ interface ChartDataPoint {
   count: number;
   cost: number;
   tokens: number;
+  promptTokens: number;
+  completionTokens: number;
 }
 
 // Getting Started Section Component - Compact
@@ -381,6 +385,10 @@ export default function ProjectDetailsPage({
       value: aiStats ? `${aiStats.avgLatency}ms` : "0ms",
       change: aiStats ? `${aiStats.errorRequests} errors` : "No data",
     },
+    tokens: {
+      value: aiStats ? aiStats.totalTokens.toLocaleString() : "0",
+      change: aiStats ? `${aiStats.totalPromptTokens.toLocaleString()} in · ${aiStats.totalCompletionTokens.toLocaleString()} out` : "No data",
+    },
   };
 
   const recentActivity: ActivityItem[] = aiStats && aiStats.totalRequests > 0 ? [
@@ -397,8 +405,8 @@ export default function ProjectDetailsPage({
         <div className="mb-6">
           <Skeleton className="h-6 w-32" />
         </div>
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
@@ -464,17 +472,16 @@ export default function ProjectDetailsPage({
           </div>
 
           {/* Stats Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Requests Card */}
-            <div className="rounded-xl border border-border/40 bg-card p-5">
-              <div className="flex items-center gap-2.5 mb-2">
-                <ChartBarIcon className="h-5 w-5 text-muted-foreground" />
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
+              <div className="mb-2">
                 <span className="text-sm font-medium">Requests</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">API Calls</p>
               <p className="text-3xl font-semibold mb-1">{stats.aiRequests.value}</p>
               <p className="text-xs text-muted-foreground mb-3">{stats.aiRequests.change}</p>
-              <div className="h-28">
+              <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ requests: { label: "Requests", color: "hsl(24 80% 50%)" } }}
@@ -507,15 +514,14 @@ export default function ProjectDetailsPage({
             </div>
 
             {/* Cost Card */}
-            <div className="rounded-xl border border-border/40 bg-card p-5">
-              <div className="flex items-center gap-2.5 mb-2">
-                <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
+              <div className="mb-2">
                 <span className="text-sm font-medium">Cost</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Total Spend</p>
               <p className="text-3xl font-semibold mb-1">{stats.aiCost.value}</p>
               <p className="text-xs text-muted-foreground mb-3">{stats.aiCost.change}</p>
-              <div className="h-28">
+              <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ cost: { label: "Cost", color: "hsl(142 76% 36%)" } }}
@@ -548,15 +554,14 @@ export default function ProjectDetailsPage({
             </div>
 
             {/* Latency Card */}
-            <div className="rounded-xl border border-border/40 bg-card p-5">
-              <div className="flex items-center gap-2.5 mb-2">
-                <ClockIcon className="h-5 w-5 text-muted-foreground" />
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
+              <div className="mb-2">
                 <span className="text-sm font-medium">Performance</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Avg Latency</p>
               <p className="text-3xl font-semibold mb-1">{stats.avgLatency.value}</p>
               <p className="text-xs text-muted-foreground mb-3">{stats.avgLatency.change}</p>
-              <div className="h-28">
+              <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{ latency: { label: "Latency", color: "hsl(244 59% 59%)" } }}
@@ -587,12 +592,62 @@ export default function ProjectDetailsPage({
                 )}
               </div>
             </div>
+
+            {/* Tokens Card */}
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
+              <div className="mb-2">
+                <span className="text-sm font-medium">Tokens</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">Total Usage</p>
+              <p className="text-3xl font-semibold mb-1">{stats.tokens.value}</p>
+              <p className="text-xs text-muted-foreground mb-3">{stats.tokens.change}</p>
+              <div className="h-36">
+                {chartData.length > 0 ? (
+                  <ChartContainer
+                    config={{
+                      promptTokens: { label: "Input", color: "hsl(280 65% 60%)" },
+                      completionTokens: { label: "Output", color: "hsl(330 65% 55%)" },
+                    }}
+                    className="h-full w-full"
+                  >
+                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickMargin={8}
+                        interval="preserveStartEnd"
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        content={<ChartTooltipContent />}
+                      />
+                      <Bar
+                        dataKey="promptTokens"
+                        stackId="tokens"
+                        fill="var(--color-promptTokens)"
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="completionTokens"
+                        stackId="tokens"
+                        fill="var(--color-completionTokens)"
+                        radius={[3, 3, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Activity and Info */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Recent Activity */}
-            <div className="rounded-xl border border-border/40 bg-card p-5">
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-medium">Recent Activity</h3>
@@ -618,7 +673,7 @@ export default function ProjectDetailsPage({
             </div>
 
             {/* Project Information */}
-            <div className="rounded-xl border border-border/40 bg-card p-5">
+            <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-2">
               <div className="mb-4">
                 <h3 className="text-sm font-medium">Project Information</h3>
                 <p className="text-xs text-muted-foreground">Basic details</p>

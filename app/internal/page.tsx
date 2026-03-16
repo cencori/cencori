@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BarChart3, Mail, TrendingUp, Settings, ArrowRight } from 'lucide-react';
+import { BarChart3, Mail, TrendingUp, Settings, ArrowRight, ArrowRightLeft } from 'lucide-react';
 
 const SECTIONS = [
     {
@@ -22,6 +22,13 @@ const SECTIONS = [
         description: 'Compose emails, manage sender profiles, view send history',
         icon: Mail,
         color: 'text-purple-400 bg-purple-500/10',
+    },
+    {
+        href: '/internal/model-mappings',
+        label: 'Model Mappings',
+        description: 'Manage cross-provider failover mappings',
+        icon: ArrowRightLeft,
+        color: 'text-cyan-400 bg-cyan-500/10',
     },
     {
         href: '/internal/settings',
