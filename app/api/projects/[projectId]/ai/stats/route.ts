@@ -7,6 +7,8 @@ interface DateAggregation {
     count: number;
     cost: number;
     tokens: number;
+    promptTokens: number;
+    completionTokens: number;
 }
 
 interface ModelAggregation {
@@ -96,6 +98,8 @@ export async function GET(
 
         const totalCost = requests?.reduce((sum, r) => sum + (parseFloat(r.cost_usd) || 0), 0) || 0;
         const totalTokens = requests?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0;
+        const totalPromptTokens = requests?.reduce((sum, r) => sum + (r.prompt_tokens || 0), 0) || 0;
+        const totalCompletionTokens = requests?.reduce((sum, r) => sum + (r.completion_tokens || 0), 0) || 0;
         const avgLatency = totalRequests > 0
             ? requests.reduce((sum, r) => sum + (r.latency_ms || 0), 0) / totalRequests
             : 0;
@@ -115,11 +119,13 @@ export async function GET(
         const requestsByTime = requests?.reduce((acc: DateAggregationMap, r) => {
             const key = getGroupKey(r.created_at);
             if (!acc[key]) {
-                acc[key] = { date: key, count: 0, cost: 0, tokens: 0 };
+                acc[key] = { date: key, count: 0, cost: 0, tokens: 0, promptTokens: 0, completionTokens: 0 };
             }
             acc[key].count += 1;
             acc[key].cost += parseFloat(r.cost_usd || '0');
             acc[key].tokens += r.total_tokens || 0;
+            acc[key].promptTokens += r.prompt_tokens || 0;
+            acc[key].completionTokens += r.completion_tokens || 0;
             return acc;
         }, {} as DateAggregationMap);
 
@@ -136,6 +142,8 @@ export async function GET(
                     count: existing?.count || 0,
                     cost: existing?.cost || 0,
                     tokens: existing?.tokens || 0,
+                    promptTokens: existing?.promptTokens || 0,
+                    completionTokens: existing?.completionTokens || 0,
                 });
             }
         } else if (period === '24h') {
@@ -148,6 +156,8 @@ export async function GET(
                     count: existing?.count || 0,
                     cost: existing?.cost || 0,
                     tokens: existing?.tokens || 0,
+                    promptTokens: existing?.promptTokens || 0,
+                    completionTokens: existing?.completionTokens || 0,
                 });
             }
         } else {
@@ -181,6 +191,8 @@ export async function GET(
                         count: existing?.count || 0,
                         cost: existing?.cost || 0,
                         tokens: existing?.tokens || 0,
+                        promptTokens: existing?.promptTokens || 0,
+                        completionTokens: existing?.completionTokens || 0,
                     });
                 }
 
@@ -197,6 +209,8 @@ export async function GET(
                         count: existing?.count || 0,
                         cost: existing?.cost || 0,
                         tokens: existing?.tokens || 0,
+                        promptTokens: existing?.promptTokens || 0,
+                        completionTokens: existing?.completionTokens || 0,
                     });
                 }
             }
@@ -220,6 +234,8 @@ export async function GET(
                 filteredRequests,
                 totalCost: totalCost.toFixed(6),
                 totalTokens,
+                totalPromptTokens,
+                totalCompletionTokens,
                 avgLatency: Math.round(avgLatency),
             },
             chartData,

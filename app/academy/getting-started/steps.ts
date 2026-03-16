@@ -7,6 +7,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Sign up for Cencori and explore the dashboard",
         href: "/academy/getting-started/step-1",
         duration: "2 min",
+        section: "Setup",
     },
     {
         id: "create-project",
@@ -14,6 +15,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Set up your first project to organize API keys and settings",
         href: "/academy/getting-started/step-2",
         duration: "2 min",
+        section: "Setup",
     },
     {
         id: "add-provider-keys",
@@ -21,6 +23,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Connect your OpenAI, Anthropic, or Gemini API keys",
         href: "/academy/getting-started/step-3",
         duration: "2 min",
+        section: "Setup",
     },
     {
         id: "generate-api-key",
@@ -28,6 +31,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Create a Cencori API key for your application",
         href: "/academy/getting-started/step-4",
         duration: "1 min",
+        section: "SDK Integration",
     },
     {
         id: "install-sdk",
@@ -35,6 +39,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Add Cencori to your project with npm or pip",
         href: "/academy/getting-started/step-5",
         duration: "2 min",
+        section: "SDK Integration",
     },
     {
         id: "first-request",
@@ -42,6 +47,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Send your first AI chat request through Cencori",
         href: "/academy/getting-started/step-6",
         duration: "3 min",
+        section: "SDK Integration",
     },
     {
         id: "streaming",
@@ -49,6 +55,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "Get real-time token-by-token responses",
         href: "/academy/getting-started/step-7",
         duration: "2 min",
+        section: "Production Features",
     },
     {
         id: "view-logs",
@@ -56,6 +63,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "See every request logged in your dashboard",
         href: "/academy/getting-started/step-8",
         duration: "1 min",
+        section: "Production Features",
     },
     {
         id: "security-features",
@@ -63,6 +71,7 @@ export const GETTING_STARTED_STEPS: CourseStep[] = [
         description: "See how Cencori protects your AI requests",
         href: "/academy/getting-started/step-9",
         duration: "2 min",
+        section: "Production Features",
     },
 ];
 
