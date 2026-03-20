@@ -18,7 +18,8 @@ export async function generateAgentKey(agentId: string, projectId: string) {
         .from('api_keys')
         .update({ revoked_at: new Date().toISOString() })
         .eq('project_id', projectId)
-        .like('name', `Agent ${agentId} Key%`);
+        .eq('agent_id', agentId)
+        .is('revoked_at', null);
 
     // 2. Generate new key
     const rawKey = `cake_${crypto.randomBytes(24).toString('hex')}`;
@@ -26,8 +27,10 @@ export async function generateAgentKey(agentId: string, projectId: string) {
 
     const { error } = await supabase.from('api_keys').insert({
         project_id: projectId,
+        agent_id: agentId,
         key_hash: keyHash,
         key_prefix: 'cake_',
+        key_type: 'agent',
         name: `Agent ${agentId} Key`
     });
 

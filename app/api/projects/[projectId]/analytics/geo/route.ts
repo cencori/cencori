@@ -57,6 +57,7 @@ export async function GET(
 
         const { searchParams } = new URL(request.url);
         const range = searchParams.get('range') || '7d';
+        const environment = searchParams.get('environment') || 'production';
 
         const rangeMap: Record<string, number> = {
             '24h': 1,
@@ -73,6 +74,7 @@ export async function GET(
             .from('ai_requests')
             .select('country_code, total_tokens, cost_usd, latency_ms, model, created_at')
             .eq('project_id', projectId)
+            .eq('environment', environment)
             .gte('created_at', startDate.toISOString());
 
         if (error) {

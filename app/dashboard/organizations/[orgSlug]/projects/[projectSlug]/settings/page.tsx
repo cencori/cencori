@@ -21,6 +21,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
@@ -172,6 +182,8 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [showCreateKeyDialog, setShowCreateKeyDialog] = useState(false);
   const [createKeyType, setCreateKeyType] = useState<'secret' | 'publishable'>('secret');
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string; prefix: string } | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   // Provider Settings state
   const [defaultProvider, setDefaultProvider] = useState('openai');
@@ -324,10 +336,11 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   };
 
   // Revoke API key handler
-  const handleRevokeKey = async (keyId: string, keyName: string) => {
-    if (!confirm(`Are you sure you want to revoke "${keyName}"? This cannot be undone.`)) return;
+  const confirmRevokeKey = async () => {
+    if (!revokeTarget) return;
+    setRevoking(true);
     try {
-      const response = await fetch(`/api/projects/${project!.id}/api-keys/${keyId}`, {
+      const response = await fetch(`/api/projects/${project!.id}/api-keys/${revokeTarget.id}`, {
         method: "PATCH",
       });
       if (!response.ok) throw new Error("Failed to revoke key");
@@ -335,6 +348,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       refetchApiKeys();
     } catch {
       toast.error("Failed to revoke API key");
+    } finally {
+      setRevoking(false);
+      setRevokeTarget(null);
     }
   };
 
@@ -1601,7 +1617,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                         <DropdownMenuContent align="end" className="w-36">
                           <DropdownMenuItem
                             className="text-xs text-red-600 cursor-pointer"
-                            onClick={() => handleRevokeKey(key.id, key.name)}
+                            onClick={() => setRevokeTarget({ id: key.id, name: key.name, prefix: key.key_prefix })}
                           >
                             <Trash2 className="h-3 w-3 mr-2" />
                             Revoke key
@@ -1673,7 +1689,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                         <DropdownMenuContent align="end" className="w-36">
                           <DropdownMenuItem
                             className="text-xs text-red-600 cursor-pointer"
-                            onClick={() => handleRevokeKey(key.id, key.name)}
+                            onClick={() => setRevokeTarget({ id: key.id, name: key.name, prefix: key.key_prefix })}
                           >
                             <Trash2 className="h-3 w-3 mr-2" />
                             Revoke key
@@ -1706,6 +1722,37 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           />
         )
       }
+
+      <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to revoke <span className="font-medium text-foreground">{revokeTarget?.name}</span>?
+                </p>
+                <div className="rounded-md bg-muted px-3 py-2">
+                  <code className="text-xs font-mono">{revokeTarget?.prefix}...</code>
+                </div>
+                <p className="text-xs text-destructive">
+                  This action cannot be undone. Any application or agent using this key will immediately lose access.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevokeKey}
+              disabled={revoking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {revoking ? "Revoking..." : "Revoke Key"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div >
   );
 }

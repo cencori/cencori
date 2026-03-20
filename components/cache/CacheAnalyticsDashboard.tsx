@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 interface CacheAnalyticsDashboardProps {
     projectId: string;
     timeRange: string;
+    environment?: string;
 }
 
 interface CacheAnalytics {
@@ -55,14 +56,14 @@ function formatCost(v: number): string {
     return `$${v.toFixed(2)}`;
 }
 
-export function CacheAnalyticsDashboard({ projectId, timeRange }: CacheAnalyticsDashboardProps) {
+export function CacheAnalyticsDashboard({ projectId, timeRange, environment = 'production' }: CacheAnalyticsDashboardProps) {
     const range = rangeApiMap[timeRange] || '7d';
     const queryClient = useQueryClient();
 
     const { data: analytics, isLoading } = useQuery<CacheAnalytics>({
-        queryKey: ['cacheAnalytics', projectId, range],
+        queryKey: ['cacheAnalytics', projectId, range, environment],
         queryFn: async () => {
-            const res = await fetch(`/api/projects/${projectId}/cache/analytics?range=${range}`);
+            const res = await fetch(`/api/projects/${projectId}/cache/analytics?range=${range}&environment=${environment}`);
             if (!res.ok) throw new Error('Failed to fetch cache analytics');
             return res.json();
         },

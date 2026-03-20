@@ -374,7 +374,7 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         projectId: project.id,
         organizationId,
         apiKeyId: keyData.id,
-        environment: keyData.environment || 'live',
+        environment: keyData.environment || 'production',
         keyType: keyData.key_type || 'secret',
         tier,
         requestId,
@@ -452,6 +452,7 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
         await context.supabase.from('ai_requests').insert({
             project_id: context.projectId,
             api_key_id: context.apiKeyId,
+            environment: context.environment === 'test' ? 'test' : 'production',
             endpoint: params.endpoint,
             model: params.model,
             provider: params.provider,

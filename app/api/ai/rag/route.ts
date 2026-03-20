@@ -192,6 +192,7 @@ export async function POST(req: NextRequest) {
                 await ctx.supabase.from('security_incidents').insert({
                     project_id: ctx.projectId,
                     api_key_id: ctx.apiKeyId,
+                    environment: ctx.environment === 'test' ? 'test' : 'production',
                     incident_type: inputSecurity.layer,
                     severity: inputSecurity.riskScore > 0.8 ? 'critical' : 'high',
                     description: `RAG input blocked: ${inputSecurity.reasons.join(', ')}`,
@@ -359,6 +360,7 @@ export async function POST(req: NextRequest) {
                     await ctx.supabase.from('security_incidents').insert({
                         project_id: ctx.projectId,
                         api_key_id: ctx.apiKeyId,
+                        environment: ctx.environment === 'test' ? 'test' : 'production',
                         incident_type: 'output_' + outputSecurity.layer,
                         severity: 'high',
                         description: `RAG output blocked: ${outputSecurity.reasons.join(', ')}`,
