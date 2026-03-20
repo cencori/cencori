@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function POST(
     req: NextRequest,
@@ -39,6 +40,21 @@ export async function POST(
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+    if (proj?.organization_id) {
+        writeAuditLog({
+            organizationId: proj.organization_id,
+            projectId,
+            category: 'prompt',
+            action: 'deployed',
+            resourceType: 'prompt_version',
+            resourceId: version_id,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `Prompt version ${version.version} deployed for prompt ${promptId}`,
+            metadata: { promptId, versionNumber: version.version },
+        });
     }
 
     return NextResponse.json({ deployed: true, version: version.version, version_id });

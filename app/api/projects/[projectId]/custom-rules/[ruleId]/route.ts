@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface RouteParams {
     params: Promise<{
@@ -89,6 +90,21 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
         }
 
+        const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+        if (proj?.organization_id) {
+            writeAuditLog({
+                organizationId: proj.organization_id,
+                projectId,
+                category: 'security',
+                action: 'updated',
+                resourceType: 'custom_rule',
+                resourceId: ruleId,
+                actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+                description: `Custom rule updated: ${rule.name}`,
+                metadata: { updatedFields: Object.keys(updates) },
+            });
+        }
+
         return NextResponse.json({ rule });
     } catch (error) {
         console.error('[Custom Rules] Error:', error);
@@ -110,6 +126,20 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
         if (error) {
             console.error('[Custom Rules] Failed to delete:', error);
             return NextResponse.json({ error: 'Failed to delete rule' }, { status: 500 });
+        }
+
+        const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+        if (proj?.organization_id) {
+            writeAuditLog({
+                organizationId: proj.organization_id,
+                projectId,
+                category: 'security',
+                action: 'deleted',
+                resourceType: 'custom_rule',
+                resourceId: ruleId,
+                actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+                description: `Custom rule deleted: ${ruleId}`,
+            });
         }
 
         return NextResponse.json({ success: true });

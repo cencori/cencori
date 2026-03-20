@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { writeAuditLog } from "@/lib/audit-log";
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +33,7 @@ export async function PATCH(
 
         const { data: project, error: projectError } = await supabaseAdmin
             .from("projects")
-            .select("id")
+            .select("id, organization_id")
             .eq("id", projectId)
             .single();
 
@@ -101,6 +102,19 @@ export async function PATCH(
                 );
             }
         }
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'settings',
+            action: 'updated',
+            resourceType: 'project_settings',
+            resourceId: projectId,
+            actorIp: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: 'Updated project settings',
+            metadata: { changes: body },
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

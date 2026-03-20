@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -103,6 +104,25 @@ export async function PATCH(
                 { status: 500 }
             );
         }
+
+        const { data: project } = await supabaseAdmin
+            .from('projects')
+            .select('organization_id')
+            .eq('id', projectId)
+            .single();
+
+        writeAuditLog({
+            organizationId: project?.organization_id || '',
+            projectId,
+            category: 'security',
+            action: 'reviewed',
+            resourceType: 'security_incident',
+            resourceId: incidentId,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Reviewed security incident ${incidentId}`,
+            metadata: { reviewed, review_notes },
+        });
 
         return NextResponse.json({ success: true });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -73,6 +74,25 @@ export async function PATCH(
     }
 
     trackEvent({ event_type: 'cache.settings_changed', product: 'gateway', project_id: projectId, metadata: updates });
+
+    const { data: project } = await supabase
+        .from('projects')
+        .select('organization_id')
+        .eq('id', projectId)
+        .single();
+
+    writeAuditLog({
+        organizationId: project?.organization_id || '',
+        projectId,
+        category: 'cache',
+        action: 'updated',
+        resourceType: 'cache_settings',
+        resourceId: projectId,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        actorType: 'user',
+        description: 'Updated cache settings',
+        metadata: { changes: updates },
+    });
 
     return NextResponse.json(data);
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface WebhookUpdateBody {
     name?: string;
@@ -56,6 +57,23 @@ export async function PATCH(
         return NextResponse.json({ error: 'Failed to update webhook' }, { status: 500 });
     }
 
+    const orgId = (webhook.projects as unknown as { organization_id: string })?.organization_id;
+
+    writeAuditLog({
+        organizationId: orgId,
+        projectId,
+        category: 'webhook',
+        action: 'updated',
+        resourceType: 'webhook',
+        resourceId: webhookId,
+        actorId: user.id,
+        actorEmail: user.email || null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        actorType: 'user',
+        description: `Updated webhook "${updatedWebhook.name}"`,
+        metadata: { webhook_name: updatedWebhook.name, updated_fields: Object.keys(body) },
+    });
+
     return NextResponse.json({ webhook: updatedWebhook });
 }
 
@@ -91,6 +109,23 @@ export async function DELETE(
         console.error('Error deleting webhook:', deleteError);
         return NextResponse.json({ error: 'Failed to delete webhook' }, { status: 500 });
     }
+
+    const deleteOrgId = (webhook.projects as unknown as { organization_id: string })?.organization_id;
+
+    writeAuditLog({
+        organizationId: deleteOrgId,
+        projectId,
+        category: 'webhook',
+        action: 'deleted',
+        resourceType: 'webhook',
+        resourceId: webhookId,
+        actorId: user.id,
+        actorEmail: user.email || null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        actorType: 'user',
+        description: `Deleted webhook ${webhookId}`,
+        metadata: { webhook_id: webhookId },
+    });
 
     return NextResponse.json({ success: true });
 }

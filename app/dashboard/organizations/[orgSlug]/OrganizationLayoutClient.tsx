@@ -23,6 +23,7 @@ import { ActivityIcon } from "@/components/animate-ui/icons/activity";
 import { UnplugIcon } from "@/components/animate-ui/icons/unplug";
 import { UserRoundIcon } from "@/components/animate-ui/icons/user-round";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
+import { ScrollText } from "lucide-react";
 
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -183,6 +184,14 @@ export default function OrganizationLayoutClient({
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
+                                    <SidebarMenuButton asChild tooltip="Audit Log" size="sm">
+                                        <Link href={`/dashboard/organizations/${organization.slug}/audit-log`} prefetch={false}>
+                                            <ScrollText className="h-4 w-4" />
+                                            <span className="text-[13px]">Audit Log</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
                                     <SidebarMenuButton asChild tooltip="Settings" size="sm">
                                         <Link href={`/dashboard/organizations/${organization.slug}/settings`} prefetch={false}>
                                             <SettingsIcon animateOnHover />
@@ -244,6 +253,14 @@ export default function OrganizationLayoutClient({
                                             <Link href={`/dashboard/organizations/${organization.slug}/teams`} prefetch={false} onClick={() => setIsOpen(false)}>
                                                 <UserRoundIcon animateOnHover />
                                                 <span className="text-[13px]">Teams</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild size="sm">
+                                            <Link href={`/dashboard/organizations/${organization.slug}/audit-log`} prefetch={false} onClick={() => setIsOpen(false)}>
+                                                <ScrollText className="h-4 w-4" />
+                                                <span className="text-[13px]">Audit Log</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { encryptApiKey } from '@/lib/encryption';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -106,6 +107,21 @@ export async function POST(
         }
 
         trackEvent({ event_type: 'provider.added', product: 'gateway', project_id: projectId, metadata: { provider_name: name } });
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'provider',
+            action: 'created',
+            resourceType: 'custom_provider',
+            resourceId: provider.id,
+            actorId: null,
+            actorEmail: null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Custom provider created: ${name}`,
+            metadata: { providerName: name, format, modelCount: models?.length ?? 0 },
+        });
 
         return NextResponse.json({ provider }, { status: 201 });
     } catch (error) {

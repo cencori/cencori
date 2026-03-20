@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { slugify, extractVariableNames } from '@/lib/prompts/registry';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -120,6 +121,21 @@ export async function POST(
         .eq('id', prompt.id);
 
     trackEvent({ event_type: 'prompt.created', product: 'gateway', project_id: projectId, metadata: { prompt_name: name.trim(), slug } });
+
+    const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+    if (proj?.organization_id) {
+        writeAuditLog({
+            organizationId: proj.organization_id,
+            projectId,
+            category: 'prompt',
+            action: 'created',
+            resourceType: 'prompt',
+            resourceId: prompt.id,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `Prompt created: ${name.trim()}`,
+            metadata: { promptName: name.trim(), slug },
+        });
+    }
 
     return NextResponse.json({ prompt: { ...prompt, active_version_id: version.id }, version }, { status: 201 });
 }

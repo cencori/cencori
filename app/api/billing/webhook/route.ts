@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { addCredits } from '@/lib/credits';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 import {
     getCreditTopupCreditsByProductId,
     getLimitForTier,
@@ -357,6 +358,16 @@ export async function POST(req: NextRequest) {
                 }
 
                 trackEvent({ event_type: 'subscription.created', product: 'billing', organization_id: orgId, metadata: { tier, subscription_id: payload.id } });
+                writeAuditLog({
+                    organizationId: orgId,
+                    category: 'billing',
+                    action: 'tier_changed',
+                    resourceType: 'subscription',
+                    resourceId: payload.id,
+                    actorType: 'webhook',
+                    description: `Subscription upgraded to ${tier} tier`,
+                    metadata: { tier, subscription_id: payload.id, polar_customer_id: payload.customerId },
+                });
 
                 console.log(`[Polar Webhook] ✓ Updated org ${orgId} to ${tier} tier`);
                 break;
@@ -404,6 +415,16 @@ export async function POST(req: NextRequest) {
                 }
 
                 trackEvent({ event_type: 'subscription.canceled', product: 'billing', organization_id: orgId, metadata: { subscription_id: payload.id } });
+                writeAuditLog({
+                    organizationId: orgId,
+                    category: 'billing',
+                    action: 'tier_changed',
+                    resourceType: 'subscription',
+                    resourceId: payload.id,
+                    actorType: 'webhook',
+                    description: 'Subscription canceled, reverted to free tier',
+                    metadata: { subscription_id: payload.id },
+                });
 
                 console.log(`[Polar Webhook] ✓ Reverted org ${orgId} to free tier`);
                 break;
@@ -469,6 +490,16 @@ export async function POST(req: NextRequest) {
                 }
 
                 trackEvent({ event_type: 'credits.topup', product: 'billing', organization_id: orgId, metadata: { order_id: payload.id, credits_amount: creditsToAdd } });
+                writeAuditLog({
+                    organizationId: orgId,
+                    category: 'billing',
+                    action: 'topup',
+                    resourceType: 'credits',
+                    resourceId: payload.id,
+                    actorType: 'webhook',
+                    description: `Credits topped up: $${creditsToAdd.toFixed(2)}`,
+                    metadata: { order_id: payload.id, credits_amount: creditsToAdd },
+                });
 
                 console.log(`[Polar Webhook] ✓ Credited org ${orgId} with $${creditsToAdd.toFixed(2)} from order ${payload.id}`);
                 break;

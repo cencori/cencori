@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface RouteParams {
     params: Promise<{
@@ -91,6 +92,21 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         }
 
         trackEvent({ event_type: 'custom_rule.created', product: 'gateway', project_id: projectId, metadata: { rule_name: name, match_type, action } });
+
+        const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+        if (proj?.organization_id) {
+            writeAuditLog({
+                organizationId: proj.organization_id,
+                projectId,
+                category: 'security',
+                action: 'created',
+                resourceType: 'custom_rule',
+                resourceId: rule.id,
+                actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+                description: `Custom rule created: ${name}`,
+                metadata: { ruleName: name, matchType: match_type, action },
+            });
+        }
 
         return NextResponse.json({ rule }, { status: 201 });
     } catch (error) {

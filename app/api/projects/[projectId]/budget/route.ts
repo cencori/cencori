@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getBudgetStatus, updateBudgetSettings } from '@/lib/budgets';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -72,6 +73,25 @@ export async function PUT(
         }
 
         const status = await getBudgetStatus(projectId);
+
+        const { data: project } = await supabase
+            .from('projects')
+            .select('organization_id')
+            .eq('id', projectId)
+            .single();
+
+        writeAuditLog({
+            organizationId: project?.organization_id || '',
+            projectId,
+            category: 'budget',
+            action: 'updated',
+            resourceType: 'budget_settings',
+            resourceId: projectId,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: 'Updated budget settings',
+            metadata: { changes: settings },
+        });
 
         return NextResponse.json({
             success: true,

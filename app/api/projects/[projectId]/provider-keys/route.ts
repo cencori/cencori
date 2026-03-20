@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
 import { SUPPORTED_PROVIDERS, getProvider } from '@/lib/providers/config';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface ProviderKeyResponse {
     provider: string;
@@ -205,6 +206,21 @@ export async function POST(
                 .update(projectUpdate)
                 .eq('id', projectId);
         }
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'provider',
+            action: 'created',
+            resourceType: 'provider_key',
+            resourceId: providerKey.id,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Provider key saved for ${provider}`,
+            metadata: { provider, setAsDefault: !!setAsDefault },
+        });
 
         return NextResponse.json({
             success: true,

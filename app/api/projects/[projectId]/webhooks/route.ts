@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import crypto from 'crypto';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface WebhookBody {
     name: string;
@@ -99,6 +100,21 @@ export async function POST(
     }
 
     trackEvent({ event_type: 'webhook.created', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { webhook_name: body.name, events: body.events } });
+
+    writeAuditLog({
+        organizationId: project.organization_id,
+        projectId,
+        category: 'webhook',
+        action: 'created',
+        resourceType: 'webhook',
+        resourceId: webhook.id,
+        actorId: user.id,
+        actorEmail: user.email || null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        actorType: 'user',
+        description: `Created webhook "${body.name}" for ${body.url}`,
+        metadata: { webhook_name: body.name, url: body.url, events: webhook.events },
+    });
 
     return NextResponse.json({ webhook }, { status: 201 });
 }

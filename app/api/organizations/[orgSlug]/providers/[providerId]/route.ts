@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function PATCH(
   req: NextRequest,
@@ -73,6 +74,20 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
+    writeAuditLog({
+      organizationId: org.id,
+      category: 'provider',
+      action: 'updated',
+      resourceType: 'custom_provider',
+      resourceId: providerId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+      actorType: 'user',
+      description: `Org custom provider updated: ${providerId}`,
+      metadata: { updatedFields: Object.keys(updateData) },
+    });
+
     return NextResponse.json({ provider });
   } catch (error) {
     console.error('[API] Error updating provider:', error);
@@ -137,6 +152,19 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
+    writeAuditLog({
+      organizationId: org.id,
+      category: 'provider',
+      action: 'deleted',
+      resourceType: 'custom_provider',
+      resourceId: providerId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+      actorType: 'user',
+      description: `Org custom provider deleted: ${providerId}`,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API] Error deleting provider:', error);
