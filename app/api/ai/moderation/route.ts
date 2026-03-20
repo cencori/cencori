@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
                 id: crypto.randomUUID(),
                 project_id: ctx.projectId,
                 organization_id: ctx.organizationId,
+                environment: ctx.environment === 'test' ? 'test' : 'production',
                 incident_type: 'content_moderation',
                 severity: 'medium',
                 description: `Content flagged for: ${flaggedCategories.join(', ')}`,

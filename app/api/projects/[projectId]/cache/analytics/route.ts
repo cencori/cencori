@@ -8,6 +8,7 @@ export async function GET(
     const { projectId } = await params;
     const url = new URL(req.url);
     const range = url.searchParams.get('range') || '7d';
+    const environment = url.searchParams.get('environment') || 'production';
 
     const rangeMap: Record<string, number> = {
         '1h': 3600000,
@@ -22,11 +23,16 @@ export async function GET(
     const supabase = createAdminClient();
 
     // Get event counts by type
-    const { data: events } = await supabase
+    let eventsQuery = supabase
         .from('prompt_cache_events')
         .select('event_type, tokens_saved, cost_saved_usd, created_at')
         .eq('project_id', projectId)
         .gte('created_at', since);
+
+    // Filter by environment if the column exists (graceful for pre-migration data)
+    eventsQuery = eventsQuery.eq('environment', environment);
+
+    const { data: events } = await eventsQuery;
 
     const allEvents = events || [];
     const exactHits = allEvents.filter(e => e.event_type === 'hit_exact').length;

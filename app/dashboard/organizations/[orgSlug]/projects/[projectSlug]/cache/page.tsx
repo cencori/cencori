@@ -7,6 +7,7 @@ import { CacheAnalyticsDashboard } from '@/components/cache/CacheAnalyticsDashbo
 import { CacheSettingsPanel } from '@/components/cache/CacheSettingsPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 
 interface PageProps {
     params: Promise<{
@@ -43,6 +44,7 @@ const TIME_RANGES = ['Last 1 Hour', 'Last 24 Hours', 'Last 7 Days', 'Last 30 Day
 export default function CachePage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
+    const { environment } = useEnvironment();
     const [tab, setTab] = useState<Tab>('analytics');
     const [timeRange, setTimeRange] = useState<string>('Last 7 Days');
 
@@ -96,7 +98,7 @@ export default function CachePage({ params }: PageProps) {
             </div>
 
             {tab === 'analytics' ? (
-                <CacheAnalyticsDashboard projectId={projectId} timeRange={timeRange} />
+                <CacheAnalyticsDashboard projectId={projectId} timeRange={timeRange} environment={environment} />
             ) : (
                 <CacheSettingsPanel projectId={projectId} />
             )}

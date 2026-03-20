@@ -223,6 +223,7 @@ export async function logCacheEvent(params: {
     tokensSaved?: number;
     costSavedUsd?: number;
     requestId?: string;
+    environment?: string;
 }): Promise<void> {
     try {
         const supabase = createAdminClient();
@@ -236,6 +237,7 @@ export async function logCacheEvent(params: {
             tokens_saved: params.tokensSaved,
             cost_saved_usd: params.costSavedUsd,
             request_id: params.requestId,
+            environment: params.environment || 'production',
         });
     } catch (error) {
         console.error('[Cache] Event logging failed:', error);

@@ -524,6 +524,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        let agentConfigModel: string | null = null;
+
         if (keyData.key_type === 'agent' || apiKey.startsWith('cake_')) {
             if (!keyData.agent_id) {
                 return NextResponse.json(
@@ -543,6 +545,15 @@ export async function POST(req: NextRequest) {
             }
             if (agent) {
                 console.log('[Agent Identity] Request from:', agent.name);
+                // Fetch the agent's configured model from agent_configs
+                const { data: agentConfig } = await supabase
+                    .from('agent_configs')
+                    .select('model')
+                    .eq('agent_id', keyData.agent_id)
+                    .single();
+                if (agentConfig?.model) {
+                    agentConfigModel = agentConfig.model;
+                }
             }
         }
 
@@ -684,6 +695,7 @@ export async function POST(req: NextRequest) {
             const { error: incidentError } = await supabase.from('security_incidents').insert({
                 project_id: project.id,
                 api_key_id: keyData.id,
+                environment: keyData.environment || 'production',
                 incident_type: inputSecurity.layer,
                 severity,
                 description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
@@ -739,6 +751,7 @@ export async function POST(req: NextRequest) {
             if (blockRule) {
                 const { error: incidentError } = await supabase.from('security_incidents').insert({
                     project_id: project.id,
+                    environment: keyData.environment || 'production',
                     incident_type: 'data_rule_block',
                     severity: 'high',
                     risk_score: 0.8,
@@ -771,6 +784,7 @@ export async function POST(req: NextRequest) {
                 const actionLabel = match.rule.action === 'tokenize' ? 'tokenized' : `${match.rule.action}ed`;
                 const { error: incidentError } = await supabase.from('security_incidents').insert({
                     project_id: project.id,
+                    environment: keyData.environment || 'production',
                     incident_type: `data_rule_${match.rule.action}`,
                     severity: 'medium',
                     risk_score: 0.5,
@@ -812,7 +826,9 @@ export async function POST(req: NextRequest) {
             console.log('[CustomRules] Applied data rules to all user messages in conversation');
         }
 
-        const requestedModel = model || project.default_model || 'gemini-2.0-flash';
+        // Resolve model: "auto" means use agent/project config, not a literal model name
+        const resolvedModel = (model === 'auto' || model === 'cencori/auto') ? null : model;
+        const requestedModel = resolvedModel || agentConfigModel || project.default_model || 'gemini-2.0-flash';
         const customProvider = await resolveCustomProviderForProject({
             supabase,
             projectId: project.id,
@@ -1230,6 +1246,7 @@ export async function POST(req: NextRequest) {
                                 await supabase.from('security_incidents').insert({
                                     project_id: project.id,
                                     api_key_id: keyData.id,
+                                    environment: keyData.environment || 'production',
                                     incident_type: 'output_leakage',
                                     severity: 'critical',
                                     description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
@@ -1512,6 +1529,7 @@ export async function POST(req: NextRequest) {
             await supabase.from('security_incidents').insert({
                 project_id: project.id,
                 api_key_id: keyData.id,
+                environment: keyData.environment || 'production',
                 incident_type: 'output_leakage',
                 severity: 'critical',
                 description: `Blocked output leakage: ${outputSecurity.reasons.join(', ')}`,
