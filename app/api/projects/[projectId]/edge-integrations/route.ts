@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
 import { listProjectEdgeIntegrations, upsertProjectEdgeIntegration } from '@/lib/edge-integrations/repository';
 import type { EdgeEnvironment, EdgeProvider } from '@/lib/edge-integrations/types';
+import { writeAuditLog } from '@/lib/audit-log';
 
 function isEdgeProvider(value: unknown): value is EdgeProvider {
     return value === 'vercel'
@@ -114,6 +115,21 @@ export async function POST(
             metadata: {
                 source: 'manual_link',
             },
+        });
+
+        writeAuditLog({
+            organizationId: access.organizationId,
+            projectId,
+            category: 'integration',
+            action: 'created',
+            resourceType: 'edge_integration',
+            resourceId: integration.id,
+            actorId: user.id,
+            actorEmail: user.email || null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Created ${provider} edge integration`,
+            metadata: { provider, externalProjectId, externalProjectName },
         });
 
         return NextResponse.json({ integration }, { status: 201 });

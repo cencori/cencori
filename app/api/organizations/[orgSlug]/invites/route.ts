@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { resolvePublicOrigin } from '@/lib/public-origin';
 import { trackEvent } from '@/lib/track-event';
+import { writeAuditLog } from '@/lib/audit-log';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ORG_INVITE_FROM_EMAIL = process.env.RESEND_ORG_INVITE_FROM_EMAIL || process.env.RESEND_TEAM_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -187,6 +188,19 @@ export async function POST(
     }
 
     trackEvent({ event_type: 'org.invite_sent', product: 'dashboard', user_id: user.id, organization_id: org.id, metadata: { invited_email: normalizedEmail, role } });
+
+    writeAuditLog({
+        organizationId: org.id,
+        category: 'member',
+        action: 'invited',
+        resourceType: 'invite',
+        resourceId: invite.id,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        description: `Invite sent to ${normalizedEmail} as ${role}`,
+        metadata: { invitedEmail: normalizedEmail, role },
+    });
 
     return NextResponse.json({
         success: true,

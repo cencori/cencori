@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { writeAuditLog } from '@/lib/audit-log';
 
 interface SecuritySettings {
     filter_harmful_content: boolean;
@@ -133,6 +134,21 @@ export async function PUT(
         actor_id: user.id,
         actor_email: user.email,
         details: { changes: body },
+    });
+
+    writeAuditLog({
+        organizationId: project.organization_id,
+        projectId,
+        category: 'security',
+        action: 'updated',
+        resourceType: 'security_settings',
+        resourceId: projectId,
+        actorId: user.id,
+        actorEmail: user.email || null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        actorType: 'user',
+        description: 'Updated security settings',
+        metadata: { changes: body },
     });
 
     return NextResponse.json({ settings });

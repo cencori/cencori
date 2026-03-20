@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import crypto from "crypto";
 import { trackEvent } from "@/lib/track-event";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function GET(
     request: NextRequest,
@@ -151,6 +152,21 @@ export async function POST(
         }
 
         trackEvent({ event_type: 'api_key.generated', product: 'gateway', user_id: user.id, project_id: projectId, organization_id: project.organization_id, metadata: { environment, key_type, key_name: name.trim() } });
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'api_key',
+            action: 'created',
+            resourceType: 'api_key',
+            resourceId: newKey.id,
+            actorId: user.id,
+            actorEmail: user.email || null,
+            actorIp: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Created ${key_type} API key "${name.trim()}" for ${environment}`,
+            metadata: { key_name: name.trim(), key_prefix: newKey.key_prefix, environment, key_type },
+        });
 
         return NextResponse.json({
             apiKey: {

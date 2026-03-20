@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
 import { disconnectProjectEdgeIntegration } from '@/lib/edge-integrations/repository';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function DELETE(
     _req: Request,
@@ -27,6 +28,20 @@ export async function DELETE(
         }
 
         await disconnectProjectEdgeIntegration(projectId, integrationId);
+
+        writeAuditLog({
+            organizationId: access.organizationId,
+            projectId,
+            category: 'integration',
+            action: 'deleted',
+            resourceType: 'edge_integration',
+            resourceId: integrationId,
+            actorId: user.id,
+            actorEmail: user.email || null,
+            actorIp: _req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Disconnected edge integration ${integrationId}`,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

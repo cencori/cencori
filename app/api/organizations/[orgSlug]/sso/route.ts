@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createSSOProvider, deleteSSOProvider } from "@/lib/supabase-sso";
+import { writeAuditLog } from "@/lib/audit-log";
 
 async function getOrgAsOwnerOrAdmin(orgSlug: string) {
     const supabase = await createServerClient();
@@ -118,6 +119,19 @@ export async function POST(
             return NextResponse.json({ error: "Failed to save SSO configuration" }, { status: 500 });
         }
 
+        writeAuditLog({
+            organizationId: org.id,
+            category: 'sso',
+            action: 'configured',
+            resourceType: 'sso_provider',
+            resourceId: provider.id,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `SSO configured for domain ${domain}`,
+            metadata: { domain, providerId: provider.id },
+        });
+
         return NextResponse.json({
             sso_enabled: true,
             sso_provider_id: provider.id,
@@ -142,7 +156,7 @@ export async function PATCH(
         return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    const { org } = result;
+    const { org, user } = result;
     if (!org.sso_enabled) {
         return NextResponse.json(
             { error: "SSO must be configured first" },
@@ -160,6 +174,19 @@ export async function PATCH(
     if (error) {
         return NextResponse.json({ error: "Failed to update" }, { status: 500 });
     }
+
+    writeAuditLog({
+        organizationId: org.id,
+        category: 'sso',
+        action: body.sso_enforce ? 'enforced' : 'updated',
+        resourceType: 'sso_enforcement',
+        resourceId: org.sso_provider_id,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+        description: `SSO enforcement ${body.sso_enforce ? 'enabled' : 'disabled'}`,
+        metadata: { ssoEnforce: body.sso_enforce },
+    });
 
     return NextResponse.json({ sso_enforce: body.sso_enforce });
 }

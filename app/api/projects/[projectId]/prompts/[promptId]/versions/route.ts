@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { extractVariableNames } from '@/lib/prompts/registry';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -31,7 +32,7 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ projectId: string; promptId: string }> }
 ) {
-    const { promptId } = await params;
+    const { projectId, promptId } = await params;
     const body = await req.json();
     const supabase = createAdminClient();
 
@@ -70,6 +71,21 @@ export async function POST(
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+    if (proj?.organization_id) {
+        writeAuditLog({
+            organizationId: proj.organization_id,
+            projectId,
+            category: 'prompt',
+            action: 'created',
+            resourceType: 'prompt_version',
+            resourceId: version.id,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `Prompt version ${nextVersion} created for prompt ${promptId}`,
+            metadata: { promptId, versionNumber: nextVersion },
+        });
     }
 
     return NextResponse.json({ version }, { status: 201 });

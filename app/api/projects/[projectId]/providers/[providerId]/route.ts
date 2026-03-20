@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -66,6 +67,27 @@ export async function PATCH(
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
+        const { data: proj } = await supabase
+            .from('projects')
+            .select('organization_id')
+            .eq('id', projectId)
+            .single();
+
+        writeAuditLog({
+            organizationId: proj?.organization_id ?? projectId,
+            projectId,
+            category: 'provider',
+            action: 'updated',
+            resourceType: 'custom_provider',
+            resourceId: providerId,
+            actorId: null,
+            actorEmail: null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Custom provider updated: ${providerId}`,
+            metadata: { updatedFields: Object.keys(updateData).filter(k => k !== 'updated_at') },
+        });
+
         return NextResponse.json({ provider });
     } catch (error) {
         console.error('[API] Error updating provider:', error);
@@ -91,6 +113,26 @@ export async function DELETE(
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
+
+        const { data: proj } = await supabase
+            .from('projects')
+            .select('organization_id')
+            .eq('id', projectId)
+            .single();
+
+        writeAuditLog({
+            organizationId: proj?.organization_id ?? projectId,
+            projectId,
+            category: 'provider',
+            action: 'deleted',
+            resourceType: 'custom_provider',
+            resourceId: providerId,
+            actorId: null,
+            actorEmail: null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Custom provider deleted: ${providerId}`,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

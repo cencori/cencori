@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function PATCH(
     req: NextRequest,
@@ -101,6 +102,21 @@ export async function PATCH(
                 .eq('id', projectId);
         }
 
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'provider',
+            action: 'updated',
+            resourceType: 'provider_key',
+            resourceId: providerKey.id,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Provider key updated for ${provider}`,
+            metadata: { provider, updatedFields: Object.keys(updateData) },
+        });
+
         return NextResponse.json({
             success: true,
             provider: {
@@ -175,6 +191,21 @@ export async function DELETE(
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'provider',
+            action: 'removed',
+            resourceType: 'provider_key',
+            resourceId: null,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Provider key removed for ${provider}`,
+            metadata: { provider },
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

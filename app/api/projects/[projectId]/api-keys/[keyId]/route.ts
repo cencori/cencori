@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { trackEvent } from "@/lib/track-event";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function PATCH(
     request: NextRequest,
@@ -47,6 +48,21 @@ export async function PATCH(
         }
 
         trackEvent({ event_type: 'api_key.revoked', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { key_id: keyId } });
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'api_key',
+            action: 'revoked',
+            resourceType: 'api_key',
+            resourceId: keyId,
+            actorId: user.id,
+            actorEmail: user.email || null,
+            actorIp: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Revoked API key "${revokedKey.name}" (${revokedKey.key_prefix})`,
+            metadata: { key_name: revokedKey.name, key_prefix: revokedKey.key_prefix },
+        });
 
         return NextResponse.json({
             message: "API key revoked successfully",
@@ -102,6 +118,21 @@ export async function DELETE(
         }
 
         trackEvent({ event_type: 'api_key.deleted', product: 'gateway', user_id: user.id, project_id: projectId, metadata: { key_id: keyId } });
+
+        writeAuditLog({
+            organizationId: project.organization_id,
+            projectId,
+            category: 'api_key',
+            action: 'deleted',
+            resourceType: 'api_key',
+            resourceId: keyId,
+            actorId: user.id,
+            actorEmail: user.email || null,
+            actorIp: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            actorType: 'user',
+            description: `Deleted API key ${keyId}`,
+            metadata: { key_id: keyId },
+        });
 
         return NextResponse.json({
             message: "API key deleted successfully",

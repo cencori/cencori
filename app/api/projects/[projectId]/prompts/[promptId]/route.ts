@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { slugify } from '@/lib/prompts/registry';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function GET(
     req: NextRequest,
@@ -76,6 +77,21 @@ export async function PATCH(
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+    if (proj?.organization_id) {
+        writeAuditLog({
+            organizationId: proj.organization_id,
+            projectId,
+            category: 'prompt',
+            action: 'updated',
+            resourceType: 'prompt',
+            resourceId: promptId,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `Prompt updated: ${data.name}`,
+            metadata: { updatedFields: Object.keys(updates).filter(k => k !== 'updated_at') },
+        });
+    }
+
     return NextResponse.json(data);
 }
 
@@ -94,6 +110,20 @@ export async function DELETE(
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: proj } = await supabase.from('projects').select('organization_id').eq('id', projectId).single();
+    if (proj?.organization_id) {
+        writeAuditLog({
+            organizationId: proj.organization_id,
+            projectId,
+            category: 'prompt',
+            action: 'deleted',
+            resourceType: 'prompt',
+            resourceId: promptId,
+            actorIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            description: `Prompt deleted: ${promptId}`,
+        });
     }
 
     return NextResponse.json({ deleted: true });
