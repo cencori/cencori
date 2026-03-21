@@ -21,6 +21,7 @@ import {
     type GatewayContext,
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { AIProvider } from "@/lib/providers/base";
 import {
     computeExactCacheKey,
@@ -60,6 +61,7 @@ type ChatRequestBody = {
     stream?: boolean;
     temperature?: number;
     max_tokens?: number;
+    user?: string;
     prompt?: {
         name: string;
         variables?: Record<string, string>;
@@ -432,6 +434,7 @@ export async function POST(req: NextRequest) {
                         projectName: '',
                         defaultModel: null,
                         defaultProvider: null,
+                        endUserBillingEnabled: false,
                     };
                 }
             }
@@ -524,6 +527,54 @@ export async function POST(req: NextRequest) {
             }));
         };
 
+        // ── End-User Billing: Quota Check ──
+        const endUserId = body.user?.trim() || null;
+        let endUserQuota: QuotaCheckResult | null = null;
+
+        if (gatewayCtx?.endUserBillingEnabled && endUserId) {
+            endUserQuota = await checkEndUserQuota(gatewayCtx.projectId, endUserId, model);
+
+            if (!endUserQuota.allowed && endUserQuota.overageAction === 'block') {
+                return respondError(
+                    429,
+                    `End-user quota exceeded: ${endUserQuota.reason || 'limit reached'}`,
+                    'end_user_quota_exceeded'
+                );
+            }
+
+            // Model restriction check
+            if (endUserQuota.allowedModels && endUserQuota.allowedModels.length > 0) {
+                if (!endUserQuota.allowedModels.includes(model)) {
+                    return respondError(
+                        403,
+                        `Model "${model}" is not allowed for this end-user's rate plan`,
+                        'end_user_model_not_allowed'
+                    );
+                }
+            }
+        }
+
+        // Helper: record end-user usage after a successful request (fire-and-forget)
+        const maybeRecordEndUserUsage = (usageAndCost: UsageAndCost) => {
+            if (gatewayCtx?.endUserBillingEnabled && endUserId && endUserQuota) {
+                recordEndUserUsage({
+                    projectId: gatewayCtx.projectId,
+                    externalUserId: endUserId,
+                    tokens: {
+                        prompt: usageAndCost.promptTokens,
+                        completion: usageAndCost.completionTokens,
+                        total: usageAndCost.totalTokens,
+                    },
+                    cost: {
+                        providerUsd: usageAndCost.providerCostUsd,
+                        cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
+                    },
+                    customerMarkupPercentage: endUserQuota.markupPercentage,
+                    flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                });
+            }
+        };
+
         // ── Provider Routing ──
         let customProvider: Awaited<ReturnType<typeof resolveCustomProviderForProject>> = null;
         if (gatewayCtx) {
@@ -614,6 +665,7 @@ export async function POST(req: NextRequest) {
                                 providerCostUsd: 0,
                                 cencoriChargeUsd: 0,
                                 markupPercentage: 0,
+                                endUserId: endUserId || undefined,
                             });
                             await incrementUsage(gatewayCtx);
 
@@ -760,8 +812,10 @@ export async function POST(req: NextRequest) {
                                     providerCostUsd: usageAndCost.providerCostUsd,
                                     cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                     markupPercentage: usageAndCost.markupPercentage,
+                                    endUserId: endUserId || undefined,
                                 });
                                 await incrementUsage(gatewayCtx);
+                                maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
                             const message = error instanceof Error ? error.message : "Google streaming failed";
@@ -803,8 +857,10 @@ export async function POST(req: NextRequest) {
                         providerCostUsd: usageAndCost.providerCostUsd,
                         cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                         markupPercentage: usageAndCost.markupPercentage,
+                        endUserId: endUserId || undefined,
                     });
                     await incrementUsage(gatewayCtx);
+                    maybeRecordEndUserUsage(usageAndCost);
                 }
 
                 const googleResponseJson = {
@@ -909,8 +965,10 @@ export async function POST(req: NextRequest) {
                                     providerCostUsd: usageAndCost.providerCostUsd,
                                     cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                     markupPercentage: usageAndCost.markupPercentage,
+                                    endUserId: endUserId || undefined,
                                 });
                                 await incrementUsage(gatewayCtx);
+                                maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
                             console.error(`[Gateway] ${provider} streaming error:`, error);
@@ -959,8 +1017,17 @@ export async function POST(req: NextRequest) {
                         providerCostUsd: completion.cost.providerCostUsd,
                         cencoriChargeUsd: completion.cost.cencoriChargeUsd,
                         markupPercentage: completion.cost.markupPercentage,
+                        endUserId: endUserId || undefined,
                     });
                     await incrementUsage(gatewayCtx);
+                    maybeRecordEndUserUsage({
+                        promptTokens: completion.usage.promptTokens,
+                        completionTokens: completion.usage.completionTokens,
+                        totalTokens: completion.usage.totalTokens,
+                        providerCostUsd: completion.cost.providerCostUsd,
+                        cencoriChargeUsd: completion.cost.cencoriChargeUsd,
+                        markupPercentage: completion.cost.markupPercentage,
+                    });
                 }
 
                 const adapterResponseJson = {
@@ -1133,8 +1200,10 @@ export async function POST(req: NextRequest) {
                                     providerCostUsd: usageAndCost.providerCostUsd,
                                     cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                                     markupPercentage: usageAndCost.markupPercentage,
+                                    endUserId: endUserId || undefined,
                                 });
                                 await incrementUsage(gatewayCtx);
+                                maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
                             if (gatewayCtx) {
@@ -1247,8 +1316,10 @@ export async function POST(req: NextRequest) {
                         providerCostUsd: usageAndCost.providerCostUsd,
                         cencoriChargeUsd: usageAndCost.cencoriChargeUsd,
                         markupPercentage: usageAndCost.markupPercentage,
+                        endUserId: endUserId || undefined,
                     });
                     await incrementUsage(gatewayCtx);
+                    maybeRecordEndUserUsage(usageAndCost);
                 }
 
                 maybeCacheResponse(completion, usageAndCost.totalTokens, usageAndCost.cencoriChargeUsd);

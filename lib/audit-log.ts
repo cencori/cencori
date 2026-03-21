@@ -16,7 +16,9 @@ export type AuditCategory =
   | "cache"
   | "integration"
   | "memory"
-  | "export";
+  | "export"
+  | "rate_plan"
+  | "end_user";
 
 export type AuditAction =
   | "created"
