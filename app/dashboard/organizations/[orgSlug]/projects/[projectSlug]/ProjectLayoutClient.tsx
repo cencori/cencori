@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot, DatabaseZap, FileText } from "lucide-react";
+import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot, DatabaseZap, FileText, Receipt } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
@@ -259,6 +259,10 @@ export default function ProjectLayoutClient({
         { href: `${basePath}/edge`, icon: Puzzle, label: "Edge" },
     ];
 
+    const billingItems: NavItem[] = [
+        { href: `${basePath}/end-user-billing`, icon: Receipt, label: "Usage Billing" },
+    ];
+
     const settingsItems: NavItem[] = [
         { href: `${basePath}/webhooks`, icon: Webhook, label: "Webhooks" },
         { href: `${basePath}/settings`, icon: SettingsIcon, label: "Project Settings" },
@@ -274,6 +278,7 @@ export default function ProjectLayoutClient({
                             <NavGroup items={coreItems} isActive={isActive} />
                             <NavGroup items={infrastructureItems} isActive={isActive} />
                             <NavGroup items={securityItems} isActive={isActive} />
+                            <NavGroup items={billingItems} isActive={isActive} />
                             <NavGroup items={settingsItems} isActive={isActive} showDivider={false} />
                         </SidebarMenu>
                     </SidebarGroup>
@@ -293,6 +298,7 @@ export default function ProjectLayoutClient({
                                 <NavGroup items={coreItems} isActive={isActive} onClick={() => setIsOpen(false)} />
                                 <NavGroup items={infrastructureItems} isActive={isActive} onClick={() => setIsOpen(false)} />
                                 <NavGroup items={securityItems} isActive={isActive} onClick={() => setIsOpen(false)} />
+                                <NavGroup items={billingItems} isActive={isActive} onClick={() => setIsOpen(false)} />
                                 <NavGroup items={settingsItems} isActive={isActive} onClick={() => setIsOpen(false)} showDivider={false} />
                             </SidebarMenu>
                         </SidebarGroup>

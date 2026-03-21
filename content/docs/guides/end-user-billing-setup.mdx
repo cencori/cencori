@@ -1,0 +1,226 @@
+---
+title: "End-User Billing"
+description: "Step-by-step guide to billing your customers for AI usage — from enabling billing to collecting your first payment."
+section: "Guides"
+order: 7
+---
+
+This guide walks you through setting up end-user billing from scratch. By the end, you'll have rate plans, markup pricing, and Stripe payments — all managed from the Cencori dashboard.
+
+No code is required for the setup. Your engineering team only needs to integrate later (and it's minimal).
+
+## Before You Start
+
+You need:
+- A Cencori account with a project created
+- Admin or owner access to the organization
+- A Stripe account (for collecting payments — can be set up during this guide)
+
+## Step 1: Enable End-User Billing
+
+1. Open your project in the Cencori dashboard.
+2. Click **Usage Billing** in the left sidebar.
+3. You'll land on the **Configuration** tab.
+4. Toggle **Enable End-User Billing** to on.
+5. Click **Save Configuration**.
+
+That's it — billing is now active for this project.
+
+## Step 2: Set Your Default Markup
+
+While still on the Configuration tab:
+
+1. Find the **Default Markup Percentage** field.
+2. Enter your desired markup. This is the percentage you add on top of the AI provider's cost.
+
+**How to think about markup:**
+
+| Your markup | What it means | Example |
+| :--- | :--- | :--- |
+| 0% | You pass through AI costs at zero margin | $0.01 cost = $0.01 charge |
+| 20% | Healthy margin for most SaaS products | $0.01 cost = $0.012 charge |
+| 50% | Premium positioning, white-glove service | $0.01 cost = $0.015 charge |
+| 100% | Double the cost, common for API resellers | $0.01 cost = $0.02 charge |
+
+> [!NOTE]
+> This default markup applies to all end-users who don't have a rate plan with its own markup. You can override it per-plan.
+
+3. Choose a **Billing Cycle** (monthly is standard for most products).
+4. Click **Save Configuration**.
+
+## Step 3: Create Your First Rate Plan
+
+Rate plans define what each tier of user gets — their limits, their pricing, which models they can access.
+
+1. Switch to the **Rate Plans** tab.
+2. Click **Create Plan**.
+3. Fill in the basics:
+   - **Name**: Something your team understands (e.g. "Free Tier", "Pro", "Enterprise").
+   - **Slug**: A URL-friendly version (e.g. `free`, `pro`, `enterprise`). Used in the API.
+
+4. Set the limits. Start simple — you can always adjust later:
+
+**For a Free tier:**
+| Setting | Suggested value |
+| :--- | :--- |
+| Daily request limit | 50 |
+| Monthly request limit | 500 |
+| Daily token limit | 100,000 |
+| Monthly token limit | 1,000,000 |
+| Overage action | Block |
+
+**For a Pro tier:**
+| Setting | Suggested value |
+| :--- | :--- |
+| Daily request limit | 500 |
+| Monthly request limit | 10,000 |
+| Daily token limit | 2,000,000 |
+| Monthly token limit | 50,000,000 |
+| Markup percentage | 20 |
+| Overage action | Alert only |
+
+5. Check **Set as default** on the plan you want new users to start with (usually your Free tier).
+6. Click **Create**.
+
+Repeat for as many tiers as you need.
+
+### What Each Setting Does
+
+- **Token limits** (daily/monthly): Caps how many tokens (input + output) a user can consume. One token is roughly 4 characters of English text.
+- **Request limits** (daily/monthly): Caps how many API calls a user can make.
+- **Requests per minute**: Burst protection. Prevents a single user from hammering your API.
+- **Cost limits** (daily/monthly USD): Hard cap on spend. Useful if you offer unlimited requests but want to cap dollar exposure.
+- **Markup percentage**: Your margin on top of the AI provider's cost. Overrides the project default.
+- **Flat rate per request**: A fixed fee added to every request on top of the usage-based charge. Good for premium models.
+- **Allowed models**: Restrict which AI models this tier can access. Leave empty to allow all.
+- **Overage action**:
+  - **Block**: Stops requests when limits are hit. The user sees a clear error.
+  - **Throttle**: Slows down requests instead of blocking.
+  - **Alert only**: Lets requests through but flags the overage in your dashboard.
+
+## Step 4: Connect Stripe
+
+This lets you collect real payments from your end-users.
+
+1. Go back to the **Configuration** tab.
+2. Find the **Stripe Connect** card.
+3. Click **Connect Stripe Account**.
+4. You'll be redirected to Stripe to complete onboarding:
+   - **If you have a Stripe account**: Sign in and authorize Cencori.
+   - **If you don't**: Stripe will walk you through creating one (takes ~5 minutes).
+5. Once done, you'll be redirected back to the dashboard.
+6. The card should now show **Connected** with a green status.
+
+> [!NOTE]
+> Stripe Connect uses the "Standard" model. Your customers pay you directly. Cencori never touches the funds. You manage payouts, refunds, and disputes from your own Stripe dashboard.
+
+## Step 5: Understand How Users Appear
+
+End-users show up in the **End Users** tab. They get there in one of two ways:
+
+**Automatically**: When your app sends a request with a user ID (either through the gateway or the Usage Events API), Cencori creates the user record automatically. They're assigned your default rate plan.
+
+**Manually**: Click **Add End User** in the End Users tab. Fill in their external ID (whatever user ID your system uses), display name, email, and assign a rate plan.
+
+### Managing Users
+
+From the End Users tab, you can:
+- **Search** by name, email, or ID
+- **Filter** by status (active/blocked) or rate plan
+- **Block** a user — immediately stops all their requests
+- **Change their plan** — upgrade or downgrade anytime
+- **View usage** — see their token consumption, request count, and cost
+
+## Step 6: Hand Off to Engineering
+
+The dashboard setup is done. Now your engineering team needs to integrate — and it's minimal.
+
+**If you use the Cencori AI Gateway** (recommended):
+
+Your engineers change one line of code. Instead of calling OpenAI/Anthropic directly, they point to Cencori and pass the user ID:
+
+```typescript
+// Before — calling OpenAI directly
+const client = new OpenAI({ apiKey: "sk-..." });
+
+// After — one line change, everything else stays the same
+const client = new OpenAI({
+  apiKey: "csk_your_cencori_key",
+  baseURL: "https://api.cencori.com/v1",
+});
+
+// Pass the user ID in requests
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: userMessage }],
+  user: "user_123",  // this maps to end_user_id
+});
+```
+
+That's it. Billing, rate limits, quotas — all handled automatically.
+
+**If you have your own AI infrastructure:**
+
+Your engineers add two API calls — one before processing (quota check) and one after (usage report). See the [End-User Billing API Reference](/docs/platform/end-user-billing#option-2-usage-events-api) for the full integration guide.
+
+## Step 7: Monitor Revenue
+
+Once traffic starts flowing:
+
+1. Switch to the **Revenue** tab.
+2. You'll see:
+   - **Total revenue** and **provider cost** for the selected period
+   - **Margin** — your actual profit (revenue minus provider cost)
+   - **Daily revenue chart** — spot trends and growth
+   - **Top users** — who's spending the most
+3. Use the period selector (7d / 30d / 90d) to zoom in or out.
+
+### Exporting Data
+
+Click the **Export** button on the End Users tab to download usage data as CSV or JSON. Use this for:
+- Reconciling with your own billing system
+- Generating custom invoices
+- Financial reporting
+
+## Quick Reference
+
+| What you want to do | Where |
+| :--- | :--- |
+| Turn billing on/off | Configuration tab > toggle |
+| Set default markup | Configuration tab > markup field |
+| Connect Stripe | Configuration tab > Stripe Connect card |
+| Create rate plans | Rate Plans tab > Create Plan |
+| View/manage users | End Users tab |
+| Block a user | End Users tab > user row > Block |
+| Change a user's plan | End Users tab > user row > Edit |
+| View revenue | Revenue tab |
+| Export usage data | End Users tab > Export button |
+
+## What Happens When a User Hits Their Limit?
+
+It depends on the **overage action** in their rate plan:
+
+- **Block**: The API returns a `429` error with a clear message explaining which limit was hit. Your app should show the user a message like "You've reached your daily limit. Upgrade for more."
+- **Throttle**: Requests slow down but still go through. Good for soft limits.
+- **Alert only**: Everything works normally. You get a flag in the dashboard. Good for monitoring before enforcing.
+
+## Common Questions
+
+**Can I change a user's plan mid-cycle?**
+Yes. Changes take effect immediately. The new limits apply from that moment — usage already consumed in the current period still counts.
+
+**What if I don't set up Stripe?**
+Everything else still works — quota enforcement, usage tracking, the dashboard. You just won't be collecting payments through Cencori. You can use the exported data to bill through your own system.
+
+**Do users need to create a Cencori account?**
+No. End-users are your customers. They never interact with Cencori directly. Everything goes through your app.
+
+**Can I have different markup for different plans?**
+Yes. Each rate plan has its own markup percentage. The project default is just a fallback for users without a plan-specific markup.
+
+## Next Steps
+
+- [End-User Billing API Reference](/docs/platform/end-user-billing) — technical documentation for your engineering team
+- [Cost Optimization](/docs/guides/cost-optimization) — reduce your AI costs before applying markup
+- [Rate Limiting](/docs/platform/rate-limiting) — project-level rate limits (separate from per-user limits)
+- [Audit Logs](/docs/guides/audit-logs) — track who changed billing settings and when

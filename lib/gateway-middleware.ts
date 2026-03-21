@@ -34,6 +34,7 @@ export interface GatewayContext {
     projectName: string;
     defaultModel: string | null;
     defaultProvider: string | null;
+    endUserBillingEnabled: boolean;
 }
 
 export type GatewayValidationResult =
@@ -194,6 +195,7 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
                 organization_id,
                 default_model,
                 default_provider,
+                end_user_billing_enabled,
                 organizations!inner(
                     id,
                     subscription_tier,
@@ -244,6 +246,7 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         organization_id: string;
         default_model: string | null;
         default_provider: string | null;
+        end_user_billing_enabled: boolean | null;
         organizations: {
             id: string;
             subscription_tier: string;
@@ -384,6 +387,7 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         projectName: project.name,
         defaultModel: project.default_model,
         defaultProvider: project.default_provider,
+        endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
     };
 
     return { success: true, context };

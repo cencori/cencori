@@ -1,0 +1,325 @@
+---
+title: "End-User Billing"
+description: "Bill your end-users for AI usage with rate plans, quotas, and Stripe Connect payouts."
+section: "Platform"
+order: 3
+---
+
+End-user billing lets you charge your customers for AI usage. Set per-user rate plans with token/request limits, apply markup, and collect payments through Stripe Connect — all from the dashboard.
+
+> [!NOTE]
+> New to end-user billing? Start with the [Setup Guide](/docs/guides/end-user-billing-setup) — a step-by-step walkthrough for non-technical users. This page is the API reference for your engineering team.
+
+## How It Works
+
+1. Your end-user makes a request to your app.
+2. Your backend checks their quota with Cencori.
+3. If allowed, process the request.
+4. Report the usage back to Cencori.
+5. Cencori tracks everything — limits, costs, revenue.
+6. You view it all in the Usage Billing dashboard.
+
+There are two ways to connect:
+
+| Method | Best for | Integration effort |
+| :--- | :--- | :--- |
+| **AI Gateway** | Teams routing AI traffic through Cencori | 1 line (change base URL) |
+| **Usage Events API** | Teams with their own AI infrastructure | ~10 lines per endpoint |
+
+## Option 1: AI Gateway (Recommended)
+
+If you route AI requests through the Cencori gateway, end-user billing works automatically. Just pass the user ID in your request:
+
+```typescript
+const response = await fetch("https://api.cencori.com/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer csk_your_secret_key",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: "Hello!" }],
+    user: "user_123",  // your end-user's ID
+  }),
+});
+```
+
+The gateway handles quota checks, usage recording, markup calculation, and limit enforcement. No additional API calls needed.
+
+## Option 2: Usage Events API
+
+If you call AI providers directly and don't use the Cencori gateway, use the Usage Events API to report usage and check quotas.
+
+### Check Quota (Before Processing)
+
+Call this before serving an AI request to verify the user is within their limits:
+
+```bash
+curl https://api.cencori.com/api/v1/billing/check-quota?end_user_id=user_123 \
+  -H "Authorization: Bearer csk_your_secret_key"
+```
+
+Response:
+
+```json
+{
+  "allowed": true,
+  "reason": null,
+  "end_user_id": "user_123",
+  "is_new_user": false,
+  "rate_plan": "pro",
+  "overage_action": "block",
+  "usage": {
+    "daily_tokens": { "used": 45200, "limit": 1000000 },
+    "monthly_tokens": { "used": 1250000, "limit": 30000000 },
+    "daily_requests": { "used": 23, "limit": 500 },
+    "monthly_requests": { "used": 412, "limit": 10000 }
+  },
+  "billing": {
+    "markup_percentage": 20,
+    "flat_rate_per_request": null,
+    "allowed_models": ["gpt-4o", "claude-sonnet-4-20250514"]
+  }
+}
+```
+
+If `allowed` is `false`, block the request and show the `reason` to your user.
+
+You can also POST the same request with a JSON body:
+
+```bash
+curl -X POST https://api.cencori.com/api/v1/billing/check-quota \
+  -H "Authorization: Bearer csk_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{ "end_user_id": "user_123", "model": "gpt-4o" }'
+```
+
+### Report Usage (After Processing)
+
+After your AI request completes, report the usage:
+
+```bash
+curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
+  -H "Authorization: Bearer csk_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "end_user_id": "user_123",
+    "model": "gpt-4o",
+    "provider": "openai",
+    "prompt_tokens": 500,
+    "completion_tokens": 1200,
+    "cost_usd": 0.0085,
+    "latency_ms": 1340,
+    "metadata": {
+      "conversation_id": "conv_abc123"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "recorded": 1,
+  "failed": 0,
+  "total": 1
+}
+```
+
+### Batch Reporting
+
+Send up to 1,000 events in a single request:
+
+```bash
+curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
+  -H "Authorization: Bearer csk_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "end_user_id": "user_123",
+        "model": "gpt-4o",
+        "prompt_tokens": 500,
+        "completion_tokens": 1200,
+        "cost_usd": 0.0085
+      },
+      {
+        "end_user_id": "user_456",
+        "model": "claude-sonnet-4-20250514",
+        "prompt_tokens": 800,
+        "completion_tokens": 2000,
+        "cost_usd": 0.012
+      }
+    ]
+  }'
+```
+
+### Full Integration Example
+
+Here's how a typical backend integration looks:
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk";
+
+const anthropic = new Anthropic();
+const CENCORI_API = "https://api.cencori.com/api/v1/billing";
+const CENCORI_KEY = process.env.CENCORI_API_KEY;
+
+async function handleUserMessage(userId: string, message: string) {
+  // 1. Check quota
+  const quotaRes = await fetch(
+    `${CENCORI_API}/check-quota?end_user_id=${userId}`,
+    { headers: { Authorization: `Bearer ${CENCORI_KEY}` } }
+  );
+  const quota = await quotaRes.json();
+
+  if (!quota.allowed) {
+    throw new Error(`Rate limit: ${quota.reason}`);
+  }
+
+  // 2. Call your AI provider directly
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: message }],
+  });
+
+  // 3. Report usage to Cencori
+  await fetch(`${CENCORI_API}/usage-events`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${CENCORI_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      end_user_id: userId,
+      model: "claude-sonnet-4-20250514",
+      provider: "anthropic",
+      prompt_tokens: response.usage.input_tokens,
+      completion_tokens: response.usage.output_tokens,
+      cost_usd: calculateCost(response.usage), // your cost calculation
+    }),
+  });
+
+  return response.content[0].text;
+}
+```
+
+## Usage Event Fields
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `end_user_id` | string | Yes | Your user's ID (any string, consistent per user) |
+| `model` | string | No | Model name (e.g. `gpt-4o`). Defaults to `external` |
+| `provider` | string | No | Provider name (e.g. `openai`). Defaults to `external` |
+| `prompt_tokens` | integer | No | Input tokens |
+| `completion_tokens` | integer | No | Output tokens |
+| `total_tokens` | integer | No | Total tokens (auto-calculated if omitted) |
+| `cost_usd` | number | No | Provider cost for this request |
+| `latency_ms` | integer | No | Request duration in milliseconds |
+| `status` | string | No | `success` or `error`. Defaults to `success` |
+| `metadata` | object | No | Arbitrary JSON (conversation ID, session, etc.) |
+
+## Rate Plans
+
+Rate plans define per-user limits and pricing. Create them in the dashboard under **Usage Billing > Rate Plans**.
+
+Each plan can set:
+
+| Setting | Description |
+| :--- | :--- |
+| Daily/monthly token limits | Max tokens a user can consume per day/month |
+| Daily/monthly request limits | Max requests per day/month |
+| Requests per minute | Burst rate limit |
+| Cost limits (daily/monthly) | Max spend in USD |
+| Markup percentage | Your margin on top of provider cost |
+| Flat rate per request | Fixed fee added to each request |
+| Allowed models | Restrict which models this plan can access |
+| Overage action | `block` (hard stop), `throttle`, or `alert_only` |
+
+> [!NOTE]
+> If a user has no assigned plan, they inherit the project's default plan. If no default plan exists, they have no limits.
+
+## End-User Auto-Creation
+
+Users are created automatically on first quota check. You don't need to pre-register them. The `end_user_id` you pass becomes their `external_id` in the system.
+
+You can also manage users explicitly through the dashboard or the management API:
+
+```bash
+# Create/update an end-user with a specific rate plan
+curl -X POST https://api.cencori.com/api/projects/{projectId}/end-users \
+  -H "Authorization: Bearer user_session_token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "user_123",
+    "display_name": "John Doe",
+    "email": "john@example.com",
+    "rate_plan_id": "plan_uuid_here"
+  }'
+```
+
+## Stripe Connect
+
+Collect payments from your end-users using Stripe Connect. Cencori acts as the platform — your users pay you directly.
+
+### Setup
+
+1. Go to **Usage Billing > Configuration** in the dashboard.
+2. Click **Connect Stripe Account**.
+3. Complete the Stripe onboarding flow.
+4. Once connected, you can generate invoices and collect payments.
+
+### How Charges Work
+
+```text
+Provider cost (e.g. OpenAI)     $0.01
++ Your markup (e.g. 20%)        $0.002
++ Flat fee (if set)              $0.00
+= Customer charge                $0.012
+```
+
+The markup and flat fee come from the user's rate plan (or the project default).
+
+## Dashboard
+
+The **Usage Billing** page has four tabs:
+
+- **Configuration**: Enable/disable billing, set default markup, connect Stripe.
+- **End Users**: View all users, their plans, usage, and status. Block/unblock users.
+- **Rate Plans**: Create and manage rate plans with limits and pricing.
+- **Revenue**: Usage stats, cost breakdown, daily trends, and top users.
+
+## Authentication
+
+Both billing endpoints use the same API key as the gateway:
+
+- **Header**: `Authorization: Bearer csk_your_secret_key`
+- **Or**: `CENCORI_API_KEY: csk_your_secret_key`
+
+> [!CAUTION]
+> Only secret keys (`csk_*`) can report usage and check quotas. Publishable keys (`cpk_*`) are rejected.
+
+## Error Responses
+
+| Status | Meaning |
+| :--- | :--- |
+| 400 | Validation error (missing fields, billing not enabled) |
+| 401 | Invalid or missing API key |
+| 403 | Publishable key used (secret key required) |
+| 429 | End-user quota exceeded (from check-quota) |
+| 500 | Server error |
+
+## Limits
+
+- Batch size: max 1,000 events per request.
+- CSV export: max 50,000 rows per export.
+- Rate plan limits are enforced at the daily and monthly level.
+
+## Related
+
+- [Billing & Usage](/docs/platform/billing) — plan tiers and credits
+- [Rate Limiting](/docs/platform/rate-limiting) — project-level rate limits
+- [API Keys](/docs/platform/api-keys) — key types and management
+- [Authentication](/docs/api/authentication) — how to authenticate requests

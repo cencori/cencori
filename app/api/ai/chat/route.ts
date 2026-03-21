@@ -28,6 +28,7 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { deductCredits } from '@/lib/credits';
 import { computeCacheKey, getCache, getSemanticCache, saveCache, saveSemanticCache } from '@/lib/cache';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
+import { checkEndUserQuota, recordEndUserUsage, calculateCustomerCharge, type QuotaCheckResult } from '@/lib/end-user-billing';
 
 
 const router = new ProviderRouter();
@@ -503,6 +504,7 @@ export async function POST(req: NextRequest) {
           organization_id,
           default_model,
           default_provider,
+          end_user_billing_enabled,
 	          organizations!inner(
 	            id,
 	            subscription_tier,
@@ -578,6 +580,7 @@ export async function POST(req: NextRequest) {
             organization_id: string;
             default_model: string | null;
             default_provider: string | null;
+            end_user_billing_enabled: boolean | null;
 	            organizations: {
 	                id: string;
 	                subscription_tier: string;
@@ -676,6 +679,45 @@ export async function POST(req: NextRequest) {
                 { error: 'Invalid request: messages array is required' },
                 { status: 400 }
             );
+        }
+
+        // ── End-User Quota Check ──
+        let endUserQuota: QuotaCheckResult | null = null;
+        if (project.end_user_billing_enabled && userId) {
+            try {
+                endUserQuota = await checkEndUserQuota(project.id, userId, model);
+                if (!endUserQuota.allowed) {
+                    return NextResponse.json(
+                        {
+                            error: 'End-user quota exceeded',
+                            message: endUserQuota.reason || 'Usage limit reached for this user.',
+                            quota: {
+                                daily_tokens: { used: endUserQuota.dailyTokensUsed, limit: endUserQuota.dailyTokensLimit },
+                                monthly_tokens: { used: endUserQuota.monthlyTokensUsed, limit: endUserQuota.monthlyTokensLimit },
+                                daily_requests: { used: endUserQuota.dailyRequestsUsed, limit: endUserQuota.dailyRequestsLimit },
+                                monthly_requests: { used: endUserQuota.monthlyRequestsUsed, limit: endUserQuota.monthlyRequestsLimit },
+                            },
+                            rate_plan: endUserQuota.ratePlan,
+                        },
+                        { status: 429 }
+                    );
+                }
+                // Check model restrictions
+                if (endUserQuota.allowedModels && model && model !== 'auto' && model !== 'cencori/auto') {
+                    if (!endUserQuota.allowedModels.includes(model)) {
+                        return NextResponse.json(
+                            {
+                                error: 'Model not allowed',
+                                message: `Model '${model}' is not available on the '${endUserQuota.ratePlan}' plan.`,
+                                allowed_models: endUserQuota.allowedModels,
+                            },
+                            { status: 403 }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error('[EndUserBilling] Quota check failed, allowing request:', err);
+            }
         }
 
         const unifiedMessages: UnifiedMessage[] = messages.map((msg: { role: string; content: string }) => ({
@@ -1378,6 +1420,25 @@ export async function POST(req: NextRequest) {
 
                                 await incrementMonthlyUsage(supabase, organizationId, currentUsage);
 
+                                // Record end-user usage for streaming (fire-and-forget)
+                                if (project.end_user_billing_enabled && userId && endUserQuota) {
+                                    recordEndUserUsage({
+                                        projectId: project.id,
+                                        externalUserId: userId,
+                                        tokens: {
+                                            prompt: promptTokens,
+                                            completion: completionTokens,
+                                            total: promptTokens + completionTokens,
+                                        },
+                                        cost: {
+                                            providerUsd: cost,
+                                            cencoriChargeUsd: charge,
+                                        },
+                                        customerMarkupPercentage: endUserQuota.markupPercentage,
+                                        flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                                    });
+                                }
+
                                 checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
                                     console.error('[Budget] Failed to check budget alerts:', err);
                                 });
@@ -1637,6 +1698,25 @@ export async function POST(req: NextRequest) {
         }
 
         await incrementMonthlyUsage(supabase, organizationId, currentUsage);
+
+        // Record end-user usage (fire-and-forget)
+        if (project.end_user_billing_enabled && userId && endUserQuota) {
+            recordEndUserUsage({
+                projectId: project.id,
+                externalUserId: userId,
+                tokens: {
+                    prompt: response.usage.promptTokens,
+                    completion: response.usage.completionTokens,
+                    total: response.usage.totalTokens,
+                },
+                cost: {
+                    providerUsd: response.cost.providerCostUsd,
+                    cencoriChargeUsd: response.cost.cencoriChargeUsd,
+                },
+                customerMarkupPercentage: endUserQuota.markupPercentage,
+                flatRatePerRequest: endUserQuota.flatRatePerRequest,
+            });
+        }
 
         checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
             console.error('[Budget] Failed to check budget alerts:', err);
