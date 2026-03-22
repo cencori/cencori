@@ -466,7 +466,7 @@ export function CommandPalette({
                     id: "product-enterprise",
                     label: "Enterprise",
                     icon: <Building2 className="h-3.5 w-3.5" />,
-                    action: () => navigate("/enterprise"),
+                    action: () => navigate("/solutions/enterprise"),
                     keywords: ["business", "scale", "custom"],
                 },
             ],

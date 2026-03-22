@@ -86,7 +86,7 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
         requestsByModel,
         streamingRequests,
         nonStreamingRequests,
-        timeSeries: [], // Will populate based on period granularity
+        timeSeries: [],
     };
 }
 

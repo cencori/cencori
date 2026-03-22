@@ -23,7 +23,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${baseUrl}/insights`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/network`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/edge`, priority: 0.8, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/product-enterprise`, priority: 0.8, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/solutions/enterprise`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/product-developer-tools`, priority: 0.8, changeFrequency: 'weekly' as const },
     ];
 

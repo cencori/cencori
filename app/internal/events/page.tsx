@@ -17,6 +17,15 @@ const PRODUCT_COLORS: Record<string, string> = {
     billing: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
 };
 
+interface PlatformEvent {
+    id: string;
+    event_type: string;
+    product: string;
+    user_id: string | null;
+    created_at: string;
+    metadata: Record<string, unknown>;
+}
+
 export default function EventsPage() {
     const [product, setProduct] = useState('');
     const [eventType, setEventType] = useState('');
@@ -35,27 +44,27 @@ export default function EventsPage() {
     const totalPages = data ? Math.ceil(data.total / data.limit) : 0;
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-6 py-8 space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
+            <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-semibold">Event Activity Feed</h1>
+                    <h1 className="text-lg sm:text-xl font-semibold">Event Activity Feed</h1>
                     <p className="text-xs text-muted-foreground">
-                        Real-time platform events across all products
+                        Real-time platform events
                         {data && <span className="ml-1">({data.total.toLocaleString()} total)</span>}
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="h-8 text-xs rounded-full">
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                    Refresh
+                <Button variant="outline" size="sm" onClick={() => refetch()} className="h-8 text-xs rounded-full shrink-0">
+                    <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Refresh</span>
                 </Button>
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <select
                     value={product}
                     onChange={(e) => { setProduct(e.target.value); setPage(1); }}
-                    className="h-8 rounded-md border border-border/50 bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    className="h-8 rounded-md border border-border/50 bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/50 flex-1 sm:flex-none"
                 >
                     <option value="">All Products</option>
                     {PRODUCTS.filter(Boolean).map(p => (
@@ -68,7 +77,7 @@ export default function EventsPage() {
                     value={eventType}
                     onChange={(e) => { setEventType(e.target.value); setPage(1); }}
                     placeholder="Filter by event type..."
-                    className="h-8 rounded-md border border-border/50 bg-card px-3 text-xs w-56 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    className="h-8 rounded-md border border-border/50 bg-card px-3 text-xs flex-1 sm:flex-none sm:w-56 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                 />
 
                 {(product || eventType) && (
@@ -76,12 +85,12 @@ export default function EventsPage() {
                         onClick={() => { setProduct(''); setEventType(''); setPage(1); }}
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
-                        Clear filters
+                        Clear
                     </button>
                 )}
             </div>
 
-            {/* Events Table */}
+            {/* Events */}
             {error ? (
                 <div className="text-center py-12">
                     <p className="text-sm text-red-500">Failed to load events</p>
@@ -93,58 +102,92 @@ export default function EventsPage() {
                     ))}
                 </div>
             ) : data && data.events.length > 0 ? (
-                <div className="rounded-xl border border-border/50 overflow-hidden">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-border/30 bg-card/50">
-                                <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Time</th>
-                                <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Event</th>
-                                <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Product</th>
-                                <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">User</th>
-                                <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.events.map((event) => (
-                                <tr
-                                    key={event.id}
-                                    className="border-b border-border/20 hover:bg-card/30 cursor-pointer transition-colors"
-                                    onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
-                                >
-                                    <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground whitespace-nowrap">
-                                        {new Date(event.created_at).toLocaleString()}
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <Badge variant="outline" className="text-[10px] font-mono">
-                                            {event.event_type}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${PRODUCT_COLORS[event.product] || 'bg-secondary text-foreground border-border/50'}`}>
-                                            {event.product}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground truncate max-w-[120px]">
-                                        {event.user_id ? event.user_id.slice(0, 8) + '...' : '-'}
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        {expandedId === event.id ? (
-                                            <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap max-w-xs">
-                                                {JSON.stringify(event.metadata, null, 2)}
-                                            </pre>
-                                        ) : (
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {Object.keys(event.metadata).length > 0
-                                                    ? `${Object.keys(event.metadata).length} fields`
-                                                    : '-'}
-                                            </span>
-                                        )}
-                                    </td>
+                <>
+                    {/* Desktop table */}
+                    <div className="hidden md:block rounded-xl border border-border/50 overflow-hidden">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-border/30 bg-card/50">
+                                    <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Time</th>
+                                    <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Event</th>
+                                    <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Product</th>
+                                    <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">User</th>
+                                    <th className="text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-2.5">Details</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {data.events.map((event: PlatformEvent) => (
+                                    <tr
+                                        key={event.id}
+                                        className="border-b border-border/20 hover:bg-card/30 cursor-pointer transition-colors"
+                                        onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
+                                    >
+                                        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                                            {new Date(event.created_at).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <Badge variant="outline" className="text-[10px] font-mono">
+                                                {event.event_type}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${PRODUCT_COLORS[event.product] || 'bg-secondary text-foreground border-border/50'}`}>
+                                                {event.product}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground truncate max-w-[120px]">
+                                            {event.user_id ? event.user_id.slice(0, 8) + '...' : '-'}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            {expandedId === event.id ? (
+                                                <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap max-w-xs">
+                                                    {JSON.stringify(event.metadata, null, 2)}
+                                                </pre>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {Object.keys(event.metadata).length > 0
+                                                        ? `${Object.keys(event.metadata).length} fields`
+                                                        : '-'}
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile cards */}
+                    <div className="md:hidden space-y-2">
+                        {data.events.map((event: PlatformEvent) => (
+                            <div
+                                key={event.id}
+                                className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2 cursor-pointer active:bg-card/60 transition-colors"
+                                onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                                        {event.event_type}
+                                    </Badge>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 ${PRODUCT_COLORS[event.product] || 'bg-secondary text-foreground border-border/50'}`}>
+                                        {event.product}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                    <span className="font-mono">{new Date(event.created_at).toLocaleString()}</span>
+                                    {event.user_id && (
+                                        <span className="font-mono">{event.user_id.slice(0, 8)}...</span>
+                                    )}
+                                </div>
+                                {expandedId === event.id && Object.keys(event.metadata).length > 0 && (
+                                    <pre className="text-[10px] font-mono text-muted-foreground/70 whitespace-pre-wrap bg-muted/20 rounded-lg p-2 overflow-x-auto">
+                                        {JSON.stringify(event.metadata, null, 2)}
+                                    </pre>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
             ) : (
                 <div className="text-center py-12">
                     <p className="text-sm text-muted-foreground">No events found</p>

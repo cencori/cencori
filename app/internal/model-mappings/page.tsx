@@ -149,9 +149,9 @@ export default function ModelMappingsPage() {
     const uniqueSources = new Set(mappings?.map((m) => m.source_model) || []).size;
 
     return (
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 className="text-base font-medium">Model Mappings</h1>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -256,7 +256,7 @@ export default function ModelMappingsPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
@@ -267,7 +267,7 @@ export default function ModelMappingsPage() {
                     />
                 </div>
                 <Select value={filterProvider} onValueChange={setFilterProvider}>
-                    <SelectTrigger className="h-8 text-xs w-40">
+                    <SelectTrigger className="h-8 text-xs w-full sm:w-40">
                         <SelectValue placeholder="All providers" />
                     </SelectTrigger>
                     <SelectContent>
@@ -314,17 +314,17 @@ export default function ModelMappingsPage() {
                                 {grouped[sourceModel].map((mapping) => (
                                     <div
                                         key={mapping.id}
-                                        className="flex items-center justify-between px-4 py-2 group hover:bg-muted/10 transition-colors"
+                                        className="flex items-center justify-between px-3 sm:px-4 py-2 group hover:bg-muted/10 transition-colors"
                                     >
-                                        <div className="flex items-center gap-3 text-xs">
-                                            <span className="text-muted-foreground capitalize w-20">{mapping.target_provider}</span>
-                                            <ArrowRightLeft className="h-3 w-3 text-muted-foreground/40" />
-                                            <span className="font-mono">{mapping.target_model}</span>
+                                        <div className="flex items-center gap-2 sm:gap-3 text-xs min-w-0">
+                                            <span className="text-muted-foreground capitalize shrink-0">{mapping.target_provider}</span>
+                                            <ArrowRightLeft className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                                            <span className="font-mono truncate">{mapping.target_model}</span>
                                         </div>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                                            className="h-6 w-6 p-0 shrink-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
                                             onClick={() => deleteMutation.mutate(mapping.id)}
                                             disabled={deleteMutation.isPending}
                                         >

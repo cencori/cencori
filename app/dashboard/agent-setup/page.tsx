@@ -46,7 +46,7 @@ export default function AgentSetupPage() {
     // Check auth on mount — redirect to login if not signed in
     useEffect(() => {
         if (!token) return;
-        supabase.auth.getUser().then(({ data: { user } }) => {
+        supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
             if (!user) {
                 const returnUrl = `/dashboard/agent-setup?token=${token}`;
                 router.replace(`/login?redirect=${encodeURIComponent(returnUrl)}`);

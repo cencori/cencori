@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Shield, Eye, DollarSign, Gauge, Bot, Code2, Copy, Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Logo } from "@/components/logo";
@@ -20,23 +20,53 @@ import {
     PythonLogo,
     ReactLogo,
     SvelteLogo,
-    VueLogo
+    VueLogo,
+    LovableLogo,
+    ReplitLogo,
+    V0Logo,
+    BoltLogo,
 } from "@/components/icons/BrandIcons";
 
-// Simple copy button
+/* ── Scroll reveal ── */
+function useInView(threshold = 0.12) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            ([e]) => { if (e.isIntersecting) setVisible(true); },
+            { threshold }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, [threshold]);
+    return { ref, visible };
+}
+
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+    const { ref, visible } = useInView();
+    return (
+        <div
+            ref={ref}
+            className={className}
+            style={{
+                opacity: visible ? 1 : 0,
+                transform: visible ? "translateY(0)" : "translateY(24px)",
+                transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
+            }}
+        >
+            {children}
+        </div>
+    );
+}
+
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
     return (
         <button
-            onClick={handleCopy}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
             {copied ? "Copied" : "Copy"}
@@ -49,81 +79,46 @@ export default function VibeCodersPage() {
     const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null }>({ name: null, avatar: null });
 
     useEffect(() => {
-        const checkUser = async () => {
+        const check = async () => {
             const { data } = await supabase.auth.getSession();
             if (data?.session) {
                 setIsAuthenticated(true);
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
+                    const m = user.user_metadata ?? {};
+                    setUserProfile({
+                        name: (m.name ?? user.email?.split("@")[0] ?? null) as string | null,
+                        avatar: (m.avatar_url ?? m.picture ?? null) as string | null,
+                    });
                 }
             }
         };
-        checkUser();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
+        check();
+        const { data: listener } = supabase.auth.onAuthStateChange((_ev: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string } } | null) => {
             if (session) {
                 setIsAuthenticated(true);
-                const { user } = session;
-                if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null });
-                }
+                const m = session.user.user_metadata ?? {};
+                setUserProfile({
+                    name: (m.name ?? session.user.email?.split("@")[0] ?? null) as string | null,
+                    avatar: (m.avatar_url ?? m.picture ?? null) as string | null,
+                });
             } else {
                 setIsAuthenticated(false);
                 setUserProfile({ name: null, avatar: null });
             }
         });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
+        return () => { listener.subscription.unsubscribe(); };
     }, []);
 
-    const unauthenticatedActions = [
-        { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
-        { text: "Get Started", href: siteConfig.links.getStartedUrl, isButton: true, variant: "default" },
-    ];
-
-    const authenticatedActions = [
-        { text: "Dashboard", href: "/dashboard/organizations", isButton: true, variant: "default" },
-        { text: userProfile.name || "User", href: "#", isButton: false, isAvatar: true, avatarSrc: userProfile.avatar, avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase() },
-    ];
-
-    const features = [
-        { icon: Shield, title: "Security by default", description: "PII filtering, prompt injection detection, and content moderation built-in." },
-        { icon: Eye, title: "Full observability", description: "See every request, response, and token. Debug in seconds." },
-        { icon: DollarSign, title: "Cost control", description: "Per-user budgets and rate limits. No surprise bills." },
-        { icon: Gauge, title: "Zero overhead", description: "Edge processing adds <50ms. Your users won't notice." },
-        { icon: Bot, title: "Any model, one API", description: "OpenAI, Claude, Gemini — switch with one line." },
-        { icon: Code2, title: "Drop-in integration", description: "Works with Vercel AI SDK. No lock-in." },
-    ];
-
-    const prompts = [
-        { title: "Bootstrap with Cencori", prompt: "Set up a Next.js app with Cencori AI Gateway. Install cencori and create a streaming chat endpoint." },
-        { title: "Add security", prompt: "Add Cencori Edge middleware to protect /api/ai/* routes. Enable PII detection and prompt injection protection." },
-    ];
-
-    const editors = [
-        { name: "Cursor", icon: CursorLogo, href: "/docs/integrations" },
-        { name: "VS Code", icon: VSCodeLogo, href: "/docs/integrations" },
-        { name: "Windsurf", icon: WindsurfLogo, href: "/docs/integrations" },
-        { name: "Claude", icon: ClaudeLogo, href: "/docs/integrations" },
-    ];
-
-    const frameworks = [
-        { name: "Next.js", icon: NextjsLogo },
-        { name: "Vite", icon: ViteLogo },
-        { name: "React", icon: ReactLogo },
-        { name: "Svelte", icon: SvelteLogo },
-        { name: "Vue", icon: VueLogo },
-        { name: "Python", icon: PythonLogo },
-    ];
+    const navActions = isAuthenticated
+        ? [
+            { text: "Dashboard", href: "/dashboard/organizations", isButton: true, variant: "default" },
+            { text: userProfile.name || "User", href: "#", isButton: false, isAvatar: true, avatarSrc: userProfile.avatar, avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase() },
+        ]
+        : [
+            { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
+            { text: "Get Started", href: siteConfig.links.getStartedUrl, isButton: true, variant: "default" },
+        ];
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -131,243 +126,333 @@ export default function VibeCodersPage() {
                 logo={<Logo variant="mark" className="h-4" />}
                 name="cencori"
                 homeUrl="/"
-                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
+                actions={navActions}
                 isAuthenticated={isAuthenticated}
                 userProfile={isAuthenticated ? userProfile : undefined}
             />
 
             <main>
-                {/* Hero Section */}
-                <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
-
-                    <div className="container relative z-10 px-4 md:px-6 flex flex-col items-center text-center">
-                        <div className="mb-8 animate-appear">
-                            <Link href="/examples" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
-                                <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                                <span className="mr-2">For vibe coders</span>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            </Link>
-                        </div>
-
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-                            Your weekend prototype <span className="italic">deserves</span> production
-                        </h1>
-
-                        <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
-                            Stop letting backend complexity kill your momentum. Cencori handles security, observability, and cost control.
+                {/* ━━━ HERO ━━━ */}
+                <section className="pt-28 sm:pt-40 pb-24 sm:pb-32">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-8 animate-appear">
+                            For Vibe Coders
                         </p>
-
-                        <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
+                        <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4.25rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-8 max-w-3xl animate-appear [animation-delay:100ms]">
+                            Your weekend prototype
+                            <br />
+                            <span className="text-muted-foreground">deserves production</span>
+                        </h1>
+                        <p className="text-base sm:text-lg text-muted-foreground leading-[1.7] max-w-[28rem] mb-12 animate-appear [animation-delay:200ms]">
+                            AI writes the code. Cencori handles the security, observability, and cost control so you can keep shipping.
+                        </p>
+                        <div className="flex gap-4 animate-appear [animation-delay:300ms]">
                             <Link href="/login">
-                                <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                                    Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
+                                <Button size="sm" className="h-7 text-xs px-3">Get Started Free</Button>
                             </Link>
                             <Link href="/docs/quick-start">
-                                <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                                    Quickstart
-                                </Button>
+                                <Button variant="outline" size="sm" className="h-7 text-xs px-3">Quickstart</Button>
                             </Link>
                         </div>
                     </div>
                 </section>
 
-                {/* Framework bar */}
-                <section className="py-8 border-y border-border/30">
-                    <div className="container px-4 md:px-6">
-                        <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
-                            <span className="text-sm text-muted-foreground">Works with</span>
-                            {frameworks.map((framework) => (
-                                <div key={framework.name} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-                                    <framework.icon className="h-5 w-5" />
-                                    <span className="text-sm hidden sm:inline">{framework.name}</span>
+                {/* ━━━ WORKS WITH — Logos woven into flowing text ━━━ */}
+                <section className="py-20 sm:py-28">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-12">
+                                Works with everything you already use
+                            </p>
+                        </Reveal>
+
+                        {/* Editors */}
+                        <Reveal delay={0.05}>
+                            <div className="mb-16">
+                                <p className="text-sm text-muted-foreground mb-6">Editors</p>
+                                <div className="flex flex-wrap gap-10 items-center">
+                                    {[
+                                        { name: "Cursor", Logo: CursorLogo },
+                                        { name: "VS Code", Logo: VSCodeLogo },
+                                        { name: "Windsurf", Logo: WindsurfLogo },
+                                        { name: "Claude", Logo: ClaudeLogo },
+                                    ].map((editor) => (
+                                        <Link
+                                            key={editor.name}
+                                            href="/docs/integrations"
+                                            className="group flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300"
+                                        >
+                                            <editor.Logo className="h-6 w-6 opacity-50 group-hover:opacity-100 transition-opacity duration-300" size={24} />
+                                            <span className="text-[15px] font-medium group-hover:translate-x-0.5 transition-transform duration-300">{editor.name}</span>
+                                        </Link>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        </Reveal>
+
+                        {/* Platforms */}
+                        <Reveal delay={0.1}>
+                            <div className="mb-16">
+                                <p className="text-sm text-muted-foreground mb-6">Platforms</p>
+                                <div className="flex flex-wrap gap-10 items-center">
+                                    {[
+                                        { name: "Lovable", Logo: LovableLogo },
+                                        { name: "Replit", Logo: ReplitLogo },
+                                        { name: "v0", Logo: V0Logo },
+                                        { name: "Bolt", Logo: BoltLogo },
+                                    ].map((platform) => (
+                                        <div
+                                            key={platform.name}
+                                            className="group flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default"
+                                        >
+                                            <platform.Logo className="h-5 w-5 opacity-40 group-hover:opacity-90 transition-opacity duration-300" size={20} />
+                                            <span className="text-[15px] font-medium group-hover:translate-x-0.5 transition-transform duration-300">{platform.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </Reveal>
+
+                        {/* Frameworks */}
+                        <Reveal delay={0.15}>
+                            <div>
+                                <p className="text-sm text-muted-foreground mb-6">Frameworks</p>
+                                <div className="flex flex-wrap gap-10 items-center">
+                                    {[
+                                        { name: "Next.js", Logo: NextjsLogo },
+                                        { name: "React", Logo: ReactLogo },
+                                        { name: "Vue", Logo: VueLogo },
+                                        { name: "Svelte", Logo: SvelteLogo },
+                                        { name: "Vite", Logo: ViteLogo },
+                                        { name: "Python", Logo: PythonLogo },
+                                    ].map((fw) => (
+                                        <div
+                                            key={fw.name}
+                                            className="group flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default"
+                                        >
+                                            <fw.Logo className="h-5 w-5 opacity-40 group-hover:opacity-90 transition-opacity duration-300" />
+                                            <span className="text-[15px] font-medium group-hover:translate-x-0.5 transition-transform duration-300">{fw.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </Reveal>
                     </div>
                 </section>
 
-                {/* Features Section */}
-                <section className="py-20 bg-background">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="flex flex-col items-center text-center mb-12">
-                            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
-                                AI writes the code. <span className="text-muted-foreground">We handle the rest.</span>
+                {/* ━━━ WHAT YOU GET ━━━ */}
+                <section className="py-24 sm:py-32">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-emerald-500 mb-4">What you get</p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                                AI writes the code.
+                                <br />
+                                <span className="text-muted-foreground">We handle the rest.</span>
                             </h2>
-                            <p className="text-base text-muted-foreground max-w-xl">
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="text-muted-foreground leading-[1.7] max-w-lg mb-20">
                                 Everything you need to ship AI features without becoming a DevOps engineer.
                             </p>
-                        </div>
+                        </Reveal>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                            {features.map((feature) => (
-                                <div key={feature.title} className="p-6 border border-border/30 hover:border-border/60 hover:bg-muted/20 transition-colors">
-                                    <feature.icon className="h-5 w-5 text-muted-foreground mb-4" />
-                                    <h3 className="text-sm font-semibold mb-2 text-foreground">{feature.title}</h3>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
-                                </div>
+                        <div className="space-y-0">
+                            {[
+                                { title: "Security by default", desc: "PII filtering, prompt injection detection, and content moderation — active on every request, zero config." },
+                                { title: "Full observability", desc: "See every request, response, and token in real time. Debug production issues in seconds, not hours." },
+                                { title: "Cost control", desc: "Per-user budgets and rate limits. Know exactly what you're spending. No surprise bills at the end of the month." },
+                                { title: "Zero overhead", desc: "Edge processing adds less than 50ms of latency. Your users won't notice. Your investors will." },
+                                { title: "Any model, one API", desc: "OpenAI, Claude, Gemini — switch between providers with one line. No vendor lock-in, ever." },
+                                { title: "Drop-in integration", desc: "Works with the Vercel AI SDK. Keep using streamText() and useChat(). Just swap the model." },
+                            ].map((item, i) => (
+                                <Reveal key={item.title} delay={i * 0.05}>
+                                    <div className="group grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-8 py-7 sm:py-9 cursor-default">
+                                        <div className="sm:col-span-1 text-sm text-muted-foreground/30 tabular-nums font-mono">
+                                            {String(i + 1).padStart(2, "0")}
+                                        </div>
+                                        <h3 className="sm:col-span-4 text-base font-medium group-hover:text-emerald-500 transition-colors duration-300">
+                                            {item.title}
+                                        </h3>
+                                        <p className="sm:col-span-7 text-sm text-muted-foreground leading-[1.7]">
+                                            {item.desc}
+                                        </p>
+                                    </div>
+                                </Reveal>
                             ))}
                         </div>
                     </div>
                 </section>
 
-                {/* Vercel AI SDK Section */}
-                <section className="py-20 bg-background border-y border-border/30">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-4xl mx-auto">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                                <div>
-                                    <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-xs font-medium text-foreground/80 mb-4">
-                                        <VercelLogo className="h-3.5 w-3.5" />
-                                        Works with Vercel AI SDK
+                {/* ━━━ VERCEL AI SDK — Code as the visual ━━━ */}
+                <section className="py-24 sm:py-32">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start">
+                            <div>
+                                <Reveal>
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <VercelLogo className="h-4 w-4 text-foreground" />
+                                        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                                            Vercel AI SDK
+                                        </span>
                                     </div>
-                                    <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-4 text-foreground">
-                                        Drop-in. <span className="text-muted-foreground">No rewrite.</span>
+                                </Reveal>
+                                <Reveal delay={0.05}>
+                                    <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                        Drop-in.
+                                        <br />
+                                        <span className="text-muted-foreground">No rewrite.</span>
                                     </h2>
-                                    <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                                        Already using Vercel AI SDK? Keep using <code className="text-xs bg-muted px-1.5 py-0.5 rounded">streamText()</code> and <code className="text-xs bg-muted px-1.5 py-0.5 rounded">useChat()</code> — just swap the model.
+                                </Reveal>
+                                <Reveal delay={0.1}>
+                                    <p className="text-muted-foreground leading-[1.7] max-w-md mb-10">
+                                        Already using Vercel AI SDK? Keep using{" "}
+                                        <code className="text-[13px] text-foreground/70 font-mono">streamText()</code> and{" "}
+                                        <code className="text-[13px] text-foreground/70 font-mono">useChat()</code> — just swap the model.
                                     </p>
-                                    <ul className="space-y-2 text-xs text-muted-foreground">
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                </Reveal>
+                                <Reveal delay={0.15}>
+                                    <div className="space-y-3 text-sm text-muted-foreground">
+                                        <p className="group cursor-default hover:text-foreground transition-colors duration-300">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
                                             One API for OpenAI, Claude, Gemini
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                        </p>
+                                        <p className="group cursor-default hover:text-foreground transition-colors duration-300">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
                                             Safety filtering on every request
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                        </p>
+                                        <p className="group cursor-default hover:text-foreground transition-colors duration-300">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
                                             Cost tracking built-in
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="rounded-lg border border-border/40 bg-card overflow-hidden">
-                                    <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
-                                        <div className="flex gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                                            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-                                            <span className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
-                                        </div>
-                                        <span className="text-xs text-muted-foreground ml-2 font-mono">route.ts</span>
+                                        </p>
                                     </div>
-                                    <pre className="p-4 text-xs overflow-x-auto font-mono">
-                                        <code className="text-foreground/90">
-                                            <span className="text-purple-400">import</span> {"{"} <span className="text-yellow-300">cencori</span> {"}"} <span className="text-purple-400">from</span> <span className="text-emerald-400">&apos;cencori&apos;</span>;{"\n"}
-                                            <span className="text-purple-400">import</span> {"{"} <span className="text-yellow-300">streamText</span> {"}"} <span className="text-purple-400">from</span> <span className="text-emerald-400">&apos;ai&apos;</span>;{"\n\n"}
-                                            <span className="text-purple-400">const</span> result = <span className="text-blue-400">streamText</span>({"{"}{"\n"}
-                                            {"  "}model: <span className="text-blue-400">cencori</span>(<span className="text-emerald-400">&apos;gpt-4o&apos;</span>),{"\n"}
-                                            {"  "}messages,{"\n"}
-                                            {"}"});
+                                </Reveal>
+                            </div>
+
+                            {/* Code block — raw, no card */}
+                            <Reveal delay={0.1}>
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-[11px] font-mono text-muted-foreground/50">route.ts</span>
+                                        <CopyButton text={`import { cencori } from 'cencori';\nimport { streamText } from 'ai';\n\nconst result = streamText({\n  model: cencori('gpt-4o'),\n  messages,\n});`} />
+                                    </div>
+                                    <pre className="text-[13px] sm:text-sm font-mono leading-[1.8] text-foreground/80 overflow-x-auto">
+                                        <code>
+                                            <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-violet-400">import</span> {"{ "}<span className="text-foreground">cencori</span>{" }"} <span className="text-violet-400">from</span> <span className="text-emerald-400">&apos;cencori&apos;</span>;{"\n"}
+                                            <span className="text-muted-foreground/40">2</span>{"  "}<span className="text-violet-400">import</span> {"{ "}<span className="text-foreground">streamText</span>{" }"} <span className="text-violet-400">from</span> <span className="text-emerald-400">&apos;ai&apos;</span>;{"\n"}
+                                            <span className="text-muted-foreground/40">3</span>{"\n"}
+                                            <span className="text-muted-foreground/40">4</span>{"  "}<span className="text-violet-400">const</span> result = <span className="text-blue-400">streamText</span>({"{"}{"\n"}
+                                            <span className="text-muted-foreground/40">5</span>{"    "}model: <span className="text-blue-400">cencori</span>(<span className="text-emerald-400">&apos;gpt-4o&apos;</span>),{"\n"}
+                                            <span className="text-muted-foreground/40">6</span>{"    "}messages,{"\n"}
+                                            <span className="text-muted-foreground/40">7</span>{"  "}{"}"});
                                         </code>
                                     </pre>
                                 </div>
-                            </div>
+                            </Reveal>
                         </div>
                     </div>
                 </section>
 
-                {/* AI Editor Integration */}
-                <section className="py-20 bg-background">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="flex flex-col items-center text-center mb-12">
-                            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
-                                Works with your <span className="text-muted-foreground">favorite editor</span>
+                {/* ━━━ PROMPTS — Copy-paste starters ━━━ */}
+                <section className="py-24 sm:py-32">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Get started</p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-lg">
+                                Copy. Paste. Ship.
                             </h2>
-                            <p className="text-base text-muted-foreground max-w-xl">
-                                Cencori integrates with IDE extensions and MCP servers
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="text-muted-foreground leading-[1.7] max-w-lg mb-16">
+                                Drop these prompts into your AI editor to scaffold a production-ready app with Cencori.
                             </p>
-                        </div>
+                        </Reveal>
 
-                        <div className="flex flex-wrap justify-center gap-4 max-w-2xl mx-auto">
-                            {editors.map((editor) => (
-                                <Link
-                                    key={editor.name}
-                                    href={editor.href}
-                                    className="flex flex-col items-center gap-2 p-6 border border-border/30 hover:border-border/60 hover:bg-muted/20 transition-colors"
-                                >
-                                    <editor.icon className="h-8 w-8" size={32} />
-                                    <span className="text-xs text-muted-foreground">{editor.name}</span>
-                                </Link>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+                            {[
+                                {
+                                    label: "01",
+                                    title: "Bootstrap with Cencori",
+                                    prompt: "Set up a Next.js app with Cencori AI Gateway. Install cencori and create a streaming chat endpoint at /api/chat that uses cencori('gpt-4o') as the model.",
+                                },
+                                {
+                                    label: "02",
+                                    title: "Add security layer",
+                                    prompt: "Add Cencori Edge middleware to protect /api/ai/* routes. Enable PII detection and prompt injection protection. Log all blocked requests.",
+                                },
+                            ].map((item, i) => (
+                                <Reveal key={item.title} delay={i * 0.1}>
+                                    <div className="group">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-baseline gap-4">
+                                                <span className="text-sm text-muted-foreground/30 tabular-nums font-mono">{item.label}</span>
+                                                <h3 className="text-base font-medium">{item.title}</h3>
+                                            </div>
+                                            <CopyButton text={item.prompt} />
+                                        </div>
+                                        <p className="text-[13px] font-mono text-muted-foreground leading-[1.8] bg-foreground/[0.03] rounded-lg p-5 group-hover:bg-foreground/[0.05] transition-colors duration-500">
+                                            {item.prompt}
+                                        </p>
+                                    </div>
+                                </Reveal>
                             ))}
                         </div>
                     </div>
                 </section>
 
-                {/* AI Prompts Section */}
-                <section className="py-20 bg-background border-y border-border/30">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="flex flex-col items-center text-center mb-12">
-                            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
-                                Start with <span className="text-muted-foreground">Cencori prompts</span>
-                            </h2>
-                            <p className="text-base text-muted-foreground max-w-xl">
-                                Copy these into your AI editor to get started
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-                            {prompts.map((item) => (
-                                <div key={item.title} className="p-5 border border-border/30 hover:border-border/60 transition-colors">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-                                        <CopyButton text={item.prompt} />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed font-mono bg-muted/30 p-3 rounded">
-                                        {item.prompt}
+                {/* ━━━ PRICING CALLOUT ━━━ */}
+                <section className="py-24 sm:py-32">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <Reveal>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-end">
+                                <div>
+                                    <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                        Free to start.
+                                        <br />
+                                        <span className="text-muted-foreground">Fair when you scale.</span>
+                                    </h2>
+                                    <p className="text-muted-foreground leading-[1.7] max-w-md">
+                                        A generous free tier for prototyping. Pay only when your side project becomes a real product.
                                     </p>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="flex lg:justify-end">
+                                    <Link href="/pricing">
+                                        <Button variant="outline" size="sm" className="h-7 text-xs px-3 group">
+                                            View Pricing
+                                            <span className="ml-2 group-hover:translate-x-0.5 transition-transform duration-300 inline-block">&rarr;</span>
+                                        </Button>
+                                    </Link>
+                                </div>
+                            </div>
+                        </Reveal>
                     </div>
                 </section>
 
-                {/* Pricing Section */}
-                <section className="py-20 bg-background">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-lg mx-auto text-center">
-                            <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-4 text-foreground">
-                                Pricing for builders
-                            </h2>
-                            <p className="text-base text-muted-foreground mb-8">
-                                A generous free tier to start, fair pricing when you scale.
-                            </p>
-                            <Link href="/pricing">
-                                <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                                    View Pricing
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </section>
-
-                {/* CTA Section */}
-                <section className="py-20 bg-background border-t border-border/30">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-2xl mx-auto text-center">
-                            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
+                {/* ━━━ BOTTOM CTA ━━━ */}
+                <Reveal>
+                    <section className="py-28 sm:py-36">
+                        <div className="mx-auto max-w-6xl px-4 md:px-6 text-center">
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-5">
                                 Ready to ship?
                             </h2>
-                            <p className="text-base text-muted-foreground mb-8">
+                            <p className="text-muted-foreground text-sm leading-[1.7] mb-10 max-w-md mx-auto">
                                 Your AI-built app deserves production-grade infrastructure.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                 <Link href="/login">
-                                    <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                                        Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
+                                    <Button size="sm" className="h-7 text-xs px-3">Get Started Free</Button>
                                 </Link>
                                 <Link href="/contact">
-                                    <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                                        Talk to Us
-                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs px-3">Talk to Us</Button>
                                 </Link>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </Reveal>
             </main>
 
             <Footer />

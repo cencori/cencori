@@ -26,15 +26,14 @@ export function AdminDashboard() {
     }
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-6 py-8 space-y-8">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold">Platform Analytics</h1>
-                    <p className="text-xs text-muted-foreground">Real-time metrics across all Cencori services</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <TimeRangeSelector value={period} onChange={setPeriod} />
+            <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-lg sm:text-xl font-semibold">Platform Analytics</h1>
+                        <p className="text-xs text-muted-foreground">Real-time metrics across all Cencori services</p>
+                    </div>
                     <Link href="/internal/settings">
                         <Button variant="outline" size="sm" className="h-8 text-xs rounded-full">
                             <Settings className="h-3.5 w-3.5 mr-1.5" />
@@ -42,6 +41,7 @@ export function AdminDashboard() {
                         </Button>
                     </Link>
                 </div>
+                <TimeRangeSelector value={period} onChange={setPeriod} />
             </div>
 
             {isLoading ? (
@@ -373,13 +373,13 @@ function LoadingSkeleton() {
         <div className="space-y-8">
             <div className="space-y-4">
                 <Skeleton className="h-4 w-32" />
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
                 </div>
             </div>
             <div className="space-y-4">
                 <Skeleton className="h-4 w-24" />
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
                 </div>
             </div>

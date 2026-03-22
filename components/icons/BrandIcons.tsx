@@ -96,6 +96,20 @@ export { Claude as ClaudeLogo } from "@lobehub/icons";
 export { CrewAI as CrewAILogo } from "@lobehub/icons";
 export { N8n as N8nLogo } from "@lobehub/icons";
 
+// Vibe coding platforms - Re-exported from @lobehub/icons
+export { Lovable as LovableLogo } from "@lobehub/icons";
+export { Replit as ReplitLogo } from "@lobehub/icons";
+export { V0 as V0Logo } from "@lobehub/icons";
+
+// Bolt.new Logo (custom SVG - not in @lobehub/icons)
+export function BoltLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" className={className} {...props}>
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+        </svg>
+    );
+}
+
 // Framework Logos (custom SVGs - not available in @lobehub/icons)
 interface FrameworkIconProps extends React.SVGProps<SVGSVGElement> {
     className?: string;

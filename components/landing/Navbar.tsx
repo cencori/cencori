@@ -141,7 +141,7 @@ export default function Navbar({
                 { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
                 { title: "Memory & RAG", href: "/storage" },
                 { title: "Scan", href: "https://scan.cencori.com" },
-                { title: "Enterprise", href: "/enterprise" },
+                { title: "Enterprise", href: "/solutions/enterprise" },
             ]
         },
         {
@@ -201,7 +201,7 @@ export default function Navbar({
             ],
             [
                 { title: "Scan", href: "https://scan.cencori.com", description: "Security scanning & vulnerability detection." },
-                { title: "Enterprise", href: "/enterprise", description: "Compliance, audit, and governance." },
+                { title: "Enterprise", href: "/solutions/enterprise", description: "Compliance, audit, and governance." },
             ],
         ],
     };
