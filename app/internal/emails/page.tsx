@@ -520,7 +520,7 @@ export default function InternalEmailsPage() {
         <div className="text-foreground">
             {/* Header */}
             <div className="border-b border-border/40 bg-card/30">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Email Center</h1>
                         <p className="text-xs text-muted-foreground">Compose and manage internal emails</p>
@@ -551,7 +551,7 @@ export default function InternalEmailsPage() {
                 </div>
             </div>
 
-            <div className="max-w-5xl mx-auto px-6 py-6">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 {/* ═══════ COMPOSE TAB ═══════ */}
                 {activeTab === 'compose' && (
                     <div className="space-y-5">

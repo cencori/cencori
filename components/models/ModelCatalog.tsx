@@ -7,14 +7,14 @@
  * Uses @lobehub/icons for provider logos.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
     Perplexity, OpenRouter, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
 } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, type AIModel } from "@/lib/providers/config";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Provider icon mapping ──────────────────────────────────────────────────
@@ -95,6 +95,13 @@ export function ModelCatalog() {
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [sortKey, setSortKey] = useState<SortKey>("provider");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const copyModelId = useCallback((id: string) => {
+        navigator.clipboard.writeText(id);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 1500);
+    }, []);
 
     // Unique types
     const types = useMemo(() => {
@@ -168,18 +175,18 @@ export function ModelCatalog() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {/* ── Search & Filters ── */}
             <div className="flex flex-col sm:flex-row gap-3">
                 {/* Search */}
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                     <input
                         type="text"
-                        placeholder="Search models..."
+                        placeholder="Search models, providers, or types..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full h-9 pl-9 pr-4 rounded-lg border border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/40 transition-colors"
+                        className="w-full h-10 pl-9 pr-4 rounded-xl border border-border/40 bg-card/50 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
                     />
                 </div>
 
@@ -189,7 +196,7 @@ export function ModelCatalog() {
                     <select
                         value={providerFilter}
                         onChange={(e) => setProviderFilter(e.target.value)}
-                        className="flex-1 sm:flex-none h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer w-full sm:w-auto"
+                        className="flex-1 sm:flex-none h-10 px-3 rounded-xl border border-border/40 bg-card/50 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer w-full sm:w-auto"
                     >
                         <option value="all">All Providers</option>
                         {SUPPORTED_PROVIDERS.map((p) => (
@@ -201,7 +208,7 @@ export function ModelCatalog() {
                     <select
                         value={typeFilter}
                         onChange={(e) => setTypeFilter(e.target.value)}
-                        className="flex-1 sm:flex-none h-9 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none cursor-pointer w-full sm:w-auto"
+                        className="flex-1 sm:flex-none h-10 px-3 rounded-xl border border-border/40 bg-card/50 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer w-full sm:w-auto"
                     >
                         <option value="all">All Types</option>
                         {types.map((t) => (
@@ -212,7 +219,7 @@ export function ModelCatalog() {
             </div>
 
             {/* ── Result count ── */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-xs text-muted-foreground/70 px-1">
                 <span>{filtered.length} model{filtered.length !== 1 ? "s" : ""}</span>
                 <span>{SUPPORTED_PROVIDERS.length} providers</span>
             </div>
@@ -220,23 +227,33 @@ export function ModelCatalog() {
             {/* ── Mobile cards ── */}
             <div className="md:hidden space-y-2">
                 {filtered.length === 0 ? (
-                    <div className="rounded-xl border border-border/40 py-10 px-4 text-center text-sm text-muted-foreground">
+                    <div className="rounded-2xl border border-border/30 py-12 px-4 text-center text-sm text-muted-foreground/60">
                         No models found matching your filters.
                     </div>
                 ) : (
                     filtered.map((model) => (
                         <div
                             key={`${model.providerId}-${model.id}-mobile`}
-                            className="rounded-xl border border-border/40 bg-card/40 p-3"
+                            className="rounded-2xl border border-border/30 bg-card/60 p-4 hover:border-border/50 transition-colors"
                         >
                             <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-start gap-2.5 min-w-0">
-                                    <div className="shrink-0 w-5 h-5 flex items-center justify-center mt-0.5">
-                                        <ProviderIcon providerId={model.providerId} size={16} />
+                                <div className="flex items-start gap-3 min-w-0">
+                                    <div className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-muted/40">
+                                        <ProviderIcon providerId={model.providerId} size={18} />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="font-medium text-foreground truncate">{model.name}</p>
-                                        <p className="text-[11px] text-muted-foreground/70 font-mono truncate">{model.id}</p>
+                                        <p className="font-semibold text-foreground truncate leading-tight">{model.name}</p>
+                                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                            <p className="text-[11px] text-muted-foreground/60 font-mono truncate">{model.id}</p>
+                                            <button
+                                                onClick={() => copyModelId(model.id)}
+                                                className="shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-foreground active:scale-95 transition-all"
+                                            >
+                                                {copiedId === model.id
+                                                    ? <Check className="h-3 w-3 text-emerald-500" />
+                                                    : <Copy className="h-3 w-3" />}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -250,13 +267,13 @@ export function ModelCatalog() {
                                 </span>
                             </div>
 
-                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground/70">
                                 <span>{model.providerName}</span>
-                                <span className="font-mono">{formatContext(model.contextWindow)}</span>
+                                <span className="font-mono text-muted-foreground/50">{formatContext(model.contextWindow)} ctx</span>
                             </div>
 
                             {model.description && (
-                                <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/50 line-clamp-2">
                                     {model.description}
                                 </p>
                             )}
@@ -266,13 +283,13 @@ export function ModelCatalog() {
             </div>
 
             {/* ── Table ── */}
-            <div className="hidden md:block border border-border/40 rounded-xl overflow-hidden">
+            <div className="hidden md:block border border-border/30 rounded-2xl overflow-hidden bg-card/30">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[640px]">
+                    <table className="w-full text-sm table-fixed">
                         <thead>
-                            <tr className="border-b border-border/40 bg-muted/30">
+                            <tr className="border-b border-border/30">
                                 <th
-                                    className="text-left px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none sticky left-0 z-10 bg-muted/95 backdrop-blur-sm after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border/30 w-[180px] sm:w-auto"
+                                    className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[30%]"
                                     onClick={() => toggleSort("name")}
                                 >
                                     <div className="flex items-center gap-1">
@@ -280,7 +297,7 @@ export function ModelCatalog() {
                                     </div>
                                 </th>
                                 <th
-                                    className="text-left px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none hidden sm:table-cell"
+                                    className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[14%]"
                                     onClick={() => toggleSort("provider")}
                                 >
                                     <div className="flex items-center gap-1">
@@ -288,7 +305,7 @@ export function ModelCatalog() {
                                     </div>
                                 </th>
                                 <th
-                                    className="text-left px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                                    className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[10%]"
                                     onClick={() => toggleSort("type")}
                                 >
                                     <div className="flex items-center gap-1">
@@ -296,25 +313,25 @@ export function ModelCatalog() {
                                     </div>
                                 </th>
                                 <th
-                                    className="text-right px-4 py-2.5 font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none hidden md:table-cell"
+                                    className="text-right px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[10%]"
                                     onClick={() => toggleSort("contextWindow")}
                                 >
                                     <div className="flex items-center gap-1 justify-end">
                                         Context <SortIcon column="contextWindow" />
                                     </div>
                                 </th>
-                                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">
+                                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 w-[28%]">
                                     Description
                                 </th>
-                                <th className="text-center px-4 py-2.5 font-medium text-muted-foreground hidden xl:table-cell">
-                                    Cencori
+                                <th className="text-center px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 w-[8%]">
+                                    Status
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-border/10">
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                                    <td colSpan={6} className="text-center py-16 text-muted-foreground/50 text-sm">
                                         No models found matching your filters.
                                     </td>
                                 </tr>
@@ -322,31 +339,46 @@ export function ModelCatalog() {
                                 filtered.map((model) => (
                                     <tr
                                         key={`${model.providerId}-${model.id}`}
-                                        className="border-b border-border/20 hover:bg-muted/20 transition-colors"
+                                        className="group hover:bg-muted/15 transition-colors"
                                     >
-                                        {/* Model name - sticky */}
-                                        <td className="px-4 py-3 sticky left-0 z-10 bg-background after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border/20 w-[180px] sm:w-auto overflow-hidden">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                                        {/* Model name */}
+                                        <td className="px-4 py-3.5 overflow-hidden">
+                                            <div className="flex items-center gap-3">
+                                                <div className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-muted/30">
                                                     <ProviderIcon providerId={model.providerId} size={16} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="font-medium text-foreground truncate">{model.name}</div>
-                                                    <div className="text-[11px] text-muted-foreground/60 font-mono truncate">{model.id}</div>
+                                                    <div className="font-semibold text-foreground truncate leading-tight">{model.name}</div>
+                                                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                                        <span className="text-[11px] text-muted-foreground/50 font-mono truncate">{model.id}</span>
+                                                        <button
+                                                            onClick={() => copyModelId(model.id)}
+                                                            className={cn(
+                                                                "shrink-0 p-0.5 rounded transition-all",
+                                                                copiedId === model.id
+                                                                    ? "opacity-100 text-emerald-500"
+                                                                    : "opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground"
+                                                            )}
+                                                        >
+                                                            {copiedId === model.id
+                                                                ? <Check className="h-3 w-3" />
+                                                                : <Copy className="h-3 w-3" />}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
 
                                         {/* Provider */}
-                                        <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                                        <td className="px-4 py-3.5 text-muted-foreground/70 text-[13px]">
                                             {model.providerName}
                                         </td>
 
                                         {/* Type badge */}
-                                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3.5">
                                             <span
                                                 className={cn(
-                                                    "inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                                                    "inline-flex items-center text-[10px] font-medium px-2.5 py-0.5 rounded-full border",
                                                     TYPE_COLORS[model.type] || "bg-muted text-muted-foreground border-border/20"
                                                 )}
                                             >
@@ -355,19 +387,20 @@ export function ModelCatalog() {
                                         </td>
 
                                         {/* Context */}
-                                        <td className="px-4 py-3 text-right font-mono text-muted-foreground hidden md:table-cell">
+                                        <td className="px-4 py-3.5 text-right font-mono text-[12px] text-muted-foreground/50">
                                             {formatContext(model.contextWindow)}
                                         </td>
 
                                         {/* Description */}
-                                        <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate hidden lg:table-cell">
+                                        <td className="px-4 py-3.5 text-muted-foreground/50 text-xs truncate">
                                             {model.description || "—"}
                                         </td>
 
-                                        {/* Cencori support */}
-                                        <td className="px-4 py-3 text-center hidden xl:table-cell">
-                                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px]">
-                                                ✓
+                                        {/* Status */}
+                                        <td className="px-4 py-3.5 text-center">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-500/80 bg-emerald-500/8 px-2 py-0.5 rounded-full">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+                                                Live
                                             </span>
                                         </td>
                                     </tr>

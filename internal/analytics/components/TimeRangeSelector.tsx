@@ -19,19 +19,21 @@ const TIME_RANGES: { value: TimePeriod; label: string }[] = [
 
 export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     return (
-        <div className="inline-flex items-center rounded-lg border border-border/50 bg-muted/30 p-0.5">
-            {TIME_RANGES.map((range) => (
-                <button
-                    key={range.value}
-                    onClick={() => onChange(range.value)}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${value === range.value
-                            ? 'bg-background text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                >
-                    {range.label}
-                </button>
-            ))}
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="inline-flex items-center rounded-lg border border-border/50 bg-muted/30 p-0.5">
+                {TIME_RANGES.map((range) => (
+                    <button
+                        key={range.value}
+                        onClick={() => onChange(range.value)}
+                        className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap ${value === range.value
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                    >
+                        {range.label}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }

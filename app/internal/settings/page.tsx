@@ -161,7 +161,7 @@ export default function AdminSettingsPage() {
 
     if (error) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-6 py-8">
+            <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 <div className="text-center py-12">
                     <p className="text-sm text-red-500">Failed to load admins</p>
                     <p className="text-xs text-muted-foreground mt-1">{(error as Error).message}</p>
@@ -171,7 +171,7 @@ export default function AdminSettingsPage() {
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -195,7 +195,7 @@ export default function AdminSettingsPage() {
                                         inviteMutation.mutate({ email: inviteEmail, role: inviteRole });
                                     }
                                 }}
-                                className="flex gap-3"
+                                className="flex flex-col sm:flex-row gap-2 sm:gap-3"
                             >
                                 <Input
                                     type="email"

@@ -17,7 +17,7 @@ export const siteConfig = {
       insights: "/insights",
       network: "/network",
       edge: "/edge",
-      enterprise: "/product-enterprise",
+      enterprise: "/solutions/enterprise",
       developerTools: "/product-developer-tools",
     },
     company: {
