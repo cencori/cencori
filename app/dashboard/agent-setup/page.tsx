@@ -120,7 +120,7 @@ export default function AgentSetupPage() {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">Missing setup token.</p>
+                    <p className="text-sm text-muted-foreground">Missing setup token</p>
                     <p className="text-xs text-muted-foreground">
                         Run <code className="bg-muted px-1.5 py-0.5 rounded text-xs">curl -sSL https://cencori.com/install.sh | bash</code> in your terminal.
                     </p>
