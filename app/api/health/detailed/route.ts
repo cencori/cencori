@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { generateHealthSummary } from "@/lib/health-summary";
 
-// ── Types ──────────────────────────────────────────────────────
+//  Types
 type ServiceStatus = "healthy" | "degraded" | "down";
 
 interface ServiceHealth {
@@ -30,21 +30,23 @@ async function checkDatabase(): Promise<ServiceHealth> {
   const start = Date.now();
   try {
     const supabase = createAdminClient();
-    // A simple query to confirm the DB is reachable
     const { error } = await supabase.from("projects").select("id").limit(1);
     const latencyMs = Date.now() - start;
 
     if (error) throw error;
 
-    return {
-      status: latencyMs > 500 ? "degraded" : "healthy",
-      latencyMs,
-    };
-  } catch (err) {
+    const status = latencyMs > 500 ? "degraded" : "healthy";
+    console.log(`[health] Database check: ${status} (${latencyMs}ms)`);
+
+    return { status, latencyMs };
+  } catch (err: unknown) {
+    const latencyMs = Date.now() - start;
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[health] Database check: DOWN — ${message}`);
     return {
       status: "down",
-      latencyMs: Date.now() - start,
-      error: "Database unreachable", // Never expose real error details to client
+      latencyMs,
+      error: "Database unreachable",
     };
   }
 }
@@ -53,19 +55,25 @@ async function checkDatabase(): Promise<ServiceHealth> {
 async function checkAiGateway(): Promise<ServiceHealth> {
   const start = Date.now();
   try {
-    // Import the provider system and ping it
     const { getProviderHealth } = await import("@/lib/providers/index");
     const isHealthy = await getProviderHealth();
     const latencyMs = Date.now() - start;
 
-    return {
-      status: isHealthy ? (latencyMs > 500 ? "degraded" : "healthy") : "down",
-      latencyMs,
-    };
-  } catch (err) {
+    const status = isHealthy
+      ? latencyMs > 500
+        ? "degraded"
+        : "healthy"
+      : "down";
+    console.log(`[health] AI Gateway check: ${status} (${latencyMs}ms)`);
+
+    return { status, latencyMs };
+  } catch (err: unknown) {
+    const latencyMs = Date.now() - start;
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[health] AI Gateway check: DOWN — ${message}`);
     return {
       status: "down",
-      latencyMs: Date.now() - start,
+      latencyMs,
       error: "AI gateway unreachable",
     };
   }
@@ -76,7 +84,6 @@ async function checkMemory(): Promise<ServiceHealth> {
   const start = Date.now();
   try {
     const supabase = createAdminClient();
-    // Memory service uses a specific table — adjust to Cencori's actual table
     const { error } = await supabase
       .from("memory_namespaces")
       .select("id")
@@ -85,21 +92,24 @@ async function checkMemory(): Promise<ServiceHealth> {
 
     if (error) throw error;
 
-    return {
-      status: latencyMs > 500 ? "degraded" : "healthy",
-      latencyMs,
-    };
-  } catch (err) {
+    const status = latencyMs > 500 ? "degraded" : "healthy";
+    console.log(`[health] Memory check: ${status} (${latencyMs}ms)`);
+
+    return { status, latencyMs };
+  } catch (err: unknown) {
+    const latencyMs = Date.now() - start;
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[health] Memory check: DOWN — ${message}`);
     return {
       status: "down",
-      latencyMs: Date.now() - start,
+      latencyMs,
       error: "Memory service unreachable",
     };
   }
 }
 
-// ── Helper: Determine overall status ──────────────────────────
-// Exported so it can be unit tested independently (File 9)
+// Helper: Determine overall status
+// Exported so it can be unit tested independently
 export function aggregateHealthData(
   services: Record<string, ServiceHealth>,
 ): ServiceStatus {
@@ -123,38 +133,54 @@ async function persistHealthChecks(
     project_id: projectId,
   }));
 
-  // Use upsert=false, just insert. Errors here should not fail the main response.
   const { error } = await supabase.from("health_checks").insert(rows);
-  if (error)
+
+  if (error) {
     console.error("[health] Failed to persist health checks:", error.message);
+  } else {
+    console.log(
+      `[health] Persisted ${rows.length} health check row(s) to database`,
+    );
+  }
 }
 
 // ── Main Route Handler ─────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  // 1. Authentication: reject unauthenticated requests
-  const supabase = createServerClient();
+  console.log("[health] ── Route hit ──────────────────────────────────────");
+
+  // Check for cron secret first
+  const cronSecret = request.headers.get("x-cron-secret");
+  const isCronRequest = cronSecret === process.env.CRON_SECRET;
+  console.log("[health] Cron secret present:", !!cronSecret);
+  console.log("[health] Is valid cron request:", isCronRequest);
+
+  // Authenticate — check session unless it is a valid cron request
+  const supabase = await createServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
-  // Allow cron requests authenticated by CRON_SECRET header
-  const cronSecret = request.headers.get("x-cron-secret");
-  const isCronRequest = cronSecret === process.env.CRON_SECRET;
+  console.log("[health] Session present:", !!session);
 
   if (!session && !isCronRequest) {
+    console.log("[health] Rejected — no session and no valid cron secret");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 2. Run all three service checks IN PARALLEL
-  //    Promise.allSettled never throws — each result is either
-  //    { status: 'fulfilled', value: ... } or { status: 'rejected', reason: ... }
+  console.log("[health] Auth passed — running all three service checks...");
+
+  // Run all three service checks IN PARALLEL
   const [dbResult, aiResult, memResult] = await Promise.allSettled([
     checkDatabase(),
     checkAiGateway(),
     checkMemory(),
   ]);
 
-  // 3. Extract values — fall back to 'down' if a check itself crashed
+  console.log("[health] All checks complete:");
+  console.log("  database  →", dbResult.status);
+  console.log("  aiGateway →", aiResult.status);
+  console.log("  memory    →", memResult.status);
+
+  //Extract values — fall back to 'down' if a check itself crashed
   const services = {
     database:
       dbResult.status === "fulfilled"
@@ -170,16 +196,20 @@ export async function GET(request: NextRequest) {
         : { status: "down" as const, latencyMs: 0, error: "Check failed" },
   };
 
-  // 4. Calculate overall status
+  // Calculate overall status
   const overallStatus = aggregateHealthData(services);
+  console.log("[health] Overall status:", overallStatus);
+  console.log("[health] Services:", JSON.stringify(services, null, 2));
 
-  // 5. Get AI summary (File 3). Falls back to static string internally.
+  //Get AI summary — falls back to static string internally if Gemini fails
+  console.log("[health] Requesting AI summary from Gemini...");
   const summary = await generateHealthSummary({
     status: overallStatus,
     services,
   });
+  console.log("[health] AI summary received:", summary);
 
-  // 6. Build the response object
+  // Build the response object
   const response: HealthResponse = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
@@ -187,11 +217,15 @@ export async function GET(request: NextRequest) {
     summary,
   };
 
-  // 7. Save to DB (fire-and-forget, don't await — don't slow the response)
+  // Save to DB — fire-and-forget, intentionally not awaited
+  // so it does not slow down the response the user receives
   const projectId = request.nextUrl.searchParams.get("projectId");
-  persistHealthChecks(services, projectId); // intentionally not awaited
+  console.log("[health] Persisting to database (fire-and-forget)...");
+  persistHealthChecks(services, projectId);
 
-  // 8. Return JSON. Cache for 60 seconds via Next.js cache headers.
+  console.log("[health] ── Route complete — returning 200 ────────────────");
+
+  //Return JSON with 60-second cache header
   return NextResponse.json(response, {
     status: 200,
     headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate" },

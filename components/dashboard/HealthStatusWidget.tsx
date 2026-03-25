@@ -68,7 +68,7 @@ export default function HealthStatusWidget() {
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [visible, setVisible] = useState(false); // controls fade-in
+  const [visible, setVisible] = useState(false);
 
   async function fetchHealth() {
     setLoading(true);
@@ -80,7 +80,7 @@ export default function HealthStatusWidget() {
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const json: HealthData = await res.json();
       setData(json);
-      setTimeout(() => setVisible(true), 50);
+      setVisible(true);
     } catch {
       setError("Could not load health data. Please try again.");
     } finally {

@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import HealthStatusWidget from "@/components/dashboard/HealthStatusWidget";
-import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, test, beforeEach, vi } from "vitest";
 
 // Mock global fetch — we never want to hit a real API in component tests
 const mockFetch = vi.fn();
@@ -34,12 +34,12 @@ function mockFetchResponse(data: object, ok = true) {
 describe("HealthStatusWidget", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    vi.useFakeTimers();
+    // vi.useFakeTimers();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  // afterEach(() => {
+  //   vi.useRealTimers();
+  // });
 
   // ── Loading state ──────────────────────────────────────────
 
