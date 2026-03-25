@@ -4,7 +4,8 @@ import React, { use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { motion } from "framer-motion";
+import { cn as clsx } from "@/lib/utils";
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Activity, Zap, DollarSign, Clock, TrendingUp, AlertTriangle, Download, Loader2, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Organization {
@@ -247,15 +248,70 @@ export default function UsagePage({ params }: PageProps) {
 
     if (isLoading) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Skeleton className="h-5 w-24 mb-6" />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
+            <div className="w-full max-w-5xl mx-auto px-6 py-8 space-y-8">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-16" />
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-7 w-16 rounded-md" />
+                        <Skeleton className="h-7 w-28 rounded-lg" />
+                    </div>
                 </div>
-                <Skeleton className="h-64 mb-6" />
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Skeleton className="h-48" />
-                    <Skeleton className="h-48" />
+
+                {/* Monthly Quota skeleton */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
+                        <div>
+                            <Skeleton className="h-4 w-28 mb-2" />
+                            <Skeleton className="h-3 w-44" />
+                        </div>
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <div className="p-6">
+                        <div className="flex items-center gap-[2px] w-full h-6 mb-3">
+                            {Array.from({ length: 60 }).map((_, i) => (
+                                <div key={i} className="flex-1 h-full rounded-[1px] bg-muted-foreground/10" />
+                            ))}
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Skeleton className="h-3 w-52" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats + breakdowns skeleton */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                        {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="px-5 py-4">
+                                <Skeleton className="h-3 w-16 mb-2.5" />
+                                <Skeleton className="h-6 w-20 mb-2" />
+                                <Skeleton className="h-3 w-24" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid md:grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                        {[1, 2].map((section) => (
+                            <div key={section}>
+                                <div className="px-5 py-3 border-b border-border/20">
+                                    <Skeleton className="h-3 w-16" />
+                                </div>
+                                <div className="divide-y divide-border/10">
+                                    {[1, 2, 3].map((row) => (
+                                        <div key={row} className="flex items-center justify-between px-5 py-2.5">
+                                            <Skeleton className="h-3.5 w-32" />
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="w-16 h-1 rounded-full" />
+                                                <Skeleton className="h-3 w-8" />
+                                                <Skeleton className="h-3 w-8" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
@@ -266,7 +322,6 @@ export default function UsagePage({ params }: PageProps) {
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <div className="text-center py-16 flex flex-col items-center">
                     <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <Activity className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium">Organization not found</p>
                 </div>
@@ -347,7 +402,24 @@ export default function UsagePage({ params }: PageProps) {
                     </Badge>
                 </div>
                 <div className="p-6">
-                    <Progress value={percentage} className="h-2 mb-3" />
+                    <div className="flex items-center gap-[2px] w-full h-6 mb-3">
+                        {Array.from({ length: 60 }).map((_, i) => {
+                            const filled = i < Math.round((percentage / 100) * 60);
+                            const barColor = isAtLimit ? "bg-red-500" : isNearLimit ? "bg-amber-500" : "bg-emerald-500";
+                            return (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, scaleY: 0 }}
+                                    animate={{ opacity: filled ? 1 : 0.15, scaleY: 1 }}
+                                    transition={{ duration: 0.3, delay: i * 0.008, ease: "easeOut" }}
+                                    className={clsx(
+                                        "flex-1 h-full rounded-[1px]",
+                                        filled ? barColor : "bg-muted-foreground/50"
+                                    )}
+                                />
+                            );
+                        })}
+                    </div>
                     <div className="flex items-center justify-between text-[11px]">
                         <span className="text-muted-foreground">Reset happens on the 1st of every month</span>
                         {isAtLimit ? (
@@ -364,109 +436,99 @@ export default function UsagePage({ params }: PageProps) {
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border border-border/40 bg-card p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Activity className="h-4 w-4 text-blue-500" />
-                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Requests</span>
+            {/* Stats + Breakdowns — single dense card */}
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                {/* Top row: key metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Requests</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{(stats?.total_requests || 0).toLocaleString()}</p>
+                        <span className="text-[10px] text-muted-foreground">{stats?.success_rate ? `${stats.success_rate.toFixed(1)}% success` : '—'}</span>
                     </div>
-                    <p className="text-2xl font-semibold font-mono tracking-tight">{(stats?.total_requests || 0).toLocaleString()}</p>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tokens</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">
+                            {stats?.total_tokens && stats.total_tokens >= 1000000
+                                ? `${(stats.total_tokens / 1000000).toFixed(1)}M`
+                                : stats?.total_tokens && stats.total_tokens >= 1000
+                                    ? `${(stats.total_tokens / 1000).toFixed(1)}K`
+                                    : (stats?.total_tokens || 0).toLocaleString()}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">
+                            {stats?.total_requests ? `~${Math.round((stats?.total_tokens || 0) / stats.total_requests)} per req` : '—'}
+                        </span>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">${(stats?.total_cost || 0).toFixed(2)}</p>
+                        <span className="text-[10px] text-muted-foreground">
+                            {stats?.total_requests ? `$${((stats?.total_cost || 0) / stats.total_requests).toFixed(4)}/req` : '—'}
+                        </span>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Avg Latency</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{stats?.avg_latency || 0}ms</p>
+                        <span className="text-[10px] text-muted-foreground">
+                            {(stats?.avg_latency || 0) > 1000 ? `${((stats?.avg_latency || 0) / 1000).toFixed(1)}s` : 'p50 response'}
+                        </span>
+                    </div>
                 </div>
 
-                <div className="rounded-md border border-border/40 bg-card p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Zap className="h-4 w-4 text-purple-500" />
-                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tokens</span>
-                    </div>
-                    <p className="text-2xl font-semibold font-mono tracking-tight">
-                        {stats?.total_tokens && stats.total_tokens >= 1000000
-                            ? `${(stats.total_tokens / 1000000).toFixed(1)}M`
-                            : stats?.total_tokens && stats.total_tokens >= 1000
-                                ? `${(stats.total_tokens / 1000).toFixed(1)}K`
-                                : (stats?.total_tokens || 0).toLocaleString()}
-                    </p>
-                </div>
-
-                <div className="rounded-md border border-border/40 bg-card p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <DollarSign className="h-4 w-4 text-emerald-500" />
-                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Cost</span>
-                    </div>
-                    <p className="text-2xl font-semibold font-mono tracking-tight">${(stats?.total_cost || 0).toFixed(2)}</p>
-                </div>
-
-                <div className="rounded-md border border-border/40 bg-card p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Clock className="h-4 w-4 text-amber-500" />
-                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Latency</span>
-                    </div>
-                    <p className="text-2xl font-semibold font-mono tracking-tight">{stats?.avg_latency || 0}ms</p>
-                </div>
-            </div>
-
-            {/* Breakdowns */}
-            <div className="grid gap-8 md:grid-cols-2">
-                {/* Model Usage Table */}
-                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
-                    <div className="px-6 py-4 border-b border-border/40">
-                        <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Top Models</h3>
-                    </div>
-                    <div className="p-0">
+                {/* Bottom row: models + providers side by side */}
+                <div className="grid md:grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                    {/* Models */}
+                    <div>
+                        <div className="px-5 py-3 border-b border-border/20">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Models</span>
+                        </div>
                         {topModels.length === 0 ? (
-                            <div className="p-8 text-center text-xs text-muted-foreground">No data available</div>
+                            <div className="px-5 py-6 text-xs text-muted-foreground">No data</div>
                         ) : (
-                            <table className="w-full text-left text-xs">
-                                <tbody className="divide-y divide-border/20">
-                                    {topModels.map(([model, count]) => {
-                                        const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
-                                        return (
-                                            <tr key={model} className="group hover:bg-muted/20 transition-colors">
-                                                <td className="px-6 py-3 font-medium">{model}</td>
-                                                <td className="px-6 py-3 text-right tabular-nums text-muted-foreground">
-                                                    {count.toLocaleString()}
-                                                    <span className="ml-2 text-[10px] opacity-70">({pct.toFixed(0)}%)</span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <div className="divide-y divide-border/10">
+                                {topModels.map(([model, count]) => {
+                                    const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
+                                    return (
+                                        <div key={model} className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/10 transition-colors">
+                                            <span className="text-xs font-medium truncate mr-4">{model}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <div className="w-16 h-1 rounded-full bg-muted-foreground/10 overflow-hidden">
+                                                    <div className="h-full rounded-full bg-foreground/40" style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <span className="text-[11px] tabular-nums text-muted-foreground w-8 text-right">{pct.toFixed(0)}%</span>
+                                                <span className="text-[11px] tabular-nums text-foreground w-10 text-right font-medium">{count.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
-                </div>
 
-                {/* Provider Usage Table */}
-                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
-                    <div className="px-6 py-4 border-b border-border/40">
-                        <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">By Provider</h3>
-                    </div>
-                    <div className="p-0">
+                    {/* Providers */}
+                    <div>
+                        <div className="px-5 py-3 border-b border-border/20">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Providers</span>
+                        </div>
                         {topProviders.length === 0 ? (
-                            <div className="p-8 text-center text-xs text-muted-foreground">No data available</div>
+                            <div className="px-5 py-6 text-xs text-muted-foreground">No data</div>
                         ) : (
-                            <table className="w-full text-left text-xs">
-                                <tbody className="divide-y divide-border/20">
-                                    {topProviders.map(([provider, count]) => {
-                                        const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
-                                        const colorClass = PROVIDER_COLORS[provider.toLowerCase()] || 'bg-gray-500';
-                                        return (
-                                            <tr key={provider} className="group hover:bg-muted/20 transition-colors">
-                                                <td className="px-6 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`size-1.5 rounded-full ${colorClass}`} />
-                                                        <span className="font-medium capitalize">{provider}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-3 text-right tabular-nums text-muted-foreground">
-                                                    {count.toLocaleString()}
-                                                    <span className="ml-2 text-[10px] opacity-70">({pct.toFixed(0)}%)</span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <div className="divide-y divide-border/10">
+                                {topProviders.map(([provider, count]) => {
+                                    const pct = stats?.total_requests ? (count / stats.total_requests) * 100 : 0;
+                                    return (
+                                        <div key={provider} className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/10 transition-colors">
+                                            <span className="text-xs font-medium capitalize truncate mr-4">{provider}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <div className="w-16 h-1 rounded-full bg-muted-foreground/10 overflow-hidden">
+                                                    <div className="h-full rounded-full bg-foreground/40" style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <span className="text-[11px] tabular-nums text-muted-foreground w-8 text-right">{pct.toFixed(0)}%</span>
+                                                <span className="text-[11px] tabular-nums text-foreground w-10 text-right font-medium">{count.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 </div>
