@@ -7,6 +7,36 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+const TOTAL_BARS = 60;
+
+function SegmentedBar({ percentage, color }: { percentage: number; color: string }) {
+    const filledBars = Math.round((percentage / 100) * TOTAL_BARS);
+
+    return (
+        <div className="flex items-center gap-[2px] w-full h-6">
+            {Array.from({ length: TOTAL_BARS }).map((_, i) => (
+                <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scaleY: 0 }}
+                    animate={{
+                        opacity: i < filledBars ? 1 : 0.15,
+                        scaleY: 1,
+                    }}
+                    transition={{
+                        duration: 0.3,
+                        delay: i * 0.008,
+                        ease: "easeOut",
+                    }}
+                    className={cn(
+                        "flex-1 h-full rounded-[1px]",
+                        i < filledBars ? color : "bg-muted-foreground/50"
+                    )}
+                />
+            ))}
+        </div>
+    );
+}
+
 interface UsageProps {
     monthlyRequestsUsed: number;
     monthlyRequestLimit: number;
@@ -28,6 +58,8 @@ export function UsageOverview({
     const isNearLimit = requestPercentage >= 80;
     const isAtLimit = requestPercentage >= 100;
 
+    const requestBarColor = isAtLimit ? "bg-red-500" : isNearLimit ? "bg-amber-500" : "bg-emerald-500";
+
     return (
         <div className="grid gap-6 md:grid-cols-2">
             {/* Request Usage Card */}
@@ -47,7 +79,7 @@ export function UsageOverview({
                     </Badge>
                 </div>
                 <div className="p-6">
-                    <div className="flex items-baseline gap-1.5 mb-2">
+                    <div className="flex items-baseline gap-1.5 mb-3">
                         <span className="text-2xl font-semibold tabular-nums tracking-tight">
                             {monthlyRequestsUsed.toLocaleString()}
                         </span>
@@ -56,17 +88,7 @@ export function UsageOverview({
                         </span>
                     </div>
 
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/30">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${requestPercentage}%` }}
-                            transition={{ duration: 0.8, ease: "circOut" }}
-                            className={cn(
-                                "h-full transition-colors rounded-full",
-                                isAtLimit ? "bg-red-500/80" : isNearLimit ? "bg-amber-500/80" : "bg-primary"
-                            )}
-                        />
-                    </div>
+                    <SegmentedBar percentage={requestPercentage} color={requestBarColor} />
                 </div>
             </div>
 
@@ -84,7 +106,7 @@ export function UsageOverview({
                     </Badge>
                 </div>
                 <div className="p-6">
-                    <div className="flex items-baseline gap-1.5 mb-2">
+                    <div className="flex items-baseline gap-1.5 mb-3">
                         <span className="text-2xl font-semibold tabular-nums tracking-tight">
                             {projectCount}
                         </span>
@@ -93,14 +115,7 @@ export function UsageOverview({
                         </span>
                     </div>
 
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/30">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${projectPercentage}%` }}
-                            transition={{ duration: 0.8, delay: 0.1, ease: "circOut" }}
-                            className="h-full bg-primary rounded-full"
-                        />
-                    </div>
+                    <SegmentedBar percentage={projectPercentage} color="bg-emerald-500" />
                 </div>
             </div>
         </div>

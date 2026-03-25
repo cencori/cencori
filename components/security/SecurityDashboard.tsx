@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldAlert, ShieldCheck, Clock, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface SecurityDashboardProps {
     projectId: string;
@@ -34,18 +33,25 @@ function useSecurityStats(projectId: string) {
             const data = await response.json();
             return data.stats as SecurityStats;
         },
-        staleTime: 30 * 1000, // 30 seconds
-        refetchInterval: 60 * 1000, // Refresh every minute
+        staleTime: 30 * 1000,
+        refetchInterval: 60 * 1000,
     });
 }
 
-function getThreatLevel(score: number): { label: string; color: string; bgColor: string } {
-    if (score >= 80) return { label: 'Critical', color: 'text-red-500', bgColor: 'bg-red-500/10' };
-    if (score >= 60) return { label: 'High', color: 'text-amber-500', bgColor: 'bg-amber-500/10' };
-    if (score >= 40) return { label: 'Medium', color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' };
-    if (score >= 20) return { label: 'Low', color: 'text-blue-500', bgColor: 'bg-blue-500/10' };
-    return { label: 'Secure', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' };
+function getThreatLevel(score: number): { label: string; color: string } {
+    if (score >= 80) return { label: 'Critical', color: 'text-red-500' };
+    if (score >= 60) return { label: 'High', color: 'text-amber-500' };
+    if (score >= 40) return { label: 'Medium', color: 'text-yellow-500' };
+    if (score >= 20) return { label: 'Low', color: 'text-blue-500' };
+    return { label: 'Secure', color: 'text-emerald-500' };
 }
+
+const SEVERITY_COLORS: Record<string, string> = {
+    critical: 'bg-red-500',
+    high: 'bg-amber-500',
+    medium: 'bg-yellow-500',
+    low: 'bg-foreground/30',
+};
 
 export function SecurityDashboard({ projectId }: SecurityDashboardProps) {
     const { data: stats, isLoading } = useSecurityStats(projectId);
@@ -53,17 +59,54 @@ export function SecurityDashboard({ projectId }: SecurityDashboardProps) {
     if (isLoading) {
         return (
             <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="rounded-lg border border-border/40 bg-card p-4">
-                            <Skeleton className="h-3 w-20 mb-2" />
-                            <Skeleton className="h-8 w-16" />
-                        </div>
-                    ))}
+                {/* Metrics skeleton */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="px-5 py-4">
+                                <Skeleton className="h-3 w-20 mb-2.5" />
+                                <Skeleton className="h-6 w-14 mb-2" />
+                                <Skeleton className="h-3 w-24" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid md:grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                        {[1, 2].map(section => (
+                            <div key={section}>
+                                <div className="px-5 py-3 border-b border-border/20">
+                                    <Skeleton className="h-3 w-24" />
+                                </div>
+                                <div className="divide-y divide-border/10">
+                                    {[1, 2, 3, 4].map(row => (
+                                        <div key={row} className="flex items-center justify-between px-5 py-2.5">
+                                            <Skeleton className="h-3.5 w-20" />
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="w-16 h-1 rounded-full" />
+                                                <Skeleton className="h-3 w-8" />
+                                                <Skeleton className="h-3 w-8" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Skeleton className="h-[200px]" />
-                    <Skeleton className="h-[200px]" />
+                {/* Trend skeleton */}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border/20">
+                        <Skeleton className="h-3 w-28" />
+                    </div>
+                    <div className="p-5">
+                        <div className="flex items-end gap-1 h-20">
+                            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                    <Skeleton className="w-full rounded-t" style={{ height: `${20 + Math.random() * 60}%` }} />
+                                    <Skeleton className="h-2 w-4" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -72,144 +115,140 @@ export function SecurityDashboard({ projectId }: SecurityDashboardProps) {
     if (!stats) return null;
 
     const threatLevel = getThreatLevel(stats.threatScore);
-    const trend = stats.trendData;
-    const lastDayCount = trend[trend.length - 1]?.count || 0;
-    const prevDayCount = trend[trend.length - 2]?.count || 0;
-    const trendDirection = lastDayCount > prevDayCount ? 'up' : lastDayCount < prevDayCount ? 'down' : 'stable';
+
+    const severities = [
+        { key: 'critical', label: 'Critical' },
+        { key: 'high', label: 'High' },
+        { key: 'medium', label: 'Medium' },
+        { key: 'low', label: 'Low' },
+    ] as const;
+
+    const threatTypes = Object.entries(stats.typeBreakdown)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
 
     return (
         <div className="space-y-4">
-            {/* Main Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Threat Score */}
-                <div className={`rounded-lg border border-border/40 ${threatLevel.bgColor} p-4`}>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Threat Score</span>
-                    <div className="flex items-baseline gap-2 mt-1">
-                        <span className={`text-2xl font-bold font-mono ${threatLevel.color}`}>
-                            {stats.threatScore}
-                        </span>
-                        <span className={`text-xs font-medium ${threatLevel.color}`}>
-                            {threatLevel.label}
-                        </span>
+            {/* Unified stats + breakdowns card */}
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                {/* Top row: key metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Threat Score</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <span className={`text-xl font-semibold font-mono tracking-tight ${threatLevel.color}`}>
+                                {stats.threatScore}
+                            </span>
+                            <span className={`text-[10px] font-medium ${threatLevel.color}`}>
+                                {threatLevel.label}
+                            </span>
+                        </div>
                     </div>
-                </div>
-
-                {/* Blocked 24h */}
-                <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (24h)</span>
-                    <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-2xl font-bold font-mono">{stats.blocked24h}</span>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Blocked (24h)</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{stats.blocked24h}</p>
+                        <span className="text-[10px] text-muted-foreground">last 24 hours</span>
                     </div>
-                </div>
-
-                {/* Blocked 7d */}
-                <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Blocked (7d)</span>
-                    <div className="mt-1">
-                        <span className="text-2xl font-bold font-mono">{stats.blocked7d}</span>
-                        <span className="text-xs text-muted-foreground ml-2">
-                            ({stats.blockedRate}% of requests)
-                        </span>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Blocked (7d)</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{stats.blocked7d}</p>
+                        <span className="text-[10px] text-muted-foreground">{stats.blockedRate}% of requests</span>
                     </div>
-                </div>
-
-                {/* Pending Reviews */}
-                <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Pending Review</span>
-                    <div className="mt-1">
-                        <span className={`text-2xl font-bold font-mono ${stats.pendingReviews > 0 ? 'text-amber-500' : ''}`}>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Pending Review</span>
+                        <p className={`text-xl font-semibold font-mono tracking-tight mt-1 ${stats.pendingReviews > 0 ? 'text-amber-500' : ''}`}>
                             {stats.pendingReviews}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Breakdown Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Severity Breakdown */}
-                <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <h3 className="text-xs font-medium mb-3">Severity Breakdown (30d)</h3>
-                    <div className="space-y-2">
-                        {[
-                            { key: 'critical', label: 'Critical', color: 'bg-red-500' },
-                            { key: 'high', label: 'High', color: 'bg-amber-500' },
-                            { key: 'medium', label: 'Medium', color: 'bg-yellow-500' },
-                            { key: 'low', label: 'Low', color: 'bg-gray-400' },
-                        ].map(({ key, label, color }) => {
-                            const count = stats.severityBreakdown[key as keyof typeof stats.severityBreakdown];
-                            const percent = stats.totalIncidents30d > 0
-                                ? (count / stats.totalIncidents30d) * 100
-                                : 0;
-                            return (
-                                <div key={key} className="flex items-center gap-3">
-                                    <span className="text-[10px] text-muted-foreground w-14">{label}</span>
-                                    <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full ${color} transition-all`}
-                                            style={{ width: `${percent}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-xs font-mono w-8 text-right">{count}</span>
-                                </div>
-                            );
-                        })}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">awaiting action</span>
                     </div>
                 </div>
 
-                {/* Threat Type Breakdown */}
-                <div className="rounded-lg border border-border/40 bg-card p-4">
-                    <h3 className="text-xs font-medium mb-3">Threat Types (30d)</h3>
-                    <div className="space-y-2">
-                        {Object.entries(stats.typeBreakdown)
-                            .sort((a, b) => b[1] - a[1])
-                            .slice(0, 5)
-                            .map(([type, count]) => {
-                                const percent = stats.totalIncidents30d > 0
+                {/* Bottom row: severity + threat types side by side */}
+                <div className="grid md:grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                    {/* Severity Breakdown */}
+                    <div>
+                        <div className="px-5 py-3 border-b border-border/20">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Severity (30d)</span>
+                        </div>
+                        <div className="divide-y divide-border/10">
+                            {severities.map(({ key, label }) => {
+                                const count = stats.severityBreakdown[key];
+                                const pct = stats.totalIncidents30d > 0
                                     ? (count / stats.totalIncidents30d) * 100
                                     : 0;
                                 return (
-                                    <div key={type} className="flex items-center gap-3">
-                                        <span className="text-[10px] text-muted-foreground w-28 truncate capitalize">
-                                            {type.replace(/_/g, ' ')}
-                                        </span>
-                                        <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary/60 transition-all"
-                                                style={{ width: `${percent}%` }}
-                                            />
+                                    <div key={key} className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/10 transition-colors">
+                                        <span className="text-xs font-medium">{label}</span>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <div className="w-16 h-1 rounded-full bg-muted-foreground/10 overflow-hidden">
+                                                <div className={`h-full rounded-full ${SEVERITY_COLORS[key]}`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className="text-[11px] tabular-nums text-muted-foreground w-8 text-right">{pct.toFixed(0)}%</span>
+                                            <span className="text-[11px] tabular-nums text-foreground w-8 text-right font-medium">{count}</span>
                                         </div>
-                                        <span className="text-xs font-mono w-8 text-right">{count}</span>
                                     </div>
                                 );
                             })}
-                        {Object.keys(stats.typeBreakdown).length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-4">No threats detected</p>
+                        </div>
+                    </div>
+
+                    {/* Threat Types */}
+                    <div>
+                        <div className="px-5 py-3 border-b border-border/20">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Threat Types (30d)</span>
+                        </div>
+                        {threatTypes.length === 0 ? (
+                            <div className="px-5 py-6 text-xs text-muted-foreground">No threats detected</div>
+                        ) : (
+                            <div className="divide-y divide-border/10">
+                                {threatTypes.map(([type, count]) => {
+                                    const pct = stats.totalIncidents30d > 0
+                                        ? (count / stats.totalIncidents30d) * 100
+                                        : 0;
+                                    return (
+                                        <div key={type} className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/10 transition-colors">
+                                            <span className="text-xs font-medium capitalize truncate mr-4">{type.replace(/_/g, ' ')}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <div className="w-16 h-1 rounded-full bg-muted-foreground/10 overflow-hidden">
+                                                    <div className="h-full rounded-full bg-foreground/40" style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <span className="text-[11px] tabular-nums text-muted-foreground w-8 text-right">{pct.toFixed(0)}%</span>
+                                                <span className="text-[11px] tabular-nums text-foreground w-8 text-right font-medium">{count}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Trend Chart - Simple bar visualization */}
-            <div className="rounded-lg border border-border/40 bg-card p-4">
-                <h3 className="text-xs font-medium mb-3">Daily Incidents (7d)</h3>
-                <div className="flex items-end gap-1 h-20">
-                    {stats.trendData.map((day, i) => {
-                        const maxCount = Math.max(...stats.trendData.map(d => d.count), 1);
-                        const height = (day.count / maxCount) * 100;
-                        const isToday = i === stats.trendData.length - 1;
-                        return (
-                            <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                                <div
-                                    className={`w-full rounded-t transition-all ${isToday ? 'bg-primary' : 'bg-primary/40'}`}
-                                    style={{ height: `${Math.max(height, 4)}%` }}
-                                    title={`${day.date}: ${day.count} incidents`}
-                                />
-                                <span className="text-[8px] text-muted-foreground">
-                                    {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2)}
-                                </span>
-                            </div>
-                        );
-                    })}
+            {/* Daily Incidents trend */}
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-border/20">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Daily Incidents (7d)</span>
+                </div>
+                <div className="p-5">
+                    <div className="flex items-end gap-1 h-20">
+                        {stats.trendData.map((day, i) => {
+                            const maxCount = Math.max(...stats.trendData.map(d => d.count), 1);
+                            const height = (day.count / maxCount) * 100;
+                            const isToday = i === stats.trendData.length - 1;
+                            return (
+                                <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                                    <div
+                                        className={`w-full rounded-t transition-all ${isToday ? 'bg-foreground' : 'bg-foreground/25'}`}
+                                        style={{ height: `${Math.max(height, 4)}%` }}
+                                        title={`${day.date}: ${day.count} incidents`}
+                                    />
+                                    <span className="text-[8px] text-muted-foreground">
+                                        {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2)}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>

@@ -112,13 +112,15 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
         return (
             <div className="space-y-4">
                 {/* Summary skeleton */}
-                <div className="grid grid-cols-4 gap-3">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="rounded-md border border-border/40 bg-card p-3">
-                            <Skeleton className="h-2.5 w-14 mb-1.5" />
-                            <Skeleton className="h-6 w-8" />
-                        </div>
-                    ))}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="grid grid-cols-4 divide-x divide-border/30">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="px-5 py-4">
+                                <Skeleton className="h-3 w-14 mb-2.5" />
+                                <Skeleton className="h-6 w-10" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 {/* Table skeleton */}
                 <div className="bg-card border border-border/40 rounded-md overflow-hidden">
@@ -146,23 +148,25 @@ export function SecurityIncidentsTable({ projectId, environment, filters }: Secu
 
     return (
         <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
-                <div className="rounded-md border border-border/40 bg-card p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Critical</p>
-                    <p className="text-lg font-semibold font-mono text-red-500">{summary.critical}</p>
-                </div>
-                <div className="rounded-md border border-border/40 bg-card p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">High</p>
-                    <p className="text-lg font-semibold font-mono text-amber-500">{summary.high}</p>
-                </div>
-                <div className="rounded-md border border-border/40 bg-card p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Medium</p>
-                    <p className="text-lg font-semibold font-mono text-yellow-500">{summary.medium}</p>
-                </div>
-                <div className="rounded-md border border-border/40 bg-card p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Low</p>
-                    <p className="text-lg font-semibold font-mono text-muted-foreground">{summary.low}</p>
+            {/* Summary */}
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden mb-4">
+                <div className="grid grid-cols-4 divide-x divide-border/30">
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Critical</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1 text-red-500">{summary.critical}</p>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">High</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1 text-amber-500">{summary.high}</p>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Medium</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1 text-yellow-500">{summary.medium}</p>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Low</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{summary.low}</p>
+                    </div>
                 </div>
             </div>
 

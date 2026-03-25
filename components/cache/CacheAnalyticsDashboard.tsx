@@ -88,10 +88,18 @@ export function CacheAnalyticsDashboard({ projectId, timeRange, environment = 'p
     if (isLoading) {
         return (
             <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="px-5 py-4">
+                                <Skeleton className="h-3 w-16 mb-2.5" />
+                                <Skeleton className="h-6 w-14 mb-2" />
+                                <Skeleton className="h-3 w-24" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
-                <Skeleton className="h-48 rounded-xl" />
+                <Skeleton className="h-48 rounded-md" />
             </div>
         );
     }
@@ -103,42 +111,40 @@ export function CacheAnalyticsDashboard({ projectId, timeRange, environment = 'p
     return (
         <div className="space-y-4">
             {/* KPI cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                <div className="rounded-xl border border-border/30 bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Hit Rate</p>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight mt-1">
-                        {hasData ? `${(analytics.hitRate * 100).toFixed(1)}%` : '--'}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                        {analytics.exactHits + analytics.semanticHits} hits / {analytics.totalLookups} lookups
-                    </p>
-                </div>
-                <div className="rounded-xl border border-border/30 bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Tokens Saved</p>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight mt-1">
-                        {formatTokens(analytics.totalTokensSaved)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                        across {analytics.exactHits + analytics.semanticHits} cache hits
-                    </p>
-                </div>
-                <div className="rounded-xl border border-border/30 bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Cost Saved</p>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight text-emerald-500 mt-1">
-                        {formatCost(analytics.totalCostSaved)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                        estimated savings
-                    </p>
-                </div>
-                <div className="rounded-xl border border-border/30 bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Active Entries</p>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight mt-1">
-                        {analytics.activeEntries.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                        cached prompts
-                    </p>
+            <div className="rounded-md border border-border/40 bg-card overflow-hidden">
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Hit Rate</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">
+                            {hasData ? `${(analytics.hitRate * 100).toFixed(1)}%` : '--'}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">
+                            {analytics.exactHits + analytics.semanticHits} hits / {analytics.totalLookups} lookups
+                        </span>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tokens Saved</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">
+                            {formatTokens(analytics.totalTokensSaved)}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">
+                            across {analytics.exactHits + analytics.semanticHits} cache hits
+                        </span>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost Saved</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight text-emerald-500 mt-1">
+                            {formatCost(analytics.totalCostSaved)}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">estimated savings</span>
+                    </div>
+                    <div className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Active Entries</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">
+                            {analytics.activeEntries.toLocaleString()}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">cached prompts</span>
+                    </div>
                 </div>
             </div>
 

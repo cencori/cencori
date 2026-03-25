@@ -950,23 +950,25 @@ export default function UsageBillingPage({ params }: PageProps) {
       {/* ═══════════════════════ End Users Tab ═══════════════════════ */}
       {tab === "end_users" && (
         <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {[
-              { label: "Total Users", value: euStats ? fmtNum(euStats.total_end_users) : "0" },
-              { label: "Active Today", value: euStats ? fmtNum(euStats.active_end_users) : "0" },
-              { label: "Total Tokens (30d)", value: euStats ? formatTokens(euStats.total_tokens) : "0" },
-              { label: "Revenue (30d)", value: euStats ? formatCurrency(euStats.customer_revenue_usd) : "$0.00" },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
-                {!euStats && !!projectId ? (
-                  <div className="h-9 w-20 bg-secondary rounded animate-pulse" />
-                ) : (
-                  <p className="text-3xl font-semibold tabular-nums">{stat.value}</p>
-                )}
-              </div>
-            ))}
+          {/* Stats */}
+          <div className="rounded-md border border-border/40 bg-card overflow-hidden mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+              {[
+                { label: "Total Users", value: euStats ? fmtNum(euStats.total_end_users) : "0" },
+                { label: "Active Today", value: euStats ? fmtNum(euStats.active_end_users) : "0" },
+                { label: "Total Tokens (30d)", value: euStats ? formatTokens(euStats.total_tokens) : "0" },
+                { label: "Revenue (30d)", value: euStats ? formatCurrency(euStats.customer_revenue_usd) : "$0.00" },
+              ].map((stat) => (
+                <div key={stat.label} className="px-5 py-4">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{stat.label}</span>
+                  {!euStats && !!projectId ? (
+                    <div className="h-6 w-16 bg-secondary rounded animate-pulse mt-1" />
+                  ) : (
+                    <p className="text-xl font-semibold font-mono tracking-tight mt-1">{stat.value}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Filter Row */}
@@ -1455,31 +1457,30 @@ export default function UsageBillingPage({ params }: PageProps) {
             <>
               {/* Summary Stats */}
               {statsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                      <Skeleton className="h-3 w-24 mb-2" />
-                      <Skeleton className="h-8 w-20" />
-                    </div>
-                  ))}
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden mb-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="px-5 py-4">
+                        <Skeleton className="h-3 w-20 mb-2.5" />
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Provider Cost</p>
-                    <p className="text-3xl font-semibold">{fmt(stats?.provider_cost_usd ?? 0)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Revenue</p>
-                    <p className="text-3xl font-semibold">{fmt(stats?.customer_revenue_usd ?? 0)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Margin</p>
-                    <p className="text-3xl font-semibold">{fmt(stats?.margin_usd ?? 0)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Margin %</p>
-                    <p className="text-3xl font-semibold">{fmtPct(stats?.margin_percentage ?? 0)}</p>
+                <div className="rounded-md border border-border/40 bg-card overflow-hidden mb-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border/30">
+                    {[
+                      { label: "Provider Cost", value: fmt(stats?.provider_cost_usd ?? 0) },
+                      { label: "Revenue", value: fmt(stats?.customer_revenue_usd ?? 0) },
+                      { label: "Margin", value: fmt(stats?.margin_usd ?? 0) },
+                      { label: "Margin %", value: fmtPct(stats?.margin_percentage ?? 0) },
+                    ].map((stat) => (
+                      <div key={stat.label} className="px-5 py-4">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{stat.label}</span>
+                        <p className="text-xl font-semibold font-mono tracking-tight mt-1">{stat.value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1566,7 +1567,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                     <p className="text-xs text-muted-foreground">Generate and manage end-user invoices</p>
                   </div>
                   <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setInvoiceDialogOpen(true)}>
-                    <DollarSign className="h-3 w-3" /> Generate Invoices
+                    Generate Invoices
                   </Button>
                 </div>
                 {invoicesLoading ? (
