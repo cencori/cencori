@@ -57,7 +57,7 @@ export function AskSlide() {
                                 $3M
                             </span>
                             <span className="text-sm text-muted-foreground">
-                                Pre-Seed Round
+                                Seed Round
                             </span>
                         </div>
                     </div>
