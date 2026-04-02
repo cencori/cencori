@@ -14,6 +14,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
+import { logGatewayEvent } from '@/lib/gateway-reliability';
 
 // ──────────────────────────────────────────────
 // Types
@@ -35,6 +36,12 @@ export interface GatewayContext {
     defaultModel: string | null;
     defaultProvider: string | null;
     endUserBillingEnabled: boolean;
+    rateLimit?: {
+        status: 'ok' | 'skipped' | 'failed_open' | 'failed_closed';
+        limit: number;
+        remaining: number;
+        reset: number;
+    };
 }
 
 export type GatewayValidationResult =
@@ -329,9 +336,29 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     }
 
     // ── Per-minute rate limit ──
-    const rateLimitResult = await checkRateLimit(project.id);
+    const route = req.nextUrl.pathname;
+    const rateLimitResult = await checkRateLimit(project.id, {
+        requestId,
+        route,
+    });
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
+        if (rateLimitResult.reason === 'backend_unavailable') {
+            return {
+                success: false,
+                response: addGatewayHeaders(
+                    NextResponse.json(
+                        {
+                            error: 'Rate limit unavailable',
+                            message: 'Rate limiting backend is unavailable and fail-open mode is disabled.',
+                        },
+                        { status: 503 }
+                    ),
+                    { requestId, rateLimit: rateLimitResult }
+                ),
+            };
+        }
+
         return {
             success: false,
             response: addGatewayHeaders(
@@ -388,7 +415,22 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         defaultModel: project.default_model,
         defaultProvider: project.default_provider,
         endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
+        rateLimit: {
+            status: rateLimitResult.status,
+            limit: rateLimitResult.limit,
+            remaining: rateLimitResult.remaining,
+            reset: rateLimitResult.reset,
+        },
     };
+
+    logGatewayEvent('gateway.validation', {
+        requestId,
+        route,
+        projectId: project.id,
+        rateLimit: {
+            status: rateLimitResult.status,
+        },
+    });
 
     return { success: true, context };
 }

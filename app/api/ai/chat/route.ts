@@ -28,7 +28,13 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { deductCredits } from '@/lib/credits';
 import { computeCacheKey, getCache, getSemanticCache, saveCache, saveSemanticCache } from '@/lib/cache';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
-import { checkEndUserQuota, recordEndUserUsage, calculateCustomerCharge, type QuotaCheckResult } from '@/lib/end-user-billing';
+import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from '@/lib/end-user-billing';
+import {
+    getGatewayFeatureFlags,
+    incrementGatewayCounter,
+    logGatewayEvent,
+    mapProviderErrorToHttpResponse,
+} from '@/lib/gateway-reliability';
 
 
 const router = new ProviderRouter();
@@ -456,7 +462,10 @@ function validateDomain(origin: string | null, allowedDomains: string[] | null):
 
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
+    const requestId = crypto.randomUUID();
+    const route = '/api/ai/chat';
     const supabase = createAdminClient();
+    const reliabilityFlags = getGatewayFeatureFlags();
 
     const customerProvidedIp = req.headers.get('x-cencori-user-ip');
     const vercelIp = ipAddress(req);
@@ -471,6 +480,10 @@ export async function POST(req: NextRequest) {
         const geo = geolocation(req);
         countryCode = geo.country || null;
     }
+
+    let rateLimitStatus: 'ok' | 'skipped' | 'failed_open' | 'failed_closed' = reliabilityFlags.rateLimitEnabled ? 'ok' : 'skipped';
+    let semanticCacheReadStatus: 'hit' | 'miss' | 'error' | 'disabled' = reliabilityFlags.semanticCacheEnabled ? 'miss' : 'disabled';
+    let semanticCacheWriteStatus: 'ok' | 'skipped' | 'error' | 'disabled' = reliabilityFlags.semanticCacheEnabled ? 'skipped' : 'disabled';
 
     try {
         const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
@@ -643,16 +656,40 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const rateLimitResult = await checkRateLimit(project.id);
-        if (!rateLimitResult.success) {
-            return NextResponse.json(
-                {
+        const rateLimitResult = await checkRateLimit(project.id, {
+            requestId,
+            route,
+        });
+        rateLimitStatus = rateLimitResult.status;
+        if (!rateLimitResult.allowed) {
+            const status = rateLimitResult.reason === 'backend_unavailable' ? 503 : 429;
+            const responseBody = rateLimitResult.reason === 'backend_unavailable'
+                ? {
+                    error: 'Rate limit unavailable',
+                    message: 'Rate limiting backend is unavailable and fail-open mode is disabled.',
+                }
+                : {
                     error: 'Rate limit exceeded',
                     message: `${rateLimitResult.limit} requests per minute allowed. Try again shortly.`,
                     retry_after_ms: Math.max(0, rateLimitResult.reset - Date.now()),
+                };
+
+            logGatewayEvent('chat.response', {
+                requestId,
+                route,
+                rateLimit: {
+                    status: rateLimitResult.status,
                 },
-                { status: 429 }
-            );
+                semanticCache: {
+                    read: semanticCacheReadStatus,
+                    write: semanticCacheWriteStatus,
+                },
+                response: {
+                    status,
+                },
+            }, status >= 500 ? 'error' : 'warn');
+
+            return NextResponse.json(responseBody, { status });
         }
 
         const spendCapResult = await checkSpendCap(project.id);
@@ -1106,6 +1143,25 @@ export async function POST(req: NextRequest) {
 
             const cacheResponse = NextResponse.json(responseBody);
             cacheResponse.headers.set('X-Cencori-Cache', cacheType === 'semantic' ? 'SEMANTIC-HIT' : 'HIT');
+            logGatewayEvent('chat.response', {
+                requestId,
+                route,
+                provider: cachedProvider,
+                model: cachedModel,
+                rateLimit: {
+                    status: rateLimitStatus,
+                },
+                semanticCache: {
+                    read: semanticCacheReadStatus,
+                    write: semanticCacheWriteStatus,
+                },
+                response: {
+                    status: 200,
+                },
+                cache: {
+                    type: cacheType,
+                },
+            });
             return cacheResponse;
         };
 
@@ -1116,14 +1172,33 @@ export async function POST(req: NextRequest) {
                 return exactHit;
             }
 
-            semanticCacheApiKey = await resolveSemanticEmbeddingApiKey(supabase, project.id, organizationId);
-            if (semanticCacheApiKey) {
-                const { response: semanticCached, embedding } = await getSemanticCache(semanticCachePrompt, semanticCacheApiKey);
-                semanticEmbeddingForSave = embedding;
-                const semanticHit = await maybeReturnCachedResponse(semanticCached, 'semantic');
-                if (semanticHit) {
-                    return semanticHit;
+            if (reliabilityFlags.semanticCacheEnabled) {
+                semanticCacheApiKey = await resolveSemanticEmbeddingApiKey(supabase, project.id, organizationId);
+                if (semanticCacheApiKey) {
+                    const semanticLookup = await getSemanticCache(
+                        semanticCachePrompt,
+                        semanticCacheApiKey,
+                        0.95,
+                        {
+                            requestId,
+                            route,
+                            provider: providerName,
+                            model: normalizedModel,
+                        }
+                    );
+                    semanticCacheReadStatus = semanticLookup.status;
+                    semanticEmbeddingForSave = semanticLookup.embedding;
+                    const semanticHit = await maybeReturnCachedResponse(semanticLookup.response, 'semantic');
+                    if (semanticHit) {
+                        return semanticHit;
+                    }
+                } else {
+                    semanticCacheReadStatus = 'disabled';
+                    semanticCacheWriteStatus = 'disabled';
                 }
+            } else {
+                semanticCacheReadStatus = 'disabled';
+                semanticCacheWriteStatus = 'disabled';
             }
         }
 
@@ -1563,20 +1638,43 @@ export async function POST(req: NextRequest) {
         }
 
         if (!response) {
-            const isCircuitError = lastError?.message?.includes('circuit is open');
-            const errorMessage = isCircuitError
-                ? `The AI provider (${providerName}) is temporarily unavailable due to repeated failures. Please try again in 60 seconds, or add a backup provider in Settings → Providers.`
-                : `All AI providers failed. Please try again or check your provider configuration.`;
+            const providerFailure = mapProviderErrorToHttpResponse(lastError, actualProvider);
 
-            console.error(`[AI Chat] All providers failed:`, lastError?.message);
+            console.error('[AI Chat] All providers failed:', lastError?.message);
+            incrementGatewayCounter('provider_request_failure', {
+                requestId,
+                route,
+                provider: providerFailure.provider || actualProvider,
+                model: actualModel,
+                status: providerFailure.status,
+            });
+            logGatewayEvent('chat.response', {
+                requestId,
+                route,
+                provider: providerFailure.provider || actualProvider,
+                model: actualModel,
+                rateLimit: {
+                    status: rateLimitStatus,
+                },
+                semanticCache: {
+                    read: semanticCacheReadStatus,
+                    write: semanticCacheWriteStatus,
+                },
+                response: {
+                    status: providerFailure.status,
+                },
+                error: providerFailure.error,
+                message: providerFailure.message,
+            }, providerFailure.status >= 500 ? 'error' : 'warn');
 
             return NextResponse.json(
                 {
-                    error: 'Provider temporarily unavailable',
-                    message: errorMessage,
-                    retry_after: isCircuitError ? 60 : undefined,
+                    error: providerFailure.error,
+                    message: providerFailure.message,
+                    ...(providerFailure.retryAfter ? { retry_after: providerFailure.retryAfter } : {}),
+                    ...(providerFailure.provider ? { provider: providerFailure.provider } : {}),
                 },
-                { status: 503 }
+                { status: providerFailure.status }
             );
         }
 
@@ -1772,14 +1870,55 @@ export async function POST(req: NextRequest) {
                 console.error('[Cache] Failed to save exact cache entry:', error);
             });
 
-            if (semanticCacheApiKey) {
+            if (semanticCacheApiKey && reliabilityFlags.semanticCacheEnabled) {
                 // Save semantic cache entry keyed by project/model-scoped payload representation.
                 const embeddingToSave = semanticEmbeddingForSave || undefined;
-                saveSemanticCache(semanticCachePrompt, responseBody, semanticCacheApiKey, embeddingToSave).catch(error => {
+                void saveSemanticCache(
+                    semanticCachePrompt,
+                    responseBody,
+                    semanticCacheApiKey,
+                    embeddingToSave,
+                    {
+                        requestId,
+                        route,
+                        provider: actualProvider,
+                        model: actualModel,
+                        responseStatus: 200,
+                    }
+                ).then((result) => {
+                    semanticCacheWriteStatus = result.status;
+                }).catch(error => {
                     console.error('[Cache] Failed to save semantic cache entry:', error);
+                    semanticCacheWriteStatus = 'error';
                 });
             }
         }
+
+        incrementGatewayCounter('provider_request_success', {
+            requestId,
+            route,
+            provider: actualProvider,
+            model: actualModel,
+        });
+        logGatewayEvent('chat.response', {
+            requestId,
+            route,
+            provider: actualProvider,
+            model: actualModel,
+            rateLimit: {
+                status: rateLimitStatus,
+            },
+            semanticCache: {
+                read: semanticCacheReadStatus,
+                write: semanticCacheWriteStatus,
+            },
+            embedding: {
+                dimensions: semanticEmbeddingForSave?.length ?? null,
+            },
+            response: {
+                status: 200,
+            },
+        });
 
         const finalResponse = NextResponse.json(responseBody);
         if (cacheEligible) {
@@ -1789,9 +1928,41 @@ export async function POST(req: NextRequest) {
 
     } catch (error: unknown) {
         console.error('[API] Error:', error);
+        const providerFailure = mapProviderErrorToHttpResponse(error);
+        const status = providerFailure.status;
+
+        if (providerFailure.provider) {
+            incrementGatewayCounter('provider_request_failure', {
+                requestId,
+                route,
+                provider: providerFailure.provider,
+                status,
+            });
+        }
+        logGatewayEvent('chat.response', {
+            requestId,
+            route,
+            rateLimit: {
+                status: rateLimitStatus,
+            },
+            semanticCache: {
+                read: semanticCacheReadStatus,
+                write: semanticCacheWriteStatus,
+            },
+            response: {
+                status,
+            },
+            error: providerFailure.error,
+            message: providerFailure.message,
+        }, status >= 500 ? 'error' : 'warn');
         return NextResponse.json(
-            { error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' },
-            { status: 500 }
+            {
+                error: providerFailure.error,
+                message: providerFailure.message,
+                ...(providerFailure.retryAfter ? { retry_after: providerFailure.retryAfter } : {}),
+                ...(providerFailure.provider ? { provider: providerFailure.provider } : {}),
+            },
+            { status }
         );
     }
 }
