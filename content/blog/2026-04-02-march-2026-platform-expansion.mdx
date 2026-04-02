@@ -1,0 +1,136 @@
+---
+title: "30 Days of Shipping: Gateway, Scan, Observability, Billing, and Enterprise Controls"
+slug: "march-2026-platform-expansion"
+date: "2026-04-02"
+excerpt: "Over the last 30 days, Cencori expanded the AI gateway, matured Scan, deepened observability, added end-user billing, improved integrations, and strengthened enterprise controls."
+coverImage: "/blog/images/covers/ainfra.png"
+authors:
+  - bola
+tags: ["Changelog", "Product", "Launch", "Infrastructure"]
+published: true
+---
+
+Over the last 30 days, we shipped a meaningful expansion of the Cencori platform.
+
+This was not one isolated launch. It was a broad push across the surfaces that matter when teams move from AI demos to production systems: gateway reliability, model access, code scanning, observability, monetization, integrations, and enterprise controls.
+
+Here is the condensed version of what is now live.
+
+## AI Gateway: More Models, Better Routing, Stronger Reliability
+
+We expanded the gateway in a few important directions at once.
+
+- Added support for **GPT-5.3 Instant**
+- Added support for **GPT-5.4** and **GPT-5.4 Pro**
+- Added **custom provider routing** for teams working with non-default endpoints
+- Added **semantic caching** to chat flows
+- Hardened behavior so support systems like Redis-backed rate limiting and semantic cache failures do not unnecessarily take successful provider requests down
+
+This matters because production AI traffic depends on more than raw model availability. Teams need routing flexibility, caching leverage, and failure behavior that degrades gracefully when auxiliary infrastructure has a bad day.
+
+Related updates:
+
+- [GPT-5.3 Instant on Cencori](/blog/gpt-5-3-instant-on-cencori)
+- [GPT-5.4 and GPT-5.4 Pro Are Live on Cencori](/blog/gpt-5-4-on-cencori)
+
+## Cencori Scan: More Context, Better Recovery, Cleaner Remediation
+
+Scan became a much stronger product over this stretch.
+
+We shipped:
+
+- **repo-aware chat**
+- **AI quality review**
+- **project brief and continuity memory**
+- a richer **investigation stream**
+- stronger **stale-run recovery**
+- more resilient live scan behavior
+- persistent **Diff** and **Create PR** actions
+- better manual guidance when AI-generated fixes are unavailable
+
+The practical shift is this: Scan moved closer to being a full investigation and remediation workflow instead of a thin layer over scan results.
+
+Related update:
+
+- [Introducing Cencori Scan](/blog/introducing-cencori-scan)
+
+## Observability: From Charts to Intelligence
+
+Observability also got deeper.
+
+We redesigned the observability surface to support:
+
+- unified **HTTP traffic views** across API and web
+- an **intelligence panel** for anomaly detection
+- **platform-wide event tracking**
+- per-project **circuit breaker thresholds**
+- a rebuilt **geo visualization**
+- stronger **auditability** through organization-level audit logs and export/backfill work
+
+The goal here is simple: AI teams need to understand not only what requests happened, but where performance shifted, when risk spiked, and how traffic is behaving over time.
+
+## Billing and Monetization Controls
+
+We also pushed further into the commercial side of running AI products.
+
+New work in this window included:
+
+- **end-user usage billing**
+- gateway-linked usage accounting
+- **Stripe Connect** flows
+- invoicing support
+- clearer budget and cost-control positioning across product and marketing surfaces
+
+This is a key part of the Cencori thesis. Production AI infrastructure should not just route requests and log them. It should help teams meter, govern, and monetize usage cleanly.
+
+## Integrations and Edge Workflows
+
+Another major theme was making Cencori easier to connect to real deployment stacks.
+
+We shipped:
+
+- a **Vercel native integration flow**
+- stronger edge integration typing and payload handling
+- tightened webhook provisioning and ownership boundaries
+- cleaner support for **custom provider setups**
+
+This work is less flashy than a model launch, but it has a huge effect on adoption. Integrations are where “interesting platform” becomes “usable platform.”
+
+## Enterprise Controls and Governance
+
+On the enterprise side, we shipped or expanded:
+
+- **SSO / SAML**
+- **organization-level audit logs**
+- audit log export and backfill support
+- **model mappings**
+- export surfaces for usage and admin workflows
+- project-level safety and operational controls including circuit breaker configuration
+
+This is the layer buyers and platform owners care about once AI moves into real teams, real budgets, and real governance requirements.
+
+## The Throughline
+
+The throughline across all of this work is straightforward:
+
+**Cencori is being built as the infrastructure layer for AI production.**
+
+That means:
+
+- model access without fragile glue code
+- scanning and remediation that teams can actually use
+- observability that leads to action
+- billing and monetization primitives
+- integrations that fit real deployment environments
+- governance controls that hold up in enterprise settings
+
+## Explore What’s Live
+
+- [Changelog](/changelog)
+- [AI Models](/ai/models)
+- [AI Gateway](/ai-gateway)
+- [Observability](/insights)
+- [Scan](/scan)
+- [Documentation](/docs)
+
+If you are building AI systems that need security, observability, routing, and control in one layer, this is the direction we are shipping toward.
