@@ -22,6 +22,11 @@ import {
     logGatewayRequest,
     incrementUsage,
 } from '@/lib/gateway-middleware';
+import {
+    incrementGatewayCounter,
+    logGatewayEvent,
+    mapProviderErrorToHttpResponse,
+} from '@/lib/gateway-reliability';
 
 // Supported embedding providers
 type EmbeddingProvider = 'openai' | 'google' | 'cohere';
@@ -125,10 +130,14 @@ export async function POST(req: NextRequest) {
         return validation.response;
     }
     const ctx = validation.context;
+    const route = '/api/ai/embeddings';
+    let provider: EmbeddingProvider | 'unknown' = 'unknown';
+    let requestedModel = 'unknown';
 
     try {
         const body: EmbeddingRequest = await req.json();
         const { input, model = 'text-embedding-3-small', dimensions, encodingFormat } = body;
+        requestedModel = model;
 
         if (!input || (Array.isArray(input) && input.length === 0)) {
             return addGatewayHeaders(
@@ -138,7 +147,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Determine provider
-        const provider = getProviderForModel(model);
+        provider = getProviderForModel(model);
 
         // Get provider API key (BYOK or default)
         let providerApiKey: string | null = null;
@@ -207,8 +216,39 @@ export async function POST(req: NextRequest) {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
             markupPercentage: pricing.cencoriMarkupPercentage,
+            metadata: {
+                rateLimitStatus: ctx.rateLimit?.status ?? 'unknown',
+                semanticCacheRead: 'disabled',
+                semanticCacheWrite: 'disabled',
+                embeddingDimensions: result.data[0]?.embedding.length ?? null,
+            },
         });
         await incrementUsage(ctx);
+        incrementGatewayCounter('provider_request_success', {
+            route,
+            requestId: ctx.requestId,
+            provider: result.provider,
+            model: result.model,
+        });
+        logGatewayEvent('embeddings.response', {
+            requestId: ctx.requestId,
+            route,
+            provider: result.provider,
+            model: result.model,
+            rateLimit: {
+                status: ctx.rateLimit?.status ?? 'unknown',
+            },
+            semanticCache: {
+                read: 'disabled',
+                write: 'disabled',
+            },
+            embedding: {
+                dimensions: result.data[0]?.embedding.length ?? null,
+            },
+            response: {
+                status: 200,
+            },
+        });
 
         return addGatewayHeaders(
             NextResponse.json({
@@ -226,18 +266,58 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error('Embeddings API error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const providerError = mapProviderErrorToHttpResponse(error, provider === 'unknown' ? undefined : provider);
+        const status = providerError.status;
+        const errorMessage = providerError.message;
 
         await logGatewayRequest(ctx, {
             endpoint: 'embeddings',
-            model: 'unknown',
-            provider: 'unknown',
+            model: requestedModel,
+            provider,
             status: 'error',
             errorMessage,
+            metadata: {
+                rateLimitStatus: ctx.rateLimit?.status ?? 'unknown',
+                semanticCacheRead: 'disabled',
+                semanticCacheWrite: 'disabled',
+            },
         });
+        incrementGatewayCounter('provider_request_failure', {
+            route,
+            requestId: ctx.requestId,
+            provider,
+            model: requestedModel,
+            status,
+        });
+        logGatewayEvent('embeddings.response', {
+            requestId: ctx.requestId,
+            route,
+            provider,
+            model: requestedModel,
+            rateLimit: {
+                status: ctx.rateLimit?.status ?? 'unknown',
+            },
+            semanticCache: {
+                read: 'disabled',
+                write: 'disabled',
+            },
+            response: {
+                status,
+            },
+            error: providerError.error,
+            message: providerError.message,
+        }, status >= 500 ? 'error' : 'warn');
 
         return addGatewayHeaders(
-            NextResponse.json({ error: 'internal_error', message: errorMessage }, { status: 500 }),
+            NextResponse.json(
+                {
+                    error: providerError.error,
+                    message: providerError.message,
+                    ...(providerError.retryAfter ? { retry_after: providerError.retryAfter } : {}),
+                    ...(providerError.provider ? { provider: providerError.provider } : {}),
+                },
+                { status }
+            ),
             { requestId: ctx.requestId }
         );
     }
