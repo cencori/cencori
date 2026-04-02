@@ -20,6 +20,7 @@ export function BlogCard({ post }: BlogCardProps) {
                         alt={post.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        unoptimized
                     />
                 </div>
 

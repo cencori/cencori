@@ -160,6 +160,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                         fill
                                         className="object-cover"
                                         priority
+                                        unoptimized
                                     />
                                 </div>
                             )}
