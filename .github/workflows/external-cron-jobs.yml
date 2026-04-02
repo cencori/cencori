@@ -1,0 +1,124 @@
+name: External Cron Jobs
+
+on:
+  schedule:
+    # Stagger away from the top of the hour to reduce scheduler delays.
+    - cron: '7,37 * * * *'
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which cron task to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - anomaly-alerts
+          - cache-cleanup
+
+permissions:
+  contents: read
+
+concurrency:
+  group: external-cron-jobs
+  cancel-in-progress: false
+
+jobs:
+  anomaly-alerts:
+    name: Trigger anomaly alerts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'anomaly-alerts')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '7,37 * * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke anomaly alerts cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 5 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$BASE_URL/api/cron/anomaly-alerts" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/anomaly-alerts"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### Anomaly Alerts"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/anomaly-alerts\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cache-cleanup:
+    name: Trigger cache cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'cache-cleanup')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '23 * * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke cache cleanup cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 5 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/cron/cache-cleanup" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/cache-cleanup"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### Cache Cleanup"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/cache-cleanup\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
