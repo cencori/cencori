@@ -73,6 +73,7 @@
     "@upstash/vector": "^1.2.2",
     "@vercel/analytics": "^1.6.1",
     "@vercel/functions": "^3.3.4",
+    "antd": "^5.29.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

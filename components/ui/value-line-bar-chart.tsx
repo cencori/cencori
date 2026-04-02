@@ -14,13 +14,8 @@ import {
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { JetBrains_Mono } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
 import { useMotionValueEvent, useSpring } from "framer-motion";
-
-const jetBrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 const CHART_MARGIN = 35;
 
@@ -89,7 +84,7 @@ export function ValueLineBarChart() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span
-            className={cn(jetBrainsMono.className, "text-2xl tracking-tighter")}
+            className={cn(GeistMono.className, "text-2xl tracking-tighter")}
           >
             ${maxValueIndex.value}
           </span>

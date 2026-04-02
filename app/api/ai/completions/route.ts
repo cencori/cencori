@@ -207,6 +207,9 @@ export async function POST(req: NextRequest) {
             // 1. Exact Match (L1 - Fast)
             const cachedResponse = await getCache(cacheKey);
             if (cachedResponse) {
+                const cachedPayload = typeof cachedResponse === 'object' && cachedResponse !== null
+                    ? cachedResponse as Record<string, unknown>
+                    : {};
                 const usage = getCachedUsage(cachedResponse, prompt);
                 const charge = await getChargeForTokens(
                     providerName,
@@ -232,8 +235,8 @@ export async function POST(req: NextRequest) {
                 await incrementUsage(ctx);
 
                 const res = NextResponse.json({
-                    ...cachedResponse,
-                    id: `cached-${cachedResponse.id}`,
+                    ...cachedPayload,
+                    id: `cached-${typeof cachedPayload.id === 'string' ? cachedPayload.id : ctx.requestId}`,
                     created: Math.floor(Date.now() / 1000),
                 });
                 res.headers.set('X-Cencori-Cache', 'HIT');
@@ -266,6 +269,9 @@ export async function POST(req: NextRequest) {
             semanticEmbedding = embedding; // Store for later save if needed
 
             if (cachedRes) {
+                const cachedPayload = typeof cachedRes === 'object' && cachedRes !== null
+                    ? cachedRes as Record<string, unknown>
+                    : {};
                 const usage = getCachedUsage(cachedRes, prompt);
                 const charge = await getChargeForTokens(
                     providerName,
@@ -291,8 +297,8 @@ export async function POST(req: NextRequest) {
                 await incrementUsage(ctx);
 
                 const res = NextResponse.json({
-                    ...cachedRes,
-                    id: `semantic-${cachedRes.id}`,
+                    ...cachedPayload,
+                    id: `semantic-${typeof cachedPayload.id === 'string' ? cachedPayload.id : ctx.requestId}`,
                     created: Math.floor(Date.now() / 1000),
                 });
                 res.headers.set('X-Cencori-Cache', 'SEMANTIC-HIT');
