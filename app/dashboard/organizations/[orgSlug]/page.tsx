@@ -4,7 +4,7 @@ import React from "react";
 import { useParams } from "next/navigation";
 import { CreditsWidget } from "@/components/dashboard/CreditsWidget";
 import { ProvidersOverview } from "@/components/dashboard/ProvidersOverview";
-import HealthStatusWidget from "@/components/dashboard/HealthStatusWidget";
+//import HealthStatusWidget from "@/components/dashboard/HealthStatusWidget";
 
 export default function OrganizationDashboard() {
   const params = useParams();
@@ -18,11 +18,6 @@ export default function OrganizationDashboard() {
         <p className="text-muted-foreground mt-2">
           Multi-model AI platform status and credits
         </p>
-      </div>
-
-      {/* Health status — full width, sits between header and the card grid */}
-      <div className="mb-6">
-        <HealthStatusWidget />
       </div>
 
       {/* Main card grid */}

@@ -3,13 +3,24 @@
 import { supabase as browserSupabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import HealthStatusWidget from "@/components/dashboard/HealthStatusWidget";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import { Copy, Check, ExternalLink, Info, Terminal } from "lucide-react";
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { EXAMPLE_PROJECTS } from "@/config/examples";
 import { Bar, BarChart, XAxis } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import React, { useState, use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,7 +75,7 @@ function GettingStartedSection({
   orgSlug,
   projectSlug,
   hasData,
-  loading
+  loading,
 }: {
   orgSlug: string;
   projectSlug: string;
@@ -152,7 +163,9 @@ Requirements:
   };
 
   const copyEnv = async () => {
-    await navigator.clipboard.writeText("CENCORI_API_KEY=csk_your_api_key_here");
+    await navigator.clipboard.writeText(
+      "CENCORI_API_KEY=csk_your_api_key_here",
+    );
     setCopiedEnv(true);
     setTimeout(() => setCopiedEnv(false), 2000);
   };
@@ -175,7 +188,9 @@ export { cencori };`);
       <div className="space-y-1">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Waiting for first request</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            Waiting for first request
+          </span>
         </div>
         <h2 className="text-base font-medium">Get started</h2>
         <p className="text-xs text-muted-foreground">
@@ -188,8 +203,20 @@ export { cencori };`);
           <Info className="h-3 w-3 text-emerald-500" />
           <span>Copy as LLM prompt</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={copyPrompt} disabled={copyingPrompt} className="h-6 px-2 text-xs gap-1">
-          {copiedPrompt ? <Check className="h-3 w-3" /> : copyingPrompt ? <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Copy className="h-3 w-3" />}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={copyPrompt}
+          disabled={copyingPrompt}
+          className="h-6 px-2 text-xs gap-1"
+        >
+          {copiedPrompt ? (
+            <Check className="h-3 w-3" />
+          ) : copyingPrompt ? (
+            <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+          ) : (
+            <Copy className="h-3 w-3" />
+          )}
           {copiedPrompt ? "Copied" : "Copy"}
         </Button>
       </div>
@@ -198,66 +225,164 @@ export { cencori };`);
         <div className="border border-border/40 rounded-md overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
             <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-medium">1</span>
+              <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-medium">
+                1
+              </span>
               <span className="text-xs font-medium">Install SDK</span>
             </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={copyInstall}>
-              {copiedInstall ? <Check className="h-2.5 w-2.5 text-emerald-500" /> : <Copy className="h-2.5 w-2.5 text-muted-foreground" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={copyInstall}
+            >
+              {copiedInstall ? (
+                <Check className="h-2.5 w-2.5 text-emerald-500" />
+              ) : (
+                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+              )}
             </Button>
           </div>
           <div className="px-3 py-1.5 bg-zinc-950">
-            <code className="text-[11px] text-emerald-400 font-mono">npm install cencori ai</code>
+            <code className="text-[11px] text-emerald-400 font-mono">
+              npm install cencori ai
+            </code>
           </div>
         </div>
 
         <div className="border border-border/40 rounded-md overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
             <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-medium">2</span>
+              <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-medium">
+                2
+              </span>
               <span className="text-xs font-medium">Add to .env</span>
-              <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`} className="text-[10px] text-primary hover:underline">
+              <Link
+                href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/api-keys`}
+                className="text-[10px] text-primary hover:underline"
+              >
                 Get key →
               </Link>
             </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={copyEnv}>
-              {copiedEnv ? <Check className="h-2.5 w-2.5 text-emerald-500" /> : <Copy className="h-2.5 w-2.5 text-muted-foreground" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={copyEnv}
+            >
+              {copiedEnv ? (
+                <Check className="h-2.5 w-2.5 text-emerald-500" />
+              ) : (
+                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+              )}
             </Button>
           </div>
           <div className="px-3 py-1.5 bg-zinc-950">
-            <code className="text-[11px] font-mono"><span className="text-blue-400">CENCORI_API_KEY</span><span className="text-zinc-500">=csk_your_api_key_here</span></code>
+            <code className="text-[11px] font-mono">
+              <span className="text-blue-400">CENCORI_API_KEY</span>
+              <span className="text-zinc-500">=csk_your_api_key_here</span>
+            </code>
           </div>
         </div>
 
         <div className="border border-border/40 rounded-md overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/40">
             <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-full border border-muted-foreground/30 text-muted-foreground flex items-center justify-center text-[9px] font-medium">3</span>
-              <span className="text-xs font-medium text-muted-foreground">Create shared client</span>
+              <span className="w-4 h-4 rounded-full border border-muted-foreground/30 text-muted-foreground flex items-center justify-center text-[9px] font-medium">
+                3
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Create shared client
+              </span>
             </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={copyCode}>
-              {copiedCode ? <Check className="h-2.5 w-2.5 text-emerald-500" /> : <Copy className="h-2.5 w-2.5 text-muted-foreground" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={copyCode}
+            >
+              {copiedCode ? (
+                <Check className="h-2.5 w-2.5 text-emerald-500" />
+              ) : (
+                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+              )}
             </Button>
           </div>
           <div className="px-3 py-2 bg-zinc-950 space-y-0.5">
-            <code className="text-[11px] font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-amber-300">Cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori&quot;</span><span className="text-zinc-400">;</span></code>
-            <code className="text-[11px] font-mono block"><span className="text-purple-400">import</span> <span className="text-zinc-300">{"{"}</span> <span className="text-blue-300">cencori</span> <span className="text-zinc-300">{"}"}</span> <span className="text-purple-400">from</span> <span className="text-emerald-400">&quot;cencori/vercel&quot;</span><span className="text-zinc-400">;</span></code>
-            <code className="text-[11px] font-mono block text-zinc-600">&nbsp;</code>
-            <code className="text-[11px] font-mono block"><span className="text-purple-400">export const</span> <span className="text-blue-400">cencoriClient</span> <span className="text-zinc-400">=</span> <span className="text-purple-400">new</span> <span className="text-amber-300">Cencori</span><span className="text-zinc-300">({"{"}</span></code>
-            <code className="text-[11px] font-mono block">  <span className="text-zinc-300">apiKey:</span> <span className="text-blue-400">process.env</span><span className="text-zinc-400">.</span><span className="text-zinc-100">CENCORI_API_KEY</span><span className="text-zinc-400">!,</span></code>
-            <code className="text-[11px] font-mono block"><span className="text-zinc-300">{"})"}</span><span className="text-zinc-400">;</span></code>
-            <code className="text-[11px] font-mono block"><span className="text-purple-400">export</span> <span className="text-zinc-300">{"{"}</span> <span className="text-blue-300">cencori</span> <span className="text-zinc-300">{"}"}</span><span className="text-zinc-400">;</span></code>
+            <code className="text-[11px] font-mono block">
+              <span className="text-purple-400">import</span>{" "}
+              <span className="text-zinc-300">{"{"}</span>{" "}
+              <span className="text-amber-300">Cencori</span>{" "}
+              <span className="text-zinc-300">{"}"}</span>{" "}
+              <span className="text-purple-400">from</span>{" "}
+              <span className="text-emerald-400">&quot;cencori&quot;</span>
+              <span className="text-zinc-400">;</span>
+            </code>
+            <code className="text-[11px] font-mono block">
+              <span className="text-purple-400">import</span>{" "}
+              <span className="text-zinc-300">{"{"}</span>{" "}
+              <span className="text-blue-300">cencori</span>{" "}
+              <span className="text-zinc-300">{"}"}</span>{" "}
+              <span className="text-purple-400">from</span>{" "}
+              <span className="text-emerald-400">
+                &quot;cencori/vercel&quot;
+              </span>
+              <span className="text-zinc-400">;</span>
+            </code>
+            <code className="text-[11px] font-mono block text-zinc-600">
+              &nbsp;
+            </code>
+            <code className="text-[11px] font-mono block">
+              <span className="text-purple-400">export const</span>{" "}
+              <span className="text-blue-400">cencoriClient</span>{" "}
+              <span className="text-zinc-400">=</span>{" "}
+              <span className="text-purple-400">new</span>{" "}
+              <span className="text-amber-300">Cencori</span>
+              <span className="text-zinc-300">({"{"}</span>
+            </code>
+            <code className="text-[11px] font-mono block">
+              {" "}
+              <span className="text-zinc-300">apiKey:</span>{" "}
+              <span className="text-blue-400">process.env</span>
+              <span className="text-zinc-400">.</span>
+              <span className="text-zinc-100">CENCORI_API_KEY</span>
+              <span className="text-zinc-400">!,</span>
+            </code>
+            <code className="text-[11px] font-mono block">
+              <span className="text-zinc-300">{"})"}</span>
+              <span className="text-zinc-400">;</span>
+            </code>
+            <code className="text-[11px] font-mono block">
+              <span className="text-purple-400">export</span>{" "}
+              <span className="text-zinc-300">{"{"}</span>{" "}
+              <span className="text-blue-300">cencori</span>{" "}
+              <span className="text-zinc-300">{"}"}</span>
+              <span className="text-zinc-400">;</span>
+            </code>
           </div>
         </div>
       </div>
 
       <div className="flex gap-2 pt-1">
-        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" asChild>
-          <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs gap-1.5"
+          asChild
+        >
+          <Link
+            href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/playground`}
+          >
             <Terminal className="h-3 w-3" />
             Playground
           </Link>
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1.5"
+          asChild
+        >
           <Link href="https://cencori.com/docs" target="_blank">
             <ExternalLink className="h-3 w-3" />
             Docs
@@ -267,7 +392,10 @@ export { cencori };`);
       <div className="mt-8 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium">Example projects</h3>
-          <Link href="/examples" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/examples"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
             View all →
           </Link>
         </div>
@@ -281,8 +409,12 @@ export { cencori };`);
               className="group flex items-center justify-between p-3 border border-border/40 rounded-lg hover:bg-muted/30 hover:border-border/60 transition-all"
             >
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-xs font-medium truncate">{project.name}</span>
-                <span className="text-[10px] text-muted-foreground truncate">{project.description}</span>
+                <span className="text-xs font-medium truncate">
+                  {project.name}
+                </span>
+                <span className="text-[10px] text-muted-foreground truncate">
+                  {project.description}
+                </span>
               </div>
               <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
             </a>
@@ -298,7 +430,10 @@ function useProjectAndOrg(orgSlug: string, projectSlug: string) {
   return useQuery({
     queryKey: ["projectOverview", orgSlug, projectSlug],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await browserSupabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await browserSupabase.auth.getUser();
       if (userError || !user) throw new Error("Not authenticated");
 
       const { data: orgData, error: orgError } = await browserSupabase
@@ -335,18 +470,27 @@ export default function ProjectDetailsPage({
 }) {
   const { orgSlug, projectSlug } = use(params);
   const { environment } = useEnvironment();
-  const [period, setPeriod] = useState<string>('7d');
+  const [period, setPeriod] = useState<string>("7d");
 
   // Fetch project and org with caching - INSTANT ON REVISIT!
-  const { data: projectData, isLoading: projectLoading, error } = useProjectAndOrg(orgSlug, projectSlug);
+  const {
+    data: projectData,
+    isLoading: projectLoading,
+    error,
+  } = useProjectAndOrg(orgSlug, projectSlug);
   const organization = projectData?.organization;
   const project = projectData?.project;
 
   // Fetch AI stats with caching
-  const { data: statsData } = useQuery<{ stats: AIStats; chartData: ChartDataPoint[] }>({
+  const { data: statsData } = useQuery<{
+    stats: AIStats;
+    chartData: ChartDataPoint[];
+  }>({
     queryKey: ["aiStats", project?.id, period, environment],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${project!.id}/ai/stats?period=${period}&environment=${environment}`);
+      const response = await fetch(
+        `/api/projects/${project!.id}/ai/stats?period=${period}&environment=${environment}`,
+      );
       if (!response.ok) throw new Error("Failed to fetch stats");
       return response.json();
     },
@@ -361,7 +505,9 @@ export default function ProjectDetailsPage({
   const { data: hasAnyRequestsData } = useQuery<boolean>({
     queryKey: ["hasAnyRequests", project?.id],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${project!.id}/ai/stats?period=all`);
+      const response = await fetch(
+        `/api/projects/${project!.id}/ai/stats?period=all`,
+      );
       if (!response.ok) return false;
       const data = await response.json();
       return data.stats && data.stats.totalRequests > 0;
@@ -379,7 +525,9 @@ export default function ProjectDetailsPage({
     },
     aiCost: {
       value: aiStats ? `$${aiStats.totalCost}` : "$0",
-      change: aiStats ? `${aiStats.totalTokens.toLocaleString()} tokens` : "No data",
+      change: aiStats
+        ? `${aiStats.totalTokens.toLocaleString()} tokens`
+        : "No data",
     },
     avgLatency: {
       value: aiStats ? `${aiStats.avgLatency}ms` : "0ms",
@@ -387,17 +535,42 @@ export default function ProjectDetailsPage({
     },
     tokens: {
       value: aiStats ? aiStats.totalTokens.toLocaleString() : "0",
-      change: aiStats ? `${aiStats.totalPromptTokens.toLocaleString()} in · ${aiStats.totalCompletionTokens.toLocaleString()} out` : "No data",
+      change: aiStats
+        ? `${aiStats.totalPromptTokens.toLocaleString()} in · ${aiStats.totalCompletionTokens.toLocaleString()} out`
+        : "No data",
     },
   };
 
-  const recentActivity: ActivityItem[] = aiStats && aiStats.totalRequests > 0 ? [
-    { id: "1", type: "ai", message: `${aiStats.totalRequests} AI requests processed`, timestamp: "Last 7 days" },
-    { id: "2", type: "ai", message: `${aiStats.successfulRequests} successful responses`, timestamp: "Last 7 days" },
-    { id: "3", type: "cost", message: `$${aiStats.totalCost} total cost`, timestamp: "Last 7 days" },
-  ] : [
-    { id: "1", type: "info", message: "No AI activity yet", timestamp: "Start using the AI API" },
-  ];
+  const recentActivity: ActivityItem[] =
+    aiStats && aiStats.totalRequests > 0
+      ? [
+          {
+            id: "1",
+            type: "ai",
+            message: `${aiStats.totalRequests} AI requests processed`,
+            timestamp: "Last 7 days",
+          },
+          {
+            id: "2",
+            type: "ai",
+            message: `${aiStats.successfulRequests} successful responses`,
+            timestamp: "Last 7 days",
+          },
+          {
+            id: "3",
+            type: "cost",
+            message: `$${aiStats.totalCost} total cost`,
+            timestamp: "Last 7 days",
+          },
+        ]
+      : [
+          {
+            id: "1",
+            type: "info",
+            message: "No AI activity yet",
+            timestamp: "Start using the AI API",
+          },
+        ];
 
   if (projectLoading) {
     return (
@@ -422,7 +595,9 @@ export default function ProjectDetailsPage({
     return (
       <div className="w-full max-w-5xl mx-auto px-6 py-8">
         <div className="text-center py-16">
-          <p className="text-sm text-red-500">{error?.message || "Project or Organization not found."}</p>
+          <p className="text-sm text-red-500">
+            {error?.message || "Project or Organization not found."}
+          </p>
         </div>
       </div>
     );
@@ -436,7 +611,9 @@ export default function ProjectDetailsPage({
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold">{project.name}</h1>
             <Badge variant="outline" className="h-5 gap-1 text-[10px]">
-              <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+              <span
+                className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
+              />
               {project.status}
             </Badge>
           </div>
@@ -454,6 +631,11 @@ export default function ProjectDetailsPage({
       {/* Analytics - Only show when user has data */}
       {hasAnyRequests && (
         <>
+          {/* Health status — full width, sits between header and the card grid */}
+          <div className="mb-6">
+            <HealthStatusWidget />
+          </div>
+
           {/* Overview Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium">Overview</h2>
@@ -462,11 +644,21 @@ export default function ProjectDetailsPage({
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1h" className="text-xs">Last Hour</SelectItem>
-                <SelectItem value="24h" className="text-xs">24 Hours</SelectItem>
-                <SelectItem value="7d" className="text-xs">7 Days</SelectItem>
-                <SelectItem value="30d" className="text-xs">30 Days</SelectItem>
-                <SelectItem value="all" className="text-xs">All Time</SelectItem>
+                <SelectItem value="1h" className="text-xs">
+                  Last Hour
+                </SelectItem>
+                <SelectItem value="24h" className="text-xs">
+                  24 Hours
+                </SelectItem>
+                <SelectItem value="7d" className="text-xs">
+                  7 Days
+                </SelectItem>
+                <SelectItem value="30d" className="text-xs">
+                  30 Days
+                </SelectItem>
+                <SelectItem value="all" className="text-xs">
+                  All Time
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -479,25 +671,37 @@ export default function ProjectDetailsPage({
                 <span className="text-sm font-medium">Requests</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">API Calls</p>
-              <p className="text-3xl font-semibold mb-1">{stats.aiRequests.value}</p>
-              <p className="text-xs text-muted-foreground mb-3">{stats.aiRequests.change}</p>
+              <p className="text-3xl font-semibold mb-1">
+                {stats.aiRequests.value}
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {stats.aiRequests.change}
+              </p>
               <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
-                    config={{ requests: { label: "Requests", color: "hsl(24 80% 50%)" } }}
+                    config={{
+                      requests: { label: "Requests", color: "hsl(24 80% 50%)" },
+                    }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ left: 0, right: 0, top: 0, bottom: 20 }}
+                    >
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                          fontSize: 10,
+                          fill: "hsl(var(--muted-foreground))",
+                        }}
                         tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        cursor={{ fill: "hsl(var(--muted)/0.3)" }}
                         content={<ChartTooltipContent hideLabel />}
                       />
                       <Bar
@@ -508,7 +712,9 @@ export default function ProjectDetailsPage({
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                    No data
+                  </div>
                 )}
               </div>
             </div>
@@ -519,26 +725,45 @@ export default function ProjectDetailsPage({
                 <span className="text-sm font-medium">Cost</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Total Spend</p>
-              <p className="text-3xl font-semibold mb-1">{stats.aiCost.value}</p>
-              <p className="text-xs text-muted-foreground mb-3">{stats.aiCost.change}</p>
+              <p className="text-3xl font-semibold mb-1">
+                {stats.aiCost.value}
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {stats.aiCost.change}
+              </p>
               <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
-                    config={{ cost: { label: "Cost", color: "hsl(142 76% 36%)" } }}
+                    config={{
+                      cost: { label: "Cost", color: "hsl(142 76% 36%)" },
+                    }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ left: 0, right: 0, top: 0, bottom: 20 }}
+                    >
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                          fontSize: 10,
+                          fill: "hsl(var(--muted-foreground))",
+                        }}
                         tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                        content={<ChartTooltipContent hideLabel formatter={(value) => `$${Number(value).toFixed(6)}`} />}
+                        cursor={{ fill: "hsl(var(--muted)/0.3)" }}
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            formatter={(value) =>
+                              `$${Number(value).toFixed(6)}`
+                            }
+                          />
+                        }
                       />
                       <Bar
                         dataKey="cost"
@@ -548,7 +773,9 @@ export default function ProjectDetailsPage({
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                    No data
+                  </div>
                 )}
               </div>
             </div>
@@ -559,25 +786,37 @@ export default function ProjectDetailsPage({
                 <span className="text-sm font-medium">Performance</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Avg Latency</p>
-              <p className="text-3xl font-semibold mb-1">{stats.avgLatency.value}</p>
-              <p className="text-xs text-muted-foreground mb-3">{stats.avgLatency.change}</p>
+              <p className="text-3xl font-semibold mb-1">
+                {stats.avgLatency.value}
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {stats.avgLatency.change}
+              </p>
               <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
-                    config={{ latency: { label: "Latency", color: "hsl(244 59% 59%)" } }}
+                    config={{
+                      latency: { label: "Latency", color: "hsl(244 59% 59%)" },
+                    }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ left: 0, right: 0, top: 0, bottom: 20 }}
+                    >
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                          fontSize: 10,
+                          fill: "hsl(var(--muted-foreground))",
+                        }}
                         tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        cursor={{ fill: "hsl(var(--muted)/0.3)" }}
                         content={<ChartTooltipContent hideLabel />}
                       />
                       <Bar
@@ -588,7 +827,9 @@ export default function ProjectDetailsPage({
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                    No data
+                  </div>
                 )}
               </div>
             </div>
@@ -599,28 +840,44 @@ export default function ProjectDetailsPage({
                 <span className="text-sm font-medium">Tokens</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Total Usage</p>
-              <p className="text-3xl font-semibold mb-1">{stats.tokens.value}</p>
-              <p className="text-xs text-muted-foreground mb-3">{stats.tokens.change}</p>
+              <p className="text-3xl font-semibold mb-1">
+                {stats.tokens.value}
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {stats.tokens.change}
+              </p>
               <div className="h-36">
                 {chartData.length > 0 ? (
                   <ChartContainer
                     config={{
-                      promptTokens: { label: "Input", color: "hsl(280 65% 60%)" },
-                      completionTokens: { label: "Output", color: "hsl(330 65% 55%)" },
+                      promptTokens: {
+                        label: "Input",
+                        color: "hsl(280 65% 60%)",
+                      },
+                      completionTokens: {
+                        label: "Output",
+                        color: "hsl(330 65% 55%)",
+                      },
                     }}
                     className="h-full w-full"
                   >
-                    <BarChart data={chartData} margin={{ left: 0, right: 0, top: 0, bottom: 20 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ left: 0, right: 0, top: 0, bottom: 20 }}
+                    >
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{
+                          fontSize: 10,
+                          fill: "hsl(var(--muted-foreground))",
+                        }}
                         tickMargin={8}
                         interval="preserveStartEnd"
                       />
                       <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        cursor={{ fill: "hsl(var(--muted)/0.3)" }}
                         content={<ChartTooltipContent />}
                       />
                       <Bar
@@ -638,7 +895,9 @@ export default function ProjectDetailsPage({
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data</div>
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                    No data
+                  </div>
                 )}
               </div>
             </div>
@@ -651,10 +910,19 @@ export default function ProjectDetailsPage({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-medium">Recent Activity</h3>
-                  <p className="text-xs text-muted-foreground">Latest updates</p>
+                  <p className="text-xs text-muted-foreground">
+                    Latest updates
+                  </p>
                 </div>
-                <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                  <Link href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  asChild
+                >
+                  <Link
+                    href={`/dashboard/organizations/${orgSlug}/projects/${projectSlug}/logs`}
+                  >
                     View All
                   </Link>
                 </Button>
@@ -665,7 +933,9 @@ export default function ProjectDetailsPage({
                     <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
                     <div>
                       <p className="text-xs">{activity.message}</p>
-                      <p className="text-[10px] text-muted-foreground">{activity.timestamp}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {activity.timestamp}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -689,12 +959,19 @@ export default function ProjectDetailsPage({
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Visibility</span>
-                  <Badge variant="outline" className="h-5 text-[10px] px-2">{project.visibility}</Badge>
+                  <Badge variant="outline" className="h-5 text-[10px] px-2">
+                    {project.visibility}
+                  </Badge>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Status</span>
-                  <Badge variant="outline" className="h-5 text-[10px] px-2 gap-1">
-                    <span className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  <Badge
+                    variant="outline"
+                    className="h-5 text-[10px] px-2 gap-1"
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${project.status === "active" ? "bg-emerald-500" : "bg-red-500"}`}
+                    />
                     {project.status}
                   </Badge>
                 </div>
