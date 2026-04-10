@@ -1,107 +1,125 @@
 {
-    "rewrites": [
+  "rewrites": [
+    {
+      "source": "/v1/chat/completions",
+      "has": [
         {
-            "source": "/v1/chat/completions",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
-            "destination": "/api/ai/chat"
-        },
-        {
-            "source": "/v1/completions",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
-            "destination": "/api/ai/chat"
-        },
-        {
-            "source": "/v1/models",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
-            "destination": "/api/v1/models"
-        },
-        {
-            "source": "/v1/telemetry/scan",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
-            "destination": "/api/v1/telemetry/scan"
-        },
-        {
-            "source": "/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "design.cencori.com"
-                }
-            ],
-            "destination": "/design/:path*"
-        },
-        {
-            "source": "/",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "design.cencori.com"
-                }
-            ],
-            "destination": "/design"
-        },
-        {
-            "source": "/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "pitch.cencori.com"
-                }
-            ],
-            "destination": "/pitch/:path*"
-        },
-        {
-            "source": "/",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "pitch.cencori.com"
-                }
-            ],
-            "destination": "/pitch"
+          "type": "host",
+          "value": "api.cencori.com"
         }
-    ],
-    "redirects": [
+      ],
+      "destination": "/api/ai/chat"
+    },
+    {
+      "source": "/v1/completions",
+      "has": [
         {
-            "source": "/old-path",
-            "destination": "/new-path",
-            "permanent": true
-        },
-        {
-            "source": "/temporary-service",
-            "destination": "/maintenance",
-            "permanent": false
-        },
-        {
-            "source": "/old-blog/:slug",
-            "destination": "/new-blog/:slug",
-            "permanent": true
+          "type": "host",
+          "value": "api.cencori.com"
         }
-    ],
-    "crons": [
+      ],
+      "destination": "/api/ai/chat"
+    },
+    {
+      "source": "/v1/models",
+      "has": [
         {
-            "path": "/api/cron/reset-usage",
-            "schedule": "0 0 1 * *"
+          "type": "host",
+          "value": "api.cencori.com"
         }
-    ]
+      ],
+      "destination": "/api/v1/models"
+    },
+    {
+      "source": "/v1/telemetry/scan",
+      "has": [
+        {
+          "type": "host",
+          "value": "api.cencori.com"
+        }
+      ],
+      "destination": "/api/v1/telemetry/scan"
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "design.cencori.com"
+        }
+      ],
+      "destination": "/design/:path*"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "design.cencori.com"
+        }
+      ],
+      "destination": "/design"
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "pitch.cencori.com"
+        }
+      ],
+      "destination": "/pitch/:path*"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "pitch.cencori.com"
+        }
+      ],
+      "destination": "/pitch"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/old-path",
+      "destination": "/new-path",
+      "permanent": true
+    },
+    {
+      "source": "/temporary-service",
+      "destination": "/maintenance",
+      "permanent": false
+    },
+    {
+      "source": "/old-blog/:slug",
+      "destination": "/new-blog/:slug",
+      "permanent": true
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reset-usage",
+      "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/cron/anomaly-alerts",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cache-cleanup",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/model-health-check",
+      "schedule": "*/2 * * * *"
+    }
+  ],
+  "functions": {
+    "app/api/scan/projects/[projectId]/export/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
 }

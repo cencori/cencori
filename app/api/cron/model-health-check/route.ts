@@ -36,8 +36,20 @@ export async function GET(request: NextRequest) {
   // 2. Fetch projects
   const { data: projects, error: projectsError } = await admin
     .from("projects")
-    .select("id, provider_config")
+    .select("id, default_model, default_provider")
+    .not("default_model", "is", null)
+    .not("default_provider", "is", null)
     .limit(100);
+
+  console.log(
+    "[model-health] projectsError:",
+    projectsError?.message ?? "none",
+  );
+  console.log("[model-health] projects count:", projects?.length ?? 0);
+  console.log(
+    "[model-health] first project:",
+    JSON.stringify(projects?.[0], null, 2),
+  );
 
   if (projectsError || !projects) {
     return NextResponse.json(
@@ -46,25 +58,37 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  console.log("[model-health] Projects fetched:", projects.length);
+  console.log(
+    "[model-health] First project raw:",
+    JSON.stringify(projects[0], null, 2),
+  );
+
   // 3. Sequential checks (safe for rate limits)
   for (const project of projects) {
-    const config = project.provider_config as {
-      model?: string;
-      provider?: string;
-    } | null;
+    const modelName = project.default_model;
+    const provider = project.default_provider;
 
-    if (!config?.model || !config?.provider) {
+    console.log(
+      `[model-health] Project ${project.id}: model=${modelName} provider=${provider}`,
+    );
+
+    if (!modelName || !provider) {
+      console.log(
+        `[model-health] Skipping project ${project.id} — no default_model/default_provider`,
+      );
       continue;
     }
-
-    const modelName = config.model;
-    const provider = config.provider;
 
     modelsChecked++;
 
     const { latencyMs, error: pingError } = await pingModel(
       modelName,
       provider,
+    );
+
+    console.log(
+      `[model-health] Ping result: model=${modelName} latency=${latencyMs}ms error=${pingError ?? "none"}`,
     );
 
     const status = determineStatus(latencyMs, !!pingError);
