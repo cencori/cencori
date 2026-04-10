@@ -77,7 +77,7 @@ export default function ExportDialog({ projectId, isOpen, onClose }: Props) {
       if (format === "pdf") params.set("aiSummary", String(includeAi));
 
       const response = await fetch(
-        `/api/scan/projects/${projectId}/export?${params}`,
+        `/api/scan/projects/${projectId}/exports?${params}`,
       );
 
       if (!response.ok) {
@@ -107,7 +107,6 @@ export default function ExportDialog({ projectId, isOpen, onClose }: Props) {
         onClose();
       }, 2000);
     } catch (err: unknown) {
-      // ✅ err typed as unknown instead of any
       const message =
         err instanceof Error ? err.message : "Export failed. Please try again.";
       setError(message);
@@ -203,9 +202,9 @@ export default function ExportDialog({ projectId, isOpen, onClose }: Props) {
                 cursor: "pointer",
                 border:
                   format === opt.value
-                    ? "2px solid #1B3F6B"
+                    ? "2px solid black"
                     : "2px solid #e5e7eb",
-                background: format === opt.value ? "#D6E8F8" : "#fff",
+                background: format === opt.value ? "#EEEEEE" : "#fff",
                 transition: "all 0.15s",
               }}
             >
@@ -294,8 +293,8 @@ export default function ExportDialog({ projectId, isOpen, onClose }: Props) {
               padding: "12px 0",
               borderRadius: 8,
               border: "none",
-              background: loading ? "#9ca3af" : "#1B3F6B",
-              color: "#fff",
+              background: loading ? "grey" : "black",
+              color: "#ffffff",
               fontSize: 15,
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
@@ -321,7 +320,7 @@ export default function ExportDialog({ projectId, isOpen, onClose }: Props) {
                 Generating…
               </>
             ) : (
-              <>⬇ Download {format.toUpperCase()}</>
+              <> Download {format.toUpperCase()}</>
             )}
           </button>
         )}

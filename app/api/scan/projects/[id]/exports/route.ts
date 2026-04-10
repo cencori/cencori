@@ -28,10 +28,6 @@ function checkExportRateLimit(userId: string): boolean {
 }
 
 // ── Storage helpers ───────────────────────────────────────────────
-// Inlined here until lib/scan-export-storage.ts is created.
-// Once that file exists, delete these two functions and import from it.
-
-// ✅ Accepts Blob — avoids all Uint8Array/ArrayBufferLike type issues
 async function uploadExportFile(
   fileBlob: Blob,
   fileName: string,
@@ -66,9 +62,10 @@ async function getSignedDownloadUrl(filePath: string): Promise<string> {
 // ── Main route handler ───────────────────────────────────────────
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: { id: string } },
 ) {
-  const { projectId } = params;
+  const { id: projectId } = await params;
+
   const format = request.nextUrl.searchParams.get("format") ?? "csv";
   const includeAiSummary =
     request.nextUrl.searchParams.get("aiSummary") !== "false";
@@ -102,13 +99,20 @@ export async function GET(
   const admin = createAdminClient();
 
   // 4. Verify project access
-  const { data: membership } = await admin
-    .from("organization_members")
-    .select("id")
+  const { data: project, error: projectError } = await admin
+    .from("scan_projects")
+    .select("user_id")
+    .eq("id", projectId)
     .eq("user_id", session.user.id)
-    .single();
+    .maybeSingle();
 
-  if (!membership) {
+  console.log("[export] project lookup:", {
+    projectId,
+    project,
+    error: projectError?.message,
+  });
+
+  if (!project) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -147,29 +151,48 @@ export async function GET(
   }
 
   try {
-    // 6. Fetch all scan findings for this project
-    const { data: rawFindings, error: findingsError } = await admin
-      .from("scan_findings")
-      .select("severity, title, file, line, description, recommendation")
+    // 6. Fetch findings from the latest completed scan run
+    const { data: latestRun, error: findingsError } = await admin
+      .from("scan_runs")
+      .select("results")
       .eq("project_id", projectId)
-      .order("severity", { ascending: true });
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    console.log("[export] findings lookup:", {
+      count: (latestRun?.results as Record<string, unknown>)?.issues
+        ? ((latestRun?.results as Record<string, unknown>).issues as unknown[])
+            .length
+        : 0,
+      error: findingsError?.message,
+    });
 
     if (findingsError) return await failExport("Failed to fetch findings");
 
-    const findings = (rawFindings as ScanFinding[]) ?? [];
+    // 7. Map raw issues to ScanFinding shape
+    // scan_runs.results.issues use `name` instead of `title` and may lack `recommendation`
+    const rawIssues =
+      ((latestRun?.results as Record<string, unknown>)?.issues as Record<
+        string,
+        unknown
+      >[]) ?? [];
 
-    // 7. Redact credentials from all findings before export
+    const findings: ScanFinding[] = rawIssues.map((issue) => ({
+      severity: ((issue.severity as string) ??
+        "low") as ScanFinding["severity"],
+      title:
+        (issue.name as string) ?? (issue.title as string) ?? "Unknown Issue",
+      file: (issue.file as string) ?? "",
+      line: (issue.line as number) ?? null,
+      description: (issue.description as string) ?? "",
+      recommendation: (issue.recommendation as string) ?? "",
+    }));
+
+    // 8. Redact credentials from all findings before export
     const safeFindings = redactFindingsForExport(findings);
 
-    // 8. Build file as a Blob directly from the string content.
-    //
-    //    ✅ WHY BLOB NOT TEXTENCOODER:
-    //    TextEncoder.encode() returns Uint8Array<ArrayBufferLike>.
-    //    BlobPart only accepts Uint8Array<ArrayBuffer> (non-shared).
-    //    TypeScript rejects the assignment because ArrayBufferLike
-    //    includes SharedArrayBuffer which is missing several methods.
-    //    new Blob([string]) bypasses this entirely — a plain string
-    //    is always a valid BlobPart with no type conflicts.
     let fileBlob: Blob;
     let contentType: string;
     let fileName: string;
@@ -219,14 +242,13 @@ export async function GET(
       .update({
         status: "completed",
         download_url: signedUrl,
-        file_size_bytes: fileBlob.size, // ✅ Blob.size not .length
+        file_size_bytes: fileBlob.size,
         finding_count: safeFindings.length,
         completed_at: new Date().toISOString(),
       })
       .eq("id", exportId);
 
-    // 11. Audit log — fire and forget, never blocks the response
-    // void + IIFE because .catch() does not exist on PostgrestFilterBuilder
+    // 11. Audit log — fire and forget
     void (async () => {
       try {
         await admin.from("audit_logs").insert({
@@ -247,7 +269,6 @@ export async function GET(
     })();
 
     // 12. Return the file to the browser
-    // ✅ Blob is always valid BodyInit — works in every TypeScript lib version
     return new NextResponse(fileBlob, {
       status: 200,
       headers: {
