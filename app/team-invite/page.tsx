@@ -60,7 +60,7 @@ function InviteAcceptContent() {
             setStatus('success');
             setMessage(data.message || 'Welcome to the team!');
 
-            // Redirect to analytics after 2 seconds
+            // Redirect to internal panel after 2 seconds
             setTimeout(() => {
                 router.push('/internal/analytics');
             }, 2000);
@@ -71,8 +71,7 @@ function InviteAcceptContent() {
     }
 
     function handleLogin() {
-        // Redirect to login with return URL
-        const returnUrl = `/internal/invite?token=${token}`;
+        const returnUrl = `/team-invite?token=${token}`;
         router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
     }
 
@@ -123,7 +122,7 @@ function InviteAcceptContent() {
     );
 }
 
-export default function InviteAcceptPage() {
+export default function TeamInviteAcceptPage() {
     return (
         <div className="min-h-screen bg-background flex items-center justify-center px-4">
             <Suspense fallback={

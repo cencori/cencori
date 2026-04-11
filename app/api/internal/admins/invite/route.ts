@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     }
 
     const baseUrl = resolvePublicOrigin(req);
-    const inviteLink = `${baseUrl}/internal/invite?token=${invite.invite_token}`;
+    const inviteLink = `${baseUrl}/team-invite?token=${invite.invite_token}`;
 
     try {
         if (!RESEND_API_KEY || !ADMIN_INVITE_FROM_EMAIL) {
