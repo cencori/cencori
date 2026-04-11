@@ -22,8 +22,6 @@ export interface EmailTemplateOptions {
   footerText?: string;
 }
 
-const LOGO_DARK_THEME = 'https://cencori.com/clight.png'; // White logo for dark mode
-const LOGO_LIGHT_THEME = 'https://cencori.com/cdark.png'; // Dark logo for light mode
 const CURRENT_YEAR = new Date().getFullYear();
 
 function baseFooter(extra?: string): string {
@@ -86,9 +84,6 @@ function wrapInContainer(content: string, preheader?: string): string {
     .btn-outline { background: transparent !important; border: 1px solid #1a73e8 !important; color: #1a73e8 !important; text-decoration: none !important; border-radius: 999px !important; display: inline-block !important; font-weight: 600 !important; }
     .check { color: #188038 !important; font-weight: bold !important; }
 
-    .logo-dark { display: none !important; }
-    .logo-light { display: block !important; }
-
     @media (max-width: 600px) {
       .frame-pad { padding: 18px 14px !important; }
     }
@@ -109,8 +104,6 @@ function wrapInContainer(content: string, preheader?: string): string {
       .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
       .check { color: #81c995 !important; }
 
-      .logo-dark { display: block !important; }
-      .logo-light { display: none !important; }
       .footer { border-top-color: #3c4043 !important; }
     }
 
@@ -125,8 +118,6 @@ function wrapInContainer(content: string, preheader?: string): string {
     [data-ogsc] .btn { background: #8ab4f8 !important; color: #202124 !important; }
     [data-ogsc] .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
     [data-ogsc] .check { color: #81c995 !important; }
-    [data-ogsc] .logo-dark { display: block !important; }
-    [data-ogsc] .logo-light { display: none !important; }
     [data-ogsc] .footer { border-top-color: #3c4043 !important; }
   </style>
 </head>
@@ -163,10 +154,6 @@ export function minimalTemplate(options: EmailTemplateOptions): string {
     : '';
 
   return wrapInContainer(`
-    <div style="text-align:center;margin-bottom:24px;">
-      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a>
-      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:28px;margin:0 auto;" /></a></div>
-    </div>
     <div class="text" style="font-size:15px;color:#202124;line-height:1.7;">
       ${body}
     </div>
