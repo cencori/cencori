@@ -64,34 +64,62 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = createAdminClient();
 
+    const normalizedEmail = email.toLowerCase();
+
     const { data: existing } = await supabaseAdmin
         .from('cencori_admins')
         .select('id, status')
-        .eq('email', email.toLowerCase())
+        .eq('email', normalizedEmail)
         .single();
 
-    if (existing) {
-        return NextResponse.json({
-            error: existing.status === 'active'
-                ? 'User is already an admin'
-                : 'User has already been invited'
-        }, { status: 400 });
+    if (existing?.status === 'active') {
+        return NextResponse.json({ error: 'User is already an admin' }, { status: 400 });
+    }
+    if (existing?.status === 'pending') {
+        return NextResponse.json({ error: 'User has already been invited' }, { status: 400 });
     }
 
-    const { data: invite, error: inviteError } = await supabaseAdmin
-        .from('cencori_admins')
-        .insert({
-            email: email.toLowerCase(),
-            role,
-            status: 'pending',
-            invited_by: user.id,
-        })
-        .select('id, invite_token')
-        .single();
+    // Either there's no row, or there's a revoked row we can revive. We can't
+    // INSERT a second row because email is UNIQUE.
+    let invite: { id: string; invite_token: string } | null = null;
 
-    if (inviteError) {
-        console.error('[Admins] Error creating invite:', inviteError);
-        return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
+    if (existing?.status === 'revoked') {
+        const { data: revived, error: reviveError } = await supabaseAdmin
+            .from('cencori_admins')
+            .update({
+                role,
+                status: 'pending',
+                invite_token: crypto.randomUUID(),
+                invited_by: user.id,
+                accepted_at: null,
+                user_id: null,
+            })
+            .eq('id', existing.id)
+            .select('id, invite_token')
+            .single();
+
+        if (reviveError || !revived) {
+            console.error('[Admins] Error reviving revoked invite:', reviveError);
+            return NextResponse.json({ error: 'Failed to re-invite user' }, { status: 500 });
+        }
+        invite = revived;
+    } else {
+        const { data: created, error: inviteError } = await supabaseAdmin
+            .from('cencori_admins')
+            .insert({
+                email: normalizedEmail,
+                role,
+                status: 'pending',
+                invited_by: user.id,
+            })
+            .select('id, invite_token')
+            .single();
+
+        if (inviteError || !created) {
+            console.error('[Admins] Error creating invite:', inviteError);
+            return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
+        }
+        invite = created;
     }
 
     const baseUrl = resolvePublicOrigin(req);
