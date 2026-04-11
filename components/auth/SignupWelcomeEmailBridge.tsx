@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { clearSignupWelcomeEmailPending, isSignupWelcomeEmailPending } from "@/lib/auth-welcome";
+import {
+    clearSignupNewsletterOptInPending,
+    clearSignupWelcomeEmailPending,
+    isSignupNewsletterOptInPending,
+    isSignupWelcomeEmailPending,
+} from "@/lib/auth-welcome";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 const NEW_SIGNUP_WINDOW_MS = 30 * 60 * 1000;
@@ -11,6 +16,7 @@ export function SignupWelcomeEmailBridge() {
     useEffect(() => {
         let cancelled = false;
         let inFlight = false;
+        let newsletterInFlight = false;
         let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
         const isRecentlyCreatedSession = (session: Session | null): boolean => {
@@ -24,6 +30,30 @@ export function SignupWelcomeEmailBridge() {
         const shouldAttemptForSession = (session: Session | null): boolean => {
             if (isSignupWelcomeEmailPending()) return true;
             return isRecentlyCreatedSession(session);
+        };
+
+        const maybeSubscribeToNewsletter = async (session: Session | null) => {
+            const email = session?.user?.email;
+            if (!email || cancelled || newsletterInFlight) return;
+            if (!isSignupNewsletterOptInPending()) return;
+
+            newsletterInFlight = true;
+            try {
+                const response = await fetch("/api/newsletter/subscribe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, source: "signup" }),
+                });
+                // Clear on any non-network response — we don't want to retry forever
+                // if the user already exists or the request was malformed.
+                if (response.ok || (response.status >= 400 && response.status < 500)) {
+                    clearSignupNewsletterOptInPending();
+                }
+            } catch {
+                // Network error — leave the flag and retry on next page load.
+            } finally {
+                newsletterInFlight = false;
+            }
         };
 
         const maybeSendWelcomeEmail = async (session: Session | null) => {
@@ -50,13 +80,23 @@ export function SignupWelcomeEmailBridge() {
             }
         };
 
+        const processSession = async (session: Session | null) => {
+            // Welcome email and newsletter opt-in are independent flows that share the
+            // same trigger (a fresh authenticated session post-signup).
+            await Promise.all([
+                maybeSendWelcomeEmail(session),
+                maybeSubscribeToNewsletter(session),
+            ]);
+        };
+
         const trySessionSendWithRetry = async (attempt = 0) => {
             const { data: { session } }: { data: { session: Session | null } } = await supabase.auth.getSession();
             if (cancelled) return;
 
-            await maybeSendWelcomeEmail(session);
+            await processSession(session);
 
-            if (!isSignupWelcomeEmailPending() || attempt >= 5) {
+            const stillPending = isSignupWelcomeEmailPending() || isSignupNewsletterOptInPending();
+            if (!stillPending || attempt >= 5) {
                 return;
             }
 
@@ -71,7 +111,7 @@ export function SignupWelcomeEmailBridge() {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
             if (session?.user?.email && event !== "SIGNED_OUT") {
-                void maybeSendWelcomeEmail(session);
+                void processSession(session);
             }
         });
 

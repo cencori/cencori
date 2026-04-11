@@ -28,16 +28,11 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function baseFooter(extra?: string): string {
   return `
-    <div class="footer" style="text-align:center;margin-top:40px;padding-top:24px;border-top:1px solid #dadce0;">
-      ${extra ? `<p class="muted" style="color:#5f6368;font-size:13px;margin:0 0 12px;line-height:1.5;">${extra}</p>` : ''}
-      <p class="muted" style="color:#5f6368;font-size:11px;margin:0;letter-spacing:0.3px;text-transform:uppercase;">
-        © ${CURRENT_YEAR} Cencori · <a href="https://cencori.com" class="muted" style="color:#5f6368;text-decoration:underline;">cencori.com</a>
+    <div class="footer" style="text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #dadce0;">
+      ${extra ? `<p class="muted" style="color:#5f6368;font-size:12px;margin:0 0 10px;line-height:1.5;">${extra}</p>` : ''}
+      <p class="muted" style="color:#5f6368;font-size:11px;margin:0;">
+        © ${CURRENT_YEAR} <a href="https://cencori.com" class="muted" style="color:#5f6368;text-decoration:none;">Cencori</a>
       </p>
-      <div style="margin-top:12px;">
-        <a href="https://cencori.com/dashboard" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Dashboard</a>
-        <a href="https://cencori.com/docs" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Documentation</a>
-        <a href="https://cencori.com/blog" class="muted" style="color:#5f6368;font-size:11px;text-decoration:underline;margin:0 8px;">Security Research</a>
-      </div>
     </div>`;
 }
 
@@ -181,101 +176,13 @@ export function minimalTemplate(options: EmailTemplateOptions): string {
 }
 
 /**
- * Announcement template — hero-style with bold heading.
- * Best for: product launches, major updates, company news.
+ * Render an email. All categories share the same minimal template — just
+ * logo, body, and a one-line footer. The category param is kept for API
+ * compatibility with send/route.ts and for future per-category variance.
  */
-export function announcementTemplate(options: EmailTemplateOptions): string {
-  const { subject, body, preheader, ctaText, ctaUrl, footerText } = options;
-
-  const ctaBlock = ctaText && ctaUrl
-    ? `<div style="text-align:center;margin:28px 0 0;">
-        <a href="${ctaUrl}" class="btn" style="padding:14px 36px;font-size:15px;letter-spacing:0.2px;">${ctaText}</a>
-      </div>`
-    : '';
-
-  return wrapInContainer(`
-    <div class="text" style="font-size:16px;color:#202124;line-height:1.8;">
-      ${body}
-    </div>
-    <div class="callout" style="margin-top:22px;padding:18px 18px 6px;border-radius:12px;border:1px solid #dadce0;background:#f1f3f4;">
-      <p class="text" style="color:#202124;font-size:13px;font-weight:800;margin:0 0 12px;letter-spacing:0.2px;">Core Platform Capabilities</p>
-      <table width="100%" border="0" cellspacing="0" cellpadding="0">
-        <tr>
-          <td style="padding-bottom:12px;">
-            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
-            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">Advanced SAST:</strong> Real-time detection of 1,000+ secret types and vulns.</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding-bottom:12px;">
-            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
-            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">Deep SCA:</strong> Semantic dependency audits via OSV.dev integration.</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding-bottom:0;">
-            <span class="check" style="color:#188038;font-weight:bold;margin-right:8px;">✓</span>
-            <span class="text" style="color:#202124;font-size:13px;"><strong class="text" style="color:#202124;">AI Memory Layer:</strong> Context-aware security that learns from your code.</span>
-          </td>
-        </tr>
-      </table>
-    </div>
-    ${ctaBlock}
-    ${baseFooter(footerText)}
-  `, preheader);
-}
-
-/**
- * Newsletter template — multi-section layout for longer content.
- * Best for: weekly roundups, product newsletters, digest emails.
- */
-export function newsletterTemplate(options: EmailTemplateOptions): string {
-  const { subject, body, preheader, ctaText, ctaUrl, footerText } = options;
-
-  const ctaBlock = ctaText && ctaUrl
-    ? `<div style="text-align:center;margin:22px 0 0;">
-        <a href="${ctaUrl}" class="btn-outline" style="padding:10px 22px;font-size:13px;letter-spacing:0.2px;">${ctaText}</a>
-      </div>`
-    : '';
-
-  return wrapInContainer(`
-    <div style="text-align:center;margin-bottom:16px;">
-      <a href="https://cencori.com" class="logo-light"><img src="${LOGO_LIGHT_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a>
-      <div class="logo-dark" style="display:none;"><a href="https://cencori.com"><img src="${LOGO_DARK_THEME}" alt="Cencori" style="height:24px;margin:0 auto;" /></a></div>
-    </div>
-    <div style="text-align:center;margin-bottom:26px;">
-      <p class="accent" style="color:#1a73e8;font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:800;margin:0 0 8px;">Weekly Intelligence</p>
-      <h1 class="text" style="color:#202124;font-size:26px;font-weight:900;margin:0;letter-spacing:-0.4px;line-height:1.15;">${subject}</h1>
-    </div>
-    <div class="divider" style="border-top:1px solid #dadce0;padding-top:22px;">
-      <div class="text" style="font-size:15px;color:#202124;line-height:1.75;">
-        ${body}
-      </div>
-      ${ctaBlock}
-    </div>
-    <div class="callout" style="margin-top:28px;background:#f1f3f4;padding:18px;border-radius:12px;border:1px solid #dadce0;text-align:center;">
-       <p class="text" style="color:#202124;font-size:14px;font-weight:800;margin:0 0 8px;">Securing your infrastructure?</p>
-       <p class="muted" style="color:#5f6368;font-size:13px;margin:0 0 14px;">Deploy Cencori scans to detect vulnerabilities before they hit production.</p>
-       <a href="https://cencori.com/scan/import" class="accent" style="color:#1a73e8;font-size:13px;font-weight:800;text-decoration:underline;">Import Repository →</a>
-    </div>
-    ${baseFooter(footerText || 'You received this because you are part of the Cencori developer network.')}
-  `, preheader);
-}
-
-/** Map category to its default template function */
-export const templateByCategory: Record<string, (opts: EmailTemplateOptions) => string> = {
-  newsletter: newsletterTemplate,
-  product_update: announcementTemplate,
-  announcement: announcementTemplate,
-  security_advisory: minimalTemplate,
-  onboarding: minimalTemplate,
-  transactional: minimalTemplate,
-};
-
 export function renderTemplate(
-  category: string,
+  _category: string,
   options: EmailTemplateOptions
 ): string {
-  const templateFn = templateByCategory[category] || minimalTemplate;
-  return templateFn(options);
+  return minimalTemplate(options);
 }
