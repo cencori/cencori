@@ -109,7 +109,6 @@ export default function HomePage() {
         <Observability />
         <CostTracking />
         <BudgetControl />
-        <Framework />
         <FAQ />
         <CTA isAuthenticated={isAuthenticated} />
       </main>
