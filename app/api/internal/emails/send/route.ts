@@ -4,6 +4,12 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
 import { renderTemplate } from '@/lib/email-templates';
+import { buildUnsubscribeUrl, getBaseUrl } from '@/lib/newsletter';
+import {
+    buildUserUnsubscribeUrl,
+    generateUserUnsubscribeToken,
+    isUserMarketingOptedOut,
+} from '@/lib/user-unsubscribe';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
@@ -34,7 +40,7 @@ interface SendEmailRequest {
     textBody?: string;
     category: string;
     senderProfileId?: string;
-    audienceType: 'bulk' | 'single';
+    audienceType: 'bulk' | 'single' | 'newsletter';
     singleRecipient?: string;
     maxRecipients?: number;
 }
@@ -58,6 +64,33 @@ interface Recipient {
     email: string;
     fullName: string;
     firstName: string;
+    // Newsletter subscribers use a stored unsubscribe_token; auth users
+    // use an HMAC-derived token bound to their userId.
+    unsubscribeToken?: string;
+    userId?: string;
+}
+
+async function getNewsletterRecipients(maxRecipients: number): Promise<Recipient[]> {
+    const supabaseAdmin = createAdminClient();
+    const { data, error } = await supabaseAdmin
+        .from('newsletter_subscribers')
+        .select('email, unsubscribe_token')
+        .eq('status', 'confirmed')
+        .order('confirmed_at', { ascending: true })
+        .limit(maxRecipients);
+
+    if (error) throw new Error(error.message);
+
+    return (data || []).map((row) => {
+        const email = (row.email as string).trim().toLowerCase();
+        const firstName = email.split('@')[0];
+        return {
+            email,
+            fullName: '',
+            firstName,
+            unsubscribeToken: row.unsubscribe_token as string,
+        };
+    });
 }
 
 async function getAllRecipients(maxRecipients: number): Promise<Recipient[]> {
@@ -80,12 +113,25 @@ async function getAllRecipients(maxRecipients: number): Promise<Recipient[]> {
             if (!email || dedupe.has(email)) continue;
             if (!user.email_confirmed_at) continue;
 
-            const meta = user.user_metadata || {};
-            const fullName = (meta.full_name || meta.name || '').trim();
+            const meta = (user.user_metadata || {}) as Record<string, unknown>;
+
+            // Skip users who have opted out of marketing/bulk emails.
+            if (isUserMarketingOptedOut(meta)) continue;
+
+            const fullName = (
+                (meta.full_name as string | undefined) ||
+                (meta.name as string | undefined) ||
+                ''
+            ).trim();
             const firstName = fullName.split(/\s+/)[0] || email.split('@')[0];
 
             dedupe.add(email);
-            recipients.push({ email, fullName, firstName });
+            recipients.push({
+                email,
+                fullName,
+                firstName,
+                userId: user.id,
+            });
             if (recipients.length >= maxRecipients) break;
         }
 
@@ -98,13 +144,35 @@ async function getAllRecipients(maxRecipients: number): Promise<Recipient[]> {
 
 /**
  * Replace merge tags in content.
- * Supported: {first_name}, {full_name}, {email}
+ * Supported: {first_name}, {full_name}, {email}, {unsubscribe_url}
  */
-function personalize(content: string, recipient: Recipient): string {
+function personalize(content: string, recipient: Recipient, unsubscribeUrl?: string): string {
     return content
         .replace(/\{first_name\}/gi, recipient.firstName)
         .replace(/\{full_name\}/gi, recipient.fullName || recipient.firstName)
-        .replace(/\{email\}/gi, recipient.email);
+        .replace(/\{email\}/gi, recipient.email)
+        .replace(/\{unsubscribe_url\}/gi, unsubscribeUrl || '');
+}
+
+/**
+ * Append a one-click unsubscribe footer to an HTML body before </body>.
+ * Used for both newsletter sends (with the stored subscriber token) and
+ * bulk sends to all auth users (with an HMAC-derived per-user token).
+ */
+function appendUnsubscribeFooter(
+    html: string,
+    unsubscribeUrl: string,
+    kind: 'newsletter' | 'bulk' = 'newsletter',
+): string {
+    const reason =
+        kind === 'newsletter'
+            ? "You're receiving this because you subscribed to the Cencori newsletter."
+            : "You're receiving this because you have a Cencori account.";
+    const footer = `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #dadce0;text-align:center;font-size:11px;color:#5f6368;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">${reason} <a href="${unsubscribeUrl}" style="color:#5f6368;text-decoration:underline;">Unsubscribe</a></div>`;
+    if (html.includes('</body>')) {
+        return html.replace('</body>', `${footer}</body>`);
+    }
+    return html + footer;
 }
 
 export async function POST(req: NextRequest) {
@@ -234,7 +302,8 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // === Bulk Send ===
+    // === Bulk / Newsletter Send ===
+    const isNewsletter = audienceType === 'newsletter';
     const maxRecipients = Math.min(
         Math.max(Number(body.maxRecipients) || 500, 1),
         HARD_MAX_RECIPIENTS
@@ -242,33 +311,40 @@ export async function POST(req: NextRequest) {
 
     let recipients: Recipient[];
     try {
-        recipients = await getAllRecipients(maxRecipients);
+        recipients = isNewsletter
+            ? await getNewsletterRecipients(maxRecipients)
+            : await getAllRecipients(maxRecipients);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fetch audience';
         return NextResponse.json({ error: message }, { status: 500 });
     }
 
     if (recipients.length === 0) {
-        return NextResponse.json({ success: true, sent: 0, message: 'No eligible recipients found' });
+        return NextResponse.json({
+            success: true,
+            sent: 0,
+            message: isNewsletter ? 'No confirmed newsletter subscribers' : 'No eligible recipients found',
+        });
     }
 
     // Record in DB
     const { data: sendRecord } = await admin
         .from('email_sends')
         .insert({
-            category: category || 'announcement',
+            category: category || (isNewsletter ? 'newsletter' : 'announcement'),
             subject: subject.trim(),
             html_body: htmlBody,
             text_body: textBody || null,
             sender_profile_id: senderProfileId || null,
             sent_by: user.id,
-            audience_type: 'bulk',
+            audience_type: isNewsletter ? 'newsletter' : 'bulk',
             recipient_count: recipients.length,
             status: 'sending',
         })
         .select('id')
         .single();
 
+    const baseUrl = getBaseUrl();
     let sent = 0;
     let failed = 0;
 
@@ -276,8 +352,26 @@ export async function POST(req: NextRequest) {
         const slice = recipients.slice(i, i + SEND_CONCURRENCY);
         const results = await Promise.all(
             slice.map(async (recipient) => {
-                const personalizedHtml = personalize(styledHtml, recipient);
-                const personalizedSubject = personalize(subject.trim(), recipient);
+                // Newsletter recipients use the stored subscriber token;
+                // bulk auth users use an HMAC-derived per-user token.
+                let unsubscribeUrl: string | undefined;
+                if (recipient.unsubscribeToken) {
+                    unsubscribeUrl = buildUnsubscribeUrl(baseUrl, recipient.unsubscribeToken);
+                } else if (recipient.userId) {
+                    const token = generateUserUnsubscribeToken(recipient.userId);
+                    unsubscribeUrl = buildUserUnsubscribeUrl(baseUrl, recipient.userId, token);
+                }
+
+                let personalizedHtml = personalize(styledHtml, recipient, unsubscribeUrl);
+                if (unsubscribeUrl) {
+                    personalizedHtml = appendUnsubscribeFooter(
+                        personalizedHtml,
+                        unsubscribeUrl,
+                        isNewsletter ? 'newsletter' : 'bulk',
+                    );
+                }
+                const personalizedSubject = personalize(subject.trim(), recipient, unsubscribeUrl);
+
                 const { error } = await resend.emails.send({
                     from: fromAddress,
                     to: recipient.email,
@@ -285,6 +379,12 @@ export async function POST(req: NextRequest) {
                     subject: personalizedSubject,
                     html: personalizedHtml,
                     text: textBody || undefined,
+                    headers: unsubscribeUrl
+                        ? {
+                              'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                          }
+                        : undefined,
                 });
                 return { ok: !error, email: recipient.email };
             })
@@ -311,7 +411,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
         success: true,
-        mode: 'bulk',
+        mode: isNewsletter ? 'newsletter' : 'bulk',
         recipientCount: recipients.length,
         sent,
         failed,

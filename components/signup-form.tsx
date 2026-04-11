@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldDescription,
@@ -14,7 +15,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
-import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
+import {
+  clearSignupNewsletterOptInPending,
+  clearSignupWelcomeEmailPending,
+  markSignupNewsletterOptInPending,
+  markSignupWelcomeEmailPending,
+} from "@/lib/auth-welcome";
 import Link from "next/link";
 
 type SignupFormProps = React.ComponentProps<"form">;
@@ -26,6 +32,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
 
   const navigateAfterAuth = (target: string) => {
     if (/^https?:\/\//i.test(target)) {
@@ -85,6 +92,11 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
 
       // Queue welcome email to send once an authenticated session is established.
       markSignupWelcomeEmailPending();
+      if (newsletterOptIn) {
+        markSignupNewsletterOptInPending();
+      } else {
+        clearSignupNewsletterOptInPending();
+      }
 
       navigateAfterAuth(navigationTarget);
     } catch (err) {
@@ -105,18 +117,25 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
 
       // OAuth flow leaves the page immediately; persist a marker for post-auth welcome send.
       markSignupWelcomeEmailPending();
+      if (newsletterOptIn) {
+        markSignupNewsletterOptInPending();
+      } else {
+        clearSignupNewsletterOptInPending();
+      }
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo: oauthRedirectTo },
       });
       if (oauthError) {
         clearSignupWelcomeEmailPending();
+        clearSignupNewsletterOptInPending();
         setError(oauthError.message);
         setLoading(false);
       }
       // Supabase handles the redirect; we don't navigate here.
     } catch (err) {
       clearSignupWelcomeEmailPending();
+      clearSignupNewsletterOptInPending();
       const msg = err instanceof Error ? err.message : "OAuth failed";
       setError(msg);
       setLoading(false);
@@ -176,6 +195,19 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
             required
             autoComplete="new-password"
           />
+        </Field>
+
+        <Field>
+          <label className="flex items-start gap-2 text-sm text-muted-foreground cursor-pointer">
+            <Checkbox
+              checked={newsletterOptIn}
+              onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
+              className="mt-0.5"
+            />
+            <span className="leading-snug">
+              Send me product updates and security research from Cencori. Unsubscribe in one click any time.
+            </span>
+          </label>
         </Field>
 
         <Field>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
+import { isUserMarketingOptedOut } from '@/lib/user-unsubscribe';
 
 const USERS_PAGE_SIZE = 200;
 
@@ -39,10 +40,10 @@ export async function POST(req: NextRequest) {
         totalUsers += users.length;
 
         for (const u of users) {
-            if (u.email_confirmed_at && u.email?.trim()) {
-                confirmedCount++;
-                if (confirmedCount >= maxRecipients) break;
-            }
+            if (!u.email_confirmed_at || !u.email?.trim()) continue;
+            if (isUserMarketingOptedOut(u.user_metadata as Record<string, unknown> | null)) continue;
+            confirmedCount++;
+            if (confirmedCount >= maxRecipients) break;
         }
 
         if (!data?.nextPage || users.length === 0) break;
