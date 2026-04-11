@@ -1,5 +1,5 @@
 import { createServerClient } from '@/lib/supabaseServer';
-import { isCencoriEmail } from '@/lib/internal-access';
+import { checkInternalAccess } from '@/lib/internal-access';
 import { InternalShell } from '@/components/internal/internal-shell';
 import { InternalLoginForm } from '@/components/internal/internal-login-form';
 
@@ -16,11 +16,11 @@ export default async function InternalLayout({
         return <InternalLoginForm />;
     }
 
-    // Logged in but not @cencori.com → show access denied
-    const isDev = process.env.NODE_ENV === 'development';
-    const allowDev = (process.env.ALLOW_ALL_INTERNAL_IN_DEV || 'true').trim().toLowerCase() !== 'false';
+    // Logged in — allow @cencori.com OR any user with an active row in
+    // cencori_admins (team members invited via /internal/settings).
+    const hasAccess = await checkInternalAccess(user.id, user.email);
 
-    if (!(isDev && allowDev) && !isCencoriEmail(user.email)) {
+    if (!hasAccess) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-4">
                 <div className="text-center max-w-sm space-y-3">
@@ -31,7 +31,7 @@ export default async function InternalLayout({
                     </div>
                     <h1 className="text-lg font-semibold">Access Denied</h1>
                     <p className="text-sm text-muted-foreground">
-                        Only <strong>@cencori.com</strong> email addresses can access the internal panel.
+                        This account isn't authorized to access the internal panel. Ask an admin to invite you.
                     </p>
                     <p className="text-xs text-muted-foreground">
                         Signed in as <strong>{user.email}</strong>
