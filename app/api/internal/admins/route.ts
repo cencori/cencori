@@ -44,7 +44,12 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch admins' }, { status: 500 });
     }
 
-    const currentUserRole = admin?.role || (isDev ? 'super_admin' : null);
+    // Founders and (in dev) the all-access bypass are implicit super admins,
+    // mirroring the auth check above. Without this, the settings UI hides the
+    // invite/broadcast forms for founders on prod because their cencori_admins
+    // row may not exist yet.
+    const impliedSuperAdmin = isFounder || (allowAllInternalInDev() && isDev);
+    const currentUserRole = admin?.role || (impliedSuperAdmin ? 'super_admin' : null);
 
     return NextResponse.json({ admins, currentUserRole });
 }
