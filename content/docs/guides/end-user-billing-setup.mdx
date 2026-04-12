@@ -19,7 +19,7 @@ You need:
 ## Step 1: Enable End-User Billing
 
 1. Open your project in the Cencori dashboard.
-2. Click **Usage Billing** in the left sidebar.
+2. Click **End-User Billing** in the left sidebar.
 3. You'll land on the **Configuration** tab.
 4. Toggle **Enable End-User Billing** to on.
 5. Click **Save Configuration**.
@@ -94,13 +94,14 @@ Repeat for as many tiers as you need.
 - **Flat rate per request**: A fixed fee added to every request on top of the usage-based charge. Good for premium models.
 - **Allowed models**: Restrict which AI models this tier can access. Leave empty to allow all.
 - **Overage action**:
-  - **Block**: Stops requests when limits are hit. The user sees a clear error.
-  - **Throttle**: Slows down requests instead of blocking.
-  - **Alert only**: Lets requests through but flags the overage in your dashboard.
+  - **Block**: Stops requests when limits are hit. Gateway requests return `429 Too Many Requests` with a `Retry-After` header. If you use `check-quota` directly, it returns `allowed: false`.
+  - **Alert only**: Lets requests through but flags the overage in your dashboard. Good for monitoring before enforcing.
 
 ## Step 4: Connect Stripe
 
 This lets you collect real payments from your end-users.
+
+Stripe Connect is organization-scoped. Connecting it once makes it available to every project in the same organization.
 
 1. Go back to the **Configuration** tab.
 2. Find the **Stripe Connect** card.
@@ -118,7 +119,7 @@ This lets you collect real payments from your end-users.
 
 End-users show up in the **End Users** tab. They get there in one of two ways:
 
-**Automatically**: When your app sends a request with a user ID (either through the gateway or the Usage Events API), Cencori creates the user record automatically. They're assigned your default rate plan.
+**Automatically**: When usage is recorded for a user for the first time, Cencori creates the user record automatically. This happens after a successful gateway request or a Usage Events API write. A quota check by itself does not create the row.
 
 **Manually**: Click **Add End User** in the End Users tab. Fill in their external ID (whatever user ID your system uses), display name, email, and assign a rate plan.
 
@@ -163,7 +164,19 @@ That's it. Billing, rate limits, quotas — all handled automatically.
 
 Your engineers add two API calls — one before processing (quota check) and one after (usage report). See the [End-User Billing API Reference](/docs/platform/end-user-billing#option-2-usage-events-api) for the full integration guide.
 
-## Step 7: Monitor Revenue
+## Step 7: Generate Invoices
+
+Once you have usage data, you can generate invoices for your end-users:
+
+1. Open the **End Users** tab or the invoice section in the dashboard.
+2. Select a billing period (e.g. March 1 - April 1).
+3. Choose which users to invoice (or invoice all).
+4. Optionally enable **Send via Stripe** to automatically create and send Stripe invoices.
+5. Invoices are generated with line items showing usage, provider cost, markup, and total.
+
+Invoice statuses update automatically: `draft` when generated, `sent` when dispatched via Stripe, `paid` when payment is received, and `overdue` if payment fails.
+
+## Step 8: Monitor Revenue
 
 Once traffic starts flowing:
 
@@ -193,6 +206,7 @@ Click the **Export** button on the End Users tab to download usage data as CSV o
 | View/manage users | End Users tab |
 | Block a user | End Users tab > user row > Block |
 | Change a user's plan | End Users tab > user row > Edit |
+| Generate invoices | End Users tab or invoices section |
 | View revenue | Revenue tab |
 | Export usage data | End Users tab > Export button |
 
@@ -200,8 +214,7 @@ Click the **Export** button on the End Users tab to download usage data as CSV o
 
 It depends on the **overage action** in their rate plan:
 
-- **Block**: The API returns a `429` error with a clear message explaining which limit was hit. Your app should show the user a message like "You've reached your daily limit. Upgrade for more."
-- **Throttle**: Requests slow down but still go through. Good for soft limits.
+- **Block**: Gateway requests return a `429` error with a `Retry-After` header and a JSON body explaining which limit was hit. If you call `check-quota` directly, it returns `allowed: false` with a `reason` field and `retry_after_seconds`.
 - **Alert only**: Everything works normally. You get a flag in the dashboard. Good for monitoring before enforcing.
 
 ## Common Questions
@@ -217,6 +230,9 @@ No. End-users are your customers. They never interact with Cencori directly. Eve
 
 **Can I have different markup for different plans?**
 Yes. Each rate plan has its own markup percentage. The project default is just a fallback for users without a plan-specific markup.
+
+**Do test-environment requests count against production limits?**
+No. Quota checks and usage aggregation are scoped by API key environment. Test-key traffic is tracked separately from production-key traffic.
 
 ## Next Steps
 
