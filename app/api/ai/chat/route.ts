@@ -539,6 +539,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const keyEnvironment = keyData.environment || 'production';
+
         let agentConfigModel: string | null = null;
 
         if (keyData.key_type === 'agent' || apiKey.startsWith('cake_')) {
@@ -722,8 +724,33 @@ export async function POST(req: NextRequest) {
         let endUserQuota: QuotaCheckResult | null = null;
         if (project.end_user_billing_enabled && userId) {
             try {
-                endUserQuota = await checkEndUserQuota(project.id, userId, model);
+                endUserQuota = await checkEndUserQuota(project.id, userId, model, keyEnvironment);
+
+                const modelNotAllowed =
+                    endUserQuota.reason?.startsWith('model_not_allowed:')
+                    || Boolean(
+                        endUserQuota.allowedModels
+                        && model
+                        && model !== 'auto'
+                        && model !== 'cencori/auto'
+                        && !endUserQuota.allowedModels.includes(model)
+                    );
+
+                if (modelNotAllowed) {
+                    return NextResponse.json(
+                        {
+                            error: 'Model not allowed',
+                            message: `Model '${model}' is not available on the '${endUserQuota.ratePlan}' plan.`,
+                            allowed_models: endUserQuota.allowedModels,
+                        },
+                        { status: 403 }
+                    );
+                }
+
                 if (!endUserQuota.allowed) {
+                    const retryAfterHeaders = endUserQuota.retryAfterSeconds != null
+                        ? { 'Retry-After': String(endUserQuota.retryAfterSeconds) }
+                        : undefined;
                     return NextResponse.json(
                         {
                             error: 'End-user quota exceeded',
@@ -733,24 +760,16 @@ export async function POST(req: NextRequest) {
                                 monthly_tokens: { used: endUserQuota.monthlyTokensUsed, limit: endUserQuota.monthlyTokensLimit },
                                 daily_requests: { used: endUserQuota.dailyRequestsUsed, limit: endUserQuota.dailyRequestsLimit },
                                 monthly_requests: { used: endUserQuota.monthlyRequestsUsed, limit: endUserQuota.monthlyRequestsLimit },
+                                requests_per_minute: {
+                                    used: endUserQuota.requestsPerMinuteUsed,
+                                    limit: endUserQuota.requestsPerMinuteLimit,
+                                },
                             },
                             rate_plan: endUserQuota.ratePlan,
+                            retry_after_seconds: endUserQuota.retryAfterSeconds,
                         },
-                        { status: 429 }
+                        { status: 429, headers: retryAfterHeaders }
                     );
-                }
-                // Check model restrictions
-                if (endUserQuota.allowedModels && model && model !== 'auto' && model !== 'cencori/auto') {
-                    if (!endUserQuota.allowedModels.includes(model)) {
-                        return NextResponse.json(
-                            {
-                                error: 'Model not allowed',
-                                message: `Model '${model}' is not available on the '${endUserQuota.ratePlan}' plan.`,
-                                allowed_models: endUserQuota.allowedModels,
-                            },
-                            { status: 403 }
-                        );
-                    }
                 }
             } catch (err) {
                 console.error('[EndUserBilling] Quota check failed, allowing request:', err);
@@ -1500,6 +1519,7 @@ export async function POST(req: NextRequest) {
                                     recordEndUserUsage({
                                         projectId: project.id,
                                         externalUserId: userId,
+                                        environment: keyEnvironment,
                                         tokens: {
                                             prompt: promptTokens,
                                             completion: completionTokens,
@@ -1802,6 +1822,7 @@ export async function POST(req: NextRequest) {
             recordEndUserUsage({
                 projectId: project.id,
                 externalUserId: userId,
+                environment: keyEnvironment,
                 tokens: {
                     prompt: response.usage.promptTokens,
                     completion: response.usage.completionTokens,

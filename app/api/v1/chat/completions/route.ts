@@ -260,7 +260,12 @@ export async function POST(req: NextRequest) {
         return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
     };
 
-    const respondError = (status: number, message: string, code = 'invalid_request_error') => {
+    const respondError = (
+        status: number,
+        message: string,
+        code = 'invalid_request_error',
+        headers?: HeadersInit
+    ) => {
         return respond(
             NextResponse.json(
                 {
@@ -270,7 +275,7 @@ export async function POST(req: NextRequest) {
                         code,
                     },
                 },
-                { status }
+                { status, headers }
             ),
             code,
             message
@@ -532,25 +537,39 @@ export async function POST(req: NextRequest) {
         let endUserQuota: QuotaCheckResult | null = null;
 
         if (gatewayCtx?.endUserBillingEnabled && endUserId) {
-            endUserQuota = await checkEndUserQuota(gatewayCtx.projectId, endUserId, model);
+            endUserQuota = await checkEndUserQuota(
+                gatewayCtx.projectId,
+                endUserId,
+                model,
+                gatewayCtx.environment
+            );
 
-            if (!endUserQuota.allowed && endUserQuota.overageAction === 'block') {
+            const modelNotAllowed =
+                endUserQuota.reason?.startsWith('model_not_allowed:')
+                || Boolean(
+                    endUserQuota.allowedModels
+                    && endUserQuota.allowedModels.length > 0
+                    && !endUserQuota.allowedModels.includes(model)
+                );
+
+            if (modelNotAllowed) {
                 return respondError(
-                    429,
-                    `End-user quota exceeded: ${endUserQuota.reason || 'limit reached'}`,
-                    'end_user_quota_exceeded'
+                    403,
+                    `Model "${model}" is not allowed for this end-user's rate plan`,
+                    'end_user_model_not_allowed'
                 );
             }
 
-            // Model restriction check
-            if (endUserQuota.allowedModels && endUserQuota.allowedModels.length > 0) {
-                if (!endUserQuota.allowedModels.includes(model)) {
-                    return respondError(
-                        403,
-                        `Model "${model}" is not allowed for this end-user's rate plan`,
-                        'end_user_model_not_allowed'
-                    );
-                }
+            if (!endUserQuota.allowed) {
+                const retryHeaders = endUserQuota.retryAfterSeconds != null
+                    ? { 'Retry-After': String(endUserQuota.retryAfterSeconds) }
+                    : undefined;
+                return respondError(
+                    429,
+                    `End-user quota exceeded: ${endUserQuota.reason || 'limit reached'}`,
+                    'end_user_quota_exceeded',
+                    retryHeaders
+                );
             }
         }
 
@@ -560,6 +579,7 @@ export async function POST(req: NextRequest) {
                 recordEndUserUsage({
                     projectId: gatewayCtx.projectId,
                     externalUserId: endUserId,
+                    environment: gatewayCtx.environment,
                     tokens: {
                         prompt: usageAndCost.promptTokens,
                         completion: usageAndCost.completionTokens,
@@ -693,7 +713,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Helper: store response in cache after successful non-streaming completion
-        const maybeCacheResponse = (responseJson: any, tokens: number, costUsd: number) => {
+        const maybeCacheResponse = (responseJson: unknown, tokens: number, costUsd: number) => {
             if (cacheConfig?.cacheEnabled && cacheKey && gatewayCtx && !shouldStream && promptTextForCache) {
                 void storeInCache({
                     projectId: gatewayCtx.projectId,

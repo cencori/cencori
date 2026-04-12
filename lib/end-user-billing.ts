@@ -18,7 +18,7 @@ export interface QuotaCheckResult {
   isNewUser: boolean;
   endUserId?: string;
   ratePlan?: string;
-  overageAction?: "block" | "throttle" | "alert_only";
+  overageAction?: "block" | "alert_only";
   markupPercentage: number;
   flatRatePerRequest: number | null;
   allowedModels: string[] | null;
@@ -30,11 +30,15 @@ export interface QuotaCheckResult {
   dailyRequestsLimit: number | null;
   monthlyRequestsUsed: number;
   monthlyRequestsLimit: number | null;
+  requestsPerMinuteUsed: number;
+  requestsPerMinuteLimit: number | null;
+  retryAfterSeconds: number | null;
 }
 
 export interface UsageRecord {
   projectId: string;
   externalUserId: string;
+  environment?: string;
   tokens: { prompt: number; completion: number; total: number };
   cost: { providerUsd: number; cencoriChargeUsd: number };
   customerMarkupPercentage: number;
@@ -53,13 +57,15 @@ export interface UsageRecord {
 export async function checkEndUserQuota(
   projectId: string,
   externalUserId: string,
-  model?: string
+  model?: string,
+  environment = "production"
 ): Promise<QuotaCheckResult> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase.rpc("check_end_user_quota", {
     p_project_id: projectId,
     p_external_user_id: externalUserId,
+    p_environment: environment,
   });
 
   if (error || !data) {
@@ -80,6 +86,9 @@ export async function checkEndUserQuota(
       dailyRequestsLimit: null,
       monthlyRequestsUsed: 0,
       monthlyRequestsLimit: null,
+      requestsPerMinuteUsed: 0,
+      requestsPerMinuteLimit: null,
+      retryAfterSeconds: null,
     };
   }
 
@@ -101,6 +110,9 @@ export async function checkEndUserQuota(
     dailyRequestsLimit: data.daily_requests_limit ?? null,
     monthlyRequestsUsed: data.monthly_requests_used ?? 0,
     monthlyRequestsLimit: data.monthly_requests_limit ?? null,
+    requestsPerMinuteUsed: data.requests_per_minute_used ?? 0,
+    requestsPerMinuteLimit: data.requests_per_minute_limit ?? null,
+    retryAfterSeconds: data.retry_after_seconds ?? null,
   };
 
   // Model restriction check — done client-side for speed
@@ -126,6 +138,7 @@ export async function checkEndUserQuota(
 export function recordEndUserUsage(record: UsageRecord): void {
   try {
     const supabase = createAdminClient();
+    const environment = record.environment === "test" ? "test" : "production";
     const customerChargeUsd = calculateCustomerCharge(
       record.cost.cencoriChargeUsd,
       record.customerMarkupPercentage,
@@ -141,6 +154,7 @@ export function recordEndUserUsage(record: UsageRecord): void {
         p_total_cost_usd: record.cost.cencoriChargeUsd,
         p_provider_cost_usd: record.cost.providerUsd,
         p_customer_charge_usd: customerChargeUsd,
+        p_environment: environment,
       })
     )
       .then(({ error }) => {
@@ -166,6 +180,7 @@ export async function recordEndUserUsageAsync(
   record: UsageRecord
 ): Promise<void> {
   const supabase = createAdminClient();
+  const environment = record.environment === "test" ? "test" : "production";
   const customerChargeUsd = calculateCustomerCharge(
     record.cost.cencoriChargeUsd,
     record.customerMarkupPercentage,
@@ -180,6 +195,7 @@ export async function recordEndUserUsageAsync(
     p_total_cost_usd: record.cost.cencoriChargeUsd,
     p_provider_cost_usd: record.cost.providerUsd,
     p_customer_charge_usd: customerChargeUsd,
+    p_environment: environment,
   });
 
   if (error) {

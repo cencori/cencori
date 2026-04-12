@@ -164,7 +164,7 @@ interface RatePlan {
   markup_percentage: number | null;
   flat_rate_per_request: number | null;
   allowed_models: string[] | null;
-  overage_action: "block" | "throttle" | "alert_only";
+  overage_action: "block" | "alert_only";
   end_user_count: number;
   created_at: string;
 }
@@ -183,7 +183,7 @@ interface RatePlanForm {
   markup_percentage: string;
   flat_rate_per_request: string;
   allowed_models: string;
-  overage_action: "block" | "throttle" | "alert_only";
+  overage_action: "block" | "alert_only";
 }
 
 interface Invoice {
@@ -315,10 +315,9 @@ function formToPayload(form: RatePlanForm) {
   };
 }
 
-const OVERAGE_LABELS: Record<string, string> = { block: "Block", throttle: "Throttle", alert_only: "Alert Only" };
+const OVERAGE_LABELS: Record<string, string> = { block: "Block", alert_only: "Alert Only" };
 const OVERAGE_COLORS: Record<string, string> = {
   block: "bg-red-500/10 text-red-500",
-  throttle: "bg-amber-500/10 text-amber-500",
   alert_only: "bg-blue-500/10 text-blue-500",
 };
 
@@ -746,7 +745,7 @@ export default function UsageBillingPage({ params }: PageProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-base font-medium">Usage Billing</h1>
+          <h1 className="text-base font-medium">End-User Billing</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Meter, limit, and bill your end-users for AI consumption.
           </p>
@@ -1400,7 +1399,6 @@ export default function UsageBillingPage({ params }: PageProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="block" className="text-xs">Block — reject requests over limit</SelectItem>
-                      <SelectItem value="throttle" className="text-xs">Throttle — slow down requests</SelectItem>
                       <SelectItem value="alert_only" className="text-xs">Alert Only — allow but notify</SelectItem>
                     </SelectContent>
                   </Select>
