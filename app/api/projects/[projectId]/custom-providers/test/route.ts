@@ -54,19 +54,21 @@ export async function POST(
             }
 
             baseUrl = provider.base_url;
-            apiKey = decryptApiKey(provider.encrypted_api_key, project.organization_id);
+            apiKey = provider.encrypted_api_key
+                ? decryptApiKey(provider.encrypted_api_key, project.organization_id)
+                : '';
             apiFormat = provider.api_format;
             testModel = provider.custom_models?.[0]?.model_name || body.model || 'gpt-3.5-turbo';
         } else {
-            if (!body.base_url || !body.api_key) {
+            if (!body.base_url) {
                 return NextResponse.json(
-                    { error: 'base_url and api_key are required', success: false },
+                    { error: 'base_url is required', success: false },
                     { status: 400 }
                 );
             }
 
             baseUrl = body.base_url;
-            apiKey = body.api_key;
+            apiKey = body.api_key || '';
             apiFormat = body.api_format || 'openai';
             testModel = body.model || 'gpt-3.5-turbo';
         }

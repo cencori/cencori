@@ -1,0 +1,313 @@
+---
+title: "Custom Providers API"
+description: "API reference for managing custom provider endpoints — create, list, update, delete, and test connections."
+section: "API Reference"
+order: 8
+---
+
+Manage custom AI provider endpoints for your project. Custom providers let you route gateway traffic to self-hosted models or any OpenAI/Anthropic-compatible server.
+
+> [!NOTE]
+> For an overview of custom providers, model routing, and dashboard setup, see the [Custom Providers platform docs](/docs/platform/custom-providers).
+
+## Authentication
+
+All endpoints use session authentication (dashboard cookies). These are internal project-scoped endpoints, not public API keys.
+
+Base path: `/api/projects/{projectId}/providers`
+
+## Create Provider
+
+```
+POST /api/projects/{projectId}/providers
+```
+
+**Request body:**
+
+```json
+{
+  "name": "My Local LLM",
+  "baseUrl": "http://my-server.example.com/v1",
+  "apiKey": "optional-api-key",
+  "format": "openai",
+  "models": [
+    { "name": "LLaMA 3.1 8B", "modelId": "llama3.1" },
+    { "name": "LLaMA 3.1 70B", "modelId": "llama3.1-70b" }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | string | Yes | Display name for the provider. Also used for model routing (Tier 2 and Tier 3 matching). |
+| `baseUrl` | string | Yes | Base URL of your model server, up to `/v1`. Do not include `/chat/completions`. |
+| `apiKey` | string | No | API key for authentication. Encrypted at rest with AES-256-GCM. Leave empty for local models without auth. |
+| `format` | `"openai"` \| `"anthropic"` | Yes | API format your server implements. |
+| `models` | array | No | Pre-register model names. Each object needs `name` (display label) and `modelId` (upstream model identifier). |
+
+**Response:** `201 Created`
+
+```json
+{
+  "provider": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "My Local LLM",
+    "base_url": "http://my-server.example.com/v1",
+    "api_format": "openai",
+    "is_active": true,
+    "created_at": "2026-04-12T14:30:00.000Z"
+  }
+}
+```
+
+## List Providers
+
+```
+GET /api/projects/{projectId}/providers
+```
+
+Returns all custom providers for the project, ordered by creation date (newest first). Includes registered models for each provider.
+
+**Response:** `200 OK`
+
+```json
+{
+  "providers": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "My Local LLM",
+      "base_url": "http://my-server.example.com/v1",
+      "api_format": "openai",
+      "is_active": true,
+      "created_at": "2026-04-12T14:30:00.000Z",
+      "custom_models": [
+        {
+          "id": "660e8400-e29b-41d4-a716-446655440001",
+          "model_name": "llama3.1",
+          "display_name": "LLaMA 3.1 8B"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Get Provider
+
+```
+GET /api/projects/{projectId}/providers/{providerId}
+```
+
+Returns a single provider with its models. Model objects include the `is_active` field.
+
+**Response:** `200 OK`
+
+```json
+{
+  "provider": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "My Local LLM",
+    "base_url": "http://my-server.example.com/v1",
+    "api_format": "openai",
+    "is_active": true,
+    "created_at": "2026-04-12T14:30:00.000Z",
+    "custom_models": [
+      {
+        "id": "660e8400-e29b-41d4-a716-446655440001",
+        "model_name": "llama3.1",
+        "display_name": "LLaMA 3.1 8B",
+        "is_active": true
+      }
+    ]
+  }
+}
+```
+
+**Errors:**
+
+| Status | Reason |
+| :--- | :--- |
+| `404` | Provider not found or does not belong to this project |
+
+## Update Provider
+
+```
+PATCH /api/projects/{projectId}/providers/{providerId}
+```
+
+Update any combination of provider fields. Only include the fields you want to change.
+
+**Request body:**
+
+```json
+{
+  "name": "Updated Name",
+  "baseUrl": "https://new-url.example.com/v1",
+  "isActive": false,
+  "format": "anthropic"
+}
+```
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | string | New display name |
+| `baseUrl` | string | New base URL |
+| `isActive` | boolean | Set to `false` to disable. The gateway skips inactive providers during routing. |
+| `format` | `"openai"` \| `"anthropic"` | Change the API format |
+
+**Response:** `200 OK` — returns the updated provider object.
+
+## Delete Provider
+
+```
+DELETE /api/projects/{projectId}/providers/{providerId}
+```
+
+Permanently removes the provider and all its registered models. Requests that were routing to this provider will fail until you update the model name in your code or add a new provider.
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true
+}
+```
+
+## Test Connection
+
+```
+POST /api/projects/{projectId}/custom-providers/test
+```
+
+Test connectivity to a custom provider. Sends a minimal chat completion request (`"Say 'test' and nothing else."`, `max_tokens: 5`) and reports success/failure with latency.
+
+Two modes:
+
+### Test an existing provider
+
+```json
+{
+  "provider_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+The endpoint looks up the provider's base URL, decrypts the API key (if any), and uses the first registered model. You can override the model with the `model` field.
+
+### Test before creating
+
+```json
+{
+  "base_url": "http://localhost:11434/v1",
+  "api_format": "openai",
+  "model": "llama3.1",
+  "api_key": "optional"
+}
+```
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `base_url` | string | Yes (if no `provider_id`) | Model server endpoint |
+| `api_format` | `"openai"` \| `"anthropic"` | No | Defaults to `"openai"` |
+| `model` | string | No | Model to test. Defaults to `"gpt-3.5-turbo"`. |
+| `api_key` | string | No | API key for auth. Leave empty for local models. |
+
+### Success response
+
+```json
+{
+  "success": true,
+  "message": "Connection successful",
+  "latency_ms": 342,
+  "response": {
+    "model": "llama3.1",
+    "content": "test",
+    "usage": {
+      "prompt_tokens": 5,
+      "completion_tokens": 1,
+      "total_tokens": 6
+    }
+  }
+}
+```
+
+### Failure responses
+
+Provider returned an error:
+
+```json
+{
+  "success": false,
+  "error": "Provider returned 401: {\"error\":\"invalid api key\"}",
+  "latency_ms": 150
+}
+```
+
+Connection timeout (30-second limit):
+
+```json
+{
+  "success": false,
+  "error": "Connection timed out after 30 seconds"
+}
+```
+
+## List Models (Gateway)
+
+Custom provider models appear alongside built-in models in the gateway's models endpoint:
+
+```
+GET /api/v1/models
+Authorization: Bearer csk_your_key
+```
+
+Custom models are returned with `owned_by` set to `custom:{providerId}`. The provider name is also included as an alias model for Tier 2 routing.
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "llama3.1",
+      "object": "model",
+      "created": 1712937600,
+      "owned_by": "custom:550e8400-e29b-41d4-a716-446655440000",
+      "name": "LLaMA 3.1 8B",
+      "type": "chat",
+      "context_window": 0,
+      "description": "Custom provider model (My Local LLM)"
+    },
+    {
+      "id": "My Local LLM",
+      "object": "model",
+      "created": 1712937600,
+      "owned_by": "custom:550e8400-e29b-41d4-a716-446655440000",
+      "name": "My Local LLM",
+      "type": "chat",
+      "context_window": 0,
+      "description": "Custom provider alias (My Local LLM)"
+    }
+  ]
+}
+```
+
+Filter by provider:
+
+```
+GET /api/v1/models?provider=custom:550e8400-e29b-41d4-a716-446655440000
+```
+
+## Error Handling
+
+All endpoints return errors in this format:
+
+```json
+{
+  "error": "Human-readable error message"
+}
+```
+
+| Status | Meaning |
+| :--- | :--- |
+| `400` | Missing required fields or invalid input |
+| `404` | Project or provider not found |
+| `500` | Internal server error |

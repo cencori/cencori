@@ -1,0 +1,148 @@
+---
+title: "How to Connect a Local LLaMA Model to Cencori"
+slug: "connect-local-llm-to-cencori"
+date: "2026-04-12"
+excerpt: "Run your own model, get production-grade security, billing, and observability on top. A step-by-step guide to routing a self-hosted LLaMA through the Cencori gateway."
+coverImage: "/blog/images/covers/custom.png"
+tags: ["Guide", "LLaMA", "Self-Hosted", "Gateway", "Custom Providers"]
+published: true
+---
+
+Most teams start with OpenAI or Anthropic. But at some point, you want to run your own model — cost control, data privacy, fine-tuning, or just because you can. The problem: the moment you self-host, you lose everything that cloud APIs give you for free. No usage dashboard. No rate limiting. No per-user billing. No security filtering. Just a raw HTTP endpoint and a prayer.
+
+This guide shows how to connect a self-hosted LLaMA model to Cencori so you get the full production stack on top of your own infrastructure.
+
+We'll use a real example: a startup called **Marlo** that builds an AI writing assistant for legal teams. They fine-tuned LLaMA 3.1 on case law and run it on their own GPU server. Their problem: 200 law firm users hammering the model with no visibility into who's using what, no way to enforce per-firm limits, and no billing.
+
+## What You Need
+
+- A Cencori account with a project and an API key (`csk_*`)
+- LLaMA (or any model) running behind an OpenAI-compatible API
+- The model endpoint reachable from the internet
+
+## Step 1: Get Your Model Running
+
+If you're already serving your model, skip ahead. If not, the fastest way is [Ollama](https://ollama.com):
+
+```bash
+ollama serve
+ollama pull llama3.1
+```
+
+Ollama starts on `http://localhost:11434` and exposes an OpenAI-compatible API at `/v1/chat/completions`.
+
+Other options:
+
+| Server | Command | Endpoint |
+| :--- | :--- | :--- |
+| **Ollama** | `ollama serve` | `http://localhost:11434/v1` |
+| **vLLM** | `vllm serve meta-llama/Llama-3.1-8B-Instruct` | `http://localhost:8000/v1` |
+| **LM Studio** | Start from the UI | `http://localhost:1234/v1` |
+
+All three implement the OpenAI chat completions format. If your server responds to `POST /v1/chat/completions` with the standard shape, it works with Cencori.
+
+## Step 2: Make It Reachable
+
+Cencori's gateway needs to reach your model server over the internet. Three options depending on your setup:
+
+**Production** — deploy on a cloud VM (AWS, GCP, Hetzner, etc.) with a public IP or domain. This is what Marlo does: their fine-tuned LLaMA runs on a GPU instance at `https://llm.marlo.legal/v1`.
+
+**Testing** — use a tunnel:
+
+```bash
+ngrok http 11434
+```
+
+This gives you a public URL like `https://abc123.ngrok.io` that forwards to your local Ollama. Good for trying things out, not for production.
+
+**Your own infra** — if you already host services, put your model server behind your existing reverse proxy and point a subdomain at it.
+
+## Step 3: Add the Provider in Cencori
+
+1. Open your project in the [Cencori dashboard](https://cencori.com/dashboard).
+2. Go to **Custom Providers** in the sidebar.
+3. Click **Add Provider**.
+4. Fill in:
+   - **Name**: `Marlo LLaMA` (whatever makes sense for your team)
+   - **Base URL**: your model's endpoint, e.g. `https://llm.marlo.legal/v1`
+   - **API Key**: leave empty if your model doesn't require auth. If you've set up auth on your server, enter the key here — it's encrypted at rest.
+   - **Format**: **OpenAI Compatible**
+5. Click **Create**.
+
+## Step 4: Test the Connection
+
+On the provider card, click **Test**. Cencori sends a minimal request to your model and reports back with success/failure and latency. If it fails, check:
+
+- Is the base URL correct? It should be the path up to `/v1`, not including `/chat/completions`.
+- Is the server running and reachable from the internet?
+- If you're using ngrok, is the tunnel still active?
+
+## Step 5: Use It
+
+Now you call Cencori's gateway exactly like you would call OpenAI — just with your model name:
+
+```typescript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "csk_your_cencori_key",
+  baseURL: "https://api.cencori.com/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "llama3.1",  // matches what your model server expects
+  messages: [
+    { role: "system", content: "You are a legal research assistant." },
+    { role: "user", content: "Summarize the key holdings in Chevron v. NRDC." },
+  ],
+  user: "firm_davis_wright",  // optional: enables per-user tracking and billing
+});
+
+console.log(response.choices[0].message.content);
+```
+
+The gateway resolves `llama3.1` to your custom provider, forwards the request to your model server, and returns the response in the standard OpenAI format. Your app code doesn't know or care that it's hitting a self-hosted model.
+
+## What You Get
+
+The moment traffic flows through the gateway, your self-hosted model gets the same production stack as OpenAI or Anthropic:
+
+**Observability** — every request logged in the dashboard with model, latency, token count, status, and the user who made it. Marlo can see which firms are generating the most load and which prompts are slow.
+
+**Security filtering** — PII detection and prompt injection blocking run on every request before it reaches your model. If a law firm user accidentally pastes a client's SSN into the prompt, it gets caught.
+
+**Rate limiting** — project-level and per-user limits. Marlo sets each firm to 1,000 requests/day so one heavy user can't starve the others.
+
+**End-user billing** — assign rate plans to users, set markup on top of your model's cost, generate invoices through Stripe Connect. Marlo charges each firm based on actual usage instead of a flat monthly fee.
+
+**Model flexibility** — Marlo uses their fine-tuned LLaMA for case law, but routes general questions to GPT-4o. Same codebase, same gateway, same billing — just a different `model` field.
+
+## Adding More Models Later
+
+Custom providers don't lock you in. You can add OpenAI, Anthropic, Groq, or another self-hosted model at any time. Your app code stays the same:
+
+```typescript
+// Route to self-hosted LLaMA for legal research
+await client.chat.completions.create({ model: "llama3.1", ... });
+
+// Route to GPT-4o for general tasks
+await client.chat.completions.create({ model: "gpt-4o", ... });
+
+// Route to Claude for long documents
+await client.chat.completions.create({ model: "claude-sonnet-4.5", ... });
+```
+
+All three go through Cencori. All three get security, billing, and observability. The gateway handles routing.
+
+## The Point
+
+Self-hosting a model shouldn't mean giving up production tooling. You chose to run your own model for a reason — cost, privacy, fine-tuning. Cencori lets you keep that choice and still ship with the same confidence you'd have using a managed API.
+
+Your model, your infrastructure, your data. Our security, billing, and observability on top.
+
+## Resources
+
+- [Custom Providers docs](/docs/platform/custom-providers)
+- [End-User Billing](/docs/platform/end-user-billing) — meter and charge your users
+- [End-User Billing Setup Guide](/docs/guides/end-user-billing-setup) — step-by-step for non-technical users
+- [Dashboard](https://cencori.com/dashboard) — add a custom provider right now

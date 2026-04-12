@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Power, PowerOff, Server } from 'lucide-react';
+import { Plus, Trash2, Power, PowerOff, Server, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/hooks/useQueries';
@@ -126,6 +126,26 @@ export default function ProvidersPage({ params }: PageProps) {
             toast.success('Provider deleted');
         },
         onError: () => toast.error('Failed to delete provider'),
+    });
+
+    // Test connection mutation
+    const testMutation = useMutation({
+        mutationFn: async (providerId: string) => {
+            const res = await fetch(`/api/projects/${projectId}/custom-providers/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider_id: providerId }),
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                toast.success(`Connection successful (${data.latency_ms}ms)`);
+            } else {
+                toast.error(data.error || 'Connection failed');
+            }
+        },
+        onError: () => toast.error('Failed to test connection'),
     });
 
     const handleDelete = (id: string) => {
@@ -251,6 +271,16 @@ export default function ProvidersPage({ params }: PageProps) {
                             </div>
 
                             <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] flex-1"
+                                    onClick={() => testMutation.mutate(provider.id)}
+                                    disabled={testMutation.isPending}
+                                >
+                                    <Zap className="h-3 w-3 mr-1" />
+                                    {testMutation.isPending ? 'Testing...' : 'Test'}
+                                </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
