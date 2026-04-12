@@ -260,7 +260,7 @@ export default function ProjectLayoutClient({
     ];
 
     const billingItems: NavItem[] = [
-        { href: `${basePath}/end-user-billing`, icon: Receipt, label: "Usage Billing" },
+        { href: `${basePath}/end-user-billing`, icon: Receipt, label: "End-User Billing" },
     ];
 
     const settingsItems: NavItem[] = [
