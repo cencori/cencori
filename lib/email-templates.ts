@@ -68,7 +68,7 @@ function wrapInContainer(content: string, preheader?: string): string {
     table, td { color: #202124; }
     a { color: #1a73e8; text-decoration: underline; }
     img { border: 0; display: block; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
-    p { margin: 0 0 16px; }
+    p { margin: 0 0 10px; }
     h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
 
     /* Gmail-like (Google Material) light tokens */
@@ -121,7 +121,7 @@ function wrapInContainer(content: string, preheader?: string): string {
     [data-ogsc] .footer { border-top-color: #3c4043 !important; }
   </style>
 </head>
-<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.6;color:#202124;background-color:#ffffff;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<body class="body" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';line-height:1.5;color:#202124;background-color:#ffffff;margin:0;padding:0;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
   <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bg" style="background-color:#ffffff;background:#ffffff;" bgcolor="#ffffff">
     <tr>
       <td align="center" class="bg" style="background-color:#ffffff;background:#ffffff;padding:0;" bgcolor="#ffffff">
@@ -154,7 +154,7 @@ export function minimalTemplate(options: EmailTemplateOptions): string {
     : '';
 
   return wrapInContainer(`
-    <div class="text" style="font-size:15px;color:#202124;line-height:1.7;">
+    <div class="text" style="font-size:13px;color:#202124;line-height:1.5;">
       ${body}
     </div>
     ${ctaBlock}
