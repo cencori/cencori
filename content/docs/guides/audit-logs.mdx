@@ -1,32 +1,31 @@
 ---
-title: "Audit Logs"
-description: "Comprehensive logging of all AI requests and responses for compliance, debugging, and analytics."
+title: "AI Request Logs"
+description: "View, search, and export logs for every AI request processed through the Cencori gateway."
 section: "Guides"
 order: 1
 ---
 
-## What are Audit Logs?
+AI request logs capture every AI request processed through the Cencori gateway. Each log entry includes the full request and response details — model, tokens, cost, latency, provider, status, and security metadata.
 
-Audit logs are immutable records of every AI request processed through Cencori. They provide complete traceability for compliance, security investigations, and performance optimization.
+> [!NOTE]
+> This page covers AI request/response logs (what your users sent and received). For organization-level change tracking (who modified settings, keys, or rules), see [Audit Logs](/docs/platform/audit-logs).
 
 ## What Gets Logged
 
-Cencori logs a comprehensive set of metadata for every interaction:
-
 ### Request Information
-- Complete prompt text
+- Prompt text and messages
 - Model and parameters (temperature, max_tokens)
 - API key used
 - User/session identifier
 - Timestamp (millisecond precision)
-- IP address
+- IP address and geolocation
 
 ### Response Information
 - AI-generated content
 - Token usage (input/output/total)
-- Cost calculation
+- Cost calculation (provider cost and Cencori charge)
 - Latency metrics
-- Provider used
+- Provider used (including failover details)
 - Status code (success/error)
 
 ### Security Metadata
@@ -35,23 +34,10 @@ Cencori logs a comprehensive set of metadata for every interaction:
 - Prompt injection score
 - Security incidents linked
 
-## Log Retention
-
-Retention periods vary based on your plan:
-
-| Plan | Retention Period | Export Available |
-|------|------------------|------------------|
-| **Free** | 7 days | No |
-| **Pro** | 30 days | CSV |
-| **Enterprise** | 1 year+ | CSV, JSON, API |
-
-> [!NOTE]
-> After the retention period, logs are permanently deleted. Export important logs before they expire.
-
-## Viewing Logs in Dashboard
+## Viewing Logs in the Dashboard
 
 1. Navigate to your project in the [dashboard](/dashboard)
-2. Click **"Logs"** in the sidebar
+2. Click **Logs** in the sidebar
 3. Use filters to narrow results:
     - Date range
     - Model
@@ -68,49 +54,28 @@ Search through logs using full-text search to:
 - Locate expensive queries (high token usage)
 - Debug failed requests by error message
 
-## Accessing via API
-
-You can fetch logs programmatically. The dashboard uses a project-scoped endpoint:
-
-```typescript
-// fetch-logs.ts
-const response = await fetch(
-  'https://cencori.com/api/projects/proj_123/logs?' +
-  'time_range=24h&model=gpt-4o&per_page=100',
-  {
-    headers: {
-      // Uses your authenticated dashboard session
-      // (this endpoint is not part of the public API)
-    }
-  }
-);
-
-const { requests } = await response.json();
-
-requests.forEach(log => {
-  console.log(`[${log.created_at}] ${log.model}: ${log.total_tokens} tokens, $${log.cost_usd}`);
-});
-```
-
 ## Exporting Logs
 
 Export logs for archival or external analysis:
 
-### CSV Export (Pro+)
-Download as CSV for Excel/Google Sheets analysis. Includes all fields except full prompt text (for PII protection).
+### CSV Export
+Download as CSV for Excel or Google Sheets analysis. Includes all fields except full prompt text (for PII protection).
 
-### JSON Export (Enterprise)
+### JSON Export
 Complete log data including prompts and responses. Useful for data warehouses or custom analysis.
 
-### Scheduled Exports (Enterprise)
-Automatically export logs to S3, BigQuery, or Snowflake daily/weekly.
+## Log Retention
 
-## Compliance Use Cases
+Retention periods vary based on your plan:
 
-- **SOC 2 Compliance:** Demonstrate access controls and monitoring. Auditors can review who accessed what AI models and when.
-- **GDPR Right of Access:** When users request their data, search logs by user ID to find all their AI interactions.
-- **HIPAA Audit Trails:** Track all access to protected health information (PHI) for compliance reporting.
-- **Forensic Investigation:** If a security incident occurs, trace the exact sequence of events using timestamps and request IDs.
+| Plan | Retention Period | Export Available |
+| :--- | :--- | :--- |
+| **Free** | 7 days | No |
+| **Pro** | 30 days | CSV |
+| **Enterprise** | 1 year+ | CSV, JSON, API |
+
+> [!NOTE]
+> After the retention period, logs are permanently deleted. Export important logs before they expire.
 
 ## Best Practices
 
@@ -120,3 +85,9 @@ Automatically export logs to S3, BigQuery, or Snowflake daily/weekly.
 - Set up alerts for unusual patterns (cost spikes, error rate increases)
 - Document your log retention policy for compliance
 - Redact sensitive data before sharing logs with third parties
+
+## Related
+
+- [Audit Logs](/docs/platform/audit-logs) — organization-level change tracking (who modified what)
+- [Observability](/docs/guides/observability) — metrics, dashboards, and alerting
+- [Security](/docs/platform/security) — PII detection and content filtering

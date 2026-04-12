@@ -1,0 +1,103 @@
+---
+title: "Audit Logs"
+description: "Track every administrative change across your organization — who did what, when, and from where."
+section: "Platform"
+order: 4
+---
+
+Audit logs record every administrative action across your organization. API key created, security rule changed, provider key rotated, rate plan updated — it's all logged with the actor, timestamp, IP address, and metadata.
+
+This is separate from [AI request logs](/docs/guides/audit-logs), which track individual AI requests and responses. Audit logs track changes to your Cencori configuration — the actions your team takes in the dashboard or through management APIs.
+
+## What Gets Logged
+
+Every mutation to your organization or project configuration is recorded:
+
+| Category | Examples |
+| :--- | :--- |
+| **api_key** | Key created, revoked |
+| **provider** | Provider key added, updated, deleted, activated, deactivated |
+| **security** | Security settings changed, custom rules created/updated/deleted, incidents reviewed |
+| **billing** | Subscription changes, credit top-ups, Stripe Connect connected/disconnected |
+| **budget** | Budget limits configured, alerts set |
+| **end_user** | End-user created, updated, blocked, unblocked, deleted |
+| **rate_plan** | Rate plan created, updated, deleted |
+| **member** | Member invited, joined, left, role changed |
+| **sso** | SSO configured, updated |
+| **settings** | Project settings updated |
+| **prompt** | Prompt created, updated, deleted, version published, deployed |
+| **cache** | Cache settings configured |
+| **webhook** | Webhook created, updated, deleted |
+| **integration** | Edge integration added, updated, removed |
+| **agent** | Agent created, updated, configured |
+| **project** | Project created, updated |
+| **export** | Data exported (billing, logs, audit) |
+| **memory** | Memory namespace or entries modified |
+
+Each log entry includes:
+
+- **Timestamp** — millisecond precision
+- **Category** — what area was affected
+- **Action** — what happened (created, updated, deleted, revoked, etc.)
+- **Description** — human-readable summary
+- **Actor** — email address of the user who made the change
+- **Actor IP** — IP address of the request
+- **Actor type** — `user`, `system`, `api`, or `webhook`
+- **Resource type and ID** — what was changed
+- **Project** — which project was affected (if applicable)
+- **Metadata** — structured JSON with before/after values and additional context
+
+## Viewing Audit Logs
+
+Navigate to your organization's **Audit Log** page in the dashboard sidebar. The page shows a chronological table of all events.
+
+### Filtering
+
+Use the filter bar to narrow results:
+
+- **Category** — filter by area (API key, security, billing, etc.)
+- **Time range** — last hour, 24 hours, 7 days, 30 days, 90 days, or all time
+- **Project** — scope to a specific project
+- **Search** — full-text search across event descriptions
+
+### Expanded Details
+
+Click any row to expand it and view:
+
+- Resource type and ID
+- Actor IP address
+- Full ISO timestamp
+- Complete metadata JSON (includes before/after values where applicable)
+
+## Exporting
+
+Export audit logs in CSV or JSON format from the dashboard. Click the **CSV** or **JSON** button in the top-right corner of the audit log page.
+
+Exports respect your current filters — if you've filtered to a specific category, time range, or project, only matching entries are exported.
+
+- **CSV** — up to 50,000 rows. Opens in Excel, Google Sheets, or any spreadsheet tool.
+- **JSON** — full structured data including metadata. Useful for feeding into a SIEM, data warehouse, or custom analysis pipeline.
+
+## Access Control
+
+Audit logs are restricted to organization **owners** and **admins**. Members with other roles cannot view or export audit logs. This is enforced at both the API and database level (RLS).
+
+## Retention
+
+Audit logs are retained indefinitely. There is no automatic deletion. For compliance purposes, you can export logs at any time for long-term archival in your own systems.
+
+## Compliance
+
+Audit logs support common compliance requirements:
+
+- **SOC 2** — demonstrate that access and configuration changes are tracked and attributable to specific users
+- **ISO 27001** — satisfy change management and access logging controls
+- **GDPR** — trace who accessed or modified systems that process personal data
+- **HIPAA** — maintain audit trails for systems handling protected health information
+- **Internal investigations** — reconstruct the exact sequence of changes leading to an incident
+
+## Related
+
+- [AI Request Logs](/docs/guides/audit-logs) — individual AI request/response logs with token usage and cost
+- [Security](/docs/platform/security) — PII detection, content filtering, and security incidents
+- [Organizations](/docs/platform/organizations) — organization structure and member management
