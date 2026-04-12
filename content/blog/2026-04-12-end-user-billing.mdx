@@ -1,0 +1,114 @@
+---
+title: "End-User Billing: Meter, Limit, and Charge Your Users"
+slug: "end-user-billing"
+date: "2026-04-12"
+excerpt: "Per-user rate plans, quota enforcement, markup pricing, and Stripe Connect payouts — built into the Cencori gateway. Your users pay you, not us."
+coverImage: "/blog/images/covers/enduser.png"
+tags: ["Product", "Launch", "Billing", "Monetization"]
+published: true
+---
+
+If you're running AI features in production, you've already dealt with the first wave of problems: routing, security, observability. But once real users show up, a second problem arrives fast — who's using how much, and who's paying for it.
+
+Today we're launching **End-User Billing** on Cencori. It gives you per-user metering, rate plan enforcement, markup pricing, and Stripe Connect payouts. All of it works through the same gateway you already route AI traffic through.
+
+## The Problem
+
+Most teams building AI products end up cobbling together usage tracking from three or four systems. Token counts from the provider. Cost estimates from a spreadsheet. Rate limiting from a Redis layer they wrote themselves. Billing from Stripe, but with no connection to any of the above.
+
+The result: you either don't charge for AI usage at all (and eat the cost), or you build a fragile internal billing pipeline that breaks whenever you add a model or change pricing.
+
+## What We Built
+
+End-user billing is a single system that handles the full loop:
+
+**1. Rate Plans** — Define tiers with token limits, request limits, cost caps, per-minute burst protection, model restrictions, and your markup on top of provider cost. Create as many plans as you need. Assign a default for new users.
+
+**2. Quota Enforcement** — Every request through the Cencori gateway is checked against the user's plan limits in real time. Over their daily token cap? Blocked with a `429` and a `Retry-After` header. On an alert-only plan? Request goes through, you get flagged in the dashboard.
+
+**3. Usage Tracking** — Every request is metered per user, per day, per month. Token counts, request counts, provider cost, your markup — all tracked automatically. No extra API calls if you use the gateway.
+
+**4. Markup Pricing** — Set a percentage markup on top of provider cost, a flat fee per request, or both. Different plans can have different margins. The math happens at the gateway level — you see provider cost and your revenue as separate numbers.
+
+**5. Invoices** — Generate invoices for any billing period. Send them through Stripe Connect or export the data and bill however you want.
+
+**6. Stripe Connect Payouts** — Connect your Stripe account once (org-level, covers all projects). Generate invoices, send them to your users, collect payment. Your users pay you directly. Cencori never touches the funds.
+
+## Two Integration Paths
+
+**If you use the Cencori gateway** — you're done. Pass `user: "user_123"` in your AI requests. Billing, limits, metering — all automatic. Zero additional code.
+
+```typescript
+const client = new OpenAI({
+  apiKey: "csk_your_cencori_key",
+  baseURL: "https://api.cencori.com/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: userMessage }],
+  user: "user_123",
+});
+```
+
+**If you call providers directly** — two API calls. Check quota before, report usage after.
+
+```typescript
+// Before processing
+const quota = await fetch(
+  `https://api.cencori.com/api/v1/billing/check-quota?end_user_id=${userId}`,
+  { headers: { Authorization: `Bearer ${CENCORI_KEY}` } }
+).then(r => r.json());
+
+if (!quota.allowed) {
+  throw new Error(`Limit reached: ${quota.reason}`);
+}
+
+// After processing
+await fetch("https://api.cencori.com/api/v1/billing/usage-events", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${CENCORI_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    end_user_id: userId,
+    model: "gpt-4o",
+    provider: "openai",
+    prompt_tokens: response.usage.prompt_tokens,
+    completion_tokens: response.usage.completion_tokens,
+    cost_usd: 0.0085,
+  }),
+});
+```
+
+## Environment Scoping
+
+Test-key traffic and production-key traffic are tracked separately. Your QA runs don't blow out a user's production quota. This is automatic — it follows the API key environment.
+
+## The Dashboard
+
+Four tabs:
+
+- **Configuration** — toggle billing on/off, set your default markup, connect Stripe
+- **End Users** — search, filter, block/unblock, change plans, view per-user usage
+- **Rate Plans** — create and manage tiers with full limit and pricing controls
+- **Revenue** — total revenue, provider cost, margin, daily trends, top users
+
+Everything updates in real time as requests flow through the gateway.
+
+## Who This Is For
+
+Any team charging for AI usage — or any team that should be but isn't because building the billing pipeline felt like too much work.
+
+SaaS products with AI features. API companies reselling model access. Internal tools that need per-team cost attribution. Enterprise deployments where different departments need different limits.
+
+If you already route traffic through Cencori, this is a configuration change. If you don't, the Usage Events API gets you there in under an hour.
+
+## Get Started
+
+- [Setup Guide](/docs/guides/end-user-billing-setup) — step-by-step, no code required for the dashboard setup
+- [API Reference](/docs/platform/end-user-billing) — full technical docs for your engineering team
+- [Dashboard](https://cencori.com/dashboard) — enable billing on any project right now
+
+End-user billing is live for all Cencori projects today.

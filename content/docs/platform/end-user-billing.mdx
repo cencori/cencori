@@ -17,7 +17,7 @@ End-user billing lets you charge your customers for AI usage. Set per-user rate 
 3. If allowed, process the request.
 4. Report the usage back to Cencori.
 5. Cencori tracks everything — limits, costs, revenue.
-6. You view it all in the Usage Billing dashboard.
+6. You view it all in the End-User Billing dashboard.
 
 There are two ways to connect:
 
@@ -65,26 +65,30 @@ Response:
 ```json
 {
   "allowed": true,
-  "reason": null,
+  "reason": "within_limits",
   "end_user_id": "user_123",
   "is_new_user": false,
   "rate_plan": "pro",
   "overage_action": "block",
+  "retry_after_seconds": null,
   "usage": {
     "daily_tokens": { "used": 45200, "limit": 1000000 },
     "monthly_tokens": { "used": 1250000, "limit": 30000000 },
     "daily_requests": { "used": 23, "limit": 500 },
-    "monthly_requests": { "used": 412, "limit": 10000 }
+    "monthly_requests": { "used": 412, "limit": 10000 },
+    "requests_per_minute": { "used": 12, "limit": 60 }
   },
   "billing": {
     "markup_percentage": 20,
     "flat_rate_per_request": null,
-    "allowed_models": ["gpt-4o", "claude-sonnet-4-20250514"]
+    "allowed_models": ["gpt-4o", "claude-sonnet-4.5"]
   }
 }
 ```
 
-If `allowed` is `false`, block the request and show the `reason` to your user.
+When `allowed` is `false`, the `reason` field tells you which limit was hit (e.g. `daily_token_limit_exceeded`, `monthly_request_limit_exceeded`, `requests_per_minute_exceeded`, `user_blocked`). If the limit is time-based, `retry_after_seconds` tells your app how long to wait before retrying.
+
+`check-quota` always returns `200 OK` — inspect the `allowed` field to decide what to do. If you route traffic through the Cencori gateway instead, blocked requests return `429 Too Many Requests` (see [Gateway 429 Responses](#gateway-429-responses) below).
 
 You can also POST the same request with a JSON body:
 
@@ -102,7 +106,7 @@ After your AI request completes, report the usage:
 ```bash
 curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
   -H "Authorization: Bearer csk_your_secret_key" \
-  -H "Content-Type: application/json" \
+  -H "Content-Type": "application/json" \
   -d '{
     "end_user_id": "user_123",
     "model": "gpt-4o",
@@ -146,7 +150,7 @@ curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
       },
       {
         "end_user_id": "user_456",
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4.5",
         "prompt_tokens": 800,
         "completion_tokens": 2000,
         "cost_usd": 0.012
@@ -180,7 +184,7 @@ async function handleUserMessage(userId: string, message: string) {
 
   // 2. Call your AI provider directly
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4.5",
     max_tokens: 1024,
     messages: [{ role: "user", content: message }],
   });
@@ -194,7 +198,7 @@ async function handleUserMessage(userId: string, message: string) {
     },
     body: JSON.stringify({
       end_user_id: userId,
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4.5",
       provider: "anthropic",
       prompt_tokens: response.usage.input_tokens,
       completion_tokens: response.usage.output_tokens,
@@ -223,7 +227,7 @@ async function handleUserMessage(userId: string, message: string) {
 
 ## Rate Plans
 
-Rate plans define per-user limits and pricing. Create them in the dashboard under **Usage Billing > Rate Plans**.
+Rate plans define per-user limits and pricing. Create them in the dashboard under **End-User Billing > Rate Plans**.
 
 Each plan can set:
 
@@ -236,29 +240,190 @@ Each plan can set:
 | Markup percentage | Your margin on top of provider cost |
 | Flat rate per request | Fixed fee added to each request |
 | Allowed models | Restrict which models this plan can access |
-| Overage action | `block` (hard stop), `throttle`, or `alert_only` |
+| Overage action | `block` (hard stop — returns 429 via gateway, `allowed: false` via check-quota) or `alert_only` (lets requests through, flags the overage in your dashboard) |
 
 > [!NOTE]
 > If a user has no assigned plan, they inherit the project's default plan. If no default plan exists, they have no limits.
 
-## End-User Auto-Creation
+### Rate Plan API
 
-Users are created automatically on first quota check. You don't need to pre-register them. The `end_user_id` you pass becomes their `external_id` in the system.
+Rate plans are managed via the dashboard or the management API (session-cookie auth).
 
-You can also manage users explicitly through the dashboard or the management API:
+**Create a plan:**
 
-```bash
-# Create/update an end-user with a specific rate plan
-curl -X POST https://api.cencori.com/api/projects/{projectId}/end-users \
-  -H "Authorization: Bearer user_session_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "external_id": "user_123",
-    "display_name": "John Doe",
-    "email": "john@example.com",
-    "rate_plan_id": "plan_uuid_here"
-  }'
 ```
+POST /api/projects/{projectId}/rate-plans
+```
+
+```json
+{
+  "name": "Pro",
+  "slug": "pro",
+  "is_default": false,
+  "daily_token_limit": 2000000,
+  "monthly_token_limit": 50000000,
+  "daily_request_limit": 500,
+  "monthly_request_limit": 10000,
+  "requests_per_minute": 60,
+  "daily_cost_limit_usd": 5.00,
+  "monthly_cost_limit_usd": 50.00,
+  "markup_percentage": 20,
+  "flat_rate_per_request": null,
+  "allowed_models": ["gpt-4o", "claude-sonnet-4.5"],
+  "overage_action": "block",
+  "priority": 0
+}
+```
+
+Required fields: `name`, `slug`. All other fields are optional.
+
+**Update a plan:**
+
+```
+PATCH /api/projects/{projectId}/rate-plans/{planId}
+```
+
+Send only the fields you want to change. Same field names as create.
+
+**Delete a plan:**
+
+```
+DELETE /api/projects/{projectId}/rate-plans/{planId}
+```
+
+If end-users are assigned to the deleted plan, they are automatically reassigned to the project's default plan. If no default plan exists and users are still assigned, the delete returns `409 Conflict`.
+
+**List all plans:**
+
+```
+GET /api/projects/{projectId}/rate-plans
+```
+
+Returns all plans for the project, sorted by `priority` ascending.
+
+### Priority
+
+When multiple plans could apply to a user, the plan explicitly assigned to the user takes precedence. If no plan is assigned, the project's default plan (`is_default: true`) is used. The `priority` field is for your own ordering in the dashboard — it does not affect which plan is selected.
+
+## End-User Management
+
+### Auto-Creation
+
+Users are created automatically when usage is recorded for the first time, either by the AI Gateway after a successful request or by the Usage Events API. A quota check by itself does not create an `end_users` row.
+
+You can also manage users explicitly through the dashboard.
+
+> [!NOTE]
+> Project management routes such as `/api/projects/{projectId}/end-users` are currently dashboard management endpoints backed by the authenticated Supabase session cookie. They do not yet support bearer-token auth for external automation.
+
+### End-User API
+
+**Create or update a user (upsert by `external_id`):**
+
+```
+POST /api/projects/{projectId}/end-users
+```
+
+```json
+{
+  "external_id": "user_123",
+  "display_name": "Jane Doe",
+  "email": "jane@example.com",
+  "rate_plan_id": "uuid-of-rate-plan",
+  "is_blocked": false,
+  "metadata": { "plan_tier": "enterprise", "signup_source": "api" }
+}
+```
+
+Required: `external_id`. All other fields are optional. If a user with that `external_id` already exists in the project, it updates instead of creating.
+
+The `metadata` field accepts arbitrary JSON. Use it to store customer-specific tags (plan tier, signup source, internal notes, etc.) that your team can reference in the dashboard.
+
+**Update a user:**
+
+```
+PATCH /api/projects/{projectId}/end-users/{endUserId}
+```
+
+Accepts: `display_name`, `email`, `rate_plan_id`, `is_blocked`, `metadata`, `status` (alias — `"blocked"` sets `is_blocked: true`, `"active"` sets `is_blocked: false`).
+
+**Delete a user:**
+
+```
+DELETE /api/projects/{projectId}/end-users/{endUserId}
+```
+
+Permanently removes the user and their usage history. This cannot be undone.
+
+**Get user details:**
+
+```
+GET /api/projects/{projectId}/end-users/{endUserId}
+```
+
+Returns the user with their rate plan details and usage history (last 30 daily/monthly rows).
+
+**List users (paginated, filterable):**
+
+```
+GET /api/projects/{projectId}/end-users?page=1&per_page=25&search=jane&plan_id=uuid&status=active
+```
+
+## Invoices
+
+Generate invoices for your end-users based on their usage over a billing period. Invoices can optionally be sent through Stripe Connect.
+
+### List Invoices
+
+```
+GET /api/projects/{projectId}/end-user-billing/invoices?page=1&per_page=25&status=draft&end_user_id=uuid
+```
+
+All query parameters are optional. Filter by `status` (`draft`, `sent`, `paid`, `void`, `overdue`) or `end_user_id`.
+
+### Generate Invoices
+
+```
+POST /api/projects/{projectId}/end-user-billing/invoices
+```
+
+```json
+{
+  "period_start": "2026-03-01",
+  "period_end": "2026-04-01",
+  "end_user_ids": ["uuid-1", "uuid-2"],
+  "send_via_stripe": true
+}
+```
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `period_start` | string | Yes | Start date (YYYY-MM-DD) |
+| `period_end` | string | Yes | End date (YYYY-MM-DD) |
+| `end_user_ids` | string[] | No | Generate only for these users. Omit to generate for all users with usage in the period. |
+| `send_via_stripe` | boolean | No | If `true` and Stripe Connect is active, creates and sends a Stripe invoice. Defaults to `false`. |
+
+Response:
+
+```json
+{
+  "generated": 12,
+  "skipped": 3,
+  "errors": 0,
+  "invoices": [...],
+  "skipped_details": [...]
+}
+```
+
+### Invoice Lifecycle
+
+| Status | Meaning |
+| :--- | :--- |
+| `draft` | Generated but not sent |
+| `sent` | Sent to the end-user (via Stripe or manually) |
+| `paid` | Payment received (updated automatically by the Stripe Connect webhook) |
+| `overdue` | Payment failed (updated automatically by the Stripe Connect webhook) |
+| `void` | Cancelled |
 
 ## Stripe Connect
 
@@ -266,10 +431,12 @@ Collect payments from your end-users using Stripe Connect. Cencori acts as the p
 
 ### Setup
 
-1. Go to **Usage Billing > Configuration** in the dashboard.
+Stripe Connect is **organization-scoped**, not project-scoped. You connect one Stripe account per organization, and every project in that organization reuses it.
+
+1. Open any project's **End-User Billing > Configuration** page.
 2. Click **Connect Stripe Account**.
 3. Complete the Stripe onboarding flow.
-4. Once connected, you can generate invoices and collect payments.
+4. Once connected, every project in that organization can generate invoices and collect payments.
 
 ### How Charges Work
 
@@ -282,9 +449,22 @@ Provider cost (e.g. OpenAI)     $0.01
 
 The markup and flat fee come from the user's rate plan (or the project default).
 
+### Stripe Connect Webhook
+
+The webhook endpoint at `/api/billing/stripe-connect-webhook` processes the following Stripe events:
+
+| Event | Action |
+| :--- | :--- |
+| `account.updated` | Syncs the Connect account status (charges_enabled, payouts_enabled) |
+| `invoice.paid` | Marks the corresponding `end_user_invoice` as `paid` |
+| `invoice.payment_failed` | Marks the corresponding `end_user_invoice` as `overdue` |
+| `account.application.deauthorized` | Marks the Connect account as disconnected |
+
+Set the webhook URL in your Stripe dashboard to `https://your-domain.com/api/billing/stripe-connect-webhook` and configure the `STRIPE_CONNECT_WEBHOOK_SECRET` environment variable with the signing secret.
+
 ## Dashboard
 
-The **Usage Billing** page has four tabs:
+The **End-User Billing** page has four tabs:
 
 - **Configuration**: Enable/disable billing, set default markup, connect Stripe.
 - **End Users**: View all users, their plans, usage, and status. Block/unblock users.
@@ -293,13 +473,51 @@ The **Usage Billing** page has four tabs:
 
 ## Authentication
 
-Both billing endpoints use the same API key as the gateway:
+Both billing endpoints (`/api/v1/billing/*`) use the same API key as the gateway:
 
 - **Header**: `Authorization: Bearer csk_your_secret_key`
 - **Or**: `CENCORI_API_KEY: csk_your_secret_key`
 
 > [!CAUTION]
 > Only secret keys (`csk_*`) can report usage and check quotas. Publishable keys (`cpk_*`) are rejected.
+
+Dashboard management endpoints (`/api/projects/*`) use the authenticated Supabase session cookie and are not accessible via API key.
+
+## Environment Scoping
+
+Quota checks and usage aggregation are scoped by API key environment. Test-key traffic (`environment = test`) does not consume production quota, and production-key traffic does not consume test quota.
+
+## Gateway 429 Responses
+
+When a gateway request is blocked because the end-user exceeded a rate plan limit, the response looks like:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+Retry-After: 3600
+
+{
+  "error": "Rate limit exceeded",
+  "reason": "daily_token_limit_exceeded",
+  "retry_after_seconds": 3600
+}
+```
+
+The `Retry-After` header is included when the limit is time-based (daily/monthly resets, or requests-per-minute cooldown). Your client should respect this header for automatic retry logic.
+
+Possible `reason` values:
+
+| Reason | Description |
+| :--- | :--- |
+| `user_blocked` | User is manually blocked |
+| `daily_token_limit_exceeded` | Daily token cap reached |
+| `monthly_token_limit_exceeded` | Monthly token cap reached |
+| `daily_request_limit_exceeded` | Daily request cap reached |
+| `monthly_request_limit_exceeded` | Monthly request cap reached |
+| `requests_per_minute_exceeded` | Per-minute burst limit hit |
+| `daily_cost_limit_exceeded` | Daily cost cap reached |
+| `monthly_cost_limit_exceeded` | Monthly cost cap reached |
+| `model_not_allowed` | Model not in the plan's allowed list |
 
 ## Error Responses
 
@@ -308,8 +526,12 @@ Both billing endpoints use the same API key as the gateway:
 | 400 | Validation error (missing fields, billing not enabled) |
 | 401 | Invalid or missing API key |
 | 403 | Publishable key used (secret key required) |
-| 429 | End-user quota exceeded (from check-quota) |
+| 429 | Gateway request blocked for the end-user (see above) |
 | 500 | Server error |
+
+## SDK Support
+
+The TypeScript SDK (`cencori` on npm) currently covers the AI Gateway, which handles end-user billing automatically when you pass `user: "user_123"` in your requests. Dedicated `cencori.billing.checkQuota()` and `cencori.billing.recordUsage()` methods for the Usage Events API path are not yet available — use the REST endpoints directly for now.
 
 ## Limits
 
