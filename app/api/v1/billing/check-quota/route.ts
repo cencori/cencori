@@ -4,6 +4,33 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { checkEndUserQuota } from '@/lib/end-user-billing';
 import crypto from 'crypto';
 
+function buildQuotaResponse(endUserId: string, quota: Awaited<ReturnType<typeof checkEndUserQuota>>) {
+    return {
+        allowed: quota.allowed,
+        reason: quota.reason ?? null,
+        end_user_id: endUserId,
+        is_new_user: quota.isNewUser,
+        rate_plan: quota.ratePlan ?? null,
+        overage_action: quota.overageAction ?? null,
+        retry_after_seconds: quota.retryAfterSeconds,
+        usage: {
+            daily_tokens: { used: quota.dailyTokensUsed, limit: quota.dailyTokensLimit },
+            monthly_tokens: { used: quota.monthlyTokensUsed, limit: quota.monthlyTokensLimit },
+            daily_requests: { used: quota.dailyRequestsUsed, limit: quota.dailyRequestsLimit },
+            monthly_requests: { used: quota.monthlyRequestsUsed, limit: quota.monthlyRequestsLimit },
+            requests_per_minute: {
+                used: quota.requestsPerMinuteUsed,
+                limit: quota.requestsPerMinuteLimit,
+            },
+        },
+        billing: {
+            markup_percentage: quota.markupPercentage,
+            flat_rate_per_request: quota.flatRatePerRequest,
+            allowed_models: quota.allowedModels,
+        },
+    };
+}
+
 // ──────────────────────────────────────────────
 // GET — Check end-user quota before processing
 // ──────────────────────────────────────────────
@@ -25,6 +52,7 @@ export async function GET(req: NextRequest) {
             .from('api_keys')
             .select(`
                 id,
+                environment,
                 key_type,
                 projects!inner(
                     id,
@@ -43,6 +71,7 @@ export async function GET(req: NextRequest) {
             id: string;
             end_user_billing_enabled: boolean | null;
         };
+        const environment = keyData.environment || 'production';
 
         if (!project.end_user_billing_enabled) {
             return NextResponse.json(
@@ -62,27 +91,10 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const quota = await checkEndUserQuota(project.id, endUserId.trim(), model);
+        const normalizedEndUserId = endUserId.trim();
+        const quota = await checkEndUserQuota(project.id, normalizedEndUserId, model, environment);
 
-        return NextResponse.json({
-            allowed: quota.allowed,
-            reason: quota.reason ?? null,
-            end_user_id: endUserId.trim(),
-            is_new_user: quota.isNewUser,
-            rate_plan: quota.ratePlan ?? null,
-            overage_action: quota.overageAction ?? null,
-            usage: {
-                daily_tokens: { used: quota.dailyTokensUsed, limit: quota.dailyTokensLimit },
-                monthly_tokens: { used: quota.monthlyTokensUsed, limit: quota.monthlyTokensLimit },
-                daily_requests: { used: quota.dailyRequestsUsed, limit: quota.dailyRequestsLimit },
-                monthly_requests: { used: quota.monthlyRequestsUsed, limit: quota.monthlyRequestsLimit },
-            },
-            billing: {
-                markup_percentage: quota.markupPercentage,
-                flat_rate_per_request: quota.flatRatePerRequest,
-                allowed_models: quota.allowedModels,
-            },
-        });
+        return NextResponse.json(buildQuotaResponse(normalizedEndUserId, quota));
     } catch (error) {
         console.error('[CheckQuota] Error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -110,6 +122,7 @@ export async function POST(req: NextRequest) {
             .from('api_keys')
             .select(`
                 id,
+                environment,
                 key_type,
                 projects!inner(
                     id,
@@ -128,6 +141,7 @@ export async function POST(req: NextRequest) {
             id: string;
             end_user_billing_enabled: boolean | null;
         };
+        const environment = keyData.environment || 'production';
 
         if (!project.end_user_billing_enabled) {
             return NextResponse.json(
@@ -147,27 +161,10 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const quota = await checkEndUserQuota(project.id, endUserId.trim(), model);
+        const normalizedEndUserId = endUserId.trim();
+        const quota = await checkEndUserQuota(project.id, normalizedEndUserId, model, environment);
 
-        return NextResponse.json({
-            allowed: quota.allowed,
-            reason: quota.reason ?? null,
-            end_user_id: endUserId.trim(),
-            is_new_user: quota.isNewUser,
-            rate_plan: quota.ratePlan ?? null,
-            overage_action: quota.overageAction ?? null,
-            usage: {
-                daily_tokens: { used: quota.dailyTokensUsed, limit: quota.dailyTokensLimit },
-                monthly_tokens: { used: quota.monthlyTokensUsed, limit: quota.monthlyTokensLimit },
-                daily_requests: { used: quota.dailyRequestsUsed, limit: quota.dailyRequestsLimit },
-                monthly_requests: { used: quota.monthlyRequestsUsed, limit: quota.monthlyRequestsLimit },
-            },
-            billing: {
-                markup_percentage: quota.markupPercentage,
-                flat_rate_per_request: quota.flatRatePerRequest,
-                allowed_models: quota.allowedModels,
-            },
-        });
+        return NextResponse.json(buildQuotaResponse(normalizedEndUserId, quota));
     } catch (error) {
         console.error('[CheckQuota] Error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

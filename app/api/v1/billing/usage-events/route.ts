@@ -229,6 +229,7 @@ export async function POST(req: NextRequest) {
                 await recordEndUserUsageAsync({
                     projectId,
                     externalUserId: event.end_user_id,
+                    environment,
                     tokens: {
                         prompt: event.prompt_tokens,
                         completion: event.completion_tokens,
