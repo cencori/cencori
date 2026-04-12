@@ -1,0 +1,76 @@
+---
+title: "Audit Logs: Know Who Changed What, When, and Why"
+slug: "audit-logs"
+date: "2026-04-12"
+excerpt: "Every admin action across your organization — API keys, security rules, billing config, team changes — logged with full actor attribution, timestamps, and metadata. Export to CSV or JSON anytime."
+coverImage: "/blog/images/covers/audit.png"
+tags: ["Product", "Security", "Compliance", "Enterprise"]
+published: true
+---
+
+Once your team grows past one person, you lose visibility. Someone rotates a provider key. Someone changes a security rule. Someone revokes an API key. You find out when something breaks — not when it happens.
+
+Audit logs fix this. Every administrative action across your Cencori organization is recorded automatically. No setup, no configuration, no extra code.
+
+## What Gets Logged
+
+Every mutation to your organization or project configuration:
+
+- **API keys** — created, revoked
+- **Provider keys** — added, rotated, deleted, activated, deactivated
+- **Security** — settings changed, custom rules created or modified, incidents reviewed
+- **Billing** — subscription changes, credit top-ups, Stripe Connect connected or disconnected
+- **End-user billing** — rate plans created or updated, end-users blocked or unblocked, invoices generated, data exported
+- **Team** — members invited, joined, left, roles changed
+- **Prompts** — created, updated, deleted, new versions published, deployed
+- **Budgets** — limits configured, alerts set
+- **Cache** — settings changed
+- **Webhooks** — created, updated, deleted
+- **Integrations** — edge integrations added or removed
+- **SSO** — configured or updated
+- **Project settings** — any configuration change
+
+Each entry captures:
+
+- **Who** — actor email, IP address, actor type (user, system, API, or webhook)
+- **What** — category, action, resource type and ID, human-readable description
+- **When** — millisecond-precision timestamp
+- **Context** — structured metadata with before/after values where applicable
+
+## The Dashboard
+
+The audit log page is at the organization level — one timeline for everything happening across all your projects.
+
+**Filtering** — narrow by category (API key, security, billing, etc.), time range (last hour to all time), project, or free-text search across descriptions.
+
+**Expandable rows** — click any entry to see the resource ID, actor IP, full timestamp, and complete metadata JSON.
+
+**No configuration needed.** Audit logging is always on. There's nothing to enable.
+
+## Export
+
+Export your audit trail in CSV or JSON from the dashboard. Exports respect your active filters — if you've scoped to security events in the last 30 days, that's what you get.
+
+- **CSV** — up to 50,000 rows. Drop it into a spreadsheet for quick review or share it with an auditor.
+- **JSON** — full structured data with metadata. Feed it into a SIEM, Datadog, or your own compliance tooling.
+
+## Access Control
+
+Only organization owners and admins can view audit logs. This is enforced at both the API and database level with row-level security. Members, viewers, and other roles cannot access the audit trail.
+
+## Who This Is For
+
+Any team that needs to answer "what changed and who changed it."
+
+If you're going through SOC 2, your auditor will ask for evidence of access controls and change management. Export the audit log. If you're debugging why a provider key stopped working, check the audit log. If a security rule was modified and you need to know who did it, it's there.
+
+If you're a solo developer, you probably don't need this today. But the moment you add a second person to your org, you'll want it.
+
+## Get Started
+
+There's nothing to set up. If you have a Cencori organization, your audit log is already recording.
+
+- [Audit Logs Documentation](/docs/platform/audit-logs) — full reference
+- [Dashboard](https://cencori.com/dashboard) — check your audit log now
+
+Every change is tracked. Nothing slips through.
