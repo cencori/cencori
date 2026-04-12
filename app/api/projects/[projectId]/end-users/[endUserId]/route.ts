@@ -45,7 +45,7 @@ export async function GET(
 
         const { data: endUser, error: endUserError } = await supabaseAdmin
             .from('end_users')
-            .select('*, rate_plans(id, name, display_name, requests_per_minute, requests_per_day, tokens_per_minute, tokens_per_day)')
+            .select('*, rate_plans(id, name, daily_request_limit, monthly_request_limit, daily_token_limit, monthly_token_limit, requests_per_minute)')
             .eq('id', endUserId)
             .eq('project_id', projectId)
             .single();
@@ -162,7 +162,7 @@ export async function PATCH(
             .update(updates)
             .eq('id', endUserId)
             .eq('project_id', projectId)
-            .select('*, rate_plans(id, name, display_name)')
+            .select('*, rate_plans(id, name)')
             .single();
 
         if (updateError) {

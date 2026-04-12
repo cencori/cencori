@@ -54,7 +54,7 @@ export async function GET(
 
         let query = supabaseAdmin
             .from('end_users')
-            .select('*, rate_plans(id, name, display_name)', { count: 'exact' })
+            .select('*, rate_plans(id, name)', { count: 'exact' })
             .eq('project_id', projectId);
 
         if (search) {
@@ -84,30 +84,39 @@ export async function GET(
             return NextResponse.json({ error: 'Failed to fetch end-users' }, { status: 500 });
         }
 
-        // Join with latest usage data
+        // Aggregate the last 30 days of usage from daily rows.
+        // We sum daily buckets rather than reading the monthly row so "30d"
+        // stays a true rolling 30-day window regardless of calendar month.
         const userIds = endUsers?.map(u => u.id) || [];
-        let usageMap: Record<string, { total_requests: number; total_tokens: number; last_active_at: string | null }> = {};
+        const usageMap: Record<string, { total_requests: number; total_tokens: number; total_cost: number }> = {};
 
         if (userIds.length > 0) {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
+            const periodStart = thirtyDaysAgo.toISOString().split('T')[0];
+
             const { data: usageData } = await supabaseAdmin
                 .from('end_user_usage')
-                .select('end_user_id, total_requests, total_tokens, last_active_at')
-                .in('end_user_id', userIds);
+                .select('end_user_id, total_requests, total_tokens, customer_charge_usd')
+                .in('end_user_id', userIds)
+                .eq('period_type', 'daily')
+                .gte('period_start', periodStart);
 
             if (usageData) {
                 for (const u of usageData) {
+                    const existing = usageMap[u.end_user_id] || { total_requests: 0, total_tokens: 0, total_cost: 0 };
                     usageMap[u.end_user_id] = {
-                        total_requests: u.total_requests,
-                        total_tokens: u.total_tokens,
-                        last_active_at: u.last_active_at,
+                        total_requests: existing.total_requests + (u.total_requests || 0),
+                        total_tokens: existing.total_tokens + (u.total_tokens || 0),
+                        total_cost: existing.total_cost + Number(u.customer_charge_usd || 0),
                     };
                 }
             }
         }
 
         const enrichedUsers = (endUsers || []).map(eu => {
-            const usage = usageMap[eu.id] || { total_requests: 0, total_tokens: 0, last_active_at: null };
-            const ratePlan = eu.rate_plans as { id: string; name: string; display_name?: string } | null;
+            const usage = usageMap[eu.id] || { total_requests: 0, total_tokens: 0, total_cost: 0 };
+            const ratePlan = eu.rate_plans as { id: string; name: string } | null;
             return {
                 id: eu.id,
                 external_id: eu.external_id,
@@ -118,8 +127,8 @@ export async function GET(
                 metadata: eu.metadata,
                 requests_30d: usage.total_requests,
                 tokens_30d: usage.total_tokens,
-                cost_30d: 0,
-                last_seen_at: eu.last_seen_at ?? usage.last_active_at ?? null,
+                cost_30d: Math.round(usage.total_cost * 1e6) / 1e6,
+                last_seen_at: eu.last_seen_at ?? null,
                 created_at: eu.created_at,
             };
         });
@@ -232,7 +241,7 @@ export async function POST(
                 .from('end_users')
                 .update(updates)
                 .eq('id', existing.id)
-                .select('*, rate_plans(id, name, display_name)')
+                .select('*, rate_plans(id, name)')
                 .single();
 
             if (updateError) {
@@ -254,7 +263,7 @@ export async function POST(
                     is_blocked,
                     metadata: metadata || null,
                 })
-                .select('*, rate_plans(id, name, display_name)')
+                .select('*, rate_plans(id, name)')
                 .single();
 
             if (createError) {

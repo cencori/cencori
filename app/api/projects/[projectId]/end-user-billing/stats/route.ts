@@ -73,37 +73,20 @@ export async function GET(
             .eq("project_id", projectId);
 
         // 2. Active end users (with requests in period)
-        const { data: activeUsersData } = await admin.rpc(
-            "count_distinct_end_users",
-            {
-                p_project_id: projectId,
-                p_start_date: startISO,
-            }
-        );
-
-        // Fallback: if RPC doesn't exist, query manually
         let activeEndUsers = 0;
-        if (activeUsersData !== null && activeUsersData !== undefined) {
-            activeEndUsers =
-                typeof activeUsersData === "number"
-                    ? activeUsersData
-                    : Number(activeUsersData) || 0;
-        } else {
-            // Manual distinct count fallback
-            const { data: distinctUsers } = await admin
-                .from("ai_requests")
-                .select("end_user_id")
-                .eq("project_id", projectId)
-                .not("end_user_id", "is", null)
-                .neq("end_user_id", "")
-                .gte("created_at", startISO);
+        const { data: distinctUsers } = await admin
+            .from("ai_requests")
+            .select("end_user_id")
+            .eq("project_id", projectId)
+            .not("end_user_id", "is", null)
+            .neq("end_user_id", "")
+            .gte("created_at", startISO);
 
-            if (distinctUsers) {
-                const uniqueIds = new Set(
-                    distinctUsers.map((r) => r.end_user_id)
-                );
-                activeEndUsers = uniqueIds.size;
-            }
+        if (distinctUsers) {
+            const uniqueIds = new Set(
+                distinctUsers.map((r) => r.end_user_id)
+            );
+            activeEndUsers = uniqueIds.size;
         }
 
         // 3. Aggregated totals for the period
