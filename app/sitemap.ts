@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 import { getAllDocs } from '@/lib/docs';
-import { getAllPosts } from '@/lib/blog';
+import { getAllPosts, getPostUrl } from '@/lib/blog';
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const baseUrl = 'https://cencori.com';
@@ -31,8 +31,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     const companyPages = [
         { url: `${baseUrl}/about`, priority: 0.7, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/blog`, priority: 0.8, changeFrequency: 'daily' as const },
+        { url: `${baseUrl}/blog/engineering`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/blog/product`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/blog/community`, priority: 0.6, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/blog/customers`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/careers`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/changelog`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/press`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/contact`, priority: 0.6, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/customers`, priority: 0.7, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/events`, priority: 0.5, changeFrequency: 'weekly' as const },
@@ -61,10 +66,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
         changeFrequency: 'weekly' as const,
     }));
 
-    // Dynamic Blog Posts
-    const allPosts = getAllPosts();
+    // Dynamic Blog Posts (use correct URL based on category)
+    const allPosts = getAllPosts().filter((p) => p.category !== "press");
     const blogPages = allPosts.map((post) => ({
-        url: `${baseUrl}/blog/${post.slug}`,
+        url: `${baseUrl}${getPostUrl(post)}`,
         lastModified: post.date || currentDate,
         priority: 0.7,
         changeFrequency: 'monthly' as const,
