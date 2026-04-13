@@ -1,17 +1,22 @@
 import { Suspense } from "react";
-import { getAllPosts } from "@/lib/blog";
+import { getPostsByCategory } from "@/lib/blog";
 import { BlogList } from "@/components/blog/BlogList";
 import { BlogTabs } from "@/components/blog/BlogTabs";
 import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
+import type { Metadata } from "next";
 
-export default function BlogPage() {
-    const allPosts = getAllPosts();
+export const metadata: Metadata = {
+    title: "Product | Blog",
+    description: "Product updates and feature announcements from Cencori.",
+};
+
+export default function ProductBlogPage() {
+    const posts = getPostsByCategory("product");
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <AuthNavbar />
-
             <main className="flex-1 pt-20">
                 <div className="border-b border-border/40">
                     <div className="container mx-auto py-8 px-4 max-w-5xl space-y-5">
@@ -26,12 +31,10 @@ export default function BlogPage() {
                         </Suspense>
                     </div>
                 </div>
-
                 <Suspense>
-                    <BlogList posts={allPosts} />
+                    <BlogList posts={posts} />
                 </Suspense>
             </main>
-
             <Footer />
         </div>
     );

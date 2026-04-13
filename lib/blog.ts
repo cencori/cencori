@@ -18,6 +18,24 @@ export interface Author {
     github?: string;
 }
 
+export type BlogCategory =
+    | "engineering"
+    | "product"
+    | "community"
+    | "customers"
+    | "changelog"
+    | "press";
+
+export const BLOG_CATEGORIES: { slug: BlogCategory | "all"; label: string }[] = [
+    { slug: "all", label: "All" },
+    { slug: "engineering", label: "Engineering" },
+    { slug: "product", label: "Product" },
+    { slug: "community", label: "Community" },
+    { slug: "customers", label: "Customers" },
+    { slug: "changelog", label: "Changelog" },
+    { slug: "press", label: "Press" },
+];
+
 export interface BlogPostFrontmatter {
     title: string;
     slug: string;
@@ -26,6 +44,8 @@ export interface BlogPostFrontmatter {
     coverImage: string;
     authors: string[]; // Author slugs
     tags: string[];
+    category?: BlogCategory;
+    externalUrl?: string; // For press links
     published: boolean;
 }
 
@@ -114,6 +134,22 @@ export function getPostBySlug(slug: string): BlogPost | null {
 export function getPostsByTag(tag: string): BlogPost[] {
     const posts = getAllPosts();
     return posts.filter((post) => post.tags.includes(tag));
+}
+
+/**
+ * Get posts by category
+ */
+export function getPostsByCategory(category: BlogCategory): BlogPost[] {
+    const posts = getAllPosts();
+    return posts.filter((post) => post.category === category);
+}
+
+/**
+ * Get the URL path for a blog post based on its category
+ */
+export function getPostUrl(post: BlogPost | BlogPostFrontmatter): string {
+    if (post.category === "changelog") return `/changelog/${post.slug}`;
+    return `/blog/${post.slug}`;
 }
 
 /**

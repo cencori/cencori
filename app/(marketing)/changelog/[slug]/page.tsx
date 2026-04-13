@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { getPostBySlug, getAllPosts, getPostUrl } from "@/lib/blog";
+import { notFound } from "next/navigation";
+import { getPostBySlug, getPostsByCategory, getPostUrl } from "@/lib/blog";
 import { parseMDX } from "@/lib/blog";
 import { format } from "date-fns";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -13,32 +13,27 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { buildOgImageUrl } from "@/lib/og";
 
-interface BlogPostPageProps {
+interface ChangelogPostPageProps {
     params: Promise<{
         slug: string;
     }>;
 }
 
-// Generate static params for non-changelog posts
 export function generateStaticParams() {
-    const posts = getAllPosts().filter((p) => p.category !== "changelog");
+    const posts = getPostsByCategory("changelog");
     return posts.map((post) => ({
         slug: post.slug,
     }));
 }
 
-// Generate metadata for SEO
-export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: ChangelogPostPageProps): Promise<Metadata> {
     const { slug } = await params;
     const post = getPostBySlug(slug);
 
     if (!post) {
-        return {
-            title: "Post Not Found",
-        };
+        return { title: "Post Not Found" };
     }
 
-    // Use cover image or fall back to dynamic OG
     const authorName = post.authorDetails[0]?.name || "";
     const formattedDate = post.date ? new Date(post.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
@@ -60,14 +55,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             type: "article",
             publishedTime: post.date,
             authors: post.authorDetails.map((a) => a.name),
-            images: [
-                {
-                    url: ogImage,
-                    width: 1200,
-                    height: 630,
-                    alt: post.title,
-                },
-            ],
+            images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
         },
         twitter: {
             card: "summary_large_image",
@@ -78,27 +66,20 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     };
 }
 
-
-export default async function BlogPostPage({ params }: BlogPostPageProps) {
+export default async function ChangelogPostPage({ params }: ChangelogPostPageProps) {
     const { slug } = await params;
     const post = getPostBySlug(slug);
 
-    if (!post || !post.published) {
+    if (!post || !post.published || post.category !== "changelog") {
         notFound();
-    }
-
-    // Redirect changelog posts to /changelog/[slug]
-    if (post.category === "changelog") {
-        redirect(`/changelog/${slug}`);
     }
 
     const content = await parseMDX(post.content);
 
-    // Get non-changelog posts for prev/next navigation
-    const allPosts = getAllPosts().filter(p => p.published && p.category !== "changelog");
-    const currentIndex = allPosts.findIndex(p => p.slug === slug);
-    const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
-    const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+    const changelogPosts = getPostsByCategory("changelog").filter(p => p.published);
+    const currentIndex = changelogPosts.findIndex(p => p.slug === slug);
+    const prevPost = currentIndex < changelogPosts.length - 1 ? changelogPosts[currentIndex + 1] : null;
+    const nextPost = currentIndex > 0 ? changelogPosts[currentIndex - 1] : null;
 
     return (
         <div className={`min-h-screen bg-background flex flex-col ${GeistSans.variable} ${GeistMono.variable}`} style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}>
@@ -107,33 +88,30 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <main className="flex-1 pt-20">
                 <div className="container mx-auto px-4 max-w-4xl py-12">
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-12">
-                        {/* Main Content */}
                         <article>
-                            {/* Back Link */}
-                            <div className="mb-6">
-                                <Link
-                                    href="/blog"
-                                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline transition-colors"
-                                >
+                            {/* Breadcrumb */}
+                            <div className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Link href="/blog" className="text-primary hover:underline transition-colors">
                                     Blog
+                                </Link>
+                                <span>/</span>
+                                <Link href="/changelog" className="text-primary hover:underline transition-colors">
+                                    Changelog
                                 </Link>
                             </div>
 
                             {/* Header */}
                             <header className="mb-8">
-                                {/* Title */}
                                 <h1 className="text-3xl font-bold mb-4 tracking-tight leading-tight">
                                     {post.title}
                                 </h1>
 
-                                {/* Meta */}
                                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
                                     <span>{format(new Date(post.date), "dd MMMM yyyy")}</span>
-                                    <span className="text-muted-foreground/40">•</span>
+                                    <span className="text-muted-foreground/40">&bull;</span>
                                     <span>{post.readTime}</span>
                                 </div>
 
-                                {/* Author */}
                                 {post.authorDetails.map((author) => (
                                     <div key={author.slug} className="flex items-center gap-3">
                                         {author.avatar && (
@@ -156,7 +134,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                 ))}
                             </header>
 
-                            {/* Cover Image */}
                             {post.coverImage && (
                                 <div className="relative w-full aspect-[2/1] rounded-lg overflow-hidden border border-border/50 mb-10 bg-muted/30">
                                     <Image
@@ -170,12 +147,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                 </div>
                             )}
 
-                            {/* Content */}
                             <div className="prose prose-zinc dark:prose-invert max-w-none">
                                 {content}
                             </div>
 
-                            {/* Navigation */}
+                            {/* Navigation within changelog */}
                             {(prevPost || nextPost) && (
                                 <div className="mt-16 pt-8">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -212,7 +188,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                             )}
                         </article>
 
-                        {/* Sidebar */}
                         <aside className="hidden lg:block">
                             <div className="sticky top-28">
                                 <ShareButtons title={post.title} slug={slug} />
