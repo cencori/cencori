@@ -15,19 +15,19 @@ const productFeatures = [
             <div className="bg-muted/30 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] text-muted-foreground">
-                        Total Requests
+                        Requests
                     </span>
-                    <span className="text-sm font-bold">1.2M</span>
+                    <span className="text-[10px] text-emerald-500">Live</span>
                 </div>
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] text-muted-foreground">
-                        Cost This Month
+                        Cost Tracking
                     </span>
-                    <span className="text-sm font-bold text-emerald-500">$847.32</span>
+                    <span className="text-[10px] text-emerald-500">Live</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground">Avg Latency</span>
-                    <span className="text-sm font-bold">142ms</span>
+                    <span className="text-[10px] text-muted-foreground">Latency P50/P90/P99</span>
+                    <span className="text-[10px] text-emerald-500">Live</span>
                 </div>
             </div>
         ),

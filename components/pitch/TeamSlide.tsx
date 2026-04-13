@@ -52,10 +52,10 @@ const team = [
 ];
 
 const highlights = [
-    "Technical founders with 8+ years building developer tools",
-    "Deep expertise in AI/ML infrastructure and security",
-    "Previously scaled products to millions of users",
-    "Strong network in AI and developer communities",
+    "Entire platform built and shipped in 3 months",
+    "180+ users acquired with zero marketing spend",
+    "3 SDKs (TypeScript, Python, Go) published",
+    "14+ AI providers integrated and production-ready",
 ];
 
 export function TeamSlide() {

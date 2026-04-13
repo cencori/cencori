@@ -1,8 +1,10 @@
 import React from "react";
 import {
     ShieldCheckIcon,
-    BoltIcon,
+    ArrowsRightLeftIcon,
     ChartBarIcon,
+    CodeBracketIcon,
+    CpuChipIcon,
 } from "@heroicons/react/24/outline";
 
 const steps = [
@@ -37,7 +39,7 @@ export function HowItWorksSlide() {
                         {/* Your App */}
                         <div className="flex-1 p-4 rounded-xl border border-border/50 bg-card text-center">
                             <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-2 flex items-center justify-center">
-                                <span className="text-lg">🚀</span>
+                                <CodeBracketIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <h3 className="font-semibold text-sm">Your App</h3>
                             <p className="text-[10px] text-muted-foreground mt-1">
@@ -65,7 +67,7 @@ export function HowItWorksSlide() {
                                     <span className="text-[8px]">Security</span>
                                 </div>
                                 <div className="p-2 rounded-lg bg-card border border-border/50 text-center">
-                                    <BoltIcon className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
+                                    <ArrowsRightLeftIcon className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
                                     <span className="text-[8px]">Routing</span>
                                 </div>
                                 <div className="p-2 rounded-lg bg-card border border-border/50 text-center">
@@ -86,7 +88,7 @@ export function HowItWorksSlide() {
                         {/* Providers */}
                         <div className="flex-1 p-4 rounded-xl border border-border/50 bg-card text-center">
                             <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-2 flex items-center justify-center">
-                                <span className="text-lg">🤖</span>
+                                <CpuChipIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <h3 className="font-semibold text-sm">AI Providers</h3>
                             <p className="text-[10px] text-muted-foreground mt-1">
