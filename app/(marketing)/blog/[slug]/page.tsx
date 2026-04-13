@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
-import { getPostBySlug, getAllPosts } from "@/lib/blog";
+import { notFound, redirect } from "next/navigation";
+import { getPostBySlug, getAllPosts, getPostUrl } from "@/lib/blog";
 import { parseMDX } from "@/lib/blog";
 import { format } from "date-fns";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -19,9 +19,9 @@ interface BlogPostPageProps {
     }>;
 }
 
-// Generate static params for all posts
+// Generate static params for non-changelog posts
 export function generateStaticParams() {
-    const posts = getAllPosts();
+    const posts = getAllPosts().filter((p) => p.category !== "changelog");
     return posts.map((post) => ({
         slug: post.slug,
     }));
@@ -87,10 +87,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         notFound();
     }
 
+    // Redirect changelog posts to /changelog/[slug]
+    if (post.category === "changelog") {
+        redirect(`/changelog/${slug}`);
+    }
+
     const content = await parseMDX(post.content);
 
-    // Get all posts for prev/next navigation
-    const allPosts = getAllPosts().filter(p => p.published);
+    // Get non-changelog posts for prev/next navigation
+    const allPosts = getAllPosts().filter(p => p.published && p.category !== "changelog");
     const currentIndex = allPosts.findIndex(p => p.slug === slug);
     const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
     const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
@@ -176,7 +181,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {prevPost && (
                                             <Link
-                                                href={`/blog/${prevPost.slug}`}
+                                                href={getPostUrl(prevPost)}
                                                 className="group flex flex-col p-4 rounded-lg border border-border/50 hover:border-border transition-colors"
                                             >
                                                 <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -190,7 +195,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                                         )}
                                         {nextPost && (
                                             <Link
-                                                href={`/blog/${nextPost.slug}`}
+                                                href={getPostUrl(nextPost)}
                                                 className="group flex flex-col p-4 rounded-lg border border-border/50 hover:border-border transition-colors sm:text-right sm:ml-auto"
                                             >
                                                 <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1 sm:justify-end">

@@ -11,7 +11,7 @@ interface BlogCardProps {
 
 export function BlogCard({ post }: BlogCardProps) {
     return (
-        <Link href={`/blog/${post.slug}`} className="block h-full group">
+        <Link href={post.category === "changelog" ? `/changelog/${post.slug}` : `/blog/${post.slug}`} className="block h-full group">
             <div className="h-full border border-border/50 rounded-lg overflow-hidden bg-background hover:border-border transition-colors">
                 {/* Cover Image */}
                 <div className="relative w-full h-36 overflow-hidden border-b border-border/40">
