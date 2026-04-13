@@ -6,7 +6,7 @@ import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 
 export default function BlogPage() {
-    const allPosts = getAllPosts();
+    const allPosts = getAllPosts().filter((p) => p.category !== "press");
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
