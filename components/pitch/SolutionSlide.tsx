@@ -1,36 +1,36 @@
 import React from "react";
 import {
     CheckIcon,
-    BoltIcon,
+    Square3Stack3DIcon,
     ShieldCheckIcon,
-    ChartBarIcon,
+    CurrencyDollarIcon,
     ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 const features = [
     {
-        icon: BoltIcon,
-        title: "One SDK",
+        icon: Square3Stack3DIcon,
+        title: "Unified AI Gateway",
         description:
-            "Access OpenAI, Anthropic, Google Gemini, and 14+ providers with a single integration.",
+            "One API for 14+ providers. OpenAI-compatible — change your base URL and every provider works.",
     },
     {
         icon: ShieldCheckIcon,
-        title: "Built-in Security",
+        title: "Security at the Gateway",
         description:
-            "Automatic PII detection, prompt injection protection, and content filtering.",
+            "PII detection, prompt injection protection, and content filtering on every request. Not a bolt-on — built into the request pipeline.",
     },
     {
-        icon: ChartBarIcon,
-        title: "Complete Observability",
+        icon: CurrencyDollarIcon,
+        title: "End-User Billing",
         description:
-            "Audit logs, analytics, cost tracking, and usage patterns in real-time.",
+            "Meter, limit, and charge your users for AI usage. Rate plans, quota enforcement, Stripe Connect payouts. One line of code.",
     },
     {
         icon: ArrowPathIcon,
-        title: "Provider Failover",
+        title: "Production-Grade Infra",
         description:
-            "Automatic fallback to secondary providers when primary fails. Zero downtime.",
+            "Provider failover with circuit breaker, dual-layer caching, BYOK support, and full audit trail.",
     },
 ];
 

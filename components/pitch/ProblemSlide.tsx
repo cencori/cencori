@@ -11,33 +11,25 @@ const problems = [
         icon: LockClosedIcon,
         title: "Provider Lock-in",
         description:
-            "Switching from OpenAI to Anthropic means rewriting your entire integration layer.",
-        stat: "3-4 weeks",
-        statLabel: "average migration time",
+            "Switching from OpenAI to Anthropic means rewriting your entire integration layer. Every provider has a different API, different auth, different response format.",
     },
     {
         icon: ExclamationTriangleIcon,
         title: "Security Gaps",
         description:
-            "PII leaks, prompt injection attacks, no audit trail. Most teams discover issues after launch.",
-        stat: "67%",
-        statLabel: "of AI apps have security vulnerabilities",
+            "PII leaks into prompts, prompt injection attacks go undetected, no audit trail. Most teams discover these issues after they've already shipped.",
     },
     {
         icon: CurrencyDollarIcon,
-        title: "Cost Surprises",
+        title: "No Usage Billing",
         description:
-            "No visibility into AI spend until the bill arrives. Token costs spiral out of control.",
-        stat: "$50K+",
-        statLabel: "unexpected overages common",
+            "Your users consume AI tokens but you have no way to meter, limit, or charge them. You eat the cost or spend weeks building a billing pipeline.",
     },
     {
         icon: DocumentTextIcon,
-        title: "Compliance Burden",
+        title: "Fragmented Tooling",
         description:
-            "SOC2, GDPR, HIPAA require months of work. Enterprise deals stall without certifications.",
-        stat: "6+ months",
-        statLabel: "to achieve compliance",
+            "Rate limiting from Redis, cost tracking from spreadsheets, logging from a third-party, billing from Stripe — none of it connected.",
     },
 ];
 
@@ -76,14 +68,6 @@ export function ProblemSlide() {
                                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
                                     {problem.description}
                                 </p>
-                                <div className="mt-3 flex items-baseline gap-2">
-                                    <span className="text-lg md:text-xl font-bold text-amber-500">
-                                        {problem.stat}
-                                    </span>
-                                    <span className="text-[10px] md:text-xs text-muted-foreground">
-                                        {problem.statLabel}
-                                    </span>
-                                </div>
                             </div>
                         </div>
                     </div>

@@ -16,34 +16,34 @@ import {
 } from "recharts";
 
 // Financial Projections Data (Q1 2026 - Q4 2027)
-// Realistic Seed path: Pre-revenue -> Launch -> $100k MRR
+// Path: Live product, pre-revenue -> monetization -> scale
 const projectionData = [
-    { quarter: "Q1 '26", revenue: 0, label: "Pre-Rev" }, // Current: Jan 28, 2026
-    { quarter: "Q2 '26", revenue: 0, label: "Beta" },
-    { quarter: "Q3 '26", revenue: 5, label: "$5K" }, // Monetization On
-    { quarter: "Q4 '26", revenue: 15, label: "$15K" },
-    { quarter: "Q1 '27", revenue: 35, label: "$35K" },
-    { quarter: "Q2 '27", revenue: 60, label: "$60K" },
-    { quarter: "Q3 '27", revenue: 85, label: "$85K" },
-    { quarter: "Q4 '27", revenue: 120, label: "$120K" }, // Strong Series A Target
+    { quarter: "Q1 '26", revenue: 0, label: "Launch" },
+    { quarter: "Q2 '26", revenue: 0, label: "Growth" },
+    { quarter: "Q3 '26", revenue: 8, label: "$8K" },
+    { quarter: "Q4 '26", revenue: 20, label: "$20K" },
+    { quarter: "Q1 '27", revenue: 40, label: "$40K" },
+    { quarter: "Q2 '27", revenue: 65, label: "$65K" },
+    { quarter: "Q3 '27", revenue: 90, label: "$90K" },
+    { quarter: "Q4 '27", revenue: 120, label: "$120K" },
 ];
 
 const keyMetrics = [
     {
         icon: UserGroupIcon,
-        label: "Current Developers",
-        value: "100+",
-        subtext: "Pre-launch beta users",
+        label: "Registered Users",
+        value: "180+",
+        subtext: "Organic, no paid acquisition",
     },
     {
         icon: CurrencyDollarIcon,
-        label: "Proj. Q4 '27 ARR",
-        value: "$1.4M",
-        subtext: "Series A Milestone",
+        label: "Stage",
+        value: "Pre-Rev",
+        subtext: "Monetization infrastructure live",
     },
     {
         icon: ArrowTrendingUpIcon,
-        label: "Growth Strategy",
+        label: "Growth",
         value: "PLG",
         subtext: "Bottom-up developer adoption",
     },
@@ -72,11 +72,11 @@ export function TractionSlide() {
                     Traction & Projections
                 </span>
                 <h2 className="text-2xl md:text-3xl font-bold mt-2">
-                    From <span className="text-emerald-500">Day 1</span> to Scale.
+                    Live product. <span className="text-emerald-500">Real users.</span>
                 </h2>
                 <p className="text-muted-foreground text-sm mt-2 max-w-2xl">
-                    Currently serving 100+ beta developers. Projecting robust PLG-driven
-                    growth to $1M+ ARR within 18 months of public launch.
+                    Launched January 2026. 180+ developers signed up organically — no paid acquisition,
+                    no sales team. Full platform live: gateway, security, billing, SDKs, dashboard.
                 </p>
             </div>
 
@@ -109,7 +109,7 @@ export function TractionSlide() {
                 <div className="flex-1 rounded-xl border border-border/50 bg-muted/10 p-6 flex flex-col relative min-h-0">
                     {/* Chart Label */}
                     <div className="absolute top-4 left-6 z-20">
-                        <h3 className="text-sm font-semibold">Projected MRR</h3>
+                        <h3 className="text-sm font-semibold">Projected MRR (Post-Funding)</h3>
                         <p className="text-xs text-muted-foreground">in thousands (USD)</p>
                     </div>
 

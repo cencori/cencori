@@ -20,7 +20,7 @@ const marketData = {
 };
 
 const trends = [
-    { stat: "65%", label: "of enterprises will deploy AI by 2025" },
+    { stat: "72%", label: "of enterprises now have AI in production" },
     { stat: "4.5x", label: "growth in AI API calls year-over-year" },
     { stat: "$200B+", label: "spent on AI infrastructure annually" },
 ];

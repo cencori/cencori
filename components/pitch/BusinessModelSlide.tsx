@@ -46,10 +46,10 @@ const pricingTiers = [
 ];
 
 const unitEconomics = [
-    { label: "Avg Revenue/Customer", value: "$127/mo" },
-    { label: "Gross Margin", value: "85%" },
-    { label: "CAC Payback", value: "3 months" },
-    { label: "Net Revenue Retention", value: "125%" },
+    { label: "Target Avg Revenue", value: "$127/mo" },
+    { label: "Target Gross Margin", value: "85%" },
+    { label: "Revenue Model", value: "Usage +" },
+    { label: "Expansion Path", value: "PLG" },
 ];
 
 export function BusinessModelSlide() {
@@ -123,7 +123,7 @@ export function BusinessModelSlide() {
             {/* Unit Economics */}
             <div className="mt-6 p-4 rounded-xl border border-border/50 bg-card">
                 <h3 className="text-xs font-medium text-muted-foreground mb-3">
-                    Unit Economics
+                    Target Unit Economics
                 </h3>
                 <div className="grid grid-cols-4 gap-4">
                     {unitEconomics.map((metric, index) => (
