@@ -171,7 +171,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                             )}
 
                             {/* Content */}
-                            <div className="prose prose-zinc dark:prose-invert max-w-none">
+                            <div className="prose prose-zinc dark:prose-invert max-w-none prose-headings:leading-tight prose-p:leading-[1.55] prose-li:leading-[1.5] prose-ul:leading-[1.5] prose-ol:leading-[1.5]">
                                 {content}
                             </div>
 
