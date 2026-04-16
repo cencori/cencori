@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 32px;">
-              <img src="https://cencori.com/cdark.png" alt="Cencori" style="height: 48px; margin-bottom: 24px;" />
+              <img src="https://cencori.com/logos/logo-w.png" alt="Cencori" style="height: 48px; margin-bottom: 24px;" />
               <h1 style="color: #000; margin-bottom: 8px;">Welcome to Cencori!</h1>
               <p style="color: #666; font-size: 18px; margin: 0;">You're all set to build with AI infrastructure.</p>
             </div>
