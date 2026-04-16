@@ -30,7 +30,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
-import ExportDialog from "@/components/scan/ExportDialog";
 
 interface ScanProject {
   id: string;
@@ -335,8 +334,6 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
   }
 
   if (scan.status === "running") {
-    // Detect stale "running" scans — if it's been more than 6 minutes,
-    // the scan was interrupted before it could update its status.
     const scanAgeMs = Date.now() - new Date(scan.created_at).getTime();
     const STALE_THRESHOLD_MS = 6 * 60 * 1000;
     if (scanAgeMs > STALE_THRESHOLD_MS) {
@@ -352,7 +349,6 @@ function buildScanLogEntries(scan: ScanRun | null): ScanLogEntry[] {
 
     const progress = scan.results?.progress;
     if (progress?.totalFiles) {
-      // All files processed but scan never completed — likely timed out saving results
       if ((progress.processedFiles || 0) >= progress.totalFiles) {
         return [
           {
@@ -438,7 +434,252 @@ export default function ProjectDetailPage() {
   const [continuityMemory, setContinuityMemory] = useState<
     ContinuityMemoryEntry[]
   >([]);
-  const [exportOpen, setExportOpen] = useState(false);
+
+  // ── Export dropdown state ──────────────────────────────────────────────────
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowExportDropdown(false);
+      }
+    };
+    if (showExportDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showExportDropdown]);
+
+  // ── Export handlers ────────────────────────────────────────────────────────
+  const handleExportJSON = () => {
+    if (!currentScan) return;
+    const data = {
+      scanId: currentScan.id,
+      slug: currentScan.slug,
+      score: currentScan.score,
+      filesScanned: currentScan.files_scanned,
+      issuesFound: currentScan.issues_found,
+      durationMs: currentScan.scan_duration_ms,
+      createdAt: currentScan.created_at,
+      logs: currentScan.logs || [],
+      issues: currentScan.results?.issues || [],
+      summary: currentScan.results?.summary || null,
+      research: currentScan.results?.research || null,
+      aiContext: currentScan.results?.ai_context || null,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${currentScan.slug || "scan"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
+
+  const handleExportMD = () => {
+    if (!currentScan) return;
+    const lines = [
+      `# Scan Report`,
+      ``,
+      `**ID:** ${currentScan.slug || currentScan.id}`,
+      `**Date:** ${new Date(currentScan.created_at).toLocaleString()}`,
+      `**Score:** ${currentScan.score}`,
+      `**Files Scanned:** ${currentScan.files_scanned}`,
+      `**Issues Found:** ${currentScan.issues_found}`,
+      `**Duration:** ${(currentScan.scan_duration_ms / 1000).toFixed(1)}s`,
+      ``,
+    ];
+    if (currentScan.results?.issues?.length) {
+      lines.push(`## Issues`, ``);
+      for (const issue of currentScan.results.issues) {
+        lines.push(
+          `- **[${issue.severity.toUpperCase()}]** ${issue.name} in \`${issue.file}\` (line ${issue.line}): ${issue.match}`,
+        );
+      }
+    } else {
+      lines.push(`## No Issues Found ✓`);
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${currentScan.slug || "scan"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
+
+  const handleExportCSV = () => {
+    if (!currentScan) return;
+    const issues = currentScan.results?.issues || [];
+    const header = "severity,name,file,line,type,match";
+    const rows = issues.map((issue) => {
+      const escape = (v: string | number) => {
+        const str = String(v);
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? `"${str.replace(/"/g, '""')}"`
+          : str;
+      };
+      return [
+        escape(issue.severity),
+        escape(issue.name),
+        escape(issue.file),
+        escape(issue.line),
+        escape(issue.type),
+        escape(issue.match),
+      ].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${currentScan.slug || "scan"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
+
+  const handleExportPDF = () => {
+    if (!currentScan) return;
+    const issues = currentScan.results?.issues || [];
+
+    const issueRows = issues.length
+      ? issues
+          .map(
+            (issue) => `
+          <tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">
+              <span style="
+                display:inline-block;
+                padding:1px 6px;
+                border-radius:4px;
+                font-size:10px;
+                font-weight:600;
+                background:${
+                  issue.severity === "critical"
+                    ? "#fee2e2"
+                    : issue.severity === "high"
+                      ? "#ffedd5"
+                      : issue.severity === "medium"
+                        ? "#fef9c3"
+                        : "#dbeafe"
+                };
+                color:${
+                  issue.severity === "critical"
+                    ? "#dc2626"
+                    : issue.severity === "high"
+                      ? "#ea580c"
+                      : issue.severity === "medium"
+                        ? "#ca8a04"
+                        : "#2563eb"
+                };
+              ">${issue.severity.toUpperCase()}</span>
+            </td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-weight:500;">${issue.name}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:11px;color:#6b7280;">${issue.file}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;color:#6b7280;">${issue.line}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:11px;">${issue.match}</td>
+          </tr>`,
+          )
+          .join("")
+      : `<tr><td colspan="5" style="padding:20px;text-align:center;color:#6b7280;">No issues found</td></tr>`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Scan Report – ${currentScan.slug || currentScan.id}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111827; padding: 40px; }
+            h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+            .subtitle { color: #6b7280; font-size: 12px; margin-bottom: 28px; }
+            .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+            .meta-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; }
+            .meta-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; margin-bottom: 4px; }
+            .meta-card .value { font-size: 18px; font-weight: 600; }
+            h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #374151; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            thead tr { background: #f9fafb; }
+            thead th { padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
+            @media print { body { padding: 20px; } }
+          </style>
+        </head>
+        <body>
+          <h1>Scan Report</h1>
+          <p class="subtitle">Generated ${new Date().toLocaleString()} · ${currentScan.slug || currentScan.id}</p>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="label">Score</div>
+              <div class="value">${currentScan.score || "—"}</div>
+            </div>
+            <div class="meta-card">
+              <div class="label">Files Scanned</div>
+              <div class="value">${currentScan.files_scanned}</div>
+            </div>
+            <div class="meta-card">
+              <div class="label">Issues Found</div>
+              <div class="value">${currentScan.issues_found}</div>
+            </div>
+            <div class="meta-card">
+              <div class="label">Duration</div>
+              <div class="value">${(currentScan.scan_duration_ms / 1000).toFixed(1)}s</div>
+            </div>
+          </div>
+          <h2>Issues</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Name</th>
+                <th>File</th>
+                <th>Line</th>
+                <th>Match</th>
+              </tr>
+            </thead>
+            <tbody>${issueRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.top = "-9999px";
+    iframe.style.left = "-9999px";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 500);
+
+    setShowExportDropdown(false);
+  };
+
+  // ── End export handlers ────────────────────────────────────────────────────
+
   const scanStreamRef = useRef<EventSource | null>(null);
   const scanReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -499,7 +740,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Changelog timeframe options
   const [changelogTimeframe, setChangelogTimeframe] = useState<
     "24h" | "7d" | "30d"
   >("7d");
@@ -565,7 +805,6 @@ export default function ProjectDetailPage() {
     fetchProject();
   }, [projectId]);
 
-  // Fetch changelogs
   useEffect(() => {
     const fetchChangelogs = async () => {
       try {
@@ -653,7 +892,6 @@ export default function ProjectDetailPage() {
     if (!project) return;
     if (!hasScanAccess) return;
 
-    // Map timeframe to since string
     const sinceMap: Record<string, string> = {
       "24h": "1 day ago",
       "7d": "1 week ago",
@@ -1216,1285 +1454,1231 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
-        {/* ── WEEK 3 CHANGE 3: Export button — sits next to Run Scan ── */}
-        <div className="flex items-center gap-2">
-          {project.last_scan_score && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-3"
-              onClick={() => setExportOpen(true)}
-            >
-              ↓ Export
-            </Button>
+        <Button
+          onClick={handleRunScan}
+          disabled={isScanning}
+          size="sm"
+          className="h-7 text-xs px-3"
+        >
+          {isScanning ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="mr-1.5 h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
+              />
+              Scanning...
+            </>
+          ) : (
+            "Run Scan"
           )}
-          <Button
-            onClick={handleRunScan}
-            disabled={isScanning}
-            size="sm"
-            className="h-7 text-xs px-3"
-          >
-            {isScanning ? (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="mr-1.5 h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
-                />
-                Scanning...
-              </>
-            ) : (
-              "Run Scan"
-            )}
-          </Button>
-        </div>
+        </Button>
+      </div>
 
-        {/* Tabs + Sidebar */}
-        <Tabs defaultValue="scan" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="scan">Scan</TabsTrigger>
-            <TabsTrigger value="research">Research</TabsTrigger>
-            <TabsTrigger value="changelog">Changelog</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+      {/* Tabs + Sidebar */}
+      <Tabs defaultValue="scan" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="scan">Scan</TabsTrigger>
+          <TabsTrigger value="research">Research</TabsTrigger>
+          <TabsTrigger value="changelog">Changelog</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="scan" className="relative space-y-6">
-            {scanHistorySidebar && (
-              <>
-                <div className="lg:hidden mb-4">{scanHistorySidebar}</div>
-                <div
-                  className="hidden lg:block absolute left-0 top-0 w-48"
-                  style={{
-                    transform: "translate(calc(-100% - 1rem), -1.5rem)",
-                  }}
-                >
-                  {scanHistorySidebar}
-                </div>
-              </>
-            )}
-            {/* Scan log */}
-            <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Scan Log
-                  </span>
-                  {currentScan && (
-                    <span className="text-[10px] font-mono text-muted-foreground/60">
-                      {currentScan.slug || `scan-${currentScan.id.slice(0, 8)}`}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {currentScan && (
-                    <>
-                      <span className="text-[11px] text-muted-foreground">
-                        {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-2 text-[10px]"
-                          onClick={() => {
-                            const data = {
-                              scanId: currentScan.id,
-                              slug: currentScan.slug,
-                              score: currentScan.score,
-                              filesScanned: currentScan.files_scanned,
-                              issuesFound: currentScan.issues_found,
-                              durationMs: currentScan.scan_duration_ms,
-                              createdAt: currentScan.created_at,
-                              logs: currentScan.logs || [],
-                              issues: currentScan.results?.issues || [],
-                              summary: currentScan.results?.summary || null,
-                              research: currentScan.results?.research || null,
-                              aiContext:
-                                currentScan.results?.ai_context || null,
-                            };
-                            const blob = new Blob(
-                              [JSON.stringify(data, null, 2)],
-                              { type: "application/json" },
-                            );
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `${currentScan.slug || "scan"}.json`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          JSON
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-2 text-[10px]"
-                          onClick={() => {
-                            const lines = [
-                              `# Scan Report`,
-                              ``,
-                              `**ID:** ${currentScan.slug || currentScan.id}`,
-                              `**Date:** ${new Date(currentScan.created_at).toLocaleString()}`,
-                              `**Score:** ${currentScan.score}`,
-                              `**Files Scanned:** ${currentScan.files_scanned}`,
-                              `**Issues Found:** ${currentScan.issues_found}`,
-                              `**Duration:** ${(currentScan.scan_duration_ms / 1000).toFixed(1)}s`,
-                              ``,
-                            ];
-                            if (currentScan.results?.issues?.length) {
-                              lines.push(`## Issues`, ``);
-                              for (const issue of currentScan.results.issues) {
-                                lines.push(
-                                  `- **[${issue.severity.toUpperCase()}]** ${issue.name} in \`${issue.file}\` (line ${issue.line}): ${issue.match}`,
-                                );
-                              }
-                            } else {
-                              lines.push(`## No Issues Found ✓`);
-                            }
-                            const blob = new Blob([lines.join("\n")], {
-                              type: "text/markdown",
-                            });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `${currentScan.slug || "scan"}.md`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          MD
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
+        <TabsContent value="scan" className="relative space-y-6">
+          {scanHistorySidebar && (
+            <>
+              <div className="lg:hidden mb-4">{scanHistorySidebar}</div>
+              <div
+                className="hidden lg:block absolute left-0 top-0 w-48"
+                style={{
+                  transform: "translate(calc(-100% - 1rem), -1.5rem)",
+                }}
+              >
+                {scanHistorySidebar}
               </div>
-              <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
-                {displayedScanLog.length > 0 ? (
-                  displayedScanLog.map((entry, index) => (
-                    <div key={index} className="flex items-start gap-3 py-0.5">
-                      {entry.type === "info" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {entry.message}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === "start" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <span className="text-blue-400">{entry.message}</span>
-                        </>
-                      )}
-                      {entry.type === "progress" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {entry.message}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === "success" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
-                          <span className="text-emerald-500">
-                            {entry.message}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === "ai_context" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <Shield className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />
-                          <span className="text-blue-300">{entry.message}</span>
-                        </>
-                      )}
-                      {entry.type === "error" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
-                          <span className="text-red-500">{entry.message}</span>
-                        </>
-                      )}
-                      {entry.type === "file" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
-                          <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-                          <span className="text-yellow-500">
-                            {entry.message}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === "issue" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
-                          <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
-                          <span
-                            className={cn(
-                              "shrink-0",
-                              severityColors[entry.severity || "low"],
-                            )}
-                          >
-                            [{(entry.severity || "low").toUpperCase()}]
-                          </span>
-                          <span className="text-muted-foreground">
-                            {entry.message}
-                          </span>
-                          <span className="text-muted-foreground/50">
-                            line {entry.line}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === "summary" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <span className="text-foreground font-medium">
-                            ✓ {entry.message}
-                          </span>
-                          {currentScan?.score && (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 text-[10px] px-1.5 py-0"
-                            >
-                              <span
-                                className={cn(
-                                  "size-1 rounded-full",
-                                  scoreColors[currentScan.score],
-                                )}
-                              />
-                              {currentScan.score}
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                      {entry.type === "complete" && (
-                        <>
-                          <span className="text-muted-foreground/50 w-10 text-right shrink-0">
-                            {entry.time}
-                          </span>
-                          <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
-                          <span className="text-foreground font-medium">
-                            {entry.message}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-muted-foreground text-center py-8">
-                    {project.last_scan_at
-                      ? "Click 'Run Scan' to scan again"
-                      : "No scans yet. Click 'Run Scan' to start."}
-                  </div>
+            </>
+          )}
+          {/* Scan log */}
+          <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Scan Log
+                </span>
+                {currentScan && (
+                  <span className="text-[10px] font-mono text-muted-foreground/60">
+                    {currentScan.slug || `scan-${currentScan.id.slice(0, 8)}`}
+                  </span>
                 )}
               </div>
-
-              {/* Suppressed false positives — collapsible */}
-              {(() => {
-                const suppressed = currentScan?.results?.suppressed_issues;
-                if (!suppressed || suppressed.length === 0) return null;
-                return (
+              <div className="flex items-center gap-2">
+                {currentScan && (
                   <>
-                    <div className="border-t border-border/40" />
-                    <button
-                      onClick={() => setShowSuppressed((v) => !v)}
-                      className="w-full px-4 py-2 flex items-center gap-2 text-left hover:bg-secondary/30 transition-colors"
-                    >
-                      <span className="text-[11px] text-muted-foreground/60 flex-1">
-                        Filtered
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          "h-3 w-3 text-muted-foreground/40 transition-transform",
-                          showSuppressed && "rotate-180",
-                        )}
-                      />
-                    </button>
-                    {showSuppressed && (
-                      <div className="px-4 pb-3 font-mono text-xs space-y-0.5">
-                        {(() => {
-                          const byFile: Record<string, ScanIssue[]> = {};
-                          for (const issue of suppressed) {
-                            if (!byFile[issue.file]) byFile[issue.file] = [];
-                            byFile[issue.file].push(issue);
-                          }
-                          return Object.entries(byFile).map(
-                            ([file, issues]) => (
-                              <div key={file} className="mt-1.5">
-                                <div className="flex items-center gap-2 text-muted-foreground/40">
-                                  <FileText className="h-3 w-3 shrink-0" />
-                                  <span>{file}</span>
-                                </div>
-                                {issues.map((issue, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-start gap-3 py-0.5 pl-5"
-                                  >
-                                    <ChevronRight className="h-3 w-3 text-muted-foreground/20 shrink-0 mt-0.5" />
-                                    <span className="text-muted-foreground/30 shrink-0">
-                                      [{(issue.severity || "low").toUpperCase()}
-                                      ]
-                                    </span>
-                                    <span className="text-muted-foreground/40">
-                                      {issue.name}
-                                    </span>
-                                    <span className="text-muted-foreground/25">
-                                      line {issue.line}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ),
-                          );
-                        })()}
-                      </div>
-                    )}
+                    <span className="text-[11px] text-muted-foreground">
+                      {(currentScan.scan_duration_ms / 1000).toFixed(1)}s
+                    </span>
+
+                    {/* ── Export dropdown ───────────────────────────────── */}
+                    <div className="relative" ref={exportDropdownRef}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => setShowExportDropdown((prev) => !prev)}
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Export
+                        <ChevronDown
+                          className={cn(
+                            "h-3 w-3 ml-1 transition-transform duration-150",
+                            showExportDropdown && "rotate-180",
+                          )}
+                        />
+                      </Button>
+
+                      {showExportDropdown && (
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[110px] rounded-md border border-border/60 bg-popover shadow-md overflow-hidden">
+                          {(
+                            [
+                              {
+                                label: "JSON",
+                                ext: "json",
+                                handler: handleExportJSON,
+                              },
+                              {
+                                label: "Markdown",
+                                ext: "md",
+                                handler: handleExportMD,
+                              },
+                              {
+                                label: "CSV",
+                                ext: "csv",
+                                handler: handleExportCSV,
+                              },
+                              {
+                                label: "PDF",
+                                ext: "pdf",
+                                handler: handleExportPDF,
+                              },
+                            ] as const
+                          ).map(({ label, handler }) => (
+                            <button
+                              key={label}
+                              onClick={handler}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-foreground hover:bg-secondary/60 transition-colors text-left"
+                            >
+                              <Download className="h-3 w-3 text-muted-foreground shrink-0" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* ── End export dropdown ───────────────────────────── */}
                   </>
-                );
-              })()}
-              {canShowFixBanner && activeScan && (
+                )}
+              </div>
+            </div>
+            <div className="p-4 font-mono text-xs space-y-1 max-h-[400px] overflow-y-auto">
+              {displayedScanLog.length > 0 ? (
+                displayedScanLog.map((entry, index) => (
+                  <div key={index} className="flex items-start gap-3 py-0.5">
+                    {entry.type === "info" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {entry.message}
+                        </span>
+                      </>
+                    )}
+                    {entry.type === "start" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <span className="text-blue-400">{entry.message}</span>
+                      </>
+                    )}
+                    {entry.type === "progress" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {entry.message}
+                        </span>
+                      </>
+                    )}
+                    {entry.type === "success" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                        <span className="text-emerald-500">
+                          {entry.message}
+                        </span>
+                      </>
+                    )}
+                    {entry.type === "ai_context" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <Shield className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />
+                        <span className="text-blue-300">{entry.message}</span>
+                      </>
+                    )}
+                    {entry.type === "error" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
+                        <span className="text-red-500">{entry.message}</span>
+                      </>
+                    )}
+                    {entry.type === "file" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
+                        <FileText className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                        <span className="text-yellow-500">{entry.message}</span>
+                      </>
+                    )}
+                    {entry.type === "issue" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0"></span>
+                        <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0 mt-0.5" />
+                        <span
+                          className={cn(
+                            "shrink-0",
+                            severityColors[entry.severity || "low"],
+                          )}
+                        >
+                          [{(entry.severity || "low").toUpperCase()}]
+                        </span>
+                        <span className="text-muted-foreground">
+                          {entry.message}
+                        </span>
+                        <span className="text-muted-foreground/50">
+                          line {entry.line}
+                        </span>
+                      </>
+                    )}
+                    {entry.type === "summary" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <span className="text-foreground font-medium">
+                          ✓ {entry.message}
+                        </span>
+                        {currentScan?.score && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 text-[10px] px-1.5 py-0"
+                          >
+                            <span
+                              className={cn(
+                                "size-1 rounded-full",
+                                scoreColors[currentScan.score],
+                              )}
+                            />
+                            {currentScan.score}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                    {entry.type === "complete" && (
+                      <>
+                        <span className="text-muted-foreground/50 w-10 text-right shrink-0">
+                          {entry.time}
+                        </span>
+                        <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                        <span className="text-foreground font-medium">
+                          {entry.message}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-muted-foreground text-center py-8">
+                  {project.last_scan_at
+                    ? "Click 'Run Scan' to scan again"
+                    : "No scans yet. Click 'Run Scan' to start."}
+                </div>
+              )}
+            </div>
+
+            {/* Suppressed false positives — collapsible */}
+            {(() => {
+              const suppressed = currentScan?.results?.suppressed_issues;
+              if (!suppressed || suppressed.length === 0) return null;
+              return (
                 <>
                   <div className="border-t border-border/40" />
-                  <div className="px-4 py-3 flex items-center justify-between gap-2">
-                    {activeScan.fix_status === "pr_opened" ? (
-                      <>
-                        {activeScan.fix_pr_url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs px-3"
-                            onClick={() =>
-                              window.open(
-                                activeScan.fix_pr_url as string,
-                                "_blank",
-                              )
-                            }
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1.5" />
-                            View PR
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                          onClick={() => updateFixStatus("done")}
-                          disabled={isUpdatingFixStatus}
-                        >
-                          {isUpdatingFixStatus ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            "Done"
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
+                  <button
+                    onClick={() => setShowSuppressed((v) => !v)}
+                    className="w-full px-4 py-2 flex items-center gap-2 text-left hover:bg-secondary/30 transition-colors"
+                  >
+                    <span className="text-[11px] text-muted-foreground/60 flex-1">
+                      Filtered
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 text-muted-foreground/40 transition-transform",
+                        showSuppressed && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  {showSuppressed && (
+                    <div className="px-4 pb-3 font-mono text-xs space-y-0.5">
+                      {(() => {
+                        const byFile: Record<string, ScanIssue[]> = {};
+                        for (const issue of suppressed) {
+                          if (!byFile[issue.file]) byFile[issue.file] = [];
+                          byFile[issue.file].push(issue);
+                        }
+                        return Object.entries(byFile).map(([file, issues]) => (
+                          <div key={file} className="mt-1.5">
+                            <div className="flex items-center gap-2 text-muted-foreground/40">
+                              <FileText className="h-3 w-3 shrink-0" />
+                              <span>{file}</span>
+                            </div>
+                            {issues.map((issue, i) => (
+                              <div
+                                key={i}
+                                className="flex items-start gap-3 py-0.5 pl-5"
+                              >
+                                <ChevronRight className="h-3 w-3 text-muted-foreground/20 shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground/30 shrink-0">
+                                  [{(issue.severity || "low").toUpperCase()}]
+                                </span>
+                                <span className="text-muted-foreground/40">
+                                  {issue.name}
+                                </span>
+                                <span className="text-muted-foreground/25">
+                                  line {issue.line}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+            {canShowFixBanner && activeScan && (
+              <>
+                <div className="border-t border-border/40" />
+                <div className="px-4 py-3 flex items-center justify-between gap-2">
+                  {activeScan.fix_status === "pr_opened" ? (
+                    <>
+                      {activeScan.fix_pr_url && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs px-3"
-                          onClick={() => updateFixStatus("dismiss")}
-                          disabled={isUpdatingFixStatus}
-                        >
-                          {isUpdatingFixStatus ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            "Dismiss"
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
                           onClick={() =>
-                            router.push(
-                              `/scan/projects/${projectId}/fixes/${activeScan.id}`,
+                            window.open(
+                              activeScan.fix_pr_url as string,
+                              "_blank",
                             )
                           }
                         >
-                          Suggest Fix
+                          <ExternalLink className="h-3 w-3 mr-1.5" />
+                          View PR
                         </Button>
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
+                      )}
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                        onClick={() => updateFixStatus("done")}
+                        disabled={isUpdatingFixStatus}
+                      >
+                        {isUpdatingFixStatus ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Done"
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs px-3"
+                        onClick={() => updateFixStatus("dismiss")}
+                        disabled={isUpdatingFixStatus}
+                      >
+                        {isUpdatingFixStatus ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Dismiss"
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
+                        onClick={() =>
+                          router.push(
+                            `/scan/projects/${projectId}/fixes/${activeScan.id}`,
+                          )
+                        }
+                      >
+                        Suggest Fix
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="research" className="space-y-6">
+          {!currentScan ? (
+            <div className="bg-card border border-border/40 rounded-md p-6 text-center text-sm text-muted-foreground">
+              Run a scan to build repository intelligence and compare against
+              prior runs.
             </div>
-          </TabsContent>
-
-          <TabsContent value="research" className="space-y-6">
-            {!currentScan ? (
-              <div className="bg-card border border-border/40 rounded-md p-6 text-center text-sm text-muted-foreground">
-                Run a scan to build repository intelligence and compare against
-                prior runs.
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-card border border-border/40 rounded-md p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Files Indexed
+                  </p>
+                  <p className="text-xl font-semibold mt-1">
+                    {currentResearch?.filesIndexed ?? 0}
+                  </p>
+                </div>
+                <div className="bg-card border border-border/40 rounded-md p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Components Mapped
+                  </p>
+                  <p className="text-xl font-semibold mt-1">
+                    {currentResearch?.interactionMap.nodes.length ?? 0}
+                  </p>
+                </div>
+                <div className="bg-card border border-border/40 rounded-md p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Interaction Edges
+                  </p>
+                  <p className="text-xl font-semibold mt-1">
+                    {currentResearch?.interactionMap.edges.length ?? 0}
+                  </p>
+                </div>
+                <div className="bg-card border border-border/40 rounded-md p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Data Flow Traces
+                  </p>
+                  <p className="text-xl font-semibold mt-1">
+                    {currentResearch?.dataFlows.traces.length ?? 0}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-card border border-border/40 rounded-md p-4">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Files Indexed
+
+              <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Project Brief
+                  </p>
+                  {currentResearch?.projectBrief && (
+                    <p className="text-[10px] text-muted-foreground">
+                      confidence{" "}
+                      {(currentResearch.projectBrief.confidence * 100).toFixed(
+                        0,
+                      )}
+                      %
                     </p>
-                    <p className="text-xl font-semibold mt-1">
-                      {currentResearch?.filesIndexed ?? 0}
-                    </p>
-                  </div>
-                  <div className="bg-card border border-border/40 rounded-md p-4">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Components Mapped
-                    </p>
-                    <p className="text-xl font-semibold mt-1">
-                      {currentResearch?.interactionMap.nodes.length ?? 0}
-                    </p>
-                  </div>
-                  <div className="bg-card border border-border/40 rounded-md p-4">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Interaction Edges
-                    </p>
-                    <p className="text-xl font-semibold mt-1">
-                      {currentResearch?.interactionMap.edges.length ?? 0}
-                    </p>
-                  </div>
-                  <div className="bg-card border border-border/40 rounded-md p-4">
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Data Flow Traces
-                    </p>
-                    <p className="text-xl font-semibold mt-1">
-                      {currentResearch?.dataFlows.traces.length ?? 0}
-                    </p>
-                  </div>
+                  )}
                 </div>
-
-                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Project Brief
-                    </p>
-                    {currentResearch?.projectBrief && (
-                      <p className="text-[10px] text-muted-foreground">
-                        confidence{" "}
-                        {(
-                          currentResearch.projectBrief.confidence * 100
-                        ).toFixed(0)}
-                        %
+                <div className="p-4 space-y-4">
+                  {currentResearch?.projectBrief ? (
+                    <>
+                      <p className="text-sm text-foreground">
+                        {currentResearch.projectBrief.summary}
                       </p>
-                    )}
-                  </div>
-                  <div className="p-4 space-y-4">
-                    {currentResearch?.projectBrief ? (
-                      <>
-                        <p className="text-sm text-foreground">
-                          {currentResearch.projectBrief.summary}
-                        </p>
 
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                          <div className="space-y-1.5">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              App Purpose
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {currentResearch.projectBrief.appPurpose}
-                            </p>
-                          </div>
-                          <div className="space-y-1.5">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              Auth Model
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {currentResearch.projectBrief.authModel}
-                            </p>
-                          </div>
-                          <div className="space-y-1.5">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              Deployment Shape
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {currentResearch.projectBrief.deploymentShape}
-                            </p>
-                          </div>
-                        </div>
-
-                        {currentResearch.projectBrief.externalServices.length >
-                          0 && (
-                          <div className="space-y-2">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              External Services
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {currentResearch.projectBrief.externalServices.map(
-                                (service) => (
-                                  <Badge
-                                    key={service}
-                                    variant="outline"
-                                    className="text-[10px] px-1.5 py-0"
-                                  >
-                                    {service}
-                                  </Badge>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              Trust Boundaries
-                            </p>
-                            <div className="space-y-1.5">
-                              {currentResearch.projectBrief.trustBoundaries
-                                .length > 0 ? (
-                                currentResearch.projectBrief.trustBoundaries.map(
-                                  (boundary) => (
-                                    <p
-                                      key={boundary}
-                                      className="text-xs text-muted-foreground"
-                                    >
-                                      {boundary}
-                                    </p>
-                                  ),
-                                )
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  No clear trust boundaries were inferred from
-                                  this run.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              Sensitive Flows
-                            </p>
-                            <div className="space-y-1.5">
-                              {currentResearch.projectBrief.sensitiveFlows
-                                .length > 0 ? (
-                                currentResearch.projectBrief.sensitiveFlows.map(
-                                  (flow) => (
-                                    <p
-                                      key={flow}
-                                      className="text-xs text-muted-foreground"
-                                    >
-                                      {flow}
-                                    </p>
-                                  ),
-                                )
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  No sensitive flows were summarized from this
-                                  run.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                              Critical Modules
-                            </p>
-                            <div className="space-y-1.5">
-                              {currentResearch.projectBrief.criticalModules
-                                .length > 0 ? (
-                                currentResearch.projectBrief.criticalModules.map(
-                                  (module) => (
-                                    <p
-                                      key={module}
-                                      className="text-xs text-muted-foreground font-mono"
-                                    >
-                                      {module}
-                                    </p>
-                                  ),
-                                )
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  No critical modules were ranked for this run.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Run a fresh scan to generate a project brief.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Live AI Context
-                    </p>
-                    {currentAiContext && (
-                      <p className="text-[10px] text-muted-foreground">
-                        {currentAiContext.model} ·{" "}
-                        {currentAiContext.snapshotsAnalyzed} snapshot
-                        {currentAiContext.snapshotsAnalyzed === 1 ? "" : "s"}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-4 space-y-2">
-                    {currentAiContext ? (
-                      <>
-                        <p className="text-xs text-foreground">
-                          {currentAiContext.summary}
-                        </p>
-                        {currentAiContext.riskThemes.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground/90">
-                              Risk themes:
-                            </span>{" "}
-                            {currentAiContext.riskThemes.join(" · ")}
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            App Purpose
                           </p>
-                        )}
-                        {currentAiContext.priorityFiles.length > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground/90">
-                              Priority files:
-                            </span>{" "}
-                            {currentAiContext.priorityFiles
-                              .slice(0, 6)
-                              .join(", ")}
+                            {currentResearch.projectBrief.appPurpose}
                           </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        AI context snapshots are stored when a live scan stream
-                        is running.
-                      </p>
-                    )}
-                  </div>
-                </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            Auth Model
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {currentResearch.projectBrief.authModel}
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            Deployment Shape
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {currentResearch.projectBrief.deploymentShape}
+                          </p>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                    <div className="px-4 py-2.5 border-b border-border/40">
-                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Interaction Hotspots
-                      </p>
-                    </div>
-                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
-                      {currentResearch?.interactionMap.hotspots.length ? (
-                        currentResearch.interactionMap.hotspots.map(
-                          (hotspot) => (
-                            <div
-                              key={hotspot.file}
-                              className="rounded border border-border/40 p-3"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-medium font-mono truncate">
-                                  {hotspot.file}
-                                </p>
+                      {currentResearch.projectBrief.externalServices.length >
+                        0 && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            External Services
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {currentResearch.projectBrief.externalServices.map(
+                              (service) => (
                                 <Badge
+                                  key={service}
                                   variant="outline"
                                   className="text-[10px] px-1.5 py-0"
                                 >
-                                  score {hotspot.riskScore}
+                                  {service}
                                 </Badge>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground mt-1">
-                                {hotspot.kind} · {hotspot.reason}
-                              </p>
-                            </div>
-                          ),
-                        )
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          No hotspots available for this scan.
-                        </p>
+                              ),
+                            )}
+                          </div>
+                        </div>
                       )}
-                    </div>
-                  </div>
 
-                  <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                    <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Data Flow Traces
-                      </p>
-                      {currentResearch && (
-                        <p className="text-[10px] text-muted-foreground">
-                          {currentResearch.dataFlows.criticalCount} critical ·{" "}
-                          {currentResearch.dataFlows.highCount} high
-                        </p>
-                      )}
-                    </div>
-                    <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
-                      {currentResearch?.dataFlows.traces.length ? (
-                        currentResearch.dataFlows.traces
-                          .slice(0, 12)
-                          .map((trace) => (
-                            <div
-                              key={trace.id}
-                              className="rounded border border-border/40 p-3"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-medium truncate">
-                                  {trace.summary}
-                                </p>
-                                <span
-                                  className={cn(
-                                    "text-[11px] uppercase",
-                                    severityColors[trace.severity],
-                                  )}
-                                >
-                                  {trace.severity}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground mt-1 font-mono">
-                                {trace.file}:{trace.line} · confidence{" "}
-                                {(trace.confidence * 100).toFixed(0)}%
-                              </p>
-                              <div className="mt-2 space-y-1">
-                                {trace.stages.map((stage, idx) => (
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            Trust Boundaries
+                          </p>
+                          <div className="space-y-1.5">
+                            {currentResearch.projectBrief.trustBoundaries
+                              .length > 0 ? (
+                              currentResearch.projectBrief.trustBoundaries.map(
+                                (boundary) => (
                                   <p
-                                    key={`${trace.id}-${idx}`}
-                                    className="text-[11px] text-muted-foreground"
+                                    key={boundary}
+                                    className="text-xs text-muted-foreground"
                                   >
-                                    <span className="uppercase tracking-wide mr-2">
-                                      {stage.kind}
-                                    </span>
-                                    {stage.label}
+                                    {boundary}
                                   </p>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          No source-to-sink traces were identified in this run.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                                ),
+                              )
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                No clear trust boundaries were inferred from
+                                this run.
+                              </p>
+                            )}
+                          </div>
+                        </div>
 
-                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Scan Diff Viewer
-                    </p>
-                    <select
-                      className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                      value={baselineScanId}
-                      onChange={(event) =>
-                        setBaselineScanId(event.target.value)
-                      }
-                    >
-                      <option value="">Select baseline run</option>
-                      {scans
-                        .filter((scan) => scan.id !== currentScan.id)
-                        .map((scan) => (
-                          <option key={scan.id} value={scan.id}>
-                            {new Date(scan.created_at).toLocaleString()} ·{" "}
-                            {scan.score || "?"}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            Sensitive Flows
+                          </p>
+                          <div className="space-y-1.5">
+                            {currentResearch.projectBrief.sensitiveFlows
+                              .length > 0 ? (
+                              currentResearch.projectBrief.sensitiveFlows.map(
+                                (flow) => (
+                                  <p
+                                    key={flow}
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    {flow}
+                                  </p>
+                                ),
+                              )
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                No sensitive flows were summarized from this
+                                run.
+                              </p>
+                            )}
+                          </div>
+                        </div>
 
-                  {!baselineScan || !scanDiff ? (
-                    <div className="p-4 text-xs text-muted-foreground">
-                      Select a prior scan run to compare with the current run.
-                    </div>
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            Critical Modules
+                          </p>
+                          <div className="space-y-1.5">
+                            {currentResearch.projectBrief.criticalModules
+                              .length > 0 ? (
+                              currentResearch.projectBrief.criticalModules.map(
+                                (module) => (
+                                  <p
+                                    key={module}
+                                    className="text-xs text-muted-foreground font-mono"
+                                  >
+                                    {module}
+                                  </p>
+                                ),
+                              )
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                No critical modules were ranked for this run.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   ) : (
-                    <div className="p-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="rounded border border-border/40 p-3">
-                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                            Score Delta
-                          </p>
-                          <p
-                            className={cn(
-                              "text-lg font-semibold mt-1",
-                              scanDiff.scoreDelta < 0
-                                ? "text-red-500"
-                                : "text-emerald-500",
-                            )}
-                          >
-                            {scanDiff.scoreDelta > 0 ? "+" : ""}
-                            {scanDiff.scoreDelta}
-                          </p>
-                        </div>
-                        <div className="rounded border border-border/40 p-3">
-                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                            Issue Delta
-                          </p>
-                          <p
-                            className={cn(
-                              "text-lg font-semibold mt-1",
-                              scanDiff.issueDelta > 0
-                                ? "text-red-500"
-                                : "text-emerald-500",
-                            )}
-                          >
-                            {scanDiff.issueDelta > 0 ? "+" : ""}
-                            {scanDiff.issueDelta}
-                          </p>
-                        </div>
-                        <div className="rounded border border-border/40 p-3">
-                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                            File Delta
-                          </p>
-                          <p className="text-lg font-semibold mt-1">
-                            {scanDiff.fileDelta > 0 ? "+" : ""}
-                            {scanDiff.fileDelta}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="rounded border border-border/40 p-3">
-                          <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
-                            Added Findings ({scanDiff.addedIssues.length})
-                          </p>
-                          <div className="space-y-1 max-h-[220px] overflow-y-auto">
-                            {scanDiff.addedIssues.length ? (
-                              scanDiff.addedIssues.map((issue) => (
-                                <p
-                                  key={`added-${issueFingerprint(issue)}`}
-                                  className="text-xs text-muted-foreground"
-                                >
-                                  <span
-                                    className={cn(
-                                      "mr-1",
-                                      severityColors[issue.severity],
-                                    )}
-                                  >
-                                    [{issue.severity.toUpperCase()}]
-                                  </span>
-                                  {issue.file}:{issue.line} {issue.name}
-                                </p>
-                              ))
-                            ) : (
-                              <p className="text-xs text-muted-foreground">
-                                No new findings compared to baseline.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="rounded border border-border/40 p-3">
-                          <p className="text-[11px] font-medium text-red-400 uppercase tracking-wider mb-2">
-                            Resolved Findings ({scanDiff.removedIssues.length})
-                          </p>
-                          <div className="space-y-1 max-h-[220px] overflow-y-auto">
-                            {scanDiff.removedIssues.length ? (
-                              scanDiff.removedIssues.map((issue) => (
-                                <p
-                                  key={`removed-${issueFingerprint(issue)}`}
-                                  className="text-xs text-muted-foreground"
-                                >
-                                  <span
-                                    className={cn(
-                                      "mr-1",
-                                      severityColors[issue.severity],
-                                    )}
-                                  >
-                                    [{issue.severity.toUpperCase()}]
-                                  </span>
-                                  {issue.file}:{issue.line} {issue.name}
-                                </p>
-                              ))
-                            ) : (
-                              <p className="text-xs text-muted-foreground">
-                                No findings were resolved in the current run.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Run a fresh scan to generate a project brief.
+                    </p>
                   )}
                 </div>
+              </div>
 
+              <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Live AI Context
+                  </p>
+                  {currentAiContext && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {currentAiContext.model} ·{" "}
+                      {currentAiContext.snapshotsAnalyzed} snapshot
+                      {currentAiContext.snapshotsAnalyzed === 1 ? "" : "s"}
+                    </p>
+                  )}
+                </div>
+                <div className="p-4 space-y-2">
+                  {currentAiContext ? (
+                    <>
+                      <p className="text-xs text-foreground">
+                        {currentAiContext.summary}
+                      </p>
+                      {currentAiContext.riskThemes.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/90">
+                            Risk themes:
+                          </span>{" "}
+                          {currentAiContext.riskThemes.join(" · ")}
+                        </p>
+                      )}
+                      {currentAiContext.priorityFiles.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/90">
+                            Priority files:
+                          </span>{" "}
+                          {currentAiContext.priorityFiles
+                            .slice(0, 6)
+                            .join(", ")}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      AI context snapshots are stored when a live scan stream is
+                      running.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-border/40">
                     <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Research Notes
+                      Interaction Hotspots
                     </p>
                   </div>
-                  <div className="p-4 space-y-2">
-                    {currentResearch?.reasoningNotes.length ? (
-                      currentResearch.reasoningNotes.map((note, index) => (
-                        <p
-                          key={`${index}-${note}`}
-                          className="text-xs text-muted-foreground"
-                        >
-                          {index + 1}. {note}
-                        </p>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        This scan run has no generated research notes. Run a
-                        fresh scan to produce deeper analysis.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Memory
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {continuityMemory.length} remembered item
-                      {continuityMemory.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {continuityMemory.length > 0 ? (
-                      continuityMemory.map((entry) => (
+                  <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                    {currentResearch?.interactionMap.hotspots.length ? (
+                      currentResearch.interactionMap.hotspots.map((hotspot) => (
                         <div
-                          key={entry.id}
-                          className="rounded border border-border/40 p-3 space-y-2"
+                          key={hotspot.file}
+                          className="rounded border border-border/40 p-3"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-medium font-mono truncate">
+                              {hotspot.file}
+                            </p>
                             <Badge
                               variant="outline"
                               className="text-[10px] px-1.5 py-0"
                             >
-                              {continuitySourceLabels[entry.source] ||
-                                entry.source}
+                              score {hotspot.riskScore}
                             </Badge>
-                            <p className="text-[10px] text-muted-foreground">
-                              {new Date(entry.created_at).toLocaleString()}
-                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {entry.content}
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            {hotspot.kind} · {hotspot.reason}
                           </p>
-                          {entry.scan_run_id && (
-                            <p className="text-[10px] text-muted-foreground/70 font-mono">
-                              scan {entry.scan_run_id.slice(0, 8)}
-                            </p>
-                          )}
                         </div>
                       ))
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        Cencori has not accumulated continuity memory for this
-                        project yet. Run a fresh scan or mark a scan as
-                        dismissed/done to start building long-term context.
+                        No hotspots available for this scan.
                       </p>
                     )}
                   </div>
                 </div>
-              </>
-            )}
-          </TabsContent>
 
-          <TabsContent value="changelog">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-              <div>
-                <h2 className="text-[13px] font-medium">Changelog</h2>
-                <p className="text-xs text-muted-foreground">
-                  Generate changelogs from your commit history
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={changelogTimeframe}
-                  onChange={(e) =>
-                    setChangelogTimeframe(
-                      e.target.value as "24h" | "7d" | "30d",
-                    )
-                  }
-                  className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-                  disabled={isGeneratingChangelog}
-                >
-                  <option value="24h">Last 24 hours</option>
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                </select>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={handleGenerateChangelog}
-                  disabled={isGeneratingChangelog}
-                >
-                  {isGeneratingChangelog ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{" "}
-                      Generating...
-                    </>
-                  ) : (
-                    "Generate Changelog"
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {changelogs.length === 0 ? (
-              <div className="text-center py-16 flex flex-col items-center justify-center">
-                <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                  <GitBranch className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="text-sm font-medium mb-1">
-                  No changelogs generated yet
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Click &quot;Generate Changelog&quot; to create your first one
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Changelog list */}
-                <div className="flex gap-4">
-                  {/* Sidebar with changelog list */}
-                  <div className="w-48 shrink-0 space-y-1">
-                    {changelogs.map((changelog) => {
-                      const isSelected = selectedChangelog?.id === changelog.id;
-                      const date = new Date(
-                        changelog.created_at,
-                      ).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      });
-                      return (
-                        <button
-                          key={changelog.id}
-                          onClick={() => setSelectedChangelog(changelog)}
-                          className={cn(
-                            "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
-                            isSelected
-                              ? "bg-secondary text-foreground"
-                              : "hover:bg-secondary/50 text-muted-foreground",
-                          )}
-                        >
-                          <div className="font-medium">{date}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {changelog.commit_count} commits
-                          </div>
-                        </button>
-                      );
-                    })}
+                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Data Flow Traces
+                    </p>
+                    {currentResearch && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {currentResearch.dataFlows.criticalCount} critical ·{" "}
+                        {currentResearch.dataFlows.highCount} high
+                      </p>
+                    )}
                   </div>
-
-                  {/* Changelog content */}
-                  <div className="flex-1 bg-card border border-border/40 rounded-md p-4 overflow-auto">
-                    {selectedChangelog ? (
-                      <div className="prose prose-sm prose-invert max-w-none">
-                        <pre className="whitespace-pre-wrap text-xs font-mono text-foreground p-0 m-0 bg-transparent">
-                          {selectedChangelog.markdown}
-                        </pre>
-                      </div>
+                  <div className="p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                    {currentResearch?.dataFlows.traces.length ? (
+                      currentResearch.dataFlows.traces
+                        .slice(0, 12)
+                        .map((trace) => (
+                          <div
+                            key={trace.id}
+                            className="rounded border border-border/40 p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-medium truncate">
+                                {trace.summary}
+                              </p>
+                              <span
+                                className={cn(
+                                  "text-[11px] uppercase",
+                                  severityColors[trace.severity],
+                                )}
+                              >
+                                {trace.severity}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+                              {trace.file}:{trace.line} · confidence{" "}
+                              {(trace.confidence * 100).toFixed(0)}%
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              {trace.stages.map((stage, idx) => (
+                                <p
+                                  key={`${trace.id}-${idx}`}
+                                  className="text-[11px] text-muted-foreground"
+                                >
+                                  <span className="uppercase tracking-wide mr-2">
+                                    {stage.kind}
+                                  </span>
+                                  {stage.label}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))
                     ) : (
-                      <div className="text-xs text-muted-foreground text-center py-8">
-                        Select a changelog to view
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        No source-to-sink traces were identified in this run.
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
-            )}
-          </TabsContent>
 
-          <TabsContent value="settings">
-            <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
-
-            <div className="space-y-6">
-              {/* Project Details */}
-              <div className="bg-card border border-border/40 rounded-md p-4">
-                <h3 className="text-xs font-medium mb-4">Project Details</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1.5">
-                      Project Name
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono">
-                        {project.github_repo_full_name}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 shrink-0"
-                        onClick={() =>
-                          handleCopyToClipboard(
-                            project.github_repo_full_name,
-                            "name",
-                          )
-                        }
-                      >
-                        {copiedField === "name" ? (
-                          <CheckCircle className="h-3 w-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1.5">
-                      Project ID
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-muted-foreground">
-                        {project.id}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 shrink-0"
-                        onClick={() => handleCopyToClipboard(project.id, "id")}
-                      >
-                        {copiedField === "id" ? (
-                          <CheckCircle className="h-3 w-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1.5">
-                      GitHub URL
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={project.github_repo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-blue-400 hover:text-blue-300 hover:underline truncate"
-                      >
-                        {project.github_repo_url}
-                      </a>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 shrink-0"
-                        onClick={() =>
-                          handleCopyToClipboard(project.github_repo_url, "url")
-                        }
-                      >
-                        {copiedField === "url" ? (
-                          <CheckCircle className="h-3 w-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notifications */}
-              <div className="bg-card border border-border/40 rounded-md p-4">
-                <h3 className="text-xs font-medium mb-4">Notifications</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1.5">
-                      Slack Webhook URL
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue={project.slack_webhook_url || ""}
-                      placeholder="https://hooks.slack.com/services/..."
-                      className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1.5">
-                      Discord Webhook URL
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue={project.discord_webhook_url || ""}
-                      placeholder="https://discord.com/api/webhooks/..."
-                      className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button size="sm" className="h-7 text-xs px-3">
-                Save Settings
-              </Button>
-
-              {/* Danger Zone */}
-              <div className="bg-red-500/5 border border-red-500/20 rounded-md p-4 mt-8">
-                <h3 className="text-xs font-medium text-red-400 mb-2">
-                  Danger Zone
-                </h3>
-                <p className="text-[11px] text-muted-foreground mb-4">
-                  Deleting this project will permanently remove all scan history
-                  and changelogs. This action cannot be undone.
-                </p>
-
-                {!showDeleteConfirm ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs px-3 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                    onClick={() => setShowDeleteConfirm(true)}
+              <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Scan Diff Viewer
+                  </p>
+                  <select
+                    className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={baselineScanId}
+                    onChange={(event) => setBaselineScanId(event.target.value)}
                   >
-                    <Trash2 className="h-3 w-3 mr-1.5" />
-                    Delete Project
-                  </Button>
+                    <option value="">Select baseline run</option>
+                    {scans
+                      .filter((scan) => scan.id !== currentScan.id)
+                      .map((scan) => (
+                        <option key={scan.id} value={scan.id}>
+                          {new Date(scan.created_at).toLocaleString()} ·{" "}
+                          {scan.score || "?"}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {!baselineScan || !scanDiff ? (
+                  <div className="p-4 text-xs text-muted-foreground">
+                    Select a prior scan run to compare with the current run.
+                  </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs px-3 bg-red-500 hover:bg-red-600 text-white"
-                      onClick={handleDeleteProject}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{" "}
-                          Deleting...
-                        </>
-                      ) : (
-                        <>Confirm Delete</>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs px-3"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isDeleting}
-                    >
-                      Cancel
-                    </Button>
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded border border-border/40 p-3">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Score Delta
+                        </p>
+                        <p
+                          className={cn(
+                            "text-lg font-semibold mt-1",
+                            scanDiff.scoreDelta < 0
+                              ? "text-red-500"
+                              : "text-emerald-500",
+                          )}
+                        >
+                          {scanDiff.scoreDelta > 0 ? "+" : ""}
+                          {scanDiff.scoreDelta}
+                        </p>
+                      </div>
+                      <div className="rounded border border-border/40 p-3">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Issue Delta
+                        </p>
+                        <p
+                          className={cn(
+                            "text-lg font-semibold mt-1",
+                            scanDiff.issueDelta > 0
+                              ? "text-red-500"
+                              : "text-emerald-500",
+                          )}
+                        >
+                          {scanDiff.issueDelta > 0 ? "+" : ""}
+                          {scanDiff.issueDelta}
+                        </p>
+                      </div>
+                      <div className="rounded border border-border/40 p-3">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          File Delta
+                        </p>
+                        <p className="text-lg font-semibold mt-1">
+                          {scanDiff.fileDelta > 0 ? "+" : ""}
+                          {scanDiff.fileDelta}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                      <div className="rounded border border-border/40 p-3">
+                        <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
+                          Added Findings ({scanDiff.addedIssues.length})
+                        </p>
+                        <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                          {scanDiff.addedIssues.length ? (
+                            scanDiff.addedIssues.map((issue) => (
+                              <p
+                                key={`added-${issueFingerprint(issue)}`}
+                                className="text-xs text-muted-foreground"
+                              >
+                                <span
+                                  className={cn(
+                                    "mr-1",
+                                    severityColors[issue.severity],
+                                  )}
+                                >
+                                  [{issue.severity.toUpperCase()}]
+                                </span>
+                                {issue.file}:{issue.line} {issue.name}
+                              </p>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              No new findings compared to baseline.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded border border-border/40 p-3">
+                        <p className="text-[11px] font-medium text-red-400 uppercase tracking-wider mb-2">
+                          Resolved Findings ({scanDiff.removedIssues.length})
+                        </p>
+                        <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                          {scanDiff.removedIssues.length ? (
+                            scanDiff.removedIssues.map((issue) => (
+                              <p
+                                key={`removed-${issueFingerprint(issue)}`}
+                                className="text-xs text-muted-foreground"
+                              >
+                                <span
+                                  className={cn(
+                                    "mr-1",
+                                    severityColors[issue.severity],
+                                  )}
+                                >
+                                  [{issue.severity.toUpperCase()}]
+                                </span>
+                                {issue.file}:{issue.line} {issue.name}
+                              </p>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              No findings were resolved in the current run.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
+
+              <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border/40">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Research Notes
+                  </p>
+                </div>
+                <div className="p-4 space-y-2">
+                  {currentResearch?.reasoningNotes.length ? (
+                    currentResearch.reasoningNotes.map((note, index) => (
+                      <p
+                        key={`${index}-${note}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {index + 1}. {note}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This scan run has no generated research notes. Run a fresh
+                      scan to produce deeper analysis.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-card border border-border/40 rounded-md overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Memory
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {continuityMemory.length} remembered item
+                    {continuityMemory.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="p-4 space-y-3">
+                  {continuityMemory.length > 0 ? (
+                    continuityMemory.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="rounded border border-border/40 p-3 space-y-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {continuitySourceLabels[entry.source] ||
+                              entry.source}
+                          </Badge>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(entry.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {entry.content}
+                        </p>
+                        {entry.scan_run_id && (
+                          <p className="text-[10px] text-muted-foreground/70 font-mono">
+                            scan {entry.scan_run_id.slice(0, 8)}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Cencori has not accumulated continuity memory for this
+                      project yet. Run a fresh scan or mark a scan as
+                      dismissed/done to start building long-term context.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="changelog">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div>
+              <h2 className="text-[13px] font-medium">Changelog</h2>
+              <p className="text-xs text-muted-foreground">
+                Generate changelogs from your commit history
+              </p>
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-      <ExportDialog
-        projectId={project.id} // adjust to match the actual variable name in this file
-        isOpen={exportOpen}
-        onClose={() => setExportOpen(false)}
-      />
+            <div className="flex items-center gap-2">
+              <select
+                value={changelogTimeframe}
+                onChange={(e) =>
+                  setChangelogTimeframe(e.target.value as "24h" | "7d" | "30d")
+                }
+                className="h-7 px-2 text-xs rounded border border-border/50 bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                disabled={isGeneratingChangelog}
+              >
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+              <Button
+                size="sm"
+                className="h-7 text-xs px-3"
+                onClick={handleGenerateChangelog}
+                disabled={isGeneratingChangelog}
+              >
+                {isGeneratingChangelog ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{" "}
+                    Generating...
+                  </>
+                ) : (
+                  "Generate Changelog"
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {changelogs.length === 0 ? (
+            <div className="text-center py-16 flex flex-col items-center justify-center">
+              <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                <GitBranch className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium mb-1">
+                No changelogs generated yet
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Click &quot;Generate Changelog&quot; to create your first one
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="w-48 shrink-0 space-y-1">
+                  {changelogs.map((changelog) => {
+                    const isSelected = selectedChangelog?.id === changelog.id;
+                    const date = new Date(
+                      changelog.created_at,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                    return (
+                      <button
+                        key={changelog.id}
+                        onClick={() => setSelectedChangelog(changelog)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 rounded-md text-xs transition-colors",
+                          isSelected
+                            ? "bg-secondary text-foreground"
+                            : "hover:bg-secondary/50 text-muted-foreground",
+                        )}
+                      >
+                        <div className="font-medium">{date}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {changelog.commit_count} commits
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex-1 bg-card border border-border/40 rounded-md p-4 overflow-auto">
+                  {selectedChangelog ? (
+                    <div className="prose prose-sm prose-invert max-w-none">
+                      <pre className="whitespace-pre-wrap text-xs font-mono text-foreground p-0 m-0 bg-transparent">
+                        {selectedChangelog.markdown}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-8">
+                      Select a changelog to view
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <h2 className="text-[13px] font-medium mb-6">Project Settings</h2>
+
+          <div className="space-y-6">
+            <div className="bg-card border border-border/40 rounded-md p-4">
+              <h3 className="text-xs font-medium mb-4">Project Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1.5">
+                    Project Name
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono">
+                      {project.github_repo_full_name}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0 shrink-0"
+                      onClick={() =>
+                        handleCopyToClipboard(
+                          project.github_repo_full_name,
+                          "name",
+                        )
+                      }
+                    >
+                      {copiedField === "name" ? (
+                        <CheckCircle className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1.5">
+                    Project ID
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-muted-foreground">
+                      {project.id}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0 shrink-0"
+                      onClick={() => handleCopyToClipboard(project.id, "id")}
+                    >
+                      {copiedField === "id" ? (
+                        <CheckCircle className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1.5">
+                    GitHub URL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={project.github_repo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 h-7 px-2.5 text-xs rounded border border-border/50 bg-secondary/30 flex items-center font-mono text-blue-400 hover:text-blue-300 hover:underline truncate"
+                    >
+                      {project.github_repo_url}
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0 shrink-0"
+                      onClick={() =>
+                        handleCopyToClipboard(project.github_repo_url, "url")
+                      }
+                    >
+                      {copiedField === "url" ? (
+                        <CheckCircle className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border/40 rounded-md p-4">
+              <h3 className="text-xs font-medium mb-4">Notifications</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1.5">
+                    Slack Webhook URL
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={project.slack_webhook_url || ""}
+                    placeholder="https://hooks.slack.com/services/..."
+                    className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1.5">
+                    Discord Webhook URL
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={project.discord_webhook_url || ""}
+                    placeholder="https://discord.com/api/webhooks/..."
+                    className="w-full h-7 px-2.5 text-xs rounded border border-border/50 bg-transparent placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button size="sm" className="h-7 text-xs px-3">
+              Save Settings
+            </Button>
+
+            <div className="bg-red-500/5 border border-red-500/20 rounded-md p-4 mt-8">
+              <h3 className="text-xs font-medium text-red-400 mb-2">
+                Danger Zone
+              </h3>
+              <p className="text-[11px] text-muted-foreground mb-4">
+                Deleting this project will permanently remove all scan history
+                and changelogs. This action cannot be undone.
+              </p>
+
+              {!showDeleteConfirm ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs px-3 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-3 w-3 mr-1.5" />
+                  Delete Project
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs px-3 bg-red-500 hover:bg-red-600 text-white"
+                    onClick={handleDeleteProject}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{" "}
+                        Deleting...
+                      </>
+                    ) : (
+                      <>Confirm Delete</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-3"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
