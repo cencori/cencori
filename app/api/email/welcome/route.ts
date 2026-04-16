@@ -118,8 +118,20 @@ export async function POST(request: NextRequest) {
               </p>
             </div>
 
-            <div style="max-width: 620px; text-align: left; margin: 36px auto 0; color: #888888; font-size: 12px; line-height: 1.6;">
-              <p style="margin: 0;">© ${new Date().getFullYear()} Cencori. All rights reserved.</p>
+            <div style="max-width: 620px; text-align: center; margin: 36px auto 0; color: #888888; font-size: 12px; line-height: 1.7;">
+              <p style="margin: 0 0 6px;">
+                Questions? Reply to this email or contact
+                <a href="mailto:support@cencori.com" style="color: #666666; text-decoration: underline;"> support@cencori.com</a>
+              </p>
+              <p style="margin: 0 0 6px;">
+                <a href="https://cencori.com/docs" style="color: #666666; text-decoration: underline;">Documentation</a>
+              </p>
+              <p style="margin: 0 0 10px;">
+                <a href="https://cencori.com/docs" style="color: #666666; text-decoration: underline;">Docs</a>
+                <span style="color: #b0b0b0;"> | </span>
+                <a href="https://cencori.com/blog" style="color: #666666; text-decoration: underline;">Blog</a>
+              </p>
+              <p style="margin: 0;">Copyright © ${new Date().getFullYear()} Cencori, Inc. All rights reserved.</p>
             </div>
           </body>
         </html>
