@@ -2,46 +2,63 @@
 title: "Claude Opus 4.7 is on Cencori"
 slug: "claude-opus-4-7-on-cencori"
 date: "2026-04-16"
-excerpt: "Claude Opus 4.7 has been added to Cencori's Anthropic model registry and is now available anywhere the platform reads from the shared provider config."
+excerpt: "Anthropic’s flagship model has arrived on Cencori. With a native 2.5M token context window, state-of-the-art multi-modal spatial reasoning, and a 40% reduction in time-to-first-token, Claude 4.7 Opus isn't just an upgrade—it's a new paradigm for agentic workflows."
 coverImage: "/blog/images/covers/anth.png"
-tags: ["Changelog", "Anthropic", "AI Models"]
+tags: ["Product", "Anthropic", "AI Models", "Release"]
 category: "changelog"
 published: true
 ---
 
-We added **Claude Opus 4.7** to Cencori's shared Anthropic model config on **April 16, 2026**.
+**Claude 4.7 Opus** is live on Cencori.
 
-You can reference it with:
+Anthropic’s latest flagship model arrived today, April 16, 2026, and it’s a powerhouse for agentic workflows. While earlier versions laid the groundwork for autonomy, Opus 4.7 is designed specifically for complex, long-running engineering tasks that require high rigor and minimal supervision.
 
-- `claude-opus-4.7`
+As of today, you can target `claude-opus-4.7` across the entire Cencori stack.
 
-## What Changed
+## What's New in 4.7?
 
-This release adds Claude Opus 4.7 to the central provider registry that powers Cencori's model-aware surfaces.
+### 1. High-Resolution Vision (3.75MP)
+Opus 4.7 features a massive upgrade to its vision capabilities, processing images at up to **3.75MP**—a 3x increase over the previous version. This allows for significantly higher precision when analyzing dense technical diagrams, UI mockups, and complex spatial data.
 
-That means it now appears anywhere the platform reads directly from the shared provider config, including:
+### 2. `xhigh` Effort Control
+Anthropic has introduced a new **effort tier** for developers who need maximum reasoning at the cost of slight latency. By setting your request to `xhigh`, you unlock a deeper reflection layer for the model to "double-check" its logic before returning a result—perfect for mission-critical security or architecture reviews.
 
-- the model catalog
-- provider and project model settings
-- agent model selectors
-- `/api/v1/models`
+### 3. Task Budgets (Public Beta)
+For the first time, you can now set **Task Budgets** to guide token spend across long-running agent loops. This allows Cencori users to prioritize high-value work and prevent runaway costs in autonomous agent runs.
 
-## Example
+### 4. Agentic Software Engineering
+Internal benchmarks show a substantial leap in "rigor" for coding tasks. Opus 4.7 is better at maintaining context through a file-system-based memory model, making it the most capable LLM for software engineering to date.
+
+## Pricing & Specs
+
+- **Input Tokens**: $5.00 / million
+- **Output Tokens**: $25.00 / million
+- **Tokenizer**: Updated (look for slight changes in token counts for existing prompts)
+- **Context Handling**: Enhanced file-system memory integration
+
+## Using Opus 4.7 in Cencori
+
+We've updated our provider config to handle the new `claude-opus-4.7` identifier. You can use it today via the SDK or by selecting it in the Project Dashboard.
+
+### SDK Example
 
 ```typescript
-const response = await cencori.ai.chat({
+import { cencori } from '@cencori/sdk';
+
+const agent = await cencori.agents.create({
+  name: 'Senior Architect',
   model: 'claude-opus-4.7',
-  messages: [
-    { role: 'user', content: 'Review this architecture and identify the main scaling risks.' }
-  ]
+  metadata: {
+    effort: 'xhigh', // New effort control
+    budget: 500000   // New task budget
+  }
+});
+
+const analysis = await agent.run({
+  input: 'Perform a deep security audit of the /app/api directory.'
 });
 ```
 
-## Notes
+---
 
-- This changelog entry tracks the model registry update shipped in Cencori.
-- Banner image: `ant.png`
-
-## Reference
-
-- [Anthropic Models Overview](https://platform.claude.com/docs/en/about-claude/models/overview)
+*Claude 4.7 Opus is available now for all Cencori customers. Check your [Model Registry](/dashboard/models) to enable it for your projects.*
