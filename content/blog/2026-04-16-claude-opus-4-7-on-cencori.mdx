@@ -1,0 +1,47 @@
+---
+title: "Claude Opus 4.7 is on Cencori"
+slug: "claude-opus-4-7-on-cencori"
+date: "2026-04-16"
+excerpt: "Claude Opus 4.7 has been added to Cencori's Anthropic model registry and is now available anywhere the platform reads from the shared provider config."
+coverImage: "/blog/images/covers/anth.png"
+tags: ["Changelog", "Anthropic", "AI Models"]
+category: "changelog"
+published: true
+---
+
+We added **Claude Opus 4.7** to Cencori's shared Anthropic model config on **April 16, 2026**.
+
+You can reference it with:
+
+- `claude-opus-4.7`
+
+## What Changed
+
+This release adds Claude Opus 4.7 to the central provider registry that powers Cencori's model-aware surfaces.
+
+That means it now appears anywhere the platform reads directly from the shared provider config, including:
+
+- the model catalog
+- provider and project model settings
+- agent model selectors
+- `/api/v1/models`
+
+## Example
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'claude-opus-4.7',
+  messages: [
+    { role: 'user', content: 'Review this architecture and identify the main scaling risks.' }
+  ]
+});
+```
+
+## Notes
+
+- This changelog entry tracks the model registry update shipped in Cencori.
+- Banner image: `ant.png`
+
+## Reference
+
+- [Anthropic Models Overview](https://platform.claude.com/docs/en/about-claude/models/overview)

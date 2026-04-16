@@ -1,0 +1,329 @@
+---
+title: "Circuit Breakers for AI Agents: How We Stop Cascading Failures Before They Bankrupt You"
+slug: "circuit-breakers-for-ai-agents"
+date: "2026-04-16"
+excerpt: "An AI agent hits a rate limit, retries forever, burns through your entire token budget in four minutes, and takes down your other services on the way out. We built a three-state circuit breaker with Redis-backed persistence, exponential backoff, and automatic provider failover to make sure that never happens."
+coverImage: "/blog/images/covers/circuit.png"
+
+tags: ["Engineering", "Infrastructure", "Agents"]
+category: "engineering"
+published: true
+---
+
+At 2:47 AM on a Tuesday, an agent running through Cencori hit OpenAI's rate limit. The framework retried. And retried. And retried.
+
+In four minutes, it burned through 340,000 tokens of retry attempts—every single one rejected—before a budget alert finally killed it. The customer woke up to a $48 bill for zero useful output.
+
+This is the failure mode nobody talks about in AI agent demos.
+
+## The Problem With Retrying Stupid
+
+Traditional retry logic assumes a simple world: the request failed, try again, it'll probably work. That assumption is reasonable for transient network errors. It is catastrophically wrong for AI providers.
+
+Here's what actually happens when an AI provider goes down:
+
+1. Your agent's first request fails
+2. Your retry logic sends it again (now you're 2x the load)
+3. Other customers' agents are doing the same thing
+4. The provider is now under *more* pressure than before the outage
+5. Your retries keep failing, but each one still costs you a roundtrip
+6. Meanwhile, Anthropic is up. Google is up. Seven other providers are up.
+7. Your agent doesn't know that. It's still hammering a dead endpoint.
+
+This is the **cascading failure problem**. One provider goes down, and every application layer above it amplifies the damage.
+
+The circuit breaker pattern exists to break this cycle.
+
+## What a Circuit Breaker Actually Does
+
+The concept comes from electrical engineering. When a circuit detects dangerous current, it *opens*—physically breaking the connection to protect the system. You don't keep pushing electricity through a fault.
+
+Software circuit breakers work the same way. Instead of letting every request slam into a failing service, you detect the failure pattern early and **stop sending traffic entirely** for a cooldown period.
+
+Our implementation tracks three states:
+
+<CircuitBreakerDiagram />
+
+**Closed** is normal operation. Every request goes through. We count failures.
+
+**Open** means the provider is down. Every request is immediately rejected without making a network call. No latency. No wasted tokens. No cost.
+
+**Half-Open** is the recovery probe. After a timeout, we allow exactly *one* test request through. If it succeeds, the circuit closes. If it fails, the circuit reopens and the timeout resets.
+
+## The Implementation
+
+Here's the core state machine:
+
+```typescript
+interface CircuitState {
+    failures: number;
+    lastFailure: number;
+    state: 'closed' | 'open' | 'half-open';
+    lastSuccess: number;
+}
+
+const DEFAULT_FAILURE_THRESHOLD = 5;   // Failures before circuit opens
+const DEFAULT_TIMEOUT_MS = 60 * 1000;  // 60 seconds before retry
+```
+
+Five consecutive failures. That's all it takes to open the circuit. Why five and not three, or ten?
+
+Three is too aggressive—a brief network hiccup during a provider deploy could trigger it. Ten is too lenient—by the time you've hit ten failures, you've already wasted significant time and money on a dead endpoint. Five gives enough signal to confirm a real outage without excessive damage.
+
+The timeout is 60 seconds. Long enough for most provider incidents to either resolve or stabilize. Short enough that you're not locked out for minutes after a transient issue.
+
+Both are configurable per-project in the dashboard. Some teams want a hair-trigger (threshold of 2, timeout of 30s). Some want more tolerance. There's no universal right answer.
+
+### Recording Failures With State Transitions
+
+When a request fails, we don't just increment a counter. We manage state transitions:
+
+```typescript
+export async function recordFailure(
+    provider: string,
+    config?: Partial<CircuitBreakerConfig>
+): Promise<void> {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
+    const circuit = await getCircuitState(provider);
+
+    circuit.failures++;
+    circuit.lastFailure = Date.now();
+
+    if (circuit.state === 'half-open') {
+        // Test request failed — reopen immediately
+        circuit.state = 'open';
+    } else if (circuit.failures >= cfg.failureThreshold) {
+        // Threshold reached — open circuit
+        circuit.state = 'open';
+    }
+
+    await saveCircuitState(provider, circuit);
+}
+```
+
+The half-open → open transition is important. During the recovery probe, we're asking: "Is this provider back?" If the answer is no, we don't wait for another five failures. We reopen the circuit instantly. One failed probe is enough.
+
+### The Recovery Probe
+
+When the timeout elapses, we don't flood the provider with traffic. We transition to half-open and let exactly one request through:
+
+```typescript
+export async function isCircuitOpen(
+    provider: string,
+    config?: Partial<CircuitBreakerConfig>
+): Promise<boolean> {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
+    const circuit = await getCircuitState(provider);
+
+    if (circuit.state === 'open') {
+        const timeSinceFailure = Date.now() - circuit.lastFailure;
+
+        if (timeSinceFailure >= cfg.timeoutMs) {
+            // Allow one test request
+            circuit.state = 'half-open';
+            await saveCircuitState(provider, circuit);
+            return false;
+        }
+
+        return true; // Still blocked
+    }
+
+    return false;
+}
+```
+
+If the test request succeeds, the circuit closes and traffic resumes normally. If it fails, the circuit reopens and the 60-second timer restarts. This prevents the "thundering herd" problem where a recovering provider gets immediately overwhelmed by all the backed-up traffic.
+
+## Persistence: Memory + Redis
+
+Here's a design decision that matters more than you'd think.
+
+A circuit breaker that only lives in memory resets every time your serverless function cold-starts. On Vercel, that could be every request. You'd never actually protect anything.
+
+A circuit breaker that *only* lives in Redis adds latency to every request. And if Redis is down, your circuit breaker is down—which means your protection against cascading failures... cascades.
+
+We use both:
+
+```typescript
+// In-memory for immediate reads (zero latency)
+const memoryCircuits: Map<string, CircuitState> = new Map();
+
+// Redis for persistence across instances
+async function saveCircuitState(
+    provider: string,
+    state: CircuitState
+): Promise<void> {
+    // Always update memory for immediate reads
+    memoryCircuits.set(provider, state);
+
+    if (redisClient) {
+        await redisClient.set(
+            `circuit:${provider}`,
+            JSON.stringify(state),
+            { ex: 3600 } // 1 hour TTL
+        );
+    }
+}
+```
+
+Memory is the hot path. Redis is durability. If Redis is unavailable, the circuit breaker still works—it just loses cross-instance coordination and will reset on cold starts.
+
+We also lazy-load the Redis client to avoid blocking startup:
+
+```typescript
+async function initRedis(): Promise<boolean> {
+    if (redisInitialized) return redisClient !== null;
+    redisInitialized = true;
+
+    if (!process.env.UPSTASH_REDIS_REST_URL) {
+        console.log('[CircuitBreaker] Redis not configured, using in-memory');
+        return false;
+    }
+    // ... dynamic import to avoid hard dependency
+}
+```
+
+This means teams without Redis still get circuit breaker protection. It's degraded protection (no cross-instance state), but it's something. And "something" is infinitely better than "retrying a dead provider forever."
+
+## How It Integrates With Failover
+
+The circuit breaker doesn't exist in isolation. It's one component in a three-layer reliability system:
+
+**Layer 1: Retry with backoff** — Transient errors get retried with exponential backoff. The number of retries is configurable per-project (default: 3).
+
+**Layer 2: Circuit breaker** — If retries exhaust, the failure is recorded. Once the threshold is hit, the circuit opens and future requests skip this provider entirely.
+
+**Layer 3: Provider failover** — When the primary provider's circuit is open, we automatically route to a fallback chain.
+
+Here's what the actual request flow looks like:
+
+```typescript
+// Check circuit before even trying
+if (await isCircuitOpen(providerName)) {
+    lastError = new Error(`Provider ${providerName} circuit is open`);
+} else {
+    // Retry loop with exponential backoff
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            response = await provider.chat(chatRequest);
+            await recordSuccess(providerName);
+            break;
+        } catch (error) {
+            await recordFailure(providerName);
+            // Exponential backoff: 100ms, 200ms, 400ms...
+            await new Promise(r =>
+                setTimeout(r, Math.pow(2, attempt) * 100)
+            );
+        }
+    }
+}
+
+// If primary failed, try fallback chain
+if (!response && enableFallback) {
+    const fallbackChain = getFallbackChain(providerName);
+
+    for (const fallback of fallbackChain) {
+        if (await isCircuitOpen(fallback)) continue; // Skip broken providers
+        // ... try fallback provider
+    }
+}
+```
+
+The fallback chain is ordered by model equivalence. If your `gpt-4o` request fails, we try `claude-sonnet-4` on Anthropic, then `gemini-2.5-flash` on Google. The model mapping ensures semantic equivalence—you asked for a flagship model, you get a flagship model.
+
+Every provider in the fallback chain also has its own circuit breaker. If OpenAI and Anthropic are both down, we skip both instantly and go straight to Google. No wasted time probing dead endpoints.
+
+## Non-Retryable vs. Retryable
+
+Not every error should trigger a retry or a circuit breaker state change.
+
+A `401 Unauthorized` means your API key is wrong. Retrying won't fix that. A `429 Too Many Requests` means you're rate-limited—retrying makes it *worse*, but failing over to another provider might work.
+
+We classify errors explicitly:
+
+```typescript
+// These trigger failover
+const retryablePatterns = [
+    'rate limit', 'too many requests', '429',
+    'service unavailable', '503',
+    'timeout', 'connection refused',
+    'internal server error', '500',
+    'bad gateway', '502',
+];
+
+// These do NOT trigger failover
+const nonRetryablePatterns = [
+    'invalid api key', 'unauthorized',
+    'invalid request', 'bad request',
+    'model not found',
+    'content filtered', 'safety',
+];
+```
+
+If the error is non-retryable, we throw immediately. No retry loop. No circuit breaker recording. No failover. The error is in your configuration, not in the provider's availability.
+
+This distinction matters a lot in practice. Without it, a bad API key would cycle through every provider in your fallback chain, fail on all of them (because the key is wrong for *all* of them), and then open every circuit. Now your entire project is locked out for 60 seconds because of a typo.
+
+## What This Looks Like in the Dashboard
+
+Operators need visibility into circuit states. In the project settings, the provider connections panel shows real-time circuit status:
+
+- **Green dot** — Provider healthy, circuit closed
+- **Red dot + `CIRCUIT OPEN`** — Provider isolated, traffic blocked
+- **Amber dot + `TESTING`** — Half-open, probing for recovery
+
+Each provider also shows its failure count. If you see "3 failures" on a closed circuit, you know it's degraded but not yet tripped. That's an early warning signal worth watching.
+
+Teams can configure all thresholds from the dashboard:
+
+| Setting | Default | Range | Effect |
+|---------|---------|-------|--------|
+| **Enable circuit breaker** | On | On/Off | Master toggle |
+| **Failure threshold** | 5 | 1–50 | Consecutive failures before circuit opens |
+| **Recovery timeout** | 60s | 10–600s | Seconds before half-open probe |
+| **Max retries before fallback** | 3 | 1–10 | Attempts before entering fallback chain |
+| **Automatic fallback** | On | On/Off | Whether to try other providers |
+
+## Why This Matters for Agents
+
+Single-shot API calls are relatively forgiving. One failure, one retry, users understand.
+
+Agents are different. An agent that calls an LLM 40 times in a workflow can amplify a single provider outage by 40x. Each step retries independently. Each retry consumes time and budget. The workflow either hangs indefinitely or burns money on a dead endpoint.
+
+With circuit breakers, the math changes:
+
+- **Step 1** fails → retry → retry → retry → circuit opens (5 failures total)
+- **Steps 2–40**: Circuit is open, immediate failover to backup provider, zero wasted requests
+
+Without a circuit breaker, steps 2–40 each repeat the same retry-fail-retry cycle. That's up to 200 wasted requests and minutes of latency, for a problem detected in the first 5.
+
+## Lessons Learned
+
+1. **Memory + persistence is the right architecture.** Pure in-memory loses state on cold starts. Pure Redis adds latency. The dual approach gives you speed and durability.
+
+2. **Half-open is the key state.** Without it, you either never recover (circuit stays open forever) or you flood a recovering provider (circuit snaps closed and all backed-up traffic hits at once). One probe request at a time is the right approach.
+
+3. **Error classification prevents cascading lockouts.** Not every failure is a provider issue. Treating auth errors and rate limits differently prevents self-inflicted outages.
+
+4. **Defaults matter more than configurability.** Most teams never touch the settings. The defaults need to be right out of the box. Five failures and 60 seconds covers 90% of real-world scenarios.
+
+5. **Agents need infrastructure-level protection, not framework-level.** If your circuit breaker lives in the agent framework, every framework needs its own implementation. If it lives in the infrastructure layer, every agent gets protected for free.
+
+## What's Next
+
+We're building toward broader agent safety controls:
+
+- **Token budget circuit breakers** — Open the circuit when a single workflow exceeds its token budget, not just when a provider fails
+- **Latency-based triggers** — Open the circuit when p99 latency crosses a threshold, catching performance degradation before it becomes a full outage
+- **Cross-project circuit coordination** — If one customer's traffic is causing provider degradation, isolate the impact before it affects other projects
+- **Step-level replay** — When a circuit opens mid-workflow, resume from the last successful step instead of restarting the entire agent run
+
+The reality is that as agents get more capable, they also get more dangerous. An agent that can take 100 actions autonomously has 100 opportunities to amplify a failure. Circuit breakers are the first line of defense.
+
+The whole point of infrastructure is that individual application developers shouldn't have to think about this. You send a request. If the provider is down, we handle it. If the backup is down too, we handle that. Your agent keeps running.
+
+That's the job.
+
+---
+
+*Circuit breakers are enabled by default for all Cencori projects. Configure thresholds in your [project settings](/dashboard), or explore the [Cencori SDK](https://github.com/cencori/sdk) to build agents with production-grade reliability built in.*
