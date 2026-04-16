@@ -72,6 +72,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-ant-',
         models: [
             // Claude 4 Series (2025)
+            { id: 'claude-opus-4.7', name: 'Claude Opus 4.7', type: 'chat', contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding' },
             { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', type: 'chat', contextWindow: 200000, description: 'Latest flagship, enhanced reasoning & coding' },
             { id: 'claude-opus-4.6', name: 'Claude Opus 4.6', type: 'chat', contextWindow: 1000000, description: 'Latest flagship, agentic coding record-breaker' },
             { id: 'claude-opus-4', name: 'Claude Opus 4', type: 'chat', contextWindow: 200000, description: 'Most capable Claude model' },

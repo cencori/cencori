@@ -47,3 +47,7 @@ tanstack-ai-fork/
 # Scan package
 packages/scan/node_modules
 packages/scan/dist
+
+# Agents
+.agent/
+.agents/

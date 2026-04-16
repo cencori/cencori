@@ -6,6 +6,7 @@ import { Callout } from "@/components/blog/Callout";
 import { Card, Cards } from "@/components/blog/Cards";
 import { SecurityArchitectureDiagram } from "@/components/blog/SecurityArchitectureDiagram";
 import { TokenizationFlowDiagram } from "@/components/blog/TokenizationFlowDiagram";
+import { CircuitBreakerDiagram } from "@/components/blog/CircuitBreakerDiagram";
 import Link from "next/link";
 import { Check, X, AlertTriangle } from "lucide-react";
 
@@ -182,4 +183,5 @@ export const MDXComponents = {
     Cards,
     SecurityArchitectureDiagram,
     TokenizationFlowDiagram,
+    CircuitBreakerDiagram,
 };
