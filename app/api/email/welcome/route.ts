@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.7; color: #111111; background: #ffffff; margin: 0; padding: 32px 24px; text-align: left;">
-            <div style="max-width: 620px; text-align: left; margin-bottom: 28px;">
+            <div style="max-width: 620px; text-align: left; margin: 0 auto 28px;">
               <img src="https://cencori.com/logos/logo-w.png" alt="Cencori" style="display: block; height: 44px; width: 44px; margin: 0 auto 28px;" />
               <h1 style="color: #111111; margin: 0 0 22px; font-size: 20px; line-height: 1.35; font-weight: 400;">Welcome to Cencori!</h1>
 
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
               </p>
             </div>
 
-            <div style="max-width: 620px; text-align: left; margin-top: 36px; color: #888888; font-size: 12px; line-height: 1.6;">
+            <div style="max-width: 620px; text-align: left; margin: 36px auto 0; color: #888888; font-size: 12px; line-height: 1.6;">
               <p style="margin: 0;">© ${new Date().getFullYear()} Cencori. All rights reserved.</p>
             </div>
           </body>
