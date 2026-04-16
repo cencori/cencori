@@ -90,17 +90,17 @@ function wrapInContainer(content: string, preheader?: string): string {
 
     @media (prefers-color-scheme: dark) {
       /* Gmail-like (Google Material) dark tokens */
-      body, .body { background-color: #202124 !important; color: #e8eaed !important; }
+      body, .body { background-color: #131314 !important; color: #e8eaed !important; }
       table, td { color: #e8eaed !important; }
-      .bg { background-color: #202124 !important; }
-      .frame { background-color: #202124 !important; border: 0 !important; border-radius: 0 !important; }
+      .bg { background-color: #131314 !important; }
+      .frame { background-color: #131314 !important; border: 0 !important; border-radius: 0 !important; }
       .text { color: #e8eaed !important; }
       .muted { color: #9aa0a6 !important; }
       .accent { color: #8ab4f8 !important; }
       .divider { border-top-color: #3c4043 !important; }
       .callout { background-color: #2b2c2f !important; border-color: #3c4043 !important; }
       a { color: #8ab4f8 !important; }
-      .btn { background: #8ab4f8 !important; color: #202124 !important; }
+      .btn { background: #8ab4f8 !important; color: #131314 !important; }
       .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
       .check { color: #81c995 !important; }
 
@@ -108,14 +108,14 @@ function wrapInContainer(content: string, preheader?: string): string {
     }
 
     /* Outlook.com / Office 365 dark mode hooks */
-    [data-ogsc] body, [data-ogsc] .body, [data-ogsc] .bg { background-color: #202124 !important; }
-    [data-ogsc] .frame { background-color: #202124 !important; border: 0 !important; border-radius: 0 !important; }
+    [data-ogsc] body, [data-ogsc] .body, [data-ogsc] .bg { background-color: #131314 !important; }
+    [data-ogsc] .frame { background-color: #131314 !important; border: 0 !important; border-radius: 0 !important; }
     [data-ogsc] .text { color: #e8eaed !important; }
     [data-ogsc] .muted { color: #9aa0a6 !important; }
     [data-ogsc] .accent, [data-ogsc] a { color: #8ab4f8 !important; }
     [data-ogsc] .divider { border-top-color: #3c4043 !important; }
     [data-ogsc] .callout { background-color: #2b2c2f !important; border-color: #3c4043 !important; }
-    [data-ogsc] .btn { background: #8ab4f8 !important; color: #202124 !important; }
+    [data-ogsc] .btn { background: #8ab4f8 !important; color: #131314 !important; }
     [data-ogsc] .btn-outline { border-color: #8ab4f8 !important; color: #8ab4f8 !important; }
     [data-ogsc] .check { color: #81c995 !important; }
     [data-ogsc] .footer { border-top-color: #3c4043 !important; }
