@@ -88,38 +88,38 @@ export async function POST(request: NextRequest) {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
-          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 32px;">
-              <img src="https://cencori.com/logos/logo-w.png" alt="Cencori" style="height: 48px; margin-bottom: 24px;" />
-              <h1 style="color: #000; margin-bottom: 8px;">Welcome to Cencori!</h1>
-              <p style="color: #666; font-size: 18px; margin: 0;">You're all set to build with AI infrastructure.</p>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.7; color: #111111; background: #ffffff; margin: 0; padding: 32px 24px; text-align: left;">
+            <div style="max-width: 620px; text-align: left; margin-bottom: 28px;">
+              <img src="https://cencori.com/logos/logo-w.png" alt="Cencori" style="display: block; height: 44px; width: 44px; margin: 0 auto 28px;" />
+              <h1 style="color: #111111; margin: 0 0 22px; font-size: 20px; line-height: 1.35; font-weight: 400;">Welcome to Cencori!</h1>
+
+              <p style="margin: 0 0 24px; color: #444444; font-size: 16px; line-height: 1.7;">
+                Cencori gives teams the infrastructure to route, observe, secure, and monetize AI products in production.
+              </p>
+
+              <p style="margin: 0 0 24px; color: #444444; font-size: 16px; line-height: 1.7;">
+                You can start by creating your first organization, setting up a project, and generating an API key. From there, open your
+                <a href="https://cencori.com/dashboard/organizations" style="color: #111111; text-decoration: underline;"> dashboard</a>,
+                read the
+                <a href="https://cencori.com/docs/quick-start" style="color: #111111; text-decoration: underline;"> quick start guide</a>,
+                or go straight to the
+                <a href="https://cencori.com/docs/api" style="color: #111111; text-decoration: underline;"> API reference</a>.
+              </p>
+
+              <p style="margin: 0 0 24px; color: #444444; font-size: 16px; line-height: 1.7;">
+                If you want a broader view of how Cencori fits into your stack, start with the
+                <a href="https://cencori.com/docs" style="color: #111111; text-decoration: underline;"> documentation</a>.
+                If you want to move fast, make your first request and build from there.
+              </p>
+
+              <p style="margin: 0; color: #444444; font-size: 16px; line-height: 1.7;">
+                Need help? Reply to this email or contact
+                <a href="mailto:support@cencori.com" style="color: #111111; text-decoration: underline;"> support@cencori.com</a>.
+              </p>
             </div>
-            
-            <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
-              <h2 style="margin-top: 0; font-size: 16px;">Get started in 3 steps:</h2>
-              <ol style="margin: 0; padding-left: 20px; color: #555;">
-                <li style="margin-bottom: 8px;">Create your first organization</li>
-                <li style="margin-bottom: 8px;">Set up a project and get your API key</li>
-                <li style="margin-bottom: 8px;">Make your first AI request</li>
-              </ol>
-            </div>
-            
-            <div style="text-align: center; margin-bottom: 32px;">
-              <a href="https://cencori.com/dashboard/organizations" style="display: inline-block; background: #000; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 500;">Go to Dashboard</a>
-            </div>
-            
-            <div style="border-top: 1px solid #eee; padding-top: 24px; margin-top: 32px;">
-              <h3 style="font-size: 14px; margin-bottom: 12px;">Helpful Resources</h3>
-              <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px;">
-                <li><a href="https://cencori.com/docs" style="color: #000;">Documentation</a></li>
-                <li><a href="https://cencori.com/docs/quick-start" style="color: #000;">Quick Start Guide</a></li>
-                <li><a href="https://cencori.com/docs/api" style="color: #000;">API Reference</a></li>
-              </ul>
-            </div>
-            
-            <div style="text-align: center; margin-top: 40px; color: #999; font-size: 12px;">
-              <p>Need help? Reply to this email or contact <a href="mailto:support@cencori.com" style="color: #666;">support@cencori.com</a></p>
-              <p style="margin-top: 16px;">© ${new Date().getFullYear()} Cencori. All rights reserved.</p>
+
+            <div style="max-width: 620px; text-align: left; margin-top: 36px; color: #888888; font-size: 12px; line-height: 1.6;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} Cencori. All rights reserved.</p>
             </div>
           </body>
         </html>
