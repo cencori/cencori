@@ -11,7 +11,15 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+    ],
   },
+
   // Security and caching headers
   async headers() {
     // Security headers to apply to all routes
