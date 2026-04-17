@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { BlogPost } from "@/lib/blog";
 import { format } from "date-fns";
 
@@ -34,21 +35,34 @@ export function ChangelogList({ posts }: ChangelogListProps) {
 
                 <div className="space-y-0">
                     {filtered.map((post) => (
-                        <article key={post.slug} className="relative py-6">
+                        <article key={post.slug} className="relative py-6 group">
                             <div className="grid grid-cols-[16px_1fr] gap-x-5">
                                 {/* Dot */}
                                 <div className="relative flex justify-center pt-1">
-                                    <div className="h-2.5 w-2.5 rounded-full border border-border bg-background" />
+                                    <div className="h-2.5 w-2.5 rounded-full border border-border bg-background transition-colors group-hover:border-primary" />
                                 </div>
 
                                 {/* Content */}
-                                <div className="min-w-0 space-y-2">
+                                <div className="min-w-0 flex flex-col gap-2">
                                     <p className="text-[11px] text-muted-foreground">
                                         {format(new Date(post.date), "MMM d, yyyy")}
                                     </p>
 
-                                    <Link href={postUrl(post)} className="group block">
-                                        <h2 className="text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-foreground/80">
+                                    {/* Cinematic Banner */}
+                                    {post.coverImage && (
+                                        <Link href={postUrl(post)} className="block relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border/50 bg-muted hover:border-border transition-colors">
+                                            <Image
+                                                src={post.coverImage}
+                                                alt={post.title}
+                                                fill
+                                                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                                unoptimized
+                                            />
+                                        </Link>
+                                    )}
+
+                                    <Link href={postUrl(post)} className="block">
+                                        <h2 className="text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
                                             {post.title}
                                         </h2>
                                     </Link>
