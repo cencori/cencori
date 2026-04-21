@@ -54,7 +54,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Legal pages
     const legalPages = [
         { url: `${baseUrl}/privacy-policy`, priority: 0.3, changeFrequency: 'yearly' as const },
-        { url: `${baseUrl}/terms`, priority: 0.3, changeFrequency: 'yearly' as const },
+        { url: `${baseUrl}/terms-of-service`, priority: 0.3, changeFrequency: 'yearly' as const },
     ];
 
     // Dynamic Documentation Pages
