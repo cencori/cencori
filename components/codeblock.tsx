@@ -18,7 +18,7 @@ export function CodeBlock({ children, className, filename, ...props }: DocsCodeB
 
   return (
     <figure
-      className="cencori-codeblock relative my-4 rounded-xl border border-border/40 bg-muted/30 dark:bg-white/5 text-foreground"
+      className="cencori-codeblock relative my-4 w-full max-w-full rounded-xl border border-border/40 bg-muted/30 dark:bg-white/5 text-foreground"
       aria-label={props['aria-label'] ?? filename ?? 'Code'}
     >
       {(filename || language) && (
@@ -27,7 +27,7 @@ export function CodeBlock({ children, className, filename, ...props }: DocsCodeB
           <span className="ml-3 uppercase tracking-wide">{language}</span>
         </figcaption>
       )}
-      <pre className="overflow-auto px-4 py-4 text-[0.875rem] leading-relaxed">
+      <pre className="w-full max-w-full overflow-x-auto overflow-y-hidden px-3 py-3 text-[0.8125rem] leading-relaxed">
         <code className={className}>{children}</code>
       </pre>
     </figure>

@@ -106,9 +106,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
             <main className="flex-1 pt-20">
                 <div className="container mx-auto px-4 max-w-4xl py-12">
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_200px] gap-12">
                         {/* Main Content */}
-                        <article>
+                        <article className="min-w-0">
                             {/* Back Link */}
                             <div className="mb-6">
                                 <Link

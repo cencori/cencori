@@ -1,0 +1,72 @@
+---
+title: "GPT Image 2.0 Is on Cencori"
+slug: "gpt-image-2-on-cencori"
+date: "2026-04-21"
+excerpt: "OpenAI’s new ChatGPT Images 2.0 release is now available on Cencori with the canonical API model ID gpt-image-2."
+coverImage: "/blog/images/covers/chat.png"
+tags: ["Changelog", "OpenAI", "Image Generation", "AI Models"]
+category: "changelog"
+published: true
+---
+
+OpenAI’s new **ChatGPT Images 2.0** release is now available on Cencori.
+
+On Cencori, the canonical API model ID is:
+
+- `gpt-image-2`
+
+## What We Shipped
+
+We added `gpt-image-2` to Cencori’s OpenAI model registry and updated the image generation route to recognize it directly.
+
+It is now available across:
+
+- the model catalog
+- `/api/v1/models`
+- OpenAI image generation routing
+- project default image model selection
+
+## Important Naming Note
+
+OpenAI’s announcement uses the product name **ChatGPT Images 2.0**, but the model ID you should use in code on Cencori is:
+
+- `gpt-image-2`
+
+## Use It Now
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const result = await cencori.ai.generateImage({
+  model: 'gpt-image-2',
+  prompt: 'A cinematic product photo of a matte black smartwatch on stone, soft studio lighting',
+  size: '1024x1024',
+  quality: 'high'
+});
+
+console.log(result.images[0]);
+```
+
+```bash
+curl -X POST https://cencori.com/api/ai/images/generate \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "An editorial-style launch poster for an AI image model, minimal black background, precise typography",
+    "size": "1024x1024",
+    "quality": "high"
+  }'
+```
+
+## Notes
+
+- `gpt-image-1.5`, `gpt-image-1`, `dall-e-3`, and `dall-e-2` remain available.
+- If you already use Cencori for image generation, no API migration is required beyond switching the model ID.
+
+## References
+
+- [OpenAI: Introducing ChatGPT Images 2.0](https://openai.com/index/introducing-chatgpt-images-2-0/)
+- [OpenAI API Docs: GPT Image 2](https://developers.openai.com/api/docs/models/gpt-image-2)

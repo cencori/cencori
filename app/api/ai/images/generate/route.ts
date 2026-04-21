@@ -19,7 +19,7 @@ interface ImageGenerationRequest {
     model?: string;
     n?: number;
     size?: '256x256' | '512x512' | '1024x1024' | '1024x1792' | '1792x1024' | '1536x1024' | '1024x1536';
-    quality?: 'standard' | 'hd';
+    quality?: 'low' | 'medium' | 'high' | 'standard' | 'hd';
     style?: 'vivid' | 'natural';
     responseFormat?: 'url' | 'b64_json';
 }
@@ -38,6 +38,7 @@ interface ImageGenerationResponse {
 
 // Supported models with metadata
 const IMAGE_MODELS = {
+    'gpt-image-2': { provider: 'openai' as const, apiModel: 'gpt-image-2', description: 'State-of-the-art image generation model' },
     'gpt-image-1.5': { provider: 'openai' as const, apiModel: 'gpt-image-1.5', description: 'Best text rendering, top ELO rating' },
     'gpt-image-1': { provider: 'openai' as const, apiModel: 'gpt-image-1', description: 'ChatGPT image generation' },
     'dall-e-3': { provider: 'openai' as const, apiModel: 'dall-e-3', description: 'High quality, creative' },
@@ -67,6 +68,9 @@ function normalizeModelName(model: string): { normalized: string; apiModel: stri
     }
     if (modelLower === 'dalle-3' || modelLower === 'dalle3') return { normalized: 'dall-e-3', apiModel: 'dall-e-3' };
     if (modelLower === 'dalle-2' || modelLower === 'dalle2') return { normalized: 'dall-e-2', apiModel: 'dall-e-2' };
+    if (modelLower.includes('gpt') && modelLower.includes('image') && (modelLower.includes('2.0') || modelLower.endsWith('-2') || modelLower.includes('image-2'))) {
+        return { normalized: 'gpt-image-2', apiModel: 'gpt-image-2' };
+    }
     if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('1.5')) return { normalized: 'gpt-image-1.5', apiModel: 'gpt-image-1.5' };
     if (modelLower.includes('gpt') && modelLower.includes('image')) return { normalized: 'gpt-image-1', apiModel: 'gpt-image-1' };
     if (modelLower.includes('gemini') && modelLower.includes('image')) return { normalized: 'gemini-3-pro-image', apiModel: 'gemini-2.0-flash-preview-image-generation' };
@@ -76,14 +80,22 @@ function normalizeModelName(model: string): { normalized: string; apiModel: stri
     return { normalized: model, apiModel: model };
 }
 
+function mapOpenAIQuality(quality?: ImageGenerationRequest['quality']): 'low' | 'medium' | 'high' | undefined {
+    if (!quality) return undefined;
+    if (quality === 'standard') return 'medium';
+    if (quality === 'hd') return 'high';
+    return quality;
+}
+
 async function generateWithOpenAI(client: OpenAI, request: ImageGenerationRequest, apiModel: string): Promise<ImageGenerationResponse> {
     const isGptImage = apiModel.startsWith('gpt-image');
+    const openaiQuality = mapOpenAIQuality(request.quality);
     const response = await client.images.generate({
         model: apiModel,
         prompt: request.prompt,
         n: isGptImage ? 1 : (request.n ?? 1),
         size: request.size || '1024x1024',
-        quality: isGptImage ? undefined : request.quality,
+        quality: isGptImage ? openaiQuality : request.quality,
         style: isGptImage ? undefined : request.style,
         response_format: isGptImage ? 'b64_json' : (request.responseFormat || 'url'),
     });
@@ -127,6 +139,7 @@ async function generateWithGoogle(apiKey: string, request: ImageGenerationReques
 const IMAGE_PRICING: Record<string, number> = {
     'dall-e-3': 0.04,      // $0.04/image standard 1024x1024
     'dall-e-2': 0.02,      // $0.02/image 1024x1024
+    'gpt-image-2': 0.053,  // 1024x1024 medium from current OpenAI docs
     'gpt-image-1': 0.04,
     'gpt-image-1.5': 0.06,
     'gemini-3-pro-image': 0.02,

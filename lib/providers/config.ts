@@ -57,6 +57,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'o4-mini', name: 'o4 Mini', type: 'reasoning', contextWindow: 200000, description: 'Successor to o1-mini' },
             { id: 'o1', name: 'o1', type: 'reasoning', contextWindow: 200000, description: 'Legacy reasoning model' },
             // Image Generation
+            { id: 'gpt-image-2', name: 'GPT Image 2', type: 'image', contextWindow: 0, description: 'State-of-the-art image generation model' },
             { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: 'image', contextWindow: 0, description: 'Best text rendering' },
             { id: 'gpt-image-1', name: 'GPT Image 1', type: 'image', contextWindow: 0, description: 'ChatGPT image generation model' },
             { id: 'dall-e-3', name: 'DALL-E 3', type: 'image', contextWindow: 0, description: 'High quality images' },
