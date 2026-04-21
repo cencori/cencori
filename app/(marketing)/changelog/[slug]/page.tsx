@@ -87,8 +87,8 @@ export default async function ChangelogPostPage({ params }: ChangelogPostPagePro
 
             <main className="flex-1 pt-20">
                 <div className="container mx-auto px-4 max-w-4xl py-12">
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-12">
-                        <article>
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_200px] gap-12">
+                        <article className="min-w-0">
                             {/* Breadcrumb */}
                             <div className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Link href="/blog" className="text-primary hover:underline transition-colors">
