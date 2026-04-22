@@ -29,6 +29,7 @@ export const siteConfig = {
       customers: "/customers",
       events: "/events",
       examples: "/examples",
+      newsletter: "/newsletter",
       partners: "/partners",
       shipped: "/shipped",
       privacyPolicy: "/privacy-policy",
