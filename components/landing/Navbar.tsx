@@ -120,6 +120,27 @@ function renderMenuIcon(icon: React.ComponentProps<typeof HugeiconsIcon>["icon"]
     return <HugeiconsIcon icon={icon} {...menuIconProps} />;
 }
 
+const solutionsMenuColumns: NavLink[][] = [
+    [
+        { title: "Vibe Coders", href: "/solutions/vibe-coders", description: "Secure apps generated with AI.", icon: renderMenuIcon(CodeSquareIcon) },
+        { title: "Developers", href: "/solutions/developers", description: "Ship AI into existing products.", icon: renderMenuIcon(DeveloperIcon) },
+        { title: "AI Builders", href: "/solutions/ai-builders", description: "Core infrastructure for AI teams.", icon: renderMenuIcon(AiBrain01Icon) },
+        { title: "No-Code", href: "/solutions/no-code", description: "Safer workflows for no-code teams.", icon: renderMenuIcon(WorkflowCircle01Icon) },
+    ],
+    [
+        { title: "Startups", href: "/solutions/startups", description: "Move fast without security debt.", icon: renderMenuIcon(RocketIcon) },
+        { title: "Agencies", href: "/solutions/agencies", description: "Deliver client AI with guardrails.", icon: renderMenuIcon(Briefcase01Icon) },
+        { title: "Enterprise", href: "/solutions/enterprise", description: "Governed AI rollouts at scale.", icon: renderMenuIcon(Building06Icon) },
+        { title: "Fintech", href: "/solutions/fintech", description: "Controls for regulated finance apps.", icon: renderMenuIcon(ChartIcon) },
+        { title: "Healthcare", href: "/solutions/healthcare", description: "Protect PHI in clinical workflows.", icon: renderMenuIcon(StethoscopeIcon) },
+        { title: "Hackathons", href: "/solutions/hackathons", description: "Safe defaults for fast launches.", icon: renderMenuIcon(BulbIcon) },
+    ],
+];
+
+const mobileSolutionsLinks: MobileNavLink[] = solutionsMenuColumns
+    .flat()
+    .map(({ title, href, icon }) => ({ title, href, icon }));
+
 const ListItem = React.forwardRef<
     React.ElementRef<"a">,
     React.ComponentPropsWithoutRef<"a"> & { title: string; icon?: ReactNode }
@@ -206,15 +227,7 @@ export default function Navbar({
             ]
         },
         {
-            title: "Solutions", sublinks: [
-                { title: "AI-first Startups", href: "/solutions/ai-startups", icon: renderMenuIcon(RocketIcon) },
-                { title: "Platform & ISVs", href: "/solutions/platforms", icon: renderMenuIcon(Building06Icon) },
-                { title: "Regulated Industries", href: "/solutions/regulated", icon: renderMenuIcon(House01Icon) },
-                { title: "Developer Teams", href: "/solutions/devtools", icon: renderMenuIcon(DeveloperIcon) },
-                { title: "Protect Generated Apps", href: "/solutions/vibe-coded", icon: renderMenuIcon(AiBrain01Icon) },
-                { title: "Data-science Sandboxes", href: "/solutions/model-ops", icon: renderMenuIcon(NanoTechnologyIcon) },
-                { title: "Automation Safety", href: "/solutions/sandboxing", icon: renderMenuIcon(WorkflowCircle01Icon) },
-            ]
+            title: "Solutions", sublinks: mobileSolutionsLinks
         },
         {
             title: "Resources", sublinks: [
@@ -271,22 +284,7 @@ export default function Navbar({
     const solutionsDropdown: NavDropdown = {
         title: "Solutions",
         type: "mega",
-        columns: [
-            [
-                { title: "Vibe Coders", href: "/solutions/vibe-coders", description: "Secure apps generated with AI.", icon: renderMenuIcon(CodeSquareIcon) },
-                { title: "Developers", href: "/solutions/developers", description: "Ship AI into existing products.", icon: renderMenuIcon(DeveloperIcon) },
-                { title: "AI Builders", href: "/solutions/ai-builders", description: "Core infrastructure for AI teams.", icon: renderMenuIcon(AiBrain01Icon) },
-                { title: "No-Code", href: "/solutions/no-code", description: "Safer workflows for no-code teams.", icon: renderMenuIcon(WorkflowCircle01Icon) },
-            ],
-            [
-                { title: "Startups", href: "/solutions/startups", description: "Move fast without security debt.", icon: renderMenuIcon(RocketIcon) },
-                { title: "Agencies", href: "/solutions/agencies", description: "Deliver client AI with guardrails.", icon: renderMenuIcon(Briefcase01Icon) },
-                { title: "Enterprise", href: "/solutions/enterprise", description: "Governed AI rollouts at scale.", icon: renderMenuIcon(Building06Icon) },
-                { title: "Fintech", href: "/solutions/fintech", description: "Controls for regulated finance apps.", icon: renderMenuIcon(ChartIcon) },
-                { title: "Healthcare", href: "/solutions/healthcare", description: "Protect PHI in clinical workflows.", icon: renderMenuIcon(StethoscopeIcon) },
-                { title: "Hackathons", href: "/solutions/hackathons", description: "Safe defaults for fast launches.", icon: renderMenuIcon(BulbIcon) },
-            ]
-        ],
+        columns: solutionsMenuColumns,
     };
 
     const resourcesDropdown: NavDropdown = {
