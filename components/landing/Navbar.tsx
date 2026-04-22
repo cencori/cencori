@@ -1,6 +1,31 @@
 "use client";
 
-import { Menu, Settings } from "lucide-react";
+import {
+    AiBookIcon,
+    AiBrain01Icon,
+    AiMail01Icon,
+    ApiIcon,
+    BookOpen01Icon,
+    Briefcase01Icon,
+    Building06Icon,
+    BulbIcon,
+    ChartIcon,
+    CodeCircleIcon,
+    CodeSquareIcon,
+    Compass01Icon,
+    DeveloperIcon,
+    DocumentValidationIcon,
+    House01Icon,
+    MoleculesIcon,
+    NanoTechnologyIcon,
+    Pulse01Icon,
+    RocketIcon,
+    StethoscopeIcon,
+    VoiceIdIcon,
+    WorkflowCircle01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronRight, Menu, Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CircleUserRound } from "lucide-react";
@@ -39,6 +64,7 @@ interface NavLink {
     title: string;
     href: string;
     description?: string;
+    icon?: ReactNode;
 }
 
 interface NavDropdown {
@@ -53,6 +79,7 @@ interface NavDropdown {
 interface MobileNavLink {
     title: string;
     href?: string;
+    icon?: ReactNode;
     sublinks?: MobileNavLink[];
 }
 
@@ -83,22 +110,58 @@ function isNavDropdown(item: NavItem): item is NavDropdown {
     return "type" in item;
 }
 
-const ListItem = React.forwardRef<React.ElementRef<"a">, React.ComponentPropsWithoutRef<"a">>(({ className, title, children, ...props }, ref) => {
+const menuIconProps = {
+    size: 16,
+    color: "currentColor",
+    strokeWidth: 1.7,
+} as const;
+
+function renderMenuIcon(icon: React.ComponentProps<typeof HugeiconsIcon>["icon"]) {
+    return <HugeiconsIcon icon={icon} {...menuIconProps} />;
+}
+
+const ListItem = React.forwardRef<
+    React.ElementRef<"a">,
+    React.ComponentPropsWithoutRef<"a"> & { title: string; icon?: ReactNode }
+>(({ className, title, icon, children, ...props }, ref) => {
+    const hasIcon = Boolean(icon);
+
     return (
         <li>
             <NavigationMenuLink asChild>
                 <a
                     ref={ref}
                     className={cn(
-                        "block select-none space-y-0.5 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                        hasIcon
+                            ? "group grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2.5 rounded-md p-2.5 no-underline outline-none transition-colors duration-200 hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[active]:hover:bg-transparent data-[active]:focus:bg-transparent"
+                            : "block select-none space-y-0.5 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
                         className
                     )}
                     {...props}
                 >
-                    <div className="text-xs font-medium leading-none">{title}</div>
-                    <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground mt-0.5">
-                        {children}
-                    </p>
+                    {hasIcon ? (
+                        <>
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background/70 text-muted-foreground shadow-sm transition-[background-color,border-color,color,filter] duration-200 group-hover:border-border group-hover:bg-white/[0.03] group-hover:text-foreground group-hover:brightness-110">
+                                {icon}
+                            </span>
+                            <span className="min-w-0">
+                                <span className="flex items-center gap-0.5 text-xs font-medium leading-none text-foreground">
+                                    <span>{title}</span>
+                                    <ChevronRight className="size-3 -translate-x-0.5 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                                </span>
+                                <span className="mt-1 block truncate text-[10px] leading-none text-muted-foreground transition-colors duration-200 group-hover:text-muted-foreground/90">
+                                    {children}
+                                </span>
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-xs font-medium leading-none">{title}</div>
+                            <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground mt-0.5">
+                                {children}
+                            </p>
+                        </>
+                    )}
                 </a>
             </NavigationMenuLink>
         </li>
@@ -136,35 +199,35 @@ export default function Navbar({
     mobileNavItems = [
         {
             title: "Products", sublinks: [
-                { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
-                { title: "Memory & RAG", href: "/storage" },
-                { title: "Scan", href: "https://scan.cencori.com" },
-                { title: "Enterprise", href: "/solutions/enterprise" },
+                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, icon: renderMenuIcon(MoleculesIcon) },
+                { title: "Memory & RAG", href: "/storage", icon: renderMenuIcon(NanoTechnologyIcon) },
+                { title: "Scan", href: "https://scan.cencori.com", icon: renderMenuIcon(VoiceIdIcon) },
+                { title: "Enterprise", href: "/solutions/enterprise", icon: renderMenuIcon(House01Icon) },
             ]
         },
         {
             title: "Solutions", sublinks: [
-                { title: "AI-first Startups", href: "/solutions/ai-startups" },
-                { title: "Platform & ISVs", href: "/solutions/platforms" },
-                { title: "Regulated Industries", href: "/solutions/regulated" },
-                { title: "Developer Teams", href: "/solutions/devtools" },
-                { title: "Protect Generated Apps", href: "/solutions/vibe-coded" },
-                { title: "Data-science Sandboxes", href: "/solutions/model-ops" },
-                { title: "Automation Safety", href: "/solutions/sandboxing" },
+                { title: "AI-first Startups", href: "/solutions/ai-startups", icon: renderMenuIcon(RocketIcon) },
+                { title: "Platform & ISVs", href: "/solutions/platforms", icon: renderMenuIcon(Building06Icon) },
+                { title: "Regulated Industries", href: "/solutions/regulated", icon: renderMenuIcon(House01Icon) },
+                { title: "Developer Teams", href: "/solutions/devtools", icon: renderMenuIcon(DeveloperIcon) },
+                { title: "Protect Generated Apps", href: "/solutions/vibe-coded", icon: renderMenuIcon(AiBrain01Icon) },
+                { title: "Data-science Sandboxes", href: "/solutions/model-ops", icon: renderMenuIcon(NanoTechnologyIcon) },
+                { title: "Automation Safety", href: "/solutions/sandboxing", icon: renderMenuIcon(WorkflowCircle01Icon) },
             ]
         },
         {
             title: "Resources", sublinks: [
-                { title: "Documentation", href: siteConfig.links.docs },
-                { title: "API Reference", href: "/docs/api" },
-                { title: "Academy", href: "/academy" },
-                { title: "Newsletter", href: siteConfig.links.company.newsletter },
-                { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
-                { title: "Guides & Tutorials", href: "/resources/guides" },
-                { title: "Changelog", href: siteConfig.links.company.changelog },
-                { title: "Use Cases / Case Studies", href: siteConfig.links.company.customers },
-                { title: "Security & Compliance", href: "/security" },
-                { title: "Status & Incidents", href: "/status" },
+                { title: "Documentation", href: siteConfig.links.docs, icon: renderMenuIcon(BookOpen01Icon) },
+                { title: "API Reference", href: "/docs/api", icon: renderMenuIcon(ApiIcon) },
+                { title: "Academy", href: "/academy", icon: renderMenuIcon(AiBookIcon) },
+                { title: "Newsletter", href: siteConfig.links.company.newsletter, icon: renderMenuIcon(AiMail01Icon) },
+                { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools, icon: renderMenuIcon(CodeCircleIcon) },
+                { title: "Guides & Tutorials", href: "/resources/guides", icon: renderMenuIcon(Compass01Icon) },
+                { title: "Changelog", href: siteConfig.links.company.changelog, icon: renderMenuIcon(ChartIcon) },
+                { title: "Use Cases / Case Studies", href: siteConfig.links.company.customers, icon: renderMenuIcon(Briefcase01Icon) },
+                { title: "Security & Compliance", href: "/security", icon: renderMenuIcon(DocumentValidationIcon) },
+                { title: "Status & Incidents", href: "/status", icon: renderMenuIcon(Pulse01Icon) },
             ]
         },
         { title: "Pricing", href: "/pricing" },
@@ -195,12 +258,12 @@ export default function Navbar({
         type: "mega",
         columns: [
             [
-                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API for every provider with security and observability." },
-                { title: "Memory & RAG", href: "/storage", description: "Vector database & semantic search." },
+                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One endpoint, all your models.", icon: renderMenuIcon(MoleculesIcon) },
+                { title: "Memory & RAG", href: "/storage", description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
             ],
             [
-                { title: "Scan", href: "https://scan.cencori.com", description: "Security scanning & vulnerability detection." },
-                { title: "Enterprise", href: "/solutions/enterprise", description: "Compliance, audit, and governance." },
+                { title: "Scan", href: "https://scan.cencori.com", description: "AI security and vuln detection.", icon: renderMenuIcon(VoiceIdIcon) },
+                { title: "Enterprise", href: "/solutions/enterprise", description: "Governance for regulated AI teams.", icon: renderMenuIcon(House01Icon) },
             ],
         ],
     };
@@ -210,32 +273,36 @@ export default function Navbar({
         type: "mega",
         columns: [
             [
-                { title: "Vibe Coders", href: "/solutions/vibe-coders", description: "Generate secure apps with AI." },
-                { title: "Developers", href: "/solutions/developers", description: "Add AI to existing apps." },
-                { title: "AI Builders", href: "/solutions/ai-builders", description: "Full-stack AI infrastructure." },
-                { title: "No-Code", href: "/solutions/no-code", description: "Bubble, Zapier, & Make." },
+                { title: "Vibe Coders", href: "/solutions/vibe-coders", description: "Secure apps generated with AI.", icon: renderMenuIcon(CodeSquareIcon) },
+                { title: "Developers", href: "/solutions/developers", description: "Ship AI into existing products.", icon: renderMenuIcon(DeveloperIcon) },
+                { title: "AI Builders", href: "/solutions/ai-builders", description: "Core infrastructure for AI teams.", icon: renderMenuIcon(AiBrain01Icon) },
+                { title: "No-Code", href: "/solutions/no-code", description: "Safer workflows for no-code teams.", icon: renderMenuIcon(WorkflowCircle01Icon) },
             ],
             [
-                { title: "Startups", href: "/solutions/startups", description: "Ship fast, stay secure." },
-                { title: "Agencies", href: "/solutions/agencies", description: "Build for clients." },
-                { title: "Enterprise", href: "/solutions/enterprise", description: "Compliance & governance." },
-                { title: "Fintech", href: "/solutions/fintech", description: "Regulated industry focus." },
-                { title: "Healthcare", href: "/solutions/healthcare", description: "HIPAA & PHI protection." },
-                { title: "Hackathons", href: "/solutions/hackathons", description: "Free tier & instant setup." },
+                { title: "Startups", href: "/solutions/startups", description: "Move fast without security debt.", icon: renderMenuIcon(RocketIcon) },
+                { title: "Agencies", href: "/solutions/agencies", description: "Deliver client AI with guardrails.", icon: renderMenuIcon(Briefcase01Icon) },
+                { title: "Enterprise", href: "/solutions/enterprise", description: "Governed AI rollouts at scale.", icon: renderMenuIcon(Building06Icon) },
+                { title: "Fintech", href: "/solutions/fintech", description: "Controls for regulated finance apps.", icon: renderMenuIcon(ChartIcon) },
+                { title: "Healthcare", href: "/solutions/healthcare", description: "Protect PHI in clinical workflows.", icon: renderMenuIcon(StethoscopeIcon) },
+                { title: "Hackathons", href: "/solutions/hackathons", description: "Safe defaults for fast launches.", icon: renderMenuIcon(BulbIcon) },
             ]
         ],
     };
 
     const resourcesDropdown: NavDropdown = {
         title: "Resources",
-        type: "dropdown",
-        items: [
-            { title: "Documentation", href: siteConfig.links.docs },
-            { title: "API Reference", href: "/docs/api" },
-            { title: "Academy", href: "/academy" },
-            { title: "Newsletter", href: siteConfig.links.company.newsletter },
-            { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
-            { title: "Guides & Tutorials", href: "/resources/guides" },
+        type: "mega",
+        columns: [
+            [
+                { title: "Documentation", href: siteConfig.links.docs, description: "Implementation guides and setup.", icon: renderMenuIcon(BookOpen01Icon) },
+                { title: "API Reference", href: "/docs/api", description: "Endpoints, auth, and schemas.", icon: renderMenuIcon(ApiIcon) },
+                { title: "Academy", href: "/academy", description: "Training for teams and operators.", icon: renderMenuIcon(AiBookIcon) },
+            ],
+            [
+                { title: "Newsletter", href: siteConfig.links.company.newsletter, description: "Product notes from the builders.", icon: renderMenuIcon(AiMail01Icon) },
+                { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools, description: "Starter kits for every stack.", icon: renderMenuIcon(CodeCircleIcon) },
+                { title: "Guides & Tutorials", href: "/resources/guides", description: "Deeper walkthroughs and patterns.", icon: renderMenuIcon(Compass01Icon) },
+            ],
         ],
     };
 
@@ -277,11 +344,11 @@ export default function Navbar({
                                                 <NavigationMenuContent className="rounded-xl border-border/40 shadow-none bg-background/95 backdrop-blur-xl">
                                                     {item.type === "mega" ? (
                                                         <div className="flex flex-col">
-                                                            <ul className="grid gap-1 p-3 md:w-[380px] lg:w-[500px] lg:grid-cols-2">
+                                                            <ul className="grid gap-x-3 gap-y-1 p-2.5 md:w-[400px] lg:w-[500px] lg:grid-cols-2">
                                                                 {item.columns?.map((col, colIndex) => (
-                                                                    <div key={colIndex} className="space-y-1">
+                                                                    <div key={colIndex} className="space-y-0.5">
                                                                         {col.map((link, linkIndex) => (
-                                                                            <ListItem key={linkIndex} title={link.title} href={link.href}>
+                                                                            <ListItem key={linkIndex} title={link.title} href={link.href} icon={link.icon}>
                                                                                 {link.description}
                                                                             </ListItem>
                                                                         ))}
@@ -463,9 +530,10 @@ export default function Navbar({
                                                                     <Link
                                                                         key={sublinkIndex}
                                                                         href={sublink.href || "#"}
-                                                                        className="text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
+                                                                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
                                                                     >
-                                                                        {sublink.title}
+                                                                        {sublink.icon ? <span className="text-muted-foreground">{sublink.icon}</span> : null}
+                                                                        <span>{sublink.title}</span>
                                                                     </Link>
                                                                 ))}
                                                             </div>
