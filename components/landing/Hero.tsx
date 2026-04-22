@@ -1,7 +1,5 @@
 import React from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronRight } from "lucide-react";
-import { TechnicalBorder } from "./TechnicalBorder";
 import { Button } from "@/components/ui/button";
 
 interface HeroProps {
@@ -35,14 +33,14 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                 </p>
 
                 {/* CTAs */}
-                <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
+                <div className="flex flex-row gap-3 animate-appear [animation-delay:300ms]">
                     <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
-                        <Button size="default" className="h-7 px-3 text-[11px] font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
+                        <Button size="default" className="h-8 px-4 text-xs font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
                             {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                         </Button>
                     </Link>
                     <Link href="/docs">
-                        <Button variant="outline" size="default" className="h-7 px-3 text-[11px] font-medium rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
+                        <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                             Documentation
                         </Button>
                     </Link>

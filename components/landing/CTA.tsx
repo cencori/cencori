@@ -29,15 +29,15 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
                             Add Cencori to your first project in minutes. Security, visibility, and cost control from your very first request.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                        <div className="flex flex-row gap-2 justify-center">
                             <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
-                                <Button size="sm" className="h-7 px-3 text-[11px] font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
+                                <Button size="sm" className="h-8 px-4 text-xs font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
                                     {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
-                                    <ArrowRight className="ml-1.5 w-3 h-3" />
+                                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                                 </Button>
                             </Link>
                             <Link href="/docs">
-                                <Button variant="ghost" size="sm" className="h-7 px-3 text-[11px] font-medium rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all">
+                                <Button variant="ghost" size="sm" className="h-8 px-4 text-xs font-medium rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all">
                                     View Documentation
                                 </Button>
                             </Link>
@@ -48,4 +48,3 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
         </section>
     );
 };
-

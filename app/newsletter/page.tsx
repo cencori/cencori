@@ -79,7 +79,7 @@ export default async function NewsletterPage() {
           <div className="container relative z-10 mx-auto px-4 md:px-6">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-3xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/55 md:text-4xl lg:text-5xl">
-                The Builder&apos;s log.
+                The Builder&apos;s Log.
               </h1>
 
               <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -113,7 +113,7 @@ export default async function NewsletterPage() {
                 . Unsubscribe in one click any time.
               </p>
 
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mt-8 flex flex-row items-center justify-center gap-3">
                 <Button
                   variant="outline"
                   size="sm"
