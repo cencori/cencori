@@ -1,7 +1,6 @@
 "use client";
 
-import { type VariantProps } from "class-variance-authority";
-import { Menu, ChevronDown, Settings } from "lucide-react";
+import { Menu, Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CircleUserRound } from "lucide-react";
@@ -16,7 +15,6 @@ import {
     Navbar as NavbarComponent,
     NavbarLeft,
     NavbarRight,
-    NavbarCenter,
 } from "@/components/ui/navbar";
 import {
     NavigationMenu,
@@ -29,7 +27,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -126,7 +124,7 @@ interface NavbarProps extends React.HTMLAttributes<HTMLElement> {
     containerClassName?: string;
     // Allow motion props
     layout?: boolean | "position" | "size";
-    transition?: any;
+    transition?: MotionProps["transition"];
 }
 
 // ... [Keep helper functions and components]
@@ -160,6 +158,7 @@ export default function Navbar({
                 { title: "Documentation", href: siteConfig.links.docs },
                 { title: "API Reference", href: "/docs/api" },
                 { title: "Academy", href: "/academy" },
+                { title: "Newsletter", href: siteConfig.links.company.newsletter },
                 { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
                 { title: "Guides & Tutorials", href: "/resources/guides" },
                 { title: "Changelog", href: siteConfig.links.company.changelog },
@@ -234,6 +233,7 @@ export default function Navbar({
             { title: "Documentation", href: siteConfig.links.docs },
             { title: "API Reference", href: "/docs/api" },
             { title: "Academy", href: "/academy" },
+            { title: "Newsletter", href: siteConfig.links.company.newsletter },
             { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools },
             { title: "Guides & Tutorials", href: "/resources/guides" },
         ],
