@@ -29,6 +29,7 @@ export const FALLBACK_CHAINS: Record<string, string[]> = {
  */
 export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     // OpenAI models → fallbacks
+    'gpt-5.5': { 'anthropic': 'claude-opus-4.5', 'google': 'gemini-3-pro' },
     'gpt-5.4': { 'anthropic': 'claude-opus-4', 'google': 'gemini-3-pro' },
     'gpt-5.4-pro': { 'anthropic': 'claude-opus-4', 'google': 'gemini-3-pro' },
     'gpt-5.3-chat-latest': { 'anthropic': 'claude-opus-4', 'google': 'gemini-3-pro' },

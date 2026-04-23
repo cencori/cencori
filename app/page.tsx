@@ -4,14 +4,9 @@ import Navbar from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { SocialProof } from "@/components/landing/SocialProof";
 import { Features } from "@/components/landing/Features";
-import { Integrations } from "@/components/landing/Integrations";
-import { Observability } from "@/components/landing/Observability";
-import { CostTracking } from "@/components/landing/CostTracking";
 import { BudgetControl } from "@/components/landing/BudgetControl";
-import { Framework } from "@/components/landing/framework";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
-import { FAQ } from "@/components/landing/FAQ";
 import { HowToSetup } from "@/components/landing/HowToSetup";
 import { Logo } from "@/components/logo";
 import { siteConfig } from "@/config/site";
@@ -105,11 +100,7 @@ export default function HomePage() {
         <SocialProof />
         <Features />
         <HowToSetup />
-        <Integrations />
-        <Observability />
-        <CostTracking />
         <BudgetControl />
-        <FAQ />
         <CTA isAuthenticated={isAuthenticated} />
       </main>
 

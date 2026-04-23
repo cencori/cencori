@@ -1,0 +1,74 @@
+---
+title: "GPT-5.5 Is Live on Cencori"
+slug: "gpt-5-5-on-cencori"
+date: "2026-04-23"
+excerpt: "OpenAI announced GPT-5.5 today, a new class of intelligence for real work and powering agents. It is now available on Cencori."
+coverImage: "/blog/images/covers/chat.png"
+tags: ["OpenAI", "GPT-5.5", "AI Models", "Update"]
+category: "changelog"
+published: true
+---
+
+OpenAI announced **GPT-5.5** today, marking a new class of intelligence built to understand complex goals, use tools, check its work, and carry more tasks through to completion. It is now available on Cencori.
+
+You can use it today with:
+
+- `gpt-5.5`
+
+## Why This Update Matters
+
+GPT-5.5 is designed for real work and powering agents. By routing your GPT-5.5 traffic through Cencori, you immediately get our security incident logging, custom data rules, routing, and observability applied to this new way of getting computer work done.
+
+No API migration is required. If you already call Cencori chat endpoints, switch the model ID and go.
+
+## Use It Now
+
+### Cencori SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'gpt-5.5',
+  messages: [
+    { role: 'system', content: 'You are an autonomous coding agent.' },
+    { role: 'user', content: 'Build a Next.js landing page with authentication.' }
+  ]
+});
+
+console.log(response.content);
+```
+
+### HTTP API
+
+```bash
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.5",
+    "messages": [
+      {"role": "user", "content": "Analyze these query logs and suggest optimizations."}
+    ]
+  }'
+```
+
+## What We Shipped in Cencori
+
+This rollout is live across the platform:
+
+- fallback mapping for cross-provider failover (`gpt-5.5` fails over to `claude-opus-4.5` and `gemini-3-pro`)
+- dashboard model pickers (Playground, Prompts, and Logs)
+- docs and examples updated
+
+## Notes for Production Teams
+
+- `gpt-5.5` is the API model ID for GPT-5.5.
+- If you rely on strict model pinning for long-running evals, keep your own pinned fallback policy as usual.
+
+## References
+
+- [OpenAI: Introducing GPT-5.5](https://openai.com/)
+- [Cencori Models Catalog](/docs/ai/models)

@@ -30,6 +30,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
+import { Integrations } from "@/components/landing/Integrations";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 
@@ -294,6 +295,8 @@ export default function AIGatewayPage() {
             </div>
           </div>
         </section>
+
+        <Integrations />
 
         {/* Code Example Section */}
         <section className="py-20 bg-background">

@@ -2,30 +2,18 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-    ArrowDownTrayIcon,
-    ArrowTopRightOnSquareIcon,
-} from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-import script from "next/script";
 import { PITCH_SLIDES } from "@/lib/pitch-slides";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
 import { useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 
 export default function PitchLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const exportWidth = 1280;
+    const exportHeight = 840;
     const exportContainerRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -43,7 +31,7 @@ export default function PitchLayout({
             const pdf = new jsPDF({
                 orientation: "landscape",
                 unit: "px",
-                format: [1280, 720], // Adjusted resolution for better scaling/readability
+                format: [exportWidth, exportHeight],
             });
 
             for (let i = 0; i < slides.length; i++) {
@@ -52,8 +40,8 @@ export default function PitchLayout({
                 // Capture slide
                 const imgData = await toJpeg(slide, {
                     quality: 0.95,
-                    width: 1280,
-                    height: 720,
+                    width: exportWidth,
+                    height: exportHeight,
                     pixelRatio: 2, // High DPI capture for text sharpness
                     backgroundColor: "#0a0a0a", // Force dark background if transparent
                     style: {
@@ -61,8 +49,8 @@ export default function PitchLayout({
                     }
                 });
 
-                if (i > 0) pdf.addPage([1280, 720], "landscape");
-                pdf.addImage(imgData, "JPEG", 0, 0, 1280, 720);
+                if (i > 0) pdf.addPage([exportWidth, exportHeight], "landscape");
+                pdf.addImage(imgData, "JPEG", 0, 0, exportWidth, exportHeight);
 
                 // Small delay to prevent UI freeze
                 await new Promise(r => setTimeout(r, 100));
@@ -78,60 +66,31 @@ export default function PitchLayout({
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground dark">
+        <div className="min-h-screen bg-[#030303] text-white dark">
             {/* Fixed Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40">
-                <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-                    <Link href="/pitch" className="flex items-center gap-2">
-                        <span className="font-bold text-lg">Cencori</span>
-                        <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full border border-border/50">
+            <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#030303]/96 backdrop-blur-sm">
+                <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+                    <Link href="/pitch" className="flex items-baseline gap-2">
+                        <span className="text-base font-semibold tracking-[-0.03em] text-white">Cencori</span>
+                        <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
                             Pitch Deck
                         </span>
                     </Link>
 
-                    <div className="flex items-center gap-3">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-3 text-xs rounded-full gap-1.5"
-                                    disabled={isExporting}
-                                >
-                                    {isExporting ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                        <ArrowDownTrayIcon className="h-3 w-3" />
-                                    )}
-                                    {isExporting ? "Exporting..." : "Export"}
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                                    <span className="text-xs">Download PDF</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleExport("pptx")}>
-                                    <span className="text-xs text-muted-foreground">
-                                        Download PPTX (Soon)
-                                    </span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleExport("docx")}>
-                                    <span className="text-xs text-muted-foreground">
-                                        Download DOCX (Soon)
-                                    </span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                    <div className="flex items-center gap-5">
+                        <button
+                            type="button"
+                            className="text-[11px] uppercase tracking-[0.24em] text-zinc-400 transition-colors hover:text-white disabled:text-zinc-700"
+                            onClick={() => handleExport("pdf")}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? "Exporting..." : "Export PDF"}
+                        </button>
 
                         <Link href="https://cencori.com" target="_blank">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-3 text-xs rounded-full gap-1.5"
-                            >
+                            <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400 transition-colors hover:text-white">
                                 Visit Site
-                                <ArrowTopRightOnSquareIcon className="h-3 w-3" />
-                            </Button>
+                            </span>
                         </Link>
                     </div>
                 </div>
@@ -147,16 +106,16 @@ export default function PitchLayout({
                     position: "fixed",
                     top: "-10000px",
                     left: "-10000px",
-                    width: "1280px",
-                    height: "720px", // Fixed 16:9 720p logical size for larger elements
+                    width: `${exportWidth}px`,
+                    height: `${exportHeight}px`,
                     pointerEvents: "none",
                 }}
             >
                 {PITCH_SLIDES.map((slide) => (
                     <div
                         key={slide.id}
-                        style={{ width: "1280px", height: "720px" }}
-                        className="bg-card text-foreground"
+                        style={{ width: `${exportWidth}px`, height: `${exportHeight}px` }}
+                        className="bg-[#050505] text-white"
                     >
                         <slide.component />
                     </div>

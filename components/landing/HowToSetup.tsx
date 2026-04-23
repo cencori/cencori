@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CodeBlock as HighlightedCodeBlock } from "@/components/ai-elements/code-block";
 import { type BundledLanguage } from "shiki";
+import { Reveal } from "@/components/landing/Reveal";
 
 type CodeTabKey = "python" | "node" | "curl" | "go" | "csharp" | "php" | "ruby" | "java";
 
@@ -220,92 +221,105 @@ export const HowToSetup = () => {
     };
 
     return (
-        <section className="py-16 bg-background">
-            <div className="container mx-auto px-4 md:px-6">
-                <div className="text-center mb-10">
-                    <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-3 text-foreground">
-                        <span className="text-muted-foreground">Infrastructure</span> in minutes
-                    </h2>
-                    <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        Three simple steps to production-ready AI infrastructure.
-                    </p>
-                </div>
+        <section className="py-24 sm:py-32 bg-background">
+            <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,24rem)_1fr] gap-16 lg:gap-24 items-start">
+                    <div>
+                        <Reveal>
+                            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground/60">
+                                Setup
+                            </p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="max-w-md text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                Infrastructure in 
+                                <br />
+                                <span className="text-muted-foreground">minutes.</span>
+                            </h2>
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="max-w-sm text-muted-foreground leading-[1.7]">
+                                Three simple steps to go from account setup to a production-ready AI integration, with the same gateway across every provider.
+                            </p>
+                        </Reveal>
+                    </div>
 
-                <div className="max-w-2xl mx-auto space-y-8">
-                    {steps.map((step, index) => (
-                        <div
-                            key={step.number}
-                            className="flex gap-6 md:gap-8"
-                        >
-                            {/* Step number */}
-                            <div className="flex-shrink-0">
-                                <div className="w-12 h-12 rounded-full border border-border bg-card flex items-center justify-center">
-                                    <span className="text-sm font-bold text-muted-foreground">
-                                        {step.number}
-                                    </span>
+                    <div className="space-y-0">
+                        {steps.map((step, index) => (
+                            <Reveal key={step.number} delay={index * 0.08}>
+                                <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-5 sm:gap-8">
+                                    <div className="flex flex-col items-center">
+                                        <div className="flex size-8 items-center justify-center rounded-full border border-border/50 bg-card text-[10px] font-medium tracking-[0.12em] text-muted-foreground">
+                                            {step.number}
+                                        </div>
+                                        {index < steps.length - 1 && (
+                                            <div className="mt-3 w-px flex-1 min-h-20 bg-border/50" />
+                                        )}
+                                    </div>
+
+                                    <div className="pb-10 sm:pb-12">
+                                        <h3 className="mb-2 text-lg font-medium text-foreground">
+                                            {step.title}
+                                        </h3>
+                                        <p className="mb-4 text-sm text-muted-foreground leading-[1.7]">
+                                            {step.description}
+                                        </p>
+
+                                        {step.code && (
+                                            <div className="overflow-x-auto rounded-lg border border-border/40 bg-foreground/[0.02] px-4 py-4">
+                                                <pre className="text-xs md:text-sm font-mono text-foreground/80 whitespace-pre-wrap break-all md:whitespace-pre md:break-normal">
+                                                    <code>{step.code}</code>
+                                                </pre>
+                                            </div>
+                                        )}
+
+                                        {step.number === "03" && (
+                                            <div className="space-y-3">
+                                                <Tabs value={activeCodeTab} onValueChange={handleTabChange} className="w-full">
+                                                    <TabsList className="w-full justify-start overflow-x-auto">
+                                                        {setupCodeTabs.map((tab) => (
+                                                            <TabsTrigger key={tab.key} value={tab.key}>
+                                                                {tab.label}
+                                                            </TabsTrigger>
+                                                        ))}
+                                                    </TabsList>
+
+                                                    {setupCodeTabs.map((tab) => (
+                                                        <TabsContent
+                                                            key={tab.key}
+                                                            value={tab.key}
+                                                            forceMount
+                                                            hidden={activeCodeTab !== tab.key ? true : undefined}
+                                                            className="mt-3"
+                                                        >
+                                                            <figure className="relative overflow-hidden rounded-xl border border-border/40 text-foreground">
+                                                                <figcaption className="flex items-center justify-between border-b border-border/40 bg-foreground/[0.02] px-4 py-2 text-xs text-muted-foreground">
+                                                                    <span className="font-medium">{tab.label}</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleCopy(tab.code, tab.key)}
+                                                                        className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                                                        aria-label="Copy code snippet"
+                                                                    >
+                                                                        {copiedTab === tab.key ? "Copied" : "Copy"}
+                                                                    </button>
+                                                                </figcaption>
+                                                                <HighlightedCodeBlock
+                                                                    code={tab.code}
+                                                                    language={tab.language}
+                                                                    className="rounded-none border-0"
+                                                                />
+                                                            </figure>
+                                                        </TabsContent>
+                                                    ))}
+                                                </Tabs>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Connector line */}
-                                {index < steps.length - 1 && (
-                                    <div className="w-px h-full bg-border ml-6 mt-2" />
-                                )}
-                            </div>
-
-                            {/* Step content */}
-                            <div className="flex-1 min-w-0 pb-8">
-                                <h3 className="text-xl font-semibold text-foreground mb-2">
-                                    {step.title}
-                                </h3>
-                                <p className="text-muted-foreground mb-4">
-                                    {step.description}
-                                </p>
-
-                                {step.code && (
-                                    <div className="rounded-lg border border-border bg-muted/50 p-4 overflow-x-auto">
-                                        <pre className="text-xs md:text-sm font-mono text-foreground/80 whitespace-pre-wrap break-all md:whitespace-pre md:break-normal">
-                                            <code>{step.code}</code>
-                                        </pre>
-                                    </div>
-                                )}
-
-                                {step.number === "03" && (
-                                    <div className="space-y-3">
-                                        <Tabs value={activeCodeTab} onValueChange={handleTabChange} className="w-full">
-                                            <TabsList className="w-full">
-                                                {setupCodeTabs.map((tab) => (
-                                                    <TabsTrigger key={tab.key} value={tab.key}>
-                                                        {tab.label}
-                                                    </TabsTrigger>
-                                                ))}
-                                            </TabsList>
-
-                                            {setupCodeTabs.map((tab) => (
-                                                <TabsContent key={tab.key} value={tab.key} forceMount hidden={activeCodeTab !== tab.key ? true : undefined} className="mt-3">
-                                                    <figure className="relative rounded-xl border border-border/40 text-foreground overflow-hidden">
-                                                        <figcaption className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-b border-border/40 bg-muted/40">
-                                                            <span className="font-medium">{tab.label}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleCopy(tab.code, tab.key)}
-                                                                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                                                                aria-label="Copy code snippet"
-                                                            >
-                                                                {copiedTab === tab.key ? "Copied" : "Copy"}
-                                                            </button>
-                                                        </figcaption>
-                                                        <HighlightedCodeBlock
-                                                            code={tab.code}
-                                                            language={tab.language}
-                                                            className="rounded-none border-0"
-                                                        />
-                                                    </figure>
-                                                </TabsContent>
-                                            ))}
-                                        </Tabs>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                            </Reveal>
+                        ))}
+                    </div>
                 </div>
             </div>
         </section>

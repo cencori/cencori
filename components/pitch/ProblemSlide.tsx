@@ -1,85 +1,81 @@
 import React from "react";
 import {
-    LockClosedIcon,
-    ExclamationTriangleIcon,
-    CurrencyDollarIcon,
-    DocumentTextIcon,
-} from "@heroicons/react/24/outline";
+    PitchHeader,
+    PitchNumber,
+    PitchQuote,
+    PitchRuleList,
+    PitchSlide,
+} from "./PitchPrimitives";
 
 const problems = [
     {
-        icon: LockClosedIcon,
-        title: "Provider Lock-in",
-        description:
-            "Switching from OpenAI to Anthropic means rewriting your entire integration layer. Every provider has a different API, different auth, different response format.",
+        title: "Routing",
+        description: "Provider choice, failovers, retries, and resilience logic.",
     },
     {
-        icon: ExclamationTriangleIcon,
-        title: "Security Gaps",
-        description:
-            "PII leaks into prompts, prompt injection attacks go undetected, no audit trail. Most teams discover these issues after they've already shipped.",
+        title: "Rate limiting",
+        description: "Protection against abuse, spikes, and runaway usage.",
     },
     {
-        icon: CurrencyDollarIcon,
-        title: "No Usage Billing",
-        description:
-            "Your users consume AI tokens but you have no way to meter, limit, or charge them. You eat the cost or spend weeks building a billing pipeline.",
+        title: "Cost control",
+        description: "Per-user spend visibility and budget enforcement.",
     },
     {
-        icon: DocumentTextIcon,
-        title: "Fragmented Tooling",
-        description:
-            "Rate limiting from Redis, cost tracking from spreadsheets, logging from a third-party, billing from Stripe — none of it connected.",
+        title: "Billing",
+        description: "Charging customers for AI usage without custom plumbing.",
+    },
+    {
+        title: "Compute",
+        description: "Training, fine-tuning, and inference infrastructure.",
+    },
+    {
+        title: "Memory",
+        description: "Persistent context across sessions and workflows.",
+    },
+    {
+        title: "Deployment",
+        description: "Getting the full product stack into production safely.",
     },
 ];
 
 export function ProblemSlide() {
-    return (
-        <div className="h-full flex flex-col p-8 md:p-12">
-            {/* Header */}
-            <div className="mb-8">
-                <span className="text-xs font-medium text-amber-500 uppercase tracking-wider">
-                    The Problem
-                </span>
-                <h2 className="text-2xl md:text-4xl font-bold mt-2">
-                    Building AI is easy.
-                    <br />
-                    <span className="text-muted-foreground">
-                        Building it for production is hard.
-                    </span>
-                </h2>
-            </div>
+    const left = problems.slice(0, 4);
+    const right = problems.slice(4);
 
-            {/* Problem Grid */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                {problems.map((problem, index) => (
-                    <div
-                        key={index}
-                        className="group p-5 rounded-xl border border-border/50 bg-muted/20 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all"
-                    >
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                                <problem.icon className="h-5 w-5 text-amber-500" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm md:text-base mb-1">
-                                    {problem.title}
-                                </h3>
-                                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                                    {problem.description}
-                                </p>
-                            </div>
+    return (
+        <PitchSlide>
+            <PitchHeader
+                eyebrow="The problem"
+                title="Teams solve seven infrastructure problems before they write real product code."
+            />
+
+            <div className="grid flex-1 gap-8 md:grid-cols-[1.15fr_0.85fr]">
+                <div className="grid gap-6 md:grid-cols-2">
+                    <PitchRuleList items={left} numbered />
+                    <PitchRuleList items={right} numbered className="md:border-t-0" />
+                </div>
+
+                <div className="flex flex-col justify-between border-t border-white/10 pt-3">
+                    <div>
+                        <PitchNumber
+                            label="Runway burned"
+                            value="6 to 9"
+                            note="months spent on infrastructure before the product."
+                        />
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                            <p className="text-sm leading-6 text-zinc-500">
+                                Every layer is usually a separate tool, separate contract,
+                                separate integration, and separate engineering sprint.
+                            </p>
                         </div>
                     </div>
-                ))}
-            </div>
 
-            {/* Bottom message */}
-            <div className="mt-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                    Every AI team faces these challenges. Most solve them from scratch.
-                </p>
+                    <PitchQuote>
+                        The result is a fragile stack of seven vendors that breaks every
+                        time one of them changes an API.
+                    </PitchQuote>
+                </div>
             </div>
-        </div>
+        </PitchSlide>
     );
 }

@@ -1,10 +1,14 @@
+export { MomentSlide } from "./MomentSlide";
 export { TitleSlide } from "./TitleSlide";
 export { ProblemSlide } from "./ProblemSlide";
+export { MarketSlide } from "./MarketSlide";
 export { SolutionSlide } from "./SolutionSlide";
 export { ProductSlide } from "./ProductSlide";
-export { MarketSlide } from "./MarketSlide";
-export { HowItWorksSlide } from "./HowItWorksSlide";
 export { BusinessModelSlide } from "./BusinessModelSlide";
 export { TractionSlide } from "./TractionSlide";
+export { FinancialsSlide } from "./FinancialsSlide";
+export { CompetitiveSlide } from "./CompetitiveSlide";
+export { VisionSlide } from "./VisionSlide";
 export { TeamSlide } from "./TeamSlide";
 export { AskSlide } from "./AskSlide";
+export { ClosingSlide } from "./ClosingSlide";

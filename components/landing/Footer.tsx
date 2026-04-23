@@ -7,6 +7,22 @@ import { siteConfig } from "@/config/site";
 import { Loader2, Check, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
+const footerProductLinks = [
+    { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
+    { title: "Models", href: siteConfig.links.products.models },
+    { title: "AI Security", href: siteConfig.links.products.ai },
+    { title: "Compute", href: siteConfig.links.products.compute },
+    { title: "Integrations", href: siteConfig.links.products.integrations },
+    { title: "Workflow", href: siteConfig.links.products.workflow },
+    { title: "Memory & RAG", href: siteConfig.links.products.storage },
+    { title: "Audit Logs", href: siteConfig.links.products.audit },
+    { title: "Observability", href: siteConfig.links.products.insights },
+    { title: "Edge", href: siteConfig.links.products.edge },
+    { title: "Sandbox", href: siteConfig.links.products.sandbox },
+    { title: "Scan", href: siteConfig.links.products.scan, external: true },
+    { title: "Enterprise", href: siteConfig.links.products.enterprise },
+];
+
 export const Footer = () => {
     const [email, setEmail] = useState("");
     const [website, setWebsite] = useState(""); // honeypot
@@ -54,10 +70,6 @@ export const Footer = () => {
                         <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
                             Every AI request, under your control.
                         </p>
-                        <div className="text-[10px] text-muted-foreground/60 font-mono mb-5">
-                            © 2026 FohnAI
-                        </div>
-
                         {/* Newsletter */}
                         <div className="max-w-xs">
                             <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2">Newsletter</h4>
@@ -114,11 +126,24 @@ export const Footer = () => {
                     <div>
                         <h4 className="text-[10px] font-medium uppercase tracking-wider mb-3">Product</h4>
                         <ul className="space-y-1.5">
-                            <li><Link href="/ai-gateway" className="text-xs text-muted-foreground hover:text-foreground transition-colors">AI Gateway</Link></li>
-                            <li><Link href="/ai/models" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Models</Link></li>
-                            <li><Link href="/storage" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Memory & RAG</Link></li>
-                            <li><Link href="/solutions/enterprise" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Enterprise</Link></li>
-                            <li><a href="https://scan.cencori.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Scan</a></li>
+                            {footerProductLinks.map((link) => (
+                                <li key={link.title}>
+                                    {link.external ? (
+                                        <a
+                                            href={link.href}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            {link.title}
+                                        </a>
+                                    ) : (
+                                        <Link href={link.href} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                            {link.title}
+                                        </Link>
+                                    )}
+                                </li>
+                            ))}
                         </ul>
                     </div>
 
@@ -175,7 +200,7 @@ export const Footer = () => {
                 {/* Bottom bar with social links */}
                 <div className="border-t border-border/20 pt-4 flex flex-col sm:flex-row items-center justify-between mb-6 gap-3">
                     <div className="text-[10px] text-muted-foreground/50">
-                        Every AI request, under your control.
+                        © 2026 Cencori Inc.
                     </div>
                     <div className="flex items-center gap-3">
                         <Link href={siteConfig.links.github} className="text-muted-foreground/50 hover:text-foreground transition-colors">
@@ -188,6 +213,11 @@ export const Footer = () => {
                                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                             </svg>
                         </Link>
+                        <a href={siteConfig.links.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground/50 hover:text-foreground transition-colors" aria-label="YouTube">
+                            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+                                <path d="M23.498 6.186a2.997 2.997 0 0 0-2.11-2.12C19.505 3.5 12 3.5 12 3.5s-7.505 0-9.388.566a2.997 2.997 0 0 0-2.11 2.12C0 8.079 0 12 0 12s0 3.921.502 5.814a2.997 2.997 0 0 0 2.11 2.12C4.495 20.5 12 20.5 12 20.5s7.505 0 9.388-.566a2.997 2.997 0 0 0 2.11-2.12C24 15.921 24 12 24 12s0-3.921-.502-5.814ZM9.75 15.568V8.432L16.02 12 9.75 15.568Z" />
+                            </svg>
+                        </a>
                         <a href="https://linkedin.com/company/cencori" target="_blank" rel="noopener noreferrer" className="text-muted-foreground/50 hover:text-foreground transition-colors">
                             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
                                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
