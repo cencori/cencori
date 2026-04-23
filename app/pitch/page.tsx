@@ -49,8 +49,8 @@ export default function PitchDeckPage() {
     return (
         <div className="relative flex min-h-[calc(100vh-3.5rem)] flex-col bg-background">
             {/* Slide Content */}
-            <div className="flex flex-1 items-center justify-center px-4 py-6 md:px-8 md:py-10">
-                <div className="aspect-[32/21] w-full max-w-6xl overflow-hidden bg-background">
+            <div className="flex flex-1 items-center justify-center w-full h-full bg-[#030303]">
+                <div className="w-full h-full max-w-[1920px] max-h-[1080px] aspect-video overflow-hidden">
                     <CurrentSlideComponent />
                 </div>
             </div>

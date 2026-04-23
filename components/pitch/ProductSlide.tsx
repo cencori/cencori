@@ -1,46 +1,54 @@
 import React from "react";
-import { PitchHeader, PitchQuote, PitchRuleList, PitchSlide } from "./PitchPrimitives";
-
-const proof = [
-    { title: "AI gateway", description: "In production." },
-    { title: "End-user billing", description: "Shipped and in use." },
-    { title: "Dashboard", description: "Live." },
-    { title: "Documentation", description: "Live." },
-];
-
-const developerView = [
-    "One API key that routes to every major AI provider",
-    "A dashboard showing every request, every cost, every user",
-    "Rate plans they can configure for their own customers",
-    "Billing that collects revenue automatically on their behalf",
-    "Usage analytics that tell them exactly what their AI product costs",
-];
+import { PitchHeader, PitchSlide, PitchGrid, PitchQuote } from "./PitchPrimitives";
 
 export function ProductSlide() {
     return (
         <PitchSlide>
             <PitchHeader
-                eyebrow="Product"
-                title="Cencori is not a deck. It is a live, working product."
-                subtitle="The gateway is in production, billing is shipped, the dashboard is live, and the documentation is live."
+                eyebrow="The Product"
+                title="One Platform. Every Layer."
+                subtitle="Cencori replaces the fragmented AI stack with a single, unified infrastructure layer."
             />
 
-            <div className="grid flex-1 gap-2 md:grid-cols-[0.9fr_1.1fr]">
-                <div className="flex flex-col justify-between">
-                    <PitchRuleList items={proof} />
-                    <PitchQuote>Teams are building on the platform today.</PitchQuote>
-                </div>
-
-                <div>
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-                        What a developer sees
+            <PitchGrid cols={3} className="mt-12">
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Governance
                     </p>
-                    <PitchRuleList
-                        items={developerView}
-                        className="mt-3"
-                    />
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        AI Gateway & Routing
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed">
+                        Provider choice, failovers, and resilience logic across every major model.
+                    </p>
                 </div>
-            </div>
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Monetization
+                    </p>
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        Native Usage Billing
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed">
+                        Charge users per token or request. Native Stripe integration for recurring revenue.
+                    </p>
+                </div>
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Execution
+                    </p>
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        Managed Compute
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed">
+                        GPU provisioning, training, and inference infrastructure billed per usage.
+                    </p>
+                </div>
+            </PitchGrid>
+
+            <PitchQuote>
+                A developer-first experience that abstracts away the complexity of AI infrastructure.
+            </PitchQuote>
         </PitchSlide>
     );
 }

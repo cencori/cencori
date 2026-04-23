@@ -1,0 +1,76 @@
+---
+title: "Grok Voice Think Fast 1.0 Is Now on Cencori"
+slug: "grok-voice-think-fast-on-cencori"
+date: "2026-04-23"
+excerpt: "xAI just released Grok Voice Think Fast 1.0, a state-of-the-art voice model built for complex workflows. It is now available on Cencori."
+coverImage: "/blog/images/covers/chat.png"
+authors:
+  - bola
+tags: ["xAI", "Grok", "Grok Voice", "AI Models", "Update"]
+category: "product"
+published: true
+---
+
+xAI announced **Grok Voice Think Fast 1.0** today, a state-of-the-art voice model built for complex, multi-step workflows with snappy responses and high accuracy. It is now available on Cencori.
+
+You can use it today with:
+
+- `grok-voice-think-fast`
+
+## Why This Update Matters
+
+Grok Voice Think Fast 1.0 takes the top spot on the Tau Voice Bench and handles real-world messiness like noise, accents, and interruptions better than any other model in the world. By integrating it into your Cencori workflow, you get:
+
+- **Snappy Responses**: Optimized for low-latency, real-time interactions.
+- **Complex Workflows**: Built to understand goals and execute multi-step tasks.
+- **Cencori Governance**: Full security incident logging, observability, and failover support out-of-the-box.
+
+No API migration is required. If you already call Cencori chat endpoints, switch the model ID and go.
+
+## Use It Now
+
+### Cencori SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'grok-voice-think-fast',
+  messages: [
+    { role: 'system', content: 'You are a real-time voice assistant.' },
+    { role: 'user', content: 'Remind me to call the architect when I reach home, and check my calendar for slots tomorrow morning.' }
+  ]
+});
+
+console.log(response.content);
+```
+
+### HTTP API
+
+```bash
+curl -X POST https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "grok-voice-think-fast",
+    "messages": [
+      {"role": "user", "content": "How do I handle background noise in a streaming voice input?"}
+    ]
+  }'
+```
+
+## What We Shipped in Cencori
+
+This rollout is live across the platform:
+
+- model catalog and `/api/v1/models`
+- fallback mapping for cross-provider failover (`grok-voice-think-fast` fails over to `gpt-4o` and `claude-sonnet-4.5`)
+- dashboard model pickers (Playground, Prompts, and Logs)
+- docs and examples updated
+
+## References
+
+- [xAI: Introducing Grok Voice Think Fast 1.0](https://x.ai/news/grok-voice-think-fast)
+- [Cencori Models Catalog](/docs/ai/models)

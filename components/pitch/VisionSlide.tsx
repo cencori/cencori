@@ -1,27 +1,22 @@
 import React from "react";
-import { PitchHeader, PitchQuote, PitchRuleList, PitchSlide } from "./PitchPrimitives";
+import { PitchHeader, PitchQuote, PitchSlide, PitchGrid } from "./PitchPrimitives";
 
-const vision = [
+const goals = [
     {
-        title: "African research labs train frontier models on Cencori compute",
-        description:
-            "Not renting capacity from Virginia, but running on infrastructure built from the continent.",
+        label: "Ownership",
+        title: "The Backbone of Intelligence",
+        desc: "Owning the infrastructure layer of the AI economy is the single most valuable position in technology."
     },
     {
-        title: "Startups ship world-class AI products on one stack",
-        description:
-            "Teams in Lagos, Nairobi, Accra, and Cairo build without stitching together foreign infrastructure layers.",
+        label: "Autonomy",
+        title: "Africa-Native Compute",
+        desc: "Lagos, Nairobi, and Cairo training frontier models on infrastructure built from the continent."
     },
     {
-        title: "Enterprises route billions of AI requests through Cencori",
-        description:
-            "Compliance, audit trails, and cost control become part of the intelligence layer by default.",
-    },
-    {
-        title: "Software and hardware products run on the same infrastructure",
-        description:
-            "Robotics, mechatronics, autonomous systems, and frontier AI share one backbone.",
-    },
+        label: "Scale",
+        title: "Unified Execution",
+        desc: "Robotics, autonomous systems, and frontier AI sharing one single infrastructure backbone."
+    }
 ];
 
 export function VisionSlide() {
@@ -29,17 +24,28 @@ export function VisionSlide() {
         <PitchSlide>
             <PitchHeader
                 eyebrow="Vision"
-                title="The company that owns the infrastructure layer of the AI economy owns one of the most valuable positions in technology."
+                title="The infrastructure company of the AI economy."
+                subtitle="We are not building a tool. We are building the foundation for the next decade of software."
             />
 
-            <div className="grid flex-1 gap-2 md:grid-cols-2">
-                <PitchRuleList items={vision.slice(0, 2)} numbered />
-                <PitchRuleList items={vision.slice(2)} numbered />
-            </div>
+            <PitchGrid cols={3} className="mt-12">
+                {goals.map(goal => (
+                    <div key={goal.title} className="space-y-6">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                            {goal.label}
+                        </p>
+                        <p className="text-2xl font-medium text-white tracking-tight">
+                            {goal.title}
+                        </p>
+                        <p className="text-base text-zinc-500 leading-relaxed font-light">
+                            {goal.desc}
+                        </p>
+                    </div>
+                ))}
+            </PitchGrid>
 
             <PitchQuote>
-                We are not building a tool. We are building the backbone of
-                intelligence.
+                This is how we define the future of computing.
             </PitchQuote>
         </PitchSlide>
     );

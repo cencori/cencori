@@ -1,29 +1,26 @@
 import React from "react";
 import Image from "next/image";
-import { PitchHeader, PitchMeta, PitchQuote, PitchSlide, PitchTable } from "./PitchPrimitives";
+import { PitchHeader, PitchQuote, PitchSlide, PitchTable, PitchGrid } from "./PitchPrimitives";
 
 const founders = [
     {
         name: "Bola Roy Banjo",
         role: "CEO & Founder",
         bio: "22 years old. BSc Mechanical Engineering. Built Cencori from zero to a live, working infrastructure platform. Combines engineering depth with sharp product instinct.",
-        note: "Built energy tech that drew interest from researchers at Harvard and MIT.",
         avatar: "/roy.png",
     },
     {
         name: "Oreofe O. Daniel",
         role: "COO & Co-founder",
-        bio: "Operations, business infrastructure, and execution lead. Focused on turning product velocity into a scalable operating company.",
-        note: "Owns the systems that power Cencori's operational efficiency.",
+        bio: "Operations, business infrastructure, and execution lead. Focused on turning product velocity into a scalable operating organization.",
         avatar: "/daniel-avatar.png",
     },
 ];
 
-const hiringRoadmap = [
+const roadmap = [
     ["Senior Backend", "Q3 2026", "Infrastructure & Scaling"],
     ["Senior Infra", "Q3 2026", "Compute Layer Buildout"],
     ["Head of GTM", "Q4 2026", "Developer Marketing & Sales"],
-    ["Backend Int.", "Q4 2026", "Platform Reliability"],
 ];
 
 export function TeamSlide() {
@@ -31,82 +28,64 @@ export function TeamSlide() {
         <PitchSlide>
             <PitchHeader
                 eyebrow="Team"
-                title="Lean by design, clear-eyed about what the next phase requires."
+                title="Lean by design. Execution focused."
                 subtitle="Founding team in place. Next hires clearly defined to hit Series A milestones."
             />
 
-            <div className="grid flex-1 gap-12 md:grid-cols-[1.2fr_0.8fr]">
-                {/* Founding Team Section */}
-                <div className="flex flex-col justify-center space-y-10">
-                    <div className="grid gap-8 md:grid-cols-2">
-                        {founders.map((founder, index) => (
-                            <article key={founder.name} className="space-y-4">
-                                <div className="group relative h-48 w-full overflow-hidden bg-white/5">
-                                    <Image
-                                        src={founder.avatar}
-                                        alt={founder.name}
-                                        fill
-                                        className="object-cover grayscale transition-all group-hover:grayscale-0"
-                                        unoptimized
-                                    />
-                                    <div className="absolute top-4 left-4">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50 bg-black/40 px-2 py-1 backdrop-blur-md">
-                                            Founder 0{index + 1}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <h3 className="text-xl font-medium text-foreground">
-                                        {founder.name}
-                                    </h3>
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
-                                        {founder.role}
-                                    </p>
-                                    <p className="text-sm leading-relaxed text-muted-foreground/90">
-                                        {founder.bio}
-                                    </p>
-                                    {founder.note && (
-                                        <p className="text-xs italic text-muted-foreground/60 border-l border-white/10 pl-3 py-1">
-                                            {founder.note}
-                                        </p>
-                                    )}
-                                </div>
-                            </article>
-                        ))}
-                    </div>
+            <PitchGrid className="mt-12">
+                <div className="grid grid-cols-2 gap-12">
+                    {founders.map((founder, index) => (
+                        <div key={founder.name} className="space-y-6">
+                            <div className="relative h-64 w-full bg-zinc-900 overflow-hidden grayscale contrast-125">
+                                <Image
+                                    src={founder.avatar}
+                                    alt={founder.name}
+                                    fill
+                                    className="object-cover"
+                                    unoptimized
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                                    Founder 0{index + 1}
+                                </p>
+                                <p className="text-2xl font-medium text-white">{founder.name}</p>
+                                <p className="text-xs font-bold uppercase tracking-widest text-white/40">{founder.role}</p>
+                                <p className="text-base text-zinc-500 leading-relaxed font-light">
+                                    {founder.bio}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Scaling Strategy Section */}
-                <div className="flex flex-col justify-between py-4">
-                    <div className="space-y-10">
+                <div className="flex flex-col justify-between">
+                    <div className="space-y-12">
                         <div className="space-y-6">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
-                                Hiring Roadmap • Next 12 Months
+                            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                                Hiring Roadmap
                             </p>
                             <PitchTable 
                                 headers={["Role", "Timing", "Ownership"]}
-                                rows={hiringRoadmap}
+                                rows={roadmap}
                             />
                         </div>
 
-                        <div className="space-y-4 bg-white/5 p-6 border-l-2 border-white/20">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
+                        <div className="space-y-4">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
                                 Operating Principle
                             </p>
-                            <p className="text-lg font-medium text-foreground leading-snug">
-                                "We know exactly where the team is lean and we are not pretending otherwise."
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                This raise funds the specific engineering and GTM talent required to reach $4M ARR and Series A readiness.
+                            <p className="text-2xl font-light text-zinc-400 leading-tight">
+                                We know exactly where the team is lean and we are <span className="text-white font-medium">not pretending otherwise</span>.
                             </p>
                         </div>
                     </div>
 
                     <PitchQuote>
-                        The capital goes directly into the people and systems required to become a Series A company.
+                        The capital goes directly into the talent required to build a category-defining company.
                     </PitchQuote>
                 </div>
-            </div>
+            </PitchGrid>
         </PitchSlide>
     );
 }
