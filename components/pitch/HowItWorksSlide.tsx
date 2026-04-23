@@ -1,112 +1,62 @@
 import React from "react";
-
-
-const steps = [
-    { num: "01", title: "Integrate", description: "Add Cencori SDK to your app" },
-    {
-        num: "02",
-        title: "Configure",
-        description: "Set up providers & security rules",
-    },
-    { num: "03", title: "Deploy", description: "Ship with confidence" },
-];
+import { PitchHeader, PitchSlide, PitchGrid, PitchQuote } from "./PitchPrimitives";
 
 export function HowItWorksSlide() {
     return (
-        <div className="h-full flex flex-col p-8 md:p-12">
-            {/* Header */}
-            <div className="mb-3">
-                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wider">
-                    How It Works
-                </span>
-                <h2 className="text-[10px] md:text-[10px] font-bold mt-2">
-                    From integration to production{" "}
-                    <span className="text-emerald-500">in minutes.</span>
-                </h2>
-            </div>
+        <PitchSlide>
+            <PitchHeader
+                eyebrow="How it Works"
+                title="Simple integration. Complex execution."
+                subtitle="Cencori sits between your application and every major AI provider."
+            />
 
-            {/* Architecture Diagram */}
-            <div className="flex-1 flex items-center justify-center">
-                <div className="w-full max-w-4xl">
-                    {/* Flow diagram */}
-                    <div className="flex items-center justify-between gap-2 md:gap-2">
-                        {/* Your App */}
-                        <div className="flex-1 p-4 rounded-xl bg-card text-center">
-                            <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-2 flex items-center justify-center">
-                                
-                            </div>
-                            <h3 className="font-semibold text-[10px]">Your App</h3>
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                                Next.js, React, Python, Go
-                            </p>
-                        </div>
-
-                        {/* Arrow */}
-                        <div className="flex flex-col items-center">
-                            <div className="w-8 md:w-16 h-0.5 bg-emerald-500" />
-                            <span className="text-[8px] text-muted-foreground mt-1">
-                                SDK Call
-                            </span>
-                        </div>
-
-                        {/* Cencori */}
-                        <div className="flex-[2] p-4 rounded-xl bg-emerald-500/5">
-                            <div className="text-center mb-3">
-                                <h3 className="font-bold text-emerald-500">Cencori</h3>
-                                <p className="text-[10px] text-muted-foreground">AI Gateway</p>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="p-2 rounded-lg bg-card text-center">
-                                    
-                                    <span className="text-[8px]">Security</span>
-                                </div>
-                                <div className="p-2 rounded-lg bg-card text-center">
-                                    
-                                    <span className="text-[8px]">Routing</span>
-                                </div>
-                                <div className="p-2 rounded-lg bg-card text-center">
-                                    
-                                    <span className="text-[8px]">Analytics</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Arrow */}
-                        <div className="flex flex-col items-center">
-                            <div className="w-8 md:w-16 h-0.5 bg-emerald-500" />
-                            <span className="text-[8px] text-muted-foreground mt-1">
-                                API Call
-                            </span>
-                        </div>
-
-                        {/* Providers */}
-                        <div className="flex-1 p-4 rounded-xl bg-card text-center">
-                            <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-2 flex items-center justify-center">
-                                
-                            </div>
-                            <h3 className="font-semibold text-[10px]">AI Providers</h3>
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                                OpenAI, Anthropic, Google
-                            </p>
-                        </div>
-                    </div>
+            <PitchGrid cols={3} className="mt-12">
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Step 01
+                    </p>
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        One API Key
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed font-light">
+                        Replace fragmented provider keys with a single Cencori token.
+                    </p>
                 </div>
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Step 02
+                    </p>
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        Define Rules
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed font-light">
+                        Set security policies, cost limits, and failover logic in the dashboard.
+                    </p>
+                </div>
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Step 03
+                    </p>
+                    <p className="text-2xl font-medium text-white tracking-tight">
+                        Scale & Monetize
+                    </p>
+                    <p className="text-base text-zinc-500 leading-relaxed font-light">
+                        Automatically bill your users per token and monitor spend in real-time.
+                    </p>
+                </div>
+            </PitchGrid>
+
+            <div className="mt-20 border-t border-white/5 pt-16 grid grid-cols-5 items-center gap-8 opacity-40 grayscale contrast-200">
+                <p className="text-sm font-bold tracking-tighter">OPENAI</p>
+                <p className="text-sm font-bold tracking-tighter">ANTHROPIC</p>
+                <p className="text-sm font-bold tracking-tighter">GOOGLE</p>
+                <p className="text-sm font-bold tracking-tighter">COHERE</p>
+                <p className="text-sm font-bold tracking-tighter">META</p>
             </div>
 
-            {/* Steps */}
-            <div className="mt-2 grid grid-cols-3 gap-2">
-                {steps.map((step, index) => (
-                    <div key={index} className="text-center">
-                        <div className="inline-flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-bold text-emerald-500/30">
-                                {step.num}
-                            </span>
-                            <span className="font-semibold">{step.title}</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">{step.description}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
+            <PitchQuote>
+                Complex infrastructure abstracted into a world-class developer experience.
+            </PitchQuote>
+        </PitchSlide>
     );
 }

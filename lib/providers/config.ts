@@ -224,6 +224,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.x.ai',
         keyPrefix: 'xai-',
         models: [
+            // Grok Voice Series (latest)
+            { id: 'grok-voice-think-fast', name: 'Grok Voice Think Fast 1.0', type: 'chat', contextWindow: 256000, description: 'State-of-the-art voice model for complex, multi-step workflows' },
             // Grok 4 Series (July-Nov 2025)
             { id: 'grok-4', name: 'Grok 4', type: 'chat', contextWindow: 256000, description: 'Enhanced reasoning, real-time search' },
             { id: 'grok-4.1', name: 'Grok 4.1', type: 'chat', contextWindow: 256000, description: 'Improved multimodal & reasoning' },

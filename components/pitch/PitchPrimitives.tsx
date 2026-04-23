@@ -11,11 +11,17 @@ export function PitchSlide({
     return (
         <section
             className={cn(
-                "flex h-full flex-col overflow-hidden bg-background px-4 py-1 text-foreground md:px-4 md:py-2",
+                "relative flex h-full w-full flex-col overflow-hidden bg-[#050505] p-16 md:p-24 text-foreground",
                 className
             )}
         >
-            {children}
+            {/* Subtle Texture Overlay */}
+            <div className="pointer-events-none absolute inset-0 opacity-[0.03] grayscale" 
+                 style={{ backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')" }} />
+            
+            <div className="relative z-10 flex h-full flex-col">
+                {children}
+            </div>
         </section>
     );
 }
@@ -24,37 +30,29 @@ export function PitchHeader({
     eyebrow,
     title,
     subtitle,
-    aside,
     className,
 }: {
     eyebrow: string;
     title: React.ReactNode;
     subtitle?: React.ReactNode;
-    aside?: React.ReactNode;
     className?: string;
 }) {
     return (
-        <header
-            className={cn(
-                "mb-2   pb-2",
-                aside ? "grid gap-2 md:grid-cols-[1fr_auto] md:items-end" : "",
-                className
-            )}
-        >
-            <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
+        <header className={cn("mb-16 max-w-[80%]", className)}>
+            <div className="flex items-center gap-4 mb-8">
+                <p className="text-sm font-bold uppercase tracking-[0.5em] text-white/40">
                     {eyebrow}
                 </p>
-                <h2 className="mt-4 max-w-5xl text-3xl font-medium tracking-tight text-foreground md:text-5xl">
-                    {title}
-                </h2>
-                {subtitle ? (
-                    <p className="mt-4 max-w-4xl text-base leading-relaxed text-muted-foreground md:text-lg">
-                        {subtitle}
-                    </p>
-                ) : null}
+                <div className="h-px w-20 bg-white/10" />
             </div>
-            {aside ? <div className="text-right">{aside}</div> : null}
+            <h2 className="text-6xl font-medium tracking-tight text-white md:text-[5.5rem] lg:text-[7.5rem] leading-[0.9] first-letter:capitalize">
+                {title}
+            </h2>
+            {subtitle && (
+                <p className="mt-12 max-w-4xl text-2xl leading-relaxed text-zinc-400 md:text-3xl font-light">
+                    {subtitle}
+                </p>
+            )}
         </header>
     );
 }
@@ -69,11 +67,11 @@ export function PitchMeta({
     className?: string;
 }) {
     return (
-        <div className={cn("min-w-0 flex flex-col gap-1.5", className)}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/80">
+        <div className={cn("flex flex-col gap-4 py-8 border-t border-white/5", className)}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
                 {label}
             </p>
-            <div className="text-sm font-medium text-foreground md:text-base">
+            <div className="text-xl font-medium text-white md:text-3xl tracking-tight">
                 {value}
             </div>
         </div>
@@ -92,68 +90,18 @@ export function PitchNumber({
     className?: string;
 }) {
     return (
-        <div className={cn("min-w-0 flex flex-col gap-1.5", className)}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/80">
+        <div className={cn("flex flex-col gap-6 py-12 border-t border-white/5", className)}>
+            <p className="text-xs font-bold uppercase tracking-[0.4em] text-white/30">
                 {label}
             </p>
-            <div className="text-2xl font-medium tracking-tight text-foreground md:text-3xl">
+            <div className="text-7xl font-medium tracking-tighter text-white md:text-[7rem] leading-none">
                 {value}
             </div>
-            {note ? (
-                <p className="text-xs text-muted-foreground">
+            {note && (
+                <p className="text-lg text-zinc-500 font-medium tracking-tight mt-4 max-w-xs">
                     {note}
                 </p>
-            ) : null}
-        </div>
-    );
-}
-
-export function PitchRuleList({
-    items,
-    numbered = false,
-    className,
-}: {
-    items: Array<React.ReactNode | { title: React.ReactNode; description?: React.ReactNode }>;
-    numbered?: boolean;
-    className?: string;
-}) {
-    return (
-        <div className={cn(" ", className)}>
-            {items.map((item, index) => {
-                const normalized =
-                    typeof item === "object" &&
-                    item !== null &&
-                    "title" in item &&
-                    !React.isValidElement(item)
-                        ? item
-                        : { title: item, description: undefined };
-
-                return (
-                    <div
-                        key={index}
-                        className={cn(
-                            "  py-1",
-                            numbered ? "grid gap-2 md:grid-cols-[auto_1fr]" : ""
-                        )}
-                    >
-                        {numbered ? (
-                            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
-                                {String(index + 1).padStart(2, "0")}
-                            </div>
-                        ) : null}
-                        <div className="min-w-0">
-                            <div className="text-base font-medium text-foreground">
-                                {normalized.title}
-                            </div>
-                            {normalized.description ? (
-                                <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                                    {normalized.description}
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-                );
-            })}
+            )}
         </div>
     );
 }
@@ -168,11 +116,13 @@ export function PitchQuote({
     return (
         <div
             className={cn(
-                "pt-4 text-xl font-medium tracking-tight text-foreground md:text-2xl border-t border-white/10 italic",
+                "mt-auto border-t border-white/10 pt-20",
                 className
             )}
         >
-            {children}
+            <p className="text-4xl md:text-6xl font-medium tracking-tight text-white/90 leading-[0.95] italic">
+                {children}
+            </p>
         </div>
     );
 }
@@ -187,14 +137,14 @@ export function PitchTable({
     className?: string;
 }) {
     return (
-        <div className={cn("w-full overflow-hidden", className)}>
+        <div className={cn("w-full overflow-hidden my-16", className)}>
             <table className="w-full border-collapse text-left">
                 <thead>
                     <tr className="border-b border-white/10">
                         {headers.map((header, i) => (
                             <th
                                 key={i}
-                                className="pb-3 text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/80"
+                                className="pb-8 text-xs font-bold uppercase tracking-[0.4em] text-white/20"
                             >
                                 {header}
                             </th>
@@ -203,11 +153,11 @@ export function PitchTable({
                 </thead>
                 <tbody className="divide-y divide-white/5">
                     {rows.map((row, i) => (
-                        <tr key={i} className="group">
+                        <tr key={i} className="group transition-colors hover:bg-white/[0.02]">
                             {row.map((cell, j) => (
                                 <td
                                     key={j}
-                                    className="py-4 text-sm font-medium text-foreground/90 transition-colors group-hover:text-foreground md:text-base"
+                                    className="py-10 text-xl md:text-2xl font-medium text-white/70 group-hover:text-white transition-colors tracking-tight"
                                 >
                                     {cell}
                                 </td>
@@ -216,6 +166,28 @@ export function PitchTable({
                     ))}
                 </tbody>
             </table>
+        </div>
+    );
+}
+
+export function PitchGrid({
+    children,
+    cols = 2,
+    className,
+}: {
+    children: React.ReactNode;
+    cols?: number;
+    className?: string;
+}) {
+    return (
+        <div className={cn(
+            "grid gap-x-24 gap-y-16",
+            cols === 2 ? "md:grid-cols-2" : 
+            cols === 3 ? "md:grid-cols-3" : 
+            "md:grid-cols-4",
+            className
+        )}>
+            {children}
         </div>
     );
 }

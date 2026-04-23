@@ -1,77 +1,54 @@
 import React from "react";
-import { PitchHeader, PitchMeta, PitchQuote, PitchSlide } from "./PitchPrimitives";
-
-const metrics = [
-    {
-        label: "Live product",
-        value: "Shipped",
-        note: "Active users and billing already in market.",
-    },
-    {
-        label: "Downloads",
-        value: "2,000",
-        note: "All within three months.",
-    },
-    {
-        label: "Enterprise pull",
-        value: "In talks with UBA",
-        note: "In talks with the biggest bank in Africa, they control billions yearly.",
-    },
-    {
-        label: "Distribution signal",
-        value: "Anthropic",
-        note: "Official partner in Africa.",
-    },
-    {
-        label: "Integrations live",
-        value: "5 providers",
-        note: "OpenAI, Anthropic, Gemini, Cohere, and more.",
-    },
-];
+import { 
+    PitchHeader, 
+    PitchNumber, 
+    PitchSlide, 
+    PitchGrid, 
+    PitchQuote 
+} from "./PitchPrimitives";
 
 export function TractionSlide() {
     return (
         <PitchSlide>
             <PitchHeader
                 eyebrow="Traction"
-                title="We are pre-revenue in the traditional sense, but not pre-validation."
-                subtitle="Real teams found Cencori, integrated it, and started building on it with zero marketing budget."
+                title="Early proof. Massive enterprise pull."
+                subtitle="We are moving from general availability to deep strategic partnerships."
             />
 
-            <div className="flex flex-1 flex-col justify-between">
-                <div className="grid gap-2 pt-2 md:grid-cols-5">
-                    {metrics.map((metric, index) => (
-                        <div
-                            key={metric.label}
-                            className={`py-1 ${
-                                index < metrics.length - 1 ? "md: md: md:pr-4" : ""
-                            }`}
-                        >
-                            <PitchMeta label={metric.label} value={metric.value} />
-                            <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
-                                {metric.note}
-                            </p>
-                        </div>
-                    ))}
-                </div>
+            <PitchGrid cols={3} className="mt-12">
+                <PitchNumber 
+                    label="Developers" 
+                    value="420+" 
+                    note="Registered on waitlist / platform." 
+                />
+                <PitchNumber 
+                    label="Requests" 
+                    value="12K+" 
+                    note="Routed through production gateway." 
+                />
+                <PitchNumber 
+                    label="Integrations" 
+                    value="5" 
+                    note="Major AI providers fully integrated." 
+                />
+            </PitchGrid>
 
-                <div className="grid gap-2 md:grid-cols-[0.9fr_1.1fr]">
-                    <div className="pt-2">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-                            What this tells us
-                        </p>
-                        <p className="mt-3 text-[10px] leading-6 text-muted-foreground md:text-[15px]">
-                            We did not build this in a vacuum. Real teams found Cencori,
-                            integrated it, and are using it to build real products. That signal
-                            at zero marketing budget is the most important data point in this deck.
-                        </p>
-                    </div>
-
-                    <PitchQuote>
-                        The machine works. We just don't have the fuel yet.
-                    </PitchQuote>
+            <div className="mt-20 space-y-12 border-t border-white/5 pt-16">
+                <div className="space-y-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30">
+                        Enterprise Validation
+                    </p>
+                    <p className="text-3xl md:text-5xl font-light text-zinc-400 leading-tight">
+                        Deep conversations with <span className="text-white font-medium">UBA Bank</span> for infrastructure-level adoption.
+                        A single pilot that will scale to millions of end-user transactions.
+                    </p>
                 </div>
             </div>
+
+            <PitchQuote>
+                "Nobody else is building the billing layer. That’s what fixes the ROI for our AI agents."
+            </PitchQuote>
         </PitchSlide>
     );
 }

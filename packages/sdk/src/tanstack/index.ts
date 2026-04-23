@@ -80,6 +80,7 @@ export const CENCORI_CHAT_MODELS = [
     'gemini-2.0-flash',
     'gemini-3-pro',
     // xAI
+    'grok-voice-think-fast',
     'grok-4',
     'grok-3',
     // Mistral
