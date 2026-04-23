@@ -13,7 +13,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
             <div className="mx-auto max-w-6xl px-4 md:px-6">
                 <div className="mx-auto flex max-w-4xl flex-col items-center pt-2 text-center">
                         <Link
-                            href="/blog/introducing-cencori"
+                            href="/changelog/ai-gateway-launch"
                             className="group mb-8 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground animate-appear"
                         >
                             <span>Introducing AI Gateway</span>
