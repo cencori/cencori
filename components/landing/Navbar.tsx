@@ -72,6 +72,7 @@ interface NavDropdown {
     type: "mega" | "dropdown";
     columns?: NavLink[][];
     items?: NavLink[];
+    listClassName?: string;
     footerCtaPrimary?: NavLink;
     footerCtaSecondary?: NavLink;
 }
@@ -138,6 +139,32 @@ const solutionsMenuColumns: NavLink[][] = [
 ];
 
 const mobileSolutionsLinks: MobileNavLink[] = solutionsMenuColumns
+    .flat()
+    .map(({ title, href, icon }) => ({ title, href, icon }));
+
+const productMenuColumns: NavLink[][] = [
+    [
+        { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One endpoint, all your models.", icon: renderMenuIcon(MoleculesIcon) },
+        { title: "Models", href: siteConfig.links.products.models, description: "Hosted and mapped model catalog.", icon: renderMenuIcon(AiBrain01Icon) },
+        { title: "AI Security", href: siteConfig.links.products.ai, description: "Real-time protection for AI traffic.", icon: renderMenuIcon(DocumentValidationIcon) },
+        { title: "Compute", href: siteConfig.links.products.compute, description: "GPU and serverless AI workloads.", icon: renderMenuIcon(Pulse01Icon) },
+        { title: "Integrations", href: siteConfig.links.products.integrations, description: "SDKs, APIs, and automation tools.", icon: renderMenuIcon(ApiIcon) },
+    ],
+    [
+        { title: "Workflow", href: siteConfig.links.products.workflow, description: "Visual orchestration for AI systems.", icon: renderMenuIcon(WorkflowCircle01Icon) },
+        { title: "Memory & RAG", href: siteConfig.links.products.storage, description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
+        { title: "Edge", href: siteConfig.links.products.edge, description: "Platform and runtime integrations.", icon: renderMenuIcon(Compass01Icon) },
+        { title: "Enterprise", href: siteConfig.links.products.enterprise, description: "Governance for regulated AI teams.", icon: renderMenuIcon(House01Icon) },
+    ],
+    [
+        { title: "Audit Logs", href: siteConfig.links.products.audit, description: "Immutable logs and compliance trails.", icon: renderMenuIcon(BookOpen01Icon) },
+        { title: "Observability", href: siteConfig.links.products.insights, description: "Analytics and risk dashboards.", icon: renderMenuIcon(ChartIcon) },
+        { title: "Sandbox", href: siteConfig.links.products.sandbox, description: "Safe execution for generated code.", icon: renderMenuIcon(CodeSquareIcon) },
+        { title: "Scan", href: siteConfig.links.products.scan, description: "AI security and vuln detection.", icon: renderMenuIcon(VoiceIdIcon) },
+    ],
+];
+
+const mobileProductLinks: MobileNavLink[] = productMenuColumns
     .flat()
     .map(({ title, href, icon }) => ({ title, href, icon }));
 
@@ -219,12 +246,7 @@ export default function Navbar({
     homeUrl = siteConfig.url,
     mobileNavItems = [
         {
-            title: "Products", sublinks: [
-                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, icon: renderMenuIcon(MoleculesIcon) },
-                { title: "Memory & RAG", href: "/storage", icon: renderMenuIcon(NanoTechnologyIcon) },
-                { title: "Scan", href: "https://scan.cencori.com", icon: renderMenuIcon(VoiceIdIcon) },
-                { title: "Enterprise", href: "/solutions/enterprise", icon: renderMenuIcon(House01Icon) },
-            ]
+            title: "Products", sublinks: mobileProductLinks
         },
         {
             title: "Solutions", sublinks: mobileSolutionsLinks
@@ -269,16 +291,8 @@ export default function Navbar({
     const productsDropdown: NavDropdown = {
         title: "Products",
         type: "mega",
-        columns: [
-            [
-                { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One endpoint, all your models.", icon: renderMenuIcon(MoleculesIcon) },
-                { title: "Memory & RAG", href: "/storage", description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
-            ],
-            [
-                { title: "Scan", href: "https://scan.cencori.com", description: "AI security and vuln detection.", icon: renderMenuIcon(VoiceIdIcon) },
-                { title: "Enterprise", href: "/solutions/enterprise", description: "Governance for regulated AI teams.", icon: renderMenuIcon(House01Icon) },
-            ],
-        ],
+        columns: productMenuColumns,
+        listClassName: "md:w-[560px] md:grid-cols-2 lg:w-[780px] lg:grid-cols-3",
     };
 
     const solutionsDropdown: NavDropdown = {
@@ -342,7 +356,7 @@ export default function Navbar({
                                                 <NavigationMenuContent className="rounded-xl border-border/40 shadow-none bg-background/95 backdrop-blur-xl">
                                                     {item.type === "mega" ? (
                                                         <div className="flex flex-col">
-                                                            <ul className="grid gap-x-3 gap-y-1 p-2.5 md:w-[400px] lg:w-[500px] lg:grid-cols-2">
+                                                            <ul className={cn("grid gap-x-3 gap-y-1 p-2.5 md:w-[400px] lg:w-[500px] lg:grid-cols-2", item.listClassName)}>
                                                                 {item.columns?.map((col, colIndex) => (
                                                                     <div key={colIndex} className="space-y-0.5">
                                                                         {col.map((link, linkIndex) => (

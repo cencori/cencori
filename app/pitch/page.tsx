@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { PITCH_SLIDES as slides } from "@/lib/pitch-slides";
@@ -49,63 +47,60 @@ export default function PitchDeckPage() {
     const CurrentSlideComponent = slides[currentSlide].component;
 
     return (
-        <div className="relative min-h-[calc(100vh-3.5rem)] flex flex-col">
+        <div className="relative flex min-h-[calc(100vh-3.5rem)] flex-col bg-[#030303]">
             {/* Slide Content */}
-            <div className="flex-1 flex items-center justify-center p-6 md:p-12">
-                <div className="w-full max-w-6xl aspect-[16/9] bg-card rounded-2xl border border-border/50 shadow-2xl overflow-hidden">
+            <div className="flex flex-1 items-center justify-center px-4 py-6 md:px-8 md:py-10">
+                <div className="aspect-[32/21] w-full max-w-6xl overflow-hidden border border-white/10 bg-[#050505]">
                     <CurrentSlideComponent />
                 </div>
             </div>
 
             {/* Navigation Controls */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-card/90 backdrop-blur-md rounded-full border border-border/50 px-4 py-2 shadow-lg">
-                {/* Previous Button */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
+            <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-5 border-t border-white/10 bg-[#030303]/96 px-4 py-3 backdrop-blur-sm">
+                <button
+                    type="button"
+                    className="text-[11px] uppercase tracking-[0.24em] text-zinc-500 transition-colors hover:text-zinc-200 disabled:text-zinc-700"
                     onClick={prevSlide}
                     disabled={currentSlide === 0}
                 >
-                    <ChevronLeftIcon className="h-4 w-4" />
-                </Button>
+                    Previous
+                </button>
 
-                {/* Slide Dots */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                     {slides.map((slide, index) => (
                         <button
                             key={slide.id}
                             onClick={() => goToSlide(index)}
                             className={cn(
-                                "w-2 h-2 rounded-full transition-all",
+                                "text-[11px] uppercase tracking-[0.2em] transition-colors",
                                 index === currentSlide
-                                    ? "bg-emerald-500 w-6"
-                                    : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                                    ? "text-white"
+                                    : "text-zinc-600 hover:text-zinc-300"
                             )}
                             aria-label={`Go to slide ${index + 1}: ${slide.title}`}
-                        />
+                        >
+                            {String(index + 1).padStart(2, "0")}
+                        </button>
                     ))}
                 </div>
 
-                {/* Next Button */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
+                <button
+                    type="button"
+                    className="text-[11px] uppercase tracking-[0.24em] text-zinc-500 transition-colors hover:text-zinc-200 disabled:text-zinc-700"
                     onClick={nextSlide}
                     disabled={currentSlide === slides.length - 1}
                 >
-                    <ChevronRightIcon className="h-4 w-4" />
-                </Button>
+                    Next
+                </button>
             </div>
 
             {/* Slide Counter */}
-            <div className="fixed bottom-6 right-6 text-xs text-muted-foreground">
-                {currentSlide + 1} / {slides.length}
+            <div className="fixed bottom-6 right-6 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+                {String(currentSlide + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
             </div>
 
             {/* Keyboard Hint */}
-            <div className="fixed bottom-6 left-6 text-xs text-muted-foreground hidden md:block">
+            <div className="fixed bottom-6 left-6 hidden text-[11px] uppercase tracking-[0.24em] text-zinc-500 md:block">
                 Use ← → or Space to navigate
             </div>
         </div>

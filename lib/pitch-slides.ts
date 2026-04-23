@@ -1,25 +1,31 @@
+import { MomentSlide } from "@/components/pitch/MomentSlide";
 import { TitleSlide } from "@/components/pitch/TitleSlide";
 import { ProblemSlide } from "@/components/pitch/ProblemSlide";
+import { MarketSlide } from "@/components/pitch/MarketSlide";
 import { SolutionSlide } from "@/components/pitch/SolutionSlide";
 import { ProductSlide } from "@/components/pitch/ProductSlide";
-import { MarketSlide } from "@/components/pitch/MarketSlide";
-import { CompetitiveSlide } from "@/components/pitch/CompetitiveSlide";
-import { HowItWorksSlide } from "@/components/pitch/HowItWorksSlide";
 import { BusinessModelSlide } from "@/components/pitch/BusinessModelSlide";
 import { TractionSlide } from "@/components/pitch/TractionSlide";
+import { FinancialsSlide } from "@/components/pitch/FinancialsSlide";
+import { CompetitiveSlide } from "@/components/pitch/CompetitiveSlide";
+import { VisionSlide } from "@/components/pitch/VisionSlide";
 import { TeamSlide } from "@/components/pitch/TeamSlide";
 import { AskSlide } from "@/components/pitch/AskSlide";
+import { ClosingSlide } from "@/components/pitch/ClosingSlide";
 
 export const PITCH_SLIDES = [
-    { id: 1, component: TitleSlide, title: "Title" },
-    { id: 2, component: ProblemSlide, title: "Problem" },
-    { id: 3, component: SolutionSlide, title: "Solution" },
-    { id: 4, component: ProductSlide, title: "Product" },
-    { id: 5, component: MarketSlide, title: "Market" },
-    { id: 6, component: CompetitiveSlide, title: "Competition" },
-    { id: 7, component: HowItWorksSlide, title: "How It Works" },
+    { id: 1, component: TitleSlide, title: "Cover" },
+    { id: 2, component: MomentSlide, title: "The Moment" },
+    { id: 3, component: ProblemSlide, title: "Problem" },
+    { id: 4, component: MarketSlide, title: "Market" },
+    { id: 5, component: SolutionSlide, title: "Solution" },
+    { id: 6, component: ProductSlide, title: "Product" },
+    { id: 7, component: TractionSlide, title: "Traction" },
     { id: 8, component: BusinessModelSlide, title: "Business Model" },
-    { id: 9, component: TractionSlide, title: "Traction" },
-    { id: 10, component: TeamSlide, title: "Team" },
-    { id: 11, component: AskSlide, title: "Ask" },
+    { id: 9, component: FinancialsSlide, title: "Financial Projections" },
+    { id: 10, component: CompetitiveSlide, title: "Competition" },
+    { id: 11, component: VisionSlide, title: "Vision" },
+    { id: 12, component: TeamSlide, title: "Team" },
+    { id: 13, component: AskSlide, title: "Ask" },
+    { id: 14, component: ClosingSlide, title: "Closing" },
 ];

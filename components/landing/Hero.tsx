@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HeroProps {
@@ -8,42 +9,39 @@ interface HeroProps {
 
 export const Hero = ({ isAuthenticated = false }: HeroProps) => {
     return (
-        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
-            {/* Background Effects */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
+        <section className="bg-background pt-28 sm:pt-40 pb-16 sm:pb-20">
+            <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <div className="mx-auto flex max-w-4xl flex-col items-center pt-2 text-center">
+                        <Link
+                            href="/blog/introducing-cencori"
+                            className="group mb-8 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground animate-appear"
+                        >
+                            <span>Introducing AI Gateway</span>
+                            <ArrowRight className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                        </Link>
 
-            <div className="container relative z-10 px-4 md:px-6 flex flex-col items-center text-center">
+                        <h1 className="mb-8 max-w-3xl text-[2.75rem] font-semibold leading-[1.03] tracking-[-0.04em] animate-appear sm:text-[3.5rem] lg:text-[4.25rem]">
+                            The backbone of
+                            <br />
+                            <span className="text-muted-foreground">Intelligence.</span>
+                        </h1>
 
-                {/* Announcement Badge */}
-                <div className="mb-8 animate-appear">
-                    <Link href="/login" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                        <span className="mr-2">Try AI Gateway for free.</span>
-                    </Link>
-                </div>
+                        <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
+                            The Infrastructure the next generation of intelligent products is built on. Everything you need to build intelligent products, in one place.
+                        </p>
 
-                {/* Headline */}
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-                    Every AI request, under your control.
-                </h1>
-
-                {/* Subheadline */}
-                <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
-                    The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.
-                </p>
-
-                {/* CTAs */}
-                <div className="flex flex-row gap-3 animate-appear [animation-delay:300ms]">
-                    <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
-                        <Button size="default" className="h-8 px-4 text-xs font-medium rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                            {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
-                        </Button>
-                    </Link>
-                    <Link href="/docs">
-                        <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                            Documentation
-                        </Button>
-                    </Link>
+                        <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
+                            <Link href={isAuthenticated ? "/dashboard/organizations" : "/login"}>
+                                <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
+                                    {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
+                                </Button>
+                            </Link>
+                            <Link href="/contact/sales">
+                                <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
+                                    Book a Demo
+                                </Button>
+                            </Link>
+                        </div>
                 </div>
             </div>
         </section>

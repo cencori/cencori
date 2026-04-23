@@ -1,165 +1,103 @@
 import React from "react";
 import Image from "next/image";
-import { GlobeAltIcon } from "@heroicons/react/24/outline";
+import { PitchHeader, PitchMeta, PitchQuote, PitchSlide } from "./PitchPrimitives";
 
-// LinkedIn icon from devicon
-function LinkedInIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 128 128"
-            className={className}
-            fill="currentColor"
-        >
-            <path d="M116 3H12a8.91 8.91 0 00-9 8.8v104.42a8.91 8.91 0 009 8.78h104a8.93 8.93 0 009-8.81V11.77A8.93 8.93 0 00116 3zM39.17 107H21.06V48.73h18.11zm-9-66.21a10.5 10.5 0 1110.49-10.5 10.5 10.5 0 01-10.54 10.48zM107 107H88.89V78.65c0-6.75-.12-15.44-9.41-15.44s-10.87 7.36-10.87 15V107H50.53V48.73h17.36v8h.24c2.42-4.58 8.32-9.41 17.13-9.41C103.6 47.28 107 59.35 107 75z" />
-        </svg>
-    );
-}
-
-// X (Twitter) icon from devicon
-function XIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 128 128"
-            className={className}
-            fill="currentColor"
-        >
-            <path d="M75.916 54.2L122.542 0h-11.05L71.008 47.06L38.672 0H1.376l48.898 71.164L1.376 128h11.05L55.18 78.303L89.328 128h37.296L75.913 54.2ZM60.782 71.79l-4.955-7.086l-39.42-56.386h16.972l31.801 45.477l4.954 7.085l41.353 59.15h-16.97L60.782 71.793Z" />
-        </svg>
-    );
-}
-
-const team = [
+const founders = [
     {
         name: "Bola Banjo",
-        role: "Co-Founder & CEO",
-        bio: "Technical founder with deep expertise in AI/ML infrastructure. Passionate about developer experience and building tools that scale.",
+        role: "CEO & Co-founder",
+        bio: "22 years old. BSc Mechanical Engineering. Built Cencori from zero to a live infrastructure platform with real users and shipped features.",
+        note: "Previously worked on energy tech that drew interest from professors and researchers at Harvard and MIT.",
         avatar: "/roy.png",
-        links: {
-            linkedin: "https://linkedin.com/in/bolaabanjo",
-            twitter: "https://twitter.com/bolaabanjo",
-        },
     },
     {
-        name: "Daniel Oreofe",
-        role: "Co-Founder & COO",
-        bio: "Operations leader scaling startups from 0 to 1. Expert in go-to-market strategy and building high-performing teams.",
+        name: "Oreofe Ojurereoluwa Daniel",
+        role: "COO & Co-founder",
+        bio: "Leads operations, execution, and business infrastructure. Focused on turning product velocity into repeatable company-building systems.",
+        note: "Owns the execution layer that turns product momentum into an investable operating company.",
         avatar: "/daniel-avatar.png",
-        links: {
-            linkedin: "https://linkedin.com/in/TheDanielOreofe",
-            twitter: "https://twitter.com/TheDanielOreofe",
-        },
     },
 ];
 
-const highlights = [
-    "Entire platform built and shipped in 3 months",
-    "180+ users acquired with zero marketing spend",
-    "3 SDKs (TypeScript, Python, Go) published",
-    "14+ AI providers integrated and production-ready",
+const needs = [
+    "Two senior engineers",
+    "One go-to-market lead",
+    "The exact hires that take Cencori to Series A",
 ];
 
 export function TeamSlide() {
     return (
-        <div className="h-full flex flex-col p-8 md:p-12">
-            {/* Header */}
-            <div className="mb-6">
-                <span className="text-xs font-medium text-emerald-500 uppercase tracking-wider">
-                    The Team
-                </span>
-                <h2 className="text-2xl md:text-4xl font-bold mt-2">
-                    Built by developers,{" "}
-                    <span className="text-muted-foreground">for developers.</span>
-                </h2>
-            </div>
+        <PitchSlide>
+            <PitchHeader
+                eyebrow="Team"
+                title="Lean by design, clear-eyed about what the next phase requires."
+                subtitle="Founding team in place. Next hires clearly defined."
+            />
 
-            {/* Team Grid */}
-            <div className="flex-1 grid grid-cols-2 gap-6">
-                {/* Founders Section */}
-                <div className="space-y-4">
-                    {team.map((member, index) => (
-                        <div
-                            key={index}
-                            className="p-5 rounded-xl border border-border/50 bg-card"
-                        >
+            <div className="grid flex-1 gap-8 md:grid-cols-[1.05fr_0.95fr]">
+                <div className="grid gap-6 md:grid-cols-2">
+                    {founders.map((founder, index) => (
+                        <article key={founder.name} className="border-t border-white/10 pt-4">
                             <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 rounded-xl overflow-hidden border border-border/50 shrink-0">
+                                <div className="h-20 w-20 overflow-hidden border border-white/10">
                                     <Image
-                                        src={member.avatar}
-                                        alt={member.name}
-                                        width={64}
-                                        height={64}
-                                        className="w-full h-full object-cover"
+                                        src={founder.avatar}
+                                        alt={founder.name}
+                                        width={80}
+                                        height={80}
+                                        className="h-full w-full object-cover"
                                         unoptimized
                                     />
                                 </div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-lg">{member.name}</h3>
-                                    <p className="text-sm text-emerald-500">{member.role}</p>
-                                    <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                                        {member.bio}
+                                <div className="min-w-0">
+                                    <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                                        Founder 0{index + 1}
                                     </p>
-                                    <div className="flex items-center gap-2 mt-3">
-                                        {member.links.linkedin && (
-                                            <a
-                                                href={member.links.linkedin}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
-                                            >
-                                                <LinkedInIcon className="h-3.5 w-3.5" />
-                                            </a>
-                                        )}
-                                        {member.links.twitter && (
-                                            <a
-                                                href={member.links.twitter}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
-                                            >
-                                                <XIcon className="h-3.5 w-3.5" />
-                                            </a>
-                                        )}
-                                    </div>
+                                    <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                                        {founder.name}
+                                    </h3>
+                                    <p className="mt-1 text-sm text-zinc-300">{founder.role}</p>
                                 </div>
                             </div>
-                        </div>
+
+                            <p className="mt-4 text-[13px] leading-6 text-zinc-400">
+                                {founder.bio}
+                            </p>
+                            <p className="mt-3 text-[12px] leading-5 text-zinc-500">
+                                {founder.note}
+                            </p>
+                        </article>
                     ))}
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-4">
-                    {/* Highlights */}
-                    <div className="p-4 rounded-xl border border-border/50 bg-card">
-                        <h3 className="text-sm font-medium mb-3">Team Highlights</h3>
-                        <ul className="space-y-2">
-                            {highlights.map((highlight, index) => (
-                                <li
-                                    key={index}
-                                    className="flex items-start gap-2 text-xs text-muted-foreground"
-                                >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                    {highlight}
-                                </li>
+                <div className="flex flex-col justify-between">
+                    <div className="border-t border-white/10 pt-4">
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                            What we know we need
+                        </p>
+                        <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-200">
+                            {needs.map((need) => (
+                                <li key={need}>{need}</li>
                             ))}
                         </ul>
                     </div>
 
-                    {/* Company Info */}
-                    <div className="p-4 rounded-xl border border-border/50 bg-card">
-                        <h3 className="text-sm font-medium mb-3">Company</h3>
-                        <div className="space-y-2 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                                <GlobeAltIcon className="h-3 w-3" />
-                                <span>FohnAI Inc. • Delaware C-Corp</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground/50">📍</span>
-                                <span>Remote-first • Global team</span>
-                            </div>
-                        </div>
+                    <div className="border-t border-white/10 pt-4">
+                        <PitchMeta
+                            label="Operating principle"
+                            value="We are not pretending the team is complete."
+                        />
+                        <p className="mt-3 text-sm leading-6 text-zinc-500">
+                            The capital goes directly into the people and systems required
+                            to become a Series A company.
+                        </p>
                     </div>
+
+                    <PitchQuote>
+                        Cencori is intelligence infrastructure from Africa, for the world.
+                    </PitchQuote>
                 </div>
             </div>
-        </div>
+        </PitchSlide>
     );
 }
