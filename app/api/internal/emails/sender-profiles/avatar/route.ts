@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
+import { ensureStorageBucket } from '@/lib/storage-buckets';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -40,6 +41,17 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
+    const bucketError = await ensureStorageBucket(admin, BUCKET, {
+        public: true,
+        fileSizeLimit: MAX_FILE_SIZE,
+        allowedMimeTypes: ALLOWED_TYPES,
+    });
+
+    if (bucketError) {
+        console.error('[Avatar Upload] Bucket error:', bucketError);
+        return NextResponse.json({ error: bucketError }, { status: 500 });
+    }
+
     // Verify the profile exists
     const { data: profile } = await admin
         .from('email_sender_profiles')
@@ -65,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
         console.error('[Avatar Upload] Storage error:', uploadError);
-        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+        return NextResponse.json({ error: uploadError.message || 'Failed to upload file' }, { status: 500 });
     }
 
     // Get public URL

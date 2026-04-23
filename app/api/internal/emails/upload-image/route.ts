@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
+import { ensureStorageBucket } from '@/lib/storage-buckets';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -37,7 +38,17 @@ export async function POST(req: NextRequest) {
 
         const admin = createAdminClient();
 
-        // Ensure bucket exists or bypass if public
+        const bucketError = await ensureStorageBucket(admin, BUCKET, {
+            public: true,
+            fileSizeLimit: MAX_FILE_SIZE,
+            allowedMimeTypes: ALLOWED_TYPES,
+        });
+
+        if (bucketError) {
+            console.error('[Email Image Upload] Bucket error:', bucketError);
+            return NextResponse.json({ error: bucketError }, { status: 500 });
+        }
+
         // Create a unique filename
         const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
         const timestamp = Date.now();
@@ -56,7 +67,7 @@ export async function POST(req: NextRequest) {
 
         if (uploadError) {
             console.error('[Email Image Upload] Storage error:', uploadError);
-            return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+            return NextResponse.json({ error: uploadError.message || 'Failed to upload image' }, { status: 500 });
         }
 
         const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(filePath);
