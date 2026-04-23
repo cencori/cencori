@@ -10,7 +10,6 @@ import { toast } from "sonner";
 const footerProductLinks = [
     { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
     { title: "Models", href: siteConfig.links.products.models },
-    { title: "AI Security", href: siteConfig.links.products.ai },
     { title: "Compute", href: siteConfig.links.products.compute },
     { title: "Integrations", href: siteConfig.links.products.integrations },
     { title: "Workflow", href: siteConfig.links.products.workflow },

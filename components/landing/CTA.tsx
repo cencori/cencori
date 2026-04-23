@@ -27,7 +27,7 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
                             </Link>
                             <Link href="/docs">
                                 <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                                    View Documentation
+                                    Documentation
                                 </Button>
                             </Link>
                         </div>

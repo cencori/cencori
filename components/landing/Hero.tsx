@@ -21,7 +21,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                         </Link>
 
                         <h1 className="mb-8 max-w-3xl text-[2.75rem] font-semibold leading-[1.03] tracking-[-0.04em] animate-appear sm:text-[3.5rem] lg:text-[4.25rem]">
-                            The backbone of
+                            The Backbone of
                             <br />
                             <span className="text-muted-foreground">Intelligence.</span>
                         </h1>
