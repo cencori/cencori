@@ -24,7 +24,7 @@ export function ClosingSlide() {
                 title="Every era of computing creates one infrastructure company that becomes indispensable."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid flex-1 gap-2 md:grid-cols-[0.9fr_1.1fr]">
                 <div>
                     <PitchRuleList items={eras} />
                 </div>
@@ -34,15 +34,15 @@ export function ClosingSlide() {
                         The intelligence era is going to be Cencori.
                     </PitchQuote>
 
-                    <div className="border-t border-white/10 pt-4">
-                        <p className="text-sm leading-6 text-zinc-500 md:text-[15px]">
+                    <div className="pt-2">
+                        <p className="text-[10px] leading-6 text-muted-foreground md:text-[15px]">
                             The infrastructure that powers the next generation of
                             intelligent products, software, hardware, robotics, and
                             frontier models has not been built. Cencori is building it.
                         </p>
                     </div>
 
-                    <div className="grid gap-4 border-t border-white/10 pt-4 md:grid-cols-2">
+                    <div className="grid gap-2 pt-2 md:grid-cols-2">
                         <PitchMeta label="Contact" value="Bola Banjo — bola@cencori.com" />
                         <PitchMeta label="Website" value="cencori.com" />
                     </div>

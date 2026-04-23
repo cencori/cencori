@@ -13,7 +13,7 @@ const developerView = [
     "A dashboard showing every request, every cost, every user",
     "Rate plans they can configure for their own customers",
     "Billing that collects revenue automatically on their behalf",
-    "Usage analytics that show exactly what their AI product costs",
+    "Usage analytics that tell them exactly what their AI product costs",
 ];
 
 export function ProductSlide() {
@@ -25,14 +25,14 @@ export function ProductSlide() {
                 subtitle="The gateway is in production, billing is shipped, the dashboard is live, and the documentation is live."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid flex-1 gap-2 md:grid-cols-[0.9fr_1.1fr]">
                 <div className="flex flex-col justify-between">
                     <PitchRuleList items={proof} />
                     <PitchQuote>Teams are building on the platform today.</PitchQuote>
                 </div>
 
                 <div>
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
                         What a developer sees
                     </p>
                     <PitchRuleList

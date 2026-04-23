@@ -1,28 +1,29 @@
 import React from "react";
 import Image from "next/image";
-import { PitchHeader, PitchMeta, PitchQuote, PitchSlide } from "./PitchPrimitives";
+import { PitchHeader, PitchMeta, PitchQuote, PitchSlide, PitchTable } from "./PitchPrimitives";
 
 const founders = [
     {
-        name: "Bola Banjo",
-        role: "CEO & Co-founder",
-        bio: "22 years old. BSc Mechanical Engineering. Built Cencori from zero to a live infrastructure platform with real users and shipped features.",
-        note: "Previously worked on energy tech that drew interest from professors and researchers at Harvard and MIT.",
+        name: "Bola Roy Banjo",
+        role: "CEO & Founder",
+        bio: "22 years old. BSc Mechanical Engineering. Built Cencori from zero to a live, working infrastructure platform. Combines engineering depth with sharp product instinct.",
+        note: "Built energy tech that drew interest from researchers at Harvard and MIT.",
         avatar: "/roy.png",
     },
     {
-        name: "Oreofe Ojurereoluwa Daniel",
+        name: "Oreofe O. Daniel",
         role: "COO & Co-founder",
-        bio: "Leads operations, execution, and business infrastructure. Focused on turning product velocity into repeatable company-building systems.",
-        note: "Owns the execution layer that turns product momentum into an investable operating company.",
+        bio: "Operations, business infrastructure, and execution lead. Focused on turning product velocity into a scalable operating company.",
+        note: "Owns the systems that power Cencori's operational efficiency.",
         avatar: "/daniel-avatar.png",
     },
 ];
 
-const needs = [
-    "Two senior engineers",
-    "One go-to-market lead",
-    "The exact hires that take Cencori to Series A",
+const hiringRoadmap = [
+    ["Senior Backend", "Q3 2026", "Infrastructure & Scaling"],
+    ["Senior Infra", "Q3 2026", "Compute Layer Buildout"],
+    ["Head of GTM", "Q4 2026", "Developer Marketing & Sales"],
+    ["Backend Int.", "Q4 2026", "Platform Reliability"],
 ];
 
 export function TeamSlide() {
@@ -31,70 +32,78 @@ export function TeamSlide() {
             <PitchHeader
                 eyebrow="Team"
                 title="Lean by design, clear-eyed about what the next phase requires."
-                subtitle="Founding team in place. Next hires clearly defined."
+                subtitle="Founding team in place. Next hires clearly defined to hit Series A milestones."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[1.05fr_0.95fr]">
-                <div className="grid gap-6 md:grid-cols-2">
-                    {founders.map((founder, index) => (
-                        <article key={founder.name} className="border-t border-white/10 pt-4">
-                            <div className="flex items-start gap-4">
-                                <div className="h-20 w-20 overflow-hidden border border-white/10">
+            <div className="grid flex-1 gap-12 md:grid-cols-[1.2fr_0.8fr]">
+                {/* Founding Team Section */}
+                <div className="flex flex-col justify-center space-y-10">
+                    <div className="grid gap-8 md:grid-cols-2">
+                        {founders.map((founder, index) => (
+                            <article key={founder.name} className="space-y-4">
+                                <div className="group relative h-48 w-full overflow-hidden bg-white/5">
                                     <Image
                                         src={founder.avatar}
                                         alt={founder.name}
-                                        width={80}
-                                        height={80}
-                                        className="h-full w-full object-cover"
+                                        fill
+                                        className="object-cover grayscale transition-all group-hover:grayscale-0"
                                         unoptimized
                                     />
+                                    <div className="absolute top-4 left-4">
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50 bg-black/40 px-2 py-1 backdrop-blur-md">
+                                            Founder 0{index + 1}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="min-w-0">
-                                    <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-                                        Founder 0{index + 1}
-                                    </p>
-                                    <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-medium text-foreground">
                                         {founder.name}
                                     </h3>
-                                    <p className="mt-1 text-sm text-zinc-300">{founder.role}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
+                                        {founder.role}
+                                    </p>
+                                    <p className="text-sm leading-relaxed text-muted-foreground/90">
+                                        {founder.bio}
+                                    </p>
+                                    {founder.note && (
+                                        <p className="text-xs italic text-muted-foreground/60 border-l border-white/10 pl-3 py-1">
+                                            {founder.note}
+                                        </p>
+                                    )}
                                 </div>
-                            </div>
-
-                            <p className="mt-4 text-[13px] leading-6 text-zinc-400">
-                                {founder.bio}
-                            </p>
-                            <p className="mt-3 text-[12px] leading-5 text-zinc-500">
-                                {founder.note}
-                            </p>
-                        </article>
-                    ))}
+                            </article>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="flex flex-col justify-between">
-                    <div className="border-t border-white/10 pt-4">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-                            What we know we need
-                        </p>
-                        <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-200">
-                            {needs.map((need) => (
-                                <li key={need}>{need}</li>
-                            ))}
-                        </ul>
-                    </div>
+                {/* Scaling Strategy Section */}
+                <div className="flex flex-col justify-between py-4">
+                    <div className="space-y-10">
+                        <div className="space-y-6">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
+                                Hiring Roadmap • Next 12 Months
+                            </p>
+                            <PitchTable 
+                                headers={["Role", "Timing", "Ownership"]}
+                                rows={hiringRoadmap}
+                            />
+                        </div>
 
-                    <div className="border-t border-white/10 pt-4">
-                        <PitchMeta
-                            label="Operating principle"
-                            value="We are not pretending the team is complete."
-                        />
-                        <p className="mt-3 text-sm leading-6 text-zinc-500">
-                            The capital goes directly into the people and systems required
-                            to become a Series A company.
-                        </p>
+                        <div className="space-y-4 bg-white/5 p-6 border-l-2 border-white/20">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
+                                Operating Principle
+                            </p>
+                            <p className="text-lg font-medium text-foreground leading-snug">
+                                "We know exactly where the team is lean and we are not pretending otherwise."
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                This raise funds the specific engineering and GTM talent required to reach $4M ARR and Series A readiness.
+                            </p>
+                        </div>
                     </div>
 
                     <PitchQuote>
-                        Cencori is intelligence infrastructure from Africa, for the world.
+                        The capital goes directly into the people and systems required to become a Series A company.
                     </PitchQuote>
                 </div>
             </div>

@@ -1,31 +1,24 @@
 import React from "react";
-import { PitchHeader, PitchQuote, PitchRuleList, PitchSlide } from "./PitchPrimitives";
+import { PitchHeader, PitchQuote, PitchSlide, PitchTable } from "./PitchPrimitives";
 
 const streams = [
     {
-        title: "Compute",
-        description: "GPU compute billed per usage for training, fine-tuning, and inference.",
-        points: [
-            "Core revenue engine as customers scale",
-            "Target gross margin: 45-60%",
-            "AWS-style infrastructure compounding",
-        ],
+        stream: "Compute",
+        model: "Usage-based (GPU)",
+        margin: "45-60%",
+        focus: "AWS-style compounding revenue engine",
     },
     {
-        title: "Platform subscription",
-        description:
-            "Tiered plans for gateway, memory, workflow, integrations, and billing.",
-        points: ["Starter: $49/month", "Growth: $299/month", "Target gross margin: 80%+"],
+        stream: "Platform Subscription",
+        model: "Tiered SaaS ($49 - $299+)",
+        margin: "80%+",
+        focus: "Access to integrated gateway & tools",
     },
     {
-        title: "End-user billing revenue share",
-        description:
-            "A percentage of the revenue our customers collect from their own users.",
-        points: [
-            "Take rate target: 0.5-1.5%",
-            "When customers make money, we make money",
-            "No direct competitor has this layer",
-        ],
+        stream: "End-User Billing Share",
+        model: "Rev Share (0.5 - 1.5%)",
+        margin: "100%",
+        focus: "Aligned growth as customers monetize",
     },
 ];
 
@@ -35,31 +28,23 @@ export function BusinessModelSlide() {
             <PitchHeader
                 eyebrow="Business model"
                 title="Three revenue streams that compound automatically as customers grow."
+                subtitle="High-margin infrastructure revenue combined with usage scaling and ecosystem monetization."
             />
 
-            <div className="grid flex-1 gap-6 md:grid-cols-3">
-                {streams.map((stream, index) => (
-                    <section
-                        key={stream.title}
-                        className={index < streams.length - 1 ? "md:pr-4 md:border-r md:border-white/10" : ""}
-                    >
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-                            Stream 0{index + 1}
-                        </p>
-                        <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
-                            {stream.title}
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-zinc-500">
-                            {stream.description}
-                        </p>
-                        <PitchRuleList items={stream.points} className="mt-4" />
-                    </section>
-                ))}
+            <div className="flex flex-1 flex-col justify-center">
+                <PitchTable 
+                    headers={["Stream", "Pricing Model", "Target Margin", "Strategic Value"]}
+                    rows={streams.map(s => [
+                        <span key={s.stream} className="font-semibold">{s.stream}</span>,
+                        s.model,
+                        <span key={s.stream + "m"} className="text-foreground">{s.margin}</span>,
+                        <span key={s.stream + "v"} className="text-muted-foreground/70">{s.focus}</span>
+                    ])}
+                />
             </div>
 
             <PitchQuote>
-                Customers start on subscription, grow into compute, and then monetize
-                their own users through Cencori.
+                Customers start on subscription, scale via compute, and compound our growth as they monetize their own users through Cencori.
             </PitchQuote>
         </PitchSlide>
     );

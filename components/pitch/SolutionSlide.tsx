@@ -43,15 +43,15 @@ export function SolutionSlide() {
                 subtitle="One platform. Every layer. From model to production."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[1.05fr_0.95fr]">
-                <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid flex-1 gap-2 md:grid-cols-[1.05fr_0.95fr]">
+                <div className="grid gap-3 md:grid-cols-2">
                     <PitchRuleList items={features.slice(0, 3)} numbered />
-                    <PitchRuleList items={features.slice(3)} numbered className="md:border-t-0" />
+                    <PitchRuleList items={features.slice(3)} numbered className="md:" />
                 </div>
 
-                <div className="flex flex-col justify-between border-t border-white/10 pt-3">
-                    <div className="space-y-4">
-                        <p className="text-sm leading-6 text-zinc-500">
+                <div className="flex flex-col justify-between pt-1">
+                    <div className="space-y-2">
+                        <p className="text-[10px] leading-6 text-muted-foreground">
                             A team can go from zero to a production-grade AI product with
                             billing, compute, memory, and deployment without stitching
                             together ten vendors.

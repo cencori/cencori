@@ -1,5 +1,5 @@
 import React from "react";
-import { PitchHeader, PitchQuote, PitchSlide } from "./PitchPrimitives";
+import { PitchHeader, PitchQuote, PitchSlide, PitchTable } from "./PitchPrimitives";
 
 const years = [
     {
@@ -7,36 +7,24 @@ const years = [
         phase: "Foundation",
         revenue: "$222K",
         burn: "$420K",
-        outcome: "~$2.4M cash remaining",
-        targets: [
-            "50 paying teams on subscription",
-            "10 teams actively using compute",
-            "5 teams generating billing volume",
-        ],
+        outcome: "~$2.4M cash left",
+        targets: ["50 paying teams", "10 teams on compute", "5 teams on billing"],
     },
     {
         year: "2027",
         phase: "Traction",
         revenue: "$1.7M",
         burn: "$1.0M",
-        outcome: "$700K positive net",
-        targets: [
-            "200 paying teams",
-            "60 teams on compute",
-            "30 teams with billing volume",
-        ],
+        outcome: "+$700K Net",
+        targets: ["200 paying teams", "60 teams on compute", "30 teams on billing"],
     },
     {
         year: "2028",
         phase: "Scale",
         revenue: "$7.4M",
         burn: "$2.3M",
-        outcome: "$5.1M positive net",
-        targets: [
-            "600 paying teams",
-            "200 teams on compute",
-            "100 teams generating billing volume",
-        ],
+        outcome: "+$5.1M Net",
+        targets: ["600 paying teams", "200 teams on compute", "100 teams on billing"],
     },
 ];
 
@@ -48,6 +36,20 @@ const assumptions = [
 ];
 
 export function FinancialsSlide() {
+    const headers = ["Metric", ...years.map(y => y.year)];
+    
+    const rows = [
+        ["Phase", ...years.map(y => y.phase)],
+        ["Revenue", ...years.map(y => <span key={y.year} className="text-foreground font-semibold">{y.revenue}</span>)],
+        ["Burn", ...years.map(y => y.burn)],
+        ["Outcome", ...years.map(y => <span key={y.year} className="text-foreground italic">{y.outcome}</span>)],
+        ["Targets", ...years.map(y => (
+            <ul key={y.year} className="space-y-1 text-xs opacity-70">
+                {y.targets.map(t => <li key={t}>• {t}</li>)}
+            </ul>
+        ))],
+    ];
+
     return (
         <PitchSlide>
             <PitchHeader
@@ -57,93 +59,33 @@ export function FinancialsSlide() {
             />
 
             <div className="flex flex-1 flex-col justify-between">
-                <div className="overflow-hidden border-t border-white/10 pt-4">
-                    <table className="w-full table-fixed border-collapse">
-                        <thead>
-                            <tr className="border-b border-white/10 text-left text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-                                <th className="pb-3 pr-3 font-medium">Metric</th>
-                                {years.map((year) => (
-                                    <th key={year.year} className="pb-3 pr-3 font-medium">
-                                        {year.year}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="align-top">
-                            <tr className="border-b border-white/10">
-                                <td className="py-3 pr-3 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                                    Phase
-                                </td>
-                                {years.map((year) => (
-                                    <td key={year.year} className="py-3 pr-3 text-sm font-medium text-white">
-                                        {year.phase}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="border-b border-white/10">
-                                <td className="py-3 pr-3 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                                    Revenue
-                                </td>
-                                {years.map((year) => (
-                                    <td key={year.year} className="py-3 pr-3 text-lg font-semibold tracking-[-0.03em] text-white">
-                                        {year.revenue}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="border-b border-white/10">
-                                <td className="py-3 pr-3 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                                    Burn
-                                </td>
-                                {years.map((year) => (
-                                    <td key={year.year} className="py-3 pr-3 text-lg font-semibold tracking-[-0.03em] text-white">
-                                        {year.burn}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="border-b border-white/10">
-                                <td className="py-3 pr-3 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                                    Outcome
-                                </td>
-                                {years.map((year) => (
-                                    <td key={year.year} className="py-3 pr-3 text-[13px] leading-5 text-zinc-200">
-                                        {year.outcome}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr>
-                                <td className="py-3 pr-3 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                                    Targets
-                                </td>
-                                {years.map((year) => (
-                                    <td key={year.year} className="py-3 pr-3">
-                                        <ul className="space-y-1 text-[11px] leading-4 text-zinc-500">
-                                            {year.targets.map((target) => (
-                                                <li key={target}>{target}</li>
-                                            ))}
-                                        </ul>
-                                    </td>
-                                ))}
-                            </tr>
-                        </tbody>
-                    </table>
+                <div className="pt-2">
+                    <PitchTable 
+                        headers={headers}
+                        rows={rows}
+                    />
                 </div>
 
-                <div className="grid gap-8 border-t border-white/10 pt-4 md:grid-cols-[1fr_0.9fr]">
+                <div className="grid gap-8 pt-6 md:grid-cols-[1fr_1.2fr]">
                     <div>
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/80">
                             Key assumptions
                         </p>
-                        <ul className="mt-3 space-y-1.5 text-[11px] leading-4 text-zinc-500">
+                        <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                             {assumptions.map((assumption) => (
-                                <li key={assumption}>{assumption}</li>
+                                <li key={assumption} className="flex gap-2">
+                                    <span className="text-foreground/40">•</span>
+                                    {assumption}
+                                </li>
                             ))}
                         </ul>
                     </div>
 
-                    <PitchQuote className="border-t-0 pt-0">
-                        At $3-4M ARR with strong compute growth, projected around
-                        mid-2028, Cencori raises a $20-30M Series A.
-                    </PitchQuote>
+                    <div className="flex flex-col justify-end">
+                        <PitchQuote>
+                            At $3-4M ARR with strong compute revenue growth — projected mid-Year 3 — Cencori raises a Series A to accelerate compute infrastructure buildout, Africa expansion, and the hardware roadmap. Series A target: $20-30M.
+                        </PitchQuote>
+                    </div>
                 </div>
             </div>
         </PitchSlide>
