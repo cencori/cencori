@@ -483,11 +483,18 @@ export default function Navbar({
                                     </DropdownMenu>
                                 );
                             } else if (action.isButton) {
+                                const isOutlinedAction = action.variant === "outline";
+
                                 return (
                                     <Button
                                         key={index}
-                                        variant="default"
-                                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 h-7 px-3 text-[11px] font-medium"
+                                        variant={isOutlinedAction ? "outline" : "default"}
+                                        className={cn(
+                                            "h-7 px-3 text-[11px] font-medium",
+                                            isOutlinedAction
+                                                ? "rounded-md border-foreground/20 bg-transparent text-foreground/90 hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground"
+                                                : "rounded-md bg-foreground text-background hover:bg-foreground/90"
+                                        )}
                                         asChild
                                     >
                                         <Link href={action.href}>
@@ -499,8 +506,8 @@ export default function Navbar({
                                 return (
                                     <Button
                                         key={index}
-                                        variant="ghost"
-                                        className="hidden md:inline-flex h-7 px-2.5 text-[11px] font-medium rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground mr-1"
+                                        variant="outline"
+                                        className="mr-1 hidden h-7 rounded-md border-foreground/20 bg-transparent px-3 text-[11px] font-medium text-foreground/90 hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground md:inline-flex"
                                         asChild
                                     >
                                         <Link href={action.href}>
