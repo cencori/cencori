@@ -1,23 +1,30 @@
 import React from "react";
-import { PitchHeader, PitchNumber, PitchRuleList, PitchSlide } from "./PitchPrimitives";
+import { PitchHeader, PitchNumber, PitchSlide, PitchTable } from "./PitchPrimitives";
 
 const segments = [
     {
-        title: "Global AI infrastructure",
-        description: "$67B in 2024, projected to reach $530B by 2030 at 40% CAGR.",
+        segment: "Global AI Infrastructure",
+        size: "$67B",
+        projected: "$530B",
+        growth: "40% CAGR",
     },
     {
-        title: "AI compute spend",
-        description:
-            "NVIDIA posted $47B in data center revenue in 2024, up 217% year over year.",
+        segment: "AI Compute Spend",
+        size: "$47B",
+        projected: "---",
+        growth: "217% YoY",
     },
     {
-        title: "Developer platforms",
-        description: "$12B today, growing to $45B by 2029.",
+        segment: "Developer Platforms",
+        size: "$12B",
+        projected: "$45B",
+        growth: "28% CAGR",
     },
     {
-        title: "AI billing infrastructure",
-        description: "$8B by 2028, with no category owner yet.",
+        segment: "AI Billing & Monetization",
+        size: "Nascent",
+        projected: "$8B",
+        growth: "Emerging",
     },
 ];
 
@@ -27,30 +34,40 @@ export function MarketSlide() {
             <PitchHeader
                 eyebrow="Market"
                 title="This is not a market. It is a category being created in real time."
+                subtitle="The infrastructure spend is shifting from general cloud to intelligence infrastructure."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[1fr_0.9fr]">
-                <section>
-                    <PitchRuleList items={segments} />
-                </section>
+            <div className="grid flex-1 gap-8 md:grid-cols-[1.3fr_0.7fr]">
+                <div className="flex flex-col justify-center">
+                    <PitchTable 
+                        headers={["Segment", "2024 Size", "2030 Proj", "Growth"]}
+                        rows={segments.map(s => [
+                            s.segment,
+                            s.size,
+                            s.projected,
+                            <span key={s.segment} className="text-foreground font-semibold">{s.growth}</span>
+                        ])}
+                    />
+                </div>
 
-                <div className="flex flex-col justify-between">
-                    <div className="grid gap-5 md:grid-cols-3">
-                        <PitchNumber label="TAM" value="$200B+" />
-                        <PitchNumber label="SAM (3 years)" value="$4.2B" />
-                        <PitchNumber label="Initial target" value="$420M" />
-                    </div>
+                <div className="flex flex-col justify-between py-6">
+                    <div className="space-y-12">
+                        <div className="grid gap-6">
+                            <PitchNumber label="TAM" value="$200B+" />
+                            <PitchNumber label="SAM (3 years)" value="$4.2B" />
+                            <PitchNumber label="Initial target" value="$420M" />
+                        </div>
 
-                    <div className="border-t border-white/10 pt-4">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-                            Africa opportunity
-                        </p>
-                        <p className="mt-3 text-sm leading-6 text-zinc-200 md:text-[15px]">
-                            Africa has 1.4 billion people, the youngest population in the
-                            world, and one of the fastest-growing developer ecosystems.
-                            Cencori is the first intelligence infrastructure company built
-                            from Africa for the world.
-                        </p>
+                        <div className="space-y-4">
+                            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground/80">
+                                Africa Opportunity
+                            </p>
+                            <p className="text-base leading-relaxed text-muted-foreground">
+                                Cencori is the first intelligence infrastructure company built
+                                from Africa for the world. A first-mover position in a
+                                continent-scale market everyone else is ignoring.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>

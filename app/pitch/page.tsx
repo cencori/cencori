@@ -47,19 +47,19 @@ export default function PitchDeckPage() {
     const CurrentSlideComponent = slides[currentSlide].component;
 
     return (
-        <div className="relative flex min-h-[calc(100vh-3.5rem)] flex-col bg-[#030303]">
+        <div className="relative flex min-h-[calc(100vh-3.5rem)] flex-col bg-background">
             {/* Slide Content */}
             <div className="flex flex-1 items-center justify-center px-4 py-6 md:px-8 md:py-10">
-                <div className="aspect-[32/21] w-full max-w-6xl overflow-hidden border border-white/10 bg-[#050505]">
+                <div className="aspect-[32/21] w-full max-w-6xl overflow-hidden bg-background">
                     <CurrentSlideComponent />
                 </div>
             </div>
 
             {/* Navigation Controls */}
-            <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-5 border-t border-white/10 bg-[#030303]/96 px-4 py-3 backdrop-blur-sm">
+            <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-5 bg-background/96 px-4 py-3 backdrop-blur-sm">
                 <button
                     type="button"
-                    className="text-[11px] uppercase tracking-[0.24em] text-zinc-500 transition-colors hover:text-zinc-200 disabled:text-zinc-700"
+                    className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground transition-colors hover:text-foreground disabled:text-muted-foreground"
                     onClick={prevSlide}
                     disabled={currentSlide === 0}
                 >
@@ -74,8 +74,8 @@ export default function PitchDeckPage() {
                             className={cn(
                                 "text-[11px] uppercase tracking-[0.2em] transition-colors",
                                 index === currentSlide
-                                    ? "text-white"
-                                    : "text-zinc-600 hover:text-zinc-300"
+                                    ? "text-foreground"
+                                    : "text-muted-foreground hover:text-foreground"
                             )}
                             aria-label={`Go to slide ${index + 1}: ${slide.title}`}
                         >
@@ -86,7 +86,7 @@ export default function PitchDeckPage() {
 
                 <button
                     type="button"
-                    className="text-[11px] uppercase tracking-[0.24em] text-zinc-500 transition-colors hover:text-zinc-200 disabled:text-zinc-700"
+                    className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground transition-colors hover:text-foreground disabled:text-muted-foreground"
                     onClick={nextSlide}
                     disabled={currentSlide === slides.length - 1}
                 >
@@ -95,12 +95,12 @@ export default function PitchDeckPage() {
             </div>
 
             {/* Slide Counter */}
-            <div className="fixed bottom-6 right-6 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+            <div className="fixed bottom-6 right-6 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
                 {String(currentSlide + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
             </div>
 
             {/* Keyboard Hint */}
-            <div className="fixed bottom-6 left-6 hidden text-[11px] uppercase tracking-[0.24em] text-zinc-500 md:block">
+            <div className="fixed bottom-6 left-6 hidden text-[11px] uppercase tracking-[0.24em] text-muted-foreground md:block">
                 Use ← → or Space to navigate
             </div>
         </div>

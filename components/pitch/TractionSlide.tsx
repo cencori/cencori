@@ -15,7 +15,7 @@ const metrics = [
     {
         label: "Enterprise pull",
         value: "In talks with UBA",
-        note: "Conversation underway with the biggest bank in Africa.",
+        note: "In talks with the biggest bank in Africa, they control billions yearly.",
     },
     {
         label: "Distribution signal",
@@ -39,36 +39,36 @@ export function TractionSlide() {
             />
 
             <div className="flex flex-1 flex-col justify-between">
-                <div className="grid gap-4 border-t border-white/10 pt-4 md:grid-cols-5">
+                <div className="grid gap-2 pt-2 md:grid-cols-5">
                     {metrics.map((metric, index) => (
                         <div
                             key={metric.label}
                             className={`py-1 ${
-                                index < metrics.length - 1 ? "md:border-r md:border-white/10 md:pr-4" : ""
+                                index < metrics.length - 1 ? "md: md: md:pr-4" : ""
                             }`}
                         >
                             <PitchMeta label={metric.label} value={metric.value} />
-                            <p className="mt-2 text-[11px] leading-4 text-zinc-500">
+                            <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
                                 {metric.note}
                             </p>
                         </div>
                     ))}
                 </div>
 
-                <div className="grid gap-8 md:grid-cols-[0.9fr_1.1fr]">
-                    <div className="border-t border-white/10 pt-4">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                <div className="grid gap-2 md:grid-cols-[0.9fr_1.1fr]">
+                    <div className="pt-2">
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
                             What this tells us
                         </p>
-                        <p className="mt-3 text-sm leading-6 text-zinc-200 md:text-[15px]">
-                            We did not build this in a vacuum. The signal from real usage,
-                            at zero marketing spend, is the most important validation point
-                            in the deck.
+                        <p className="mt-3 text-[10px] leading-6 text-muted-foreground md:text-[15px]">
+                            We did not build this in a vacuum. Real teams found Cencori,
+                            integrated it, and are using it to build real products. That signal
+                            at zero marketing budget is the most important data point in this deck.
                         </p>
                     </div>
 
                     <PitchQuote>
-                        The machine works. We just do not have the fuel yet.
+                        The machine works. We just don't have the fuel yet.
                     </PitchQuote>
                 </div>
             </div>

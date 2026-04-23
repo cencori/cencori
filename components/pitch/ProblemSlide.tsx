@@ -3,75 +3,79 @@ import {
     PitchHeader,
     PitchNumber,
     PitchQuote,
-    PitchRuleList,
     PitchSlide,
+    PitchTable,
 } from "./PitchPrimitives";
 
 const problems = [
     {
-        title: "Routing",
-        description: "Provider choice, failovers, retries, and resilience logic.",
+        layer: "Routing",
+        oldWay: "Custom logic, failovers, provider choice",
+        cencoriWay: "One unified endpoint",
     },
     {
-        title: "Rate limiting",
-        description: "Protection against abuse, spikes, and runaway usage.",
+        layer: "Billing",
+        oldWay: "Usage tracking + Stripe integration",
+        cencoriWay: "Native: Meter & charge in minutes",
     },
     {
-        title: "Cost control",
-        description: "Per-user spend visibility and budget enforcement.",
+        layer: "Cost Ctrl",
+        oldWay: "Manual tracking & budget alerts",
+        cencoriWay: "Per-user spend visibility",
     },
     {
-        title: "Billing",
-        description: "Charging customers for AI usage without custom plumbing.",
+        layer: "Compute",
+        oldWay: "GPUI Provisioning & infra management",
+        cencoriWay: "AWS-style billed per usage",
     },
     {
-        title: "Compute",
-        description: "Training, fine-tuning, and inference infrastructure.",
-    },
-    {
-        title: "Memory",
-        description: "Persistent context across sessions and workflows.",
-    },
-    {
-        title: "Deployment",
-        description: "Getting the full product stack into production safely.",
+        layer: "Memory",
+        oldWay: "Custom vector DBs & context logic",
+        cencoriWay: "Managed persistent context",
     },
 ];
 
 export function ProblemSlide() {
-    const left = problems.slice(0, 4);
-    const right = problems.slice(4);
-
     return (
         <PitchSlide>
             <PitchHeader
                 eyebrow="The problem"
-                title="Teams solve seven infrastructure problems before they write real product code."
+                title="Teams solve seven engineering problems before they write product code."
+                subtitle="The average team spends 6 to 9 months solving infrastructure before they build product."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-[1.15fr_0.85fr]">
-                <div className="grid gap-6 md:grid-cols-2">
-                    <PitchRuleList items={left} numbered />
-                    <PitchRuleList items={right} numbered className="md:border-t-0" />
+            <div className="grid flex-1 gap-8 md:grid-cols-[1.4fr_0.6fr]">
+                <div className="flex flex-col justify-center">
+                    <PitchTable 
+                        headers={["Infrastructure Layer", "Manual Effort", "Cencori Solution"]}
+                        rows={problems.map(p => [
+                            p.layer,
+                            <span key={p.layer + "a"} className="text-muted-foreground/60">{p.oldWay}</span>,
+                            <span key={p.layer + "b"} className="text-foreground font-semibold">✓ {p.cencoriWay}</span>
+                        ])}
+                    />
                 </div>
 
-                <div className="flex flex-col justify-between border-t border-white/10 pt-3">
-                    <div>
+                <div className="flex flex-col justify-between py-6">
+                    <div className="space-y-8">
                         <PitchNumber
                             label="Runway burned"
-                            value="6 to 9"
-                            note="months spent on infrastructure before the product."
+                            value="6 to 9 months"
+                            note="spent on problems that have nothing to do with their actual idea."
                         />
-                        <div className="mt-6 border-t border-white/10 pt-4">
-                            <p className="text-sm leading-6 text-zinc-500">
-                                Every layer is usually a separate tool, separate contract,
-                                separate integration, and separate engineering sprint.
+                        <div className="space-y-4">
+                            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground/80">
+                                The Fragile Stack
+                            </p>
+                            <p className="text-base leading-relaxed text-muted-foreground">
+                                Every single one of these is a separate tool, a separate
+                                contract, and a separate engineering sprint.
                             </p>
                         </div>
                     </div>
 
                     <PitchQuote>
-                        The result is a fragile stack of seven vendors that breaks every
+                        The result is a fragile stack of 7 vendors that breaks every
                         time one of them changes an API.
                     </PitchQuote>
                 </div>

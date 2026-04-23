@@ -32,7 +32,7 @@ export function VisionSlide() {
                 title="The company that owns the infrastructure layer of the AI economy owns one of the most valuable positions in technology."
             />
 
-            <div className="grid flex-1 gap-8 md:grid-cols-2">
+            <div className="grid flex-1 gap-2 md:grid-cols-2">
                 <PitchRuleList items={vision.slice(0, 2)} numbered />
                 <PitchRuleList items={vision.slice(2)} numbered />
             </div>
