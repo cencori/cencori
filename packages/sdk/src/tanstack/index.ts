@@ -87,6 +87,8 @@ export const CENCORI_CHAT_MODELS = [
     'mistral-large',
     'codestral',
     // DeepSeek
+    'deepseek-v4-pro',
+    'deepseek-v4-flash',
     'deepseek-v3.2',
     'deepseek-reasoner',
     // Groq
