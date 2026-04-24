@@ -236,7 +236,7 @@ export default function SalesContactPage() {
                                             />
                                         </div>
 
-                                        <Button type="submit" size="sm" className="h-7 w-full px-3 text-xs" disabled={isSubmitting}>
+                                        <Button type="submit" size="sm" className="h-10 w-full px-3 text-xs" disabled={isSubmitting}>
                                             {isSubmitting ? (
                                                 <>
                                                     <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />

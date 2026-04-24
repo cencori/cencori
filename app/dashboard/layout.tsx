@@ -551,7 +551,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                 <p className="text-xs font-medium mb-1">Community support</p>
                 <p className="text-[10px] text-muted-foreground mb-2">Our Discord community can help with code-related issues.</p>
                 <Link
-                  href="https://discord.gg/cencori"
+                  href="https://cencori.com/discord"
                   target="_blank"
                   className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
                 >

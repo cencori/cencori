@@ -160,7 +160,7 @@ export default function EnterprisePage() {
                                             <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Message</label>
                                             <Textarea placeholder="Tell us about your use case..." value={form.message} onChange={e => setForm(s => ({ ...s, message: e.target.value }))} className="min-h-[90px] bg-transparent border-border/60 rounded-lg resize-none" />
                                         </div>
-                                        <Button type="submit" size="sm" className="w-full h-7 text-xs px-3">
+                                        <Button type="submit" size="sm" className="w-full h-10 text-xs px-3">
                                             Request a Demo
                                         </Button>
                                         <p className="text-[11px] text-muted-foreground/50 text-center">
