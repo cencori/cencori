@@ -10,7 +10,7 @@ export const siteConfig = {
     signInUrl: "/login",
     x: "https://x.com/cencori",
     youtube: "https://www.youtube.com/@cencori",
-    discord: "https://discord.gg/T3kWHAjK",
+    discord: "/discord",
     products: {
       aiGateway: "/ai-gateway",
       models: "/ai/models",

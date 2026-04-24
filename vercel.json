@@ -83,6 +83,11 @@
     ],
     "redirects": [
         {
+            "source": "/discord",
+            "destination": "https://discord.gg/T3kWHAjK",
+            "permanent": false
+        },
+        {
             "source": "/old-path",
             "destination": "/new-path",
             "permanent": true
