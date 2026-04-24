@@ -117,7 +117,7 @@ export default async function NewsletterPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 rounded-full border-foreground/20 px-4 text-[11px] font-medium hover:bg-foreground/5 hover:border-foreground/40"
+                  className="h-8 rounded-md border-foreground/20 px-4 text-[11px] font-medium hover:bg-foreground/5 hover:border-foreground/40"
                   asChild
                 >
                   <Link href={siteConfig.links.company.blog}>Read the blog</Link>
@@ -125,7 +125,7 @@ export default async function NewsletterPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 rounded-full px-4 text-[11px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  className="h-8 rounded-md px-4 text-[11px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   asChild
                 >
                   <Link href={siteConfig.links.docs}>Explore docs</Link>
