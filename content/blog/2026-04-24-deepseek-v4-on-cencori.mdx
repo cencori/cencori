@@ -1,0 +1,72 @@
+---
+title: "DeepSeek-V4: The Era of Cost-Effective 1M Context"
+slug: "deepseek-v4-on-cencori"
+date: "2026-04-24"
+excerpt: "DeepSeek-V4 Preview is now live on Cencori, introducing 1M context length and performance that rivals the world's top closed-source models at a fraction of the cost."
+coverImage: "/blog/images/covers/deepseek.png"
+tags: ["DeepSeek", "V4", "AI Models", "Update", "Open Source"]
+category: "changelog"
+published: true
+---
+
+DeepSeek announced **DeepSeek-V4 Preview** today, marking a significant milestone in open-source AI. With a massive **1M context length** and parameters ranging up to 1.6T (MoE), the V4 series brings flagship-level intelligence to developers with unprecedented cost-effectiveness.
+
+Both variants are now available on Cencori:
+
+- `deepseek-v4-pro`: 1.6T total / 49B active params. Rivaling the world's top closed-source models.
+- `deepseek-v4-flash`: 284B total / 13B active params. Your fast, efficient, and economical choice.
+
+## Performance Reimagined
+
+DeepSeek-V4 represents a leap in efficiency. By utilizing advanced Mixture-of-Experts (MoE) architectures, these models provide high-density intelligence while maintaining low inference costs. 
+
+### Key Highlights:
+- **1M Context Window**: Process entire codebases, long legal documents, or complex research papers in a single prompt.
+- **Expert Mode (Pro)**: Optimized for complex reasoning, coding, and mathematical tasks.
+- **Instant Mode (Flash)**: Sub-second response times for high-volume applications and chat.
+
+## Use It Now
+
+You can start using DeepSeek-V4 immediately through the Cencori Gateway.
+
+### Cencori SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'deepseek-v4-pro', // or 'deepseek-v4-flash'
+  messages: [
+    { role: 'user', content: 'Analyze this 500-page technical specification and find security flaws.' }
+  ]
+});
+
+console.log(response.content);
+```
+
+### TanStack AI Integration
+
+```typescript
+import { cencori } from 'cencori/tanstack';
+import { chat } from '@tanstack/ai';
+
+const result = await chat({
+  adapter: cencori('deepseek-v4-pro'),
+  messages: [{ role: 'user', content: 'Help me optimize this large-scale distributed system.' }]
+});
+```
+
+## Resilience Integrated
+
+As part of the Cencori model catalog, DeepSeek-V4 benefits from our built-in reliability features:
+
+- **Automatic Failover**: `deepseek-v4-pro` automatically fails over to `gpt-5` or `claude-opus-4.5` if the primary provider experiences downtime.
+- **Security & Governance**: All requests are checked against your custom data rules and logged for audit trails.
+- **Semantic Caching**: Reduce latency and costs for repetitive 1M-context queries.
+
+## References
+
+- [DeepSeek-V4 Tech Report](https://huggingface.co/deepseek-ai)
+- [Cencori Models Catalog](/docs/ai/models)

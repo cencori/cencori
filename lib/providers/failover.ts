@@ -75,6 +75,8 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     // DeepSeek models → fallbacks
     'deepseek-chat': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-flash' },
     'deepseek-reasoner': { 'openai': 'o1', 'anthropic': 'claude-opus-4', 'google': 'gemini-3-deep-think' },
+    'deepseek-v4-pro': { 'openai': 'gpt-5', 'anthropic': 'claude-opus-4.5', 'google': 'gemini-3.1-pro-preview' },
+    'deepseek-v4-flash': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4.5', 'google': 'gemini-2.5-flash' },
 };
 
 // In-memory cache for DB mappings

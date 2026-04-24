@@ -292,6 +292,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.deepseek.com/docs',
         keyPrefix: 'sk-',
         models: [
+            // V4 Series (April 2026)
+            { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: 'chat', contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance' },
+            { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: 'chat', contextWindow: 1000000, description: '284B total / 13B active params, fast & economical' },
             // V3.2 Series (Dec 2025)
             { id: 'deepseek-v3.2', name: 'DeepSeek V3.2', type: 'chat', contextWindow: 128000, description: 'GPT-5 level, daily driver' },
             { id: 'deepseek-v3.2-speciale', name: 'DeepSeek V3.2 Speciale', type: 'reasoning', contextWindow: 128000, description: 'Maxed reasoning, competition gold' },
