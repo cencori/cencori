@@ -119,6 +119,7 @@ export class AINamespace {
                 stream: false,
                 tools: request.tools,
                 toolChoice: request.toolChoice,
+                prompt: request.prompt,
             }),
         });
 
@@ -179,6 +180,7 @@ export class AINamespace {
                 stream: true,
                 tools: request.tools,
                 toolChoice: request.toolChoice,
+                prompt: request.prompt,
             }),
         });
 
