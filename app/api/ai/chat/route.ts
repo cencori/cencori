@@ -35,6 +35,8 @@ import {
     logGatewayEvent,
     mapProviderErrorToHttpResponse,
 } from '@/lib/gateway-reliability';
+import { resolvePrompt, logPromptUsage } from '@/lib/prompts/registry';
+import type { ResolvedPrompt } from '@/lib/prompts/types';
 
 
 const router = new ProviderRouter();
@@ -711,7 +713,8 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { messages, model, temperature, maxTokens, max_tokens, stream, userId, tools, toolChoice } = body;
+        const { messages: rawMessages, model, temperature, maxTokens, max_tokens, stream, userId, tools, toolChoice } = body;
+        let messages = rawMessages;
 
         if (!messages || !Array.isArray(messages)) {
             return NextResponse.json(
@@ -773,6 +776,39 @@ export async function POST(req: NextRequest) {
                 }
             } catch (err) {
                 console.error('[EndUserBilling] Quota check failed, allowing request:', err);
+            }
+        }
+
+        // ── Prompt Registry Resolution ──
+        let resolvedPromptData: ResolvedPrompt | null = null;
+        const promptRef = body.prompt?.name || req.headers.get('X-Cencori-Prompt');
+        if (promptRef) {
+            try {
+                const varsHeader = req.headers.get('X-Cencori-Prompt-Vars');
+                const variables = body.prompt?.variables
+                    || (varsHeader ? JSON.parse(varsHeader) : undefined);
+
+                resolvedPromptData = await resolvePrompt(project.id, promptRef, variables);
+                if (!resolvedPromptData) {
+                    return NextResponse.json(
+                        { error: `Prompt "${promptRef}" not found or has no active version` },
+                        { status: 404 }
+                    );
+                }
+
+                // Inject as system message, replacing any existing system messages
+                messages = messages.filter((m: { role: string }) => m.role !== 'system');
+                messages = [
+                    { role: 'system', content: resolvedPromptData.content },
+                    ...messages,
+                ];
+                console.log(`[Prompts] Resolved "${promptRef}" v${resolvedPromptData.version} for project ${project.id}`);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : 'Prompt resolution failed';
+                return NextResponse.json(
+                    { error: msg },
+                    { status: 400 }
+                );
             }
         }
 
@@ -1816,6 +1852,20 @@ export async function POST(req: NextRequest) {
         }
 
         await incrementMonthlyUsage(supabase, organizationId, currentUsage);
+
+        // ── Log Prompt Registry usage (fire-and-forget) ──
+        if (resolvedPromptData) {
+            logPromptUsage({
+                projectId: project.id,
+                promptId: resolvedPromptData.promptId,
+                versionId: resolvedPromptData.versionId,
+                model: actualModel,
+                apiKeyId: keyData.id,
+                requestId,
+                variablesUsed: body.prompt?.variables || null,
+                latencyMs: Date.now() - startTime,
+            }).catch(err => console.error('[Prompts] Usage logging failed:', err));
+        }
 
         // Record end-user usage (fire-and-forget)
         if (project.end_user_billing_enabled && userId && endUserQuota) {

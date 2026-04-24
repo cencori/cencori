@@ -80,6 +80,20 @@ export interface ChatRequest {
     tools?: ToolDefinition[];
     /** How the model chooses to call tools */
     toolChoice?: ToolChoice;
+    /**
+     * Reference a named prompt from the Cencori Prompt Registry.
+     * When provided, the gateway resolves the active version and
+     * injects it as the system message — no need to hardcode prompts.
+     * 
+     * @example
+     * prompt: { name: 'support-agent', variables: { tier: 'pro' } }
+     */
+    prompt?: {
+        /** Prompt name or slug as shown in the dashboard */
+        name: string;
+        /** Template variables to interpolate (e.g. {{tier}} → 'pro') */
+        variables?: Record<string, string>;
+    };
 }
 
 export interface ChatResponse {
