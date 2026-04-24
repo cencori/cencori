@@ -86,7 +86,7 @@ export function NewsletterSignupForm({
         Email address
       </label>
 
-      <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/80 p-1.5 shadow-sm shadow-foreground/5 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/80 p-1.5 backdrop-blur-sm">
         <input
           id={emailId}
           type="email"
@@ -112,7 +112,6 @@ export function NewsletterSignupForm({
           ) : (
             <>
               Subscribe
-              <ArrowRight className="h-4 w-4" />
             </>
           )}
         </button>
