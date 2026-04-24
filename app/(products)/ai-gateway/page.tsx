@@ -33,6 +33,7 @@ import { Footer } from "@/components/landing/Footer";
 import { Integrations } from "@/components/landing/Integrations";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { BudgetControl } from "@/components/landing/BudgetControl";
 
 // The 5 core pillars of AI Gateway
 const pillars = [
@@ -374,6 +375,8 @@ export default function AIGatewayPage() {
             </div>
           </div>
         </section>
+
+        <BudgetControl />
 
         {/* CTA Section */}
         <section className="py-16 bg-background relative overflow-hidden">
