@@ -4,7 +4,6 @@ import Navbar from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { SocialProof } from "@/components/landing/SocialProof";
 import { Features } from "@/components/landing/Features";
-import { BudgetControl } from "@/components/landing/BudgetControl";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 import { HowToSetup } from "@/components/landing/HowToSetup";
@@ -100,7 +99,6 @@ export default function HomePage() {
         <SocialProof />
         <Features />
         <HowToSetup />
-        <BudgetControl />
         <CTA isAuthenticated={isAuthenticated} />
       </main>
 
