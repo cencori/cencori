@@ -65,9 +65,9 @@ function PitchDeckContent() {
                 .pitch-deck-container {
                     --black: #000000;
                     --white: #FFFFFF;
-                    --muted: #737373;
-                    --muted-light: #A3A3A3;
-                    --border: #1a1a1a;
+                    --muted: #A3A3A3;
+                    --muted-light: #D4D4D4;
+                    --border: #262626;
                     --border-light: #E5E5E5;
                     --accent: #FFFFFF;
                     
@@ -147,7 +147,7 @@ function PitchDeckContent() {
                     font-family: 'DM Mono', monospace;
                     font-size: 10px;
                     letter-spacing: 0.1em;
-                    color: #737373;
+                    color: #A3A3A3;
                     line-height: 1.8;
                     max-width: 240px;
                     text-transform: uppercase;
@@ -163,7 +163,7 @@ function PitchDeckContent() {
                 .nav-dots { display: flex; gap: 6px; }
                 .dot { width: 4px; height: 4px; border-radius: 50%; background: #333; cursor: pointer; transition: all .3s; }
                 .dot.active { background: #fff; width: 20px; border-radius: 2px; }
-                .nav-btn { background: none; border: 1px solid #333; color: #737373; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .1em; padding: 6px 14px; cursor: pointer; transition: all .2s; }
+                .nav-btn { background: none; border: 1px solid #333; color: #A3A3A3; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .1em; padding: 6px 14px; cursor: pointer; transition: all .2s; }
                 .nav-btn:hover { border-color: #fff; color: #fff; }
 
                 /* EXPORT BUTTON */
@@ -188,12 +188,12 @@ function PitchDeckContent() {
 
                 /* SLIDE 1 */
                 .s1 { background: #000; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 10%; }
-                .s1-eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .2em; color: #444; text-transform: uppercase; margin-bottom: 32px; }
+                .s1-eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .2em; color: #A3A3A3; text-transform: uppercase; margin-bottom: 32px; }
                 .s1-headline { font-family: 'Playfair Display', serif; font-size: clamp(56px, 8vw, 110px); font-weight: 800; line-height: .95; color: #fff; margin-bottom: 16px; }
-                .s1-headline em { font-style: italic; color: #737373; }
-                .s1-sub { font-size: 15px; color: #444; max-width: 480px; line-height: 1.6; margin-bottom: 60px; font-weight: 300; }
-                .s1-meta { display: flex; gap: 48px; border-top: 1px solid #1a1a1a; padding-top: 32px; }
-                .s1-meta-item label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #444; text-transform: uppercase; margin-bottom: 6px; }
+                .s1-headline em { font-style: italic; color: #A3A3A3; }
+                .s1-sub { font-size: 15px; color: #A3A3A3; max-width: 480px; line-height: 1.6; margin-bottom: 60px; font-weight: 300; }
+                .s1-meta { display: flex; gap: 48px; border-top: 1px solid #262626; padding-top: 32px; }
+                .s1-meta-item label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #888; text-transform: uppercase; margin-bottom: 6px; }
                 .s1-meta-item span { font-size: 14px; color: #fff; font-weight: 500; }
                 .s1-line { display: none; }
                 .s1-vertical-text { display: none; }
@@ -351,29 +351,29 @@ function PitchDeckContent() {
                 .ask-label.dark { color: #737373; }
                 .ask-value { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 8px; }
                 .ask-value.dark { color: #000; }
-                .ask-value-sub { font-size: 12px; color: #555; font-weight: 300; }
+                .ask-value-sub { font-size: 12px; color: #A3A3A3; font-weight: 300; }
                 .ask-value-sub.dark { color: #737373; }
                 .funds-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
-                .funds-table td { padding: 8px 0; border-bottom: 1px solid #0d0d0d; color: #666; }
+                .funds-table td { padding: 8px 0; border-bottom: 1px solid #262626; color: #A3A3A3; }
                 .milestones { display: flex; flex-direction: column; gap: 0; margin-top: 16px; }
-                .milestone-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #0d0d0d; }
-                .milestone-month { font-family: 'DM Mono', monospace; font-size: 10px; color: #333; min-width: 70px; }
-                .milestone-text { font-size: 12px; color: #555; font-weight: 300; }
+                .milestone-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #262626; }
+                .milestone-month { font-family: 'DM Mono', monospace; font-size: 10px; color: #737373; min-width: 70px; }
+                .milestone-text { font-size: 12px; color: #A3A3A3; font-weight: 300; }
 
                 /* SLIDE 14 */
                 .s14 { background: #000; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 10%; }
                 .closing-eras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #1a1a1a; border: 1px solid #1a1a1a; margin-bottom: 48px; width: 100%; }
                 .closing-era { background: #000; padding: 24px; display: flex; flex-direction: column; gap: 8px; }
                 .closing-era.active { background: #fff; }
-                .closing-era-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #444; text-transform: uppercase; }
+                .closing-era-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #888; text-transform: uppercase; }
                 .closing-era-label.dark { color: #737373; }
                 .closing-era-company { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: #fff; }
                 .closing-era-company.dark { color: #000; }
-                .closing-era-role { font-size: 11px; color: #333; font-weight: 300; line-height: 1.4; }
-                .closing-era-role.dark { color: #737373; }
+                .closing-era-role { font-size: 11px; color: #737373; font-weight: 300; line-height: 1.4; }
+                .closing-era-role.dark { color: #555; }
                 .closing-headline { font-family: 'Playfair Display', serif; font-size: clamp(40px, 6vw, 72px); font-weight: 900; color: #fff; line-height: 1; margin-bottom: 24px; }
                 .closing-contact { display: flex; gap: 48px; border-top: 1px solid #1a1a1a; padding-top: 32px; width: 100%; }
-                .closing-contact-item label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #444; text-transform: uppercase; margin-bottom: 6px; }
+                .closing-contact-item label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #888; text-transform: uppercase; margin-bottom: 6px; }
                 .closing-contact-item span { font-size: 14px; color: #fff; font-weight: 500; }
             `}</style>
 
