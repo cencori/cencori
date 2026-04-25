@@ -44,8 +44,12 @@ export function writeTemplateFiles(targetDir: string, files: Record<string, stri
         // Create parent directories
         fs.mkdirSync(dir, { recursive: true });
 
-        // Write file
-        fs.writeFileSync(fullPath, content, 'utf-8');
+        // Write file (handle base64 encoding for binary files)
+        if (content.startsWith('__BASE64__')) {
+            fs.writeFileSync(fullPath, content.substring(10), 'base64');
+        } else {
+            fs.writeFileSync(fullPath, content, 'utf-8');
+        }
     }
 }
 
