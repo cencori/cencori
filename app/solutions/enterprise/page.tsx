@@ -111,10 +111,10 @@ export default function EnterprisePage() {
                                 <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-8 animate-appear">
                                     Cencori for Enterprise
                                 </p>
-                                <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-8 animate-appear [animation-delay:100ms]">
+                                <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4rem] font-heading font-black tracking-[-0.035em] leading-[1.05] mb-8 animate-appear [animation-delay:100ms] text-foreground">
                                     AI infrastructure
                                     <br />
-                                    <span className="text-muted-foreground">built for scale</span>
+                                    <span className="font-serif italic font-normal text-muted-foreground">built for scale.</span>
                                 </h1>
                                 <p className="text-base text-muted-foreground leading-[1.7] max-w-[26rem] mb-12 animate-appear [animation-delay:200ms]">
                                     Security, governance, and observability for every AI request your organization makes.
@@ -184,7 +184,7 @@ export default function EnterprisePage() {
                             ].map((s, i) => (
                                 <Reveal key={s.label} delay={i * 0.08}>
                                     <div className="text-center lg:text-left">
-                                        <p className="text-[2.5rem] sm:text-[3rem] font-semibold tracking-[-0.03em] leading-none mb-2">{s.number}</p>
+                                        <p className="text-[2.5rem] sm:text-[3rem] font-heading font-black tracking-[-0.03em] leading-none mb-2 text-foreground">{s.number}</p>
                                         <p className="text-sm text-muted-foreground">{s.label}</p>
                                     </div>
                                 </Reveal>
@@ -200,7 +200,7 @@ export default function EnterprisePage() {
                             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-emerald-500 mb-4">Security</p>
                         </Reveal>
                         <Reveal delay={0.05}>
-                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                            <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl text-foreground">
                                 Every request is inspected before it reaches a model
                             </h2>
                         </Reveal>
@@ -244,10 +244,10 @@ export default function EnterprisePage() {
                                     <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground/60 mb-4">Observability</p>
                                 </Reveal>
                                 <Reveal delay={0.05}>
-                                    <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                    <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black tracking-[-0.03em] leading-[1.1] mb-6 text-foreground">
                                         See everything.
                                         <br />
-                                        Miss nothing.
+                                        <span className="font-serif italic font-normal text-muted-foreground">Miss nothing.</span>
                                     </h2>
                                 </Reveal>
                                 <Reveal delay={0.1}>
@@ -282,7 +282,7 @@ export default function EnterprisePage() {
                             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Platform</p>
                         </Reveal>
                         <Reveal delay={0.05}>
-                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-20 max-w-2xl">
+                            <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black tracking-[-0.03em] leading-[1.1] mb-20 max-w-2xl text-foreground">
                                 One API to route, cache, secure, and observe — across every model provider
                             </h2>
                         </Reveal>
@@ -317,7 +317,7 @@ export default function EnterprisePage() {
                                     <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Enterprise Plan</p>
                                 </Reveal>
                                 <Reveal delay={0.05}>
-                                    <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                    <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black tracking-[-0.03em] leading-[1.1] mb-6 text-foreground">
                                         Everything your team needs
                                     </h2>
                                 </Reveal>
@@ -328,7 +328,7 @@ export default function EnterprisePage() {
                                 </Reveal>
                                 <Reveal delay={0.15}>
                                     <div className="flex gap-4">
-                                        <a href="#top">
+                                        <a href="/contact/sales">
                                             <Button size="sm" className="h-7 text-xs px-3">Request a Demo</Button>
                                         </a>
                                         <Link href="/pricing">
@@ -371,14 +371,14 @@ export default function EnterprisePage() {
                 <Reveal>
                     <section className="py-28 sm:py-36">
                         <div className="mx-auto max-w-6xl px-4 md:px-6 text-center">
-                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-5">
+                            <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black tracking-[-0.03em] leading-[1.1] mb-5 text-foreground">
                                 Ready to get started?
                             </h2>
                             <p className="text-muted-foreground text-sm leading-[1.7] mb-10 max-w-md mx-auto">
                                 Talk to our team about your security, compliance, and scale requirements.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Link href="/contact">
+                                <Link href="/contact/sales">
                                     <Button size="sm" className="h-7 text-xs px-3">Contact Sales</Button>
                                 </Link>
                                 <Link href="/docs">

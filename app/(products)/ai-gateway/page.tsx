@@ -31,6 +31,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Integrations } from "@/components/landing/Integrations";
+import { CTA } from "@/components/landing/CTA";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { BudgetControl } from "@/components/landing/BudgetControl";
@@ -177,33 +178,34 @@ export default function AIGatewayPage() {
 
           <div className="container relative z-10 px-4 md:px-6 flex flex-col items-center text-center">
             {/* Badge */}
-            <div className="mb-8 animate-appear">
-              <Link href="/" className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground/5 px-3 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                <span className="mr-2">Try AI Gateway</span>
-                <ChevronRightIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              </Link>
-            </div>
+            <Link
+              href="/"
+              className="group mb-8 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground animate-appear"
+            >
+              <span>Try AI Gateway</span>
+              <ArrowRightIcon className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+            </Link>
 
             {/* Headline */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter mb-6 max-w-4xl animate-appear [animation-delay:100ms] text-transparent bg-clip-text bg-gradient-to-b from-foreground to-foreground/50">
-              AI Gateway
+            <h1 className="mb-8 max-w-3xl text-[3rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[4.5rem] lg:text-[5.5rem] text-foreground">
+              AI 
+              <span className="font-serif italic font-normal text-muted-foreground"> Gateway.</span>
             </h1>
 
             {/* Subheadline */}
-            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-6 animate-appear [animation-delay:200ms] leading-relaxed">
+            <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
               One API for every AI provider. Built-in security, observability, and compliance.
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
+            <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
               <Link href={siteConfig.links.getStartedUrl}>
-                <Button size="default" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]">
-                  Get Started Free <ArrowRightIcon className="ml-2 h-4 w-4" aria-hidden="true" />
+                <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
+                  Get Started Free
                 </Button>
               </Link>
               <Link href="/docs">
-                <Button variant="outline" size="default" className="h-10 px-6 text-sm rounded-full border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
+                <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                   Documentation
                 </Button>
               </Link>
@@ -376,43 +378,7 @@ export default function AIGatewayPage() {
 
         <BudgetControl />
 
-        {/* CTA Section */}
-        <section className="py-16 bg-background relative overflow-hidden">
-          <div className="max-w-screen-xl mx-auto px-4 md:px-6 relative z-10">
-            <div className="relative overflow-hidden rounded-xl border border-border/30 bg-foreground/[0.02] px-6 py-12 md:px-10 text-center">
-              {/* Background Effects */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-foreground/5 via-transparent to-transparent opacity-50" />
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
-
-              <div className="relative z-10 flex flex-col items-center max-w-2xl mx-auto">
-                <div className="mb-4 inline-flex items-center justify-center rounded-full border border-border/40 bg-muted/30 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  <span>Free tier available</span>
-                </div>
-
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-foreground">
-                  Ready to ship AI?
-                </h2>
-                <p className="text-sm text-muted-foreground mb-6 max-w-lg leading-relaxed">
-                  Get started with AI Gateway in minutes. No credit card required.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <Link href={siteConfig.links.getStartedUrl}>
-                    <Button size="sm" className="h-8 px-4 text-xs rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                      Get Started Free
-                      <ArrowRightIcon className="ml-1.5 w-3 h-3" aria-hidden="true" />
-                    </Button>
-                  </Link>
-                  <Link href="/pricing">
-                    <Button variant="ghost" size="sm" className="h-8 px-4 text-xs rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all">
-                      View Pricing
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <CTA isAuthenticated={isAuthenticated} />
       </main>
 
       <Footer />
