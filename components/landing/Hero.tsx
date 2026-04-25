@@ -20,10 +20,10 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                             <ArrowRight className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
                         </Link>
 
-                        <h1 className="mb-8 max-w-3xl text-[2.75rem] font-semibold leading-[1.03] tracking-[-0.04em] animate-appear sm:text-[3.5rem] lg:text-[4.25rem]">
+                        <h1 className="mb-8 max-w-3xl text-[3rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[4.5rem] lg:text-[5.5rem] text-foreground">
                             The Backbone of
                             <br />
-                            <span className="text-muted-foreground">Intelligence.</span>
+                            <span className="font-serif italic font-normal text-muted-foreground">Intelligence.</span>
                         </h1>
 
                         <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
