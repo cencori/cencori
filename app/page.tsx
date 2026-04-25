@@ -88,8 +88,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
       <Navbar
-        logo={<Logo variant="mark" className="h-4" />}
-        name="cencori"
         homeUrl="/"
         actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
         isAuthenticated={isAuthenticated}
@@ -99,8 +97,8 @@ export default function HomePage() {
       <main>
         <Hero isAuthenticated={isAuthenticated} />
         <SocialProof />
-        <FullStack />
         <Features />
+        <FullStack />
         <HowToSetup />
         <ErasSection />
         <CTA isAuthenticated={isAuthenticated} />

@@ -64,7 +64,8 @@ export const ValueProp = () => {
                                     {/* Middle Layer: Cencori (Highlighted) */}
                                     <div className="w-full h-24 mt-8 bg-zinc-950 text-foreground flex items-center justify-center">
                                         <div className="flex flex-col items-center">
-                                            <img src="/cdark.png" alt="Cencori logo" className="h-20 w-auto" />
+                                            <img src="/logos/ww.png" alt="Cencori logo" className="h-20 w-auto hidden dark:block" />
+                                            <img src="/logos/bw.png" alt="Cencori logo" className="h-20 w-auto block dark:hidden" />
                                         </div>
 
                                         {/* Connection Line Up */}

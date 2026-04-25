@@ -213,8 +213,6 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center">
             <Navbar
-                logo={<Logo variant="mark" className="h-4" />}
-                name="cencori"
                 homeUrl="/"
                 actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
                 isAuthenticated={isAuthenticated}

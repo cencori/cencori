@@ -124,8 +124,6 @@ export default function WorkflowPage() {
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
             <Navbar
-                logo={<Logo variant="mark" className="h-4" />}
-                name="cencori"
                 homeUrl="/"
                 actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
                 isAuthenticated={isAuthenticated}

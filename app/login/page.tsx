@@ -9,7 +9,7 @@ function LoginPageContent() {
       <div className="w-full max-w-sm flex flex-col gap-8">
         <div className="flex justify-center">
           <Link href="/" className="flex items-center gap-2 font-medium">
-            <Logo variant="full" className="h-6" />
+            <Logo variant="wordmark" className="h-6" />
           </Link>
         </div>
         <div className="w-full">

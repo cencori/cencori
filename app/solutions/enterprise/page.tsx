@@ -96,8 +96,6 @@ export default function EnterprisePage() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar
-                logo={<Logo variant="mark" className="h-4" />}
-                name="cencori"
                 homeUrl="/"
                 actions={navActions}
                 isAuthenticated={isAuthenticated}

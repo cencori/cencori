@@ -98,7 +98,7 @@ export function DocsNavbar() {
                     {/* Logo */}
                     <div className="flex items-center gap-6">
                         <Link href="/docs" className="flex items-center gap-2">
-                            <Logo variant="mark" className="h-5" />
+                            <Logo variant="wordmark" className="h-4" />
                             <span className="font-semibold text-sm">Docs</span>
                         </Link>
                     </div>
@@ -149,7 +149,7 @@ export function DocsNavbar() {
                                 <div className="flex flex-col h-full">
                                     <div className="px-6 py-6 border-b border-border/40">
                                         <Link href="/docs" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-                                            <Logo variant="mark" className="h-6" />
+                                            <Logo variant="wordmark" className="h-4" />
                                             <span className="font-semibold">Docs</span>
                                         </Link>
                                     </div>
