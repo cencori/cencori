@@ -48,6 +48,10 @@ tanstack-ai-fork/
 packages/scan/node_modules
 packages/scan/dist
 
+# Create App CLI
+packages/create-cencori-app/node_modules
+packages/create-cencori-app/dist
+
 # Agents
 .agent/
 .agents/
