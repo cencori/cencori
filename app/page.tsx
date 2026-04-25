@@ -7,6 +7,8 @@ import { Features } from "@/components/landing/Features";
 import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 import { HowToSetup } from "@/components/landing/HowToSetup";
+import { ErasSection } from "@/components/landing/ErasSection";
+import { FullStack } from "@/components/landing/FullStack";
 import { Logo } from "@/components/logo";
 import { siteConfig } from "@/config/site";
 import { useState, useEffect } from "react";
@@ -97,10 +99,21 @@ export default function HomePage() {
       <main>
         <Hero isAuthenticated={isAuthenticated} />
         <SocialProof />
+        <FullStack />
         <Features />
         <HowToSetup />
+        <ErasSection />
         <CTA isAuthenticated={isAuthenticated} />
       </main>
+
+      {/* Closing Statement */}
+      <section className="py-20 sm:py-28 bg-background">
+        <div className="max-w-3xl mx-auto px-4 md:px-6 text-center">
+          <p className="font-serif italic text-lg sm:text-xl text-muted-foreground leading-relaxed">
+            Ship models and applications from the same platform. Deploy fine-tuned models to auto-scaling inference endpoints, and host your complete AI application on a global edge network — no external infrastructure required.
+          </p>
+        </div>
+      </section>
 
       <Footer />
     </div>
