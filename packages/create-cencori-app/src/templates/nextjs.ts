@@ -27,7 +27,7 @@ export function getNextjsTemplate(options: TemplateOptions): Record<string, stri
                 lint: 'next lint',
             },
             dependencies: {
-                ai: '^4.0.0',
+                ai: '^6.0.0',
                 cencori: '^1.2.0',
                 next: '^15.0.0',
                 react: '^19.0.0',
