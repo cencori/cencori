@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Code2, ChevronRight, CheckCircle } from 'lucide-react';
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
+import { CTA } from "@/components/landing/CTA";
 import { Logo } from "@/components/logo";
 import { VercelLogo, SupabaseLogo, VSCodeLogo, CursorLogo } from "@/components/icons/BrandIcons";
 
@@ -105,30 +106,41 @@ export default function ProductEdgePage() {
 
       <main>
         {/* Hero Section */}
-        <section className="pt-32 pb-16 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge variant="outline" className="mb-4 text-xs font-medium px-3 py-1 rounded-full border-border/60">
-              Platform Integrations
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-              Cencori Edge
+        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
+          {/* Background Effects */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-500/5 via-background to-background pointer-events-none" />
+
+          <div className="container relative z-10 px-4 md:px-6 flex flex-col items-center text-center">
+            {/* Badge */}
+            <div className="mb-8 animate-appear">
+              <div className="group inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground">
+                <span>Platform Integrations</span>
+              </div>
+            </div>
+
+            {/* Headline */}
+            <h1 className="mb-8 max-w-3xl text-[3rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[4.5rem] lg:text-[5.5rem] text-foreground">
+              <span className="font-serif italic font-normal text-muted-foreground">Edge.</span>
             </h1>
-            <p className="text-base text-muted-foreground max-w-2xl mx-auto mb-8">
+
+            {/* Subheadline */}
+            <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
               Pre-built integrations and middleware for Vercel, Supabase, and edge runtimes.
               Activate AI protection without extensive engineering effort.
             </p>
-            <div className="flex items-center justify-center gap-3">
-              <Button asChild className="h-9 px-4 text-sm rounded-full">
-                <Link href={siteConfig.links.getStartedUrl}>
+
+            {/* CTAs */}
+            <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
+              <Link href={siteConfig.links.getStartedUrl}>
+                <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
                   Get Started
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outline" asChild className="h-9 px-4 text-sm rounded-full">
-                <Link href="/docs/integrations">
+                </Button>
+              </Link>
+              <Link href="/docs/integrations">
+                <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                   View Docs
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
           </div>
         </section>
@@ -189,29 +201,7 @@ export default function ProductEdgePage() {
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-16 px-4 border-t border-border/40">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-xl font-semibold mb-2">
-              Ready to integrate?
-            </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Start protecting your platform&apos;s AI requests in minutes.
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <Button asChild className="h-9 px-4 text-sm rounded-full">
-                <Link href={siteConfig.links.getStartedUrl}>
-                  Get Started Free
-                </Link>
-              </Button>
-              <Button variant="ghost" asChild className="h-9 px-4 text-sm rounded-full">
-                <Link href="mailto:support@fohnai.com">
-                  Talk to Us
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </section>
+        <CTA isAuthenticated={isAuthenticated} />
       </main>
 
       <Footer />

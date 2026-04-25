@@ -9,35 +9,35 @@ import { Cpu, Network, Database, Workflow, CreditCard } from "lucide-react";
 
 const layers = [
     {
-        name: "Compute & Training Layer",
+        name: "Compute",
         description: "The foundation. Access on-demand GPUs for fine-tuning and hosting custom models without leaving your environment.",
         icon: Cpu,
         gradient: "from-foreground/10 to-foreground/0",
         color: "text-foreground"
     },
     {
-        name: "Gateway & Routing Layer",
+        name: "AI Gateway",
         description: "Universal routing to OpenAI, Anthropic, Gemini, or custom models with built-in fallbacks, caching, and rate limiting.",
         icon: Network,
         gradient: "from-orange-500/20 to-red-500/0",
         color: "text-orange-500"
     },
     {
-        name: "Persistent Memory Layer",
+        name: "Persistent Memory",
         description: "Native RAG and vector storage so your intelligent systems remember users, documents, and context across sessions.",
         icon: Database,
         gradient: "from-purple-500/20 to-fuchsia-500/0",
         color: "text-purple-500"
     },
     {
-        name: "Agentic Workflows Layer",
+        name: "Agentic Workflows",
         description: "Multi-step reasoning and tool-calling orchestration to build agents that actually execute tasks autonomously.",
         icon: Workflow,
         gradient: "from-blue-500/20 to-cyan-500/0",
         color: "text-blue-500"
     },
     {
-        name: "Deployment Layer",
+        name: "Deployment",
         description: "Enterprise-grade hosting. Deploy massive custom models to dedicated serverless endpoints and host your full-stack AI applications on a global edge network.",
         icon: Workflow, // Not used in the UI anymore, but keeping for structural consistency
         gradient: "from-yellow-500/20 to-amber-500/0",
