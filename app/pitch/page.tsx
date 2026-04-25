@@ -53,7 +53,7 @@ function PitchDeckContent() {
                 <img src="/logo white.svg" alt="Cencori Logo" style={{ width: "60px", height: "auto", marginBottom: "60px" }} />
                 <div className="mobile-wall-message">Best experienced on a<br />high-resolution display.</div>
                 <div className="mobile-wall-sub">
-                    To review the Intelligence Infrastructure roadmap and technical architecture, please open this link on your desktop.
+                    Our tech is too dense and too important for a quick thumb-scroll while you're in an Uber. Please open this link on your desktop to review the full technical roadmap.
                 </div>
             </div>
             
