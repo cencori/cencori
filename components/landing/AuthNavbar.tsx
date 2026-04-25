@@ -83,8 +83,6 @@ export function AuthNavbar({ className }: AuthNavbarProps) {
 
     return (
         <Navbar
-            logo={<Logo variant="mark" className="h-4" />}
-            name="cencori"
             homeUrl="/"
             className={className}
             actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}

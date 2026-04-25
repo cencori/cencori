@@ -240,8 +240,8 @@ interface NavbarProps extends React.HTMLAttributes<HTMLElement> {
 // ... [Keep helper functions and components]
 
 export default function Navbar({
-    logo = <Logo variant="mark" className="h-5 w-5" />,
-    name = siteConfig.name,
+    logo = <Logo variant="wordmark" className="h-4" />,
+    name = "",
     homeUrl = siteConfig.url,
     mobileNavItems = [
         {
@@ -530,8 +530,8 @@ export default function Navbar({
                             <SheetContent side="right" className="w-full border-none bg-background/95 backdrop-blur-xl p-6">
                                 <div className="flex flex-col h-full">
                                     <div className="flex items-center gap-2 mb-8">
-                                        <Logo variant="mark" className="h-6 w-6" />
-                                        <span className="font-bold text-xl tracking-tight">cencori</span>
+                                        {logo}
+                                        {name && <span className="font-bold text-xl tracking-tight">{name}</span>}
                                     </div>
 
                                     <div className="flex-1 overflow-y-auto -mx-6 px-6">

@@ -2,6 +2,9 @@
 
 import React from "react";
 import { Reveal } from "@/components/landing/Reveal";
+import { IsoStack } from "@/components/landing/IsoStack";
+import { GatewayGraphic } from "@/components/landing/GatewayGraphic";
+import { MemoryGraphic } from "@/components/landing/MemoryGraphic";
 import { Cpu, Network, Database, Workflow, CreditCard } from "lucide-react";
 
 const layers = [
@@ -77,6 +80,25 @@ export const FullStack = () => {
                                     </span>
                                     <div className="h-[1px] flex-1 bg-border/20 transition-colors duration-500 group-hover:bg-border/60" />
                                 </div>
+
+                                {/* Infrastructure Graphics - Hidden for now */}
+                                {/* {index === 0 && (
+                                    <div className="w-full mt-2 mb-1 flex justify-center opacity-80 group-hover:opacity-100 transition-opacity duration-500">
+                                        <IsoStack />
+                                    </div>
+                                )}
+
+                                {index === 1 && (
+                                    <div className="w-full mt-2 mb-1 flex justify-center opacity-80 group-hover:opacity-100 transition-opacity duration-500">
+                                        <GatewayGraphic />
+                                    </div>
+                                )}
+
+                                {index === 2 && (
+                                    <div className="w-full mt-2 mb-1 flex justify-center opacity-80 group-hover:opacity-100 transition-opacity duration-500">
+                                        <MemoryGraphic />
+                                    </div>
+                                )} */}
                                 
                                 <div className="mt-2">
                                     <h3 className="text-xl sm:text-2xl font-heading font-semibold text-foreground/70 transition-colors duration-500 group-hover:text-foreground mb-3">

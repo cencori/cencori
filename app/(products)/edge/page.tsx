@@ -97,8 +97,6 @@ export default function ProductEdgePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar
-        logo={<Logo variant="mark" className="h-4" />}
-        name="cencori"
         homeUrl="/"
         actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
         isAuthenticated={isAuthenticated}

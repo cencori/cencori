@@ -85,8 +85,6 @@ export default function BrandPageContent() {
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-purple-500/30 selection:text-purple-200 font-sans">
             <Navbar
-                logo={<Logo variant="mark" className="h-4" />}
-                name="cencori"
                 homeUrl="/"
                 actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
                 isAuthenticated={isAuthenticated}
@@ -160,7 +158,7 @@ export default function BrandPageContent() {
                                 <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
                                         <h3 className="font-medium text-foreground">White Logomark</h3>
-                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG</p>
                                     </div>
                                     <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/logo white.svg" download>
@@ -190,7 +188,7 @@ export default function BrandPageContent() {
                                 <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
                                         <h3 className="font-medium text-foreground">Black Logomark</h3>
-                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG</p>
                                     </div>
                                     <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
                                         <a href="/logo black.svg" download>
@@ -218,7 +216,7 @@ export default function BrandPageContent() {
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                     <div className="relative w-56 h-16 transition-transform duration-500 group-hover:scale-105 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                                         <Image
-                                            src="/wordmark white.svg"
+                                            src="/logos/ww.png"
                                             alt="Cencori Wordmark White"
                                             fill
                                             className="object-contain"
@@ -233,10 +231,10 @@ export default function BrandPageContent() {
                                 <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
                                         <h3 className="font-medium text-foreground">White Wordmark</h3>
-                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">PNG</p>
                                     </div>
                                     <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
-                                        <a href="/wordmark white.svg" download>
+                                        <a href="/logos/ww.png" download>
                                             <Download className="h-4 w-4" />
                                         </a>
                                     </Button>
@@ -248,7 +246,7 @@ export default function BrandPageContent() {
                                 <div className="aspect-[2/1] relative flex items-center justify-center bg-white">
                                     <div className="relative w-56 h-16 transition-transform duration-500 group-hover:scale-105 drop-shadow-xl">
                                         <Image
-                                            src="/wordmark black.svg"
+                                            src="/logos/bw.png"
                                             alt="Cencori Wordmark Black"
                                             fill
                                             className="object-contain"
@@ -263,10 +261,10 @@ export default function BrandPageContent() {
                                 <div className="p-6 border-t border-border bg-muted/30 backdrop-blur-xl flex items-center justify-between">
                                     <div>
                                         <h3 className="font-medium text-foreground">Black Wordmark</h3>
-                                        <p className="text-xs text-muted-foreground font-mono mt-1">SVG / PNG</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-1">PNG</p>
                                     </div>
                                     <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground" asChild>
-                                        <a href="/wordmark black.svg" download>
+                                        <a href="/logos/bw.png" download>
                                             <Download className="h-4 w-4" />
                                         </a>
                                     </Button>

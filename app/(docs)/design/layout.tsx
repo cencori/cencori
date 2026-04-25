@@ -84,7 +84,7 @@ function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
             {/* Logo */}
             <div className="p-4 border-b border-border/40">
                 <Link href={logoHref} className="flex items-center gap-2">
-                    <Logo variant="mark" className="h-5" />
+                    <Logo variant="wordmark" className="h-4" />
                     <span className="text-sm font-semibold">Cenpact</span>
                 </Link>
                 <p className="text-[10px] text-muted-foreground mt-1">Design System</p>
@@ -131,7 +131,7 @@ export default function DesignDocsLayout({
             {/* Mobile Header */}
             <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between h-12 px-4 border-b border-border/40 bg-background/95 backdrop-blur">
                 <Link href={logoHref} className="flex items-center gap-2">
-                    <Logo variant="mark" className="h-4" />
+                    <Logo variant="wordmark" className="h-4" />
                     <span className="text-sm font-semibold">Cenpact</span>
                 </Link>
                 <Sheet open={open} onOpenChange={setOpen}>

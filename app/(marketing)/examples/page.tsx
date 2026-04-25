@@ -54,8 +54,6 @@ export default function ExamplesPage() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar
-                logo={<Logo variant="mark" className="h-4" />}
-                name="cencori"
                 homeUrl="/"
                 actions={[
                     { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
