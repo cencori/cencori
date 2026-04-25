@@ -221,10 +221,10 @@ function PitchDeckContent() {
                 .problem-item { background: #000; padding: 28px 24px; position: relative; }
                 .problem-num { font-family: 'Playfair Display', serif; font-size: 48px; font-weight: 800; color: #1a1a1a; line-height: 1; margin-bottom: 12px; }
                 .problem-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 8px; letter-spacing: .02em; }
-                .problem-desc { font-size: 12px; color: #555; line-height: 1.6; font-weight: 300; }
+                .problem-desc { font-size: 12px; color: #A3A3A3; line-height: 1.6; font-weight: 300; }
                 .problem-stat { background: #0a0a0a; border: 1px solid #1a1a1a; padding: 28px 36px; margin-top: 32px; display: flex; align-items: center; gap: 48px; }
                 .problem-stat-num { font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 800; color: #fff; line-height: 1; white-space: nowrap; }
-                .problem-stat-text { font-size: 14px; color: #555; line-height: 1.7; font-weight: 300; max-width: 480px; }
+                .problem-stat-text { font-size: 14px; color: #A3A3A3; line-height: 1.7; font-weight: 300; max-width: 480px; }
                 .problem-stat-text strong { color: #fff; font-weight: 500; }
 
                 /* SLIDE 4 */
@@ -245,9 +245,9 @@ function PitchDeckContent() {
                 .solution-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #1a1a1a; margin-top: 36px; border: 1px solid #1a1a1a; }
                 .solution-item { background: #000; padding: 28px 24px; }
                 .solution-item.featured { background: #050505; border-left: 2px solid #fff; }
-                .solution-num { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .2em; color: #333; margin-bottom: 16px; }
+                .solution-num { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .2em; color: #888; margin-bottom: 16px; }
                 .solution-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; letter-spacing: .02em; }
-                .solution-desc { font-size: 12px; color: #555; line-height: 1.65; font-weight: 300; }
+                .solution-desc { font-size: 12px; color: #A3A3A3; line-height: 1.65; font-weight: 300; }
                 .solution-tagline { font-family: 'Playfair Display', serif; font-style: italic; font-size: 15px; color: #737373; border-top: 1px solid #1a1a1a; padding-top: 20px; margin-top: 24px; }
 
                 /* SLIDE 6 */
@@ -270,11 +270,11 @@ function PitchDeckContent() {
                 .traction-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #1a1a1a; margin: 36px 0 32px; border: 1px solid #1a1a1a; }
                 .traction-item { background: #000; padding: 28px 24px; }
                 .traction-big { font-family: 'Playfair Display', serif; font-size: 44px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 8px; }
-                .traction-label { font-size: 12px; color: #555; font-weight: 300; line-height: 1.5; }
+                .traction-label { font-size: 12px; color: #A3A3A3; font-weight: 300; line-height: 1.5; }
                 .traction-label strong { font-weight: 700; color: #fff; }
                 .testimonial { border: 1px solid #1a1a1a; padding: 28px 32px; display: flex; align-items: flex-start; gap: 24px; }
                 .testimonial-quote { font-family: 'Playfair Display', serif; font-style: italic; font-size: 18px; color: #fff; line-height: 1.5; flex: 1; }
-                .testimonial-attr { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #444; margin-top: 12px; text-transform: uppercase; }
+                .testimonial-attr { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #888; margin-top: 12px; text-transform: uppercase; }
 
                 /* SLIDE 8 */
                 .s8 { background: #fff; flex-direction: column; justify-content: center; padding: 0 10%; }
@@ -298,8 +298,8 @@ function PitchDeckContent() {
                 /* SLIDE 9 */
                 .s9 { background: #000; flex-direction: column; justify-content: center; padding: 0 8%; }
                 .fin-table { width: 100%; border-collapse: collapse; margin-top: 32px; font-size: 12px; }
-                .fin-table th { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #444; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 1px solid #1a1a1a; }
-                .fin-table td { padding: 12px 16px; border-bottom: 1px solid #0d0d0d; font-weight: 300; color: #666; }
+                .fin-table th { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .15em; color: #888; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 1px solid #1a1a1a; }
+                .fin-table td { padding: 12px 16px; border-bottom: 1px solid #0d0d0d; font-weight: 300; color: #A3A3A3; }
                 .fin-table tr.total td { color: #fff; font-weight: 600; border-top: 1px solid #1a1a1a; font-size: 13px; }
                 .fin-chart-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #1a1a1a; margin-top: 24px; border: 1px solid #1a1a1a; }
                 .fin-chart-item { background: #000; padding: 20px; display: flex; flex-direction: column; align-items: flex-start; }
@@ -324,7 +324,7 @@ function PitchDeckContent() {
                 .vision-list { display: flex; flex-direction: column; gap: 0; margin-top: 36px; max-width: 800px; }
                 .vision-item { display: flex; gap: 32px; padding: 24px 0; border-bottom: 1px solid #4d4c4cff; align-items: flex-start; }
                 .vision-year { font-family: 'DM Mono', monospace; font-size: 11px; color: #969494ff; min-width: 80px; }
-                .vision-text { font-size: 14px; color: #555; line-height: 1.7; font-weight: 300; }
+                .vision-text { font-size: 14px; color: #A3A3A3; line-height: 1.7; font-weight: 300; }
                 .vision-close { font-family: 'Playfair Display', serif; font-size: clamp(28px, 4vw, 44px); font-weight: 800; font-style: italic; color: #fff; margin-top: 48px; }
 
                 /* SLIDE 12 */
@@ -347,7 +347,7 @@ function PitchDeckContent() {
                 .ask-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1px; background: #1a1a1a; margin-top: 36px; border: 1px solid #1a1a1a; width: 100%; }
                 .ask-cell { background: #000; padding: 32px 28px; }
                 .ask-cell.featured { background: #fff; }
-                .ask-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .2em; color: #444; text-transform: uppercase; margin-bottom: 12px; }
+                .ask-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .2em; color: #888; text-transform: uppercase; margin-bottom: 12px; }
                 .ask-label.dark { color: #737373; }
                 .ask-value { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 8px; }
                 .ask-value.dark { color: #000; }
