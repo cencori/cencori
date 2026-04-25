@@ -44,7 +44,7 @@ const layers = [
         color: "text-yellow-500"
     },
     {
-        name: "Monetization Layer",
+        name: "Monetization",
         description: "Built-in end-user billing. Meter usage, set margins, and charge your customers automatically via Stripe.",
         icon: CreditCard,
         gradient: "from-green-500/20 to-emerald-500/0",

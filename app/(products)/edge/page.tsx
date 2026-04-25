@@ -10,6 +10,7 @@ import { Code2, ChevronRight, CheckCircle } from 'lucide-react';
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { CTA } from "@/components/landing/CTA";
+import { WaitlistModal } from "@/components/landing/WaitlistModal";
 import { Logo } from "@/components/logo";
 import { VercelLogo, SupabaseLogo, VSCodeLogo, CursorLogo } from "@/components/icons/BrandIcons";
 
@@ -131,11 +132,11 @@ export default function ProductEdgePage() {
 
             {/* CTAs */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
-              <Link href={siteConfig.links.getStartedUrl}>
+              <WaitlistModal productName="Edge">
                 <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
-                  Get Started
+                  Join the Waitlist
                 </Button>
-              </Link>
+              </WaitlistModal>
               <Link href="/docs/integrations">
                 <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                   View Docs

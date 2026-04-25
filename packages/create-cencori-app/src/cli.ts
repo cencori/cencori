@@ -15,9 +15,9 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { select, confirm, password } from '@inquirer/prompts';
-import { validateProjectName, writeTemplateFiles, runInstall, printSuccess } from './utils.js';
-import { getNextjsTemplate } from './templates/nextjs.js';
-import { getTanstackTemplate } from './templates/tanstack.js';
+import { validateProjectName, writeTemplateFiles, runInstall, printSuccess } from './utils';
+import { getNextjsTemplate } from './templates/nextjs';
+import { getTanstackTemplate } from './templates/tanstack';
 import * as fs from 'fs';
 import * as path from 'path';
 
