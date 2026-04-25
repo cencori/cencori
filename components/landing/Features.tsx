@@ -6,9 +6,9 @@ export const Features = () => {
         <section className="py-20 bg-background">
             <div className="container mx-auto px-4 md:px-6">
                 <div className="flex flex-col items-center text-center mb-12">
-                    <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
+                    <h2 className="text-[2.25rem] md:text-[3rem] font-heading font-black leading-[1.05] tracking-[-0.02em] mb-4 text-foreground">
                         Everything you need {" "}
-                        <span className="text-muted-foreground">to ship AI.</span>
+                        <span className="font-serif italic font-normal text-muted-foreground">to ship AI.</span>
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl">
                         Security, visibility, and cost control, built into every request from day one.

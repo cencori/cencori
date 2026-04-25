@@ -12,8 +12,8 @@ export const CTA = ({ isAuthenticated = false }: CTAProps) => {
             <div className="max-w-screen-xl mx-auto px-4 md:px-6 relative z-10">
                 <div className="px-6 py-12 md:px-10 text-center">
                     <div className="flex flex-col items-center max-w-2xl mx-auto">
-                        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-foreground">
-                            Your AI is live. Do you know what&apos;s happening inside it?
+                        <h2 className="text-[2rem] md:text-[2.75rem] font-heading font-black leading-[1.05] tracking-[-0.02em] mb-4 text-foreground">
+                            Your AI is live. <span className="font-serif italic font-normal text-muted-foreground">Do you know what&apos;s happening inside it?</span>
                         </h2>
                         <p className="text-sm text-muted-foreground mb-6 max-w-lg leading-relaxed">
                             Add Cencori to your first project in minutes. Security, visibility, and cost control from your very first request.

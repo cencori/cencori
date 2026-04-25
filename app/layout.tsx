@@ -1,6 +1,6 @@
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Newsreader } from "next/font/google";
+import { Newsreader, Playfair_Display } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -196,6 +196,11 @@ const newsreader = Newsreader({
   variable: "--font-newsreader",
 });
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+});
+
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -232,7 +237,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${newsreader.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${newsreader.variable} ${playfair.variable} font-sans`}>
         <ThemeProvider>
           <PostHogProvider>
             {children}

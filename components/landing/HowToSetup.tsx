@@ -231,10 +231,10 @@ export const HowToSetup = () => {
                             </p>
                         </Reveal>
                         <Reveal delay={0.05}>
-                            <h2 className="max-w-md text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                            <h2 className="max-w-md text-3xl sm:text-[3rem] font-heading font-black tracking-[-0.02em] leading-[1.05] mb-6 text-foreground">
                                 Infrastructure in 
                                 <br />
-                                <span className="text-muted-foreground">minutes.</span>
+                                <span className="font-serif italic font-normal text-muted-foreground">minutes.</span>
                             </h2>
                         </Reveal>
                         <Reveal delay={0.1}>
