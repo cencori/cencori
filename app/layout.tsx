@@ -1,6 +1,6 @@
-// app/layout.tsx
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { Newsreader } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -190,6 +190,12 @@ const softwareApplicationSchema = {
   }
 };
 
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  style: "italic",
+  variable: "--font-newsreader",
+});
+
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -226,7 +232,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${newsreader.variable} font-sans`}>
         <ThemeProvider>
           <PostHogProvider>
             {children}
