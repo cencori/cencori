@@ -38,7 +38,7 @@ export const Hero = ({ isAuthenticated = false }: HeroProps) => {
                             </Link>
                             <Link href="/contact/sales">
                                 <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                                    Book a Demo
+                                    Request a Demo
                                 </Button>
                             </Link>
                         </div>
