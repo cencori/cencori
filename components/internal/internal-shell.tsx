@@ -37,7 +37,7 @@ function NavContent({ pathname, userEmail, onNavigate }: { pathname: string; use
             {/* Logo / Title */}
             <div className="px-4 py-4 border-b border-border/30">
                 <Link href="/internal" className="flex items-center gap-2" onClick={onNavigate}>
-                    <Logo variant="wordmark" className="h-4" />
+                    <Logo variant="mark" className="h-4" />
                     <span className="text-sm font-semibold">Internal</span>
                 </Link>
             </div>
@@ -107,7 +107,7 @@ export function InternalShell({
                 {/* Mobile Top Bar */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-12 bg-background/95 backdrop-blur-sm border-b border-border/30 flex items-center justify-between px-4">
                     <Link href="/internal" className="flex items-center gap-2">
-                        <Logo variant="wordmark" className="h-4" />
+                        <Logo variant="mark" className="h-4" />
                         <span className="text-sm font-semibold">Internal</span>
                     </Link>
                     <button
