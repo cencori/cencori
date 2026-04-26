@@ -558,7 +558,7 @@ export async function POST(req: Request) {
     const { messages, model }: { messages: UIMessage[]; model?: string } = await req.json();
 
     const result = streamText({
-        model: cencori(model || 'gpt-4o'),
+        model: cencori('gpt-4o'),
         messages: await convertToModelMessages(messages),
     });
 
@@ -758,7 +758,7 @@ export function Chat() {
                     <div className="message-row assistant">
                         <div className="message-bubble assistant">
                             <div className="loading-indicator">
-                                Thinking <span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" />
+                                <span className="loading-dot" /><span className="loading-dot" /><span className="loading-dot" />
                             </div>
                         </div>
                     </div>
