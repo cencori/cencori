@@ -71,6 +71,7 @@ export function printSuccess(projectName: string, template: string, includeChat:
     const templateLabel = template === 'nextjs'
         ? 'Next.js + Vercel AI SDK'
         : 'TanStack + React Query';
+    const envFile = template === 'nextjs' ? '.env.local' : '.env';
 
     console.log();
     console.log(chalk.gray('  ─────────────────────────────────────────────'));
@@ -87,7 +88,7 @@ export function printSuccess(projectName: string, template: string, includeChat:
     console.log(`    ${chalk.cyan('cd')} ${projectName}`);
     console.log();
     console.log(`    ${chalk.gray('1.')} Add your API key:`);
-    console.log(`       Open ${chalk.cyan('.env.local')} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
+    console.log(`       Open ${chalk.cyan(envFile)} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
     console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
     console.log();
     console.log(`    ${chalk.gray('2.')} Start building:`);

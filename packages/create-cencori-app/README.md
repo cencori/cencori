@@ -13,7 +13,7 @@ That's it. The CLI will:
 1. Ask you to pick a framework (Next.js or TanStack)
 2. Scaffold a project with the Cencori SDK already wired up
 3. Create an API route ready for AI chat
-4. Set up a `.env.local` for your API key
+4. Set up the right env file for your template (`.env.local` for Next.js, `.env` for TanStack)
 5. Install dependencies
 
 Open the project, drop in your API key from [cencori.com/dashboard](https://cencori.com/dashboard/organizations), and you're making AI requests in under 5 minutes.
@@ -52,15 +52,9 @@ npx create-cencori-app my-project --template tanstack
 
 ## What You Get
 
-```
-my-project/
-├── app/api/chat/route.ts     ← AI chat route (ready to use)
-├── components/chat.tsx       ← Demo chat UI (optional)
-├── lib/cencori.ts            ← Shared Cencori client
-├── cencori.config.ts         ← Model selection, settings
-├── .env.local                ← Your API key goes here
-└── ...
-```
+Next.js projects include `app/api/chat/route.ts` and `.env.local`.
+
+TanStack projects include `server/index.ts`, `server/cencori.ts`, and `.env` so your API key stays on the server.
 
 ## Links
 
