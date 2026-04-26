@@ -2,7 +2,7 @@
  * TanStack Template
  *
  * Generates all files for a Vite + React + TanStack Query project
- * pre-wired to Cencori via the cencori/tanstack adapter.
+ * with a local API server that keeps the Cencori API key off the client.
  */
 
 export interface TemplateOptions {
@@ -22,12 +22,15 @@ export function getTanstackTemplate(options: TemplateOptions): Record<string, st
             private: true,
             type: 'module',
             scripts: {
-                dev: 'vite',
+                dev: 'concurrently "npm:dev:client" "npm:dev:server"',
+                'dev:client': 'vite',
+                'dev:server': 'tsx watch server/index.ts',
                 build: 'tsc -b && vite build',
                 preview: 'vite preview',
             },
             dependencies: {
                 cencori: '^1.2.0',
+                dotenv: '^16.4.5',
                 '@tanstack/react-query': '^5.90.0',
                 react: '^19.0.0',
                 'react-dom': '^19.0.0',
@@ -37,6 +40,8 @@ export function getTanstackTemplate(options: TemplateOptions): Record<string, st
                 '@types/react': '^19',
                 '@types/react-dom': '^19',
                 '@vitejs/plugin-react': '^4.0.0',
+                concurrently: '^9.1.2',
+                tsx: '^4.19.4',
                 typescript: '^5',
                 vite: '^6.0.0',
             },
@@ -64,11 +69,12 @@ export function getTanstackTemplate(options: TemplateOptions): Record<string, st
                 noUnusedLocals: true,
                 noUnusedParameters: true,
                 noFallthroughCasesInSwitch: true,
+                types: ['node'],
                 paths: {
                     '@/*': ['./src/*'],
                 },
             },
-            include: ['src'],
+            include: ['src', 'server'],
         },
         null,
         2
@@ -196,8 +202,9 @@ export function App() {
                 }}
             >
                 <p style={{ color: 'var(--muted)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                    Your Cencori client is ready. Import from{' '}
-                    <code>@/lib/cencori</code> and start building.
+                    Your local API route is ready at{' '}
+                    <code>/api/chat</code>. Add your API key to{' '}
+                    <code>.env</code> and start building.
                 </p>
             </div>
         </main>
@@ -557,31 +564,97 @@ code {
 }
 `;
 
-    // ── src/lib/cencori.ts ──
-    files['src/lib/cencori.ts'] = `import { Cencori } from 'cencori';
+    // ── server/cencori.ts ──
+    files['server/cencori.ts'] = `import { Cencori } from 'cencori';
 
 /**
- * Shared Cencori client instance.
+ * Shared Cencori client factory.
  *
- * All API calls import from here — one client, every primitive.
- * When new Cencori products ship (Compute, Workflow, Storage),
- * they're accessible from this same instance.
+ * Keep your API key on the server by creating the SDK client here.
  */
-export const cencori = new Cencori({
-    apiKey: import.meta.env.VITE_CENCORI_API_KEY,
-});
+export function getCencori() {
+    const apiKey = process.env.CENCORI_API_KEY;
+
+    if (!apiKey) {
+        throw new Error('CENCORI_API_KEY is not set. Add it to your .env file.');
+    }
+
+    return new Cencori({ apiKey });
+}
 `;
 
-    // Update .env to use VITE_ prefix
+    // ── .env ──
     files['.env'] = `# Get your API key at https://cencori.com/dashboard
-VITE_CENCORI_API_KEY=${options.apiKey || ''}
+CENCORI_API_KEY=${options.apiKey || ''}
+`;
+
+    // ── server/index.ts ──
+    files['server/index.ts'] = `import 'dotenv/config';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { getCencori } from './cencori';
+
+interface Message {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+
+    if (chunks.length === 0) {
+        return {};
+    }
+
+    return JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown) {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(body));
+}
+
+const server = createServer(async (req, res) => {
+    if (req.url === '/api/chat') {
+        if (req.method !== 'POST') {
+            sendJson(res, 405, { error: 'Method not allowed' });
+            return;
+        }
+
+        try {
+            const { messages = [], model = 'gpt-4o' } = await readJsonBody(req) as {
+                messages?: Message[];
+                model?: string;
+            };
+
+            const cencori = getCencori();
+            const response = await cencori.ai.chat({ model, messages });
+
+            sendJson(res, 200, { content: response.content });
+        } catch (error) {
+            sendJson(res, 500, {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+
+        return;
+    }
+
+    sendJson(res, 404, { error: 'Not found' });
+});
+
+server.listen(3001, () => {
+    console.log('Cencori API server running at http://localhost:3001');
+});
 `;
 
     // ── src/lib/use-chat.ts — lightweight chat hook ──
     if (options.includeChat) {
         files['src/lib/use-chat.ts'] = `import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { cencori } from './cencori';
 
 interface Message {
     id: string;
@@ -590,9 +663,8 @@ interface Message {
 }
 
 /**
- * Lightweight chat hook using TanStack Query + Cencori SDK.
+ * Lightweight chat hook using TanStack Query + the local API server.
  *
- * For streaming, use the cencori/tanstack adapter directly.
  * This hook provides a simple request/response pattern.
  */
 export function useChat() {
@@ -600,36 +672,44 @@ export function useChat() {
     const [input, setInput] = useState('');
 
     const mutation = useMutation({
-        mutationFn: async (userMessage: string) => {
-            const newMessages = [
-                ...messages,
-                { id: crypto.randomUUID(), role: 'user' as const, content: userMessage },
-            ];
-
-            const response = await cencori.ai.chat({
-                model: 'gpt-4o',
-                messages: newMessages.map((m) => ({
-                    role: m.role,
-                    content: m.content,
-                })),
+        mutationFn: async (nextMessages: Message[]) => {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: nextMessages.map((m) => ({
+                        role: m.role,
+                        content: m.content,
+                    })),
+                }),
             });
 
-            return { userMessage, assistantMessage: response.content };
+            const data = await response.json().catch(() => null) as
+                | { content?: string; error?: string }
+                | null;
+
+            if (!response.ok) {
+                throw new Error(data?.error || 'Failed to generate a response.');
+            }
+
+            if (!data?.content) {
+                throw new Error('The chat API returned an empty response.');
+            }
+
+            return data.content;
         },
-        onMutate: (userMessage) => {
-            const userMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'user',
-                content: userMessage,
-            };
-            setMessages((prev) => [...prev, userMsg]);
+        onMutate: (nextMessages) => {
+            setMessages(nextMessages);
             setInput('');
         },
-        onSuccess: (data) => {
+        onSuccess: (assistantMessage) => {
             const assistantMsg: Message = {
                 id: crypto.randomUUID(),
                 role: 'assistant',
-                content: data.assistantMessage,
+                content: assistantMessage,
             };
             setMessages((prev) => [...prev, assistantMsg]);
         },
@@ -638,14 +718,24 @@ export function useChat() {
     const handleSubmit = useCallback(
         (e: React.FormEvent) => {
             e.preventDefault();
-            if (!input.trim() || mutation.isPending) return;
-            mutation.mutate(input.trim());
+            const userMessage = input.trim();
+
+            if (!userMessage || mutation.isPending) return;
+
+            mutation.mutate([
+                ...messages,
+                {
+                    id: crypto.randomUUID(),
+                    role: 'user',
+                    content: userMessage,
+                },
+            ]);
         },
-        [input, mutation]
+        [input, messages, mutation]
     );
 
     const handleInputChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
+        (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => {
             setInput(e.target.value);
         },
         []
@@ -677,7 +767,7 @@ const ArrowUpIcon = () => (
 
 export function Chat() {
     const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
-        useChat({ api: '/api/chat' });
+        useChat();
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -715,7 +805,7 @@ export function Chat() {
                             <img src="/logos/ww.png" alt="Cencori" className="welcome-logo logo-dark" />
                             <img src="/logos/bw.png" alt="Cencori" className="welcome-logo logo-light" />
                             <div className="welcome-text">
-                                <p style={{ marginBottom: '0.5rem' }}>1.Confirm your Cencori API key in your .env.</p>
+                                <p style={{ marginBottom: '0.5rem' }}>1. Confirm your Cencori API key in .env.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>2. Get started by typing a message below and send.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>3. See the AI stream instantly.</p>
                             </div>
@@ -853,21 +943,29 @@ AI app powered by [Cencori](https://cencori.com).
 
 \`\`\`bash
 # 1. Add your API key
-#    Open .env and set VITE_CENCORI_API_KEY=csk_...
+#    Open .env and set CENCORI_API_KEY=csk_...
 #    Get a key at https://cencori.com/dashboard
 
-# 2. Start the dev server
+# 2. Start the frontend and local API server
 npm run dev
 
 # 3. Open http://localhost:3000
 \`\`\`
 
+## API
+
+| Route | Description |
+|-------|-------------|
+| \`POST /api/chat\` | Local API proxy that keeps your Cencori API key on the server |
+
 ## Using the SDK
 
-Import the shared Cencori client from \`src/lib/cencori.ts\`:
+Server-side calls use the shared helper in \`server/cencori.ts\`:
 
 \`\`\`typescript
-import { cencori } from '@/lib/cencori';
+import { getCencori } from './server/cencori';
+
+const cencori = getCencori();
 
 // Chat
 const response = await cencori.ai.chat({

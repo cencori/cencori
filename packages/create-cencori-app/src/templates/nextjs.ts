@@ -543,7 +543,7 @@ code {
 
     // ── app/api/chat/route.ts ──
     files['app/api/chat/route.ts'] = `import { cencori } from 'cencori/vercel';
-import { streamText } from 'ai';
+import { convertToModelMessages, streamText, type UIMessage } from 'ai';
 
 /**
  * POST /api/chat
@@ -555,14 +555,14 @@ import { streamText } from 'ai';
  * in cencori.config.ts.
  */
 export async function POST(req: Request) {
-    const { messages, model } = await req.json();
+    const { messages, model }: { messages: UIMessage[]; model?: string } = await req.json();
 
     const result = streamText({
         model: cencori(model || 'gpt-4o'),
-        messages,
+        messages: await convertToModelMessages(messages),
     });
 
-    return result.toDataStreamResponse();
+    return result.toUIMessageStreamResponse();
 }
 `;
 
@@ -646,6 +646,12 @@ const ArrowUpIcon = () => (
     </svg>
 );
 
+function getMessageText(message: { parts: Array<{ type: string; text?: string }> }) {
+    return message.parts
+        .map((part) => (part.type === 'text' ? part.text || '' : ''))
+        .join('');
+}
+
 export function Chat() {
     const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
         useChat({ api: '/api/chat' });
@@ -686,7 +692,7 @@ export function Chat() {
                             <img src="/logos/ww.png" alt="Cencori" className="welcome-logo logo-dark" />
                             <img src="/logos/bw.png" alt="Cencori" className="welcome-logo logo-light" />
                             <div className="welcome-text">
-                                <p style={{ marginBottom: '0.5rem' }}>1.Confirm your Cencori API key in your .env.</p>
+                                <p style={{ marginBottom: '0.5rem' }}>1. Confirm your Cencori API key in .env.local.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>2. Get started by typing a message below and send.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>3. See the AI stream instantly.</p>
                             </div>
@@ -732,7 +738,7 @@ export function Chat() {
                 {messages.map((message) => (
                     <div key={message.id} className={\`message-row \${message.role}\`}>
                         <div className={\`message-bubble \${message.role}\`}>
-                            {message.content}
+                            {getMessageText(message)}
                         </div>
                     </div>
                 ))}

@@ -18,10 +18,11 @@ import { select, confirm, password } from '@inquirer/prompts';
 import { validateProjectName, writeTemplateFiles, runInstall, printSuccess } from './utils';
 import { getNextjsTemplate } from './templates/nextjs';
 import { getTanstackTemplate } from './templates/tanstack';
+import packageJson from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const VERSION = '1.0.0';
+const VERSION = packageJson.version;
 
 type Template = 'nextjs' | 'tanstack';
 
