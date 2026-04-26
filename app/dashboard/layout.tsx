@@ -237,7 +237,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/dashboard/organizations" className="flex items-center">
-            <Logo variant="wordmark" className="h-4" />
+            <Logo variant="mark" className="h-4" />
           </Link>
           {/* Breadcrumbs - hidden on mobile */}
           <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm hidden lg:block" aria-hidden>

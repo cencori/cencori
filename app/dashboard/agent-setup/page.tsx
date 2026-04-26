@@ -237,7 +237,7 @@ export default function AgentSetupPage() {
         <div className="min-h-screen flex items-center justify-center p-4">
             <div className="w-full max-w-md space-y-6">
                 <div className="text-center space-y-2">
-                    <Logo variant="wordmark" className="h-6 mx-auto mb-4" />
+                    <Logo variant="mark" className="h-6 mx-auto mb-4" />
                     <h1 className="text-lg font-semibold">Connect Agent</h1>
                     <p className="text-xs text-muted-foreground">
                         Your terminal is waiting. Select a project and agent to connect.
