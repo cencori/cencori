@@ -356,21 +356,21 @@ Here's the most common use case: a Next.js chat application powered by Cencori a
 ```typescript
 // app/api/chat/route.ts
 import { cencori } from 'cencori/vercel';
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
     model: cencori('gemini-2.5-flash'),
     system: `You are a helpful AI assistant for our platform. 
              Be concise, friendly, and accurate.
              If unsure, say so rather than making things up.`,
-    messages,
+    messages: convertToModelMessages(messages),
     maxTokens: 1000,
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
 ```
 

@@ -109,17 +109,17 @@ export async function POST(req: NextRequest) {
                     language="typescript"
                     filename="app/api/chat/route.ts"
                     code={`import { cencori } from 'cencori/vercel';
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = await streamText({
     model: cencori('gpt-4o'),
-    messages,
+    messages: convertToModelMessages(messages),
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }`}
                 />
             </div>
