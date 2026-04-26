@@ -35,18 +35,18 @@ export { cencori };
 
 ```typescript
 // app/api/chat/route.ts
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { cencori } from '@/lib/cencori';
 
 export async function POST(req: Request) {
-  const { messages, model = 'gpt-4o' } = await req.json();
+  const { messages, model = 'gpt-4o' }: { messages: UIMessage[]; model?: string } = await req.json();
 
   const result = streamText({
     model: cencori(model),
-    messages,
+    messages: convertToModelMessages(messages),
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
 ```
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 ```tsx
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat({

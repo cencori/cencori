@@ -175,7 +175,7 @@ for await (const chunk of result.textStream) {
 
 ```typescript
 import { cencori } from 'cencori/vercel';
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat({
