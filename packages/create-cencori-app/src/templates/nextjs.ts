@@ -28,7 +28,7 @@ export function getNextjsTemplate(options: TemplateOptions): Record<string, stri
             },
             dependencies: {
                 ai: '^6.0.0',
-                '@ai-sdk/react': '^1.0.0',
+                '@ai-sdk/react': '^3.0.0',
                 cencori: '^1.2.0',
                 next: '^15.0.0',
                 react: '^19.0.0',
@@ -637,7 +637,7 @@ export default function Home() {
         files['components/chat.tsx'] = `'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 const ArrowUpIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -653,10 +653,11 @@ function getMessageText(message: { parts: Array<{ type: string; text?: string }>
 }
 
 export function Chat() {
-    const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
-        useChat({ api: '/api/chat' });
+    const [input, setInput] = useState('');
+    const { messages, sendMessage, status, error } = useChat({ api: '/api/chat' });
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const isLoading = status !== 'ready';
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -675,11 +676,21 @@ export function Chat() {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (input.trim() && !isLoading) {
-                // Manually trigger submit since we're intercepting Enter
-                const formEvent = new Event('submit', { bubbles: true, cancelable: true }) as any;
-                handleSubmit(formEvent);
+                const message = input.trim();
+                setInput('');
+                void sendMessage({ text: message });
             }
         }
+    };
+
+    const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!input.trim() || isLoading) return;
+
+        const message = input.trim();
+        setInput('');
+        void sendMessage({ text: message });
     };
 
     return (
@@ -763,12 +774,12 @@ export function Chat() {
             {/* Input Area */}
             <div className="chat-input-wrapper">
                 <div className="chat-input-container">
-                    <form onSubmit={handleSubmit} className="chat-form">
+                    <form onSubmit={onSubmit} className="chat-form">
                         <textarea
                             ref={inputRef}
                             name="prompt"
                             value={input}
-                            onChange={handleInputChange}
+                            onChange={(e) => setInput(e.target.value)}
                             onKeyDown={onKeyDown}
                             placeholder="Ask a question..."
                             className="chat-input"
