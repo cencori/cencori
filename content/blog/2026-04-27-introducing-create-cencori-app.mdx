@@ -1,0 +1,83 @@
+---
+title: "The Step-by-Step Guide to Launching AI Apps with Cencori"
+slug: "guide-to-create-cencori-app"
+date: "2026-04-27"
+excerpt: "Learn how to go from zero to a production-ready AI application in less than 60 seconds using our new specialized CLI."
+coverImage: "/blog/images/covers/build.png"
+tags: ["Guide", "Engineering", "Next.js", "TanStack", "AI"]
+category: "engineering"
+published: true
+---
+
+Building AI applications often feels like assembling a 1,000-piece puzzle where half the pieces are infrastructure boilerplate. You need streaming routes, provider adapters, client instances, and a responsive UI—all before you even write your first prompt.
+
+Today, we're simplifying this with **`cencori app`**. This guide walks you through the 60-second path to a running AI application.
+
+## Step 1: Initialize your Project
+
+The beauty of `create-cencori-app` is that you don't need to clone any repositories or manage boilerplate yourself. Just run the following command in your terminal:
+
+```bash
+npx create-cencori-app my-ai-app
+```
+
+## Step 2: Choose your Foundation
+
+The CLI will guide you through an interactive setup process. You'll need to make two primary decisions:
+
+1.  **Select a Framework**: 
+    - **Next.js**: The recommended choice for full-stack applications. It comes pre-wired with the Vercel AI SDK and App Router.
+    - **TanStack**: Choose this for lightweight Vite-based applications using React Query for data fetching.
+2.  **Include Demo Chat UI?**: 
+    - Select **Yes** to inject a pre-built chat component. This gives you a premium, production-ready interface out of the box.
+
+## Step 3: Configure your API Key
+
+Once the project is scaffolded, navigate into the directory:
+
+```bash
+cd my-ai-app
+```
+
+Open the `.env.local` file (for Next.js) or `.env` (for TanStack). You'll see a placeholder for your Cencori API key. 
+
+```env
+# Get your key at https://cencori.com/dashboard
+CENCORI_API_KEY=csk_your_actual_key_here
+```
+
+> [!TIP]
+> If you provided your key during the CLI prompts, this step is already done for you!
+
+## Step 4: Launch and Test
+
+Now, start your development server:
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser. If you opted for the Chat UI, you'll see a minimalist, high-end interface ready for its first message. 
+
+Type a question, and watch as Cencori handles the streaming, model routing, and security policies in the background.
+
+## Step 5: Advanced Customization
+
+Your project includes a `cencori.config.ts` file. This is where you can easily swap models or adjust settings without touching your application logic.
+
+To change your default model from GPT-4o to Claude 3.5 Sonnet, simply update the config:
+
+```typescript
+// cencori.config.ts
+export const cencoriConfig = {
+    defaultModel: 'claude-3-5-sonnet',
+    // ...
+};
+```
+
+## Build your AI Future
+
+You now have a production-grade AI infrastructure. From here, you can start building your unique AI experience, leveraging Cencori's unified gateway to access any model with built-in security and failover.
+
+Start building today at [cencori.com/docs](https://cencori.com/docs).
