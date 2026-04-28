@@ -137,12 +137,12 @@ export default function VibeCodersPage() {
                             For Vibe Coders
                         </p>
                         <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4.25rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-8 max-w-3xl animate-appear [animation-delay:100ms]">
-                            Your weekend prototype
+                            AI writes the code.
                             <br />
-                            <span className="text-muted-foreground">deserves production</span>
+                            <span className="text-muted-foreground">Cencori handles the rest</span>
                         </h1>
                         <p className="text-base sm:text-lg text-muted-foreground leading-[1.7] max-w-[28rem] mb-12 animate-appear [animation-delay:200ms]">
-                            AI writes the code. Cencori handles the security, observability, and cost control so you can keep shipping.
+                            
                         </p>
                         <div className="flex gap-4 animate-appear [animation-delay:300ms]">
                             <Link href="/login">
