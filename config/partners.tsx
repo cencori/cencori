@@ -1,5 +1,6 @@
 import { PartnerConfig } from "@/types/partner";
 import React from "react";
+import Image from "next/image";
 import {
     CursorLogo,
     VSCodeLogo,
@@ -15,6 +16,7 @@ import {
     SvelteLogo,
     ViteLogo,
     PythonLogo,
+    RagMetricsLogo,
 } from "@/components/icons/BrandIcons";
 
 export const partners: Record<string, PartnerConfig> = {
@@ -166,16 +168,7 @@ export const partners: Record<string, PartnerConfig> = {
         slug: "ragmetrics",
         name: "RagMetrics",
         category: "AI Evaluation",
-        logo: ({ className }: { className?: string }) => (
-            <div className={className + " relative"}>
-                <Image 
-                    src="/partners/ragmetrics/logo.png" 
-                    alt="RagMetrics Logo" 
-                    fill 
-                    className="object-contain"
-                />
-            </div>
-        ),
+        logo: RagMetricsLogo,
         websiteUrl: "https://ragmetrics.ai",
         docsUrl: "https://docs.ragmetrics.ai",
         screenshots: ["/partners/ragmetrics/1.png", "/partners/ragmetrics/2.png", "/partners/ragmetrics/3.png"],
@@ -260,19 +253,7 @@ export const partners: Record<string, PartnerConfig> = {
             secondaryCta: { text: "View Criteria", href: "https://docs.ragmetrics.ai" },
         },
         integrations: {
-            editors: [{ 
-                name: "RagMetrics", 
-                logo: ({ className }: { className?: string }) => (
-                    <div className={className + " relative"}>
-                        <Image 
-                            src="/partners/ragmetrics/logo.png" 
-                            alt="RagMetrics Logo" 
-                            fill 
-                            className="object-contain"
-                        />
-                    </div>
-                )
-            }],
+            editors: [{ name: "RagMetrics", logo: RagMetricsLogo }],
             platforms: [{ name: "Next.js", logo: NextjsLogo }],
             frameworks: [{ name: "Python", logo: PythonLogo }],
         },
