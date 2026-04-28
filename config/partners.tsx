@@ -166,7 +166,16 @@ export const partners: Record<string, PartnerConfig> = {
         slug: "ragmetrics",
         name: "RagMetrics",
         category: "AI Evaluation",
-        logo: () => <div className="h-full w-full bg-foreground/[0.03]" />,
+        logo: ({ className }: { className?: string }) => (
+            <div className={className + " relative"}>
+                <Image 
+                    src="/partners/ragmetrics/logo.png" 
+                    alt="RagMetrics Logo" 
+                    fill 
+                    className="object-contain"
+                />
+            </div>
+        ),
         websiteUrl: "https://ragmetrics.ai",
         docsUrl: "https://docs.ragmetrics.ai",
         screenshots: ["/partners/ragmetrics/1.png", "/partners/ragmetrics/2.png", "/partners/ragmetrics/3.png"],
@@ -251,7 +260,19 @@ export const partners: Record<string, PartnerConfig> = {
             secondaryCta: { text: "View Criteria", href: "https://docs.ragmetrics.ai" },
         },
         integrations: {
-            editors: [{ name: "RagMetrics", logo: () => <div className="h-full w-full bg-foreground/[0.03]" /> }],
+            editors: [{ 
+                name: "RagMetrics", 
+                logo: ({ className }: { className?: string }) => (
+                    <div className={className + " relative"}>
+                        <Image 
+                            src="/partners/ragmetrics/logo.png" 
+                            alt="RagMetrics Logo" 
+                            fill 
+                            className="object-contain"
+                        />
+                    </div>
+                )
+            }],
             platforms: [{ name: "Next.js", logo: NextjsLogo }],
             frameworks: [{ name: "Python", logo: PythonLogo }],
         },
