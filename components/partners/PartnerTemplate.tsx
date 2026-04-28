@@ -91,7 +91,11 @@ export function PartnerTemplate({ config, isAuthenticated, userProfile }: Partne
                                     <Reveal key={i} delay={i * 0.1}>
                                         <div className="aspect-[16/10] bg-foreground/[0.03] border border-border/5 overflow-hidden group relative">
                                             <div className="absolute inset-0 bg-foreground/[0.05] group-hover:bg-foreground/[0.02] transition-colors duration-700" />
-                                            {/* <img src={src} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-700" /> */}
+                                            <img 
+                                                src={src} 
+                                                alt={`Screenshot ${i + 1}`}
+                                                className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-700" 
+                                            />
                                             <div className="absolute top-4 left-4 text-[8px] font-mono text-muted-foreground uppercase opacity-0 group-hover:opacity-100 transition-opacity">
                                                 Visual_{i + 1}.bin
                                             </div>
