@@ -31,7 +31,7 @@ export default function PartnerPage() {
         };
         checkAuth();
 
-        const { data: listener } = supabase.auth.onAuthStateChange((_ev: any, session) => {
+        const { data: listener } = supabase.auth.onAuthStateChange((_ev: any, session: any) => {
             if (session) {
                 setIsAuthenticated(true);
                 const m = session.user.user_metadata ?? {};
