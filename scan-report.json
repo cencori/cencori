@@ -1719,7 +1719,7 @@
       "type": "route",
       "severity": "high",
       "name": "Admin Route Exposed",
-      "file": "app/(products)/storage/page.tsx",
+      "file": "app/(products)/memory/page.tsx",
       "line": 119,
       "column": 36,
       "match": "\"/dashboard/organizations\"",

@@ -65,7 +65,7 @@ export default function AIBuildersPage() {
         { icon: Share2, title: "Gateway", description: "Universal API for all LLMs." },
         { icon: Cpu, title: "Compute", description: "Serverless code execution for agents." },
         { icon: Workflow, title: "Workflow", description: "Orchestrate complex AI chains." },
-        { icon: Database, title: "Storage", description: "Vector DB and semantic cache." },
+        { icon: Database, title: "Memory", description: "Vector DB and semantic cache." },
         { icon: Layers, title: "Integration", description: "Connect to the world's APIs." },
     ];
 
@@ -97,7 +97,7 @@ export default function AIBuildersPage() {
                         </h1>
 
                         <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-10 animate-appear [animation-delay:200ms] leading-relaxed">
-                            Don't stitch together 10 different tools. Cencori gives you Gateway, Compute, and Storage in one platform.
+                            Don't stitch together 10 different tools. Cencori gives you Gateway, Compute, and Memory in one platform.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-3 animate-appear [animation-delay:300ms]">
@@ -182,7 +182,7 @@ export default function AIBuildersPage() {
                                             <div className="bg-background border border-border/50 p-3 rounded text-center text-xs font-medium">Gateway</div>
                                             <div className="bg-background border border-border/50 p-3 rounded text-center text-xs font-medium">Security</div>
                                             <div className="bg-background border border-border/50 p-3 rounded text-center text-xs font-medium">Compute</div>
-                                            <div className="bg-background border border-border/50 p-3 rounded text-center text-xs font-medium">Storage</div>
+                                            <div className="bg-background border border-border/50 p-3 rounded text-center text-xs font-medium">Memory</div>
                                         </div>
                                     </div>
 

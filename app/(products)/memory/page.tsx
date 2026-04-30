@@ -68,7 +68,7 @@ const colorClasses: Record<string, { bg: string; border: string; text: string }>
     purple: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-500" },
 };
 
-export default function StoragePage() {
+export default function MemoryPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null }>({ name: null, avatar: null });
 
@@ -147,7 +147,7 @@ export default function StoragePage() {
 
                         {/* Headline */}
                         <h1 className="mb-8 max-w-3xl text-[3rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[4.5rem] lg:text-[5.5rem] text-foreground">
-                            <span className="font-serif italic font-normal text-muted-foreground">Data Storage.</span>
+                            <span className="font-serif italic font-normal text-muted-foreground">Memory</span>
                         </h1>
 
                         {/* Subheadline */}
@@ -157,7 +157,7 @@ export default function StoragePage() {
 
                         {/* CTAs */}
                         <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
-                            <WaitlistModal productName="Storage">
+                            <WaitlistModal productName="Memory">
                                 <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
                                     Join the Waitlist
                                 </Button>

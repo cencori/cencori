@@ -18,7 +18,7 @@ class VectorsNamespace {
     async search(query: string, options?: VectorSearchOptions): Promise<never> {
         throw new Error(
             `cencori.storage.vectors.search() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 
@@ -30,7 +30,7 @@ class VectorsNamespace {
     async upsert(vectors: { id: string; values: number[]; metadata?: Record<string, unknown> }[]): Promise<never> {
         throw new Error(
             `cencori.storage.vectors.upsert() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 
@@ -42,7 +42,7 @@ class VectorsNamespace {
     async delete(ids: string[]): Promise<never> {
         throw new Error(
             `cencori.storage.vectors.delete() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 }
@@ -56,7 +56,7 @@ class KnowledgeNamespace {
     async query(question: string): Promise<never> {
         throw new Error(
             `cencori.storage.knowledge.query() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 
@@ -68,7 +68,7 @@ class KnowledgeNamespace {
     async add(documents: { content: string; metadata?: Record<string, unknown> }[]): Promise<never> {
         throw new Error(
             `cencori.storage.knowledge.add() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 }
@@ -82,7 +82,7 @@ class FilesNamespace {
     async upload(file: Blob | Buffer, name: string): Promise<never> {
         throw new Error(
             `cencori.storage.files.upload() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 
@@ -94,7 +94,7 @@ class FilesNamespace {
     async process(fileId: string): Promise<never> {
         throw new Error(
             `cencori.storage.files.process() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/storage`
+            `Join our waitlist at https://cencori.com/memory`
         );
     }
 }

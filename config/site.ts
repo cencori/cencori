@@ -18,7 +18,7 @@ export const siteConfig = {
       compute: "/compute",
       integrations: "/integration",
       workflow: "/workflow",
-      storage: "/storage",
+      memory: "/memory",
       audit: "/audit",
       knight: "/product-knight",
       sandbox: "/product-sandbox",
