@@ -151,7 +151,7 @@ const productMenuColumns: NavLink[][] = [
     ],
     [
         { title: "Workflow", href: siteConfig.links.products.workflow, description: "Visual orchestration for AI systems.", icon: renderMenuIcon(WorkflowCircle01Icon) },
-        { title: "Memory & RAG", href: siteConfig.links.products.storage, description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
+        { title: "Memory", href: siteConfig.links.products.memory, description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
         { title: "Edge", href: siteConfig.links.products.edge, description: "Platform and runtime integrations.", icon: renderMenuIcon(Compass01Icon) },
         { title: "Enterprise", href: siteConfig.links.products.enterprise, description: "Governance for regulated AI teams.", icon: renderMenuIcon(House01Icon) },
     ],
