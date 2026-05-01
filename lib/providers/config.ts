@@ -213,6 +213,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', type: 'chat', contextWindow: 256000, description: 'Access any model' },
             { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5 (via OpenRouter)', type: 'chat', contextWindow: 200000, description: 'Unified billing' },
             { id: 'google/gemini-3-pro', name: 'Gemini 3 Pro (via OpenRouter)', type: 'chat', contextWindow: 2000000, description: 'Meta-provider' },
+            { id: 'x-ai/grok-4.3', name: 'Grok 4.3 (via OpenRouter)', type: 'reasoning', contextWindow: 1000000, description: 'Latest xAI reasoning model' },
             { id: 'x-ai/grok-4', name: 'Grok 4 (via OpenRouter)', type: 'chat', contextWindow: 256000, description: 'Access xAI models' },
         ],
     },
@@ -224,7 +225,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.x.ai',
         keyPrefix: 'xai-',
         models: [
-            // Grok Voice Series (latest)
+            // Grok 4.3 Series (April 2026)
+            { id: 'grok-4.3', name: 'Grok 4.3', type: 'reasoning', contextWindow: 1000000, description: 'Latest xAI reasoning model with text and image input' },
+            // Grok Voice Series
             { id: 'grok-voice-think-fast', name: 'Grok Voice Think Fast 1.0', type: 'chat', contextWindow: 256000, description: 'State-of-the-art voice model for complex, multi-step workflows' },
             // Grok 4 Series (July-Nov 2025)
             { id: 'grok-4', name: 'Grok 4', type: 'chat', contextWindow: 256000, description: 'Enhanced reasoning, real-time search' },
