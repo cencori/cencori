@@ -45,6 +45,25 @@ function isTemplate(value: string | undefined): value is Template {
     return value !== undefined && TEMPLATES.includes(value as Template);
 }
 
+const CENCORI_API_URL = 'https://cencori.com';
+
+async function verifyApiKey(apiKey: string): Promise<boolean> {
+    if (!apiKey) return true;
+    try {
+        // Use projects endpoint which requires auth
+        const response = await fetch(`${CENCORI_API_URL}/api/projects`, {
+            method: 'GET',
+            headers: {
+                'CENCORI_API_KEY': apiKey,
+            },
+            signal: AbortSignal.timeout(5000),
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
 async function main(): Promise<void> {
     program
         .name('create-cencori-app')
@@ -124,6 +143,25 @@ async function main(): Promise<void> {
                     }
                 } catch {
                     // User cancelled — skip
+                }
+            }
+
+            // ── Verify API key ──
+            if (apiKey) {
+                const verifySpinner = ora({
+                    text: 'Verifying API key...',
+                    color: 'cyan',
+                }).start();
+
+                const isValid = await verifyApiKey(apiKey);
+
+                if (isValid) {
+                    verifySpinner.succeed('API key verified');
+                } else {
+                    verifySpinner.fail('Invalid API key');
+                    console.log(chalk.gray(`  Get one at ${chalk.cyan('https://cencori.com/dashboard')}`));
+                    console.log();
+                    process.exit(1);
                 }
             }
 
