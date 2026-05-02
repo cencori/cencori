@@ -25,6 +25,7 @@ import * as path from 'path';
 const VERSION = packageJson.version;
 
 type Template = 'nextjs' | 'tanstack';
+const TEMPLATES: Template[] = ['nextjs', 'tanstack'];
 
 interface CreateOptions {
     template?: Template;
@@ -38,6 +39,10 @@ function printBanner(): void {
     console.log(chalk.cyan.bold('  Cencori') + chalk.gray(' — Create App'));
     console.log(chalk.gray(`  v${VERSION}`));
     console.log();
+}
+
+function isTemplate(value: string | undefined): value is Template {
+    return value !== undefined && TEMPLATES.includes(value as Template);
 }
 
 async function main(): Promise<void> {
@@ -71,9 +76,17 @@ async function main(): Promise<void> {
             }
 
             // ── Interactive prompts (if flags not provided) ──
-            let template: Template = options.template as Template;
+            if (options.template && !isTemplate(options.template)) {
+                console.log(chalk.red(`  ✖ Invalid template "${options.template}".`));
+                console.log(chalk.gray(`    Choose one of: ${TEMPLATES.join(', ')}.`));
+                console.log();
+                process.exit(1);
+            }
+
+            let template: Template | undefined = options.template;
             let includeChat = options.chat !== false;
             let apiKey = options.apiKey || '';
+            const chatOptionSource = program.getOptionValueSource('chat');
 
             if (!template) {
                 template = await select<Template>({
@@ -93,7 +106,7 @@ async function main(): Promise<void> {
                 });
             }
 
-            if (options.chat === undefined) {
+            if (chatOptionSource === 'default' && process.stdin.isTTY) {
                 includeChat = await confirm({
                     message: 'Include a demo chat UI?',
                     default: true,

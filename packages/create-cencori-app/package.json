@@ -30,7 +30,9 @@
     "homepage": "https://cencori.com",
     "scripts": {
         "build": "tsup",
-        "dev": "tsup --watch"
+        "dev": "tsup --watch",
+        "test": "npm run build && node --test test/*.test.mjs",
+        "prepublishOnly": "npm run build"
     },
     "dependencies": {
         "@inquirer/prompts": "^8.2.0",
