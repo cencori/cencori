@@ -28,6 +28,7 @@ Options:
   --no-chat                  Skip the demo chat UI component
   --no-install               Skip installing dependencies
   --api-key <key>            Pre-fill your Cencori API key
+  --dev                      Start the dev server after scaffolding
   -V, --version              Output the version number
   -h, --help                 Display help
 ```
