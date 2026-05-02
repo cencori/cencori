@@ -90,7 +90,7 @@ export async function runInstall(targetDir: string): Promise<void> {
 /**
  * Print the success message with next steps
  */
-export function printSuccess(projectName: string, template: string, includeChat: boolean): void {
+export function printSuccess(projectName: string, template: string, includeChat: boolean, startDev = false): void {
     const templateLabel = template === 'nextjs'
         ? 'Next.js + Vercel AI SDK'
         : 'TanStack + React Query';
@@ -104,20 +104,25 @@ export function printSuccess(projectName: string, template: string, includeChat:
     if (includeChat) {
         console.log(chalk.gray(`  Chat UI: included`));
     }
+    if (startDev) {
+        console.log(chalk.gray(`  Dev server: starting`));
+    }
     console.log();
 
-    console.log(`  ${chalk.bold('Next steps:')}`);
-    console.log();
-    console.log(`    ${chalk.cyan('cd')} ${projectName}`);
-    console.log();
-    console.log(`    ${chalk.gray('1.')} Add your API key:`);
-    console.log(`       Open ${chalk.cyan(envFile)} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
-    console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
-    console.log();
-    console.log(`    ${chalk.gray('2.')} Start building:`);
-    console.log(`       ${chalk.cyan('npm run dev')}`);
-    console.log();
-    console.log(`    ${chalk.gray('3.')} Open ${chalk.cyan('http://localhost:3000')}`);
+    if (!startDev) {
+        console.log(`  ${chalk.bold('Next steps:')}`);
+        console.log();
+        console.log(`    ${chalk.cyan('cd')} ${projectName}`);
+        console.log();
+        console.log(`    ${chalk.gray('1.')} Add your API key:`);
+        console.log(`       Open ${chalk.cyan(envFile)} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
+        console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
+        console.log();
+        console.log(`    ${chalk.gray('2.')} Start building:`);
+        console.log(`       ${chalk.cyan('npm run dev')}`);
+        console.log();
+        console.log(`    ${chalk.gray('3.')} Open ${chalk.cyan('http://localhost:3000')}`);
+    }
     console.log();
     console.log(chalk.gray('  ─────────────────────────────────────────────'));
     console.log();

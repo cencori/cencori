@@ -21,6 +21,7 @@ import { getTanstackTemplate } from './templates/tanstack';
 import packageJson from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawn } from 'child_process';
 
 const VERSION = packageJson.version;
 
@@ -32,6 +33,7 @@ interface CreateOptions {
     chat?: boolean;
     install?: boolean;
     apiKey?: string;
+    dev?: boolean;
 }
 
 function printBanner(): void {
@@ -74,6 +76,7 @@ async function main(): Promise<void> {
         .option('--no-chat', 'Skip the demo chat UI component')
         .option('--no-install', 'Skip installing dependencies')
         .option('--api-key <key>', 'Pre-fill your Cencori API key')
+        .option('--dev', 'Start the dev server after scaffolding')
         .action(async (projectName: string, options: CreateOptions) => {
             printBanner();
 
@@ -105,6 +108,7 @@ async function main(): Promise<void> {
             let template: Template | undefined = options.template;
             let includeChat = options.chat !== false;
             let apiKey = options.apiKey || '';
+            const startDev = options.dev === true;
             const chatOptionSource = program.getOptionValueSource('chat');
 
             if (!template) {
@@ -222,7 +226,14 @@ async function main(): Promise<void> {
             }
 
             // ── Success ──
-            printSuccess(projectName, template, includeChat);
+            printSuccess(projectName, template, includeChat, startDev);
+
+            // ── Start dev server ──
+            if (startDev && options.install !== false) {
+                console.log(chalk.cyan('Starting dev server...'));
+                console.log();
+                spawn('npm', ['run', 'dev'], { cwd: targetDir, stdio: 'inherit' });
+            }
         });
 
     program.parse();
