@@ -11,7 +11,7 @@ published: true
 
 Building AI applications often feels like assembling a 1,000-piece puzzle where half the pieces are infrastructure boilerplate. You need streaming routes, provider adapters, client instances, and a responsive UI—all before you even write your first prompt.
 
-Today, we're simplifying this with **`cencori app`**. This guide walks you through the 60-second path to a running AI application.
+Today, we're simplifying this with **`create-cencori-app`**. This guide walks you through the 60-second path to a running AI application.
 
 ## Step 1: Initialize your Project
 
@@ -29,7 +29,7 @@ The CLI will guide you through an interactive setup process. You'll need to make
     - **Next.js**: The recommended choice for full-stack applications. It comes pre-wired with the Vercel AI SDK and App Router.
     - **TanStack**: Choose this for lightweight Vite-based applications using React Query for data fetching.
 2.  **Include Demo Chat UI?**: 
-    - Select **Yes** to inject a pre-built chat component. This gives you a premium, production-ready interface out of the box.
+    - Select **Yes** to inject a pre-built streaming chat component so you can test the gateway immediately.
 
 ## Step 3: Configure your API Key
 
@@ -39,7 +39,7 @@ Once the project is scaffolded, navigate into the directory:
 cd my-ai-app
 ```
 
-Open the `.env.local` file (for Next.js) or `.env` (for TanStack). You'll see a placeholder for your Cencori API key. 
+Open the `.env.local` file (for Next.js) or `.env` (for TanStack). These files are ignored by git, and the scaffold also includes `.env.example` for sharing safe placeholders. You'll see a placeholder for your Cencori API key.
 
 ```env
 # Get your key at https://cencori.com/dashboard
@@ -51,10 +51,9 @@ CENCORI_API_KEY=csk_your_actual_key_here
 
 ## Step 4: Launch and Test
 
-Now, start your development server:
+Now, start your development server. The CLI installs dependencies by default; if you used `--no-install`, run `npm install` first.
 
 ```bash
-npm install
 npm run dev
 ```
 
