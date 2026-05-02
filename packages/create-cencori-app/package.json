@@ -1,6 +1,6 @@
 {
     "name": "create-cencori-app",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Scaffold a new Cencori AI application in seconds.",
     "bin": {
         "create-cencori-app": "dist/cli.js"
