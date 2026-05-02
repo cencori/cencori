@@ -7,12 +7,46 @@ order: 2
 
 ## Overview
 
-Cencori exposes chat completions through two main surfaces:
+Cencori exposes chat completions through two HTTP endpoints:
 
-1. the official SDKs (`cencori`, `cencori/vercel`, `cencori/tanstack`)
-2. the OpenAI-compatible endpoint at `https://api.cencori.com/v1/chat/completions`
+| Endpoint | Path | Best For |
+|----------|------|----------|
+| **Cencori Native** | `/api/ai/chat` | Full Cencori features (security, custom rules, streaming) |
+| **OpenAI-Compatible** | `/api/v1/chat/completions` | Migrating from OpenAI, framework integrations |
 
-Both routes give you Cencori's routing, security enforcement, logging, and cost tracking.
+Both endpoints give you Cencori's routing, security enforcement, logging, and cost tracking — but with different feature sets.
+
+## When to Use Which Endpoint
+
+Choose based on your use case:
+
+| Use Case | Recommended Endpoint |
+|---------|----------------------|
+| Using the Cencori SDK (`cencori`) | `/api/ai/chat` (SDK uses this automatically) |
+| Need **security scanning** (PII, jailbreak, prompt injection) | `/api/ai/chat` |
+| Need **custom data rules** (mask/redact/block patterns) | `/api/ai/chat` |
+| Migrating from OpenAI directly | `/api/v1/chat/completions` |
+| Using Vercel AI SDK or other OpenAI-compatible frameworks | `/api/v1/chat/completions` |
+| Need simpler, OpenAI-compatible request/response | `/api/v1/chat/completions` |
+
+### Feature Comparison
+
+| Feature | `/api/ai/chat` | `/api/v1/chat/completions` |
+|---------|-----------------|-------------------------|
+| Multi-provider routing | Yes | Yes |
+| Prompt Registry | Yes | Yes |
+| End-user billing | Yes | Yes |
+| Semantic caching | Yes | Yes |
+| Circuit breaker | Yes | Yes |
+| Custom providers | Yes | Yes |
+| **Security scanning** (PII, jailbreak, prompt injection) | Yes | No |
+| **Custom data rules** (mask/redact/block) | Yes | No |
+
+### Why the Difference?
+
+The `/api/ai/chat` endpoint was built first as the core Cencori gateway with full security features. The `/api/v1/chat/completions` endpoint was added later for OpenAI compatibility, making it easier to migrate existing codebases without changing client logic.
+
+If you're starting fresh and don't need the extra security features, either works. If you need Cencori's security layer, use `/api/ai/chat`.
 
 ## Official TypeScript SDK
 
