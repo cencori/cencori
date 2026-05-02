@@ -7,26 +7,49 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
+const RESERVED_PACKAGE_NAMES = new Set([
+    'node_modules',
+    'favicon.ico',
+]);
+
 /**
  * Validate a project name
  */
 export function validateProjectName(name: string): { valid: boolean; reason?: string } {
-    if (!name || name.trim() === '') {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
         return { valid: false, reason: 'Project name is required.' };
     }
 
-    if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+    if (trimmedName !== name) {
+        return { valid: false, reason: 'Project name cannot start or end with whitespace.' };
+    }
+
+    if (trimmedName.toLowerCase() !== trimmedName) {
+        return { valid: false, reason: 'Project name must be lowercase.' };
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(trimmedName)) {
         return {
             valid: false,
-            reason: 'Project name can only contain letters, numbers, hyphens, underscores, and dots.',
+            reason: 'Project name can only contain lowercase letters, numbers, hyphens, underscores, and dots.',
         };
     }
 
-    if (name.startsWith('.') || name.startsWith('-')) {
+    if (trimmedName.startsWith('.') || trimmedName.startsWith('-')) {
         return { valid: false, reason: 'Project name cannot start with a dot or hyphen.' };
     }
 
-    if (name.length > 214) {
+    if (trimmedName.includes('..')) {
+        return { valid: false, reason: 'Project name cannot contain consecutive dots.' };
+    }
+
+    if (RESERVED_PACKAGE_NAMES.has(trimmedName)) {
+        return { valid: false, reason: `"${trimmedName}" is a reserved package name.` };
+    }
+
+    if (trimmedName.length > 214) {
         return { valid: false, reason: 'Project name is too long (max 214 characters).' };
     }
 

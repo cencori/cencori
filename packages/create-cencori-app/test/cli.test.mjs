@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import {
+    existsSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+
+const cliPath = join(process.cwd(), 'dist', 'cli.js');
+
+function withTempDir(fn) {
+    const dir = mkdtempSync(join(tmpdir(), 'create-cencori-app-'));
+
+    try {
+        return fn(dir);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+function runCli(cwd, args) {
+    return execFileSync('node', [cliPath, ...args], {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, NO_COLOR: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+}
+
+function runCliFailure(cwd, args) {
+    try {
+        runCli(cwd, args);
+    } catch (error) {
+        return [
+            error.stdout?.toString() || '',
+            error.stderr?.toString() || '',
+            error.message || '',
+        ].join('\n');
+    }
+
+    throw new Error('Expected CLI command to fail.');
+}
+
+function read(projectDir, relativePath) {
+    return readFileSync(join(projectDir, relativePath), 'utf8');
+}
+
+test('rejects invalid template names', () => {
+    withTempDir((cwd) => {
+        const output = runCliFailure(cwd, [
+            'bad-template-app',
+            '--template',
+            'bogus',
+            '--no-install',
+        ]);
+
+        assert.match(output, /Invalid template "bogus"/);
+        assert.equal(existsSync(join(cwd, 'bad-template-app')), false);
+    });
+});
+
+test('rejects npm-invalid project names', () => {
+    withTempDir((cwd) => {
+        const output = runCliFailure(cwd, [
+            'BadName',
+            '--template',
+            'nextjs',
+            '--no-install',
+        ]);
+
+        assert.match(output, /Project name must be lowercase/);
+    });
+});
+
+test('scaffolds TanStack with ignored env files and streaming config', () => {
+    withTempDir((cwd) => {
+        runCli(cwd, [
+            'tanstack-app',
+            '--template',
+            'tanstack',
+            '--no-install',
+            '--api-key',
+            'csk_secret',
+        ]);
+
+        const projectDir = join(cwd, 'tanstack-app');
+        const gitignore = read(projectDir, '.gitignore');
+        const html = read(projectDir, 'index.html');
+        const server = read(projectDir, 'server/index.ts');
+        const hook = read(projectDir, 'src/lib/use-chat.ts');
+
+        assert.match(gitignore, /^\.env$/m);
+        assert.match(gitignore, /^!\.env\.example$/m);
+        assert.match(html, /<link rel="icon" href="\/favicon\.ico" \/>/);
+        assert.match(read(projectDir, '.env'), /CENCORI_API_KEY=csk_secret/);
+        assert.match(read(projectDir, '.env.example'), /CENCORI_API_KEY=csk_\.\.\./);
+        assert.equal(existsSync(join(projectDir, 'public/favicon.ico')), true);
+        assert.equal(existsSync(join(projectDir, 'app/favicon.ico')), false);
+        assert.match(server, /cencoriConfig\.defaultModel/);
+        assert.match(server, /chatStream/);
+        assert.doesNotMatch(hook, /model: 'gpt-4o'/);
+        assert.match(hook, /TextDecoder/);
+    });
+});
+
+test('scaffolds Next.js no-chat without chat-only assets', () => {
+    withTempDir((cwd) => {
+        runCli(cwd, ['next-app', '--template', 'nextjs', '--no-chat', '--no-install']);
+
+        const projectDir = join(cwd, 'next-app');
+        const packageJson = JSON.parse(read(projectDir, 'package.json'));
+        const route = read(projectDir, 'app/api/chat/route.ts');
+
+        assert.equal(existsSync(join(projectDir, 'components/chat.tsx')), false);
+        assert.equal(existsSync(join(projectDir, 'public/logos/ww.png')), false);
+        assert.equal(existsSync(join(projectDir, 'public/logos/bw.png')), false);
+        assert.equal(packageJson.dependencies['@ai-sdk/react'], undefined);
+        assert.match(route, /cencoriConfig\.defaultModel/);
+        assert.equal(existsSync(join(projectDir, '.env.example')), true);
+    });
+});
