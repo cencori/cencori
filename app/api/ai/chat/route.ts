@@ -26,6 +26,7 @@ import { handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { deductCredits } from '@/lib/credits';
+import { getFeaturesForTier, hasFeature } from '@/lib/entitlements';
 import { computeCacheKey, getCache, getSemanticCache, saveCache, saveSemanticCache } from '@/lib/cache';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from '@/lib/end-user-billing';
@@ -819,7 +820,7 @@ export async function POST(req: NextRequest) {
         const lastUserMessage = unifiedMessages.slice().reverse().find(m => m.role === 'user');
         const inputText = lastUserMessage?.content || '';
 
-        const securityConfig = await getProjectSecurityConfig(supabase, project.id);
+        const securityConfig = await getProjectSecurityConfig(supabase, project.id, tier as any);
 
         const inputSecurity = checkInputSecurity(inputText, unifiedMessages, securityConfig);
 

@@ -6,15 +6,20 @@
 
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
+import type { SubscriptionTier } from '@/lib/entitlements';
 
 /**
  * Get project security configuration from database.
  * Returns sensible defaults if no config is found.
+ * Security features are disabled for free tier.
  */
 export async function getProjectSecurityConfig(
     supabase: ReturnType<typeof createAdminClient>,
-    projectId: string
+    projectId: string,
+    tier: SubscriptionTier = 'free'
 ): Promise<ProjectSecurityConfig> {
+    const securityEnabled = tier !== 'free';
+    
     try {
         const { data: settings } = await supabase
             .from('security_settings')
@@ -27,10 +32,10 @@ export async function getProjectSecurityConfig(
                 inputThreshold: 0.5,
                 outputThreshold: 0.6,
                 jailbreakThreshold: 0.7,
-                enableOutputScanning: true,
-                enableJailbreakDetection: true,
-                enableObfuscatedPII: true,
-                enableIntentAnalysis: true,
+                enableOutputScanning: securityEnabled,
+                enableJailbreakDetection: securityEnabled,
+                enableObfuscatedPII: securityEnabled,
+                enableIntentAnalysis: securityEnabled,
             };
         }
 
@@ -43,10 +48,10 @@ export async function getProjectSecurityConfig(
             inputThreshold,
             outputThreshold,
             jailbreakThreshold,
-            enableOutputScanning: true,
-            enableJailbreakDetection: settings.filter_jailbreaks ?? true,
-            enableObfuscatedPII: settings.filter_pii ?? true,
-            enableIntentAnalysis: settings.filter_prompt_injection ?? true,
+            enableOutputScanning: securityEnabled,
+            enableJailbreakDetection: securityEnabled && (settings.filter_jailbreaks ?? true),
+            enableObfuscatedPII: securityEnabled && (settings.filter_pii ?? true),
+            enableIntentAnalysis: securityEnabled && (settings.filter_prompt_injection ?? true),
         };
     } catch (error) {
         console.warn('[Security] Failed to fetch security settings:', error);
@@ -54,10 +59,10 @@ export async function getProjectSecurityConfig(
             inputThreshold: 0.5,
             outputThreshold: 0.6,
             jailbreakThreshold: 0.7,
-            enableOutputScanning: true,
-            enableJailbreakDetection: true,
-            enableObfuscatedPII: true,
-            enableIntentAnalysis: true,
+            enableOutputScanning: securityEnabled,
+            enableJailbreakDetection: securityEnabled,
+            enableObfuscatedPII: securityEnabled,
+            enableIntentAnalysis: securityEnabled,
         };
     }
 }

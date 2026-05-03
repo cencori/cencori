@@ -20,7 +20,6 @@ const tiers: Array<{
     displayName: string;
     description: string;
     price: { monthly: number | string; annual: number | string };
-    limit: string;
     features: string[];
     highlighted?: boolean;
     cta: string;
@@ -31,11 +30,12 @@ const tiers: Array<{
         displayName: "Free",
         description: "Perfect for side projects and experimentation.",
         price: { monthly: 0, annual: 0 },
-        limit: "1,000",
         features: [
-            "1,000 requests/month",
-            "1 project",
-            "Basic security features",
+            "Unlimited requests",
+            "100+ AI models",
+            "Streaming & tool calling",
+            "Bring your own keys (BYOK)",
+            "API keys & playground",
             "Community support",
         ],
         cta: "Start Free",
@@ -46,14 +46,14 @@ const tiers: Array<{
         displayName: "Pro",
         description: "For professional developers and small teams.",
         price: { monthly: 49, annual: 490 },
-        limit: "50,000",
         features: [
-            "50,000 requests/month",
-            "Unlimited projects",
-            "All security features",
-            "Priority support (24hr)",
-            "Advanced analytics",
-            "Webhooks & integrations",
+            "Up to 3 team members",
+            "Security scanning",
+            "Failover & routing",
+            "Semantic cache",
+            "Request logs & analytics",
+            "Prompt registry",
+            "Priority support (email)",
         ],
         highlighted: true,
         cta: "Get Started",
@@ -63,14 +63,14 @@ const tiers: Array<{
         displayName: "Team",
         description: "For growing teams needing collaboration.",
         price: { monthly: 149, annual: 1490 },
-        limit: "250,000",
         features: [
-            "250,000 requests/month",
             "Everything in Pro",
-            "Team collaboration (10 members)",
-            "Priority support (4hr)",
-            "API access",
-            "90-day log retention",
+            "Up to 10 team members",
+            "Custom providers",
+            "Webhooks",
+            "Geo analytics",
+            "Failover analytics",
+            "Priority support (chat)",
         ],
         cta: "Get Started",
         ctaVariant: "outline",
@@ -80,10 +80,9 @@ const tiers: Array<{
         displayName: "Enterprise",
         description: "For large organizations with custom needs.",
         price: { monthly: "Custom", annual: "Custom" },
-        limit: "Custom",
         features: [
-            "Custom request limits",
             "Everything in Team",
+            "SSO & SAML",
             "Unlimited members",
             "Dedicated support",
             "SLA guarantees",
@@ -152,114 +151,150 @@ const matrixSections: Array<{
     }>;
 }> = [
     {
-        title: "AI Gateway",
-        description: "Core inference, routing, and safety controls.",
+        title: "AI Access",
+        description: "Core inference capabilities.",
         rows: [
             {
-                feature: "Chat, image, audio, and embeddings APIs",
+                feature: "100+ AI models (chat, image, audio, embeddings)",
                 values: { free: true, pro: true, team: true, enterprise: true },
             },
+            {
+                feature: "Streaming & tool calling",
+                values: { free: true, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Structured output",
+                values: { free: true, pro: true, team: true, enterprise: true },
+            },
+        ],
+    },
+    {
+        title: "Infrastructure",
+        description: "Provider routing and reliability.",
+        rows: [
             {
                 feature: "Bring your own provider keys (BYOK)",
                 values: { free: true, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Automatic retries and provider failover",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                feature: "Multi-provider routing",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Security scanning and policy enforcement",
-                values: {
-                    free: "Basic",
-                    pro: "Advanced",
-                    team: "Advanced",
-                    enterprise: "Custom policy",
-                },
+                feature: "Failover & circuit breaker",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Request observability and usage logs",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                feature: "Custom providers",
+                values: { free: false, pro: false, team: true, enterprise: true },
+            },
+            {
+                feature: "Semantic cache",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
         ],
     },
     {
-        title: "Billing Model",
-        description: "Plan limits plus usage-based AI charging.",
+        title: "Security",
+        description: "Content safety and data protection.",
         rows: [
             {
-                feature: "Monthly request allowance",
-                values: {
-                    free: "1,000",
-                    pro: "50,000",
-                    team: "250,000",
-                    enterprise: "Custom",
-                },
+                feature: "Jailbreak detection",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Usage charging",
-                values: {
-                    free: "Provider cost + markup",
-                    pro: "Provider cost + markup",
-                    team: "Provider cost + markup",
-                    enterprise: "Contract terms",
-                },
+                feature: "PII masking & redaction",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Credits wallet and top-up flow",
-                values: {
-                    free: "Policy-based",
-                    pro: "Included",
-                    team: "Included",
-                    enterprise: "Custom",
-                },
+                feature: "Custom data rules",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Standalone scan add-on pricing",
-                values: {
-                    free: "Free: 5 projects + 2 scans/project",
-                    pro: "Included (unlimited)",
-                    team: "Included (unlimited)",
-                    enterprise: "Included (unlimited)",
-                },
+                feature: "Output scanning",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
-                feature: "Hard spend caps and budget controls",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                feature: "Security incidents & audit trails",
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
         ],
     },
     {
-        title: "Platform & Support",
-        description: "Collaboration, governance, and support coverage.",
+        title: "Observability",
+        description: "Monitoring and analytics.",
+        rows: [
+            {
+                feature: "Request logs",
+                values: { free: false, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Analytics dashboard",
+                values: { free: false, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Cost tracking",
+                values: { free: false, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Geo analytics",
+                values: { free: false, pro: false, team: true, enterprise: true },
+            },
+            {
+                feature: "Failover analytics",
+                values: { free: false, pro: false, team: true, enterprise: true },
+            },
+        ],
+    },
+    {
+        title: "Developer Tools",
+        description: "APIs and integrations.",
+        rows: [
+            {
+                feature: "API keys (scoped)",
+                values: { free: true, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Playground",
+                values: { free: true, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Prompt registry",
+                values: { free: false, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Webhooks",
+                values: { free: false, pro: false, team: true, enterprise: true },
+            },
+        ],
+    },
+    {
+        title: "Platform",
+        description: "Collaboration and support.",
         rows: [
             {
                 feature: "Projects",
                 values: { free: "1", pro: "Unlimited", team: "Unlimited", enterprise: "Unlimited" },
             },
             {
-                feature: "Collaboration",
-                values: {
-                    free: "Solo",
-                    pro: "Small team",
-                    team: "Up to 10 members",
-                    enterprise: "Unlimited members",
-                },
+                feature: "Team members",
+                values: { free: "1", pro: "Up to 3", team: "Up to 10", enterprise: "Unlimited" },
             },
             {
                 feature: "Support",
                 values: {
                     free: "Community",
-                    pro: "Priority (24hr)",
+                    pro: "Priority (email)",
                     team: "Priority (4hr)",
-                    enterprise: "Dedicated support",
+                    enterprise: "Dedicated",
                 },
             },
             {
-                feature: "Log retention",
-                values: { free: "Standard", pro: "Standard", team: "90 days", enterprise: "Custom" },
+                feature: "SSO & SAML",
+                values: { free: false, pro: false, team: false, enterprise: true },
             },
             {
-                feature: "SLA and contractual guarantees",
+                feature: "SLA guarantees",
                 values: { free: false, pro: false, team: false, enterprise: true },
             },
         ],
@@ -291,12 +326,12 @@ function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPe
         return "Talk to sales";
     }
     if (tier.price.monthly === 0) {
-        return "Free forever + usage-based AI costs";
+        return "Free + you pay for AI usage";
     }
     if (billingPeriod === "annual") {
-        return `Billed ${tier.price.annual}/year + usage-based AI costs`;
+        return `Billed ${tier.price.annual}/year`;
     }
-    return "Plus usage-based AI costs";
+    return "Platform subscription";
 }
 
 function isPaidScanTier(tier: ScanTier): tier is PaidScanTier {
@@ -429,8 +464,8 @@ export function Pricing() {
                         Pick a plan to power your AI applications.
                     </h1>
                     <p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground md:text-base">
-                        Cencori billing combines plan limits with usage-based credits. Keep platform economics predictable
-                        while scaling across providers.
+                        Free tier includes unlimited requests. Pro unlocks security scanning,
+                        failover, caching, and observability. You pay providers directly for AI usage.
                     </p>
                 </div>
 
@@ -537,7 +572,7 @@ export function Pricing() {
                                         <th key={tier.name} className="w-[17.5%] px-5 py-4 align-top">
                                             <div className="space-y-2">
                                                 <p className="text-sm font-semibold">{tier.displayName}</p>
-                                                <p className="text-xs text-muted-foreground">{tier.limit} requests / month</p>
+                                                <p className="text-xs text-muted-foreground">Platform subscription</p>
                                             </div>
                                         </th>
                                     ))}
@@ -630,11 +665,10 @@ export function Pricing() {
 
                 <div className="mt-8 rounded-xl border border-border/50 bg-muted/20 p-4 text-xs text-muted-foreground">
                     <p>
-                        Billing model: plan tier controls request limits and platform entitlements, while usage is charged as
-                        provider cost plus configured markup through your credits wallet. Scan can also be purchased as a
-                        standalone add-on ($9 individual / $29 teams) for unlimited usage. Free scan usage includes up to
-                        5 imported projects and 2 scans per project, while platform Pro, Team, and Enterprise include full
-                        unlimited scan access by default.
+                        Cencori charges a platform subscription (not per-request). You pay the provider directly
+                        for AI usage through your own API keys. Free tier includes unlimited requests with basic features.
+                        Pro, Team, and Enterprise unlock security scanning, failover, caching, observability, and more.
+                        Scan add-on available separately ($9/mo individual / $29/mo teams).
                     </p>
                 </div>
             </div>

@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Input Security ──
-        const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId);
+        const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId, ctx.tier as any);
         const unifiedMessages = [{ role: 'user' as const, content: prompt }];
         const inputSecurity = checkInputSecurity(prompt, unifiedMessages, securityConfig);
 
