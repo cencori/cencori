@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
 
         // ── Input Security Scanning (critical for RAG — prevents data exfiltration) ──
         try {
-            const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId);
+            const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId, ctx.tier as any);
             const inputSecurity = checkInputSecurity(inputText, messages.map((m: { role: string; content: string }) => ({
                 role: m.role as 'system' | 'user' | 'assistant',
                 content: m.content,
@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
 
             // ── Output Security Scanning ──
             try {
-                const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId);
+                const securityConfig = await getProjectSecurityConfig(ctx.supabase, ctx.projectId, ctx.tier as any);
                 const outputSecurity = checkOutputSecurity(response.content, { inputText }, securityConfig);
 
                 if (!outputSecurity.safe) {

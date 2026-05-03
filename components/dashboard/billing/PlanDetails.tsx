@@ -25,13 +25,39 @@ export function PlanDetails({
     actionLabel = 'Manage Plan',
     actionExternal = false
 }: PlanProps) {
-    const features = [
-        "Distributed Gateway Nodes",
-        "Unlimited API Projects",
-        "Granular Security Audits",
-        "90-Day Request History",
-        "Priority Support Line"
+    const freeFeatures = [
+        "Unlimited requests",
+        "100+ AI models",
+        "Streaming & tool calling",
+        "Bring your own keys (BYOK)",
     ];
+    
+    const proFeatures = [
+        "Everything in Free",
+        "Security scanning",
+        "Failover & routing",
+        "Semantic cache",
+        "Request logs & analytics",
+    ];
+    
+    const teamFeatures = [
+        "Everything in Pro",
+        "Custom providers",
+        "Webhooks",
+        "Geo & failover analytics",
+    ];
+    
+    const enterpriseFeatures = [
+        "Everything in Team",
+        "SSO & SAML",
+        "Dedicated support",
+        "Custom SLAs",
+    ];
+    
+    const tierFeatures = tier === 'free' ? freeFeatures 
+        : tier === 'pro' ? proFeatures 
+        : tier === 'team' ? teamFeatures 
+        : enterpriseFeatures;
 
     return (
         <div className="rounded-md border border-border/40 bg-card overflow-hidden">
@@ -75,7 +101,7 @@ export function PlanDetails({
                     </div>
                     <div className="p-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
-                            {features.map((feature, i) => (
+                            {tierFeatures.map((feature, i) => (
                                 <div key={i} className="flex items-start gap-2 text-[11px] text-muted-foreground">
                                     <span className="text-emerald-500/60 mt-0.5 shrink-0">•</span>
                                     <span>{feature}</span>
