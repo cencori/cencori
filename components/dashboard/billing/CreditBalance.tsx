@@ -1,9 +1,6 @@
 "use client";
 
-import React from 'react';
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { formatCurrency } from '@/lib/currency';
 
 interface Transaction {
     id: string;
@@ -17,6 +14,7 @@ interface CreditProps {
     orgId: string;
     balance: number;
     transactions: Transaction[];
+    currency?: string;
 }
 
 type CreditPackId = 'starter' | 'growth' | 'scale';
@@ -27,7 +25,7 @@ const CREDIT_PACK_OPTIONS: Array<{ id: CreditPackId; label: string }> = [
     { id: 'scale', label: '$200' },
 ];
 
-export function CreditBalance({ orgId, balance, transactions }: CreditProps) {
+export function CreditBalance({ orgId, balance, transactions, currency = 'USD' }: CreditProps) {
     const [selectedPack, setSelectedPack] = React.useState<CreditPackId>('growth');
     const [isRecharging, setIsRecharging] = React.useState(false);
 
@@ -68,7 +66,9 @@ export function CreditBalance({ orgId, balance, transactions }: CreditProps) {
             <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <div className="text-2xl font-medium tabular-nums">${balance.toFixed(2)}</div>
+                        <div className="text-2xl font-medium tabular-nums">
+                            {formatCurrency(balance, currency, { maximumFractionDigits: 8, minimumFractionDigits: 8 })}
+                        </div>
                         <p className="text-[11px] text-muted-foreground mt-1">
                             Available for on-demand generation
                         </p>
@@ -104,7 +104,7 @@ export function CreditBalance({ orgId, balance, transactions }: CreditProps) {
                         {transactions.map((t) => {
                             const amount = Number(t.amount) || 0;
                             const isCredit = amount >= 0;
-                            const absoluteAmount = Math.abs(amount).toFixed(2);
+                            const formattedAmount = formatCurrency(Math.abs(amount), currency, { maximumFractionDigits: 8 });
 
                             return (
                                 <div key={t.id} className="flex items-center justify-between py-2 text-xs border-b border-border/40 last:border-0">
@@ -112,7 +112,7 @@ export function CreditBalance({ orgId, balance, transactions }: CreditProps) {
                                         "font-medium",
                                         isCredit ? "text-emerald-500" : "text-foreground"
                                     )}>
-                                        {isCredit ? '+' : '-'}${absoluteAmount}
+                                        {isCredit ? '+' : '-'}{formattedAmount}
                                     </span>
                                     <span className="text-muted-foreground">{t.description}</span>
                                     <span className="text-muted-foreground/50 tabular-nums">

@@ -122,6 +122,7 @@ export async function PATCH(
             'daily_request_limit', 'monthly_request_limit', 'requests_per_minute',
             'daily_cost_limit_usd', 'monthly_cost_limit_usd',
             'markup_percentage', 'flat_rate_per_request',
+            'currency',
             'allowed_models', 'overage_action',
         ];
 

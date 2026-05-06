@@ -9,6 +9,7 @@ import { Logo } from "@/components/logo";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { CircleUserRound, CreditCard, Settings, HelpCircle, Book, Wrench, Activity, Mail, Command, Menu } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/currency";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -230,7 +231,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     ? "Credits --"
     : orgCreditsLoading
       ? "Credits..."
-      : `$${creditsBalance.toFixed(2)}`;
+      : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 4, minimumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen bg-background transition-colors">

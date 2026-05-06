@@ -9,13 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
-import { geolocation, ipAddress } from '@vercel/functions';
+import { geolocation, ipAddress, waitUntil } from '@vercel/functions';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { logGatewayEvent } from '@/lib/gateway-reliability';
 import { getCachedApiKeyConfig, setCachedApiKeyConfig, invalidateApiKeyCache } from '@/lib/config-cache';
+import { processUsageQueue } from '@/lib/queue';
 
 // ──────────────────────────────────────────────
 // Types
@@ -248,8 +249,18 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     const organizationId = organization.id;
     const tier = organization.subscription_tier || 'free';
     const billingFrozen = Boolean(organization.billing_frozen);
-    const creditsBalance = Number(organization.credits_balance ?? 0);
+    
+    // ── Credits Fast-Path (Redis) ──
     const shouldEnforceCredits = tier !== 'free' && tier !== 'enterprise';
+    let creditsBalance = Number(organization.credits_balance ?? 0);
+
+    if (shouldEnforceCredits) {
+        const { getCachedCreditsBalance } = await import('@/lib/config-cache');
+        const cachedBalance = await getCachedCreditsBalance(organizationId);
+        if (cachedBalance !== null) {
+            creditsBalance = cachedBalance;
+        }
+    }
 
     if (billingFrozen) {
         return {
@@ -409,6 +420,15 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
             status: rateLimitResult.status,
         },
     });
+
+    // ── Passive Queue Drain (Vercel Free Plan Workaround) ──
+    // Every ~20 requests (5% probability), trigger a background drain of the usage queue.
+    // This ensures logs are processed without needing a paid Cron job.
+    if (Math.random() < 0.05) {
+        waitUntil(processUsageQueue(50).catch(err => {
+            console.error('[Gateway] Failed to drain usage queue:', err);
+        }));
+    }
 
     return { success: true, context };
 }

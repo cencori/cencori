@@ -140,6 +140,7 @@ export async function POST(
             ['monthly_cost_limit_usd', 'monthly_cost_limit_usd'],
             ['markup_percentage', 'markup_percentage'],
             ['flat_rate_per_request', 'flat_rate_per_request'],
+            ['currency', 'currency'],
             ['allowed_models', 'allowed_models'],
             ['overage_action', 'overage_action'],
         ];
