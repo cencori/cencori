@@ -136,8 +136,8 @@ export function getDocsNavigation(): NavSection[] {
     const sectionOrder = [
         'Getting Started',
         'Agents',
-        'platform',
         'Platform',
+        'AI Gateway',
         'AI',
         'AI Endpoints',
         'AI Memory',
