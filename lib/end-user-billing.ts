@@ -36,6 +36,7 @@ export interface QuotaCheckResult {
   currency: string;
   pricingModel: 'flat' | 'tiered' | 'volume';
   pricingTiers: PricingTier[];
+  platformCommissionPercentage: number;
 }
 
 export interface UsageRecord {
@@ -50,6 +51,7 @@ export interface UsageRecord {
   pricingModel: 'flat' | 'tiered' | 'volume';
   pricingTiers: PricingTier[];
   monthlyTokensUsed: number;
+  platformCommissionPercentage: number;
 }
 
 // ──────────────────────────────────────────────
@@ -97,6 +99,10 @@ export async function checkEndUserQuota(
       requestsPerMinuteUsed: 0,
       requestsPerMinuteLimit: null,
       retryAfterSeconds: null,
+      currency: "USD",
+      pricingModel: "flat",
+      pricingTiers: [],
+      platformCommissionPercentage: 20,
     };
   }
 
@@ -124,6 +130,7 @@ export async function checkEndUserQuota(
     currency: data.currency || 'USD',
     pricingModel: data.pricing_model || 'flat',
     pricingTiers: data.pricing_tiers || [],
+    platformCommissionPercentage: data.platform_commission_percentage || 20,
   };
 
   // Model restriction check — done client-side for speed
@@ -183,6 +190,10 @@ export async function recordEndUserUsageAsync(
     record.monthlyTokensUsed
   );
 
+  // Calculate Platform Commission (Cut of the profit)
+  const userProfitUsd = Math.max(0, customerChargeUsd - record.cost.cencoriChargeUsd);
+  const platformCommissionUsd = userProfitUsd * (record.platformCommissionPercentage / 100);
+
   const { error } = await supabase.rpc("increment_end_user_usage", {
     p_project_id: record.projectId,
     p_external_user_id: record.externalUserId,
@@ -191,6 +202,7 @@ export async function recordEndUserUsageAsync(
     p_total_cost_usd: record.cost.cencoriChargeUsd,
     p_provider_cost_usd: record.cost.providerUsd,
     p_customer_charge_usd: customerChargeUsd,
+    p_platform_commission_usd: platformCommissionUsd,
     p_currency: record.currency || 'USD',
     p_environment: environment,
   });
@@ -217,6 +229,7 @@ export interface PricingTier {
 export function calculateCustomerCharge(
   cencoriChargeUsd: number,
   markupPercentage: number,
+  flatRatePerRequest: number | null,
   pricingModel: 'flat' | 'tiered' | 'volume' = 'flat',
   pricingTiers: PricingTier[] = [],
   requestUnits: number = 0,

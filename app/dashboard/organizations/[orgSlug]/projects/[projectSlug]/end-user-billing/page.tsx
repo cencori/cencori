@@ -65,6 +65,7 @@ import {
   Shield,
   Zap,
   AlertCircle,
+  CheckCircle2,
   CreditCard,
   Banknote,
   ExternalLink,
@@ -162,6 +163,7 @@ interface RatePlan {
   daily_cost_limit_usd: number | null;
   monthly_cost_limit_usd: number | null;
   markup_percentage: number | null;
+  platform_commission_percentage: number | null;
   flat_rate_per_request: number | null;
   currency: string;
   allowed_models: string[] | null;
@@ -182,6 +184,7 @@ interface RatePlanForm {
   daily_cost_limit_usd: string;
   monthly_cost_limit_usd: string;
   markup_percentage: string;
+  platform_commission_percentage: string;
   flat_rate_per_request: string;
   currency: string;
   allowed_models: string;
@@ -276,7 +279,9 @@ const emptyForm: RatePlanForm = {
   daily_token_limit: "", monthly_token_limit: "",
   daily_request_limit: "", monthly_request_limit: "", requests_per_minute: "",
   daily_cost_limit_usd: "", monthly_cost_limit_usd: "",
-  markup_percentage: "", flat_rate_per_request: "",
+  markup_percentage: "", 
+  platform_commission_percentage: "20",
+  flat_rate_per_request: "",
   currency: "USD",
   allowed_models: "", overage_action: "block",
 };
@@ -292,6 +297,7 @@ function planToForm(plan: RatePlan): RatePlanForm {
     daily_cost_limit_usd: plan.daily_cost_limit_usd?.toString() ?? "",
     monthly_cost_limit_usd: plan.monthly_cost_limit_usd?.toString() ?? "",
     markup_percentage: plan.markup_percentage?.toString() ?? "",
+    platform_commission_percentage: plan.platform_commission_percentage?.toString() ?? "20",
     flat_rate_per_request: plan.flat_rate_per_request?.toString() ?? "",
     currency: plan.currency || "USD",
     allowed_models: plan.allowed_models?.join(", ") ?? "",
@@ -311,6 +317,7 @@ function formToPayload(form: RatePlanForm) {
     daily_cost_limit_usd: parseNum(form.daily_cost_limit_usd),
     monthly_cost_limit_usd: parseNum(form.monthly_cost_limit_usd),
     markup_percentage: parseNum(form.markup_percentage),
+    platform_commission_percentage: parseNum(form.platform_commission_percentage),
     flat_rate_per_request: parseNum(form.flat_rate_per_request),
     currency: form.currency,
     allowed_models: form.allowed_models.trim()
@@ -1248,9 +1255,10 @@ export default function UsageBillingPage({ params }: PageProps) {
 
                       {/* Pricing/Markup */}
                       <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Pricing Model</p>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Profit Share</p>
                         <div className="text-xs font-medium space-y-0.5">
                           <p>{plan.markup_percentage ? `${plan.markup_percentage}% Markup` : "At cost"}</p>
+                          <p className="text-[10px] text-muted-foreground font-normal">{plan.platform_commission_percentage}% Cencori Commission</p>
                           {plan.flat_rate_per_request && <p className="text-[10px] text-muted-foreground font-normal">+{formatUSD(plan.flat_rate_per_request, plan.currency)}/req</p>}
                         </div>
                       </div>
@@ -1329,6 +1337,9 @@ export default function UsageBillingPage({ params }: PageProps) {
                       <SelectItem value="KES" className="text-xs">KES (KSh)</SelectItem>
                       <SelectItem value="ZAR" className="text-xs">ZAR (R)</SelectItem>
                       <SelectItem value="GHS" className="text-xs">GHS (₵)</SelectItem>
+                      <SelectItem value="BRL" className="text-xs">BRL (R$)</SelectItem>
+                      <SelectItem value="INR" className="text-xs">INR (₹)</SelectItem>
+                      <SelectItem value="SGD" className="text-xs">SGD (S$)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1389,12 +1400,17 @@ export default function UsageBillingPage({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Pricing</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-xs font-medium text-muted-foreground">Pricing & Commission</p>
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="rp-markup-pct" className="text-[10px] text-muted-foreground">Markup %</Label>
                       <Input id="rp-markup-pct" type="number" step="0.1" placeholder="e.g. 20" className="h-8 text-xs" value={rpForm.markup_percentage}
                         onChange={(e) => setRpForm(prev => ({ ...prev, markup_percentage: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="rp-commission-pct" className="text-[10px] text-muted-foreground">Commission %</Label>
+                      <Input id="rp-commission-pct" type="number" step="0.1" placeholder="e.g. 20" className="h-8 text-xs" value={rpForm.platform_commission_percentage}
+                        onChange={(e) => setRpForm(prev => ({ ...prev, platform_commission_percentage: e.target.value }))} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="flat-rate" className="text-[10px] text-muted-foreground">Flat Rate / Request ({rpForm.currency})</Label>
