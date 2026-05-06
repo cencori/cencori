@@ -15,6 +15,7 @@ import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { logGatewayEvent } from '@/lib/gateway-reliability';
+import { getCachedApiKeyConfig, setCachedApiKeyConfig, invalidateApiKeyCache } from '@/lib/config-cache';
 
 // ──────────────────────────────────────────────
 // Types
@@ -185,37 +186,52 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         };
     }
 
-    // ── Look up key ──
+    // ── Look up key (with Redis cache) ──
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
-    const { data: keyData, error: keyError } = await supabase
-        .from('api_keys')
-        .select(`
-            id,
-            project_id,
-            environment,
-            key_type,
-            allowed_domains,
-            projects!inner(
+    // Try cache first for performance
+    const cachedKey = await getCachedApiKeyConfig(keyHash);
+    let keyData = cachedKey?.data;
+    let keyError = null;
+
+    if (!keyData) {
+        const result = await supabase
+            .from('api_keys')
+            .select(`
                 id,
-                name,
-                organization_id,
-                default_model,
-                default_provider,
-                end_user_billing_enabled,
-                organizations!inner(
+                project_id,
+                environment,
+                key_type,
+                allowed_domains,
+                projects!inner(
                     id,
-                    subscription_tier,
-                    monthly_requests_used,
-                    monthly_request_limit,
-                    credits_balance,
-                    billing_frozen
+                    name,
+                    organization_id,
+                    default_model,
+                    default_provider,
+                    end_user_billing_enabled,
+                    organizations!inner(
+                        id,
+                        subscription_tier,
+                        monthly_requests_used,
+                        monthly_request_limit,
+                        credits_balance,
+                        billing_frozen
+                    )
                 )
-            )
-        `)
-        .eq('key_hash', keyHash)
-        .is('revoked_at', null)
-        .single();
+            `)
+            .eq('key_hash', keyHash)
+            .is('revoked_at', null)
+            .single();
+        
+        keyData = result.data;
+        keyError = result.error;
+
+        // Cache the result for next time
+        if (keyData) {
+            await setCachedApiKeyConfig(keyHash, keyData);
+        }
+    }
 
     if (keyError || !keyData) {
         return {

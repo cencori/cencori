@@ -31,6 +31,7 @@ import {
     recordCacheHit,
     logCacheEvent,
 } from "@/lib/cache/prompt-cache";
+import { getCachedCacheConfig, setCachedCacheConfig, getCachedAgentConfig, setCachedAgentConfig } from "@/lib/config-cache";
 import type { CacheConfig, CacheLookupResult } from "@/lib/cache/types";
 import { resolvePrompt, logPromptUsage } from "@/lib/prompts/registry";
 import type { ResolvedPrompt } from "@/lib/prompts/types";
@@ -333,21 +334,34 @@ export async function POST(req: NextRequest) {
 
         if (agentId) {
             // ── Agent Path: config injection + shadow mode + agent scoping ──
-            const { data: config, error: configError } = await adminClient
-                .from("agent_configs")
-                .select(`
-                    *,
-                    agents!inner (
-                        id,
-                        project_id,
-                        is_active,
-                        shadow_mode
-                    )
-                `)
-                .eq("agent_id", agentId)
-                .single();
+            // Try cache first for performance
+            let config = null;
+            const cachedAgent = await getCachedAgentConfig(agentId);
+            if (cachedAgent) {
+                config = cachedAgent.data;
+            } else {
+                const { data, error } = await adminClient
+                    .from("agent_configs")
+                    .select(`
+                        *,
+                        agents!inner (
+                            id,
+                            project_id,
+                            is_active,
+                            shadow_mode
+                        )
+                    `)
+                    .eq("agent_id", agentId)
+                    .single();
+                
+                config = data;
+                // Cache for next request
+                if (config) {
+                    await setCachedAgentConfig(agentId, config);
+                }
+            }
 
-            if (configError || !config) {
+            if (!config) {
                 const errResponse = NextResponse.json(
                     { error: "Agent configuration not found. Create the agent in Cencori first." },
                     { status: 404 }
@@ -623,11 +637,22 @@ export async function POST(req: NextRequest) {
         let cacheKey: string | null = null;
         let promptTextForCache: string | null = null;
 
-        if (gatewayCtx && !shouldStream && !tools) {
-            try {
-                cacheConfig = await getProjectCacheConfig(gatewayCtx.projectId);
+        // Check if user wants to skip cache for this request
+        const skipCache = req.headers.get('x-skip-cache')?.toLowerCase() === 'true';
 
-                if (cacheConfig.cacheEnabled && !cacheConfig.excludedModels.includes(model)) {
+        if (gatewayCtx && !shouldStream && !tools && !skipCache) {
+            try {
+                // Try cache first - use cached config if available
+                const cachedConfig = await getCachedCacheConfig(gatewayCtx.projectId);
+                if (cachedConfig) {
+                    cacheConfig = cachedConfig.data;
+                } else {
+                    cacheConfig = await getProjectCacheConfig(gatewayCtx.projectId);
+                    // Cache the config for next time
+                    await setCachedCacheConfig(gatewayCtx.projectId, cacheConfig);
+                }
+
+                if (cacheConfig && cacheConfig.cacheEnabled && !cacheConfig.excludedModels.includes(model)) {
                     const requestTemp = body.temperature ?? 0;
 
                     if (requestTemp <= cacheConfig.maxCacheableTemperature) {
