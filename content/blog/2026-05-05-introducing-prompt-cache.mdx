@@ -20,39 +20,36 @@ Every time your AI application sends the same prompt, you are paying full price.
 ## Two-Tier Cache Architecture
 
 ### Exact Match Cache Redis
-- Less than 10ms latency for instant cache hits
-- SHA-256 hash of normalized prompt
-- Case-insensitive, whitespace-normalized
-- Redis-backed for speed
+
+Less than 10ms latency for instant cache hits. SHA-256 hash of normalized prompt. Case-insensitive, whitespace-normalized. Redis-backed for speed.
 
 ### Semantic Match Cache pgvector
-- About 50ms latency for similarity search via embeddings
-- Finds semantically similar prompts
-- Configurable similarity threshold default point nine five
-- Uses text-embedding-004 for vector embeddings
+
+About 50ms latency for similarity search via embeddings. Finds semantically similar prompts. Configurable similarity threshold. Uses text-embedding-004 for vector embeddings.
 
 ## Smart Features
 
 ### Temperature-Aware Caching
+
 Only cache deterministic responses. Prompt Cache defaults to caching only low-temperature responses, preserving creativity while maximizing savings on predictable outputs.
 
 ### Model Exclusion
+
 Exclude specific models from caching, like reasoning models or expensive fine-tuned models, while caching responses from cheaper models.
 
 ### Full Analytics
+
 Track your ROI with built-in analytics including hit rate, tokens saved, cost saved, and active entries.
 
 ## Try It Now
 
 Enable Prompt Cache from your project dashboard:
 
-```typescript
-const response = await cencori.chat({
-  model: gpt-4o,
-  messages: [{ role: user, content: Summarize this article }],
-  cache: { mode: semantic }
-});
-```
+<pre><code>const response = await cencori.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Summarize this article' }],
+  cache: { mode: 'semantic' }
+});</code></pre>
 
 Or toggle it on in your project settings. No code changes required.
 
