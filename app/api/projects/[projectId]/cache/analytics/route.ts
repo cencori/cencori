@@ -55,9 +55,9 @@ export async function GET(
         p_bucket_seconds: Math.floor(bucketMs / 1000),
     });
 
-    const hitRateOverTime = (timeBuckets || []).map(b => ({
+    const hitRateOverTime = (timeBuckets || []).map((b: { bucket: string; hits: bigint; total: bigint }) => ({
         timestamp: b.bucket,
-        hitRate: b.total > 0 ? Number(b.hits) / Number(b.total) : 0,
+        hitRate: Number(b.total) > 0 ? Number(b.hits) / Number(b.total) : 0,
         lookups: Number(b.total),
     }));
 
