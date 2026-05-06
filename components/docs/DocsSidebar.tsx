@@ -100,10 +100,10 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                                         <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
                                     ))}
                                 </ul>
-                                {/* AI Gateway sub-group */}
+                                {/* AI Gateway nested inside Platform */}
                                 {group.subGroup && (
-                                    <div className="mt-3 pt-3 border-t border-border/40">
-                                        <div className="ml-4.5 mb-2 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                                    <>
+                                        <div className="ml-4.5 mt-3 mb-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
                                             {group.subGroup.title}
                                         </div>
                                         <ul className="relative ml-3.5 border-l border-border/60">
@@ -111,7 +111,7 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                                                 <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
                                             ))}
                                         </ul>
-                                    </div>
+                                    </>
                                 )}
                             </AccordionContent>
                         </AccordionItem>
