@@ -11,12 +11,12 @@ Prompt Cache reduces AI costs by **30-60%** and latency by **95%** by caching LL
 
 ### Two-Tier Caching
 
-**1. Exact Match** (Redis) - under 10ms latency for identical prompts
-**2. Semantic Match** (pgvector) - around 50ms for similar prompts via embeddings
+**Exact Match** (Redis) - under 10ms latency for identical prompts
+**Semantic Match** (pgvector) - around 50ms for similar prompts via embeddings
 
-1. **Request arrives** → Check exact cache (Redis)
-2. **No exact hit?** → Check semantic cache (pgvector)
-3. **No semantic hit?** → Call provider, store response
+**Step 1:** Request arrives → Check exact cache (Redis)
+**Step 2:** No exact hit? → Check semantic cache (pgvector)
+**Step 3:** No semantic hit? → Call provider, store response
 
 ### Cache Key
 
@@ -147,11 +147,11 @@ const response = await cencori.chat({
 
 ## Best Practices
 
-1. **Enable Exact Match first** - safest, fastest
-2. **Start with high threshold** (0.95+) for semantic
-3. **Exclude reasoning models** (`o3-mini`, `o1`, `claude-3-opus`)
-4. **Lower TTL for fast-changing data** (1 hour)
-5. **Higher TTL for static content** (24 hours)
+- **Enable Exact Match first** - safest, fastest
+- **Start with high threshold** (0.95 or higher) for semantic
+- **Exclude reasoning models** - `o3-mini`, `o1`, `claude-3-opus`
+- **Lower TTL for fast-changing data** - 1 hour
+- **Higher TTL for static content** - 24 hours
 
 ## Cache Invalidation
 
