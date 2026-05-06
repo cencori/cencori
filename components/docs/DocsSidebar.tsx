@@ -21,9 +21,15 @@ interface SidebarItem {
     order: number;
 }
 
+interface SidebarSubGroup {
+    title: string;
+    items: SidebarItem[];
+}
+
 interface SidebarSection {
     title: string;
     items: SidebarItem[];
+    subGroup?: SidebarSubGroup;
 }
 
 function SidebarLinkItem({ item, pathname }: { item: SidebarItem; pathname: string }) {
@@ -94,6 +100,19 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                                         <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
                                     ))}
                                 </ul>
+                                {/* AI Gateway sub-group */}
+                                {group.subGroup && (
+                                    <div className="mt-3 pt-3 border-t border-border/40">
+                                        <div className="ml-4.5 mb-2 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                                            {group.subGroup.title}
+                                        </div>
+                                        <ul className="relative ml-3.5 border-l border-border/60">
+                                            {group.subGroup.items.map((item) => (
+                                                <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </AccordionContent>
                         </AccordionItem>
                     ))}

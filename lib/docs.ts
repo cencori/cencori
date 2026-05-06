@@ -29,11 +29,16 @@ export interface NavItem {
     title: string;
     href: string;
     order: number;
+    isSubItem?: boolean;
 }
 
 export interface NavSection {
     title: string;
     items: NavItem[];
+    subGroup?: {
+        title: string;
+        items: NavItem[];
+    };
 }
 
 export interface Heading {
@@ -116,11 +121,31 @@ export function getDocBySlug(slug: string): Doc | null {
 export function getDocsNavigation(): NavSection[] {
     const docs = getAllDocs();
 
-    // Group by section
+    // Group by section, with sub-groups for ai-gateway
     const sections = new Map<string, NavItem[]>();
 
     for (const doc of docs) {
         const section = doc.section || 'Other';
+        
+        // Check if this is an AI Gateway doc (in ai-gateway/ subfolder)
+        let sectionKey = section;
+        let isSubItem = false;
+        
+        if (doc.slug.startsWith('ai-gateway/')) {
+            // AI Gateway docs get their own sub-group under Platform
+            if (!sections.has('Platform:AI Gateway')) {
+                sections.set('Platform:AI Gateway', []);
+            }
+            sections.get('Platform:AI Gateway')!.push({
+                title: doc.title,
+                href: `/docs/${doc.slug}`,
+                order: doc.order || 999,
+                isSubItem: true,
+            });
+            // Don't add to main Platform group
+            continue;
+        }
+        
         if (!sections.has(section)) {
             sections.set(section, []);
         }
@@ -152,9 +177,17 @@ export function getDocsNavigation(): NavSection[] {
     for (const sectionTitle of sectionOrder) {
         const items = sections.get(sectionTitle);
         if (items) {
+            // Check for AI Gateway sub-items
+            const subItems = sections.get(`${sectionTitle}:AI Gateway`);
+            const hasSubGroup = sectionTitle === 'Platform' && subItems && subItems.length > 0;
+            
             result.push({
                 title: sectionTitle,
                 items: items.sort((a, b) => a.order - b.order),
+                subGroup: hasSubGroup ? {
+                    title: 'AI Gateway',
+                    items: subItems.sort((a, b) => a.order - b.order),
+                } : undefined,
             });
             sections.delete(sectionTitle);
         }
