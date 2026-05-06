@@ -123,16 +123,15 @@ export async function checkRateLimit(
     }
 
     try {
-        // Atomic increment
-        const requests = await client.incr(key);
+        // Pipeline: batch all 3 Redis ops into a single HTTP round-trip
+        const pipeline = client.pipeline();
+        pipeline.incr(key);
+        pipeline.expire(key, RATE_LIMIT_WINDOW);
+        pipeline.ttl(key);
+        const results = await pipeline.exec<[number, number, number]>();
 
-        // Set expiration if it's a new key (first request)
-        if (requests === 1) {
-            await client.expire(key, RATE_LIMIT_WINDOW);
-        }
-
-        // Get TTL to return accurate reset time
-        const ttl = await client.ttl(key);
+        const requests = results[0];
+        const ttl = results[2] > 0 ? results[2] : RATE_LIMIT_WINDOW;
 
         const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - requests);
         const reset = now + (ttl * 1000);

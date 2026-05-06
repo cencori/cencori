@@ -2,10 +2,33 @@
  * Budget Management for Projects
  *
  * Handles budget alerts and spend caps for AI Gateway usage.
+ * Uses Redis for fast per-request spend cap checks, with DB as fallback.
  */
 
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { triggerCostThresholdWebhook } from '@/lib/webhooks/trigger';
+import { Redis } from '@upstash/redis';
+
+let redis: Redis | null | undefined;
+
+function getRedisClient(): Redis | null {
+    if (redis !== undefined) return redis;
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) { redis = null; return null; }
+    redis = new Redis({ url, token });
+    return redis;
+}
+
+function getSpendMonthKey(projectId: string): string {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return `spend:${projectId}:${month}`;
+}
+
+function getSpendCapConfigKey(projectId: string): string {
+    return `cfg:spend_cap:${projectId}`;
+}
 
 // Alert thresholds (percentage of budget)
 const ALERT_THRESHOLDS = [50, 80, 100];
@@ -37,9 +60,24 @@ function getCurrentMonthRange(): { start: Date; end: Date } {
 }
 
 /**
- * Get current month spend for a project
+ * Get current month spend for a project.
+ * Uses Redis counter first (fast), falls back to DB aggregate (slow).
  */
 export async function getCurrentMonthSpend(projectId: string): Promise<number> {
+    // Try Redis counter first (~10ms)
+    const client = getRedisClient();
+    if (client) {
+        try {
+            const cached = await client.get<string>(getSpendMonthKey(projectId));
+            if (cached !== null && cached !== undefined) {
+                return parseFloat(String(cached)) || 0;
+            }
+        } catch {
+            // Fall through to DB
+        }
+    }
+
+    // DB fallback — only on cold start or Redis miss
     const supabase = createAdminClient();
     const { start, end } = getCurrentMonthRange();
 
@@ -55,7 +93,36 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
         return 0;
     }
 
-    return data?.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0) || 0;
+    const total = data?.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0) || 0;
+
+    // Seed Redis so subsequent requests are fast
+    if (client) {
+        try {
+            // Set with TTL = seconds until end of month + 1 day buffer
+            const ttl = Math.max(60, Math.ceil((end.getTime() - Date.now()) / 1000) + 86400);
+            await client.set(getSpendMonthKey(projectId), String(total), { ex: ttl });
+        } catch {
+            // Non-critical
+        }
+    }
+
+    return total;
+}
+
+/**
+ * Increment the running spend counter after a successful request.
+ * Fire-and-forget — never blocks the response.
+ */
+export function incrementSpendCounter(projectId: string, costUsd: number): void {
+    if (!(costUsd > 0)) return;
+    const client = getRedisClient();
+    if (!client) return;
+
+    const key = getSpendMonthKey(projectId);
+    // INCRBYFLOAT is atomic — safe for concurrent requests
+    client.incrbyfloat(key, costUsd).catch((err) => {
+        console.error('[Budget] Failed to increment spend counter:', err);
+    });
 }
 
 /**
@@ -104,10 +171,73 @@ export async function getBudgetStatus(projectId: string): Promise<BudgetStatus> 
 }
 
 /**
- * Check if a request is allowed based on spend cap
+ * Fast spend cap check using Redis-cached config and spend counter.
+ * Falls back to full DB path if Redis is unavailable.
  */
 export async function checkSpendCap(projectId: string): Promise<BudgetCheckResult> {
+    const client = getRedisClient();
+
+    // Fast path: check Redis-cached config + spend counter (~20ms total)
+    if (client) {
+        try {
+            const configKey = getSpendCapConfigKey(projectId);
+            const [cachedConfig, cachedSpend] = await Promise.all([
+                client.get<{ spendCap: number | null; enforce: boolean }>(configKey),
+                client.get<string>(getSpendMonthKey(projectId)),
+            ]);
+
+            if (cachedConfig !== null) {
+                const currentSpend = cachedSpend !== null ? (parseFloat(String(cachedSpend)) || 0) : 0;
+                const isCapReached = cachedConfig.enforce && cachedConfig.spendCap !== null && currentSpend >= cachedConfig.spendCap;
+
+                if (isCapReached) {
+                    return {
+                        allowed: false,
+                        reason: `Spend cap of $${cachedConfig.spendCap?.toFixed(2)} reached. Current spend: $${currentSpend.toFixed(2)}`,
+                        status: {
+                            currentSpend,
+                            monthlyBudget: null,
+                            spendCap: cachedConfig.spendCap,
+                            enforceSpendCap: cachedConfig.enforce,
+                            percentUsed: null,
+                            isCapReached: true,
+                            alertsEnabled: true,
+                        },
+                    };
+                }
+
+                return {
+                    allowed: true,
+                    status: {
+                        currentSpend,
+                        monthlyBudget: null,
+                        spendCap: cachedConfig.spendCap,
+                        enforceSpendCap: cachedConfig.enforce,
+                        percentUsed: null,
+                        isCapReached: false,
+                        alertsEnabled: true,
+                    },
+                };
+            }
+        } catch {
+            // Fall through to DB path
+        }
+    }
+
+    // Slow path: full DB query (only on cold start)
     const status = await getBudgetStatus(projectId);
+
+    // Cache the config for fast checks next time
+    if (client) {
+        try {
+            await client.set(getSpendCapConfigKey(projectId), {
+                spendCap: status.spendCap,
+                enforce: status.enforceSpendCap,
+            }, { ex: 300 }); // 5 min TTL
+        } catch {
+            // Non-critical
+        }
+    }
 
     if (status.isCapReached) {
         return {
@@ -117,10 +247,7 @@ export async function checkSpendCap(projectId: string): Promise<BudgetCheckResul
         };
     }
 
-    return {
-        allowed: true,
-        status,
-    };
+    return { allowed: true, status };
 }
 
 /**

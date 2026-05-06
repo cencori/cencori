@@ -104,43 +104,10 @@ function validateDomain(origin: string | null, allowedDomains: string[] | null):
 // IP / Geolocation
 // ──────────────────────────────────────────────
 
-async function lookupCountryFromIp(ip: string): Promise<string | null> {
-    try {
-        if (!ip || ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.') || ip === '::1') {
-            return null;
-        }
-
-        try {
-            const response = await fetch(`https://ipinfo.io/${ip}/country`, {
-                signal: AbortSignal.timeout(3000),
-                headers: { 'Accept': 'text/plain' }
-            });
-            if (response.ok) {
-                const countryCode = (await response.text()).trim();
-                if (countryCode && countryCode.length === 2) {
-                    return countryCode.toUpperCase();
-                }
-            }
-        } catch {
-            // Fall through to fallback
-        }
-
-        const fallbackResponse = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/country/`, {
-            signal: AbortSignal.timeout(3000),
-            headers: { 'Accept': 'text/plain' },
-        });
-        if (fallbackResponse.ok) {
-            const countryCode = (await fallbackResponse.text()).trim();
-            if (countryCode && countryCode.length === 2) {
-                return countryCode.toUpperCase();
-            }
-        }
-
-        return null;
-    } catch {
-        return null;
-    }
-}
+// NOTE: lookupCountryFromIp was removed — it made external HTTP calls to
+// ipinfo.io and ipapi.co with 3s timeouts each, adding 0-6s of latency
+// per request. We now rely on Vercel's geolocation() (free, zero-latency)
+// and customer-provided X-Cencori-User-Country headers instead.
 
 // ──────────────────────────────────────────────
 // Main Validation
@@ -160,11 +127,8 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     const vercelIp = ipAddress(req);
     const fallbackIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     const clientIp = customerProvidedIp || vercelIp || fallbackIp || 'unknown';
+    // Use customer-provided country header first, then Vercel's free geolocation
     let countryCode = req.headers.get('x-cencori-user-country');
-
-    if (!countryCode && customerProvidedIp) {
-        countryCode = await lookupCountryFromIp(customerProvidedIp);
-    }
     if (!countryCode) {
         const geo = geolocation(req);
         countryCode = geo.country || null;
@@ -351,12 +315,12 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         };
     }
 
-    // ── Per-minute rate limit ──
+    // ── Per-minute rate limit + Spend cap (parallel — these are independent) ──
     const route = req.nextUrl.pathname;
-    const rateLimitResult = await checkRateLimit(project.id, {
-        requestId,
-        route,
-    });
+    const [rateLimitResult, spendCapResult] = await Promise.all([
+        checkRateLimit(project.id, { requestId, route }),
+        checkSpendCap(project.id),
+    ]);
 
     if (!rateLimitResult.allowed) {
         if (rateLimitResult.reason === 'backend_unavailable') {
@@ -391,8 +355,6 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         };
     }
 
-    // ── Spend cap check ──
-    const spendCapResult = await checkSpendCap(project.id);
     if (!spendCapResult.allowed) {
         return {
             success: false,
@@ -541,49 +503,20 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
     }
 }
 
-async function chargeCreditsForRequest(context: GatewayContext): Promise<void> {
+async function chargeCreditsForRequest(context: GatewayContext, costUsd?: number): Promise<void> {
     // Free and enterprise tiers are not credit-gated by default.
     if (context.tier === 'free' || context.tier === 'enterprise') {
         return;
     }
 
-    const { data: requestLog, error: requestLogError } = await context.supabase
-        .from('ai_requests')
-        .select('id, endpoint, cencori_charge_usd')
-        .eq('request_id', context.requestId)
-        .maybeSingle();
-
-    if (requestLogError || !requestLog) {
-        if (requestLogError) {
-            console.warn(`[Gateway] Failed to load request log for credit charge (${context.requestId}):`, requestLogError.message);
-        }
-        return;
-    }
-
-    const amount = Number(requestLog.cencori_charge_usd ?? 0);
+    // Use the cost passed directly from the caller (avoids re-querying ai_requests)
+    const amount = costUsd ?? 0;
     if (!(amount > 0)) {
         return;
     }
 
-    // Idempotency guard: avoid duplicate charges for the same request log row.
-    const { data: existingCharge, error: existingChargeError } = await context.supabase
-        .from('credit_transactions')
-        .select('id')
-        .eq('organization_id', context.organizationId)
-        .eq('transaction_type', 'usage')
-        .eq('reference_id', requestLog.id)
-        .maybeSingle();
-
-    if (existingChargeError) {
-        console.warn(`[Gateway] Failed to check existing credit charge (${context.requestId}):`, existingChargeError.message);
-    }
-
-    if (existingCharge?.id) {
-        return;
-    }
-
-    const description = `Usage charge: ${requestLog.endpoint || 'gateway'}`;
-    const charged = await deductCredits(context.organizationId, amount, description, requestLog.id);
+    const description = `Usage charge: gateway`;
+    const charged = await deductCredits(context.organizationId, amount, description, context.requestId);
     if (!charged) {
         console.warn(`[Gateway] Credit deduction failed for request ${context.requestId}. org=${context.organizationId} amount=${amount}`);
     }
@@ -592,10 +525,17 @@ async function chargeCreditsForRequest(context: GatewayContext): Promise<void> {
 /**
  * Increment the monthly usage counter for the organization.
  * Called after a successful request.
+ * @param costUsd - The cencori charge for this request (passed directly to avoid re-querying)
  */
-export async function incrementUsage(context: GatewayContext): Promise<void> {
+export async function incrementUsage(context: GatewayContext, costUsd?: number): Promise<void> {
     try {
-        await chargeCreditsForRequest(context);
+        // Update Redis spend counter for fast spend cap checks (fire-and-forget)
+        if (costUsd && costUsd > 0) {
+            const { incrementSpendCounter } = await import('@/lib/budgets');
+            incrementSpendCounter(context.projectId, costUsd);
+        }
+
+        await chargeCreditsForRequest(context, costUsd);
 
         // Try RPC first (atomic increment)
         const { error } = await context.supabase.rpc('increment_monthly_usage', {
