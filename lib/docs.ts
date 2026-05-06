@@ -127,11 +127,8 @@ export function getDocsNavigation(): NavSection[] {
     for (const doc of docs) {
         const section = doc.section || 'Other';
         
-        // Check if this is an AI Gateway doc (in ai-gateway/ subfolder)
-        let sectionKey = section;
-        let isSubItem = false;
-        
-        if (doc.slug.startsWith('ai-gateway/')) {
+        // Check if this is an AI Gateway doc (in ai-gateway/ subfolder under platform)
+        if (doc.slug.includes('/ai-gateway/')) {
             // AI Gateway docs get their own sub-group under Platform
             if (!sections.has('Platform:AI Gateway')) {
                 sections.set('Platform:AI Gateway', []);
@@ -142,7 +139,11 @@ export function getDocsNavigation(): NavSection[] {
                 order: doc.order || 999,
                 isSubItem: true,
             });
-            // Don't add to main Platform group
+            // Still add to Platform main group too (for the accordion to show)
+            if (!sections.has('Platform')) {
+                sections.set('Platform', []);
+            }
+            // Skip adding to main Platform - we'll combine them later
             continue;
         }
         
@@ -190,15 +191,9 @@ export function getDocsNavigation(): NavSection[] {
                 } : undefined,
             });
             sections.delete(sectionTitle);
+            // Also delete the AI Gateway sub-group key
+            sections.delete(`${sectionTitle}:AI Gateway`);
         }
-    }
-
-    // Add any remaining sections
-    for (const [sectionTitle, items] of sections) {
-        result.push({
-            title: sectionTitle,
-            items: items.sort((a, b) => a.order - b.order),
-        });
     }
 
     return result;
