@@ -137,7 +137,6 @@ export function getDocsNavigation(): NavSection[] {
         'Getting Started',
         'Agents',
         'Platform',
-        'AI Gateway',
         'AI',
         'AI Endpoints',
         'AI Memory',
