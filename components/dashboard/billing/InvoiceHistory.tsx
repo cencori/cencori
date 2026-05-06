@@ -1,11 +1,6 @@
 "use client";
 
-import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Download, Eye, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from '@/lib/currency';
 
 interface Invoice {
     id: string;
@@ -14,6 +9,7 @@ interface Invoice {
     amount: number;
     status: 'paid' | 'pending' | 'refunded';
     pdfUrl: string | null;
+    currency?: string;
 }
 
 interface InvoiceHistoryProps {
@@ -97,7 +93,7 @@ export function InvoiceHistory({ invoices }: InvoiceHistoryProps) {
                                     })}
                                 </TableCell>
                                 <TableCell className="text-xs font-medium py-3 tabular-nums">
-                                    ${invoice.amount.toFixed(2)}
+                                    {formatCurrency(invoice.amount, invoice.currency || 'USD')}
                                 </TableCell>
                                 <TableCell className="py-3">
                                     <Badge

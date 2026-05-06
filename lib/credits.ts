@@ -5,13 +5,21 @@
  */
 
 import { createAdminClient } from './supabaseAdmin';
+import { getCachedCreditsBalance, setCachedCreditsBalance, invalidateCreditsBalance } from './config-cache';
 
 /**
  * Get organization's current credits balance
+ * Tries Redis cache first for sub-1ms performance on hot paths.
  */
 export async function getCreditsBalance(organizationId: string): Promise<number> {
-    const supabase = createAdminClient();
+    // 1. Try cache first
+    const cached = await getCachedCreditsBalance(organizationId);
+    if (cached !== null) {
+        return cached;
+    }
 
+    // 2. Fallback to DB
+    const supabase = createAdminClient();
     const { data, error } = await supabase
         .from('organizations')
         .select('credits_balance')
@@ -23,7 +31,12 @@ export async function getCreditsBalance(organizationId: string): Promise<number>
         return 0;
     }
 
-    return parseFloat(data.credits_balance) || 0;
+    const balance = parseFloat(data.credits_balance) || 0;
+    
+    // 3. Seed cache for next time
+    await setCachedCreditsBalance(organizationId, balance);
+    
+    return balance;
 }
 
 /**
@@ -39,7 +52,8 @@ export async function hasInsufficientCredits(
 
 /**
  * Deduct credits from organization balance
- * Logs the transaction and updates balance atomically
+ * Logs the transaction and updates balance atomically via RPC.
+ * Updates Redis cache on success.
  */
 export async function deductCredits(
     organizationId: string,
@@ -120,6 +134,42 @@ async function applyCreditDelta(
 ): Promise<boolean> {
     const supabase = createAdminClient();
 
+    // Use the atomic RPC for usage-based deductions to prevent race conditions
+    if (transactionType === 'usage' && delta < 0) {
+        const amount = Math.abs(delta);
+        const { data, error } = await supabase.rpc('deduct_organization_credits', {
+            p_org_id: organizationId,
+            p_amount: amount,
+            p_description: description,
+            p_reference_id: referenceId,
+            p_metadata: metadata || {}
+        });
+
+        if (error) {
+            console.error('[Credits] RPC Error deducting credits:', error);
+            return false;
+        }
+
+        // The RPC returns a table/array in some Supabase client versions
+        const resultData = Array.isArray(data) ? data[0] : data;
+        const result = resultData as unknown as { success: boolean, new_balance: number, error_message: string };
+        
+        if (!result.success) {
+            console.warn(`[Credits] Deduction failed: ${result.error_message}`);
+            // If it failed due to insufficient funds, update cache to reflect reality
+            if (result.error_message === 'Insufficient balance') {
+                await setCachedCreditsBalance(organizationId, result.new_balance);
+            }
+            return false;
+        }
+
+        // SUCCESS: Update Redis cache with the exact balance returned by the DB
+        await setCachedCreditsBalance(organizationId, result.new_balance);
+        return true;
+    }
+
+    // For top-ups and adjustments, we still use the manual path for now, 
+    // but we invalidate the cache to ensure the next read is fresh.
     try {
         const currentBalance = await getCreditsBalance(organizationId);
         const newBalance = currentBalance + delta;
@@ -159,6 +209,8 @@ async function applyCreditDelta(
             console.error('[Credits] Error logging transaction:', logError);
         }
 
+        // Invalidate cache so the next request gets the new balance from DB
+        await invalidateCreditsBalance(organizationId);
         return true;
     } catch (error) {
         console.error('[Credits] Unexpected error applying credit delta:', error);

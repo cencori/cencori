@@ -64,15 +64,15 @@ import {
   Users,
   Shield,
   Zap,
-  DollarSign,
-  ExternalLink,
-  CheckCircle2,
   AlertCircle,
   CreditCard,
+  Banknote,
+  ExternalLink,
 } from "lucide-react";
 import { Bar, BarChart, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
+import { formatCurrency as globalFormatCurrency } from "@/lib/currency";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -163,6 +163,7 @@ interface RatePlan {
   monthly_cost_limit_usd: number | null;
   markup_percentage: number | null;
   flat_rate_per_request: number | null;
+  currency: string;
   allowed_models: string[] | null;
   overage_action: "block" | "alert_only";
   end_user_count: number;
@@ -182,6 +183,7 @@ interface RatePlanForm {
   monthly_cost_limit_usd: string;
   markup_percentage: string;
   flat_rate_per_request: string;
+  currency: string;
   allowed_models: string;
   overage_action: "block" | "alert_only";
 }
@@ -260,9 +262,9 @@ function formatRatePlanNum(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
-function formatUSD(n: number | null | undefined): string {
+function formatUSD(n: number | null | undefined, currency: string = 'USD'): string {
   if (n == null) return "—";
-  return `$${n.toFixed(2)}`;
+  return globalFormatCurrency(n, currency);
 }
 
 function slugify(name: string): string {
@@ -275,6 +277,7 @@ const emptyForm: RatePlanForm = {
   daily_request_limit: "", monthly_request_limit: "", requests_per_minute: "",
   daily_cost_limit_usd: "", monthly_cost_limit_usd: "",
   markup_percentage: "", flat_rate_per_request: "",
+  currency: "USD",
   allowed_models: "", overage_action: "block",
 };
 
@@ -290,6 +293,7 @@ function planToForm(plan: RatePlan): RatePlanForm {
     monthly_cost_limit_usd: plan.monthly_cost_limit_usd?.toString() ?? "",
     markup_percentage: plan.markup_percentage?.toString() ?? "",
     flat_rate_per_request: plan.flat_rate_per_request?.toString() ?? "",
+    currency: plan.currency || "USD",
     allowed_models: plan.allowed_models?.join(", ") ?? "",
     overage_action: plan.overage_action,
   };
@@ -308,6 +312,7 @@ function formToPayload(form: RatePlanForm) {
     monthly_cost_limit_usd: parseNum(form.monthly_cost_limit_usd),
     markup_percentage: parseNum(form.markup_percentage),
     flat_rate_per_request: parseNum(form.flat_rate_per_request),
+    currency: form.currency,
     allowed_models: form.allowed_models.trim()
       ? form.allowed_models.split(",").map(s => s.trim()).filter(Boolean)
       : null,
@@ -1187,97 +1192,92 @@ export default function UsageBillingPage({ params }: PageProps) {
               <p className="text-xs text-muted-foreground max-w-[300px] mx-auto">Create a rate plan to define usage limits and pricing tiers for your end-users</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {(Array.isArray(ratePlans) ? ratePlans : []).map((plan) => (
-                <div key={plan.id} className="rounded-xl border border-border/40 bg-card pt-5 px-5 pb-4 flex flex-col">
-                  <div className="flex items-start justify-between mb-3">
+                <div key={plan.id} className="rounded-xl border border-border/40 bg-card p-6 flex flex-col transition-all hover:border-border/80 group">
+                  <div className="flex items-start justify-between mb-6">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{plan.name}</p>
-                        {plan.is_default && <Badge variant="secondary" className="h-5 text-[10px] px-1.5 shrink-0">Default</Badge>}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{plan.slug}</p>
+                      <p className="text-sm font-semibold tracking-tight">{plan.name}</p>
+                      <p className="text-[11px] text-muted-foreground font-mono mt-1 opacity-60 uppercase tracking-widest leading-none">{plan.slug}</p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openRpEdit(plan)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600" onClick={() => setRpDeleteTarget(plan)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {plan.is_default && (
+                        <Badge variant="secondary" className="h-5 text-[9px] px-2 font-black uppercase tracking-tighter bg-emerald-500/10 text-emerald-500 border-emerald-500/20 rounded-full">
+                          Default
+                        </Badge>
+                      )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-secondary rounded-full" onClick={() => openRpEdit(plan)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-full" onClick={() => setRpDeleteTarget(plan)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2 flex-1">
-                    {(plan.daily_token_limit || plan.monthly_token_limit) && (
-                      <div className="flex items-start gap-2">
-                        <Zap className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="text-xs">
-                          <span className="text-muted-foreground">Tokens</span>
-                          <span className="ml-1.5 text-muted-foreground">
-                            {plan.daily_token_limit ? `${formatRatePlanNum(plan.daily_token_limit)}/day` : ""}
-                            {plan.daily_token_limit && plan.monthly_token_limit ? " · " : ""}
-                            {plan.monthly_token_limit ? `${formatRatePlanNum(plan.monthly_token_limit)}/mo` : ""}
-                          </span>
+                  <div className="space-y-6 flex-1">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                      {/* Tokens */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Tokens</p>
+                        <div className="text-xs font-medium space-y-0.5">
+                          <p>{plan.daily_token_limit ? `${formatRatePlanNum(plan.daily_token_limit)}/day` : "Unlimited"}</p>
+                          {plan.monthly_token_limit && <p className="text-[10px] text-muted-foreground font-normal">{formatRatePlanNum(plan.monthly_token_limit)}/mo</p>}
                         </div>
                       </div>
-                    )}
-                    {(plan.daily_request_limit || plan.monthly_request_limit || plan.requests_per_minute) && (
-                      <div className="flex items-start gap-2">
-                        <Shield className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="text-xs">
-                          <span className="text-muted-foreground">Requests</span>
-                          <span className="ml-1.5 text-muted-foreground">
-                            {[
-                              plan.daily_request_limit ? `${formatRatePlanNum(plan.daily_request_limit)}/day` : "",
-                              plan.monthly_request_limit ? `${formatRatePlanNum(plan.monthly_request_limit)}/mo` : "",
-                              plan.requests_per_minute ? `${formatRatePlanNum(plan.requests_per_minute)}/min` : "",
-                            ].filter(Boolean).join(" · ")}
-                          </span>
+
+                      {/* Requests */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Requests</p>
+                        <div className="text-xs font-medium space-y-0.5">
+                          <p>{plan.daily_request_limit ? `${formatRatePlanNum(plan.daily_request_limit)}/day` : "Unlimited"}</p>
+                          {plan.requests_per_minute && <p className="text-[10px] text-muted-foreground font-normal">{plan.requests_per_minute} req/min</p>}
                         </div>
                       </div>
-                    )}
-                    {(plan.daily_cost_limit_usd || plan.monthly_cost_limit_usd) && (
-                      <div className="flex items-start gap-2">
-                        <DollarSign className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="text-xs">
-                          <span className="text-muted-foreground">Cost</span>
-                          <span className="ml-1.5 text-muted-foreground">
-                            {plan.daily_cost_limit_usd ? `${formatUSD(plan.daily_cost_limit_usd)}/day` : ""}
-                            {plan.daily_cost_limit_usd && plan.monthly_cost_limit_usd ? " · " : ""}
-                            {plan.monthly_cost_limit_usd ? `${formatUSD(plan.monthly_cost_limit_usd)}/mo` : ""}
-                          </span>
+
+                      {/* Cost Limits */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Spend Limit</p>
+                        <div className="text-xs font-medium space-y-0.5">
+                          <p>{plan.daily_cost_limit_usd ? `${formatUSD(plan.daily_cost_limit_usd, plan.currency)}/day` : "None"}</p>
+                          {plan.monthly_cost_limit_usd && <p className="text-[10px] text-muted-foreground font-normal">{formatUSD(plan.monthly_cost_limit_usd, plan.currency)}/mo</p>}
                         </div>
                       </div>
-                    )}
-                    {(plan.markup_percentage || plan.flat_rate_per_request) && (
-                      <div className="text-xs text-muted-foreground">
-                        <span>Markup</span>
-                        <span className="ml-1.5">
-                          {[
-                            plan.markup_percentage ? `${plan.markup_percentage}%` : "",
-                            plan.flat_rate_per_request ? `+${formatUSD(plan.flat_rate_per_request)}/req` : "",
-                          ].filter(Boolean).join(" ")}
-                        </span>
+
+                      {/* Pricing/Markup */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.1em]">Pricing Model</p>
+                        <div className="text-xs font-medium space-y-0.5">
+                          <p>{plan.markup_percentage ? `${plan.markup_percentage}% Markup` : "At cost"}</p>
+                          {plan.flat_rate_per_request && <p className="text-[10px] text-muted-foreground font-normal">+{formatUSD(plan.flat_rate_per_request, plan.currency)}/req</p>}
+                        </div>
                       </div>
-                    )}
+                    </div>
+
                     {plan.allowed_models && plan.allowed_models.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {plan.allowed_models.map((model) => (
-                          <span key={model} className="px-1.5 py-0.5 text-[10px] bg-secondary rounded font-mono">{model}</span>
-                        ))}
+                      <div className="pt-5 border-t border-border/10">
+                        <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.15em] mb-2.5">Restricted Models</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {plan.allowed_models.map((model) => (
+                            <span key={model} className="px-2 py-0.5 text-[9px] font-mono border border-border/20 rounded-md bg-muted/30 text-muted-foreground">{model}</span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      <span>{plan.end_user_count ?? 0} user{(plan.end_user_count ?? 0) !== 1 ? "s" : ""}</span>
+                  <div className="flex items-center justify-between mt-6 pt-5 border-t border-border/10">
+                    <div className="text-[10px] font-medium text-muted-foreground">
+                      <span className="text-foreground font-semibold">{plan.end_user_count ?? 0}</span> assigned users
                     </div>
-                    <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${OVERAGE_COLORS[plan.overage_action] ?? ""}`}>
-                      {OVERAGE_LABELS[plan.overage_action] ?? plan.overage_action}
-                    </span>
+                    <Badge variant="outline" className={cn(
+                      "text-[9px] px-2 py-0 font-black uppercase tracking-tighter border-0 rounded-full",
+                      OVERAGE_COLORS[plan.overage_action] || "bg-secondary text-secondary-foreground"
+                    )}>
+                      {OVERAGE_LABELS[plan.overage_action] || plan.overage_action}
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -1313,6 +1313,24 @@ export default function UsageBillingPage({ params }: PageProps) {
                     <p className="text-[10px] text-muted-foreground">Assign to new end-users automatically</p>
                   </div>
                   <Switch checked={rpForm.is_default} onCheckedChange={(checked) => setRpForm(prev => ({ ...prev, is_default: checked }))} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Currency</Label>
+                  <Select value={rpForm.currency} onValueChange={(v) => setRpForm(prev => ({ ...prev, currency: v }))}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD" className="text-xs">USD ($)</SelectItem>
+                      <SelectItem value="EUR" className="text-xs">EUR (€)</SelectItem>
+                      <SelectItem value="GBP" className="text-xs">GBP (£)</SelectItem>
+                      <SelectItem value="NGN" className="text-xs">NGN (₦)</SelectItem>
+                      <SelectItem value="KES" className="text-xs">KES (KSh)</SelectItem>
+                      <SelectItem value="ZAR" className="text-xs">ZAR (R)</SelectItem>
+                      <SelectItem value="GHS" className="text-xs">GHS (₵)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -1355,7 +1373,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Cost Limits (USD)</p>
+                  <p className="text-xs font-medium text-muted-foreground">Cost Limits ({rpForm.currency})</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="daily-cost" className="text-[10px] text-muted-foreground">Daily</Label>
@@ -1379,7 +1397,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                         onChange={(e) => setRpForm(prev => ({ ...prev, markup_percentage: e.target.value }))} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="flat-rate" className="text-[10px] text-muted-foreground">Flat Rate / Request ($)</Label>
+                      <Label htmlFor="flat-rate" className="text-[10px] text-muted-foreground">Flat Rate / Request ({rpForm.currency})</Label>
                       <Input id="flat-rate" type="number" step="0.001" placeholder="e.g. 0.002" className="h-8 text-xs" value={rpForm.flat_rate_per_request}
                         onChange={(e) => setRpForm(prev => ({ ...prev, flat_rate_per_request: e.target.value }))} />
                     </div>

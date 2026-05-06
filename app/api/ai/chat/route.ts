@@ -1568,6 +1568,10 @@ export async function POST(req: NextRequest) {
                                         },
                                         customerMarkupPercentage: endUserQuota.markupPercentage,
                                         flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                                        currency: endUserQuota.currency,
+                                        pricingModel: endUserQuota.pricingModel,
+                                        pricingTiers: endUserQuota.pricingTiers,
+                                        monthlyTokensUsed: endUserQuota.monthlyTokensUsed,
                                     });
                                 }
 
@@ -1885,6 +1889,10 @@ export async function POST(req: NextRequest) {
                 },
                 customerMarkupPercentage: endUserQuota.markupPercentage,
                 flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                currency: endUserQuota.currency,
+                pricingModel: endUserQuota.pricingModel,
+                pricingTiers: endUserQuota.pricingTiers,
+                monthlyTokensUsed: endUserQuota.monthlyTokensUsed,
             });
         }
 

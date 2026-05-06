@@ -17,7 +17,39 @@ const TTL = {
     API_KEY: 60,           // 1 minute for API key + project config
     CACHE_CONFIG: 300,     // 5 minutes for cache config
     SECURITY_CONFIG: 60,   // 1 minute for security config
+    CREDITS: 300,          // 5 minutes for balance (invalidated on spend)
 };
+
+/**
+ * Cache organization credits balance
+ */
+export async function getCachedCreditsBalance(organizationId: string): Promise<number | null> {
+    const cacheKey = `${CONFIG_PREFIX}credits:${organizationId}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        return cached !== null ? Number(cached) : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function setCachedCreditsBalance(organizationId: string, balance: number): Promise<void> {
+    const cacheKey = `${CONFIG_PREFIX}credits:${organizationId}`;
+    try {
+        await redis.set(cacheKey, balance, { ex: TTL.CREDITS });
+    } catch {
+        // Silently fail
+    }
+}
+
+export async function invalidateCreditsBalance(organizationId: string): Promise<void> {
+    const cacheKey = `${CONFIG_PREFIX}credits:${organizationId}`;
+    try {
+        await redis.del(cacheKey);
+    } catch {
+        // Silently fail
+    }
+}
 
 /**
  * Cache API key + project config lookup
