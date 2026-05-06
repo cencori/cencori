@@ -698,7 +698,7 @@ export async function POST(req: NextRequest) {
                             });
 
                             // Log as cached request (zero cost)
-                            await logGatewayRequest(gatewayCtx, {
+                            void logGatewayRequest(gatewayCtx, {
                                 endpoint: '/v1/chat/completions',
                                 model,
                                 provider: 'cache',
@@ -712,7 +712,7 @@ export async function POST(req: NextRequest) {
                                 markupPercentage: 0,
                                 endUserId: endUserId || undefined,
                             });
-                            await incrementUsage(gatewayCtx);
+                            void incrementUsage(gatewayCtx);
 
                             const cachedResponse = NextResponse.json(cacheResult.response);
                             cachedResponse.headers.set('X-Cache', cacheResult.hitType === 'exact' ? 'HIT-EXACT' : 'HIT-SEMANTIC');
@@ -845,7 +845,7 @@ export async function POST(req: NextRequest) {
 
                             if (gatewayCtx) {
                                 const usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, fullResponseText);
-                                await logGatewayRequest(gatewayCtx, {
+                                void logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
                                     provider: 'google',
@@ -859,7 +859,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                await incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -890,7 +890,7 @@ export async function POST(req: NextRequest) {
                 const usageAndCost = await calculateUsageAndCost(providerForMetrics, model, messages, completionText);
 
                 if (gatewayCtx) {
-                    await logGatewayRequest(gatewayCtx, {
+                    void logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
                         provider: 'google',
@@ -904,7 +904,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: usageAndCost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    await incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx);
                     maybeRecordEndUserUsage(usageAndCost);
                 }
 
@@ -998,7 +998,7 @@ export async function POST(req: NextRequest) {
 
                             if (gatewayCtx) {
                                 const usageAndCost = await calculateUsageAndCost(providerImpl, routedModel, messages, fullResponseText);
-                                await logGatewayRequest(gatewayCtx, {
+                                void logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
                                     provider: providerLogName,
@@ -1012,7 +1012,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                await incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -1050,7 +1050,7 @@ export async function POST(req: NextRequest) {
                 const finishReason = completion.finishReason || (openAiToolCalls && openAiToolCalls.length > 0 ? "tool_calls" : "stop");
 
                 if (gatewayCtx) {
-                    await logGatewayRequest(gatewayCtx, {
+                    void logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
                         provider: providerLogName,
@@ -1064,7 +1064,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: completion.cost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    await incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx);
                     maybeRecordEndUserUsage({
                         promptTokens: completion.usage.promptTokens,
                         completionTokens: completion.usage.completionTokens,
@@ -1233,7 +1233,7 @@ export async function POST(req: NextRequest) {
                             // Usage tracking
                             if (gatewayCtx) {
                                 const usageAndCost = await calculateUsageAndCost(providerForMetrics, routedModel, messages, fullResponseText);
-                                await logGatewayRequest(gatewayCtx, {
+                                void logGatewayRequest(gatewayCtx, {
                                     endpoint: '/v1/chat/completions',
                                     model,
                                     provider: providerLogName,
@@ -1247,7 +1247,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                await incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -1349,7 +1349,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 if (gatewayCtx) {
-                    await logGatewayRequest(gatewayCtx, {
+                    void logGatewayRequest(gatewayCtx, {
                         endpoint: '/v1/chat/completions',
                         model,
                         provider: providerLogName,
@@ -1363,7 +1363,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: usageAndCost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    await incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx);
                     maybeRecordEndUserUsage(usageAndCost);
                 }
 
