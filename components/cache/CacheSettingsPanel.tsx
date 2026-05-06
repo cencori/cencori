@@ -34,6 +34,8 @@ function formatTTL(seconds: number): string {
 
 export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
     const queryClient = useQueryClient();
+    const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+    const [excludedInput, setExcludedInput] = useState('');
 
     const { data: settings, isLoading } = useQuery<CacheSettings>({
         queryKey: ['cacheSettings', projectId],
@@ -81,7 +83,20 @@ export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
         },
     });
 
-    const [excludedInput, setExcludedInput] = useState('');
+    const update = useCallback((field: keyof CacheSettings, value: any) => {
+        if (debounceTimers.current[field]) {
+            clearTimeout(debounceTimers.current[field]);
+        }
+
+        if (field === 'ttl_seconds' || field === 'similarity_threshold' || field === 'max_entries' || field === 'max_cacheable_temperature') {
+            debounceTimers.current[field] = setTimeout(() => {
+                mutation.mutate({ [field]: value });
+                delete debounceTimers.current[field];
+            }, 300);
+        } else {
+            mutation.mutate({ [field]: value });
+        }
+    }, [mutation]);
 
     if (isLoading || !settings) {
         return (
@@ -90,26 +105,6 @@ export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
             </div>
         );
     }
-
-    const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
-
-    const update = useCallback((field: keyof CacheSettings, value: any) => {
-        // Clear any pending debounce for this field
-        if (debounceTimers.current[field]) {
-            clearTimeout(debounceTimers.current[field]);
-        }
-
-        // Debounce slider inputs (ttl, similarity_threshold) by 300ms
-        if (field === 'ttl_seconds' || field === 'similarity_threshold' || field === 'max_entries' || field === 'max_cacheable_temperature') {
-            debounceTimers.current[field] = setTimeout(() => {
-                mutation.mutate({ [field]: value });
-                delete debounceTimers.current[field];
-            }, 300);
-        } else {
-            // Immediate for toggles/switches
-            mutation.mutate({ [field]: value });
-        }
-    }, [mutation]);
 
     return (
         <div className="space-y-6">
