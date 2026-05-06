@@ -151,8 +151,8 @@ const matrixSections: Array<{
     }>;
 }> = [
     {
-        title: "AI Access",
-        description: "Core inference capabilities.",
+        title: "AI Gateway",
+        description: "inference capabilities.",
         rows: [
             {
                 feature: "100+ AI models (chat, image, audio, embeddings)",
