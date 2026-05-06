@@ -186,21 +186,43 @@ export async function POST(req: NextRequest) {
 
         // Look up rate plan markup for each unique end-user
         const uniqueUserIds = [...new Set(validated.map(e => e.end_user_id))];
-        const userMarkups: Record<string, { markupPercentage: number; flatRatePerRequest: number | null }> = {};
+        const userMarkups: Record<string, { 
+            markupPercentage: number; 
+            flatRatePerRequest: number | null;
+            currency: string;
+            pricingModel: 'flat' | 'tiered' | 'volume';
+            pricingTiers: any[];
+            platformCommissionPercentage: number;
+        }> = {};
 
         if (uniqueUserIds.length > 0) {
             const { data: endUsers } = await supabase
                 .from('end_users')
-                .select('external_id, rate_plan_id, rate_plans(markup_percentage, flat_rate_per_request)')
+                .select(`
+                    external_id, 
+                    rate_plan_id, 
+                    rate_plans(
+                        markup_percentage, 
+                        flat_rate_per_request,
+                        currency,
+                        pricing_model,
+                        pricing_tiers,
+                        platform_commission_percentage
+                    )
+                `)
                 .eq('project_id', projectId)
                 .in('external_id', uniqueUserIds);
 
             if (endUsers) {
                 for (const eu of endUsers) {
-                    const plan = eu.rate_plans as { markup_percentage?: number; flat_rate_per_request?: number } | null;
+                    const plan = eu.rate_plans as any;
                     userMarkups[eu.external_id] = {
                         markupPercentage: plan?.markup_percentage ?? customerMarkupPercentage,
                         flatRatePerRequest: plan?.flat_rate_per_request ?? null,
+                        currency: plan?.currency ?? 'USD',
+                        pricingModel: plan?.pricing_model ?? 'flat',
+                        pricingTiers: plan?.pricing_tiers ?? [],
+                        platformCommissionPercentage: plan?.platform_commission_percentage ?? 20,
                     };
                 }
             }
@@ -222,6 +244,10 @@ export async function POST(req: NextRequest) {
                 cencoriChargeUsd,
                 markup.markupPercentage,
                 markup.flatRatePerRequest,
+                markup.pricingModel,
+                markup.pricingTiers,
+                event.total_tokens,
+                0 // In-batch monthly usage tracking not implemented for this endpoint yet
             );
 
             try {
@@ -241,6 +267,11 @@ export async function POST(req: NextRequest) {
                     },
                     customerMarkupPercentage: markup.markupPercentage,
                     flatRatePerRequest: markup.flatRatePerRequest,
+                    currency: markup.currency,
+                    pricingModel: markup.pricingModel,
+                    pricingTiers: markup.pricingTiers,
+                    monthlyTokensUsed: 0,
+                    platformCommissionPercentage: markup.platformCommissionPercentage,
                 });
 
                 // Build ai_requests row for the raw log

@@ -26,6 +26,7 @@ export interface UsageTask {
     pricingModel: 'flat' | 'tiered' | 'volume';
     pricingTiers: any[];
     monthlyTokensUsed: number;
+    platformCommissionPercentage: number;
     timestamp: number;
 }
 

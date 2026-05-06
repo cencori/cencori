@@ -609,6 +609,7 @@ export async function POST(req: NextRequest) {
                     pricingModel: endUserQuota.pricingModel,
                     pricingTiers: endUserQuota.pricingTiers,
                     monthlyTokensUsed: endUserQuota.monthlyTokensUsed,
+                    platformCommissionPercentage: endUserQuota.platformCommissionPercentage,
                 });
             }
         };
