@@ -1,0 +1,88 @@
+---
+title: "Introducing Prompt Cache: 60% Cost Reduction, 95% Faster Latency"
+slug: "introducing-prompt-cache"
+date: "2026-05-05"
+excerpt: "Reduce AI costs by 30-60% and latency by 95% with Cencori's two-tier caching - exact match and semantic match caching for production AI apps."
+coverImage: "/blog/images/covers/prompt-cache.png"
+authors:
+  - bola
+tags: ["Product", "AI Gateway", "Caching", "Cost Optimization"]
+category: "product"
+published: true
+---
+
+We're excited to announce **Prompt Cache**, the most advanced caching solution for production AI applications. Built directly into the Cencori AI Gateway, it reduces your AI costs by 30-60% and latency by 95% — without sacrificing accuracy.
+
+## Why Caching Matters
+
+Every time your AI application sends the same prompt, you're paying full price. For applications with repetitive queries, classifiers, or RAG systems, this adds up fast. Most caching solutions only match identical prompts — but real applications often have slight variations that should still share a cached response.
+
+That's where Prompt Cache stands apart.
+
+## Two-Tier Cache Architecture
+
+### 1. Exact Match Cache (Redis)
+- **<10ms latency** — instant cache hits
+- SHA-256 hash of normalized prompt
+- Case-insensitive, whitespace-normalized
+- Redis-backed for speed
+
+### 2. Semantic Match Cache (pgvector)
+- **~50ms latency** — similarity search via embeddings
+- Finds semantically similar prompts (e.g., "capital of France" matches "France's capital")
+- Configurable similarity threshold (default: 0.95)
+- Uses text-embedding-004 for vector embeddings
+
+## Smart Features
+
+### Temperature-Aware Caching
+Only cache deterministic responses. Prompt Cache defaults to caching only low-temperature responses (≤0.2), preserving creativity while maximizing savings on predictable outputs.
+
+### Model Exclusion
+Exclude specific models from caching — like reasoning models (o3-mini, o1) or expensive fine-tuned models — while caching responses from cheaper models.
+
+### Full Analytics
+Track your ROI with built-in analytics:
+- **Hit Rate** — cache effectiveness
+- **Tokens Saved** — cumulative savings
+- **Cost Saved** — estimated USD savings
+- **Active Entries** — current cache size
+
+## Real World Impact
+
+| Application | Without Cache | With Cache | Savings |
+|-------------|-------------|----------|---------|
+| RAG Q&A | $2,400/mo | $960/mo | 60% |
+| Classifier | $800/mo | $280/mo | 65% |
+| Customer Support | $1,200/mo | $480/mo | 60% |
+
+## Try It Now
+
+Enable Prompt Cache from your project dashboard:
+
+```typescript
+const response = await cencori.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Summarize this article' }],
+  cache: { mode: 'semantic' }
+});
+```
+
+Or toggle it on in your project settings — no code changes required.
+
+## What's Included
+
+- Exact + Semantic caching
+- Built-in analytics dashboard
+- Temperature-aware logic
+- Model exclusion controls
+- Per-project configuration
+- Manual cache clearing
+
+Prompt Cache is available on all plans. You only pay for the underlying infrastructure (Redis + pgvector).
+
+**Get started:** [cencori.com/docs/platform/ai-gateway/caching](/docs/platform/ai-gateway/caching)
+
+---
+
+Questions? [Contact us](https://cencori.com/contact) or join the [Discord](https://discord.gg/cencori).
