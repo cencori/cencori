@@ -19,9 +19,9 @@ Every time your AI application sends the same prompt, you are paying full price.
 
 ## Two-Tier Cache Architecture
 
-Exact Match Cache Redis gives less than 10ms latency for instant cache hits. It uses SHA-256 hash of normalized prompt, is case-insensitive and whitespace-normalized, and is Redis-backed for speed.
+Exact Match Cache gives less than 10ms latency for instant cache hits. It uses SHA-256 hash of normalized prompt, is case-insensitive and whitespace-normalized, and is Redis-backed for speed.
 
-Semantic Match Cache pgvector gives about 50ms latency for similarity search via embeddings. It finds semantically similar prompts, has configurable similarity threshold, and uses text-embedding-004 for vector embeddings.
+Semantic Match Cache gives about 50ms latency for similarity search via embeddings. It finds semantically similar prompts, has configurable similarity threshold, and uses text-embedding-004 for vector embeddings.
 
 ## Smart Features
 
@@ -39,4 +39,4 @@ Whats included: Exact plus Semantic caching, built-in analytics dashboard, tempe
 
 Prompt Cache is available on all plans. You only pay for the underlying infrastructure.
 
-Get started at cencori.com/docs/platform/ai-gateway/caching
+Get started [here](https://cencori.com/docs/platform/ai-gateway/caching)
