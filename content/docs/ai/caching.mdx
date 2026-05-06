@@ -1,60 +1,31 @@
 ---
 title: "Prompt Cache"
-description: "Reduce costs and latency with Exact + Semantic caching. Full analytics, model controls, and smart temperature handling."
+description: "Reduce costs and latency with Exact and Semantic caching."
 section: "AI Gateway"
 order: 3
 ---
 
-Prompt Cache reduces AI costs by **30-60%** and latency by **95%** by caching LLM responses. Supports both exact and semantic matching with full analytics.
+Prompt Cache reduces AI costs by 30-60% and latency by 95%.
 
 ## How It Works
 
-### Two-Tier Caching
+Exact Match uses Redis for instant hits under 10ms. Semantic Match uses pgvector for similar prompts.
 
-**Exact Match** (Redis) - under 10ms latency for identical prompts
-**Semantic Match** (pgvector) - around 50ms for similar prompts via embeddings
-
-**Step 1:** Request arrives → Check exact cache (Redis)
-**Step 2:** No exact hit? → Check semantic cache (pgvector)
-**Step 3:** No semantic hit? → Call provider, store response
-
-### Cache Key
-
-The cache key includes:
-- `project_id`
-- `model`
-- `messages` (normalized, whitespace-trimmed)
-- `temperature` (normalized within `max_cacheable_temperature`)
+Request arrives, check exact cache. No exact hit, check semantic cache. No semantic hit, call provider and store response.
 
 ## Features
 
-### Exact Match
-- **Instant hits** - Redis-backed, <10ms latency
-- **SHA-256 hash** of normalized prompt
-- Case-insensitive, whitespace-normalized
+Exact Match is Redis-backed with SHA-256 hash of normalized prompt. Case-insensitive and whitespace-normalized.
 
-### Semantic Match  
-- **Similarity search** using text-embedding-004
-- **Configurable threshold** (default: 0.95)
-- Best for paraphrased or varied prompts
+Semantic Match uses text-embedding-004 with configurable threshold. Default is 0.95. Best for paraphrased prompts.
 
-### Smart Temperature Handling
-Only caches low-temperature (deterministic) responses:
-- `max_cacheable_temperature` defaults to `0.2`
-- Higher temps → skipped from cache
-- Preserves creative outputs
+Smart Temperature Handling caches only low-temperature responses. Default max_cacheable_temperature is 0.2. Higher temperatures are skipped.
 
-### Model Exclusion
-Exclude specific models from caching:
-- Reasoning models (`o3-mini`, `o1`, etc.)
-- Fine-tuned models
-- Expensive models
+Model Exclusion lets you exclude specific models like o3-mini, o1, and claude-3-opus.
 
 ## Configuration
 
-### Dashboard
-
-Navigate to **Project → Cache → Settings**:
+Navigate to Project and then Cache in Settings.
 
 ```json
 {
@@ -64,133 +35,41 @@ Navigate to **Project → Cache → Settings**:
   "ttl_seconds": 3600,
   "similarity_threshold": 0.95,
   "max_entries": 10000,
-  "excluded_models": ["o3-mini", "o1"],
+  "excluded_models": ["o3-mini"],
   "max_cacheable_temperature": 0.2
 }
 ```
 
-### API
-
-Enable/disable per request:
-
-```typescript
-import { Cencori } from 'cencori';
-
-const cencori = new Cencori({ apiKey: 'ck_...' });
-
-const response = await cencori.chat({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Explain quantum entanglement' }],
-  // Override project settings
-  cache: {
-    enabled: true,
-    mode: 'semantic'
-  }
-});
-```
-
-### Headers
-
-```bash
-curl https://api.cencori.com/v1/chat/completions \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello"}],
-    "cache": {
-      "enabled": true,
-      "mode": "semantic"
-    }
-  }'
-```
-
 ## Analytics
 
-Track cache performance in **Project → Cache → Analytics**:
-
-- **Hit Rate** - percentage of requests served from cache
-- **Tokens Saved** - cumulative tokens saved
-- **Cost Saved** - estimated USD savings
-- **Active Entries** - current cache size
-
-### Time Ranges
-- Last 1 Hour
-- Last 24 Hours
-- Last 7 Days
-- Last 30 Days
+Track Hit Rate, Tokens Saved, Cost Saved, and Active Entries. Time ranges include Last 1 Hour, Last 24 Hours, Last 7 Days, Last 30 Days.
 
 ## Examples
 
-### Exact Match (Recommended for Production)
+Enable Exact Match for production use:
 
 ```typescript
 const response = await cencori.chat({
   model: 'gpt-4o-mini',
-  messages: [{ role: 'user', content: 'Classify sentiment: ${text}' }],
+  messages: [{ role: 'user', content: 'Hello' }],
   cache: { mode: 'exact' }
 });
 ```
 
-### Semantic Match (Best for Cost Savings)
+Enable Semantic Match for cost savings:
 
 ```typescript
 const response = await cencori.chat({
   model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Summarize this article: ${article}' }],
-  cache: { 
-    mode: 'semantic',
-    threshold: 0.95  // stricter = more accurate
-  }
+  messages: [{ role: 'user', content: 'Summarize' }],
+  cache: { mode: 'semantic', threshold: 0.95 }
 });
 ```
 
 ## Best Practices
 
-- **Enable Exact Match first** - safest, fastest
-- **Start with high threshold** (0.95 or higher) for semantic
-- **Exclude reasoning models** - `o3-mini`, `o1`, `claude-3-opus`
-- **Lower TTL for fast-changing data** - 1 hour
-- **Higher TTL for static content** - 24 hours
-
-## Cache Invalidation
-
-### Manual (Dashboard)
-
-Go to **Project → Cache → Analytics → Clear All**
-
-### API
-
-```bash
-# Clear specific cache key
-curl -X DELETE https://api.cencori.com/v1/cache \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{"cache_key": "abc123"}'
-
-# Clear all
-curl -X DELETE https://api.cencori.com/v1/cache \
-  -H "Authorization: Bearer sk_..." \
-  -d '{"all": true}'
-
-# Clear by model
-curl -X DELETE https://api.cencori.com/v1/cache \
-  -H "Authorization: Bearer sk_..." \
-  -d '{"model": "gpt-4o-mini"}'
-```
+Enable Exact Match first. Start with high threshold for semantic. Exclude reasoning models. Lower TTL for dynamic data.
 
 ## Limits
 
-- **TTL**: Default 1 hour (adjustable 1 min - 24 hours)
-- **Max Entries**: Default 10,000 (adjustable 100 - 100,000)
-- **Similarity Threshold**: Default 0.95 (adjustable 0.80 - 1.0)
-- **Max Temperature**: Default 0.2 (adjustable 0.0 - 2.0)
-
-## Pricing
-
-Cache feature is included in all plans. You only pay for the underlying infrastructure:
-
-- **Redis** (Exact): Free on Hobby, $5/mo on Pro
-- **pgvector** (Semantic): Included in Pro+
-
-See [Pricing](/pricing) for details.
+TTL is 1 hour default. Max entries is 10,000. Similarity threshold is 0.95. Max temperature is 0.2.
