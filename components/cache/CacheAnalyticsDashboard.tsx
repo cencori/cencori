@@ -80,7 +80,23 @@ export function CacheAnalyticsDashboard({ projectId, timeRange, environment = 'p
             if (!res.ok) throw new Error('Failed to invalidate');
             return res.json();
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['cacheAnalytics', projectId, range, environment] });
+            const previous = queryClient.getQueryData<CacheAnalytics>(['cacheAnalytics', projectId, range, environment]);
+
+            queryClient.setQueryData(['cacheAnalytics', projectId, range, environment], (old: CacheAnalytics | undefined) => {
+                if (!old) return old;
+                return { ...old, activeEntries: 0, topCachedPrompts: [] };
+            });
+
+            return { previous };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(['cacheAnalytics', projectId, range, environment], context.previous);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['cacheAnalytics', projectId] });
         },
     });

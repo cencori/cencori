@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,7 @@ export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
             if (!res.ok) throw new Error('Failed to fetch cache settings');
             return res.json();
         },
+        staleTime: 60 * 1000,
     });
 
     const mutation = useMutation({
@@ -54,8 +55,29 @@ export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
             if (!res.ok) throw new Error('Failed to update cache settings');
             return res.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['cacheSettings', projectId] });
+        onMutate: async (updates) => {
+            // Optimistic update - cancel outgoing refetches
+            await queryClient.cancelQueries({ queryKey: ['cacheSettings', projectId] });
+
+            // Snapshot previous value
+            const previous = queryClient.getQueryData<CacheSettings>(['cacheSettings', projectId]);
+
+            // Optimistically update
+            queryClient.setQueryData(['cacheSettings', projectId], (old: CacheSettings | undefined) => ({
+                ...old,
+                ...updates,
+            }));
+
+            return { previous };
+        },
+        onError: (_err, _vars, context) => {
+            // Rollback on error
+            if (context?.previous) {
+                queryClient.setQueryData(['cacheSettings', projectId], context.previous);
+            }
+        },
+        onSettled: () => {
+            // Don't invalidate - data is already optimistically updated
         },
     });
 
@@ -69,9 +91,25 @@ export function CacheSettingsPanel({ projectId }: CacheSettingsPanelProps) {
         );
     }
 
-    const update = (field: keyof CacheSettings, value: any) => {
-        mutation.mutate({ [field]: value });
-    };
+    const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
+    const update = useCallback((field: keyof CacheSettings, value: any) => {
+        // Clear any pending debounce for this field
+        if (debounceTimers.current[field]) {
+            clearTimeout(debounceTimers.current[field]);
+        }
+
+        // Debounce slider inputs (ttl, similarity_threshold) by 300ms
+        if (field === 'ttl_seconds' || field === 'similarity_threshold' || field === 'max_entries' || field === 'max_cacheable_temperature') {
+            debounceTimers.current[field] = setTimeout(() => {
+                mutation.mutate({ [field]: value });
+                delete debounceTimers.current[field];
+            }, 300);
+        } else {
+            // Immediate for toggles/switches
+            mutation.mutate({ [field]: value });
+        }
+    }, [mutation]);
 
     return (
         <div className="space-y-6">
