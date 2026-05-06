@@ -12,6 +12,13 @@ const redis = new Redis({
 
 const REDIS_PREFIX = 'pcache:';
 
+// ---- Helper: Normalize temperature for cache key ----
+
+function normalizeTemperature(temp: number | undefined, maxCacheableTemp: number): number {
+    const t = temp ?? 0;
+    return t > maxCacheableTemp ? t : 0;
+}
+
 // ---- Cache Key ----
 
 export function computeExactCacheKey(params: {
@@ -24,7 +31,7 @@ export function computeExactCacheKey(params: {
     const normalized = JSON.stringify({
         p: params.projectId,
         m: params.model,
-        t: params.temperature ?? 0,
+        t: normalizeTemperature(params.temperature, DEFAULT_CACHE_CONFIG.maxCacheableTemperature),
         mt: params.maxTokens ?? null,
         msgs: params.messages.map(msg => ({
             r: msg.role,
@@ -73,6 +80,11 @@ export async function lookupCache(params: {
 }): Promise<CacheLookupResult> {
     const { projectId, cacheKey, promptText, model, config } = params;
     const miss: CacheLookupResult = { hit: false, hitType: null, response: null, entryId: null, similarityScore: null, embedding: null };
+
+    // Skip caching for excluded models
+    if (config.excludedModels.includes(model)) {
+        return miss;
+    }
 
     // 1. Exact match via Redis
     if (config.exactMatchEnabled) {
@@ -149,44 +161,63 @@ export async function storeInCache(params: CacheStoreParams): Promise<void> {
         ttlSeconds, estimatedTokens, estimatedCostUsd,
     } = params;
 
+    // Get config to check excluded models
+    const config = await getProjectCacheConfig(projectId);
+    if (config.excludedModels.includes(model)) {
+        return;
+    }
+
     try {
-        // 1. Redis exact-match store
-        await redis.set(
-            `${REDIS_PREFIX}${cacheKey}`,
-            JSON.stringify(response),
-            { ex: ttlSeconds }
-        );
+        // Deduplication lock using SETNX
+        const lockKey = `${REDIS_PREFIX}lock:${cacheKey}`;
+        const lockAcquired = await redis.set(lockKey, '1', { nx: true, ex: 30 });
+        if (!lockAcquired) {
+            // Another request is already storing this entry
+            return;
+        }
 
-        // 2. Supabase persistent store
-        const supabase = createAdminClient();
-        const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+        try {
+            // 1. Redis exact-match store
+            await redis.set(
+                `${REDIS_PREFIX}${cacheKey}`,
+                JSON.stringify(response),
+                { ex: ttlSeconds }
+            );
 
-        await supabase
-            .from('prompt_cache_entries')
-            .upsert({
-                project_id: projectId,
-                cache_key: cacheKey,
-                prompt_text: promptText,
+            // 2. Supabase persistent store
+            const supabase = createAdminClient();
+            const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+
+            await supabase
+                .from('prompt_cache_entries')
+                .upsert({
+                    project_id: projectId,
+                    cache_key: cacheKey,
+                    prompt_text: promptText,
+                    model,
+                    temperature: temperature ?? 0,
+                    max_tokens: maxTokens ?? null,
+                    response,
+                    embedding: embedding ? JSON.stringify(embedding) : null,
+                    expires_at: expiresAt,
+                    updated_at: new Date().toISOString(),
+                }, {
+                    onConflict: 'project_id,cache_key',
+                });
+
+            // 3. Log store event
+            void logCacheEvent({
+                projectId,
+                entryId: null,
+                eventType: 'store',
                 model,
-                temperature: temperature ?? 0,
-                max_tokens: maxTokens ?? null,
-                response,
-                embedding: embedding ? JSON.stringify(embedding) : null,
-                expires_at: expiresAt,
-                updated_at: new Date().toISOString(),
-            }, {
-                onConflict: 'project_id,cache_key',
+                tokensSaved: estimatedTokens,
+                costSavedUsd: estimatedCostUsd,
             });
-
-        // 3. Log store event
-        void logCacheEvent({
-            projectId,
-            entryId: null,
-            eventType: 'store',
-            model,
-            tokensSaved: estimatedTokens,
-            costSavedUsd: estimatedCostUsd,
-        });
+        } finally {
+            // Always release lock
+            await redis.del(lockKey);
+        }
     } catch (error) {
         console.error('[Cache] Store failed:', error);
     }

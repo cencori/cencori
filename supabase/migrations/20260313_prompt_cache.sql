@@ -134,6 +134,61 @@ begin
 end;
 $$;
 
+-- ===== RPC: Cache analytics aggregation (fast) =====
+create or replace function get_cache_analytics(
+    p_project_id uuid,
+    p_since timestamptz,
+    p_environment text default 'production',
+    p_bucket_ms bigint default 3600000
+)
+returns table (
+    exact_hits bigint,
+    semantic_hits bigint,
+    misses bigint,
+    total_tokens_saved bigint,
+    total_cost_saved numeric,
+    hit_rate numeric,
+    bucket_timestamp timestamptz,
+    bucket_hits bigint,
+    bucket_total bigint
+)
+language plpgsql
+as $$
+begin
+    return query
+    with events as (
+        select
+            event_type,
+            tokens_saved,
+            cost_saved_usd,
+            created_at,
+            date_trunc('hour', created_at) as bucket
+        from public.prompt_cache_events
+        where project_id = p_project_id
+          and created_at >= p_since
+          and (p_environment is null or environment = p_environment)
+    )
+    select
+        (select count(*)::bigint from events where event_type = 'hit_exact') as exact_hits,
+        (select count(*)::bigint from events where event_type = 'hit_semantic') as semantic_hits,
+        (select count(*)::bigint from events where event_type = 'miss') as misses,
+        (select coalesce(sum(tokens_saved), 0)::bigint from events where event_type in ('hit_exact', 'hit_semantic')) as total_tokens_saved,
+        (select coalesce(sum(cost_saved_usd), 0) from events where event_type in ('hit_exact', 'hit_semantic')) as total_cost_saved,
+        case
+            when (select count(*) from events where event_type in ('hit_exact', 'hit_semantic', 'miss')) > 0
+            then (select count(*)::numeric from events where event_type in ('hit_exact', 'hit_semantic'))
+                 / (select count(*)::numeric from events where event_type in ('hit_exact', 'hit_semantic', 'miss'))
+            else 0
+        end as hit_rate,
+        bucket as bucket_timestamp,
+        (select count(*)::bigint from events where event_type in ('hit_exact', 'hit_semantic') and date_trunc('hour', created_at) = bucket) as bucket_hits,
+        (select count(*)::bigint from events where event_type in ('hit_exact', 'hit_semantic', 'miss') and date_trunc('hour', created_at) = bucket) as bucket_total
+    from events
+    group by bucket
+    order by bucket;
+end;
+$$;;
+
 -- ===== RLS =====
 alter table public.prompt_cache_entries enable row level security;
 alter table public.prompt_cache_events enable row level security;

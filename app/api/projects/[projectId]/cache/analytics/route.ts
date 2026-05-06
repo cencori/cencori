@@ -19,60 +19,47 @@ export async function GET(
 
     const sinceMs = rangeMap[range] || rangeMap['7d'];
     const since = new Date(Date.now() - sinceMs).toISOString();
+    const bucketMs = sinceMs <= 86400000 ? 3600000 : 86400000;
 
     const supabase = createAdminClient();
 
-    // Get event counts by type
-    let eventsQuery = supabase
-        .from('prompt_cache_events')
-        .select('event_type, tokens_saved, cost_saved_usd, created_at')
-        .eq('project_id', projectId)
-        .gte('created_at', since);
+    // Get aggregated counts by event type using RPC
+    const { data: counts } = await supabase.rpc('get_cache_event_counts', {
+        p_project_id: projectId,
+        p_since: since,
+        p_environment: environment,
+    });
 
-    // Filter by environment if the column exists (graceful for pre-migration data)
-    eventsQuery = eventsQuery.eq('environment', environment);
-
-    const { data: events } = await eventsQuery;
-
-    const allEvents = events || [];
-    const exactHits = allEvents.filter(e => e.event_type === 'hit_exact').length;
-    const semanticHits = allEvents.filter(e => e.event_type === 'hit_semantic').length;
-    const misses = allEvents.filter(e => e.event_type === 'miss').length;
+    const eventCounts = counts?.[0] || { hit_exact: 0, hit_semantic: 0, miss: 0 };
+    const exactHits = Number(eventCounts.hit_exact) || 0;
+    const semanticHits = Number(eventCounts.hit_semantic) || 0;
+    const misses = Number(eventCounts.miss) || 0;
     const totalLookups = exactHits + semanticHits + misses;
     const hitRate = totalLookups > 0 ? (exactHits + semanticHits) / totalLookups : 0;
 
-    const totalTokensSaved = allEvents
-        .filter(e => e.event_type === 'hit_exact' || e.event_type === 'hit_semantic')
-        .reduce((sum, e) => sum + (e.tokens_saved || 0), 0);
+    // Get aggregated tokens/cost saved
+    const { data: savings } = await supabase.rpc('get_cache_savings', {
+        p_project_id: projectId,
+        p_since: since,
+        p_environment: environment,
+    });
 
-    const totalCostSaved = allEvents
-        .filter(e => e.event_type === 'hit_exact' || e.event_type === 'hit_semantic')
-        .reduce((sum, e) => sum + (parseFloat(String(e.cost_saved_usd)) || 0), 0);
+    const totalTokensSaved = Number(savings?.[0]?.total_tokens) || 0;
+    const totalCostSaved = parseFloat(String(savings?.[0]?.total_cost)) || 0;
 
-    // Hit rate over time (bucket by hour for 24h/1h, by day for 7d/30d)
-    const bucketMs = sinceMs <= 86400000 ? 3600000 : 86400000;
-    const buckets = new Map<string, { hits: number; total: number }>();
+    // Get hit rate over time using time_bucket
+    const { data: timeBuckets } = await supabase.rpc('get_cache_time_buckets', {
+        p_project_id: projectId,
+        p_since: since,
+        p_environment: environment,
+        p_bucket_seconds: Math.floor(bucketMs / 1000),
+    });
 
-    for (const event of allEvents) {
-        if (event.event_type !== 'hit_exact' && event.event_type !== 'hit_semantic' && event.event_type !== 'miss') continue;
-        const ts = new Date(event.created_at);
-        const bucketStart = new Date(Math.floor(ts.getTime() / bucketMs) * bucketMs).toISOString();
-
-        if (!buckets.has(bucketStart)) {
-            buckets.set(bucketStart, { hits: 0, total: 0 });
-        }
-        const bucket = buckets.get(bucketStart)!;
-        bucket.total++;
-        if (event.event_type !== 'miss') bucket.hits++;
-    }
-
-    const hitRateOverTime = Array.from(buckets.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([timestamp, { hits, total }]) => ({
-            timestamp,
-            hitRate: total > 0 ? hits / total : 0,
-            lookups: total,
-        }));
+    const hitRateOverTime = (timeBuckets || []).map(b => ({
+        timestamp: b.bucket,
+        hitRate: b.total > 0 ? Number(b.hits) / Number(b.total) : 0,
+        lookups: Number(b.total),
+    }));
 
     // Top cached prompts
     const { data: topEntries } = await supabase
