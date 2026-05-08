@@ -75,7 +75,7 @@ export function CacheAnalyticsDashboard({ projectId, timeRange, environment = 'p
             const res = await fetch(`/api/projects/${projectId}/cache/entries`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(entryId ? { cache_key: entryId } : { all: true }),
+                body: JSON.stringify(entryId ? { cache_key: entryId, environment } : { all: true, environment }),
             });
             if (!res.ok) throw new Error('Failed to invalidate');
             return res.json();

@@ -27,7 +27,16 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { deductCredits } from '@/lib/credits';
 import { getFeaturesForTier, hasFeature } from '@/lib/entitlements';
-import { computeCacheKey, getCache, getSemanticCache, saveCache, saveSemanticCache } from '@/lib/cache';
+import {
+    computeExactCacheKey,
+    getProjectCacheConfig,
+    lookupCache,
+    storeInCache,
+    recordCacheHit,
+    logCacheEvent,
+} from '@/lib/cache/prompt-cache';
+import { getCachedCacheConfig, setCachedCacheConfig } from '@/lib/config-cache';
+import type { CacheConfig, CacheLookupResult } from '@/lib/cache/types';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from '@/lib/end-user-billing';
 import {
@@ -404,35 +413,6 @@ function getCachedUsage(payload: Record<string, unknown>): {
         completionTokens,
         totalTokens: totalTokens > 0 ? totalTokens : promptTokens + completionTokens,
     };
-}
-
-async function resolveSemanticEmbeddingApiKey(
-    supabase: ReturnType<typeof createAdminClient>,
-    projectId: string,
-    organizationId: string
-): Promise<string | undefined> {
-    const envGoogleKey = getGoogleApiKey();
-    if (envGoogleKey) {
-        return envGoogleKey;
-    }
-
-    const { data: providerKey, error } = await supabase
-        .from('provider_keys')
-        .select('encrypted_key, is_active')
-        .eq('project_id', projectId)
-        .eq('provider', 'google')
-        .single();
-
-    if (error || !providerKey || !providerKey.is_active) {
-        return undefined;
-    }
-
-    try {
-        return decryptApiKey(providerKey.encrypted_key, organizationId);
-    } catch (error) {
-        console.warn('[Semantic Cache] Failed to decrypt Google provider key:', error);
-        return undefined;
-    }
 }
 
 function validateDomain(origin: string | null, allowedDomains: string[] | null): boolean {
@@ -1036,39 +1016,31 @@ export async function POST(req: NextRequest) {
         };
 
         const cacheEligible = stream !== true && (!Array.isArray(tools) || tools.length === 0);
+        const skipCache = req.headers.get('x-skip-cache')?.toLowerCase() === 'true';
         const cacheMaxTokens = typeof maxTokens === 'number'
             ? maxTokens
             : (typeof max_tokens === 'number' ? max_tokens : undefined);
         const cacheTemperature = typeof temperature === 'number' ? temperature : undefined;
-        const cachePromptPayload = JSON.stringify(
-            unifiedMessages.map((message) => ({
-                role: message.role,
-                content: message.content,
-            }))
-        );
-        const exactCacheKey = computeCacheKey({
-            projectId: project.id,
-            model: normalizedModel,
-            prompt: cachePromptPayload,
-            temperature: cacheTemperature,
-            maxTokens: cacheMaxTokens,
-        });
-        const semanticCachePrompt = JSON.stringify({
-            projectId: project.id,
-            model: normalizedModel,
-            temperature: cacheTemperature ?? 0,
-            maxTokens: cacheMaxTokens ?? 0,
-            messages: unifiedMessages,
-        });
+        const normalizedCacheMessages = unifiedMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+        }));
 
-        let semanticEmbeddingForSave: number[] | null = null;
-        let semanticCacheApiKey: string | undefined;
+        let cacheConfig: CacheConfig | null = null;
+        let cacheResult: CacheLookupResult | null = null;
+        let exactCacheKey: string | null = null;
+        let cachePromptText: string | null = null;
+        let cacheWriteEligible = false;
 
         const maybeReturnCachedResponse = async (
-            rawCachedPayload: unknown,
-            cacheType: 'exact' | 'semantic'
+            lookup: CacheLookupResult
         ): Promise<NextResponse | null> => {
-            const cachedPayload = parseCachedPayload(rawCachedPayload);
+            if (!lookup.hit || !lookup.response || !lookup.hitType) {
+                return null;
+            }
+
+            const cacheType = lookup.hitType;
+            const cachedPayload = parseCachedPayload(lookup.response);
             if (!cachedPayload) {
                 return null;
             }
@@ -1105,12 +1077,31 @@ export async function POST(req: NextRequest) {
 
             const toolCallsCandidate = cachedPayload.tool_calls ?? cachedPayload.toolCalls;
             const cachedToolCalls = Array.isArray(toolCallsCandidate) ? toolCallsCandidate : null;
+            const tokensSaved = lookup.estimatedTokens || cachedUsage.totalTokens;
+            const costSaved = lookup.estimatedCostUsd || Number(cachedPayload.cost_usd) || 0;
+
+            if (lookup.entryId) {
+                void recordCacheHit(lookup.entryId, tokensSaved, costSaved);
+            }
+            void logCacheEvent({
+                projectId: project.id,
+                entryId: lookup.entryId,
+                eventType: cacheType === 'exact' ? 'hit_exact' : 'hit_semantic',
+                model: cachedModel,
+                similarityScore: lookup.similarityScore ?? undefined,
+                latencySavedMs: Date.now() - startTime,
+                tokensSaved,
+                costSavedUsd: costSaved,
+                requestId,
+                environment: keyEnvironment,
+            });
 
             const { error: cacheLogError } = await supabase
                 .from('ai_requests')
                 .insert({
                     project_id: project.id,
                     api_key_id: keyData.id,
+                    environment: keyEnvironment,
                     provider: cachedProvider,
                     model: cachedModel,
                     prompt_tokens: cachedUsage.promptTokens,
@@ -1199,6 +1190,10 @@ export async function POST(req: NextRequest) {
 
             const cacheResponse = NextResponse.json(responseBody);
             cacheResponse.headers.set('X-Cencori-Cache', cacheType === 'semantic' ? 'SEMANTIC-HIT' : 'HIT');
+            cacheResponse.headers.set('X-Cache', cacheType === 'semantic' ? 'HIT-SEMANTIC' : 'HIT-EXACT');
+            if (lookup.similarityScore) {
+                cacheResponse.headers.set('X-Cache-Similarity', String(lookup.similarityScore.toFixed(4)));
+            }
             logGatewayEvent('chat.response', {
                 requestId,
                 route,
@@ -1221,40 +1216,80 @@ export async function POST(req: NextRequest) {
             return cacheResponse;
         };
 
-        if (cacheEligible) {
-            const exactCached = await getCache(exactCacheKey);
-            const exactHit = await maybeReturnCachedResponse(exactCached, 'exact');
-            if (exactHit) {
-                return exactHit;
-            }
+        if (cacheEligible && !skipCache) {
+            try {
+                const cachedConfig = await getCachedCacheConfig(project.id);
+                cacheConfig = cachedConfig?.data || await getProjectCacheConfig(project.id);
+                if (!cachedConfig) {
+                    await setCachedCacheConfig(project.id, cacheConfig);
+                }
 
-            if (reliabilityFlags.semanticCacheEnabled) {
-                semanticCacheApiKey = await resolveSemanticEmbeddingApiKey(supabase, project.id, organizationId);
-                if (semanticCacheApiKey) {
-                    const semanticLookup = await getSemanticCache(
-                        semanticCachePrompt,
-                        semanticCacheApiKey,
-                        0.95,
-                        {
-                            requestId,
-                            route,
-                            provider: providerName,
-                            model: normalizedModel,
-                        }
-                    );
-                    semanticCacheReadStatus = semanticLookup.status;
-                    semanticEmbeddingForSave = semanticLookup.embedding;
-                    const semanticHit = await maybeReturnCachedResponse(semanticLookup.response, 'semantic');
-                    if (semanticHit) {
-                        return semanticHit;
-                    }
-                } else {
+                const baseCacheConfig = cacheConfig as CacheConfig;
+                const effectiveCacheConfig: CacheConfig = {
+                    ...baseCacheConfig,
+                    semanticMatchEnabled: baseCacheConfig.semanticMatchEnabled && reliabilityFlags.semanticCacheEnabled,
+                };
+
+                if (!effectiveCacheConfig.semanticMatchEnabled) {
                     semanticCacheReadStatus = 'disabled';
                     semanticCacheWriteStatus = 'disabled';
                 }
-            } else {
-                semanticCacheReadStatus = 'disabled';
-                semanticCacheWriteStatus = 'disabled';
+
+                const requestTemp = cacheTemperature ?? 0;
+                const modelExcluded = effectiveCacheConfig.excludedModels.includes(normalizedModel);
+                cacheWriteEligible = Boolean(
+                    effectiveCacheConfig.cacheEnabled
+                    && !modelExcluded
+                    && requestTemp <= effectiveCacheConfig.maxCacheableTemperature
+                    && (effectiveCacheConfig.exactMatchEnabled || effectiveCacheConfig.semanticMatchEnabled)
+                );
+
+                if (cacheWriteEligible) {
+                    exactCacheKey = computeExactCacheKey({
+                        projectId: project.id,
+                        environment: keyEnvironment,
+                        model: normalizedModel,
+                        temperature: requestTemp,
+                        maxTokens: cacheMaxTokens,
+                        messages: normalizedCacheMessages,
+                    });
+                    cachePromptText = normalizedCacheMessages
+                        .map((message) => `${message.role}: ${message.content}`)
+                        .join('\n');
+
+                    cacheResult = await lookupCache({
+                        projectId: project.id,
+                        environment: keyEnvironment,
+                        cacheKey: exactCacheKey,
+                        promptText: cachePromptText,
+                        model: normalizedModel,
+                        maxTokens: cacheMaxTokens,
+                        config: effectiveCacheConfig,
+                    });
+
+                    if (cacheResult.hitType === 'semantic') {
+                        semanticCacheReadStatus = 'hit';
+                    } else if (effectiveCacheConfig.semanticMatchEnabled) {
+                        semanticCacheReadStatus = 'miss';
+                    }
+
+                    const cachedResponse = await maybeReturnCachedResponse(cacheResult);
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+
+                    void logCacheEvent({
+                        projectId: project.id,
+                        entryId: null,
+                        eventType: 'miss',
+                        model: normalizedModel,
+                        requestId,
+                        environment: keyEnvironment,
+                    });
+                }
+            } catch (error) {
+                console.error('[Cache] Lookup failed:', error);
+                semanticCacheReadStatus = 'error';
             }
         }
 
@@ -1506,6 +1541,7 @@ export async function POST(req: NextRequest) {
                                     .insert({
                                         project_id: project.id,
                                         api_key_id: keyData.id,
+                                        environment: keyEnvironment,
                                         provider: streamActualProvider,
                                         model: streamActualModel,
                                         prompt_tokens: promptTokens,
@@ -1814,6 +1850,7 @@ export async function POST(req: NextRequest) {
             .insert({
                 project_id: project.id,
                 api_key_id: keyData.id,
+                environment: keyEnvironment,
                 provider: actualProvider,
                 model: actualModel,
                 prompt_tokens: response.usage.promptTokens,
@@ -1946,34 +1983,28 @@ export async function POST(req: NextRequest) {
             }),
         };
 
-        if (cacheEligible) {
-            // Save exact cache entry keyed by scoped chat payload.
-            saveCache(exactCacheKey, responseBody).catch(error => {
-                console.error('[Cache] Failed to save exact cache entry:', error);
+        if (cacheWriteEligible && exactCacheKey && cachePromptText && cacheConfig) {
+            void storeInCache({
+                projectId: project.id,
+                environment: keyEnvironment,
+                cacheKey: exactCacheKey,
+                promptText: cachePromptText,
+                model: normalizedModel,
+                temperature: cacheTemperature,
+                maxTokens: cacheMaxTokens,
+                response: responseBody,
+                embedding: cacheResult?.embedding ?? null,
+                ttlSeconds: cacheConfig.ttlSeconds,
+                estimatedTokens: response.usage.totalTokens,
+                estimatedCostUsd: response.cost.cencoriChargeUsd,
+            }).then(() => {
+                semanticCacheWriteStatus = cacheResult?.embedding
+                    ? 'ok'
+                    : (cacheConfig?.semanticMatchEnabled && reliabilityFlags.semanticCacheEnabled ? 'skipped' : 'disabled');
+            }).catch(error => {
+                console.error('[Cache] Failed to save cache entry:', error);
+                semanticCacheWriteStatus = 'error';
             });
-
-            if (semanticCacheApiKey && reliabilityFlags.semanticCacheEnabled) {
-                // Save semantic cache entry keyed by project/model-scoped payload representation.
-                const embeddingToSave = semanticEmbeddingForSave || undefined;
-                void saveSemanticCache(
-                    semanticCachePrompt,
-                    responseBody,
-                    semanticCacheApiKey,
-                    embeddingToSave,
-                    {
-                        requestId,
-                        route,
-                        provider: actualProvider,
-                        model: actualModel,
-                        responseStatus: 200,
-                    }
-                ).then((result) => {
-                    semanticCacheWriteStatus = result.status;
-                }).catch(error => {
-                    console.error('[Cache] Failed to save semantic cache entry:', error);
-                    semanticCacheWriteStatus = 'error';
-                });
-            }
         }
 
         incrementGatewayCounter('provider_request_success', {
@@ -1995,7 +2026,7 @@ export async function POST(req: NextRequest) {
                 write: semanticCacheWriteStatus,
             },
             embedding: {
-                dimensions: semanticEmbeddingForSave?.length ?? null,
+                dimensions: cacheResult?.embedding?.length ?? null,
             },
             response: {
                 status: 200,
@@ -2003,8 +2034,9 @@ export async function POST(req: NextRequest) {
         });
 
         const finalResponse = NextResponse.json(responseBody);
-        if (cacheEligible) {
+        if (cacheWriteEligible) {
             finalResponse.headers.set('X-Cencori-Cache', 'MISS');
+            finalResponse.headers.set('X-Cache', 'MISS');
         }
         return finalResponse;
 

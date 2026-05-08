@@ -66,6 +66,7 @@ export async function GET(
         .from('prompt_cache_entries')
         .select('id, prompt_text, model, hit_count, cost_saved_usd, last_hit_at')
         .eq('project_id', projectId)
+        .eq('environment', environment)
         .gt('expires_at', new Date().toISOString())
         .order('hit_count', { ascending: false })
         .limit(10);
@@ -84,6 +85,7 @@ export async function GET(
         .from('prompt_cache_entries')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
+        .eq('environment', environment)
         .gt('expires_at', new Date().toISOString());
 
     return NextResponse.json({

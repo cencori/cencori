@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // Delete expired cache entries
     const { data: expired } = await supabase
         .from('prompt_cache_entries')
-        .select('id, project_id')
+        .select('id, project_id, environment')
         .lt('expires_at', now);
 
     if (expired && expired.length > 0) {
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         const evictionEvents = expired.map(e => ({
             project_id: e.project_id,
             cache_entry_id: e.id,
+            environment: e.environment || 'production',
             event_type: 'evict' as const,
         }));
 

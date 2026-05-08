@@ -28,7 +28,7 @@ import {
 import { decryptApiKey } from '@/lib/encryption';
 import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import { getProjectSecurityConfig } from '@/lib/safety/utils';
-import { getCache, saveCache, computeCacheKey, getSemanticCache, saveSemanticCache } from '@/lib/cache';
+import { getCache, saveCache, computeCacheKey } from '@/lib/cache';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 
 // Initialize Router
@@ -248,62 +248,13 @@ export async function POST(req: NextRequest) {
 
         // Initialize Default & BYOK
         initializeDefaultProviders();
-        const byokKey = await initializeBYOKProviders(ctx, providerName);
-
-        const effectiveApiKey = byokKey || (providerName === 'google' ? process.env.GEMINI_API_KEY : undefined);
+        await initializeBYOKProviders(ctx, providerName);
 
         if (!router.hasProvider(providerName)) {
             return addGatewayHeaders(
                 NextResponse.json({ error: `Provider ${providerName} not configured` }, { status: 400 }),
                 { requestId: ctx.requestId }
             );
-        }
-
-        // ── Caching Check (Semantic) ──
-        let semanticEmbedding: number[] | null = null;
-
-        if (!stream && providerName === 'google' && effectiveApiKey) {
-            // 2. Semantic Match (L2 - Smart) - uses Vector DB
-            // Only enabled for Google-backed requests for now as we use Gemini Embeddings
-            const { response: cachedRes, embedding } = await getSemanticCache(prompt, effectiveApiKey);
-            semanticEmbedding = embedding; // Store for later save if needed
-
-            if (cachedRes) {
-                const cachedPayload = typeof cachedRes === 'object' && cachedRes !== null
-                    ? cachedRes as Record<string, unknown>
-                    : {};
-                const usage = getCachedUsage(cachedRes, prompt);
-                const charge = await getChargeForTokens(
-                    providerName,
-                    normalizedModel,
-                    usage.promptTokens,
-                    usage.completionTokens
-                );
-
-                await logGatewayRequest(ctx, {
-                    endpoint: 'completions',
-                    model: normalizedModel,
-                    provider: providerName,
-                    status: 'success',
-                    promptTokens: usage.promptTokens,
-                    completionTokens: usage.completionTokens,
-                    totalTokens: usage.totalTokens,
-                    costUsd: charge.cencoriCharge,
-                    providerCostUsd: charge.providerCost,
-                    cencoriChargeUsd: charge.cencoriCharge,
-                    markupPercentage: charge.markupPercentage,
-                    metadata: { cache: 'semantic' },
-                });
-                await incrementUsage(ctx);
-
-                const res = NextResponse.json({
-                    ...cachedPayload,
-                    id: `semantic-${typeof cachedPayload.id === 'string' ? cachedPayload.id : ctx.requestId}`,
-                    created: Math.floor(Date.now() / 1000),
-                });
-                res.headers.set('X-Cencori-Cache', 'SEMANTIC-HIT');
-                return addGatewayHeaders(res, { requestId: ctx.requestId });
-            }
         }
 
         const provider = router.getProviderForModel(requestedModel);
@@ -460,14 +411,6 @@ export async function POST(req: NextRequest) {
                 // Save Exact Match (L1)
                 saveCache(cacheKey, jsonResponse).catch(e => console.error('Cache save error', e));
 
-                // Save Semantic Match (L2) - Only if Google provider and key available
-                if (providerName === 'google' && effectiveApiKey) {
-                    // Pass the reusable embedding if available
-                    // Convert null (from failed embedding gen) to undefined for the function call if needed, 
-                    // though function signature handles optional.
-                    const embedToSave = semanticEmbedding || undefined;
-                    saveSemanticCache(prompt, jsonResponse, effectiveApiKey, embedToSave).catch(e => console.error('Semantic cache save error', e));
-                }
             }
 
             const finalRes = NextResponse.json(jsonResponse);
