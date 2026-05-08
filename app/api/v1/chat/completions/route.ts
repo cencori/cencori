@@ -668,6 +668,7 @@ export async function POST(req: NextRequest) {
 
                         cacheKey = computeExactCacheKey({
                             projectId: gatewayCtx.projectId,
+                            environment: gatewayCtx.environment,
                             model,
                             temperature: requestTemp,
                             maxTokens: body.max_tokens,
@@ -678,16 +679,18 @@ export async function POST(req: NextRequest) {
 
                         cacheResult = await lookupCache({
                             projectId: gatewayCtx.projectId,
+                            environment: gatewayCtx.environment,
                             cacheKey,
                             promptText: promptTextForCache,
                             model,
+                            maxTokens: body.max_tokens,
                             config: cacheConfig,
                         });
 
                         if (cacheResult.hit && cacheResult.response) {
                             // Track hit
-                            const estimatedTokens = cacheResult.response?.usage?.total_tokens || 0;
-                            const estimatedCost = 0; // Cache hits are free
+                            const estimatedTokens = cacheResult.estimatedTokens || cacheResult.response?.usage?.total_tokens || 0;
+                            const estimatedCost = cacheResult.estimatedCostUsd || Number(cacheResult.response?.cost_usd) || 0;
                             if (cacheResult.entryId) {
                                 void recordCacheHit(cacheResult.entryId, estimatedTokens, estimatedCost);
                             }
@@ -699,7 +702,9 @@ export async function POST(req: NextRequest) {
                                 similarityScore: cacheResult.similarityScore ?? undefined,
                                 latencySavedMs: Date.now() - startedAt,
                                 tokensSaved: estimatedTokens,
+                                costSavedUsd: estimatedCost,
                                 requestId: gatewayCtx.requestId,
+                                environment: gatewayCtx.environment,
                             });
 
                             // Log as cached request (zero cost)
@@ -721,6 +726,7 @@ export async function POST(req: NextRequest) {
 
                             const cachedResponse = NextResponse.json(cacheResult.response);
                             cachedResponse.headers.set('X-Cache', cacheResult.hitType === 'exact' ? 'HIT-EXACT' : 'HIT-SEMANTIC');
+                            cachedResponse.headers.set('X-Cencori-Cache', cacheResult.hitType === 'exact' ? 'HIT' : 'SEMANTIC-HIT');
                             if (cacheResult.similarityScore) {
                                 cachedResponse.headers.set('X-Cache-Similarity', String(cacheResult.similarityScore.toFixed(4)));
                             }
@@ -732,6 +738,7 @@ export async function POST(req: NextRequest) {
                                 eventType: 'miss',
                                 model,
                                 requestId: gatewayCtx.requestId,
+                                environment: gatewayCtx.environment,
                             });
                         }
                     }
@@ -750,6 +757,7 @@ export async function POST(req: NextRequest) {
                     cacheKey,
                     promptText: promptTextForCache,
                     model,
+                    environment: gatewayCtx.environment,
                     temperature: body.temperature,
                     maxTokens: body.max_tokens,
                     response: responseJson,
@@ -766,6 +774,7 @@ export async function POST(req: NextRequest) {
                         tokensSaved: tokens,
                         costSavedUsd: costUsd,
                         requestId: gatewayCtx!.requestId,
+                        environment: gatewayCtx!.environment,
                     });
                 });
             }

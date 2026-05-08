@@ -11,6 +11,11 @@ const redis = new Redis({
 });
 
 const REDIS_PREFIX = 'pcache:';
+const DEFAULT_ENVIRONMENT = 'production';
+
+function normalizeEnvironment(environment: string | undefined): 'production' | 'test' {
+    return environment === 'test' ? 'test' : 'production';
+}
 
 // ---- Helper: Normalize temperature for cache key ----
 
@@ -23,6 +28,7 @@ function normalizeTemperature(temp: number | undefined, maxCacheableTemp: number
 
 export function computeExactCacheKey(params: {
     projectId: string;
+    environment?: string;
     model: string;
     temperature?: number;
     maxTokens?: number;
@@ -30,6 +36,7 @@ export function computeExactCacheKey(params: {
 }): string {
     const normalized = JSON.stringify({
         p: params.projectId,
+        e: normalizeEnvironment(params.environment),
         m: params.model,
         t: normalizeTemperature(params.temperature, DEFAULT_CACHE_CONFIG.maxCacheableTemperature),
         mt: params.maxTokens ?? null,
@@ -73,13 +80,25 @@ export async function getProjectCacheConfig(projectId: string): Promise<CacheCon
 
 export async function lookupCache(params: {
     projectId: string;
+    environment?: string;
     cacheKey: string;
     promptText: string;
     model: string;
+    maxTokens?: number;
     config: CacheConfig;
 }): Promise<CacheLookupResult> {
-    const { projectId, cacheKey, promptText, model, config } = params;
-    const miss: CacheLookupResult = { hit: false, hitType: null, response: null, entryId: null, similarityScore: null, embedding: null };
+    const { projectId, cacheKey, promptText, model, maxTokens, config } = params;
+    const environment = normalizeEnvironment(params.environment);
+    const miss: CacheLookupResult = {
+        hit: false,
+        hitType: null,
+        response: null,
+        entryId: null,
+        similarityScore: null,
+        embedding: null,
+        estimatedTokens: 0,
+        estimatedCostUsd: 0,
+    };
 
     // Skip caching for excluded models
     if (config.excludedModels.includes(model)) {
@@ -95,9 +114,11 @@ export async function lookupCache(params: {
                 const supabase = createAdminClient();
                 const { data: entry } = await supabase
                     .from('prompt_cache_entries')
-                    .select('id, tokens_saved, cost_saved_usd')
+                    .select('id, estimated_tokens, estimated_cost_usd')
                     .eq('project_id', projectId)
+                    .eq('environment', environment)
                     .eq('cache_key', cacheKey)
+                    .gt('expires_at', new Date().toISOString())
                     .single();
 
                 const response = typeof cached === 'string' ? JSON.parse(cached) : cached;
@@ -109,6 +130,8 @@ export async function lookupCache(params: {
                     entryId: entry?.id || null,
                     similarityScore: 1.0,
                     embedding: null,
+                    estimatedTokens: Number(entry?.estimated_tokens) || Number(response?.usage?.total_tokens) || 0,
+                    estimatedCostUsd: Number(entry?.estimated_cost_usd) || Number(response?.cost_usd) || 0,
                 };
             }
         } catch (error) {
@@ -127,6 +150,9 @@ export async function lookupCache(params: {
                     query_embedding: JSON.stringify(embedding),
                     match_threshold: config.similarityThreshold,
                     match_count: 1,
+                    p_environment: environment,
+                    p_model: model,
+                    p_max_tokens: maxTokens ?? null,
                 });
 
                 if (matches && matches.length > 0) {
@@ -138,6 +164,8 @@ export async function lookupCache(params: {
                         entryId: best.id,
                         similarityScore: best.similarity,
                         embedding,
+                        estimatedTokens: Number(best.estimated_tokens) || Number(best.response?.usage?.total_tokens) || 0,
+                        estimatedCostUsd: Number(best.estimated_cost_usd) || Number(best.response?.cost_usd) || 0,
                     };
                 }
 
@@ -157,9 +185,10 @@ export async function lookupCache(params: {
 export async function storeInCache(params: CacheStoreParams): Promise<void> {
     const {
         projectId, cacheKey, promptText, model,
-        temperature, maxTokens, response, embedding,
+        environment: rawEnvironment, temperature, maxTokens, response, embedding,
         ttlSeconds, estimatedTokens, estimatedCostUsd,
     } = params;
+    const environment = normalizeEnvironment(rawEnvironment);
 
     // Get config to check excluded models
     const config = await getProjectCacheConfig(projectId);
@@ -192,6 +221,7 @@ export async function storeInCache(params: CacheStoreParams): Promise<void> {
                 .from('prompt_cache_entries')
                 .upsert({
                     project_id: projectId,
+                    environment,
                     cache_key: cacheKey,
                     prompt_text: promptText,
                     model,
@@ -200,6 +230,8 @@ export async function storeInCache(params: CacheStoreParams): Promise<void> {
                     response,
                     embedding: embedding ? JSON.stringify(embedding) : null,
                     expires_at: expiresAt,
+                    estimated_tokens: estimatedTokens,
+                    estimated_cost_usd: estimatedCostUsd,
                     updated_at: new Date().toISOString(),
                 }, {
                     onConflict: 'project_id,cache_key',
@@ -213,6 +245,7 @@ export async function storeInCache(params: CacheStoreParams): Promise<void> {
                 model,
                 tokensSaved: estimatedTokens,
                 costSavedUsd: estimatedCostUsd,
+                environment,
             });
         } finally {
             // Always release lock
@@ -279,15 +312,21 @@ export async function logCacheEvent(params: {
 
 export async function invalidateCache(params: {
     projectId: string;
+    environment?: string;
     cacheKey?: string;
     model?: string;
     all?: boolean;
 }): Promise<{ deletedCount: number }> {
     const supabase = createAdminClient();
+    const environment = params.environment ? normalizeEnvironment(params.environment) : null;
     let query = supabase
         .from('prompt_cache_entries')
         .select('id, cache_key')
         .eq('project_id', params.projectId);
+
+    if (environment) {
+        query = query.eq('environment', environment);
+    }
 
     if (params.cacheKey) {
         query = query.eq('cache_key', params.cacheKey);

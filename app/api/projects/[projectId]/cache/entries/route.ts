@@ -11,6 +11,7 @@ export async function GET(
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
     const model = url.searchParams.get('model');
+    const environment = url.searchParams.get('environment');
     const offset = (page - 1) * limit;
 
     const supabase = createAdminClient();
@@ -22,6 +23,10 @@ export async function GET(
         .gt('expires_at', new Date().toISOString())
         .order('hit_count', { ascending: false })
         .range(offset, offset + limit - 1);
+
+    if (environment === 'production' || environment === 'test') {
+        query = query.eq('environment', environment);
+    }
 
     if (model) {
         query = query.eq('model', model);
@@ -54,6 +59,7 @@ export async function DELETE(
 
     const result = await invalidateCache({
         projectId,
+        environment: body.environment,
         cacheKey: body.cache_key,
         model: body.model,
         all: body.all,

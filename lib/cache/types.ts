@@ -16,6 +16,8 @@ export interface CacheLookupResult {
     entryId: string | null;
     similarityScore: number | null;
     embedding: number[] | null;
+    estimatedTokens: number;
+    estimatedCostUsd: number;
 }
 
 export interface CacheStoreParams {
@@ -23,6 +25,7 @@ export interface CacheStoreParams {
     cacheKey: string;
     promptText: string;
     model: string;
+    environment?: string;
     temperature: number | undefined;
     maxTokens: number | undefined;
     response: any;

@@ -1,9 +1,12 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
-process.env.MOCK_EMBEDDINGS = 'true'; // Enable mock embeddings for verification
 
-const API_URL = 'http://localhost:3000/api/ai/completions';
-const API_KEY = process.env.CENCORI_API_KEY || 'csk_test_68044d62f550c28a1a0f3962e9670be71a63ec801ce23884';
+const API_URL = process.env.CENCORI_API_URL || 'http://localhost:3000/api/ai/chat';
+const API_KEY = process.env.CENCORI_API_KEY;
+
+if (!API_KEY) {
+    throw new Error('Set CENCORI_API_KEY before running semantic cache verification.');
+}
 
 async function runVerification() {
     console.log('🧪 Verifying Vector Semantic Caching...');
@@ -25,7 +28,7 @@ async function runVerification() {
             'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
-            prompt: prompt1,
+            messages: [{ role: 'user', content: prompt1 }],
             model: 'gemini-2.5-flash',
             max_tokens: 50
         })
@@ -48,7 +51,7 @@ async function runVerification() {
             'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
-            prompt: prompt2,
+            messages: [{ role: 'user', content: prompt2 }],
             model: 'gemini-2.5-flash',
             max_tokens: 50
         })
@@ -74,7 +77,7 @@ async function runVerification() {
             'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
-            prompt: prompt3,
+            messages: [{ role: 'user', content: prompt3 }],
             model: 'gemini-2.5-flash',
             max_tokens: 50
         })
