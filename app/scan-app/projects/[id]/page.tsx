@@ -901,7 +901,7 @@ export default function ProjectDetailPage() {
     if (!hasScanAccess) {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+                <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                     <ArrowLeft className="h-3 w-3" />
                     Back to projects
                 </Link>
@@ -1010,7 +1010,7 @@ export default function ProjectDetailPage() {
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Back link */}
-            <Link href="/scan" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
+            <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
                 <ArrowLeft className="h-3 w-3" />
                 Back to projects
             </Link>
@@ -1358,7 +1358,7 @@ export default function ProjectDetailPage() {
                                             <Button
                                                 size="sm"
                                                 className="h-7 text-xs px-3 bg-emerald-500 hover:bg-emerald-600"
-                                                onClick={() => router.push(`/scan/projects/${projectId}/fixes/${activeScan.id}`)}
+                                                onClick={() => router.push(`/projects/${projectId}/fixes/${activeScan.id}`)}
                                             >
                                                 Suggest Fix
                                             </Button>

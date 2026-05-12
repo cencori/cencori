@@ -724,7 +724,7 @@ export default function FixWorkspacePage() {
         return (
             <div className="w-full max-w-5xl mx-auto px-6 py-8">
                 <Link
-                    href={`/scan/projects/${projectId}`}
+                    href={`/projects/${projectId}`}
                     className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6"
                 >
                     <ArrowLeft className="h-3 w-3" />
@@ -740,7 +740,7 @@ export default function FixWorkspacePage() {
             <div className="w-full max-w-6xl mx-auto px-6 py-8">
                 <p className="text-sm text-red-400">{error || "Fix workspace not found."}</p>
                 <Button size="sm" className="mt-4 h-7 text-xs px-3" asChild>
-                    <Link href={`/scan/projects/${projectId}`}>Back to project</Link>
+                    <Link href={`/projects/${projectId}`}>Back to project</Link>
                 </Button>
             </div>
         );
@@ -752,7 +752,7 @@ export default function FixWorkspacePage() {
             <div className="w-full max-w-3xl mx-auto px-4 py-8 pt-16 pb-40">
                 {/* Header: back link only */}
                 <Link
-                    href={`/scan/projects/${projectId}`}
+                    href={`/projects/${projectId}`}
                     className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-8"
                 >
                     <ArrowLeft className="h-3 w-3" />

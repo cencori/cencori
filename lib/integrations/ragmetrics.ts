@@ -188,16 +188,18 @@ export async function evaluateWithRagMetrics(params: {
         console.error('[RagMetrics] Evaluation failed:', error);
 
         // Mark as failed so the UI can show the error state
-        await supabase
+        const { error: dbErr } = await supabase
             .from('ai_requests')
             .update({
                 evaluation_status: 'failed',
                 evaluation_details: { error: error instanceof Error ? error.message : 'Unknown error' },
                 evaluation_at: new Date().toISOString(),
             })
-            .eq('id', params.requestId)
-            .catch(dbErr => console.error('[RagMetrics] Failed to update failure status:', dbErr));
+            .eq('id', params.requestId);
 
+        if (dbErr) {
+            console.error('[RagMetrics] Failed to update failure status:', dbErr);
+        }
         return {
             score: 0,
             details: { error: error instanceof Error ? error.message : 'Unknown error' },

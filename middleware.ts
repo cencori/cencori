@@ -241,10 +241,18 @@ export async function middleware(request: NextRequest) {
         else if (isScanSubdomain) {
             if (!isScanAuthPath) {
                 const url = request.nextUrl.clone();
-                url.pathname = `/scan${url.pathname}`;
+                // Point to the dedicated product app folder
+                url.pathname = `/scan-app${url.pathname}`;
                 rewriteUrl = url;
                 response = NextResponse.rewrite(url);
             }
+        }
+        // Protect product-app from being accessed via main domain
+        else if (pathname.startsWith('/scan-app')) {
+            const url = request.nextUrl.clone();
+            url.host = domain === 'localhost' ? `scan.localhost:${hostname.split(':')[1] || ''}`.replace(/:$/, '') : 'scan.cencori.com';
+            url.pathname = pathname.replace(/^\/scan-app/, '') || '/';
+            return NextResponse.redirect(url, 301);
         }
     }
 

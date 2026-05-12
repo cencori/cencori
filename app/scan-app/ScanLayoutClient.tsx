@@ -77,16 +77,19 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
         };
     }, []);
 
-    // Extract current project from URL
-    const projectId = pathname.match(/\/scan\/projects\/([^/]+)/)?.[1];
+    // Extract current project from URL (handles both /scan/projects/... and /projects/...)
+    const projectId = pathname.match(/(?:\/scan)?\/projects\/([^/]+)/)?.[1];
 
     // Build breadcrumb items
     const getBreadcrumbItems = () => {
         const items: { label: string; href?: string }[] = [];
 
-        if (pathname === '/scan' || pathname === '/scan/') {
+        const isRoot = pathname === '/scan' || pathname === '/scan/' || pathname === '/';
+        const isImport = pathname === '/scan/import' || pathname === '/import';
+
+        if (isRoot) {
             // No breadcrumbs on main page - "Scan" is the wordmark
-        } else if (pathname === '/scan/import') {
+        } else if (isImport) {
             items.push({ label: 'Import' });
         } else if (projectId) {
             items.push({ label: 'Project' });
@@ -124,7 +127,7 @@ export default function ScanLayoutClient({ children }: ScanLayoutClientProps) {
             <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {/* Logo + Wordmark */}
-                    <Link href="/scan" className="flex items-center gap-2">
+                    <Link href="/" className="flex items-center gap-2">
                         <Image
                             src="/logo white.svg"
                             alt="Cencori"
