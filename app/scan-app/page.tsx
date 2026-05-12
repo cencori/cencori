@@ -192,7 +192,7 @@ export default function ScanDashboardPage() {
                     />
                 </div>
                 <Button asChild size="sm" className="h-7 text-xs px-3">
-                    <Link href="/scan/import">
+                    <Link href="/import">
                         Import
                     </Link>
                 </Button>
@@ -215,7 +215,7 @@ export default function ScanDashboardPage() {
                                 <TableRow
                                     key={project.id}
                                     className="cursor-pointer hover:bg-secondary/30 border-b border-border/40 last:border-b-0 transition-colors"
-                                    onClick={() => router.push(`/scan/projects/${project.id}`)}
+                                    onClick={() => router.push(`/projects/${project.id}`)}
                                 >
                                     <TableCell className="py-3 px-4">
                                         <div className="text-[13px] font-medium font-mono">{project.github_repo_full_name}</div>
@@ -262,7 +262,7 @@ export default function ScanDashboardPage() {
                     </p>
                     {!searchTerm && (
                         <Button asChild size="sm" className="h-7 text-xs px-3">
-                            <Link href="/scan/import">Import repository</Link>
+                            <Link href="/import">Import repository</Link>
                         </Button>
                     )}
                 </div>
