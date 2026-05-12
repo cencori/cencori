@@ -21,6 +21,9 @@ interface ProviderSettings {
     circuit_breaker_enabled?: boolean;
     circuit_breaker_failure_threshold?: number;
     circuit_breaker_timeout_seconds?: number;
+    ragmetrics_enabled?: boolean;
+    ragmetrics_api_key?: string;
+    ragmetrics_config?: any;
 }
 
 export async function PATCH(
@@ -65,6 +68,9 @@ export async function PATCH(
                     circuit_breaker_enabled: body.circuit_breaker_enabled,
                     circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold,
                     circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds,
+                    ragmetrics_enabled: body.ragmetrics_enabled,
+                    ragmetrics_api_key: body.ragmetrics_api_key,
+                    ragmetrics_config: body.ragmetrics_config,
                     updated_at: new Date().toISOString(),
                 })
                 .eq("project_id", projectId);
@@ -92,6 +98,9 @@ export async function PATCH(
                     circuit_breaker_enabled: body.circuit_breaker_enabled ?? true,
                     circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold || 5,
                     circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds || 60,
+                    ragmetrics_enabled: body.ragmetrics_enabled ?? false,
+                    ragmetrics_api_key: body.ragmetrics_api_key || null,
+                    ragmetrics_config: body.ragmetrics_config || {},
                 });
 
             if (insertError) {

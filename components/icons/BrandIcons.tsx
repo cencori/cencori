@@ -214,10 +214,6 @@ export function FlutterLogo({ className, ...props }: FrameworkIconProps) {
 }
 
 // React Logo (custom SVG)
-interface IconProps extends React.SVGProps<SVGSVGElement> {
-    className?: string;
-}
-
 export function ReactLogo({ className, ...props }: IconProps) {
     return (
         <svg viewBox="-11.5 -10.23174 23 20.46348" fill="currentColor" className={className} {...props}>
@@ -302,8 +298,6 @@ export function GoogleCloudLogo({ className, ...props }: IconProps) {
     );
 }
 
-
-
 // Zapier Logo
 export function ZapierLogo({ className, ...props }: IconProps) {
     return (
@@ -352,6 +346,7 @@ export function AutoGPTLogo({ className, ...props }: any) {
         </div>
     );
 }
+
 // Custom Agent Logo (User Provided)
 export function CustomAgentLogo({ className, ...props }: IconProps) {
     return (
@@ -360,6 +355,7 @@ export function CustomAgentLogo({ className, ...props }: IconProps) {
         </svg>
     );
 }
+
 // RagMetrics Logo
 export function RagMetricsLogo({ className, ...props }: any) {
     return (
@@ -367,7 +363,7 @@ export function RagMetricsLogo({ className, ...props }: any) {
             <img
                 src="/partners/ragmetrics/logo.png"
                 alt="RagMetrics"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
             />
         </div>
     );

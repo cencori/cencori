@@ -722,7 +722,7 @@ export async function POST(req: NextRequest) {
                                 markupPercentage: 0,
                                 endUserId: endUserId || undefined,
                             });
-                            void incrementUsage(gatewayCtx);
+                            void incrementUsage(gatewayCtx, 0);
 
                             const cachedResponse = NextResponse.json(cacheResult.response);
                             cachedResponse.headers.set('X-Cache', cacheResult.hitType === 'exact' ? 'HIT-EXACT' : 'HIT-SEMANTIC');
@@ -873,7 +873,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                void incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx, usageAndCost.cencoriChargeUsd);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -918,7 +918,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: usageAndCost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    void incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx, usageAndCost.cencoriChargeUsd);
                     maybeRecordEndUserUsage(usageAndCost);
                 }
 
@@ -1026,7 +1026,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                void incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx, usageAndCost.cencoriChargeUsd);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -1078,7 +1078,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: completion.cost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    void incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx, completion.cost.cencoriChargeUsd);
                     maybeRecordEndUserUsage({
                         promptTokens: completion.usage.promptTokens,
                         completionTokens: completion.usage.completionTokens,
@@ -1261,7 +1261,7 @@ export async function POST(req: NextRequest) {
                                     markupPercentage: usageAndCost.markupPercentage,
                                     endUserId: endUserId || undefined,
                                 });
-                                void incrementUsage(gatewayCtx);
+                                void incrementUsage(gatewayCtx, usageAndCost.cencoriChargeUsd);
                                 maybeRecordEndUserUsage(usageAndCost);
                             }
                         } catch (error: unknown) {
@@ -1377,7 +1377,7 @@ export async function POST(req: NextRequest) {
                         markupPercentage: usageAndCost.markupPercentage,
                         endUserId: endUserId || undefined,
                     });
-                    void incrementUsage(gatewayCtx);
+                    void incrementUsage(gatewayCtx, usageAndCost.cencoriChargeUsd);
                     maybeRecordEndUserUsage(usageAndCost);
                 }
 

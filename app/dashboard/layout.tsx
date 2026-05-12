@@ -37,6 +37,7 @@ import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import posthog from "posthog-js";
+import { toast } from "sonner";
 
 const CommandPalette = dynamic(
   () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
@@ -493,8 +494,22 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
                     type="button"
                     className="h-7 px-3 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     disabled={!feedbackText.trim()}
-                    onClick={() => {
-                      // TODO: Submit feedback
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/feedback', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            type: 'general',
+                            content: feedbackText
+                          })
+                        });
+                        if (response.ok) {
+                          toast.success("Thanks for your feedback!");
+                        }
+                      } catch (error) {
+                        console.error("Feedback submission failed:", error);
+                      }
                       setFeedbackText("");
                       setFeedbackOpen(false);
                     }}

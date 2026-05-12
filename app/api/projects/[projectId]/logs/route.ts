@@ -157,6 +157,8 @@ export async function GET(
                 error_message: req.error_message,
                 filtered_reasons: req.filtered_reasons,
                 request_preview: requestPreview,
+                evaluation_status: req.evaluation_status,
+                evaluation_score: req.evaluation_score,
                 source: 'ai_request' as const,
             };
         }) || [];
@@ -205,6 +207,8 @@ export async function GET(
                 error_message: incident.description,
                 filtered_reasons: [incident.incident_type],
                 request_preview: incident.input_text?.substring(0, 100) || incident.description || '',
+                evaluation_status: 'skipped',
+                evaluation_score: null,
                 source: 'security_incident' as const,
             }));
         }

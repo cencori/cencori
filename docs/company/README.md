@@ -248,6 +248,52 @@ The stable reference layer for glossary, primitives, naming, schemas, canonical 
 - `REF-06` Cross-Volume Reference Index
 - `REF-07` Versioning and Change Rules
 
+### Volume 7: Agent Knowledge Base
+
+**Audience**
+
+- AI agents
+- developer advocates
+- support
+- GTM
+- founder-assist workflows
+
+**Purpose**
+
+The confidential representation layer for AI agents: identity, positioning, product status, roadmap, fundraising, objection handling, FAQ, tone, and canonical statements an agent needs to represent Cencori accurately.
+
+**Document**
+
+- [VOLUME_7_AGENT_KNOWLEDGE_BASE.md](/Users/apple/cencori/docs/company/VOLUME_7_AGENT_KNOWLEDGE_BASE.md)
+
+**Module Table of Contents**
+
+- `AGENT-00` Operating Rules
+- `AGENT-01` Identity
+- `AGENT-02` The Vision
+- `AGENT-03` The Problem Cencori Solves
+- `AGENT-04` Product System
+- `AGENT-05` AI Gateway
+- `AGENT-06` Compute
+- `AGENT-07` Memory
+- `AGENT-08` Billing
+- `AGENT-09` Deployment
+- `AGENT-10` Workflow And Orchestration
+- `AGENT-11` Data
+- `AGENT-12` Developer Experience
+- `AGENT-13` Business Model
+- `AGENT-14` Traction And Validation
+- `AGENT-15` Competitive Landscape
+- `AGENT-16` Roadmap
+- `AGENT-17` Fundraising
+- `AGENT-18` Positioning And Messaging
+- `AGENT-19` Objection Handling
+- `AGENT-20` What Cencori Is Not
+- `AGENT-21` Tone And Communication Style
+- `AGENT-22` FAQ
+- `AGENT-23` Key Quotes And Statements
+- `AGENT-24` Response Discipline
+
 ---
 
 ## Future Volumes
@@ -310,4 +356,3 @@ There are not multiple company truths.
 There is one company truth, expressed through multiple role-specific lenses.
 
 That is how the ecosystem remains coherent.
-

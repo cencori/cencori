@@ -37,6 +37,13 @@ const SECTIONS = [
         icon: Settings,
         color: 'text-orange-400 bg-orange-500/10',
     },
+    {
+        href: '/internal/feedback',
+        label: 'User Feedback',
+        description: 'Review user suggestions and integration requests',
+        icon: Mail,
+        color: 'text-amber-400 bg-amber-500/10',
+    },
 ];
 
 export default function InternalOverviewPage() {

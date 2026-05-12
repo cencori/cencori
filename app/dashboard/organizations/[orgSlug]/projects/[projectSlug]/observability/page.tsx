@@ -530,21 +530,8 @@ export default function ObservabilityPage({ params }: PageProps) {
                                     />
                                 </div>
                             )}
-
-                            {emptyOverall && !overviewLoading && (
-                                <div className="text-center py-14 flex flex-col items-center rounded-xl border border-border/30 bg-card mt-4">
-                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center mb-3">
-                                        <BoltIcon className="h-5 w-5 text-primary/70" />
-                                    </div>
-                                    <p className="text-sm font-medium mb-0.5">No data yet</p>
-                                    <p className="text-xs text-muted-foreground/60 max-w-[280px]">
-                                        Make your first AI request to see metrics here.
-                                    </p>
-                                </div>
-                            )}
                         </>
                     )}
-
                     {section === 'ai' && (
                         <>
                             <div className="flex items-center justify-between mb-4">
