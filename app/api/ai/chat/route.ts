@@ -47,6 +47,7 @@ import {
 } from '@/lib/gateway-reliability';
 import { resolvePrompt, logPromptUsage } from '@/lib/prompts/registry';
 import type { ResolvedPrompt } from '@/lib/prompts/types';
+import { evaluateWithRagMetrics, extractRAGContext } from '@/lib/integrations/ragmetrics';
 
 
 const router = new ProviderRouter();
@@ -1616,6 +1617,22 @@ export async function POST(req: NextRequest) {
                                     console.error('[Budget] Failed to check budget alerts:', err);
                                 });
 
+                                // Trigger RagMetrics evaluation (fire-and-forget)
+                                if (streamLogData?.id) {
+                                    evaluateWithRagMetrics({
+                                        projectId: project.id,
+                                        requestId: streamLogData.id,
+                                        prompt: unifiedMessages.map(m => `${m.role}: ${m.content}`).join('\n'),
+                                        response: streamLoggedContent,
+                                        context: extractRAGContext(unifiedMessages),
+                                        metadata: {
+                                            model: streamActualModel,
+                                            provider: streamActualProvider,
+                                            is_streaming: true
+                                        }
+                                    }).catch(err => console.error('[RagMetrics] Evaluation trigger failed:', err));
+                                }
+
                                 controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                             }
                         }
@@ -1938,6 +1955,23 @@ export async function POST(req: NextRequest) {
         checkAndSendBudgetAlerts(project.id, project.id, organizationId).catch(err => {
             console.error('[Budget] Failed to check budget alerts:', err);
         });
+
+        // Trigger RagMetrics evaluation (fire-and-forget)
+        if (logData?.id) {
+            evaluateWithRagMetrics({
+                projectId: project.id,
+                requestId: logData.id,
+                prompt: unifiedMessages.map(m => `${m.role}: ${m.content}`).join('\n'),
+                response: response.content,
+                context: extractRAGContext(unifiedMessages),
+                metadata: {
+                    model: actualModel,
+                    provider: actualProvider,
+                    is_streaming: false
+                }
+            }).catch(err => console.error('[RagMetrics] Evaluation trigger failed:', err));
+        }
+
         // De-tokenize response before returning to user
         const finalContent = requestTokenMap
             ? deTokenize(response.content, requestTokenMap)

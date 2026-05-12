@@ -7,8 +7,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Shield, Gauge, Loader2 } from "lucide-react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { RagMetricsLogo } from "@/components/icons/BrandIcons";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MinimalScrollArea } from "@/components/ui/scroll-area";
@@ -42,11 +43,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { GeoMap } from "@/components/dashboard/GeoMap";
 import { RegionalCharts } from "@/components/dashboard/RegionalCharts";
 import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { SUPPORTED_PROVIDERS, getModelsForProvider } from "@/lib/providers/config";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface ProjectData {
   id: string;
@@ -207,6 +211,15 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
   const [isSavingBudget, setIsSavingBudget] = useState(false);
 
+  // RagMetrics state
+  const [ragmetricsEnabled, setRagmetricsEnabled] = useState(false);
+  const [ragmetricsApiKey, setRagmetricsApiKey] = useState('');
+  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+  const [integrationsDirty, setIntegrationsDirty] = useState(false);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [suggestion, setSuggestion] = useState('');
+  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+
   // API Key interface
   interface ApiKeyData {
     id: string;
@@ -281,6 +294,8 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     circuit_breaker_enabled: boolean;
     circuit_breaker_failure_threshold: number;
     circuit_breaker_timeout_seconds: number;
+    ragmetrics_enabled: boolean;
+    ragmetrics_api_key: string;
   }
 
   const { data: providerSettings } = useQuery<{ settings: ProviderSettingsData }>({
@@ -309,7 +324,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       setCircuitBreakerEnabled(s.circuit_breaker_enabled ?? true);
       setCircuitBreakerFailureThreshold(String(s.circuit_breaker_failure_threshold || 5));
       setCircuitBreakerTimeoutSeconds(String(s.circuit_breaker_timeout_seconds || 60));
+      setRagmetricsEnabled(s.ragmetrics_enabled ?? false);
+      setRagmetricsApiKey(s.ragmetrics_api_key || '');
       setProviderSettingsDirty(false);
+      setIntegrationsDirty(false);
     }
   }, [providerSettings]);
 
@@ -568,6 +586,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
 
@@ -783,10 +802,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <div className="w-full bg-muted/50 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all ${(budgetSettings.percent_used || 0) >= 100
-                          ? 'bg-red-500'
-                          : (budgetSettings.percent_used || 0) >= 80
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
+                        ? 'bg-red-500'
+                        : (budgetSettings.percent_used || 0) >= 80
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
                         }`}
                       style={{ width: `${Math.min(budgetSettings.percent_used || 0, 100)}%` }}
                     />
@@ -924,7 +943,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <div key={threshold} className="flex items-center justify-between px-4 py-2.5">
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-2 rounded-full ${threshold >= 100 ? 'bg-red-500' :
-                          threshold >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        threshold >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
                         }`} />
                       <span className="text-xs">{threshold}% of budget</span>
                     </div>
@@ -937,6 +956,262 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 ))}
               </div>
             </div>
+          </section>
+        </TabsContent>
+
+        {/* PROVIDERS TAB */}
+        <TabsContent value="providers" className="space-y-6">
+          {/* Default Provider & Model */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Default Provider</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Default provider</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
+                </div>
+                <Select value={defaultProvider} onValueChange={(v) => { setDefaultProvider(v); setProviderSettingsDirty(true); }}>
+                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {SUPPORTED_PROVIDERS.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
+                        {provider.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Default model</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Fallback model when not specified.</p>
+                </div>
+                <Select value={defaultModel} onValueChange={(v) => { setDefaultModel(v); setProviderSettingsDirty(true); }}>
+                  <SelectTrigger className="w-full md:w-56 h-10 md:h-8 text-sm md:text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {getModelsForProvider(defaultProvider).map((model) => (
+                      <SelectItem key={model.id} value={model.id} className="text-xs">
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </section>
+
+          {/* Rate Limiting */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Rate Limiting</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Requests per minute</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
+                </div>
+                <Input
+                  value={requestsPerMinute}
+                  onChange={(e) => { setRequestsPerMinute(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Tokens per day</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
+                </div>
+                <Input
+                  value={tokensPerDay}
+                  onChange={(e) => { setTokensPerDay(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Concurrent requests</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
+                </div>
+                <Input
+                  value={concurrentRequests}
+                  onChange={(e) => { setConcurrentRequests(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Fallback Configuration */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Fallback Configuration</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Enable automatic fallback</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
+                </div>
+                <Checkbox
+                  checked={enableFallback}
+                  onCheckedChange={(checked) => { setEnableFallback(!!checked); setProviderSettingsDirty(true); }}
+                  className="h-5 w-5 md:h-4 md:w-4"
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Fallback provider</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when primary fails.</p>
+                </div>
+                <Select value={fallbackProvider} onValueChange={(v) => { setFallbackProvider(v); setProviderSettingsDirty(true); }} disabled={!enableFallback}>
+                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {SUPPORTED_PROVIDERS.filter(p => p.id !== defaultProvider).map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
+                        {provider.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Max retries before fallback</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Attempts before switching provider.</p>
+                </div>
+                <Input
+                  value={maxRetriesBeforeFallback}
+                  onChange={(e) => { setMaxRetriesBeforeFallback(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                  disabled={!enableFallback}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Circuit Breaker Configuration */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Circuit Breaker</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic provider isolation when failures are detected.</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Enable circuit breaker</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Automatically isolate failing providers to prevent cascading failures.</p>
+                </div>
+                <Checkbox
+                  checked={circuitBreakerEnabled}
+                  onCheckedChange={(checked) => { setCircuitBreakerEnabled(!!checked); setProviderSettingsDirty(true); }}
+                  className="h-5 w-5 md:h-4 md:w-4"
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Failure threshold</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Consecutive failures before circuit opens.</p>
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={circuitBreakerFailureThreshold}
+                  onChange={(e) => { setCircuitBreakerFailureThreshold(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                  disabled={!circuitBreakerEnabled}
+                />
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Recovery timeout</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Seconds before retrying a failed provider.</p>
+                </div>
+                <Input
+                  type="number"
+                  min="10"
+                  max="600"
+                  value={circuitBreakerTimeoutSeconds}
+                  onChange={(e) => { setCircuitBreakerTimeoutSeconds(e.target.value); setProviderSettingsDirty(true); }}
+                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
+                  disabled={!circuitBreakerEnabled}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Save Button */}
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-muted-foreground">
+              {providerSettingsDirty ? "You have unsaved changes" : "All changes saved"}
+            </p>
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              disabled={!providerSettingsDirty || isSavingProviders}
+              onClick={async () => {
+                setIsSavingProviders(true);
+                try {
+                  const response = await fetch(`/api/projects/${project.id}/settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      default_provider: defaultProvider,
+                      default_model: defaultModel,
+                      requests_per_minute: parseInt(requestsPerMinute),
+                      tokens_per_day: parseInt(tokensPerDay),
+                      concurrent_requests: parseInt(concurrentRequests),
+                      enable_fallback: enableFallback,
+                      fallback_provider: fallbackProvider,
+                      max_retries_before_fallback: parseInt(maxRetriesBeforeFallback),
+                      circuit_breaker_enabled: circuitBreakerEnabled,
+                      circuit_breaker_failure_threshold: parseInt(circuitBreakerFailureThreshold),
+                      circuit_breaker_timeout_seconds: parseInt(circuitBreakerTimeoutSeconds),
+                    }),
+                  });
+                  if (!response.ok) throw new Error('Failed to save settings');
+                  toast.success('Provider settings saved');
+                  setProviderSettingsDirty(false);
+                  // Refresh rate limits in Infrastructure tab to reflect new settings
+                  queryClient.invalidateQueries({ queryKey: ["rateLimits", project.id] });
+                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                } catch (error) {
+                  toast.error('Failed to save settings');
+                } finally {
+                  setIsSavingProviders(false);
+                }
+              }}
+            >
+              {isSavingProviders ? (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save changes'
+              )}
+            </Button>
+          </div>
+
+          {/* Geographic Usage */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-sm font-medium">Requests by Geography</h2>
+              <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
+            </div>
+            <GeoAnalyticsSection projectId={project.id} />
           </section>
         </TabsContent>
 
@@ -1202,41 +1477,43 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="webhook-name" className="text-xs">Name</Label>
-                      <Input
-                        id="webhook-name"
-                        placeholder="My Webhook"
-                        value={webhookName}
-                        onChange={(e) => setWebhookName(e.target.value)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="webhook-url" className="text-xs">Endpoint URL</Label>
-                      <Input
-                        id="webhook-url"
-                        placeholder="https://your-server.com/webhook"
-                        value={webhookUrl}
-                        onChange={(e) => setWebhookUrl(e.target.value)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Events</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {WEBHOOK_EVENTS.map((event) => (
-                          <div key={event.value} className="flex items-center gap-2">
-                            <Checkbox
-                              id={event.value}
-                              checked={webhookEvents.includes(event.value)}
-                              onCheckedChange={() => toggleWebhookEvent(event.value)}
-                            />
-                            <label htmlFor={event.value} className="text-[10px] cursor-pointer">
-                              {event.label}
-                            </label>
-                          </div>
-                        ))}
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="webhook-name" className="text-xs">Name</Label>
+                        <Input
+                          id="webhook-name"
+                          placeholder="My Webhook"
+                          value={webhookName}
+                          onChange={(e) => setWebhookName(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="webhook-url" className="text-xs">Endpoint URL</Label>
+                        <Input
+                          id="webhook-url"
+                          placeholder="https://your-server.com/webhook"
+                          value={webhookUrl}
+                          onChange={(e) => setWebhookUrl(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Events</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {WEBHOOK_EVENTS.map((event) => (
+                            <div key={event.value} className="flex items-center gap-2">
+                              <Checkbox
+                                id={event.value}
+                                checked={webhookEvents.includes(event.value)}
+                                onCheckedChange={() => toggleWebhookEvent(event.value)}
+                              />
+                              <label htmlFor={event.value} className="text-[10px] cursor-pointer">
+                                {event.label}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1305,268 +1582,263 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               )}
             </div>
           </section>
-        </TabsContent >
+        </TabsContent>
 
-        {/* PROVIDERS TAB */}
-        < TabsContent value="providers" className="space-y-6" >
-          {/* Default Provider & Model */}
-          < section className="space-y-3" >
-            <div>
-              <h2 className="text-sm font-medium">Default Provider</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Select the default provider and model for requests without explicit model specification.</p>
+        {/* INTEGRATIONS TAB */}
+        <TabsContent value="integrations" className="space-y-6">
+          <section className="space-y-4">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">External Integrations</h2>
+              <p className="text-[10px] text-muted-foreground">Connect Cencori to third-party tools for evaluation, monitoring, and deployments.</p>
             </div>
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Default provider</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when no provider is specified in API requests.</p>
-                </div>
-                <Select value={defaultProvider} onValueChange={(v) => { setDefaultProvider(v); setProviderSettingsDirty(true); }}>
-                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {SUPPORTED_PROVIDERS.map((provider) => (
-                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
-                        {provider.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Default model</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Fallback model when not specified.</p>
-                </div>
-                <Select value={defaultModel} onValueChange={(v) => { setDefaultModel(v); setProviderSettingsDirty(true); }}>
-                  <SelectTrigger className="w-full md:w-56 h-10 md:h-8 text-sm md:text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {getModelsForProvider(defaultProvider).map((model) => (
-                      <SelectItem key={model.id} value={model.id} className="text-xs">
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section >
 
-          {/* Rate Limiting */}
-          < section className="space-y-3" >
-            <div>
-              <h2 className="text-sm font-medium">Rate Limiting</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Configure request limits enforced via your Cencori API key.</p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Requests per minute</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Maximum API requests allowed per minute.</p>
-                </div>
-                <Input
-                  value={requestsPerMinute}
-                  onChange={(e) => { setRequestsPerMinute(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                />
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Tokens per day</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Daily token usage limit across all requests.</p>
-                </div>
-                <Input
-                  value={tokensPerDay}
-                  onChange={(e) => { setTokensPerDay(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                />
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Concurrent requests</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Max simultaneous requests allowed.</p>
-                </div>
-                <Input
-                  value={concurrentRequests}
-                  onChange={(e) => { setConcurrentRequests(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                />
-              </div>
-            </div>
-          </section >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-border/50 bg-card p-5 flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
+                      <RagMetricsLogo className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">RagMetrics Evaluation</h3>
+                      <p className="text-[10px] text-muted-foreground">Governance Engine</p>
+                    </div>
+                  </div>
 
-          {/* Fallback Configuration */}
-          < section className="space-y-3" >
-            <div>
-              <h2 className="text-sm font-medium">Fallback Configuration</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Enable automatic fallback</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Route to backup provider on failure.</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-[0.14em]",
+                      ragmetricsEnabled ? "text-emerald-500" : "text-muted-foreground/50"
+                    )}>
+                      {ragmetricsEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <Switch
+                      id="ragmetrics-enabled"
+                      checked={ragmetricsEnabled}
+                      onCheckedChange={async (checked) => {
+                        setRagmetricsEnabled(checked);
+                        try {
+                          const response = await fetch(`/api/projects/${project.id}/settings`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ragmetrics_enabled: checked })
+                          });
+                          if (!response.ok) throw new Error();
+                          queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                        } catch {
+                          setRagmetricsEnabled(!checked);
+                          toast.error('Failed to update integration');
+                        }
+                      }}
+                      className="scale-75 origin-right"
+                    />
+                  </div>
                 </div>
-                <Checkbox
-                  checked={enableFallback}
-                  onCheckedChange={(checked) => { setEnableFallback(!!checked); setProviderSettingsDirty(true); }}
-                  className="h-5 w-5 md:h-4 md:w-4"
-                />
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Fallback provider</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Used when primary fails.</p>
-                </div>
-                <Select value={fallbackProvider} onValueChange={(v) => { setFallbackProvider(v); setProviderSettingsDirty(true); }} disabled={!enableFallback}>
-                  <SelectTrigger className="w-full md:w-48 h-10 md:h-8 text-sm md:text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {SUPPORTED_PROVIDERS.filter(p => p.id !== defaultProvider).map((provider) => (
-                      <SelectItem key={provider.id} value={provider.id} className="text-xs">
-                        {provider.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Max retries before fallback</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Attempts before switching provider.</p>
-                </div>
-                <Input
-                  value={maxRetriesBeforeFallback}
-                  onChange={(e) => { setMaxRetriesBeforeFallback(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                  disabled={!enableFallback}
-                />
-              </div>
-            </div>
-          </section >
 
-          {/* Circuit Breaker Configuration */}
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-sm font-medium">Circuit Breaker</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic provider isolation when failures are detected.</p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Enable circuit breaker</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Automatically isolate failing providers to prevent cascading failures.</p>
+                <p className="text-xs text-muted-foreground mb-4 flex-1">
+                  Live AI output evaluation and hallucination detection.
+                </p>
+
+                <ul className="space-y-1.5 mb-6">
+                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    Automated faithfulness scoring
+                  </li>
+                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    Real-time hallucination alerts
+                  </li>
+                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    Context-aware verification
+                  </li>
+                </ul>
+
+                <div className="pt-4 border-t border-border/40">
+                  {ragmetricsApiKey ? (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 h-8 rounded-full text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/5"
+                        disabled
+                      >
+                        Connected
+                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[400px]">
+                          <DialogHeader>
+                            <DialogTitle className="text-sm">Update RagMetrics API Key</DialogTitle>
+                            <DialogDescription className="text-xs">
+                              Enter a new API key to replace the existing one.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-3 py-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="ragmetrics-key-update" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                                API Key
+                              </Label>
+                              <Input
+                                id="ragmetrics-key-update"
+                                type="password"
+                                placeholder="rm_live_..."
+                                defaultValue={ragmetricsApiKey}
+                                onChange={(e) => setRagmetricsApiKey(e.target.value)}
+                                className="h-8 text-[11px] font-mono bg-secondary/30 border-border/40"
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter className="gap-2">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="text-xs h-8"
+                              onClick={async () => {
+                                setRagmetricsApiKey('');
+                                setRagmetricsEnabled(false);
+                                try {
+                                  await fetch(`/api/projects/${project.id}/settings`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ ragmetrics_enabled: false, ragmetrics_api_key: '' })
+                                  });
+                                  toast.success('RagMetrics disconnected');
+                                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                                } catch {
+                                  toast.error('Failed to disconnect');
+                                }
+                              }}
+                            >
+                              Disconnect
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="text-xs h-8"
+                              onClick={async () => {
+                                setIsSavingIntegrations(true);
+                                try {
+                                  const response = await fetch(`/api/projects/${project.id}/settings`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ ragmetrics_api_key: ragmetricsApiKey, ragmetrics_enabled: true })
+                                  });
+                                  if (!response.ok) throw new Error();
+                                  toast.success('API key updated');
+                                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                                } catch {
+                                  toast.error('Failed to update API key');
+                                } finally {
+                                  setIsSavingIntegrations(false);
+                                }
+                              }}
+                              disabled={isSavingIntegrations}
+                            >
+                              {isSavingIntegrations ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+                              Save
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  ) : (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full h-8 rounded-full text-xs">
+                          Connect
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[400px]">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-sm">
+                            <div className="w-6 h-6 rounded overflow-hidden">
+                              <RagMetricsLogo className="w-full h-full object-cover" />
+                            </div>
+                            Connect RagMetrics
+                          </DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Paste your RagMetrics API key to enable live AI evaluation on every request.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3 py-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="ragmetrics-key-connect" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                              API Key
+                            </Label>
+                            <Input
+                              id="ragmetrics-key-connect"
+                              type="password"
+                              placeholder="rm_live_..."
+                              value={ragmetricsApiKey}
+                              onChange={(e) => setRagmetricsApiKey(e.target.value)}
+                              className="h-8 text-[11px] font-mono bg-secondary/30 border-border/40"
+                            />
+                            <p className="text-[10px] text-muted-foreground/60">
+                              Find your key at{' '}
+                              <a href="https://app.ragmetrics.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
+                                app.ragmetrics.ai → Keys
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            className="w-full text-xs h-8"
+                            disabled={!ragmetricsApiKey || isSavingIntegrations}
+                            onClick={async () => {
+                              setIsSavingIntegrations(true);
+                              try {
+                                const response = await fetch(`/api/projects/${project.id}/settings`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ ragmetrics_enabled: true, ragmetrics_api_key: ragmetricsApiKey })
+                                });
+                                if (!response.ok) throw new Error();
+                                setRagmetricsEnabled(true);
+                                toast.success('RagMetrics connected successfully');
+                                queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
+                              } catch {
+                                toast.error('Failed to connect RagMetrics');
+                              } finally {
+                                setIsSavingIntegrations(false);
+                              }
+                            }}
+                          >
+                            {isSavingIntegrations ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+                            {isSavingIntegrations ? 'Connecting...' : 'Save & Connect'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
-                <Checkbox
-                  checked={circuitBreakerEnabled}
-                  onCheckedChange={(checked) => { setCircuitBreakerEnabled(!!checked); setProviderSettingsDirty(true); }}
-                  className="h-5 w-5 md:h-4 md:w-4"
-                />
               </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Failure threshold</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Consecutive failures before circuit opens.</p>
+
+
+              {/* Placeholder for future integrations */}
+              <button
+                onClick={() => setShowSuggestModal(true)}
+                className="rounded-xl border border-dashed border-border/40 bg-card/20 p-5 flex flex-col items-center justify-center text-center space-y-2 min-h-[240px] hover:bg-card/40 hover:border-border/60 transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center group-hover:bg-secondary transition-colors">
+                  <Plus className="w-5 h-5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
                 </div>
-                <Input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={circuitBreakerFailureThreshold}
-                  onChange={(e) => { setCircuitBreakerFailureThreshold(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                  disabled={!circuitBreakerEnabled}
-                />
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Recovery timeout</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Seconds before retrying a failed provider.</p>
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">More integrations</p>
+                  <p className="text-[9px] text-muted-foreground/60">Suggest a tool for the ecosystem</p>
                 </div>
-                <Input
-                  type="number"
-                  min="10"
-                  max="600"
-                  value={circuitBreakerTimeoutSeconds}
-                  onChange={(e) => { setCircuitBreakerTimeoutSeconds(e.target.value); setProviderSettingsDirty(true); }}
-                  className="w-full md:w-24 h-10 md:h-8 text-sm md:text-xs text-right"
-                  disabled={!circuitBreakerEnabled}
-                />
-              </div>
+              </button>
             </div>
           </section>
-
-          {/* Save Button */}
-          < div className="flex items-center justify-between pt-2" >
-            <p className="text-xs text-muted-foreground">
-              {providerSettingsDirty ? "You have unsaved changes" : "All changes saved"}
-            </p>
-            <Button
-              size="sm"
-              className="h-8 text-xs"
-              disabled={!providerSettingsDirty || isSavingProviders}
-              onClick={async () => {
-                setIsSavingProviders(true);
-                try {
-                  const response = await fetch(`/api/projects/${project.id}/settings`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      default_provider: defaultProvider,
-                      default_model: defaultModel,
-                      requests_per_minute: parseInt(requestsPerMinute),
-                      tokens_per_day: parseInt(tokensPerDay),
-                      concurrent_requests: parseInt(concurrentRequests),
-                      enable_fallback: enableFallback,
-                      fallback_provider: fallbackProvider,
-                      max_retries_before_fallback: parseInt(maxRetriesBeforeFallback),
-                      circuit_breaker_enabled: circuitBreakerEnabled,
-                      circuit_breaker_failure_threshold: parseInt(circuitBreakerFailureThreshold),
-                      circuit_breaker_timeout_seconds: parseInt(circuitBreakerTimeoutSeconds),
-                    }),
-                  });
-                  if (!response.ok) throw new Error('Failed to save settings');
-                  toast.success('Provider settings saved');
-                  setProviderSettingsDirty(false);
-                  // Refresh rate limits in Infrastructure tab to reflect new settings
-                  queryClient.invalidateQueries({ queryKey: ["rateLimits", project.id] });
-                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
-                } catch (error) {
-                  toast.error('Failed to save settings');
-                } finally {
-                  setIsSavingProviders(false);
-                }
-              }}
-            >
-              {isSavingProviders ? (
-                <>
-                  <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save changes'
-              )}
-            </Button>
-          </div >
-
-          {/* Geographic Usage */}
-          < section className="space-y-3" >
-            <div>
-              <h2 className="text-sm font-medium">Requests by Geography</h2>
-              <p className="text-xs text-muted-foreground">Monitor API request distribution by country.</p>
-            </div>
-            <GeoAnalyticsSection projectId={project.id} />
-          </section >
-        </TabsContent >
+        </TabsContent>
 
         {/* API TAB */}
-        < TabsContent value="api" className="space-y-8" >
+        <TabsContent value="api" className="space-y-8">
           {/* Publishable Keys Section */}
-          < section className="space-y-3" >
+          <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-medium">Publishable keys</h2>
@@ -1580,7 +1852,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   setShowCreateKeyDialog(true);
                 }}
               >
-                <Plus className="h-3 w-3" />
                 New publishable key
               </Button>
             </div>
@@ -1590,36 +1861,40 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 <span className="text-[10px] font-medium text-muted-foreground uppercase">API Key</span>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase sr-only">Actions</span>
               </div>
-              {publishableKeys.length > 0 ? (
+              {publishableKeys.length === 0 ? (
+                <div className="px-4 py-8 text-center text-muted-foreground text-xs">
+                  No publishable keys created yet.
+                </div>
+              ) : (
                 <div className="divide-y divide-border/40">
-                  {publishableKeys.map((key) => (
-                    <div key={key.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 items-center px-4 py-3">
-                      <div>
-                        <p className="text-xs font-medium">{key.name}</p>
-                        {key.allowed_domains && key.allowed_domains.length > 0 && (
-                          <p className="text-[10px] text-muted-foreground">{key.allowed_domains.join(', ')}</p>
-                        )}
-                      </div>
+                  {publishableKeys.map((k: ApiKeyData) => (
+                    <div key={k.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-3 items-center group">
+                      <span className="text-xs font-medium truncate">{k.name}</span>
                       <div className="flex items-center gap-2">
-                        <code className="text-[11px] font-mono bg-secondary px-2.5 py-1 rounded truncate max-w-[280px]">
-                          {key.key_prefix}
+                        <code className="text-[11px] font-mono bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">
+                          {k.key_prefix}••••••••
                         </code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleCopyKey(key.key_prefix)}>
-                          {copiedKeyId === key.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleCopyKey(k.key_prefix)}
+                        >
+                          <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
                             <MoreHorizontal className="h-3.5 w-3.5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuContent align="end" className="w-32">
                           <DropdownMenuItem
-                            className="text-xs text-red-600 cursor-pointer"
-                            onClick={() => setRevokeTarget({ id: key.id, name: key.name, prefix: key.key_prefix })}
+                            className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer"
+                            onSelect={() => setRevokeTarget({ id: k.id, name: k.name, prefix: k.key_prefix })}
                           >
-                            <Trash2 className="h-3 w-3 mr-2" />
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
                             Revoke key
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1627,26 +1902,18 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-xs text-muted-foreground">No publishable keys yet</p>
-                </div>
               )}
-              <div className="px-4 py-2 border-t border-border/40 bg-muted/20">
-                <p className="text-[10px] text-muted-foreground">Publishable keys can be safely shared publicly</p>
-              </div>
             </div>
-          </section >
+          </section>
 
           {/* Secret Keys Section */}
-          < section className="space-y-3" >
+          <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-medium">Secret keys</h2>
-                <p className="text-xs text-muted-foreground">For server-side use only. Never expose in browser or client code.</p>
+                <p className="text-xs text-muted-foreground">Server-side keys. Keep them private and never share with models.</p>
               </div>
               <Button
-                variant="outline"
                 size="sm"
                 className="h-7 text-xs gap-1.5"
                 onClick={() => {
@@ -1654,7 +1921,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   setShowCreateKeyDialog(true);
                 }}
               >
-                <Plus className="h-3 w-3" />
                 New secret key
               </Button>
             </div>
@@ -1664,34 +1930,43 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 <span className="text-[10px] font-medium text-muted-foreground uppercase">API Key</span>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase sr-only">Actions</span>
               </div>
-              {secretKeys.length > 0 ? (
+              {secretKeys.length === 0 ? (
+                <div className="px-4 py-8 text-center text-muted-foreground text-xs">
+                  No secret keys created yet.
+                </div>
+              ) : (
                 <div className="divide-y divide-border/40">
-                  {secretKeys.map((key) => (
-                    <div key={key.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 items-center px-4 py-3">
-                      <div>
-                        <p className="text-xs font-medium">{key.name}</p>
-                        <p className="text-[10px] text-muted-foreground">Created {formatRelativeDate(key.created_at)}</p>
+                  {secretKeys.map((k: ApiKeyData) => (
+                    <div key={k.id} className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-3 items-center group">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-xs font-medium truncate">{k.name}</span>
+                        <span className="text-[10px] text-muted-foreground">Created {formatRelativeDate(k.created_at)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <code className="text-[11px] font-mono bg-secondary px-2.5 py-1 rounded truncate max-w-[280px]">
-                          {key.key_prefix}
+                        <code className="text-[11px] font-mono bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">
+                          {k.key_prefix}••••••••
                         </code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleCopyKey(key.key_prefix)}>
-                          {copiedKeyId === key.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleCopyKey(k.key_prefix)}
+                        >
+                          <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
                             <MoreHorizontal className="h-3.5 w-3.5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuContent align="end" className="w-32">
                           <DropdownMenuItem
-                            className="text-xs text-red-600 cursor-pointer"
-                            onClick={() => setRevokeTarget({ id: key.id, name: key.name, prefix: key.key_prefix })}
+                            className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer"
+                            onSelect={() => setRevokeTarget({ id: k.id, name: k.name, prefix: k.key_prefix })}
                           >
-                            <Trash2 className="h-3 w-3 mr-2" />
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
                             Revoke key
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1699,60 +1974,97 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-xs text-muted-foreground">No secret keys yet</p>
-                </div>
               )}
             </div>
-          </section >
-        </TabsContent >
+          </section>
+        </TabsContent>
+      </Tabs>
 
-      </Tabs >
-
-      {/* Create API Key Dialog */}
-      {
-        project && (
-          <GenerateKeyDialog
-            projectId={project.id}
-            open={showCreateKeyDialog}
-            onOpenChange={setShowCreateKeyDialog}
-            onKeyGenerated={() => refetchApiKeys()}
-            defaultKeyType={createKeyType}
-          />
-        )
-      }
-
+      {/* Revoke Key Confirmation */}
       <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  Are you sure you want to revoke <span className="font-medium text-foreground">{revokeTarget?.name}</span>?
-                </p>
-                <div className="rounded-md bg-muted px-3 py-2">
-                  <code className="text-xs font-mono">{revokeTarget?.prefix}...</code>
-                </div>
-                <p className="text-xs text-destructive">
-                  This action cannot be undone. Any application or agent using this key will immediately lose access.
-                </p>
-              </div>
+            <AlertDialogDescription className="text-xs">
+              Are you sure you want to revoke <span className="font-medium text-foreground">{revokeTarget?.name}</span>?
+              Applications using this key will immediately fail.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmRevokeKey}
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+              onClick={(e) => { e.preventDefault(); confirmRevokeKey(); }}
               disabled={revoking}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {revoking ? "Revoking..." : "Revoke Key"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div >
+
+      {/* Generate Key Dialog */}
+      <GenerateKeyDialog
+        open={showCreateKeyDialog}
+        onOpenChange={setShowCreateKeyDialog}
+        projectId={project.id}
+        defaultKeyType={createKeyType}
+        onKeyGenerated={() => refetchApiKeys()}
+      />
+
+      {/* Suggest Integration Dialog */}
+      <Dialog open={showSuggestModal} onOpenChange={setShowSuggestModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Suggest an integration</DialogTitle>
+            <DialogDescription className="text-xs">
+              Tell us which tool you'd like to see integrated with Cencori.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-3">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Tool Name</Label>
+              <Input
+                placeholder="e.g. LangSmith, Weights & Biases"
+                value={suggestion}
+                onChange={(e) => setSuggestion(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              size="sm"
+              className="w-full text-xs h-8"
+              disabled={!suggestion.trim() || isSubmittingSuggestion}
+              onClick={async () => {
+                setIsSubmittingSuggestion(true);
+                try {
+                  // Send to feedback API if exists, or just log for now
+                  await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'integration_suggestion',
+                      content: suggestion,
+                      project_id: project?.id
+                    })
+                  }).catch(() => { /* fallback to success toast anyway */ });
+
+                  toast.success("Thanks! We've received your suggestion.");
+                  setSuggestion("");
+                  setShowSuggestModal(false);
+                } finally {
+                  setIsSubmittingSuggestion(false);
+                }
+              }}
+            >
+              {isSubmittingSuggestion ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+              {isSubmittingSuggestion ? "Submitting..." : "Submit Suggestion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -14,6 +14,20 @@ export async function getPricingFromDB(
     provider: string,
     model: string
 ): Promise<ModelPricing> {
+    const FREE_MODELS = [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant'
+    ];
+    
+    // Intercept natively free models before any DB queries for 0-latency pricing
+    if (FREE_MODELS.includes(model)) {
+        return {
+            inputPer1KTokens: 0,
+            outputPer1KTokens: 0,
+            cencoriMarkupPercentage: 0,
+        };
+    }
+
     const supabase = createAdminClient();
 
     const { data, error } = await supabase
@@ -53,6 +67,11 @@ function getDefaultPricing(provider: string): ModelPricing {
         google: {
             inputPer1KTokens: 0.00025,
             outputPer1KTokens: 0.00075,
+            cencoriMarkupPercentage: 0,
+        },
+        groq: {
+            inputPer1KTokens: 0,
+            outputPer1KTokens: 0,
             cencoriMarkupPercentage: 0,
         },
         custom: {

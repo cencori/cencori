@@ -11,6 +11,7 @@ export interface AIModel {
     type: 'chat' | 'reasoning' | 'code' | 'search' | 'embedding' | 'image';
     contextWindow: number;
     description?: string;
+    free?: boolean;
 }
 
 export interface AIProviderConfig {
@@ -111,7 +112,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // Gemini 2.0 Series
             { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', type: 'chat', contextWindow: 1000000, description: 'Fast model' },
             { id: 'gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', type: 'reasoning', contextWindow: 1000000, description: 'Reasoning variant' },
-            // Image Generation
             { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: 'image', contextWindow: 0, description: 'Fast photorealism' },
             { id: 'imagen-3', name: 'Imagen 3', type: 'image', contextWindow: 0, description: 'High quality images' },
         ],
@@ -131,7 +131,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // Ministral (Dec 2025)
             { id: 'ministral-3b', name: 'Ministral 3B', type: 'chat', contextWindow: 128000, description: 'Compact edge model' },
             { id: 'ministral-8b', name: 'Ministral 8B', type: 'chat', contextWindow: 128000, description: 'Small efficient model' },
-            // Code Models
             { id: 'codestral-latest', name: 'Codestral 25.01', type: 'code', contextWindow: 256000, description: '2.5x faster code generation' },
             { id: 'devstral-latest', name: 'Devstral 2', type: 'code', contextWindow: 256000, description: 'Frontier code agents' },
             // Reasoning
@@ -150,8 +149,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Latest multimodal Llama' },
             { id: 'llama-4-scout', name: 'Llama 4 Scout', type: 'chat', contextWindow: 256000, description: 'Advanced Llama 4 model' },
             // Llama 3.3
-            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: 'chat', contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model' },
-            { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: 'chat', contextWindow: 128000, description: 'Ultra-fast inference' },
+            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: 'chat', contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model', free: true },
+            { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: 'chat', contextWindow: 128000, description: 'Ultra-fast inference', free: true },
             { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', type: 'chat', contextWindow: 32768, description: 'MoE architecture' },
         ],
     },
@@ -310,6 +309,211 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2', type: 'code', contextWindow: 128000, description: '338 languages, GPT-4 level' },
         ],
     },
+    {
+        id: 'ai21',
+        name: 'AI21 Labs',
+        icon: '/providers/ai21.svg',
+        website: 'https://ai21.com',
+        docsUrl: 'https://docs.ai21.com',
+        keyPrefix: '',
+        models: [
+            { id: 'jamba-1.5-large', name: 'Jamba 1.5 Large', type: 'chat', contextWindow: 256000, description: 'Hybrid SSM-Transformer' },
+            { id: 'jamba-1.5-mini', name: 'Jamba 1.5 Mini', type: 'chat', contextWindow: 256000, description: 'Fast hybrid model' },
+        ],
+    },
+    {
+        id: 'bedrock',
+        name: 'Amazon Bedrock',
+        icon: '/providers/bedrock.svg',
+        website: 'https://aws.amazon.com/bedrock',
+        docsUrl: 'https://docs.aws.amazon.com/bedrock',
+        keyPrefix: '',
+        models: [
+            { id: 'anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'Claude 3.5 Sonnet (Bedrock)', type: 'chat', contextWindow: 200000, description: 'Via AWS Bedrock' },
+            { id: 'meta.llama3-1-405b-instruct-v1:0', name: 'Llama 3.1 405B (Bedrock)', type: 'chat', contextWindow: 128000, description: 'Via AWS Bedrock' },
+        ],
+    },
+    {
+        id: 'nova',
+        name: 'Amazon Nova',
+        icon: '/providers/nova.svg',
+        website: 'https://aws.amazon.com/nova',
+        docsUrl: 'https://docs.aws.amazon.com/nova',
+        keyPrefix: '',
+        models: [
+            { id: 'us.amazon.nova-pro-v1:0', name: 'Nova Pro', type: 'chat', contextWindow: 300000, description: 'Flagship Nova model' },
+            { id: 'us.amazon.nova-lite-v1:0', name: 'Nova Lite', type: 'chat', contextWindow: 300000, description: 'Fast Nova model' },
+            { id: 'us.amazon.nova-micro-v1:0', name: 'Nova Micro', type: 'chat', contextWindow: 128000, description: 'Lowest latency Nova' },
+        ],
+    },
+    {
+        id: 'azure',
+        name: 'Azure AI',
+        icon: '/providers/azure.svg',
+        website: 'https://azure.microsoft.com',
+        docsUrl: 'https://learn.microsoft.com/azure/ai-services',
+        keyPrefix: '',
+        models: [
+            { id: 'gpt-4o', name: 'GPT-4o (Azure)', type: 'chat', contextWindow: 128000, description: 'Via Azure AI' },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo (Azure)', type: 'chat', contextWindow: 128000, description: 'Via Azure AI' },
+        ],
+    },
+    {
+        id: 'cerebras',
+        name: 'Cerebras',
+        icon: '/providers/cerebras.svg',
+        website: 'https://cerebras.ai',
+        docsUrl: 'https://docs.cerebras.ai',
+        keyPrefix: 'csk-',
+        models: [
+            { id: 'llama3.1-70b', name: 'Llama 3.1 70B (Cerebras)', type: 'chat', contextWindow: 128000, description: 'World fastest inference' },
+            { id: 'llama3.1-8b', name: 'Llama 3.1 8B (Cerebras)', type: 'chat', contextWindow: 128000, description: 'World fastest inference' },
+        ],
+    },
+    {
+        id: 'cloudflare',
+        name: 'Cloudflare',
+        icon: '/providers/cloudflare.svg',
+        website: 'https://cloudflare.com',
+        docsUrl: 'https://developers.cloudflare.com/workers-ai',
+        keyPrefix: '',
+        models: [
+            { id: '@cf/meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B (Cloudflare)', type: 'chat', contextWindow: 128000, description: 'Via Workers AI' },
+            { id: '@cf/meta/llama-3.1-8b-instruct', name: 'Llama 3.1 8B (Cloudflare)', type: 'chat', contextWindow: 128000, description: 'Via Workers AI' },
+        ],
+    },
+    {
+        id: 'deepinfra',
+        name: 'DeepInfra',
+        icon: '/providers/deepinfra.svg',
+        website: 'https://deepinfra.com',
+        docsUrl: 'https://deepinfra.com/docs',
+        keyPrefix: '',
+        models: [
+            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B (DeepInfra)', type: 'chat', contextWindow: 128000, description: 'High-throughput' },
+            { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3 (DeepInfra)', type: 'chat', contextWindow: 128000, description: 'Via DeepInfra' },
+        ],
+    },
+    {
+        id: 'fireworks',
+        name: 'Fireworks AI',
+        icon: '/providers/fireworks.svg',
+        website: 'https://fireworks.ai',
+        docsUrl: 'https://docs.fireworks.ai',
+        keyPrefix: '',
+        models: [
+            { id: 'accounts/fireworks/models/llama-v3p1-405b-instruct', name: 'Llama 3.1 405B (Fireworks)', type: 'chat', contextWindow: 128000, description: 'Via Fireworks AI' },
+            { id: 'accounts/fireworks/models/qwen2p5-72b-instruct', name: 'Qwen 2.5 72B (Fireworks)', type: 'chat', contextWindow: 128000, description: 'Via Fireworks AI' },
+        ],
+    },
+    {
+        id: 'nvidia',
+        name: 'NVIDIA',
+        icon: '/providers/nvidia.svg',
+        website: 'https://nvidia.com',
+        docsUrl: 'https://docs.nvidia.com',
+        keyPrefix: 'nvapi-',
+        models: [
+            { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B (NVIDIA)', type: 'chat', contextWindow: 128000, description: 'Via NVIDIA NIM' },
+            { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Llama 3.1 Nemotron 70B', type: 'chat', contextWindow: 128000, description: 'NVIDIA optimized' },
+        ],
+    },
+    {
+        id: 'sambanova',
+        name: 'SambaNova',
+        icon: '/providers/sambanova.svg',
+        website: 'https://sambanova.ai',
+        docsUrl: 'https://docs.sambanova.ai',
+        keyPrefix: '',
+        models: [
+            { id: 'Meta-Llama-3.1-405B-Instruct', name: 'Llama 3.1 405B (SambaNova)', type: 'chat', contextWindow: 128000, description: 'High-speed inference' },
+            { id: 'Meta-Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B (SambaNova)', type: 'chat', contextWindow: 128000, description: 'High-speed inference' },
+        ],
+    },
+    {
+        id: 'upstage',
+        name: 'Upstage',
+        icon: '/providers/upstage.svg',
+        website: 'https://upstage.ai',
+        docsUrl: 'https://developers.upstage.ai',
+        keyPrefix: 'up_',
+        models: [
+            { id: 'solar-1-mini-chat', name: 'Solar Mini', type: 'chat', contextWindow: 32000, description: 'Compact and capable' },
+            { id: 'solar-pro', name: 'Solar Pro', type: 'chat', contextWindow: 128000, description: 'Latest Upstage flagship' },
+        ],
+    },
+    {
+        id: 'minimax',
+        name: 'MiniMax',
+        icon: '/providers/minimax.svg',
+        website: 'https://minimax.ai',
+        docsUrl: 'https://platform.minimaxi.com',
+        keyPrefix: '',
+        models: [
+            { id: 'abab6.5-chat', name: 'abab6.5', type: 'chat', contextWindow: 128000, description: 'MoE model' },
+            { id: 'abab7-chat', name: 'abab7', type: 'chat', contextWindow: 128000, description: 'Latest flagship' },
+        ],
+    },
+    {
+        id: 'moonshot',
+        name: 'Moonshot AI',
+        icon: '/providers/moonshot.svg',
+        website: 'https://moonshot.cn',
+        docsUrl: 'https://platform.moonshot.cn',
+        keyPrefix: '',
+        models: [
+            { id: 'moonshot-v1-8k', name: 'Moonshot V1 8K', type: 'chat', contextWindow: 8000, description: 'Kimi core model' },
+            { id: 'moonshot-v1-32k', name: 'Moonshot V1 32K', type: 'chat', contextWindow: 32000, description: 'Kimi core model' },
+            { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K', type: 'chat', contextWindow: 128000, description: 'Kimi core model' },
+        ],
+    },
+    {
+        id: 'stepfun',
+        name: 'StepFun',
+        icon: '/providers/stepfun.svg',
+        website: 'https://stepfun.com',
+        docsUrl: 'https://platform.stepfun.com',
+        keyPrefix: '',
+        models: [
+            { id: 'step-1-8k', name: 'Step-1 8K', type: 'chat', contextWindow: 8000, description: 'Flagship model' },
+            { id: 'step-1-128k', name: 'Step-1 128K', type: 'chat', contextWindow: 128000, description: 'Flagship model' },
+        ],
+    },
+    {
+        id: 'baseten',
+        name: 'Baseten',
+        icon: '/providers/baseten.svg',
+        website: 'https://baseten.co',
+        docsUrl: 'https://docs.baseten.co',
+        keyPrefix: '',
+        models: [
+            { id: 'llama-3-8b-instruct', name: 'Llama 3 8B (Baseten)', type: 'chat', contextWindow: 8000, description: 'Dedicated inference' },
+        ],
+    },
+    {
+        id: 'alibaba',
+        name: 'Alibaba Cloud',
+        icon: '/providers/alibaba.svg',
+        website: 'https://alibabacloud.com',
+        docsUrl: 'https://help.aliyun.com/product/2399480.html',
+        keyPrefix: '',
+        models: [
+            { id: 'qwen-max', name: 'Qwen Max (Alibaba)', type: 'chat', contextWindow: 30000, description: 'Via Model Studio' },
+            { id: 'qwen-plus', name: 'Qwen Plus (Alibaba)', type: 'chat', contextWindow: 30000, description: 'Via Model Studio' },
+        ],
+    },
+    {
+        id: 'baidu',
+        name: 'Baidu Cloud',
+        icon: '/providers/baidu.svg',
+        website: 'https://cloud.baidu.com',
+        docsUrl: 'https://cloud.baidu.com/doc/WENXINWORKSHOP',
+        keyPrefix: '',
+        models: [
+            { id: 'ernie-4.0-8k', name: 'ERNIE 4.0 8K', type: 'chat', contextWindow: 8000, description: 'Via Qianfan' },
+            { id: 'ernie-3.5-8k', name: 'ERNIE 3.5 8K', type: 'chat', contextWindow: 8000, description: 'Via Qianfan' },
+        ],
+    },
 ];
 
 /**
@@ -364,7 +568,23 @@ export function detectProviderFromModel(modelId: string): string | undefined {
     if (modelId.startsWith('gpt-') || modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) return 'openai';
     if (modelId.startsWith('claude-')) return 'anthropic';
     if (modelId.startsWith('gemini-')) return 'google';
-    if (modelId.startsWith('mistral-') || modelId.startsWith('codestral')) return 'mistral';
+    if (modelId.startsWith('mistral-') || modelId.startsWith('codestral') || modelId.startsWith('ministral-')) return 'mistral';
     if (modelId.includes('llama')) return 'groq';
+    if (modelId.startsWith('jamba')) return 'ai21';
+    if (modelId.includes('bedrock')) return 'bedrock';
+    if (modelId.includes('nova')) return 'nova';
+    if (modelId.includes('azure')) return 'azure';
+    if (modelId.includes('cerebras')) return 'cerebras';
+    if (modelId.startsWith('@cf')) return 'cloudflare';
+    if (modelId.includes('deepinfra')) return 'deepinfra';
+    if (modelId.includes('fireworks')) return 'fireworks';
+    if (modelId.includes('nvidia') || modelId.includes('nemotron')) return 'nvidia';
+    if (modelId.includes('sambanova')) return 'sambanova';
+    if (modelId.startsWith('solar')) return 'upstage';
+    if (modelId.startsWith('abab')) return 'minimax';
+    if (modelId.startsWith('moonshot')) return 'moonshot';
+    if (modelId.startsWith('step-')) return 'stepfun';
+    if (modelId.startsWith('ernie')) return 'baidu';
+    if (modelId.startsWith('qwen-') && !modelId.includes('deepinfra')) return 'alibaba';
     return undefined;
 }

@@ -361,13 +361,13 @@ export default function ProjectDetailsPage({
   const { data: hasAnyRequestsData } = useQuery<boolean>({
     queryKey: ["hasAnyRequests", project?.id],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${project!.id}/ai/stats?period=all`);
+      const response = await fetch(`/api/projects/${project!.id}/ai/has-activity`);
       if (!response.ok) return false;
       const data = await response.json();
-      return data.stats && data.stats.totalRequests > 0;
+      return !!data.hasActivity;
     },
     enabled: !!project?.id,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache is safe for this
   });
 
   const hasAnyRequests = hasAnyRequestsData ?? null;

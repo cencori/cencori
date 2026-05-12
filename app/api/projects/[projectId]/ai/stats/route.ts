@@ -79,7 +79,14 @@ export async function GET(
         const { data: requests, error: requestsError } = await supabaseAdmin
             .from('ai_requests')
             .select(`
-                *,
+                status,
+                cost_usd,
+                total_tokens,
+                prompt_tokens,
+                completion_tokens,
+                latency_ms,
+                created_at,
+                model,
                 api_keys!inner(environment)
             `)
             .eq('project_id', projectId)

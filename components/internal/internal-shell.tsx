@@ -28,6 +28,7 @@ const NAV_ITEMS = [
     { href: '/internal/kpi', label: 'KPIs', icon: TrendingUp },
     { href: '/internal/emails', label: 'Emails', icon: Mail },
     { href: '/internal/model-mappings', label: 'Mappings', icon: ArrowRightLeft },
+    { href: '/internal/feedback', label: 'Feedback', icon: Mail },
     { href: '/internal/settings', label: 'Settings', icon: Settings },
 ];
 
