@@ -132,22 +132,6 @@ CENCORI_API_KEY=csk_...
     // ── lib/cencori.ts ──
     files['lib/cencori.ts'] = `import { Cencori } from 'cencori';
 
-/**
- * Shared Cencori client instance.
- *
- * All API routes import from here — one client, every primitive.
- * When new Cencori products ship (Compute, Workflow, Storage),
- * they're accessible from this same instance.
- *
- * @example
- * import { cencori } from '@/lib/cencori';
- *
- * // AI
- * await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
- *
- * // Memory
- * await cencori.memory.store({ namespace: 'docs', content: '...' });
- */
 export const cencori = new Cencori({
     apiKey: process.env.CENCORI_API_KEY,
 });
@@ -555,15 +539,6 @@ code {
 import { cencoriConfig } from '@/cencori.config';
 import { convertToModelMessages, streamText, type UIMessage } from 'ai';
 
-/**
- * POST /api/chat
- *
- * Streaming chat endpoint powered by Cencori.
- * Uses the Vercel AI SDK for seamless streaming to the client.
- *
- * The model can be changed per-request or set a default
- * in cencori.config.ts.
- */
 export async function POST(req: Request) {
     const { messages, model }: { messages: UIMessage[]; model?: string } = await req.json();
     const selectedModel = model || cencoriConfig.defaultModel;
