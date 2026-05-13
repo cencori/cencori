@@ -54,25 +54,29 @@ export async function PATCH(
             .single();
 
         if (existingSettings) {
+            // Build update object dynamically to avoid wiping out fields not sent in the request
+            const updateData: any = {
+                updated_at: new Date().toISOString(),
+            };
+
+            if (body.default_provider !== undefined) updateData.default_provider = body.default_provider;
+            if (body.default_model !== undefined) updateData.default_model = body.default_model;
+            if (body.requests_per_minute !== undefined) updateData.requests_per_minute = body.requests_per_minute;
+            if (body.tokens_per_day !== undefined) updateData.tokens_per_day = body.tokens_per_day;
+            if (body.concurrent_requests !== undefined) updateData.concurrent_requests = body.concurrent_requests;
+            if (body.enable_fallback !== undefined) updateData.enable_fallback = body.enable_fallback;
+            if (body.fallback_provider !== undefined) updateData.fallback_provider = body.fallback_provider;
+            if (body.max_retries_before_fallback !== undefined) updateData.max_retries_before_fallback = body.max_retries_before_fallback;
+            if (body.circuit_breaker_enabled !== undefined) updateData.circuit_breaker_enabled = body.circuit_breaker_enabled;
+            if (body.circuit_breaker_failure_threshold !== undefined) updateData.circuit_breaker_failure_threshold = body.circuit_breaker_failure_threshold;
+            if (body.circuit_breaker_timeout_seconds !== undefined) updateData.circuit_breaker_timeout_seconds = body.circuit_breaker_timeout_seconds;
+            if (body.ragmetrics_enabled !== undefined) updateData.ragmetrics_enabled = body.ragmetrics_enabled;
+            if (body.ragmetrics_api_key !== undefined) updateData.ragmetrics_api_key = body.ragmetrics_api_key;
+            if (body.ragmetrics_config !== undefined) updateData.ragmetrics_config = body.ragmetrics_config;
+
             const { error: updateError } = await supabaseAdmin
                 .from("project_settings")
-                .update({
-                    default_provider: body.default_provider,
-                    default_model: body.default_model,
-                    requests_per_minute: body.requests_per_minute,
-                    tokens_per_day: body.tokens_per_day,
-                    concurrent_requests: body.concurrent_requests,
-                    enable_fallback: body.enable_fallback,
-                    fallback_provider: body.fallback_provider,
-                    max_retries_before_fallback: body.max_retries_before_fallback,
-                    circuit_breaker_enabled: body.circuit_breaker_enabled,
-                    circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold,
-                    circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds,
-                    ragmetrics_enabled: body.ragmetrics_enabled,
-                    ragmetrics_api_key: body.ragmetrics_api_key,
-                    ragmetrics_config: body.ragmetrics_config,
-                    updated_at: new Date().toISOString(),
-                })
+                .update(updateData)
                 .eq("project_id", projectId);
 
             if (updateError) {
@@ -168,6 +172,8 @@ export async function GET(
                 circuit_breaker_enabled: true,
                 circuit_breaker_failure_threshold: 5,
                 circuit_breaker_timeout_seconds: 60,
+                ragmetrics_enabled: false,
+                ragmetrics_api_key: null,
             },
         });
     } catch (error) {
