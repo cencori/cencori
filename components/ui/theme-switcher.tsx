@@ -18,7 +18,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
 
     return (
         <div 
-            className={cn("flex w-fit rounded-full bg-white p-1 border border-zinc-200 shadow-sm dark:bg-zinc-950 dark:border-zinc-800", className)}
+            className={cn("flex w-fit rounded-full bg-white p-1 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800", className)}
         >
             <button
                 onClick={() => setTheme("system")}
