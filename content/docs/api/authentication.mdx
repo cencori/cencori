@@ -7,7 +7,9 @@ order: 3
 
 ## API Key Authentication
 
-Cencori uses API keys to authenticate requests. Your API key identifies your project and determines which security policies and rate limits apply.
+Cencori uses project API keys to authenticate requests. Your API key identifies your project and determines which security policies, rate limits, provider settings, and logs apply.
+
+Your Cencori project key is not the same thing as an OpenAI, Anthropic, or Google provider key. Provider keys are configured separately in **Project > Providers** when your project uses BYOK.
 
 ### Getting Your API Key
 1. Log in to the [Cencori Dashboard](/dashboard)
@@ -52,7 +54,7 @@ curl https://cencori.com/api/ai/chat \
 ```
 
 ### Direct HTTP Requests (REST /api/v1)
-For REST endpoints under `/api/v1`, use the `Authorization` header:
+For public `/v1` endpoints on `api.cencori.com`, use the `Authorization` header:
 
 ```bash
 curl https://api.cencori.com/v1/metrics?period=24h \
@@ -73,7 +75,7 @@ Make sure to add `.env` to your `.gitignore` file.
 
 When making direct API requests, include these headers:
 - **AI & Memory endpoints:** `CENCORI_API_KEY: YOUR_API_KEY` (preferred). `Authorization: Bearer YOUR_API_KEY` is also accepted.
-- **REST endpoints (`/api/v1/*`):** `Authorization: Bearer YOUR_API_KEY` (required)
+- **OpenAI-compatible and REST endpoints (`https://api.cencori.com/v1/*`):** `Authorization: Bearer YOUR_API_KEY` is preferred because OpenAI-compatible SDKs expect it.
 - **Content-Type:** `application/json` (required for POST)
 
 ## Authentication Errors

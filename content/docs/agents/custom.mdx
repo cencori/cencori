@@ -25,10 +25,10 @@ Look for settings in your tool related to "Custom API Endpoint", "OpenAI Proxy",
 
 - **API Base**: `https://api.cencori.com/v1`
 - **API Key**: `cake_YOUR_KEY_HERE`
-- **Model Name**: Use any model ID supported in your Cencori dashboard (e.g., `gpt-4o`, `claude-3-5-sonnet-20240620`).
+- **Model Name**: Use any model ID supported in your Cencori dashboard (e.g., `gpt-4o`, `claude-sonnet-4.5`).
 
 > [!NOTE]
-> Some tools append `/chat/completions` automatically, while others expect you to include it in the base URL. If connections fail, try setting the URL to `https://api.cencori.com/v1/chat/completions`.
+> If a tool asks for an OpenAI **base URL**, use `https://api.cencori.com/v1`. Only use the full `https://api.cencori.com/v1/chat/completions` URL when the tool asks for a complete request endpoint.
 
 ## Testing the Connection
 
@@ -64,7 +64,7 @@ In your IDE extension settings:
 1. Select "OpenAI Compatible" as the provider
 2. Base URL: `https://api.cencori.com/v1`
 3. API Key: Your `cake_` key
-4. Model ID: e.g., `claude-3-5-sonnet-20240620`
+4. Model ID: e.g., `claude-sonnet-4.5`
 
 ### Aider
 

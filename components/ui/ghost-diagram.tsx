@@ -74,22 +74,19 @@ interface GhostGridProps {
     className?: string;
 }
 
-export function GhostGrid({ items = [], columns = 3, className }: GhostGridProps) {
+export function GhostGrid({ items = [], columns, className }: GhostGridProps) {
     // Determine items to render (supports both array and string)
     const gridItems = Array.isArray(items)
         ? items
         : (typeof items === 'string' ? items.split(',').map(s => s.trim()) : []);
 
-    const gridCols = {
-        2: 'grid-cols-2',
-        3: 'grid-cols-3',
-        4: 'grid-cols-4',
-    };
-
     return (
-        <div className={cn('grid gap-2 text-xs text-current/60', gridCols[columns], className)}>
+        <div className={cn(
+            'flex flex-wrap justify-center gap-2 text-[10px] text-current/60',
+            className
+        )}>
             {gridItems.map((item, i) => (
-                <div key={i} className="border border-current/15 rounded px-2 py-1.5 text-center">
+                <div key={i} className="border border-current/15 rounded px-2.5 py-1 text-center whitespace-nowrap">
                     {item}
                 </div>
             ))}

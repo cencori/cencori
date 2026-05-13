@@ -27,7 +27,7 @@ export function DocsMobileNav({ onOpenSearch }: DocsMobileNavProps) {
         if (pathname.includes("/docs/platform")) return "Platform";
         if (pathname.includes("/docs/integrations")) return "Integrations";
         if (pathname.includes("/docs/security")) return "Security";
-        if (pathname.includes("/docs/concepts")) return "Core Concepts";
+        if (pathname.includes("/docs/workflows")) return "Workflows";
         if (pathname.includes("/docs/guides")) return "Guides";
         if (pathname.includes("/docs/api")) return "API Reference";
         return "Documentation";

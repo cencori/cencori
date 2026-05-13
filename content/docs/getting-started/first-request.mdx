@@ -9,18 +9,18 @@ Learn how to send your first AI request through Cencori.
 
 ## Prerequisites
 
-- Cencori account with API key
-- Node.js 18+ installed
-- SDK installed (`npm install cencori`)
+- Cencori account and project.
+- A project secret key in `CENCORI_API_KEY`.
+- Provider access for the model you call. If you use `gpt-4o`, your project needs OpenAI access through managed keys or BYOK.
+- Node.js 18+ installed.
+- SDK installed with `npm install cencori`.
 
 ## Basic Chat Request
 
 ```typescript
 import { Cencori } from 'cencori';
 
-const cencori = new Cencori({
-  apiKey: 'csk_live_...'
-});
+const cencori = new Cencori();
 
 async function main() {
   const response = await cencori.ai.chat({
@@ -63,10 +63,26 @@ Switch providers by changing the model:
 await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
 
 // Anthropic
-await cencori.ai.chat({ model: 'claude-opus-4', messages: [...] });
+await cencori.ai.chat({ model: 'claude-sonnet-4.5', messages: [...] });
 
 // Google
 await cencori.ai.chat({ model: 'gemini-2.5-flash', messages: [...] });
+```
+
+If switching models returns a provider configuration error, add that provider in **Project > Providers** or choose a model from a provider already configured for the project.
+
+## Direct cURL Check
+
+Use this when you want to prove the Cencori key and provider setup work before debugging your app:
+
+```bash
+curl https://cencori.com/api/ai/chat \
+  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
 ```
 
 ## View in Dashboard

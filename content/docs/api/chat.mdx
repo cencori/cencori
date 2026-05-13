@@ -7,14 +7,14 @@ order: 2
 
 ## Overview
 
-Cencori exposes chat completions through two HTTP endpoints:
+Cencori exposes chat completions through two public HTTP surfaces:
 
 | Endpoint | Path | Best For |
 |----------|------|----------|
-| **Cencori Native** | `/api/ai/chat` | Full Cencori features (security, custom rules, streaming) |
-| **OpenAI-Compatible** | `/api/v1/chat/completions` | Migrating from OpenAI, framework integrations |
+| **Cencori Native** | `https://cencori.com/api/ai/chat` | Official SDKs and direct Cencori calls |
+| **OpenAI-Compatible** | `https://api.cencori.com/v1/chat/completions` | Existing OpenAI-compatible clients and agent frameworks |
 
-Both endpoints give you Cencori's routing, security enforcement, logging, and cost tracking — but with different feature sets.
+Both surfaces authenticate with your Cencori project key and log requests to the same project dashboard.
 
 ## When to Use Which Endpoint
 
@@ -22,31 +22,13 @@ Choose based on your use case:
 
 | Use Case | Recommended Endpoint |
 |---------|----------------------|
-| Using the Cencori SDK (`cencori`) | `/api/ai/chat` (SDK uses this automatically) |
-| Need **security scanning** (PII, jailbreak, prompt injection) | `/api/ai/chat` |
-| Need **custom data rules** (mask/redact/block patterns) | `/api/ai/chat` |
-| Migrating from OpenAI directly | `/api/v1/chat/completions` |
-| Using Vercel AI SDK or other OpenAI-compatible frameworks | `/api/v1/chat/completions` |
-| Need simpler, OpenAI-compatible request/response | `/api/v1/chat/completions` |
+| Using the Cencori SDK (`cencori`) | Native endpoint. The SDK uses it automatically. |
+| Building a new Next.js or Node route | Native endpoint or SDK. |
+| Migrating from OpenAI directly | OpenAI-compatible endpoint. |
+| Using agent tools that ask for an OpenAI base URL | OpenAI-compatible endpoint with base URL `https://api.cencori.com/v1`. |
+| Debugging whether Cencori auth and provider routing work | Native endpoint with `curl`. |
 
-### Feature Comparison
-
-| Feature | `/api/ai/chat` | `/api/v1/chat/completions` |
-|---------|-----------------|-------------------------|
-| Multi-provider routing | Yes | Yes |
-| Prompt Registry | Yes | Yes |
-| End-user billing | Yes | Yes |
-| Semantic caching | Yes | Yes |
-| Circuit breaker | Yes | Yes |
-| Custom providers | Yes | Yes |
-| **Security scanning** (PII, jailbreak, prompt injection) | Yes | No |
-| **Custom data rules** (mask/redact/block) | Yes | No |
-
-### Why the Difference?
-
-The `/api/ai/chat` endpoint was built first as the core Cencori gateway with full security features. The `/api/v1/chat/completions` endpoint was added later for OpenAI compatibility, making it easier to migrate existing codebases without changing client logic.
-
-If you're starting fresh and don't need the extra security features, either works. If you need Cencori's security layer, use `/api/ai/chat`.
+The OpenAI-compatible base URL should usually stop at `/v1`; most clients append `/chat/completions` themselves.
 
 ## Official TypeScript SDK
 
@@ -95,7 +77,7 @@ Use the native endpoint when you want direct access to `/api/ai/chat`:
 
 ```bash
 curl https://cencori.com/api/ai/chat \
-  -H "CENCORI_API_KEY: csk_live_..." \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -112,13 +94,15 @@ Use this when a client or framework already expects the OpenAI Chat Completions 
 
 ```bash
 curl https://api.cencori.com/v1/chat/completions \
-  -H "Authorization: Bearer csk_live_..." \
+  -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
+
+When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not the full `/chat/completions` URL.
 
 ## Request Parameters
 
@@ -131,7 +115,7 @@ curl https://api.cencori.com/v1/chat/completions \
 | `stream` | boolean | No | Stream the response |
 | `tools` | array | No | Function/tool definitions |
 | `toolChoice` | string or object | No | Tool selection mode |
-| `userId` | string | No | End-user identifier for attribution |
+| `userId` or `user` | string | No | End-user identifier for attribution and end-user billing |
 
 ## OpenAI-Compatible Response Shape
 
@@ -178,7 +162,7 @@ for await (const chunk of stream) {
 
 ```bash
 curl -N https://api.cencori.com/v1/chat/completions \
-  -H "Authorization: Bearer csk_live_..." \
+  -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",

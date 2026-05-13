@@ -47,22 +47,25 @@ function isTemplate(value: string | undefined): value is Template {
     return value !== undefined && TEMPLATES.includes(value as Template);
 }
 
-const CENCORI_API_URL = 'https://cencori.com';
+const CENCORI_API_URL = 'https://api.cencori.com/v1';
 
-async function verifyApiKey(apiKey: string): Promise<boolean> {
-    if (!apiKey) return true;
+async function verifyApiKey(apiKey: string): Promise<'valid' | 'invalid' | 'unknown'> {
+    if (!apiKey) return 'valid';
     try {
-        // Use projects endpoint which requires auth
-        const response = await fetch(`${CENCORI_API_URL}/api/projects`, {
+        // /v1/models validates the project key without creating usage or requiring provider access.
+        const response = await fetch(`${CENCORI_API_URL}/models`, {
             method: 'GET',
             headers: {
-                'CENCORI_API_KEY': apiKey,
+                'Authorization': `Bearer ${apiKey}`,
             },
             signal: AbortSignal.timeout(5000),
         });
-        return response.ok;
+
+        if (response.ok) return 'valid';
+        if (response.status === 401 || response.status === 403) return 'invalid';
+        return 'unknown';
     } catch {
-        return false;
+        return 'unknown';
     }
 }
 
@@ -151,21 +154,24 @@ async function main(): Promise<void> {
             }
 
             // ── Verify API key ──
-            if (apiKey) {
+            if (apiKey && process.env.CENCORI_SKIP_API_KEY_VERIFY !== '1') {
                 const verifySpinner = ora({
                     text: 'Verifying API key...',
                     color: 'cyan',
                 }).start();
 
-                const isValid = await verifyApiKey(apiKey);
+                const verification = await verifyApiKey(apiKey);
 
-                if (isValid) {
+                if (verification === 'valid') {
                     verifySpinner.succeed('API key verified');
-                } else {
+                } else if (verification === 'invalid') {
                     verifySpinner.fail('Invalid API key');
                     console.log(chalk.gray(`  Get one at ${chalk.cyan('https://cencori.com/dashboard')}`));
                     console.log();
                     process.exit(1);
+                } else {
+                    verifySpinner.warn('Could not verify API key right now');
+                    console.log(chalk.gray('  Continuing anyway. The generated app will use the key from your env file.'));
                 }
             }
 

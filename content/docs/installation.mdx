@@ -5,7 +5,7 @@ section: "Getting Started"
 order: 3
 ---
 
-Install the official Cencori SDK for your preferred language.
+Install the official Cencori SDK for your preferred language. The SDK is meant to run on the server because it uses your Cencori project secret key.
 
 ## TypeScript / Node.js
 
@@ -29,8 +29,19 @@ go get github.com/cencori/cencori-go
 
 ## Requirements
 
-- Node.js 18+
-- TypeScript 5+ (optional, but recommended)
+- Node.js 18+ for the TypeScript SDK.
+- TypeScript 5+ is optional, but recommended.
+- A Cencori project key from **Project > API Keys**.
+- Provider access for the model you want to call. Use managed access if enabled, or add your own provider key in **Project > Providers**.
+
+## Environment Variables
+
+```bash
+# .env.local for Next.js, .env for most Node apps
+CENCORI_API_KEY=csk_...
+```
+
+Do not expose a `csk_...` key through `NEXT_PUBLIC_*` variables or browser-side code.
 
 ## Configuration
 
@@ -39,18 +50,11 @@ import { Cencori } from 'cencori';
 
 const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
-  baseUrl: 'https://cencori.com', // optional override
+  baseUrl: 'https://cencori.com', // optional; this is the default
   headers: {
     'X-Trace-ID': 'req_123',
   },
 });
-```
-
-## Environment Variables
-
-```bash
-# .env
-CENCORI_API_KEY=csk_live_...
 ```
 
 The SDK automatically reads `CENCORI_API_KEY` if no `apiKey` is provided:
@@ -58,6 +62,17 @@ The SDK automatically reads `CENCORI_API_KEY` if no `apiKey` is provided:
 ```typescript
 const cencori = new Cencori();
 ```
+
+## OpenAI-Compatible Base URL
+
+For tools that already speak the OpenAI API, install nothing from Cencori and set:
+
+```text
+Base URL: https://api.cencori.com/v1
+API key:  your Cencori project key
+```
+
+In most OpenAI-compatible clients, the base URL should stop at `/v1`; the client appends `/chat/completions`.
 
 ## TypeScript Support
 
@@ -78,4 +93,4 @@ const response: ChatResponse = await cencori.ai.chat(request);
 
 ## Next Steps
 
-See [Making Your First Request](/docs/getting-started/first-request) to start using the SDK.
+See [Quick Start](/docs/quick-start) for the full setup flow, or [Making Your First Request](/docs/getting-started/first-request) to send a request with the SDK.

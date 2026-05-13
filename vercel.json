@@ -31,6 +31,26 @@
             "destination": "/api/v1/models"
         },
         {
+            "source": "/v1/metrics",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/v1/metrics"
+        },
+        {
+            "source": "/v1/billing/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/v1/billing/:path*"
+        },
+        {
             "source": "/v1/telemetry/scan",
             "has": [
                 {
@@ -39,6 +59,16 @@
                 }
             ],
             "destination": "/api/v1/telemetry/scan"
+        },
+        {
+            "source": "/v1/telemetry/web",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/v1/telemetry/web"
         },
         {
             "source": "/:path*",

@@ -117,6 +117,7 @@ export function printSuccess(projectName: string, template: string, includeChat:
         console.log(`    ${chalk.gray('1.')} Add your API key:`);
         console.log(`       Open ${chalk.cyan(envFile)} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
         console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
+        console.log(`       Confirm provider access in your project ${chalk.cyan('Providers')} page.`);
         console.log();
         console.log(`    ${chalk.gray('2.')} Start building:`);
         console.log(`       ${chalk.cyan('npm run dev')}`);
