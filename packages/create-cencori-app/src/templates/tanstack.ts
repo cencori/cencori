@@ -114,12 +114,14 @@ dist/
 `;
 
     // ── .env ──
-    files['.env'] = `# Get your API key at https://cencori.com/dashboard
+    files['.env'] = `# Get a project API key at https://cencori.com/dashboard
+# Then confirm provider access in Project > Providers
 CENCORI_API_KEY=${options.apiKey || ''}
 `;
 
     // ── .env.example ──
-    files['.env.example'] = `# Get your API key at https://cencori.com/dashboard
+    files['.env.example'] = `# Get a project API key at https://cencori.com/dashboard
+# Then confirm provider access in Project > Providers
 CENCORI_API_KEY=csk_...
 `;
 
@@ -889,7 +891,7 @@ export function Chat() {
                             <img src="/logos/ww.png" alt="Cencori" className="welcome-logo logo-dark" />
                             <img src="/logos/bw.png" alt="Cencori" className="welcome-logo logo-light" />
                             <div className="welcome-text">
-                                <p style={{ marginBottom: '0.5rem' }}>1. Confirm your Cencori API key in .env.</p>
+                                <p style={{ marginBottom: '0.5rem' }}>1. Confirm your Cencori API key and provider access.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>2. Get started by typing a message below and send.</p>
                                 <p style={{ marginBottom: '0.5rem' }}>3. See the AI stream instantly.</p>
                             </div>
@@ -948,7 +950,7 @@ export function Chat() {
 
                 {error && (
                     <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
-                        {error.message || 'Something went wrong. Check your API key.'}
+                        {error.message || 'Something went wrong. Check your API key and provider access.'}
                     </div>
                 )}
             </div>
@@ -1003,7 +1005,7 @@ export const cencoriConfig = {
 
     models: [
         { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
-        { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'anthropic' },
+        { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
         { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' },
         { id: 'grok-4', name: 'Grok 4', provider: 'xai' },
         { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek' },
@@ -1025,6 +1027,7 @@ AI app powered by [Cencori](https://cencori.com).
 # 1. Add your API key
 #    Open .env and set CENCORI_API_KEY=csk_...
 #    Get a key at https://cencori.com/dashboard
+#    Confirm provider access in Project > Providers
 
 # 2. Start the frontend and local API server
 npm run dev
@@ -1062,7 +1065,7 @@ Update the default model in \`cencori.config.ts\`; the local API server reads th
 
 \`\`\`typescript
 export const cencoriConfig = {
-    defaultModel: 'claude-3-5-sonnet',
+    defaultModel: 'claude-sonnet-4.5',
     temperature: 0.7,
     maxTokens: 4096,
 };

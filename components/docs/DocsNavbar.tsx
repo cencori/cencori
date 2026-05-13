@@ -39,27 +39,27 @@ const sidebarItems = [
         ],
     },
     {
-        title: "Core Concepts",
+        title: "Platform",
         items: [
-            { title: "Projects", href: "/docs/concepts/projects" },
-            { title: "Organizations", href: "/docs/concepts/organizations" },
-            { title: "API Keys", href: "/docs/concepts/api-keys" },
-            { title: "Multi-Provider", href: "/docs/concepts/multi-provider" },
+            { title: "Projects", href: "/docs/platform/projects" },
+            { title: "Organizations", href: "/docs/platform/organizations" },
+            { title: "API Keys", href: "/docs/platform/api-keys" },
+            { title: "Providers", href: "/docs/ai/providers" },
             { title: "Models", href: "/docs/ai/models" },
-            { title: "Streaming", href: "/docs/concepts/streaming" },
+            { title: "Streaming", href: "/docs/ai/streaming" },
             { title: "Credits System", href: "/docs/platform/credits" },
-            { title: "Rate Limiting", href: "/docs/concepts/rate-limiting" },
-            { title: "Security", href: "/docs/concepts/security" },
+            { title: "Rate Limiting", href: "/docs/platform/ai-gateway/rate-limiting" },
+            { title: "Security", href: "/docs/security/content-filtering" },
         ],
     },
     {
         title: "API Reference",
         items: [
-            { title: "Authentication", href: "/docs/api/auth" },
+            { title: "Authentication", href: "/docs/api/authentication" },
             { title: "Chat", href: "/docs/api/chat" },
             { title: "Metrics", href: "/docs/api/metrics" },
-            { title: "Projects API", href: "/docs/api/projects" },
-            { title: "API Keys API", href: "/docs/api/keys" },
+            { title: "Projects Setup", href: "/docs/api/projects" },
+            { title: "API Keys Setup", href: "/docs/api/api-keys" },
             { title: "Errors", href: "/docs/api/errors" },
         ],
     },
@@ -68,7 +68,7 @@ const sidebarItems = [
         items: [
             { title: "Migrating from OpenAI", href: "/docs/guides/migrate-openai" },
             { title: "Migrating from Anthropic", href: "/docs/guides/migrate-anthropic" },
-            { title: "Custom Providers", href: "/docs/guides/custom-providers" },
+            { title: "Custom Providers", href: "/docs/platform/ai-gateway/custom-providers" },
             { title: "Cost Optimization", href: "/docs/guides/cost-optimization" },
         ],
     },
@@ -76,13 +76,6 @@ const sidebarItems = [
         title: "Security",
         items: [
             { title: "PII Detection", href: "/docs/security/pii-detection" },
-        ],
-    },
-    {
-        title: "Use Cases",
-        items: [
-            { title: "For Context Engineers", href: "/docs/use-cases/vibe-coders" },
-            { title: "For AI Companies", href: "/docs/use-cases/ai-companies" },
         ],
     },
 ];

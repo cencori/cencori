@@ -18,7 +18,7 @@ const steps = [
     {
         number: "02",
         title: "Get your API key",
-        description: "Create a free account and grab your API key from the dashboard.",
+        description: "Create a project key and confirm provider access in the dashboard.",
         code: null,
     },
     {
@@ -37,13 +37,13 @@ const setupCodeTabs: Array<{ key: CodeTabKey; label: string; language: BundledLa
         code: `# pip install cencori
 from cencori import Cencori
 
-client = Cencori(api_key="csk_live_...")
-response = client.chat.completions.create(
+client = Cencori()
+response = client.ai.chat(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Hello from Python!"}]
 )
 
-print(response.choices[0].message.content)`,
+print(response.content)`,
     },
     {
         key: "node",
@@ -52,7 +52,7 @@ print(response.choices[0].message.content)`,
         code: `// npm install cencori
 import { Cencori } from "cencori";
 
-const client = new Cencori({ apiKey: "csk_live_..." });
+const client = new Cencori();
 
 const response = await client.ai.chat({
   model: "gpt-4o",
@@ -65,8 +65,8 @@ console.log(response.content);`,
         key: "curl",
         label: "cURL",
         language: "bash",
-        code: `curl https://cencori.com/v1/chat/completions \\
-  -H "Authorization: Bearer csk_live_..." \\
+        code: `curl https://api.cencori.com/v1/chat/completions \\
+  -H "Authorization: Bearer $CENCORI_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "gpt-4o",
@@ -88,19 +88,21 @@ import (
     "os"
 
     "github.com/cencori/cencori-go"
-    "github.com/cencori/cencori-go/option"
 )
 
 func main() {
-    client := cencori.NewClient(
-        option.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
+    client, err := cencori.NewClient(
+        cencori.WithAPIKey(os.Getenv("CENCORI_API_KEY")),
     )
+    if err != nil {
+        panic(err)
+    }
 
-    resp, err := client.Chat.Completions.New(context.TODO(), cencori.ChatCompletionNewParams{
-        Model: cencori.F(cencori.ChatModelGPT4o),
-        Messages: cencori.F([]cencori.ChatCompletionMessageParam{
-            cencori.UserMessage("Hello from Go!"),
-        }),
+    resp, err := client.Chat.Create(context.TODO(), &cencori.ChatParams{
+        Model: "gpt-4o",
+        Messages: []cencori.Message{
+            {Role: "user", Content: "Hello from Go!"},
+        },
     })
     if err != nil {
         panic(err)
@@ -113,13 +115,13 @@ func main() {
         key: "csharp",
         label: "C#",
         language: "csharp",
-        code: `// dotnet add package OpenAI
+        code: `// dotnet add package Azure.AI.OpenAI
 using Azure;
 using Azure.AI.OpenAI;
 
 var client = new OpenAIClient(
-    new Uri("https://cencori.com/v1"),
-    new AzureKeyCredential("csk_live_...")
+    new Uri("https://api.cencori.com/v1"),
+    new AzureKeyCredential(Environment.GetEnvironmentVariable("CENCORI_API_KEY"))
 );
 
 var request = new ChatCompletionsOptions()
@@ -142,8 +144,8 @@ Console.WriteLine(response.Value.Choices[0].Message.Content);`,
 use OpenAI;
 
 $client = OpenAI::factory()
-    ->withBaseUri('https://cencori.com/v1')
-    ->withApiKey('csk_live_...')
+    ->withBaseUri('https://api.cencori.com/v1')
+    ->withApiKey(getenv('CENCORI_API_KEY'))
     ->make();
 
 $result = $client->chat()->create([
@@ -163,8 +165,8 @@ echo $result->choices[0]->message->content;`,
 require "openai"
 
 client = OpenAI::Client.new(
-  access_token: "csk_live_...",
-  uri_base: "https://cencori.com/v1"
+  access_token: ENV.fetch("CENCORI_API_KEY"),
+  uri_base: "https://api.cencori.com/v1"
 )
 
 response = client.chat(
@@ -182,9 +184,9 @@ puts response.dig("choices", 0, "message", "content")`,
         language: "java",
         code: `// implementation("com.theokanning.openai-gpt3-java:service:latest")
 OpenAiService service = new OpenAiService(
-    "csk_live_...",
+    System.getenv("CENCORI_API_KEY"),
     Duration.ofSeconds(30),
-    "https://cencori.com/v1/"
+    "https://api.cencori.com/v1/"
 );
 
 ChatCompletionRequest request = ChatCompletionRequest.builder()

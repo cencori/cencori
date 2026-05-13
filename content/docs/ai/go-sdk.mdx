@@ -32,7 +32,7 @@ func main() {
 		panic(err)
 	}
 
-	resp, err := client.Chat.Create(context.TODO(), cencori.ChatParams{
+	resp, err := client.Chat.Create(context.TODO(), &cencori.ChatParams{
 		Model: "gpt-4o",
 		Messages: []cencori.Message{
 			{Role: "user", Content: "Hello from Go!"},
@@ -69,7 +69,7 @@ if err != nil {
 ## Streaming
 
 ```go
-stream, err := client.Chat.Stream(context.TODO(), cencori.ChatParams{
+stream, err := client.Chat.Stream(context.TODO(), &cencori.ChatParams{
     Model: "gpt-4o",
     Messages: []cencori.Message{
         {Role: "user", Content: "Tell me a story"},

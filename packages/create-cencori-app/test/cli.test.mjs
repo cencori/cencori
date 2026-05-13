@@ -26,7 +26,7 @@ function runCli(cwd, args) {
     return execFileSync('node', [cliPath, ...args], {
         cwd,
         encoding: 'utf8',
-        env: { ...process.env, NO_COLOR: '1' },
+        env: { ...process.env, NO_COLOR: '1', CENCORI_SKIP_API_KEY_VERIFY: '1' },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
 }

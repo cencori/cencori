@@ -56,7 +56,7 @@ If you call AI providers directly and don't use the Cencori gateway, use the Usa
 Call this before serving an AI request to verify the user is within their limits:
 
 ```bash
-curl https://api.cencori.com/api/v1/billing/check-quota?end_user_id=user_123 \
+curl https://api.cencori.com/v1/billing/check-quota?end_user_id=user_123 \
   -H "Authorization: Bearer csk_your_secret_key"
 ```
 
@@ -93,7 +93,7 @@ When `allowed` is `false`, the `reason` field tells you which limit was hit (e.g
 You can also POST the same request with a JSON body:
 
 ```bash
-curl -X POST https://api.cencori.com/api/v1/billing/check-quota \
+curl -X POST https://api.cencori.com/v1/billing/check-quota \
   -H "Authorization: Bearer csk_your_secret_key" \
   -H "Content-Type: application/json" \
   -d '{ "end_user_id": "user_123", "model": "gpt-4o" }'
@@ -104,9 +104,9 @@ curl -X POST https://api.cencori.com/api/v1/billing/check-quota \
 After your AI request completes, report the usage:
 
 ```bash
-curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
+curl -X POST https://api.cencori.com/v1/billing/usage-events \
   -H "Authorization: Bearer csk_your_secret_key" \
-  -H "Content-Type": "application/json" \
+  -H "Content-Type: application/json" \
   -d '{
     "end_user_id": "user_123",
     "model": "gpt-4o",
@@ -136,7 +136,7 @@ Response:
 Send up to 1,000 events in a single request:
 
 ```bash
-curl -X POST https://api.cencori.com/api/v1/billing/usage-events \
+curl -X POST https://api.cencori.com/v1/billing/usage-events \
   -H "Authorization: Bearer csk_your_secret_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -167,7 +167,7 @@ Here's how a typical backend integration looks:
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic();
-const CENCORI_API = "https://api.cencori.com/api/v1/billing";
+const CENCORI_API = "https://api.cencori.com/v1/billing";
 const CENCORI_KEY = process.env.CENCORI_API_KEY;
 
 async function handleUserMessage(userId: string, message: string) {
@@ -473,7 +473,7 @@ The **End-User Billing** page has four tabs:
 
 ## Authentication
 
-Both billing endpoints (`/api/v1/billing/*`) use the same API key as the gateway:
+Both billing endpoints (`https://api.cencori.com/v1/billing/*`) use the same API key as the gateway:
 
 - **Header**: `Authorization: Bearer csk_your_secret_key`
 - **Or**: `CENCORI_API_KEY: csk_your_secret_key`
@@ -542,6 +542,6 @@ The TypeScript SDK (`cencori` on npm) currently covers the AI Gateway, which han
 ## Related
 
 - [Billing & Usage](/docs/platform/billing) — plan tiers and credits
-- [Rate Limiting](/docs/platform/rate-limiting) — project-level rate limits
+- [Rate Limiting](/docs/platform/ai-gateway/rate-limiting) — project-level rate limits
 - [API Keys](/docs/platform/api-keys) — key types and management
 - [Authentication](/docs/api/authentication) — how to authenticate requests

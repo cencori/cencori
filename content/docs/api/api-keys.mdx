@@ -1,79 +1,45 @@
 ---
-title: "API Keys API"
-description: "Complete API reference for managing API keys programmatically."
+title: "API Keys Setup"
+description: "How to create and use Cencori API keys for public integrations."
 section: "API Reference"
 order: 6
 ---
 
 ## Overview
 
-The API Keys API allows you to create, list, and revoke API keys for your projects programmatically.
+Cencori API keys are created and revoked in the project dashboard. Public product integrations use those keys to call runtime APIs; they do not create or rotate keys through `https://api.cencori.com/v1`.
 
-Base URL: `https://api.cencori.com/v1`
+Go to **Project > API Keys**, create a secret key for server-side use, and store it as `CENCORI_API_KEY`.
 
-## List API Keys
-Get all API keys for a project.
+## Key Types
 
-### Request
+| Key | Prefix | Use |
+|-----|--------|-----|
+| Secret key | `csk_...` or `csk_test_...` | Server-side SDKs, API routes, workers, and backend services |
+| Publishable key | `cpk_...` or `cpk_test_...` | Browser/mobile scenarios that explicitly support publishable keys and allowed domains |
+
+Use `csk_...` keys for the quick start, SDKs, and OpenAI-compatible integrations unless a guide specifically tells you to use a publishable key.
+
+## Public Runtime Usage
+
 ```bash
-GET /projects/{projectId}/api-keys?environment={environment}
-Query: environment=production|test (optional)
+CENCORI_API_KEY=csk_...
 ```
 
-### Response
-```json
-{
-  "keys": [
-    {
-      "id": "key_123",
-      "name": "Production Key",
-      "prefix": "csk_",
-      "environment": "production",
-      "last_used_at": "2024-01-15T12:30:00Z"
-    }
-  ]
-}
-```
-
-## Create API Key
-Generate a new API key for a project.
-
-### Request
 ```bash
-POST /projects/{projectId}/api-keys
-Body: { "name": "Production Key", "environment": "production" }
+curl https://api.cencori.com/v1/models \
+  -H "Authorization: Bearer $CENCORI_API_KEY"
 ```
 
-> [!IMPORTANT]
-> The full API key is only shown once during creation. Store it securely.
+For native Cencori SDK/REST calls, `CENCORI_API_KEY: csk_...` is also accepted.
 
-## Revoke API Key
-Permanently revoke an API key.
+## Programmatic Key Management
 
-### Request
-```bash
-DELETE /projects/{projectId}/api-keys/{keyId}
-```
-
-> [!NOTE]
-> Revoked keys stop working immediately. All requests using the revoked key will return 401 errors.
-
-## Get Usage Stats
-Retrieve usage statistics for a specific API key.
-
-### Request
-```bash
-GET /projects/{projectId}/api-keys/{keyId}/stats
-```
-
-## Error Responses
-- **400:** Missing required parameters
-- **401:** Invalid API key
-- **403:** No permission to manage keys
-- **404:** Project or key doesn't exist
+Public API-key management endpoints are not available yet. Dashboard routes under `/api/projects/{projectId}/api-keys` require a signed-in Cencori owner session and should not be used from customer product code.
 
 ## Best Practices
 - Rotate keys regularly (every 90 days recommended).
 - Use separate keys for different environments.
 - Revoke unused keys immediately.
 - Never commit keys to version control.
+- Never expose a `csk_...` key in browser code or a mobile app bundle.

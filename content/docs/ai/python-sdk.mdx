@@ -1,6 +1,6 @@
 ---
 title: "Python SDK"
-description: "Official Python client for Cencori. Supports sync/async/await, strict typing with Pydantic, and streaming."
+description: "Official Python client for Cencori. Supports sync calls, async calls, typed responses, and streaming."
 section: "AI"
 order: 2.1
 ---
@@ -18,35 +18,33 @@ The standard client is blocking and best for scripts or simple applications.
 ```python
 from cencori import Cencori
 
-client = Cencori(
-    api_key="csk_...", # Defaults to os.environ.get("CENCORI_API_KEY")
-)
+client = Cencori()  # Reads os.environ["CENCORI_API_KEY"]
 
-response = client.chat.completions.create(
+response = client.ai.chat(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Hello world"}]
 )
 
-print(response.choices[0].message.content)
+print(response.content)
 ```
 
 ## Async Usage (Async/Await)
 
-For high-performance web applications (FastAPI, Django, etc.), use `AsyncCencori`.
+For high-performance web applications (FastAPI, Django, etc.), use the async methods on the same client.
 
 ```python
 import asyncio
-from cencori import AsyncCencori
+from cencori import Cencori
 
 async def main():
-    client = AsyncCencori()
+    client = Cencori()
     
-    response = await client.chat.completions.create(
-        model="claude-3-5-sonnet",
+    response = await client.ai.async_chat(
+        model="claude-sonnet-4.5",
         messages=[{"role": "user", "content": "Tell me a joke"}]
     )
     
-    print(response.choices[0].message.content)
+    print(response.content)
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -57,64 +55,57 @@ if __name__ == "__main__":
 Streaming allows you to process the response chunk-by-chunk, which is critical for real-time AI experiences.
 
 ```python
-stream = client.chat.completions.create(
+stream = client.ai.chat_stream(
     model="gemini-2.5-flash",
     messages=[{"role": "user", "content": "Write a long story..."}],
-    stream=True,
 )
 
 for chunk in stream:
-    if chunk.choices[0].delta.content is not None:
-        print(chunk.choices[0].delta.content, end="")
+    if chunk.delta:
+        print(chunk.delta, end="")
 ```
 
-### Async Streaming
+### Text Completions
 
 ```python
-stream = await client.chat.completions.create(
+response = client.ai.completions(
+    prompt="Write a haiku about production logs",
     model="gpt-4o",
-    messages=[{"role": "user", "content": "..."}],
-    stream=True,
 )
 
-async for chunk in stream:
-    content = chunk.choices[0].delta.content
-    if content:
-        print(content, end="")
+print(response.content)
 ```
 
 ## Typing & Pydantic Support
 
-The SDK utilizes Pydantic V2 for all data models, ensuring runtime type safety.
+The SDK returns typed dataclasses for responses and errors.
 
 ```python
-from cencori.types import ChatCompletion
+from cencori.types import ChatResponse
 
 # Functions can explicitly accept Cencori types
-def process_response(response: ChatCompletion):
+def process_response(response: ChatResponse):
     print(f"Usage: {response.usage.total_tokens}")
 
 # Exceptions also use standard types
-from cencori import APIError, RateLimitError
+from cencori import CencoriError, RateLimitError
 
 try:
-    client.chat.completions.create(...)
+    client.ai.chat(messages=[{"role": "user", "content": "..."}])
 except RateLimitError:
     print("Too many requests!")
-except APIError as e:
-    print(f"Cencori error: {e.message}")
+except CencoriError as e:
+    print(f"Cencori error: {e}")
 ```
 
 ## Advanced Configuration
 
-You can override the http client or set global timeouts.
+You can override the base URL or request timeout.
 
 ```python
-import httpx
-
 client = Cencori(
-    timeout=20.0, # 20 seconds default timeout
-    http_client=httpx.Client(proxies="http://my-proxy"),
-    max_retries=2,
+    api_key="csk_...",
+    base_url="https://cencori.com",
+    timeout=20.0,
 )
 ```

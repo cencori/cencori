@@ -1,88 +1,40 @@
 ---
-title: "Projects API"
-description: "Complete API reference for managing projects programmatically via REST endpoints."
+title: "Projects Setup"
+description: "How projects fit into public Cencori integrations."
 section: "API Reference"
 order: 5
 ---
 
 ## Overview
 
-The Projects API allows you to create, update, and manage projects programmatically. All endpoints require authentication via API key.
+Cencori project creation and project settings are managed in the dashboard today. They are not part of the public `https://api.cencori.com/v1` runtime API.
 
-Base URL: `https://api.cencori.com/v1`
+For product integrations, the setup flow is:
 
-## List Projects
-Get all projects in your organization.
+1. Create a project in the [dashboard](/dashboard/organizations).
+2. Generate a project API key from the project's **API Keys** page.
+3. Configure provider access in the project's **Providers** page.
+4. Use that project key from your server when calling the runtime APIs.
 
-### Request
-```bash
-GET /organizations/{orgSlug}/projects
-Headers: { "Authorization": "Bearer YOUR_API_KEY" }
-```
+## Runtime APIs
 
-### Response
-```json
-{
-  "projects": [
-    {
-      "id": "proj_123",
-      "name": "Production API",
-      "slug": "production-api",
-      "status": "active",
-      "created_at": "2024-01-01T00:00:00Z"
-    }
-  ]
-}
-```
+Project API keys authenticate these public runtime surfaces:
 
-## Create Project
-Create a new project in your organization.
+| Use case | Endpoint |
+|----------|----------|
+| Native Cencori SDK / REST chat | `https://cencori.com/api/ai/chat` |
+| OpenAI-compatible chat | `https://api.cencori.com/v1/chat/completions` |
+| Models | `https://api.cencori.com/v1/models` |
+| Metrics | `https://api.cencori.com/v1/metrics` |
 
-### Request
-```bash
-POST /organizations/{orgSlug}/projects
-Headers: { "Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json" }
-Body: { "name": "My New Project", "visibility": "public" }
-```
+## Programmatic Project Management
 
-### Parameters
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Project name |
-| `description` | string | No | Project description |
-| `visibility` | string | No | `public` or `private` |
+Public project-management endpoints are not available yet. Do not configure product code to call `/organizations/{orgSlug}/projects` on `api.cencori.com`.
 
-## Get Project
-Retrieve details for a specific project.
+Dashboard routes under `/api/projects/...` are session-authenticated and are intended for the signed-in Cencori dashboard, not for runtime product integrations.
 
-### Request
-```bash
-GET /organizations/{orgSlug}/projects/{projectSlug}
-```
+## Common Setup Mistake
 
-## Update Project
-Update an existing project.
+A valid project API key only proves your app can authenticate to Cencori. AI requests still need provider access configured for the project, either through a connected provider, Cencori-managed access, or BYOK.
 
-### Request
-```bash
-PATCH /organizations/{orgSlug}/projects/{projectSlug}
-Body: { "name": "Updated Name" }
-```
-
-## Delete Project
-Permanently delete a project and all associated data.
-
-### Request
-```bash
-DELETE /organizations/{orgSlug}/projects/{projectSlug}
-```
-
-> [!WARNING]
-> This action is irreversible. All API keys, logs, and analytics for this project will be permanently deleted.
-
-## Error Responses
-- **400:** Missing or invalid parameters
-- **401:** Invalid API key
-- **403:** No permission to access project
-- **404:** Project doesn't exist
-- **409:** Project with same name exists
+If `/v1/models` works but `/v1/chat/completions` fails with a provider configuration error, keep the same Cencori key and finish provider setup in the dashboard.

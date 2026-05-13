@@ -84,7 +84,10 @@ go get github.com/cencori/cencori-go
 
 1. Sign up at [cencori.com](https://cencori.com)
 2. Create a project
-3. Generate an API key
+3. Generate a project API key in **Project > API Keys**
+4. Confirm provider access in **Project > Providers** for the model you want to call
+
+Your Cencori key (`csk_...`) authenticates your app to Cencori. Provider access controls where Cencori routes the upstream model request.
 
 ### 3. Make Your First Request
 
@@ -92,13 +95,11 @@ go get github.com/cencori/cencori-go
 ```typescript
 import { Cencori } from 'cencori';
 
-const cencori = new Cencori({
-  apiKey: 'csk_your_secret_key'  // Server-side secret key
-});
+const cencori = new Cencori(); // reads CENCORI_API_KEY
 
 const response = await cencori.ai.chat({
   messages: [{ role: 'user', content: 'Hello!' }],
-  model: 'gpt-4o' // or 'claude-3-opus', 'gemini-2.5-flash'
+  model: 'gpt-4o' // or 'claude-sonnet-4.5', 'gemini-2.5-flash'
 });
 
 console.log(response.content);
@@ -108,11 +109,11 @@ console.log(response.content);
 ```python
 from cencori import Cencori
 
-cencori = Cencori(api_key="csk_your_secret_key")
+cencori = Cencori()  # reads CENCORI_API_KEY
 
 response = cencori.ai.chat(
     messages=[{"role": "user", "content": "Hello!"}],
-    model="gpt-4o"  # or "claude-3-opus", "gemini-2.5-flash"
+    model="gpt-4o"  # or "claude-sonnet-4.5", "gemini-2.5-flash"
 )
 
 print(response.content)

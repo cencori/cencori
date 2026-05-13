@@ -11,7 +11,7 @@ Cencori's **Routing Engine** allows you to decouple your application logic from 
 
 You can configure routing rules in the **Dashboard > Gateway > Policies**.
 
-- **Lowest Cost**: Routes to the cheapest provider that meets the model capabilities (e.g., `gpt-4o` vs `claude-3-5-sonnet`).
+- **Lowest Cost**: Routes to the cheapest provider that meets the model capabilities (e.g., `gpt-4o` vs `claude-sonnet-4.5`).
 - **Lowest Latency**: Routes to the provider with the fastest current response time.
 - **Performance**: Routes based on historical quality scores (user feedback).
 
@@ -41,7 +41,7 @@ For more complex logic, you can define routing policies via the Gateway API:
 {
   "primary": "openai/gpt-4o",
   "fallbacks": [
-    "anthropic/claude-3-5-sonnet",
+    "anthropic/claude-sonnet-4.5",
     "google/gemini-1.5-pro",
     "mistral/large"
   ],

@@ -16,7 +16,7 @@ That's it. The CLI will:
 4. Set up the right ignored env file for your template (`.env.local` for Next.js, `.env` for TanStack) plus `.env.example`
 5. Install dependencies
 
-Open the project, drop in your API key from [cencori.com/dashboard](https://cencori.com/dashboard/organizations), and you're making AI requests in under 5 minutes.
+Open the project, add a `csk_...` project key from [cencori.com/dashboard](https://cencori.com/dashboard/organizations), and confirm provider access in **Project > Providers**. The Cencori key authenticates your app; provider access is what lets the generated app call models such as `gpt-4o` or `claude-sonnet-4.5`.
 
 ## Options
 
@@ -56,6 +56,10 @@ npx create-cencori-app my-project --template tanstack
 Next.js projects include `app/api/chat/route.ts` and `.env.local`.
 
 TanStack projects include `server/index.ts`, `server/cencori.ts`, and an ignored `.env` so your API key stays on the server and out of git.
+
+## API Key Check
+
+When you pass `--api-key`, the CLI checks `https://api.cencori.com/v1/models` to confirm the key can authenticate. If Cencori is temporarily unreachable, scaffolding continues and the generated app reads `CENCORI_API_KEY` from your env file.
 
 ## Links
 

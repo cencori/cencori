@@ -57,7 +57,7 @@ const response = await client.chat.completions.create({
 ```typescript
 // Before processing
 const quota = await fetch(
-  `https://api.cencori.com/api/v1/billing/check-quota?end_user_id=${userId}`,
+  `https://api.cencori.com/v1/billing/check-quota?end_user_id=${userId}`,
   { headers: { Authorization: `Bearer ${CENCORI_KEY}` } }
 ).then(r => r.json());
 
@@ -66,7 +66,7 @@ if (!quota.allowed) {
 }
 
 // After processing
-await fetch("https://api.cencori.com/api/v1/billing/usage-events", {
+await fetch("https://api.cencori.com/v1/billing/usage-events", {
   method: "POST",
   headers: {
     Authorization: `Bearer ${CENCORI_KEY}`,

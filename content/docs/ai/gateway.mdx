@@ -19,6 +19,8 @@ The AI Gateway is Cencori's runtime control point. Your application sends AI tra
 | `/api/ai/moderation` | Content moderation | OpenAI |
 | `https://api.cencori.com/v1/chat/completions` | OpenAI-compatible chat endpoint | OpenAI-compatible clients |
 
+Use `https://api.cencori.com/v1` as the base URL for OpenAI-compatible SDKs. Most SDKs append `/chat/completions` automatically.
+
 ## SDK Usage
 
 ```typescript
@@ -111,6 +113,6 @@ curl -X POST https://api.cencori.com/v1/chat/completions \
 
 Every request requires a project API key:
 - **Preferred for `/api/ai/*`:** `CENCORI_API_KEY: csk_...`
-- **Required for `https://api.cencori.com/v1/*`:** `Authorization: Bearer csk_...`
+- **Preferred for `https://api.cencori.com/v1/*`:** `Authorization: Bearer csk_...`
 
-Create and manage project keys in the [dashboard](/dashboard).
+Create and manage project keys in the [dashboard](/dashboard). If authentication succeeds but routing fails with a provider configuration error, add provider access in **Project > Providers** or choose a model from an enabled provider.

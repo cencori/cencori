@@ -60,36 +60,11 @@ for chunk in cencori.ai.chat_stream(
 ```
 
 
-## Project Management
+## Project and API Key Setup
 
-```python
-from cencori.types import CreateProjectParams
+Create projects, generate API keys, and configure provider access in the Cencori dashboard. Public Python SDK usage starts after you have a project secret key (`csk_...`) stored as `CENCORI_API_KEY`.
 
-# List projects
-projects = cencori.projects.list(org_slug="my-org")
-
-# Create project
-project = cencori.projects.create(
-    org_slug="my-org",
-    params=CreateProjectParams(name="New Project")
-)
-```
-
-## API Key Management
-
-```python
-from cencori.types import CreateAPIKeyParams
-
-# Create API key
-key = cencori.api_keys.create(
-    project_id="proj_123",
-    params=CreateAPIKeyParams(name="Dev Key", environment="dev")
-)
-print(f"Secret Key: {key.key}") # Only shown once!
-
-# Get key stats
-stats = cencori.api_keys.get_stats(project_id="proj_123", key_id=key.id)
-```
+The `projects` and `api_keys` modules are not part of the public runtime setup path. They target dashboard-management surfaces and should not be used from product integrations.
 
 ## Metrics & Analytics
 

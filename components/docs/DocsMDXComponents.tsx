@@ -283,6 +283,24 @@ export const DocsMDXComponents = {
     AlertTriangle: ({ className, ...props }: ComponentProps<typeof AlertTriangle>) => (
         <AlertTriangle className={cn("w-4 h-4 text-amber-500 inline-block align-middle", className)} {...props} />
     ),
+    Shield: ({ className, ...props }: ComponentProps<typeof Shield>) => (
+        <Shield className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
+    Database: ({ className, ...props }: ComponentProps<typeof Database>) => (
+        <Database className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
+    Brain: ({ className, ...props }: ComponentProps<typeof Brain>) => (
+        <Brain className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
+    Server: ({ className, ...props }: ComponentProps<typeof Server>) => (
+        <Server className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
+    Zap: ({ className, ...props }: ComponentProps<typeof Zap>) => (
+        <Zap className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
+    Layout: ({ className, ...props }: ComponentProps<typeof Layout>) => (
+        <Layout className={cn("w-4 h-4 inline-block align-middle", className)} {...props} />
+    ),
     Card,
     Cards: CardGroup,
     CardGroup,

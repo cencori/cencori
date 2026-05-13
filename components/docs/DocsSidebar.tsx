@@ -76,7 +76,10 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
     }, []);
 
     const activeSection = useMemo(() => {
-        const current = sections.find((group) => group.items.some((item) => item.href === pathname));
+        const current = sections.find((group) =>
+            group.items.some((item) => item.href === pathname)
+            || group.subGroup?.items.some((item) => item.href === pathname)
+        );
         return current?.title;
     }, [sections, pathname]);
 
@@ -121,4 +124,3 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
         </aside>
     );
 }
-
