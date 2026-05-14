@@ -1,0 +1,211 @@
+---
+title: "Add Cencori to an Existing Product"
+description: "Connect an existing app, backend, or OpenAI-compatible client to Cencori without rebuilding your product."
+section: "Getting Started"
+order: 3
+---
+
+Use this guide when you already have a product and want Cencori in the request path. You do not need to rebuild auth, rewrite your database, or start over with `create-cencori-app`.
+
+The job is simple: create a Cencori project, pick a model that works in that project, put a Cencori key on your server, and point your AI calls through Cencori.
+
+## Dashboard-to-Code Checklist
+
+Do these steps in order:
+
+| Step | Where | What to do | You should leave with |
+|------|-------|------------|------------------------|
+| 1 | Dashboard | Create or open the project for this product | One Cencori project for the app/environment |
+| 2 | **Models** or **Playground** | Pick one model ID for the first test | A known-good model such as `gpt-4o`, `claude-sonnet-4.5`, or `gemini-2.5-flash` |
+| 3 | **Providers** | Use an enabled catalog/managed/free model, or add your provider key | A model your project can actually route to |
+| 4 | **API Keys** | Create a secret key | A `csk_...` key |
+| 5 | Your server env | Store the key as `CENCORI_API_KEY` | The key available to backend code only |
+| 6 | Your code | Change the SDK client or base URL | Requests go through Cencori |
+| 7 | Dashboard Logs | Send one test request | A visible request log with model, tokens, latency, and cost |
+
+The fastest first test is a catalog or free model that is already enabled for your project. After that works, switch to your preferred production model or BYOK provider.
+
+## 1. Pick a Known-Good Model
+
+Before touching code, choose one model ID in the dashboard and use only that model for the first request.
+
+Good first-test choices:
+
+```text
+gpt-4o
+claude-sonnet-4.5
+gemini-2.5-flash
+```
+
+If the dashboard offers a free, managed, or catalog model for your project, use it first. That removes provider-key setup from the first test. If you want to use your own OpenAI, Anthropic, Google, xAI, or custom provider account, add that provider in **Project > Providers** before testing.
+
+## 2. Add the Cencori Key to Your Server
+
+Create a secret key in **Project > API Keys** and add it to the server environment where your AI call runs:
+
+```bash
+CENCORI_API_KEY=csk_...
+```
+
+Keep `csk_...` keys out of browser code, mobile bundles, and `NEXT_PUBLIC_*` variables. For a Next.js app, put Cencori calls in a route handler or server action.
+
+## 3. Choose Your Integration Path
+
+Most existing products use one of these paths.
+
+| Current app | Best path |
+|-------------|-----------|
+| Already uses the OpenAI SDK or an OpenAI-compatible framework | Keep the client and change the base URL/key |
+| New backend route or direct TypeScript integration | Install the `cencori` SDK |
+| Vercel AI SDK app | Use the first-party `cencori/vercel` provider |
+| Python/Go service | Use the Python or Go SDK, or the OpenAI-compatible endpoint |
+
+## Path A: Keep Your Existing OpenAI Client
+
+Change the API key and base URL. Most OpenAI-compatible clients append `/chat/completions` automatically, so the base URL should stop at `/v1`.
+
+```typescript
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.CENCORI_API_KEY,
+  baseURL: 'https://api.cencori.com/v1',
+});
+
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello from my existing app.' }],
+  user: 'user_123',
+});
+
+console.log(response.choices[0]?.message?.content);
+```
+
+Python is the same idea:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["CENCORI_API_KEY"],
+    base_url="https://api.cencori.com/v1",
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello from Python."}],
+    user="user_123",
+)
+
+print(response.choices[0].message.content)
+```
+
+## Path B: Use the Cencori SDK
+
+Install the SDK:
+
+```bash
+npm install cencori
+```
+
+Then call Cencori from server-side code:
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori(); // reads CENCORI_API_KEY
+
+const response = await cencori.ai.chat({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'Hello from my existing app.' }],
+  userId: 'user_123',
+});
+
+console.log(response.content);
+```
+
+## Next.js Route Example
+
+Use a route handler when your frontend needs to call AI without exposing the secret key:
+
+```typescript
+// app/api/chat/route.ts
+import { Cencori } from 'cencori';
+import { NextResponse } from 'next/server';
+
+const cencori = new Cencori();
+
+export async function POST(request: Request) {
+  const { message, userId } = await request.json();
+
+  const response = await cencori.ai.chat({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: message }],
+    userId,
+  });
+
+  return NextResponse.json({ content: response.content });
+}
+```
+
+Your frontend calls `/api/chat`; your server route calls Cencori.
+
+## Verify Outside Your App
+
+If code is confusing the issue, test the dashboard setup with cURL:
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Say hello in one sentence."}]
+  }'
+```
+
+If this works, your Cencori project, key, and model routing are good. Any remaining problem is in your application wiring.
+
+## Confirm in Logs
+
+Open the project dashboard and check **Logs** after the test request. A successful integration should show:
+
+- Request timestamp
+- Model and provider
+- Input and output tokens
+- Latency
+- Cost
+- End-user ID if you passed `user` or `userId`
+
+If no log appears, your product is still calling the provider directly or the request never reached Cencori.
+
+## Production Rollout
+
+For production, repeat the same setup in your hosting provider:
+
+1. Add `CENCORI_API_KEY` to production environment variables.
+2. Confirm the production project has provider access for the selected model.
+3. Redeploy the service.
+4. Send one production smoke-test request.
+5. Confirm the request appears in the production project logs.
+
+Use separate Cencori projects or keys for development and production if you want clean logs, limits, and spend tracking.
+
+## Troubleshooting
+
+| Symptom | Meaning | Fix |
+|---------|---------|-----|
+| `Missing API key` | The server process cannot read `CENCORI_API_KEY` | Add the env var and restart the server |
+| `Invalid API key` | The key is wrong, revoked, or being sent in the wrong header | Create a new secret key and use `Authorization: Bearer ...` for `/v1` clients |
+| `Provider 'openai' is not configured` | Cencori auth worked, but the selected model cannot route | Use a catalog/free model that is enabled, or add the provider in **Project > Providers** |
+| No dashboard log | Your app did not call Cencori | Check the base URL, route handler, SDK import, and environment |
+| Works locally, fails in production | Production env is missing the key or provider setup | Add the env var to your host and verify the production project |
+| Browser shows the key | A secret key was placed in client-side code | Move the AI call behind a server route |
+
+## Related
+
+- [Quick Start](/docs/quick-start) — new app or first Cencori test
+- [Chat API](/docs/api/chat) — native and OpenAI-compatible endpoint reference
+- [Authentication](/docs/api/authentication) — supported headers and key formats
+- [Providers](/docs/ai/providers) — supported model/provider IDs

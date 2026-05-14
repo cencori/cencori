@@ -34,6 +34,7 @@ const sidebarItems = [
         items: [
             { title: "Introduction", href: "/docs/introduction" },
             { title: "Quick Start", href: "/docs/quick-start" },
+            { title: "Existing Product", href: "/docs/getting-started/existing-product" },
             { title: "Installation", href: "/docs/installation" },
             { title: "Making Your First Request", href: "/docs/getting-started/first-request" },
         ],

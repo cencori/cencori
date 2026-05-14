@@ -42,6 +42,78 @@ Use one of these integration paths:
 - Base URL: `https://cencori.com`
 - Best for: direct calls to `/api/ai/*` or `/api/v1/telemetry/web`
 
+## Setup Decision
+
+- Existing product: preserve the app and use the Existing Product Setup Contract.
+- New starter app: use the Scaffold Contract with `create-cencori-app`.
+- Do not scaffold a new app when the user asks to integrate Cencori into an existing product.
+- Do not hand-wire a starter from scratch when `create-cencori-app` is available and the user wants a new app.
+
+## Existing Product Setup Contract
+
+When the user already has an application, do not start by scaffolding a new app.
+Use the existing product path:
+
+1. Create or open the Cencori project for the app/environment.
+2. Pick one known-good model ID in Models or Playground.
+3. Confirm the project can route to that model:
+   - use an enabled catalog, managed, or free model first when available
+   - otherwise add the upstream provider key in Project > Providers
+4. Create a secret project key in Project > API Keys.
+5. Store the key server-side as `CENCORI_API_KEY`.
+6. Change the existing SDK client, provider adapter, or base URL.
+7. Send one test request and verify it appears in dashboard Logs.
+
+Use `create-cencori-app` only when the user wants a new Cencori starter app.
+For existing products, preserve the app's current auth, database, routing, UI, and response contract.
+
+Fast first-test model IDs:
+
+```text
+gpt-4o
+claude-sonnet-4.5
+gemini-2.5-flash
+```
+
+If a request returns `Provider 'openai' is not configured`, Cencori authentication worked.
+The project still needs provider access for the selected model.
+
+## Scaffold Contract
+
+Use `create-cencori-app` when the user wants a new Cencori starter app or asks to scaffold a fresh project.
+
+### Commands
+
+```bash
+npx create-cencori-app my-ai-app
+npx create-cencori-app my-ai-app --template nextjs
+npx create-cencori-app my-ai-app --template tanstack
+npx create-cencori-app my-ai-app --template nextjs --no-chat
+npx create-cencori-app my-ai-app --template nextjs --api-key csk_...
+npx create-cencori-app my-ai-app --template nextjs --dev
+```
+
+### Supported Options
+
+- `--template nextjs`: Next.js App Router, Vercel AI SDK streaming, server route at `app/api/chat/route.ts`, env file `.env.local`
+- `--template tanstack`: Vite + React Query app with server-side Cencori calls, env file `.env`
+- `--no-chat`: skip the demo chat UI
+- `--no-install`: write files without installing dependencies
+- `--api-key <key>`: pre-fill the env file and verify the key against `https://api.cencori.com/v1/models`
+- `--dev`: start the dev server after scaffolding and installing dependencies
+
+### Scaffolded App Rules
+
+1. The CLI creates `.env.local` for Next.js and `.env` for TanStack.
+2. The generated env file should contain `CENCORI_API_KEY=csk_...`.
+3. The generated `.env.example` should use `CENCORI_API_KEY=csk_...`.
+4. The Next.js template uses `cencori/vercel` with `streamText()` and `toUIMessageStreamResponse()`.
+5. The TanStack template keeps Cencori calls on the server.
+6. The default first-test model is `gpt-4o`; users can switch to `claude-sonnet-4.5` or `gemini-2.5-flash` after provider access is confirmed.
+7. `--api-key` verifies Cencori authentication only. Users may still need provider access for the selected model.
+8. If key verification is temporarily unavailable, scaffolding may continue and the generated app reads `CENCORI_API_KEY` from the env file.
+9. After scaffolding, run `npm run dev` and confirm a request appears in dashboard Logs.
+
 ## Do Not Use These As Public Contract Yet
 
 Avoid generating code against these surfaces unless the target project already implements and verifies them:
@@ -79,7 +151,7 @@ npm install cencori ai
 
 ```bash
 # .env.local
-CENCORI_API_KEY=csk_live_...
+CENCORI_API_KEY=csk_...
 ```
 
 ### Shared Cencori Setup
@@ -108,7 +180,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: cencori(model),
-    messages: convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages),
   });
 
   return result.toUIMessageStreamResponse();
@@ -122,20 +194,33 @@ export async function POST(req: Request) {
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { useState, type FormEvent } from 'react';
+
+function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }) {
+  return message.parts
+    ?.map((part) => (part.type === 'text' ? part.text || '' : ''))
+    .join('') || '';
+}
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: '/api/chat',
-    body: { model: 'gpt-4o' },
-  });
+  const [input, setInput] = useState('');
+  const { messages, sendMessage, status } = useChat({ api: '/api/chat' });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!input.trim() || status !== 'ready') return;
+    const text = input.trim();
+    setInput('');
+    void sendMessage({ text });
+  }
 
   return (
     <div>
       {messages.map((message) => (
-        <div key={message.id}>{message.content}</div>
+        <div key={message.id}>{getMessageText(message)}</div>
       ))}
       <form onSubmit={handleSubmit}>
-        <input value={input} onChange={handleInputChange} />
+        <input value={input} onChange={(event) => setInput(event.target.value)} />
       </form>
     </div>
   );
@@ -480,7 +565,7 @@ Common endpoints:
 
 ```bash
 curl https://cencori.com/api/ai/chat \
-  -H "CENCORI_API_KEY: csk_live_..." \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -502,7 +587,7 @@ Base origin:
 
 ```bash
 curl https://api.cencori.com/v1/chat/completions \
-  -H "Authorization: Bearer csk_live_..." \
+  -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -590,10 +675,15 @@ When integrating Cencori into a project:
 6. Preserve the app's existing response contract when replacing another provider.
 7. Do not generate code against `compute`, `workflow`, or speculative deployment APIs.
 8. Do not assume undocumented routing, failover, or evaluation settings are user-configurable.
+9. For existing products, complete the dashboard-to-code checklist before changing application code.
+10. For new apps, prefer `create-cencori-app` over manually assembling a starter.
 
 ## Documentation Links
 
 - Docs: https://cencori.com/docs
+- Add Cencori to an Existing Product: https://cencori.com/docs/getting-started/existing-product
+- Quick Start: https://cencori.com/docs/quick-start
+- create-cencori-app: https://www.npmjs.com/package/create-cencori-app
 - Vercel AI SDK: https://cencori.com/docs/integrations/vercel-ai-sdk
 - TanStack AI: https://cencori.com/docs/integrations/tanstack
 - Authentication: https://cencori.com/docs/api/authentication

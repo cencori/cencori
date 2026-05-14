@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: cencori(model),
-    messages: convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages),
   });
 
   return result.toUIMessageStreamResponse();
@@ -67,25 +67,37 @@ export async function POST(req: Request) {
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { useState, type FormEvent } from 'react';
+
+function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }) {
+  return message.parts
+    ?.map((part) => (part.type === 'text' ? part.text || '' : ''))
+    .join('') || '';
+}
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: '/api/chat',
-    body: {
-      model: 'gpt-4o',
-    },
-  });
+  const [input, setInput] = useState('');
+  const { messages, sendMessage, status } = useChat({ api: '/api/chat' });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!input.trim() || status !== 'ready') return;
+
+    const text = input.trim();
+    setInput('');
+    void sendMessage({ text });
+  }
 
   return (
     <div>
       {messages.map((message) => (
         <div key={message.id}>
-          {message.role}: {message.content}
+          {getMessageText(message)}
         </div>
       ))}
 
       <form onSubmit={handleSubmit}>
-        <input value={input} onChange={handleInputChange} />
+        <input value={input} onChange={(event) => setInput(event.target.value)} />
       </form>
     </div>
   );

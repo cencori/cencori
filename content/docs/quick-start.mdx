@@ -5,7 +5,9 @@ section: "Getting Started"
 order: 2
 ---
 
-This guide gets a real product integration running. Cencori sits between your app and model providers, so there are two separate setup pieces:
+This guide gets a real Cencori request running. If you already have an app, use [Add Cencori to an Existing Product](/docs/getting-started/existing-product) for the dashboard-to-code path.
+
+Cencori sits between your app and model providers, so there are two separate setup pieces:
 
 - **Cencori project key**: authenticates your app to Cencori. This is the `CENCORI_API_KEY` value your code uses.
 - **Provider access**: lets Cencori route to OpenAI, Anthropic, Google, or another provider. Use Cencori managed access when it is enabled for your project, or add your own provider key in **Project > Providers**.
@@ -28,13 +30,14 @@ CENCORI_API_KEY=csk_...
 
 Keep `csk_...` keys on the server. Do not put them in browser code or `NEXT_PUBLIC_*` variables.
 
-## 2. Confirm Provider Access
+## 2. Choose a Working Model
 
-Choose the provider/model you want to call, then make sure your project can route to it:
+Choose the model you want to call, then make sure your project can route to it:
 
-1. Open **Project > Providers**.
-2. Use managed provider access if it is available on your plan, or add your own provider API key.
-3. Set a default provider/model if you want requests without an explicit model to work.
+1. Open **Models** or **Playground** in your project.
+2. Pick one model ID for the first test.
+3. If a free, managed, or catalog model is enabled for your project, use that first.
+4. If you want BYOK or a custom provider, open **Project > Providers** and add the provider before testing.
 
 For the fastest first test, use one known model such as `gpt-4o`, `claude-sonnet-4.5`, or `gemini-2.5-flash`.
 
@@ -53,53 +56,19 @@ Open `.env.local`, paste your Cencori project key, then run:
 npm run dev
 ```
 
+## 4. Existing Product: Follow the Dashboard-to-Code Guide
 
-## 4. Existing Product: Install the SDK
+If you already have a product, do not start with a blank scaffold. Follow [Add Cencori to an Existing Product](/docs/getting-started/existing-product) to wire Cencori into your current backend, OpenAI client, or framework.
 
-```bash
-npm install cencori
-```
+The short version:
 
-Create a server-side client:
+1. Pick a model in the dashboard.
+2. Create a `csk_...` key in **API Keys**.
+3. Store it as `CENCORI_API_KEY` on your server.
+4. Change your SDK client or base URL.
+5. Send one request and confirm it appears in **Logs**.
 
-```typescript
-import { Cencori } from 'cencori';
-
-const cencori = new Cencori();
-
-const response = await cencori.ai.chat({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello!' }]
-});
-
-console.log(response.content);
-```
-
-The SDK reads `CENCORI_API_KEY` automatically. You can also pass it explicitly with `new Cencori({ apiKey: process.env.CENCORI_API_KEY })`.
-
-## 5. Existing OpenAI Client: Change the Base URL
-
-If your product already uses an OpenAI-compatible client, keep your client and change only the key and base URL:
-
-```typescript
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.CENCORI_API_KEY,
-  baseURL: 'https://api.cencori.com/v1',
-});
-
-const response = await openai.chat.completions.create({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello from Cencori!' }],
-});
-
-console.log(response.choices[0]?.message?.content);
-```
-
-Use `https://api.cencori.com/v1` as the base URL. Do not include `/chat/completions` in the base URL unless your tool specifically asks for the full endpoint URL.
-
-## 6. Verify With cURL
+## 5. Verify With cURL
 
 This test removes your framework from the equation:
 
@@ -125,7 +94,7 @@ curl https://api.cencori.com/v1/chat/completions \
   }'
 ```
 
-## 7. View in Dashboard
+## 6. View in Dashboard
 
 All requests are logged in your dashboard with:
 - Full prompt and response
@@ -147,6 +116,7 @@ All requests are logged in your dashboard with:
 
 | Topic | Description |
 |-------|-------------|
+| [Add Cencori to an Existing Product](/docs/getting-started/existing-product) | Step-by-step dashboard-to-code setup |
 | [AI Gateway](/docs/ai/gateway) | Learn about multi-provider routing |
 | [Cencori SDK](/docs/ai/sdk) | Explore SDK methods |
 | [Vercel AI SDK](/docs/ai/vercel-sdk) | Use Cencori with `streamText()` and `useChat()` |
