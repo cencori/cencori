@@ -138,7 +138,7 @@ const cencori = new Cencori();
 
 // Gateway + Security + Billing in one call
 const response = await cencori.ai.chat({
-  model: 'claude-3-5-sonnet',
+  model: 'claude-sonnet-4.5',
   messages: [{ role: 'user', content: 'Scan this medical record...' }],
   security: { scanPII: true, jailbreakDetection: true },
   billing: { userId: 'user_456', plan: 'pro-tier' }
@@ -154,7 +154,7 @@ console.log(response.content);
 | Goal | Path |
 |-------|-------------|
 | **Get running in 3 minutes** | [Quick Start](/docs/quick-start) |
+| **Add Cencori to an existing product** | [Existing Product Setup](/docs/getting-started/existing-product) |
 | **Monetize your AI usage** | [End-User Billing](/docs/platform/end-user-billing) |
 | **Secure your production app** | [Security & Scan](/docs/security/scan) |
-| **Train and fine-tune models** | [Cencori Compute](/docs/platform/compute) |
-
+| **Explore available models** | [Models](/docs/ai/models) |

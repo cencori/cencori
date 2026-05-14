@@ -30,6 +30,7 @@ interface QuickLink {
 const quickLinks: QuickLink[] = [
     { title: "Introduction", href: "/docs/introduction", icon: <FileText className="h-4 w-4" /> },
     { title: "Quick Start", href: "/docs/quick-start", icon: <ArrowRight className="h-4 w-4" /> },
+    { title: "Existing Product", href: "/docs/getting-started/existing-product", icon: <ArrowRight className="h-4 w-4" /> },
     { title: "AI Gateway", href: "/docs/ai/gateway", icon: <Hash className="h-4 w-4" /> },
     { title: "SDK Reference", href: "/docs/ai/sdk", icon: <FileText className="h-4 w-4" /> },
     { title: "Authentication", href: "/docs/api/authentication", icon: <Hash className="h-4 w-4" /> },

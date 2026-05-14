@@ -424,7 +424,7 @@ Cencori is built on a modern, scalable stack:
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Framework** | Next.js 15 (App Router) | Full-stack platform |
+| **Framework** | Next.js 16 (App Router) | Full-stack platform |
 | **Auth & Database** | Supabase | Authentication & data |
 | **Language** | TypeScript | Type-safe development |
 | **Deployment** | Vercel | Hosting & CI/CD |
@@ -438,7 +438,7 @@ Cencori is built on a modern, scalable stack:
 
 ```typescript
 POST /api/ai/chat
-Headers: { "CENCORI_API_KEY": "your-api-key" }
+Headers: { "CENCORI_API_KEY": "csk_..." }
 Body: {
   "model": "gpt-4o",
   "messages": [
@@ -453,9 +453,9 @@ Body: {
 
 ```typescript
 POST /api/ai/chat
-Headers: { "CENCORI_API_KEY": "your-api-key" }
+Headers: { "CENCORI_API_KEY": "csk_..." }
 Body: {
-  "model": "claude-3-opus",
+  "model": "claude-sonnet-4.5",
   "messages": [
     { "role": "user", "content": "Tell me a story" }
   ],
@@ -510,7 +510,7 @@ const stream = cencori.ai.chatStream({
     { role: 'system', content: 'You are a helpful assistant' },
     { role: 'user', content: 'Write a poem about AI' }
   ],
-  model: 'claude-3-opus'
+  model: 'claude-sonnet-4.5'
 });
 
 for await (const chunk of stream) {

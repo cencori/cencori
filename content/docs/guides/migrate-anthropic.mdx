@@ -27,7 +27,7 @@ const anthropic = new Anthropic({
 });
 
 const response = await anthropic.messages.create({
-  model: 'claude-3-opus-20240229',
+  model: 'claude-sonnet-4-20250514',
   max_tokens: 1024,
   messages: [{ role: 'user', content: 'Hello!' }],
 });
@@ -43,7 +43,7 @@ const cencori = new Cencori({
 });
 
 const response = await cencori.ai.chat({
-  model: 'claude-3-opus',
+  model: 'claude-sonnet-4.5',
   maxTokens: 1024,
   messages: [{ role: 'user', content: 'Hello!' }],
 });
@@ -93,7 +93,7 @@ const cencori = new Cencori({
 | Anthropic SDK | Cencori SDK |
 |---------------|-------------|
 | `anthropic.messages.create()` | `cencori.ai.chat()` |
-| `claude-3-opus-20240229` | `claude-3-opus` |
+| `claude-sonnet-4-20250514` | `claude-sonnet-4.5` |
 | `max_tokens` | `maxTokens` |
 | `stream: true` | `cencori.ai.chatStream()` |
 
@@ -104,7 +104,7 @@ Anthropic SDK has a separate `system` parameter. Cencori handles this automatica
 **Anthropic Native:**
 ```typescript
 await anthropic.messages.create({
-  model: 'claude-3-opus-20240229',
+  model: 'claude-sonnet-4-20250514',
   system: 'You are helpful',
   messages: [{ role: 'user', content: 'Hello' }],
 });
@@ -113,7 +113,7 @@ await anthropic.messages.create({
 **Cencori (standard format):**
 ```typescript
 await cencori.ai.chat({
-  model: 'claude-3-opus',
+  model: 'claude-sonnet-4.5',
   messages: [
     { role: 'system', content: 'You are helpful' },
     { role: 'user', content: 'Hello' }
@@ -129,7 +129,7 @@ await cencori.ai.chat({
 ### Anthropic Streaming
 ```typescript
 const stream = await anthropic.messages.create({
-  model: 'claude-3-opus-20240229',
+  model: 'claude-sonnet-4-20250514',
   messages: messages,
   stream: true,
 });
@@ -144,7 +144,7 @@ for await (const event of stream) {
 ### Cencori Streaming
 ```typescript
 const stream = cencori.ai.chatStream({
-  model: 'claude-3-opus',
+  model: 'claude-sonnet-4.5',
   messages: messages,
 });
 
@@ -163,7 +163,7 @@ Now that you're on Cencori, switching to other providers is trivial:
 ```typescript
 // Use Claude (same as before)
 const claudeResponse = await cencori.ai.chat({
-  model: 'claude-3-opus',
+  model: 'claude-sonnet-4.5',
   messages: messages,
 });
 

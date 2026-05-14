@@ -45,7 +45,7 @@ If you're making direct HTTP requests to the AI or Memory endpoints, include you
 
 ```bash
 curl https://cencori.com/api/ai/chat \
-  -H "CENCORI_API_KEY: YOUR_API_KEY" \
+  -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -58,7 +58,7 @@ For public `/v1` endpoints on `api.cencori.com`, use the `Authorization` header:
 
 ```bash
 curl https://api.cencori.com/v1/metrics?period=24h \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer csk_..."
 ```
 
 ## Environment Variables
@@ -67,15 +67,15 @@ Store your API keys in environment variables to keep them secure.
 
 ### Local Development (`.env`)
 ```bash
-CENCORI_API_KEY=csk_your_api_key_here
+CENCORI_API_KEY=csk_...
 ```
 Make sure to add `.env` to your `.gitignore` file.
 
 ## Required Headers
 
 When making direct API requests, include these headers:
-- **AI & Memory endpoints:** `CENCORI_API_KEY: YOUR_API_KEY` (preferred). `Authorization: Bearer YOUR_API_KEY` is also accepted.
-- **OpenAI-compatible and REST endpoints (`https://api.cencori.com/v1/*`):** `Authorization: Bearer YOUR_API_KEY` is preferred because OpenAI-compatible SDKs expect it.
+- **AI & Memory endpoints:** `CENCORI_API_KEY: csk_...` (preferred). `Authorization: Bearer csk_...` is also accepted.
+- **OpenAI-compatible and REST endpoints (`https://api.cencori.com/v1/*`):** `Authorization: Bearer csk_...` is preferred because OpenAI-compatible SDKs expect it.
 - **Content-Type:** `application/json` (required for POST)
 
 ## Authentication Errors
