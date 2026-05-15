@@ -25,7 +25,7 @@ export const siteConfig = {
       insights: "/insights",
       network: "/product-network",
       edge: "/edge",
-      scan: "https://scan.cencori.com",
+      scan: "/scan",
       enterprise: "/solutions/enterprise",
       developerTools: "/developer-tools",
     },
