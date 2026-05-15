@@ -6,7 +6,12 @@ interface CTAProps {
     isAuthenticated?: boolean;
 }
 
-export const CTA = ({ isAuthenticated = false }: CTAProps) => {
+import { useAuth } from "@/lib/hooks/useAuth";
+
+export const CTA = ({ isAuthenticated: providedIsAuthenticated }: CTAProps) => {
+    const { isAuthenticated: hookIsAuthenticated } = useAuth();
+    const isAuthenticated = providedIsAuthenticated ?? hookIsAuthenticated;
+
     return (
         <section className="py-16 bg-background relative overflow-hidden">
             <div className="max-w-screen-xl mx-auto px-4 md:px-6 relative z-10">

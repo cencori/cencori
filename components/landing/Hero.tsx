@@ -7,7 +7,12 @@ interface HeroProps {
     isAuthenticated?: boolean;
 }
 
-export const Hero = ({ isAuthenticated = false }: HeroProps) => {
+import { useAuth } from "@/lib/hooks/useAuth";
+
+export const Hero = ({ isAuthenticated: providedIsAuthenticated }: HeroProps) => {
+    const { isAuthenticated: hookIsAuthenticated } = useAuth();
+    const isAuthenticated = providedIsAuthenticated ?? hookIsAuthenticated;
+
     return (
         <section className="bg-background pt-28 sm:pt-40 pb-16 sm:pb-20">
             <div className="mx-auto max-w-6xl px-4 md:px-6">
