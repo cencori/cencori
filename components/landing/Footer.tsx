@@ -8,7 +8,7 @@ import { siteConfig } from "@/config/site";
 import { Loader2, Check, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
-const footerProductLinks = [
+const footerProductLinks: { title: string; href: string; external?: boolean }[] = [
     { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
     { title: "Models", href: siteConfig.links.products.models },
     { title: "Compute", href: siteConfig.links.products.compute },
@@ -19,7 +19,7 @@ const footerProductLinks = [
     { title: "Observability", href: siteConfig.links.products.insights },
     { title: "Edge", href: siteConfig.links.products.edge },
     { title: "Sandbox", href: siteConfig.links.products.sandbox },
-    { title: "Scan", href: siteConfig.links.products.scan, external: true },
+    { title: "Scan", href: siteConfig.links.products.scan },
     { title: "Enterprise", href: siteConfig.links.products.enterprise },
 ];
 
