@@ -239,6 +239,8 @@ interface NavbarProps extends React.HTMLAttributes<HTMLElement> {
 
 // ... [Keep helper functions and components]
 
+import { useAuth } from "@/lib/hooks/useAuth";
+
 export default function Navbar({
     logo = <Logo variant="wordmark" className="h-4" />,
     name = "",
@@ -268,7 +270,39 @@ export default function Navbar({
         { title: "Documentation", href: siteConfig.links.docs },
         { title: "Blog", href: siteConfig.links.company.blog },
     ],
-    actions = [
+    actions: providedActions,
+    className,
+    isAuthenticated: providedIsAuthenticated,
+    userProfile: providedUserProfile,
+    searchSlot,
+    containerClassName,
+    ...props
+}: NavbarProps) {
+    const router = useRouter();
+    const { theme, setTheme } = useTheme();
+
+    const { isAuthenticated: hookIsAuthenticated, userProfile: hookUserProfile } = useAuth();
+    
+    const isAuthenticated = providedIsAuthenticated ?? hookIsAuthenticated;
+    const userProfile = providedUserProfile ?? hookUserProfile;
+
+    // Default actions based on auth state
+    const actions = providedActions || (isAuthenticated ? [
+        {
+            text: "Dashboard",
+            href: "/dashboard/organizations",
+            isButton: true,
+            variant: "default",
+        },
+        {
+            text: userProfile.name || "User",
+            href: "#",
+            isButton: false,
+            isAvatar: true,
+            avatarSrc: userProfile.avatar,
+            avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
+        },
+    ] : [
         { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
         {
             text: "Get Started",
@@ -276,16 +310,7 @@ export default function Navbar({
             isButton: true,
             variant: "default",
         },
-    ],
-    className,
-    isAuthenticated = false,
-    userProfile,
-    searchSlot,
-    containerClassName,
-    ...props
-}: NavbarProps) {
-    const router = useRouter();
-    const { theme, setTheme } = useTheme();
+    ]);
 
     const productsDropdown: NavDropdown = {
         title: "Products",
