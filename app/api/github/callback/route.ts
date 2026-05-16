@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { getInstallationOctokit } from '@/lib/github';
+import { getInstallationOctokit, appId } from '@/lib/github';
 import { parseGithubInstallState } from '@/lib/github-install-state';
 
 function sanitizeRedirectPath(path: string | undefined, fallbackPath: string): string {
@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
           github_account_id: account.id,
           github_account_name: 'name' in account ? account.name : accountLogin,
           installed_by_user_id: installedByUserId,
+          github_app_id: appId,
         }, { onConflict: 'installation_id' });
 
       if (installationError) {
