@@ -18,6 +18,14 @@ export const supabase = (() => {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      cookieOptions: {
+        domain: typeof window !== 'undefined' && window.location.hostname.endsWith('cencori.com') 
+          ? '.cencori.com' 
+          : undefined,
+        path: '/',
+        sameSite: 'lax',
+        secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+      },
     }
   );
 

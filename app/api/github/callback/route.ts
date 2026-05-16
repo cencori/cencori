@@ -41,8 +41,12 @@ export async function GET(req: NextRequest) {
   const setupAction = setupActionParam || (parsedInstallationId ? 'install' : null);
 
   // Helper to build redirect URL
-  // When source is 'scan', redirect to the scan subdomain instead of the callback domain
-  const redirectBase = isScanSource && process.env.NEXT_PUBLIC_SCAN_URL
+  // When source is 'scan', redirect to the scan subdomain instead of the callback domain.
+  // In development, we stay on localhost even if NEXT_PUBLIC_SCAN_URL is set to production.
+  const host = req.headers.get('host') || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  
+  const redirectBase = (isScanSource && process.env.NEXT_PUBLIC_SCAN_URL && !isLocal)
     ? process.env.NEXT_PUBLIC_SCAN_URL
     : req.url;
   const buildRedirect = (path: string) => new URL(path, redirectBase);
