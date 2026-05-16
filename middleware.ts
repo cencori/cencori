@@ -268,7 +268,7 @@ export async function middleware(request: NextRequest) {
     if (shouldRefreshAuth) {
         // 3. Supabase Auth Session Refresh (only on auth-sensitive routes)
         // Determine cookie domain for cross-subdomain auth
-        const isProduction = domain.endsWith('.cencori.com') || domain === 'cencori.com';
+        const isProduction = domain.endsWith('cencori.com');
         const cookieDomain = isProduction ? '.cencori.com' : undefined;
 
         const supabase = createServerClient(
@@ -288,7 +288,10 @@ export async function middleware(request: NextRequest) {
                         cookiesToSet.forEach(({ name, value, options }) =>
                             response.cookies.set(name, value, {
                                 ...options,
-                                domain: cookieDomain // Enable cross-subdomain auth
+                                domain: cookieDomain,
+                                sameSite: 'lax',
+                                secure: isProduction,
+                                path: '/',
                             })
                         )
                     },
