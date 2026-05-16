@@ -52,6 +52,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const [user, setUser] = useState<User | null>(null);
     const [paywallDialogOpen, setPaywallDialogOpen] = useState(false);
     const [paywallPayload, setPaywallPayload] = useState<ScanPaywallPayload | null>(null);
+    const [mounted, setMounted] = useState(false);
 
     // Check auth
     useEffect(() => {
@@ -78,6 +79,10 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         return () => {
             subscription.unsubscribe();
         };
+    }, []);
+
+    useEffect(() => {
+        setMounted(true);
     }, []);
 
     useEffect(() => {
@@ -120,21 +125,28 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     const meta = user?.user_metadata ?? {};
     const avatar = (meta.avatar_url as string | null) ?? (meta.picture as string | null) ?? null;
     const name = (meta.name as string | null) ?? user?.email?.split?.("@")[0] ?? null;
+
+    // Window-dependent logic must only run after mounting to avoid hydration mismatch
     const isScanSubdomainHost =
-        typeof window !== "undefined" && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
+        mounted && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
+    
     const scanEntryUrl =
-        typeof window !== "undefined"
+        mounted
             ? `${window.location.pathname}${window.location.search}${window.location.hash}`
             : "/scan";
+
     const signInHref = isScanSubdomainHost
         ? `/login?redirect=${encodeURIComponent(scanEntryUrl)}`
         : "/login?redirect=/scan";
+
     const dashboardHref = isScanSubdomainHost
         ? "https://cencori.com/dashboard/organizations"
         : "/dashboard/organizations";
+
     const docsHref = isScanSubdomainHost
         ? "https://cencori.com/docs/security/scan/web-dashboard"
         : "/docs/security/scan/web-dashboard";
+
     const logoutHref = "/login";
 
     return (

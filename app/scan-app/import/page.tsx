@@ -65,12 +65,12 @@ export default function ImportRepoPage() {
     const [isConnectingGitHub, setIsConnectingGitHub] = useState(false);
     const [hasScanAccess, setHasScanAccess] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
     const scanSubdomainRedirect = '/import';
     const isScanSubdomainHost =
-        typeof window !== 'undefined'
-            ? /^(scan|scaan)(\.|$)/i.test(window.location.hostname)
-            : false;
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        mounted && /^(scan|scaan)(\.|$)/i.test(window.location.hostname);
+    
+    const urlParams = mounted ? new URLSearchParams(window.location.search) : null;
     const successParam = urlParams?.get('success');
     const errorParam = urlParams?.get('error');
 
@@ -163,6 +163,10 @@ export default function ImportRepoPage() {
             isMounted = false;
             subscription.unsubscribe();
         };
+    }, []);
+
+    useEffect(() => {
+        setMounted(true);
     }, []);
 
     const handleConnectGitHub = async (openInNewTab = false) => {
