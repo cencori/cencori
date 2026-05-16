@@ -74,8 +74,12 @@ export async function GET() {
                         installation_id: installationId,
                     });
                 }
-            } catch (err) {
-                console.error(`[Scan GitHub] Error fetching repos for installation ${installationId}:`, err);
+            } catch (err: any) {
+                if (err.status === 404) {
+                    console.error(`[Scan GitHub] Installation ${installationId} not found for this App. This usually happens when switching between Dev/Prod apps. Please re-install the GitHub App.`);
+                } else {
+                    console.error(`[Scan GitHub] Error fetching repos for installation ${installationId}:`, err);
+                }
                 // Continue with other installations
             }
         }

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { appId } from "@/lib/github";
 
 interface UserIdentity {
     provider?: string;
@@ -58,7 +59,8 @@ export async function getUserOwnedGithubInstallationIds(
     const { data: installedByUser, error: installedByUserError } = await supabaseAdmin
         .from("github_app_installations")
         .select("installation_id")
-        .eq("installed_by_user_id", user.id);
+        .eq("installed_by_user_id", user.id)
+        .eq("github_app_id", appId);
 
     if (installedByUserError) {
         throw new Error("Failed to resolve user-installed GitHub installations");
@@ -70,7 +72,8 @@ export async function getUserOwnedGithubInstallationIds(
         const { data: byLogin, error: byLoginError } = await supabaseAdmin
             .from("github_app_installations")
             .select("installation_id")
-            .ilike("github_account_login", githubUsername);
+            .ilike("github_account_login", githubUsername)
+            .eq("github_app_id", appId);
 
         if (byLoginError) {
             throw new Error("Failed to resolve GitHub account installations");
@@ -86,8 +89,12 @@ export async function getOrganizationLinkedInstallationIds(organizationId: strin
     const supabaseAdmin = createAdminClient();
     const { data, error } = await supabaseAdmin
         .from("organization_github_installations")
-        .select("installation_id")
-        .eq("organization_id", organizationId);
+        .select(`
+            installation_id,
+            github_app_installations!inner(github_app_id)
+        `)
+        .eq("organization_id", organizationId)
+        .eq("github_app_installations.github_app_id", appId);
 
     if (error) {
         throw new Error("Failed to resolve organization GitHub installation links");
@@ -137,8 +144,12 @@ export async function getReachableGithubInstallationIds(
     if (organizationIds.size > 0) {
         const { data: orgLinks, error: orgLinksError } = await supabaseAdmin
             .from("organization_github_installations")
-            .select("installation_id")
-            .in("organization_id", Array.from(organizationIds));
+            .select(`
+                installation_id,
+                github_app_installations!inner(github_app_id)
+            `)
+            .in("organization_id", Array.from(organizationIds))
+            .eq("github_app_installations.github_app_id", appId);
 
         if (orgLinksError) {
             throw new Error("Failed to resolve organization-linked GitHub installations");

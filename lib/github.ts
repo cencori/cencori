@@ -2,7 +2,7 @@ import { Octokit } from '@octokit/rest';
 import { App } from '@octokit/app';
 import { createAppAuth } from '@octokit/auth-app';
 
-const appId = process.env.NEXT_PUBLIC_GITHUB_APP_ID as string;
+export const appId = process.env.NEXT_PUBLIC_GITHUB_APP_ID as string;
 const rawKey = process.env.GITHUB_APP_PRIVATE_KEY as string;
 // Handle both formats: literal \n strings and actual newlines
 const privateKey = rawKey?.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey;
