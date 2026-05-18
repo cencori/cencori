@@ -509,7 +509,7 @@ export function CommandPalette({
                     id: "discord",
                     label: "Join Discord",
                     icon: <ChatBubbleIcon className="h-3.5 w-3.5" />,
-                    action: () => openExternal("https://discord.gg/cencori"),
+                    action: () => openExternal("https://discord.gg/j3eAV5WzCa"),
                     keywords: ["community", "chat", "support"],
                 },
                 {

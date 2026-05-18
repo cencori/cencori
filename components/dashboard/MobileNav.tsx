@@ -207,7 +207,7 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                            <Link href="https://discord.gg/cencori" target="_blank">
+                            <Link href="https://discord.gg/j3eAV5WzCa" target="_blank">
                                 <ExternalLink className="h-3 w-3 mr-2" />
                                 Discord Community
                             </Link>
