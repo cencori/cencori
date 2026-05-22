@@ -126,7 +126,9 @@ export function printSuccess(projectName: string, template: string, includeChat:
         console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
         console.log(`       Confirm provider access in your project ${chalk.cyan('Providers')} page.`);
         if (isAgentStarter) {
-            console.log(`       Optional: set ${chalk.cyan('CENCORI_AGENT_ID')} for an agent-scoped run.`);
+            console.log(
+                `       Optional: set ${chalk.cyan('CENCORI_AGENT_ID')} to a dashboard agent UUID (leave empty for project-key-only).`
+            );
         }
         if (template === 'celo-agent') {
             console.log(`       Optional: set ${chalk.cyan('CELO_PRIVATE_KEY')} and ${chalk.cyan('CELO_RECEIPTS_CONTRACT')} to record onchain.`);

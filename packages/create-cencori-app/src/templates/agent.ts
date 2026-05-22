@@ -87,6 +87,19 @@ export function loadEnv() {
 export function readEnv(name, fallback = "") {
   return process.env[name] || fallback;
 }
+
+/** Set CENCORI_AGENT_ID only when a real dashboard agent UUID is configured. */
+export function readOptionalAgentId() {
+  const raw = (process.env.CENCORI_AGENT_ID || "").trim();
+  const placeholders = new Set([
+    "",
+    "demo-agent",
+    "your_agent_id",
+    "agent_uuid_or_blank_for_project_key",
+  ]);
+  if (placeholders.has(raw)) return null;
+  return raw;
+}
 `;
 
     files['src/run-receipt.mjs'] = `import crypto from "node:crypto";
@@ -232,13 +245,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCencoriAgent } from "./cencori-agent.mjs";
 import { createRunReceipt, hashRunReceipt, stableJson } from "./run-receipt.mjs";
-import { loadEnv, readEnv } from "./env.mjs";
+import { loadEnv, readEnv, readOptionalAgentId } from "./env.mjs";
 
 loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.resolve(__dirname, "../output");
 
+const agentId = readOptionalAgentId();
 const externalRunId = \`cencori-agent-\${Date.now()}\`;
 const task =
   "Explain what this Cencori agent starter does and suggest one practical production use case.";
@@ -248,7 +262,7 @@ const startedAt = new Date().toISOString();
 const result = await runCencoriAgent({
   apiKey: readEnv("CENCORI_API_KEY"),
   baseUrl: readEnv("CENCORI_BASE_URL", "https://api.cencori.com/v1"),
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
+  agentId,
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   task,
   externalRunId,
@@ -257,8 +271,8 @@ const result = await runCencoriAgent({
 const completedAt = new Date().toISOString();
 
 const receipt = createRunReceipt({
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
-  agentName: readEnv("AGENT_NAME", "Cencori Research Agent"),
+  agentId,
+  agentName: readEnv("AGENT_NAME", agentId ? "Cencori Research Agent" : "Cencori project agent"),
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   externalRunId,
   task,

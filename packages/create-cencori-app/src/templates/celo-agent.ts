@@ -126,6 +126,19 @@ export function loadEnv() {
 export function readEnv(name, fallback = "") {
   return process.env[name] || fallback;
 }
+
+/** Set CENCORI_AGENT_ID only when a real dashboard agent UUID is configured. */
+export function readOptionalAgentId() {
+  const raw = (process.env.CENCORI_AGENT_ID || "").trim();
+  const placeholders = new Set([
+    "",
+    "demo-agent",
+    "your_agent_id",
+    "agent_uuid_or_blank_for_project_key",
+  ]);
+  if (placeholders.has(raw)) return null;
+  return raw;
+}
 `;
 
     files['src/receipt.mjs'] = `import crypto from "node:crypto";
@@ -335,13 +348,14 @@ import { fileURLToPath } from "node:url";
 import { runCencoriAgent } from "./cencori-agent.mjs";
 import { recordReceiptOnCelo } from "./celo-record.mjs";
 import { createReceipt, hashReceipt, stableJson } from "./receipt.mjs";
-import { loadEnv, readEnv } from "./env.mjs";
+import { loadEnv, readEnv, readOptionalAgentId } from "./env.mjs";
 
 loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.resolve(__dirname, "../output");
 
+const agentId = readOptionalAgentId();
 const externalRunId = \`cencori-celo-\${Date.now()}\`;
 const task =
   "Write a short market brief explaining why Cencori and Celo together matter for production agents that can safely move money.";
@@ -351,7 +365,7 @@ const startedAt = new Date().toISOString();
 const result = await runCencoriAgent({
   apiKey: readEnv("CENCORI_API_KEY"),
   baseUrl: readEnv("CENCORI_BASE_URL", "https://api.cencori.com/v1"),
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
+  agentId,
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   task,
   externalRunId,
@@ -360,8 +374,8 @@ const result = await runCencoriAgent({
 const completedAt = new Date().toISOString();
 
 const receipt = createReceipt({
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
-  agentName: "Cencori x Celo Research Agent",
+  agentId,
+  agentName: agentId ? "Cencori x Celo Research Agent" : "Cencori project agent",
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   externalRunId,
   task,
@@ -451,7 +465,8 @@ The first run works in simulation mode. To use real Cencori model calls, set:
 
 \`\`\`bash
 CENCORI_API_KEY=csk_...
-CENCORI_AGENT_ID=your_agent_id
+# Leave CENCORI_AGENT_ID empty for project-key-only, or set a dashboard agent UUID:
+# CENCORI_AGENT_ID=
 \`\`\`
 
 To record receipts on Celo Sepolia, deploy \`contracts/AgentRunReceipts.sol\` and set:

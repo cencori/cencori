@@ -4,13 +4,14 @@ import { fileURLToPath } from "node:url";
 import { runCencoriAgent } from "./cencori-agent.mjs";
 import { recordReceiptOnCelo } from "./celo-record.mjs";
 import { createReceipt, hashReceipt, stableJson } from "./receipt.mjs";
-import { loadEnv, readEnv } from "./env.mjs";
+import { loadEnv, readEnv, readOptionalAgentId } from "./env.mjs";
 
 loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.resolve(__dirname, "../output");
 
+const agentId = readOptionalAgentId();
 const externalRunId = `cencori-celo-${Date.now()}`;
 const task =
   "Write a short market brief explaining why Cencori and Celo together matter for production agents that can safely move money.";
@@ -20,7 +21,7 @@ const startedAt = new Date().toISOString();
 const result = await runCencoriAgent({
   apiKey: readEnv("CENCORI_API_KEY"),
   baseUrl: readEnv("CENCORI_BASE_URL", "https://api.cencori.com/v1"),
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
+  agentId,
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   task,
   externalRunId,
@@ -29,8 +30,8 @@ const result = await runCencoriAgent({
 const completedAt = new Date().toISOString();
 
 const receipt = createReceipt({
-  agentId: readEnv("CENCORI_AGENT_ID", "demo-agent"),
-  agentName: "Cencori x Celo Research Agent",
+  agentId,
+  agentName: agentId ? "Cencori x Celo Research Agent" : "Cencori project agent",
   model: readEnv("CENCORI_MODEL", "claude-sonnet-4-5"),
   externalRunId,
   task,

@@ -27,3 +27,16 @@ export function loadEnv() {
 export function readEnv(name, fallback = "") {
   return process.env[name] || fallback;
 }
+
+/** Set CENCORI_AGENT_ID only when a real dashboard agent UUID is configured. */
+export function readOptionalAgentId() {
+  const raw = (process.env.CENCORI_AGENT_ID || "").trim();
+  const placeholders = new Set([
+    "",
+    "demo-agent",
+    "your_agent_id",
+    "agent_uuid_or_blank_for_project_key",
+  ]);
+  if (placeholders.has(raw)) return null;
+  return raw;
+}
