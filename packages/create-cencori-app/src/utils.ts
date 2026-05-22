@@ -93,19 +93,26 @@ export async function runInstall(targetDir: string): Promise<void> {
 export function printSuccess(projectName: string, template: string, includeChat: boolean, startDev = false): void {
     const templateLabel = template === 'nextjs'
         ? 'Next.js + Vercel AI SDK'
-        : 'TanStack + React Query';
+        : template === 'tanstack'
+            ? 'TanStack + React Query'
+            : template === 'agent'
+                ? 'Cencori Agent Starter'
+                : 'Celo Agent Integration Starter';
     const envFile = template === 'nextjs' ? '.env.local' : '.env';
+    const isAgentStarter = template === 'agent' || template === 'celo-agent';
+    const startCommand = isAgentStarter ? 'npm run demo' : 'npm run dev';
+    const localUrl = isAgentStarter ? null : 'http://localhost:3000';
 
     console.log();
     console.log(chalk.gray('  ─────────────────────────────────────────────'));
     console.log();
     console.log(`  ${chalk.green.bold('Success!')} Created ${chalk.bold(projectName)}`);
     console.log(chalk.gray(`  Template: ${templateLabel}`));
-    if (includeChat) {
+    if (includeChat && !isAgentStarter) {
         console.log(chalk.gray(`  Chat UI: included`));
     }
     if (startDev) {
-        console.log(chalk.gray(`  Dev server: starting`));
+        console.log(chalk.gray(isAgentStarter ? '  Demo: running' : '  Dev server: starting'));
     }
     console.log();
 
@@ -118,11 +125,22 @@ export function printSuccess(projectName: string, template: string, includeChat:
         console.log(`       Open ${chalk.cyan(envFile)} and set ${chalk.cyan('CENCORI_API_KEY=csk_...')}`);
         console.log(`       Get a key → ${chalk.cyan('https://cencori.com/dashboard')}`);
         console.log(`       Confirm provider access in your project ${chalk.cyan('Providers')} page.`);
+        if (isAgentStarter) {
+            console.log(`       Optional: set ${chalk.cyan('CENCORI_AGENT_ID')} for an agent-scoped run.`);
+        }
+        if (template === 'celo-agent') {
+            console.log(`       Optional: set ${chalk.cyan('CELO_PRIVATE_KEY')} and ${chalk.cyan('CELO_RECEIPTS_CONTRACT')} to record onchain.`);
+        }
         console.log();
         console.log(`    ${chalk.gray('2.')} Start building:`);
-        console.log(`       ${chalk.cyan('npm run dev')}`);
-        console.log();
-        console.log(`    ${chalk.gray('3.')} Open ${chalk.cyan('http://localhost:3000')}`);
+        console.log(`       ${chalk.cyan(startCommand)}`);
+        if (localUrl) {
+            console.log();
+            console.log(`    ${chalk.gray('3.')} Open ${chalk.cyan(localUrl)}`);
+        } else {
+            console.log();
+            console.log(`    ${chalk.gray('3.')} Check the generated receipt in ${chalk.cyan('output/')}`);
+        }
     }
     console.log();
     console.log(chalk.gray('  ─────────────────────────────────────────────'));

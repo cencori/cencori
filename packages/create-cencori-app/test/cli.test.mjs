@@ -123,3 +123,64 @@ test('scaffolds Next.js no-chat without chat-only assets', () => {
         assert.equal(existsSync(join(projectDir, '.env.example')), true);
     });
 });
+
+test('scaffolds Cencori agent starter without integration dependencies', () => {
+    withTempDir((cwd) => {
+        runCli(cwd, [
+            'agent-app',
+            '--template',
+            'agent',
+            '--no-install',
+            '--api-key',
+            'csk_secret',
+        ]);
+
+        const projectDir = join(cwd, 'agent-app');
+        const packageJson = JSON.parse(read(projectDir, 'package.json'));
+        const env = read(projectDir, '.env');
+        const readme = read(projectDir, 'README.md');
+        const index = read(projectDir, 'src/index.mjs');
+
+        assert.equal(packageJson.scripts.demo, 'node src/index.mjs');
+        assert.equal(packageJson.dependencies, undefined);
+        assert.match(env, /CENCORI_API_KEY=csk_secret/);
+        assert.match(env, /CENCORI_BASE_URL=https:\/\/api\.cencori\.com\/v1/);
+        assert.match(readme, /default Cencori-native agent scaffold/);
+        assert.match(readme, /Celo Sepolia receipts on top of the Cencori agent core/);
+        assert.match(index, /Cencori Agent Starter Demo/);
+        assert.equal(existsSync(join(projectDir, 'src/run-receipt.mjs')), true);
+        assert.equal(existsSync(join(projectDir, 'src/celo-record.mjs')), false);
+        assert.equal(existsSync(join(projectDir, 'contracts/AgentRunReceipts.sol')), false);
+        assert.equal(existsSync(join(projectDir, '.env.example')), true);
+    });
+});
+
+test('scaffolds Celo agent starter with Cencori defaults and receipt contract', () => {
+    withTempDir((cwd) => {
+        runCli(cwd, [
+            'celo-agent-app',
+            '--template',
+            'celo-agent',
+            '--no-install',
+            '--api-key',
+            'csk_secret',
+        ]);
+
+        const projectDir = join(cwd, 'celo-agent-app');
+        const packageJson = JSON.parse(read(projectDir, 'package.json'));
+        const env = read(projectDir, '.env');
+        const readme = read(projectDir, 'README.md');
+        const contract = read(projectDir, 'contracts/AgentRunReceipts.sol');
+        const index = read(projectDir, 'src/index.mjs');
+
+        assert.equal(packageJson.scripts.demo, 'node src/index.mjs');
+        assert.equal(packageJson.dependencies.viem, '^2.39.3');
+        assert.match(env, /CENCORI_API_KEY=csk_secret/);
+        assert.match(env, /CENCORI_BASE_URL=https:\/\/api\.cencori\.com\/v1/);
+        assert.match(env, /CELO_RPC_URL=https:\/\/forno\.celo-sepolia\.celo-testnet\.org/);
+        assert.match(readme, /Cencori for agent infrastructure/);
+        assert.match(contract, /event AgentRunRecorded/);
+        assert.match(index, /Cencori x Celo Agent Receipt Demo/);
+        assert.equal(existsSync(join(projectDir, '.env.example')), true);
+    });
+});
