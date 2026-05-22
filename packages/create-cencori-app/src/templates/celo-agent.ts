@@ -49,7 +49,7 @@ CELO_PRIVATE_KEY=
 CELO_RECEIPTS_CONTRACT=
 CELO_EXPLORER_URL=https://celo-sepolia.blockscout.com
 
-# Demo payment metadata
+# Receipt-only payment story (NOT an onchain USDC transfer in this starter)
 DEMO_PAYEE_ADDRESS=
 DEMO_PAYMENT_TOKEN=USDC
 DEMO_PAYMENT_AMOUNT=0.05
@@ -396,6 +396,9 @@ const receipt = createReceipt({
     payment_token: readEnv("DEMO_PAYMENT_TOKEN", "USDC"),
     payment_amount: readEnv("DEMO_PAYMENT_AMOUNT", "0.05"),
     payee: readEnv("DEMO_PAYEE_ADDRESS", ""),
+    payment_settled_onchain: false,
+    payment_note:
+      "payment_* fields are receipt metadata only; onchain tx is recordRun(receiptHash), not a token transfer",
   },
 });
 
@@ -427,6 +430,9 @@ console.log(\`Receipt file: \${receiptPath}\`);
 console.log(\`Onchain recorded: \${onchain.simulated ? "no (simulation mode)" : "yes"}\`);
 if (onchain.message) console.log(\`Note: \${onchain.message}\`);
 if (explorerUrl) console.log(\`Celo explorer: \${explorerUrl}\`);
+console.log(
+  "Payment fields in receipt JSON are metadata only (no USDC transfer in this starter)."
+);
 console.log("");
 console.log("Agent output preview:");
 console.log(result.content.slice(0, 800));
@@ -443,6 +449,12 @@ This scaffold is designed for Celo agent hackathon builders who want to ship qui
 Cencori for agent infrastructure.
 Celo for agent economy.
 \`\`\`
+
+## Payments vs onchain proof
+
+- **Onchain in this repo:** `recordRun(receiptHash, …)` on `AgentRunReceipts` (proof event).
+- **Not in this repo:** USDC/USDT transfers, x402 charges, or MiniPay sends.
+- `DEMO_PAYMENT_*` values are copied into the receipt JSON for demos; they do not execute a payment.
 
 ## What You Get
 
