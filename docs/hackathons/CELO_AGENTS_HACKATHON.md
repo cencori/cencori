@@ -1,5 +1,8 @@
 # Cencori x Celo Agents Hackathon Guide
 
+> **Published URL (share with builders):** https://cencori.com/docs/hackathons/celo-agents  
+> This repo copy is for editing before deploy. Remove `content/docs/hackathons/celo-agents.mdx` after the hackathon ends.
+
 Status: Standalone hackathon guide  
 Audience: Celo hackathon builders using Cencori Agents  
 Last updated: 2026-05-22  
