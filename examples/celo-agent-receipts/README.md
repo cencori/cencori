@@ -11,6 +11,11 @@ Cencori gives agents production infrastructure.
 
 The demo runs a Cencori-governed agent task, creates a structured receipt for the run, hashes that receipt, and optionally records the receipt hash on Celo Sepolia.
 
+## Payments vs onchain proof
+
+- **Onchain in this example:** `recordRun(receiptHash, …)` — anchors proof, does **not** transfer USDC.
+- **`DEMO_PAYMENT_*` / `celo.payment_*` in the receipt:** metadata for demos only, not a live payment.
+
 ## What It Shows
 
 - A Cencori agent can perform useful work through the Gateway.

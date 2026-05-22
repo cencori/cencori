@@ -39,6 +39,25 @@ By the end, you will have:
 - Optional Celo Sepolia onchain recording of the receipt hash.
 - A clean base for adding x402 payments, MiniPay flows, or ERC-8004 reputation later.
 
+## Payments vs onchain proof (read this)
+
+This starter has **two separate layers**:
+
+| Layer | What happens in the demo |
+| --- | --- |
+| **Cencori** | Real (or simulated) model call through the Gateway |
+| **Receipt JSON** | Local file in `output/` with run metadata |
+| **Onchain (Celo)** | One transaction: `recordRun(receiptHash, …)` on `AgentRunReceipts` — an **event**, not a token transfer |
+
+The `DEMO_PAYMENT_*` env vars and the `celo.payment_*` fields in the receipt are **storytelling metadata** for judges (e.g. “this run would cost 0.05 USDC”). They are **not** sent to a payee onchain in this repo.
+
+```text
+✓ Onchain today: proof that a run completed (receipt hash anchored)
+✗ Not in scope yet: USDC transfer, x402 settlement, MiniPay send
+```
+
+If a builder’s explorer tx only shows `recordRun`, that is correct — they should not expect a USDC `Transfer` event from this starter.
+
 ## Prerequisites
 
 **Required:**
@@ -153,7 +172,7 @@ The starter sends `X-Agent-ID` only when `CENCORI_AGENT_ID` is a real UUID (not 
 ### Notes
 
 - `CENCORI_MODEL` must be enabled for your project (configure **Providers** if you get a provider error).
-- `DEMO_PAYMENT_*` fields are **metadata in the receipt JSON** only. The onchain step records the receipt hash via `recordRun` — it does not transfer USDC in this demo.
+- See [Payments vs onchain proof](#payments-vs-onchain-proof-read-this) — `DEMO_PAYMENT_*` does not move funds.
 
 Run again:
 
@@ -230,14 +249,14 @@ Celo explorer: https://celo-sepolia.blockscout.com/tx/0x...
 Show these four things:
 
 - The agent task running through Cencori.
-- The generated receipt file in `output/`.
+- The generated receipt file in `output/` (point out `celo.payment_*` as **planned** payment metadata).
 - The receipt hash printed in the terminal.
-- The Celo Sepolia explorer transaction if you enabled onchain recording.
+- The Celo Sepolia explorer transaction for **`recordRun`** (proof), not a USDC transfer.
 
 Strong demo sentence:
 
 ```text
-This agent runs through Cencori for model routing, safety, observability, and spend control, then records proof of completed work on Celo.
+This agent runs through Cencori for model routing, safety, observability, and spend control, then anchors a verifiable receipt hash on Celo Sepolia. Payment fields in the receipt describe intent; actual stablecoin settlement is the next layer (x402 / transfers).
 ```
 
 ## Real-World Use Cases
