@@ -172,6 +172,7 @@ test('scaffolds Celo agent starter with Cencori defaults and receipt contract', 
         const readme = read(projectDir, 'README.md');
         const contract = read(projectDir, 'contracts/AgentRunReceipts.sol');
         const index = read(projectDir, 'src/index.mjs');
+        const envMjs = read(projectDir, 'src/env.mjs');
 
         assert.equal(packageJson.scripts.demo, 'node src/index.mjs');
         assert.equal(packageJson.dependencies.viem, '^2.39.3');
@@ -181,6 +182,9 @@ test('scaffolds Celo agent starter with Cencori defaults and receipt contract', 
         assert.match(readme, /Cencori for agent infrastructure/);
         assert.match(contract, /event AgentRunRecorded/);
         assert.match(index, /Cencori x Celo Agent Receipt Demo/);
+        assert.match(envMjs, /readOptionalAgentId/);
+        assert.match(index, /readOptionalAgentId/);
+        assert.doesNotMatch(index, /demo-agent/);
         assert.equal(existsSync(join(projectDir, '.env.example')), true);
     });
 });
