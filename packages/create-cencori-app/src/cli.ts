@@ -9,6 +9,8 @@
  *   npx create-cencori-app my-project
  *   npx create-cencori-app my-project --template nextjs
  *   npx create-cencori-app my-project --template tanstack --no-chat
+ *   npx create-cencori-app my-agent --template agent
+ *   npx create-cencori-app my-agent --template celo-agent
  */
 
 import { program } from 'commander';
@@ -18,6 +20,8 @@ import { select, confirm, password } from '@inquirer/prompts';
 import { validateProjectName, writeTemplateFiles, runInstall, printSuccess } from './utils';
 import { getNextjsTemplate } from './templates/nextjs';
 import { getTanstackTemplate } from './templates/tanstack';
+import { getAgentTemplate } from './templates/agent';
+import { getCeloAgentTemplate } from './templates/celo-agent';
 import packageJson from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -25,8 +29,8 @@ import { spawn } from 'child_process';
 
 const VERSION = packageJson.version;
 
-type Template = 'nextjs' | 'tanstack';
-const TEMPLATES: Template[] = ['nextjs', 'tanstack'];
+type Template = 'nextjs' | 'tanstack' | 'agent' | 'celo-agent';
+const TEMPLATES: Template[] = ['nextjs', 'tanstack', 'agent', 'celo-agent'];
 
 interface CreateOptions {
     template?: Template;
@@ -75,11 +79,11 @@ async function main(): Promise<void> {
         .description('Create a new AI app powered by Cencori.')
         .version(VERSION)
         .argument('<project-name>', 'Name of your project')
-        .option('-t, --template <template>', 'Template to use (nextjs or tanstack)')
+        .option('-t, --template <template>', 'Template to use (nextjs, tanstack, agent, or celo-agent)')
         .option('--no-chat', 'Skip the demo chat UI component')
         .option('--no-install', 'Skip installing dependencies')
         .option('--api-key <key>', 'Pre-fill your Cencori API key')
-        .option('--dev', 'Start the dev server after scaffolding')
+        .option('--dev', 'Start the dev server or run the agent demo after scaffolding')
         .action(async (projectName: string, options: CreateOptions) => {
             printBanner();
 
@@ -116,7 +120,7 @@ async function main(): Promise<void> {
 
             if (!template) {
                 template = await select<Template>({
-                    message: 'Select a framework:',
+                    message: 'Select a template:',
                     choices: [
                         {
                             name: 'Next.js (App Router + Vercel AI SDK)',
@@ -128,11 +132,23 @@ async function main(): Promise<void> {
                             value: 'tanstack',
                             description: 'Lightweight React with TanStack Query for data fetching',
                         },
+                        {
+                            name: 'Cencori Agent (Gateway + run receipts)',
+                            value: 'agent',
+                            description: 'Cencori-native agent starter with Gateway, controls, and local run receipts',
+                        },
+                        {
+                            name: 'Celo Agent (Cencori + Celo receipts)',
+                            value: 'celo-agent',
+                            description: 'Integration starter that layers Celo Sepolia receipts on the Cencori agent core',
+                        },
                     ],
                 });
             }
 
-            if (chatOptionSource === 'default' && process.stdin.isTTY) {
+            if (template === 'agent' || template === 'celo-agent') {
+                includeChat = false;
+            } else if (chatOptionSource === 'default' && process.stdin.isTTY) {
                 includeChat = await confirm({
                     message: 'Include a demo chat UI?',
                     default: true,
@@ -201,11 +217,19 @@ async function main(): Promise<void> {
             try {
                 const templateLabel = template === 'nextjs'
                     ? 'Next.js + Vercel AI SDK'
-                    : 'TanStack + React Query';
+                    : template === 'tanstack'
+                        ? 'TanStack + React Query'
+                        : template === 'agent'
+                            ? 'Cencori Agent Starter'
+                            : 'Celo Agent Integration Starter';
 
                 const files = template === 'nextjs'
                     ? getNextjsTemplate({ projectName, includeChat, apiKey })
-                    : getTanstackTemplate({ projectName, includeChat, apiKey });
+                    : template === 'tanstack'
+                        ? getTanstackTemplate({ projectName, includeChat, apiKey })
+                        : template === 'agent'
+                            ? getAgentTemplate({ projectName, apiKey })
+                            : getCeloAgentTemplate({ projectName, apiKey });
 
                 writeTemplateFiles(targetDir, files);
                 templateSpinner.succeed(`Scaffolded ${chalk.bold(templateLabel)}`);
@@ -236,9 +260,10 @@ async function main(): Promise<void> {
 
             // ── Start dev server ──
             if (startDev && options.install !== false) {
-                console.log(chalk.cyan('Starting dev server...'));
+                const command = template === 'agent' || template === 'celo-agent' ? 'demo' : 'dev';
+                console.log(chalk.cyan(command === 'demo' ? 'Running agent demo...' : 'Starting dev server...'));
                 console.log();
-                spawn('npm', ['run', 'dev'], { cwd: targetDir, stdio: 'inherit' });
+                spawn('npm', ['run', command], { cwd: targetDir, stdio: 'inherit' });
             }
         });
 

@@ -35,6 +35,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!examples/celo-agent-receipts/.env.example
 
 # vercel
 .vercel
@@ -55,3 +56,6 @@ packages/create-cencori-app/dist
 # Agents
 .agent/
 .agents/
+docs/prds/CENCORI_AGENTS_PRD.md
+docs/prds/CENCORI_CELO_AGENTS_HACKATHON_BRIEF.md
+examples/celo-agent-receipts/output/
