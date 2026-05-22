@@ -76,9 +76,11 @@ export async function createAgent({
 
     const { error: keyError } = await supabase.from('api_keys').insert({
         project_id: projectId,
+        agent_id: agent.id,
         key_hash: keyHash,
         key_prefix: 'cake_',
-        name: `Agent ${agent.id} Key`
+        key_type: 'agent',
+        name: `Agent ${agent.id} Key`,
     });
 
     if (keyError) {

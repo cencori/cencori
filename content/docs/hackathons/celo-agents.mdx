@@ -124,6 +124,8 @@ Important files:
 
 ## 4. Add Cencori
 
+### Path A — Project API key only (fastest)
+
 Open `.env` and set:
 
 ```bash
@@ -133,12 +135,25 @@ CENCORI_BASE_URL=https://api.cencori.com/v1
 CENCORI_MODEL=claude-sonnet-4-5
 ```
 
-Notes:
+Leave `CENCORI_AGENT_ID` **empty**. The starter will not send `X-Agent-ID`, so your project key works without creating a dashboard agent first.
 
-- `CENCORI_API_KEY` is your project key from the [Cencori dashboard](https://cencori.com/dashboard/organizations).
-- `CENCORI_AGENT_ID` is optional. Use it if you created a dashboard agent and want requests scoped to it.
-- `CENCORI_MODEL` can be any model enabled in your Cencori project.
-- If you see a provider configuration error, your Cencori key works, but the selected model provider is not configured yet.
+### Path B — Dashboard agent (shadow mode, live feed, config from UI)
+
+1. In [Cencori](https://cencori.com/dashboard/organizations), open your project → **Agents** → create an agent.
+2. Copy the agent UUID and the **`cake_` agent API key** from the agent page.
+3. Set in `.env`:
+
+```bash
+CENCORI_API_KEY=cake_...
+CENCORI_AGENT_ID=<your-agent-uuid>
+```
+
+The starter sends `X-Agent-ID` only when `CENCORI_AGENT_ID` is a real UUID (not placeholders like `demo-agent`).
+
+### Notes
+
+- `CENCORI_MODEL` must be enabled for your project (configure **Providers** if you get a provider error).
+- `DEMO_PAYMENT_*` fields are **metadata in the receipt JSON** only. The onchain step records the receipt hash via `recordRun` — it does not transfer USDC in this demo.
 
 Run again:
 

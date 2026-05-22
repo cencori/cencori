@@ -38,7 +38,8 @@ Add at least:
 
 ```bash
 CENCORI_API_KEY=your_cencori_key
-CENCORI_AGENT_ID=your_agent_id
+# Optional — leave empty for project-key-only (do not use demo-agent):
+# CENCORI_AGENT_ID=
 ```
 
 For onchain recording, also add:
