@@ -1,11 +1,12 @@
-# Cencori x Celo Agents Hackathon Guide
+---
+title: "Celo Agents Hackathon"
+description: "Build a Cencori-powered agent with optional Celo Sepolia receipt proof. Quickstart for Celo hackathon builders."
+section: "Hackathons"
+order: 1
+lastUpdated: "2026-05-22"
+---
 
-> **Published URL (share with builders):** https://cencori.com/docs/hackathons/celo-agents  
-> This repo copy is for editing before deploy. Remove `content/docs/hackathons/celo-agents.mdx` after the hackathon ends.
-
-Status: Standalone hackathon guide  
-Audience: Celo hackathon builders using Cencori Agents  
-Last updated: 2026-05-22  
+Standalone guide for Celo hackathon builders using Cencori Agents.
 
 ## The Goal
 
@@ -40,18 +41,18 @@ By the end, you will have:
 
 ## Prerequisites
 
-Required:
+**Required:**
 
 - Node.js 18 or newer.
 - npm, pnpm, yarn, or bun.
 
-Optional for real Cencori model calls:
+**Optional for real Cencori model calls:**
 
-- A Cencori account.
+- A [Cencori account](https://cencori.com/signup).
 - A Cencori project API key: `csk_...`.
 - Provider access for the model you want to call.
 
-Optional for Celo onchain recording:
+**Optional for Celo onchain recording:**
 
 - A Celo Sepolia wallet.
 - Testnet funds for gas.
@@ -60,8 +61,6 @@ Optional for Celo onchain recording:
 The first demo run does not require keys. It runs in simulation mode so you can start immediately.
 
 ## 1. Create The Starter
-
-Run:
 
 ```bash
 npx create-cencori-app my-celo-agent --template celo-agent
@@ -136,7 +135,7 @@ CENCORI_MODEL=claude-sonnet-4-5
 
 Notes:
 
-- `CENCORI_API_KEY` is your project key from Cencori.
+- `CENCORI_API_KEY` is your project key from the [Cencori dashboard](https://cencori.com/dashboard/organizations).
 - `CENCORI_AGENT_ID` is optional. Use it if you created a dashboard agent and want requests scoped to it.
 - `CENCORI_MODEL` can be any model enabled in your Cencori project.
 - If you see a provider configuration error, your Cencori key works, but the selected model provider is not configured yet.
@@ -228,8 +227,6 @@ This agent runs through Cencori for model routing, safety, observability, and sp
 
 ## Real-World Use Cases
 
-Use these as hackathon project ideas:
-
 | Use case | What Cencori does | What Celo does |
 | --- | --- | --- |
 | Paid research agent | Runs the research agent and logs cost/output | Records proof of completed research and payment metadata |
@@ -245,9 +242,9 @@ This starter focuses on receipts first because receipts are the simplest proof p
 
 Next layers:
 
-- x402: use when an API, tool, or agent action should require payment before execution.
-- MiniPay: use when the end user is a MiniPay wallet user.
-- ERC-8004: use when your agent needs public identity, validation, or reputation.
+- **x402**: use when an API, tool, or agent action should require payment before execution.
+- **MiniPay**: use when the end user is a MiniPay wallet user.
+- **ERC-8004**: use when your agent needs public identity, validation, or reputation.
 
 Keep the stack clean:
 
@@ -306,9 +303,9 @@ ls output
 
 ## Links
 
-- Cencori: https://cencori.com
-- Celo: https://celo.org
-- Celo Sepolia Explorer: https://celo-sepolia.blockscout.com
-- Celo Build with AI: https://docs.celo.org/build-on-celo/build-with-ai/overview
-- ERC-8004: https://eips.ethereum.org/EIPS/eip-8004
-- x402: https://www.x402.org
+- [Cencori](https://cencori.com)
+- [Celo](https://celo.org)
+- [Celo Sepolia Explorer](https://celo-sepolia.blockscout.com)
+- [Celo Build with AI](https://docs.celo.org/build-on-celo/build-with-ai/overview)
+- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
+- [x402](https://www.x402.org)
