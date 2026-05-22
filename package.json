@@ -17,7 +17,9 @@
     "e2e:security": "playwright test --grep @security",
     "e2e:ui": "playwright test --ui",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:integration:watch": "vitest --config vitest.integration.config.ts"
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
+    "test:gateway": "vitest run --config vitest.gateway.config.ts",
+    "test:gateway:watch": "vitest --config vitest.gateway.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
