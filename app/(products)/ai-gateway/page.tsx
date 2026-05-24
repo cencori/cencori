@@ -11,6 +11,7 @@ import {
   ChevronRightIcon,
   Square3Stack3DIcon,
   CheckCircleIcon,
+  CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 import {
   OpenAI,
@@ -83,6 +84,15 @@ const pillars = [
     color: "cyan",
     features: ["Audit logs", "Security incidents", "Policy enforcement"],
   },
+  {
+    id: "billing",
+    title: "End-User Billing",
+    tagline: "Monetize AI usage",
+    description: "Meter, limit, and charge your users for AI consumption. Stripe Connect native with markup pricing.",
+    icon: CurrencyDollarIcon,
+    color: "amber",
+    features: ["Per-user metering", "Rate plan enforcement", "Stripe Connect payouts"],
+  },
 ];
 
 // Supported providers
@@ -105,11 +115,16 @@ const colorClasses: Record<string, { bg: string; border: string; text: string }>
   purple: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-500" },
   orange: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-500" },
   cyan: { bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-500" },
+  amber: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-500" },
 };
 
 export default function AIGatewayPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null }>({ name: null, avatar: null });
+
+  // Interactive Billing Calculator State
+  const [selectedCalcModel, setSelectedCalcModel] = useState<"gpt" | "claude" | "llama">("gpt");
+  const [markupPercent, setMarkupPercent] = useState(100);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -161,6 +176,18 @@ export default function AIGatewayPage() {
     { text: userProfile.name || "User", href: "#", isButton: false, isAvatar: true, avatarSrc: userProfile.avatar, avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase() },
   ];
 
+  const modelInfo = {
+    gpt: { name: "GPT-4o (OpenAI)", raw: 5.00 },
+    claude: { name: "Claude 3.5 Sonnet", raw: 9.00 },
+    llama: { name: "Llama 3 70B (Groq)", raw: 0.80 },
+  };
+
+  const selectedModel = modelInfo[selectedCalcModel];
+  const rawCost = selectedModel.raw;
+  const markupAmount = (rawCost * markupPercent) / 100;
+  const retailPrice = rawCost + markupAmount;
+  const profitMarginPercent = retailPrice > 0 ? Math.round((markupAmount / retailPrice) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
       <Navbar
@@ -172,11 +199,16 @@ export default function AIGatewayPage() {
 
       <main>
         {/* Hero Section */}
-        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-background pt-32 pb-20">
+        <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0 relative overflow-hidden">
           {/* Background Effects */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
 
-          <div className="container relative z-10 px-4 md:px-6 flex flex-col items-center text-center">
+          <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 py-20 sm:px-12 sm:py-28 z-10 flex flex-col items-center text-center">
+            {/* Corner Intersection Markers */}
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
             {/* Badge */}
             <Link
               href="/"
@@ -187,14 +219,14 @@ export default function AIGatewayPage() {
             </Link>
 
             {/* Headline */}
-            <h1 className="mb-8 max-w-3xl text-[3rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[4.5rem] lg:text-[5.5rem] text-foreground">
-              AI 
-              <span className="font-serif italic font-normal text-muted-foreground"> Gateway.</span>
+            <h1 className="mb-8 max-w-3xl text-[2.5rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[3.5rem] lg:text-[4.5rem] text-foreground">
+            Every AI request, under your
+              <span className="font-serif italic font-normal text-muted-foreground"> control.</span>
             </h1>
 
             {/* Subheadline */}
             <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
-              One API for every AI provider. Built-in security, observability, and compliance.
+            One endpoint for 100+ models. AI control, security, observability, and monetization. <br/>OpenAI-compatible API. Fast setup. No rewrite.
             </p>
 
             {/* CTAs */}
@@ -226,72 +258,74 @@ export default function AIGatewayPage() {
         </section>
 
         {/* 5 Pillars Section */}
-        <section className="py-20 bg-background">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center text-center mb-12">
-              <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
+        <section className="bg-background border-b border-border/30">
+          <div className="mx-auto max-w-6xl border-x border-border/30 relative">
+            {/* Corner Intersection Markers */}
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+            {/* Header Area */}
+            <div className="flex flex-col items-center text-center px-6 py-20 sm:px-12">
+              <h2 className="text-2xl md:text-4xl font-heading font-semibold tracking-[-0.02em] mb-4 text-foreground leading-[1.1]">
                 Everything in <span className="text-muted-foreground">one gateway</span>
               </h2>
-              <p className="text-base text-muted-foreground max-w-xl">
-                AI Gateway combines five essential capabilities into one unified solution.
+              <p className="text-sm text-muted-foreground max-w-xl">
+                AI Gateway combines six essential capabilities into one unified solution.
               </p>
             </div>
 
-            {/* Pillar Cards - Bento Style */}
-            <div className="relative max-w-5xl mx-auto">
-              {/* Outer border with + corner markers */}
-              <div className="relative border border-border/40 bg-background">
-                {/* Corner markers */}
-                <div className="absolute -top-[7px] -left-[7px] w-[14px] h-[14px] flex items-center justify-center text-muted-foreground/50 text-xs z-10">+</div>
-                <div className="absolute -top-[7px] -right-[7px] w-[14px] h-[14px] flex items-center justify-center text-muted-foreground/50 text-xs z-10">+</div>
-                <div className="absolute -bottom-[7px] -left-[7px] w-[14px] h-[14px] flex items-center justify-center text-muted-foreground/50 text-xs z-10">+</div>
-                <div className="absolute -bottom-[7px] -right-[7px] w-[14px] h-[14px] flex items-center justify-center text-muted-foreground/50 text-xs z-10">+</div>
+            {/* Pillar Cards - Connected Grid Layout */}
+            <div className="relative border-t border-border/30">
+              {/* Horizontal divider intersection markers */}
+              <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+              <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
 
-                {/* Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {pillars.map((pillar, index) => {
-                    const colors = colorClasses[pillar.color];
-                    const isLastRow = index >= 3;
-                    const isRightEdge = (index + 1) % 3 === 0 || index === pillars.length - 1;
-                    return (
-                      <div
-                        key={pillar.id}
-                        className={cn(
-                          "group relative flex flex-col p-6 transition-colors duration-300 hover:bg-foreground/[0.02]",
-                          !isLastRow && "border-b border-border/40",
-                          !isRightEdge && "lg:border-r border-border/40",
-                          "md:border-r md:border-b border-border/40",
-                          "md:[&:nth-child(2n)]:border-r-0",
-                          "lg:[&:nth-child(2n)]:border-r",
-                          "lg:[&:nth-child(3n)]:border-r-0",
-                          pillar.id === "routing" && "lg:col-span-2"
-                        )}
-                      >
-                        {/* Icon */}
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-4", colors.bg, colors.border, "border")}>
-                          <pillar.icon className={cn("h-4 w-4", colors.text)} aria-hidden="true" />
-                        </div>
-
-                        {/* Content */}
-                        <h3 className="text-base font-semibold tracking-tight mb-1">{pillar.title}</h3>
-                        <p className={cn("text-xs font-medium mb-2", colors.text)}>{pillar.tagline}</p>
-                        <p className="text-muted-foreground text-sm leading-relaxed mb-4">
-                          {pillar.description}
-                        </p>
-
-                        {/* Feature list */}
-                        <ul className="mt-auto space-y-1.5">
-                          {pillar.features.map((feature, i) => (
-                            <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <CheckCircleIcon className={cn("w-3 h-3", colors.text)} aria-hidden="true" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
+              {/* Grid / Mobile scroll */}
+              <div className="flex overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-2 lg:grid-cols-3">
+                {pillars.map((pillar, index) => {
+                  const colors = colorClasses[pillar.color];
+                  return (
+                    <div
+                      key={pillar.id}
+                      className={cn(
+                        "group relative flex flex-col p-8 transition-colors duration-300 hover:bg-foreground/[0.02]",
+                        "w-[80vw] max-w-[280px] sm:max-w-[320px] flex-shrink-0 snap-start md:w-auto md:max-w-none md:flex-shrink md:snap-align-none",
+                        // Mobile: horizontal scroll borders (right border on all except last, no bottom border)
+                        "border-r border-border/30 last:border-r-0 border-b-0",
+                        // Medium screen (2 cols): bottom border on first 4, right border on even-index
+                        index < 4 ? "md:border-b" : "md:border-b-0",
+                        index % 2 === 0 ? "md:border-r" : "md:border-r-0",
+                        // Large screen (3 cols, 2 rows): bottom border on first row, right border on cols 1 & 2
+                        index < 3 ? "lg:border-b" : "lg:border-b-0",
+                        index % 3 !== 2 ? "lg:border-r" : "lg:border-r-0"
+                      )}
+                    >
+                      {/* Icon */}
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-4", colors.bg, colors.border, "border")}>
+                        <pillar.icon className={cn("h-4 w-4", colors.text)} aria-hidden="true" />
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Content */}
+                      <h3 className="text-base font-semibold tracking-tight mb-1">{pillar.title}</h3>
+                      <p className={cn("text-xs font-medium mb-2", colors.text)}>{pillar.tagline}</p>
+                      <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                        {pillar.description}
+                      </p>
+
+                      {/* Feature list */}
+                      <ul className="mt-auto space-y-1.5">
+                        {pillar.features.map((feature, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircleIcon className={cn("w-3 h-3", colors.text)} aria-hidden="true" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -300,14 +334,20 @@ export default function AIGatewayPage() {
         <Integrations />
 
         {/* Code Example Section */}
-        <section className="py-20 bg-background">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="grid lg:grid-cols-2 gap-8 items-center max-w-5xl mx-auto">
+        <section className="bg-background border-b border-border/30">
+          <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 py-20 sm:px-12 sm:py-28">
+            {/* Corner Intersection Markers */}
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+            <div className="grid lg:grid-cols-2 gap-8 items-center">
               <div>
-                <h2 className="text-2xl md:text-4xl font-bold tracking-tighter mb-4 text-foreground">
+                <h2 className="text-2xl md:text-4xl font-heading font-semibold tracking-[-0.02em] mb-4 text-foreground leading-[1.1]">
                   Integrate in <span className="text-muted-foreground">3 lines</span>
                 </h2>
-                <p className="text-base text-muted-foreground mb-6 leading-relaxed">
+                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
                   Drop-in replacement for your existing OpenAI calls. Switch providers with one parameter.
                 </p>
 
@@ -332,8 +372,8 @@ export default function AIGatewayPage() {
               </div>
 
               <div className="relative">
-                <div className="border border-border/40 bg-muted/20 overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/30">
+                <div className="border border-border/30 bg-muted/20 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/30 bg-muted/30">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
@@ -358,11 +398,17 @@ export default function AIGatewayPage() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-16 bg-background">
-          <div className="container mx-auto px-4 md:px-6">
+        <section className="bg-background border-b border-border/30">
+          <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 py-16 sm:px-12">
+            {/* Corner Intersection Markers */}
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
               {[
-                { value: "14+", label: "AI Providers" },
+                { value: "14+", label: "Providers Supported" },
                 { value: "<50ms", label: "Added Latency" },
                 { value: "99.9%", label: "Uptime SLA" },
                 { value: "100+", label: "Models Available" },
@@ -372,6 +418,168 @@ export default function AIGatewayPage() {
                   <div className="text-xs text-muted-foreground">{stat.label}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* End-User Billing Seductive Section */}
+        <section className="bg-background border-b border-border/30 relative overflow-hidden">
+          <div className="mx-auto max-w-6xl border-x border-border/30 relative">
+            {/* Corner Intersection Markers */}
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+              {/* Left Column: Copy & Value Props */}
+              <div className="lg:col-span-6 p-8 sm:p-12 sm:py-20 flex flex-col justify-center space-y-6">
+                
+                <h2 className="text-3xl sm:text-4xl lg:text-4xl font-heading font-black leading-[0.95] tracking-[-0.02em] text-foreground">
+                  The only AI gateway <br/>
+                  that <span className="font-serif italic font-normal text-muted-foreground">makes you money.</span>
+                </h2>
+                
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                Every other gateway stops at routing. Cencori closes the loop with native monetization, budgets, and direct payouts — no extra plumbing, no revenue leakage.
+                </p>
+
+                <div className="space-y-4 pt-4">
+                  {[
+                    {
+                      title: "Zero-latency margin calculator",
+                      desc: "Set percentage markups or flat fees per model. The math is calculated on the fly as payloads pass through the gateway.",
+                    },
+                    {
+                      title: "Hard edge quota enforcement",
+                      desc: "Define strict token, request, or dollar limits per user. When limits are exceeded, Cencori blocks requests with a neat 429 at the edge, keeping your API bills safe.",
+                    },
+                    {
+                      title: "Direct Stripe Connect payouts",
+                      desc: "Link your Stripe account once. Invoices are dispatched, funds are collected, and payouts land directly in your account. Cencori never touches the money.",
+                    },
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center">
+                        <CheckCircleIcon className="w-3 h-3 text-amber-500" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">{item.title}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column: Seductive Interactive Visual deconstructed into page grid */}
+              <div className="lg:col-span-6 flex flex-col border-t lg:border-t-0 lg:border-l border-border/30 bg-muted/[0.01]">
+                
+                {/* 1. Stripe Connection Header Row */}
+                <div className="relative border-b border-border/30 p-8 sm:px-10 sm:py-6 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Stripe Connect: Connected</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground bg-foreground/5 px-2 py-0.5 rounded border border-border/20">acct_cencori_19a</span>
+                </div>
+
+                {/* 2. Select Model & Surcharge Slider Row */}
+                <div className="relative border-b border-border/30 p-8 sm:px-10 sm:py-8 space-y-6">
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">1. Select Resold Model</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["gpt", "claude", "llama"] as const).map((modelKey) => (
+                        <button
+                          key={modelKey}
+                          onClick={() => setSelectedCalcModel(modelKey)}
+                          className={cn(
+                            "py-2 px-3 text-xs font-medium rounded-md border transition-all",
+                            selectedCalcModel === modelKey
+                              ? "bg-foreground text-background border-foreground font-semibold"
+                              : "border-border/30 hover:border-foreground/30 hover:bg-foreground/[0.02]"
+                          )}
+                        >
+                          {modelKey === "gpt" ? "GPT-4o" : modelKey === "claude" ? "Claude 3.5" : "Llama 3"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">2. Surcharge / Markup Percentage</label>
+                      <span className="text-xs font-mono font-bold text-amber-500">+{markupPercent}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="300"
+                      step="5"
+                      value={markupPercent}
+                      onChange={(e) => setMarkupPercent(Number(e.target.value))}
+                      className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-none"
+                    />
+                    <div className="flex justify-between text-[9px] text-muted-foreground/60 font-mono">
+                      <span>Cost (0%)</span>
+                      <span>100%</span>
+                      <span>300%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Calculations, Margins and Code block Row */}
+                <div className="p-8 sm:px-10 sm:py-8 space-y-6 flex-grow flex flex-col justify-between">
+                  {/* Math readout */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block mb-0.5">Raw API Cost</span>
+                      <span className="text-lg font-mono font-semibold text-muted-foreground">${rawCost.toFixed(2)}<span className="text-[9px] font-normal text-muted-foreground/60 block">per 1M tokens</span></span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-mono tracking-wider text-amber-500 block mb-0.5">Retail Price Charged</span>
+                      <span className="text-lg font-mono font-semibold text-foreground">${retailPrice.toFixed(2)}<span className="text-[9px] font-normal text-muted-foreground/60 block">per 1M tokens</span></span>
+                    </div>
+                  </div>
+
+                  {/* Glowing profit readout */}
+                  <div className="bg-amber-500/[0.03] border border-amber-500/20 rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-mono tracking-wider text-amber-500 block mb-0.5">Gross Margin</span>
+                      <span className="text-2xl font-mono font-black tracking-tight text-amber-500">
+                        {profitMarginPercent}%
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block mb-0.5">Your Margin Profit</span>
+                      <span className="text-xl font-mono font-bold text-emerald-500">
+                        +${markupAmount.toFixed(2)}<span className="text-xs font-normal text-muted-foreground/80">/1M</span>
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Visual integration snippet demo */}
+                  <div className="space-y-2 mt-2">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">3. Pass User Context in Header</span>
+                    <div className="border border-border/20 bg-background/50 rounded overflow-hidden">
+                      <pre className="p-3 text-[10px] font-mono text-muted-foreground/90 overflow-x-auto leading-relaxed">
+                        <code>
+                          <span className="text-blue-400">const</span> response = <span className="text-blue-400">await</span> cencori.ai.<span className="text-yellow-400">chat</span>({"{"}{"\n"}
+                          {"  "}model: <span className="text-emerald-400">&apos;{selectedCalcModel === "gpt" ? "gpt-4o" : selectedCalcModel === "claude" ? "claude-3-5" : "llama-3"}&apos;</span>,{"\n"}
+                          {"  "}messages: [{"{"} role: <span className="text-emerald-400">&apos;user&apos;</span>, content: <span className="text-emerald-400">&apos;...&apos;</span> {"}"}],{"\n"}
+                          {"  "}<span className="text-amber-500 font-semibold">user: &apos;user_123&apos;</span> <span className="text-muted-foreground/50">// Meters & limits instantly</span>{"\n"}
+                          {"}"});
+                        </code>
+                      </pre>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground/60 text-center mt-2">
+                    Every request meters token counts and charges user balance automatically at the network edge.
+                  </p>
+                </div>
+
+              </div>
             </div>
           </div>
         </section>
