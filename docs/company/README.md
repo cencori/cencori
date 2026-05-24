@@ -296,6 +296,14 @@ The confidential representation layer for AI agents: identity, positioning, prod
 
 ---
 
+## Official Capital & Fundraising
+
+| Document | Audience | Purpose |
+|----------|----------|---------|
+| [SEED_CAPITAL_PLAN_2026.md](./SEED_CAPITAL_PLAN_2026.md) | Leadership, all employees (summary), trusted seed investors under NDA | Canonical $5M seed plan: use of funds, infra priorities, hiring, milestones, operating model |
+
+---
+
 ## Future Volumes
 
 These are not mandatory for the first major version of the bible, but they are likely candidates as the company scales:

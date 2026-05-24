@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
-type Tier = "free" | "pro" | "team" | "enterprise";
+type Tier = "free" | "pro" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
 type ScanTier = "scan_free" | "scan" | "scan_team";
 type PaidScanTier = Exclude<ScanTier, "scan_free">;
@@ -28,15 +28,14 @@ const tiers: Array<{
     {
         name: "free",
         displayName: "Free",
-        description: "Perfect for side projects and experimentation.",
+        description: "Everything you need to build and test.",
         price: { monthly: 0, annual: 0 },
         features: [
-            "Unlimited requests",
+            "1,000 requests/month",
+            "1 active project",
             "100+ AI models",
-            "Streaming & tool calling",
-            "Bring your own keys (BYOK)",
-            "API keys & playground",
             "Community support",
+            "No credit card required",
         ],
         cta: "Start Free",
         ctaVariant: "outline",
@@ -44,49 +43,32 @@ const tiers: Array<{
     {
         name: "pro",
         displayName: "Pro",
-        description: "For professional developers and small teams.",
+        description: "For professional developers and growing products.",
         price: { monthly: 49, annual: 490 },
         features: [
-            "Up to 3 team members",
-            "Security scanning",
-            "Failover & routing",
-            "Semantic cache",
-            "Request logs & analytics",
-            "Prompt registry",
-            "Priority support (email)",
+            "50,000 requests/month",
+            "Unlimited projects",
+            "End-user billing",
+            "Full security pipeline",
+            "Jailbreak detection",
+            "PII masking & audit trails",
+            "Priority support",
         ],
         highlighted: true,
         cta: "Get Started",
     },
     {
-        name: "team",
-        displayName: "Team",
-        description: "For growing teams needing collaboration.",
-        price: { monthly: 149, annual: 1490 },
-        features: [
-            "Everything in Pro",
-            "Up to 10 team members",
-            "Custom providers",
-            "Webhooks",
-            "Geo analytics",
-            "Failover analytics",
-            "Priority support (chat)",
-        ],
-        cta: "Get Started",
-        ctaVariant: "outline",
-    },
-    {
         name: "enterprise",
         displayName: "Enterprise",
-        description: "For large organizations with custom needs.",
+        description: "For large organizations with custom security and scale.",
         price: { monthly: "Custom", annual: "Custom" },
         features: [
-            "Everything in Team",
+            "Unlimited requests & projects",
+            "Dedicated support & SLAs",
             "SSO & SAML",
-            "Unlimited members",
-            "Dedicated support",
-            "SLA guarantees",
-            "Custom integrations",
+            "RBAC & custom residency",
+            "Bring your own infra",
+            "SOC2 compliance audit logs",
         ],
         cta: "Contact Sales",
         ctaVariant: "outline",
@@ -152,19 +134,19 @@ const matrixSections: Array<{
 }> = [
     {
         title: "AI Gateway",
-        description: "inference capabilities.",
+        description: "Inference capabilities.",
         rows: [
             {
                 feature: "100+ AI models (chat, image, audio, embeddings)",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Streaming & tool calling",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Structured output",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
         ],
     },
@@ -174,23 +156,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Bring your own provider keys (BYOK)",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Multi-provider routing",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Failover & circuit breaker",
-                values: { free: false, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Custom providers",
-                values: { free: false, pro: false, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Semantic cache",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
         ],
     },
@@ -200,23 +178,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Jailbreak detection",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "PII masking & redaction",
-                values: { free: false, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Custom data rules",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Output scanning",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Security incidents & audit trails",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
         ],
     },
@@ -225,46 +199,12 @@ const matrixSections: Array<{
         description: "Monitoring and analytics.",
         rows: [
             {
-                feature: "Request logs",
-                values: { free: false, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Analytics dashboard",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                feature: "Request logs & analytics",
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Cost tracking",
-                values: { free: false, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Geo analytics",
-                values: { free: false, pro: false, team: true, enterprise: true },
-            },
-            {
-                feature: "Failover analytics",
-                values: { free: false, pro: false, team: true, enterprise: true },
-            },
-        ],
-    },
-    {
-        title: "Developer Tools",
-        description: "APIs and integrations.",
-        rows: [
-            {
-                feature: "API keys (scoped)",
-                values: { free: true, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Playground",
-                values: { free: true, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Prompt registry",
-                values: { free: false, pro: true, team: true, enterprise: true },
-            },
-            {
-                feature: "Webhooks",
-                values: { free: false, pro: false, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
         ],
     },
@@ -273,29 +213,24 @@ const matrixSections: Array<{
         description: "Collaboration and support.",
         rows: [
             {
-                feature: "Projects",
-                values: { free: "1", pro: "Unlimited", team: "Unlimited", enterprise: "Unlimited" },
-            },
-            {
-                feature: "Team members",
-                values: { free: "1", pro: "Up to 3", team: "Up to 10", enterprise: "Unlimited" },
+                feature: "Active Projects",
+                values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
             },
             {
                 feature: "Support",
                 values: {
                     free: "Community",
-                    pro: "Priority (email)",
-                    team: "Priority (4hr)",
-                    enterprise: "Dedicated",
+                    pro: "Priority",
+                    enterprise: "Dedicated SLA",
                 },
             },
             {
                 feature: "SSO & SAML",
-                values: { free: false, pro: false, team: false, enterprise: true },
+                values: { free: false, pro: false, enterprise: true },
             },
             {
                 feature: "SLA guarantees",
-                values: { free: false, pro: false, team: false, enterprise: true },
+                values: { free: false, pro: false, enterprise: true },
             },
         ],
     },
@@ -582,7 +517,7 @@ export function Pricing() {
                                 {matrixSections.map((section) => (
                                     <React.Fragment key={section.title}>
                                         <tr className="border-y border-border/50 bg-muted/10">
-                                            <td colSpan={5} className="px-5 py-4">
+                                            <td colSpan={4} className="px-5 py-4">
                                                 <p className="text-sm font-semibold">{section.title}</p>
                                                 <p className="text-xs text-muted-foreground">{section.description}</p>
                                             </td>
@@ -663,12 +598,9 @@ export function Pricing() {
                     </div>
                 </div>
 
-                <div className="mt-8 rounded-xl border border-border/50 bg-muted/20 p-4 text-xs text-muted-foreground">
+                 <div className="mt-8 rounded-xl border border-border/50 bg-muted/20 p-4 text-xs text-muted-foreground">
                     <p>
-                        Cencori charges a platform subscription (not per-request). You pay the provider directly
-                        for AI usage through your own API keys. Free tier includes unlimited requests with basic features.
-                        Pro, Team, and Enterprise unlock security scanning, failover, caching, observability, and more.
-                        Scan add-on available separately ($9/mo individual / $29/mo teams).
+                        Compute billed separately by GPU hour and token usage. Team plan and usage-based pricing launching soon.
                     </p>
                 </div>
             </div>

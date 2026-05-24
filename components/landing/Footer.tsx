@@ -21,6 +21,7 @@ const footerProductLinks: { title: string; href: string; external?: boolean }[] 
     { title: "Sandbox", href: siteConfig.links.products.sandbox },
     { title: "Scan", href: siteConfig.links.products.scan },
     { title: "Enterprise", href: siteConfig.links.products.enterprise },
+    { title: "Compare Cencori", href: "/compare" },
 ];
 
 export const Footer = () => {

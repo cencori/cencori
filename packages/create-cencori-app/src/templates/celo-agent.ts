@@ -452,9 +452,9 @@ Celo for agent economy.
 
 ## Payments vs onchain proof
 
-- **Onchain in this repo:** `recordRun(receiptHash, …)` on `AgentRunReceipts` (proof event).
+- **Onchain in this repo:** \`recordRun(receiptHash, …)\` on \`AgentRunReceipts\` (proof event).
 - **Not in this repo:** USDC/USDT transfers, x402 charges, or MiniPay sends.
-- `DEMO_PAYMENT_*` values are copied into the receipt JSON for demos; they do not execute a payment.
+- \`DEMO_PAYMENT_*\` values are copied into the receipt JSON for demos; they do not execute a payment.
 
 ## What You Get
 

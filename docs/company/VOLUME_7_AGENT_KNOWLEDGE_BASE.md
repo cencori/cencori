@@ -1,8 +1,8 @@
 # Volume 7: Agent Knowledge Base
 
-> Status: Confidential source of truth  
-> Version: 1.0  
-> Last updated: May 7, 2026  
+> Status: Confidential source of truth — Cencori's complete knowledge base (Parts 1–15)  
+> Version: 2.0  
+> Last updated: May 22, 2026  
 > Audience: AI agents, developer advocates, support, GTM, founder-assist workflows  
 > Intent: Give any AI agent enough context to represent Cencori accurately, answer questions, engage with developers, handle objections, and communicate the long-range vision without making the company sound small.
 
@@ -32,6 +32,10 @@ The short version:
 The sentence to remember:
 
 > We are not building a tool. We are building the backbone of intelligence.
+
+The ethos:
+
+> Build Different. We are either creating trends or adapting to trends.
 
 Confidentiality rule:
 

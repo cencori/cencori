@@ -14,10 +14,20 @@ packages/sdk/dist
 # testing
 /coverage
 
+.cursor/
+.cursorrules
+.cursorignore
+.cursorignorerules
+.cursorignorerules
+
+AGENTS.md
+docs/prds/
+docs/volumes/
+docs/company/VOLUME_7_AGENT_KNOWLEDGE_BASE.md
 # next.js
 /.next/
 /out/
-
+docs/
 # production
 /build
 
