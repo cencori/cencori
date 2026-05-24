@@ -41,7 +41,7 @@ export const GatewayWedge = () => {
           <div className="px-6 py-16 md:py-24 flex items-center justify-center">
             {/* Light mode diagram */}
             <Image
-              src="/archie-ww.svg"
+              src="/archie-w1.svg"
               alt="Cencori AI Gateway architecture — request pipeline with guardrails, semantic cache, and smart failover routing to multiple providers"
               width={520}
               height={400}
@@ -50,7 +50,7 @@ export const GatewayWedge = () => {
             />
             {/* Dark mode diagram */}
             <Image
-              src="/archie.svg"
+              src="/archie-b1.svg"
               alt="Cencori AI Gateway architecture — request pipeline with guardrails, semantic cache, and smart failover routing to multiple providers"
               width={520}
               height={400}
