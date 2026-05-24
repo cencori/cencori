@@ -25,8 +25,14 @@ interface ConnectionPathProps {
 
 export const Integrations = () => {
     return (
-        <section className="py-32 bg-background overflow-hidden relative">
-            <div className="container mx-auto px-4 md:px-6 relative z-10">
+        <section className="bg-background border-b border-border/30 overflow-hidden relative">
+            <div className="mx-auto max-w-6xl border-x border-border/30 relative z-10 px-6 py-20 sm:px-12 sm:py-28">
+                {/* Corner Intersection Markers */}
+                <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
                 <div className="text-center mb-20">
                     <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-4">
                         Universal AI Gateway

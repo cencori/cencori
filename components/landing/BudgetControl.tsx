@@ -22,8 +22,14 @@ const items = [
 
 export const BudgetControl = () => {
     return (
-        <section className="py-24 sm:py-32 bg-background">
-            <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <section className="bg-background border-b border-border/30">
+            <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 py-20 sm:px-12 sm:py-28">
+                {/* Corner Intersection Markers */}
+                <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
                 <Reveal>
                     <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">
                         Controls
