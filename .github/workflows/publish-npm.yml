@@ -1,0 +1,46 @@
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        type: choice
+        options:
+          - create-cencori-app
+          - cencori
+          - both
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish create-cencori-app
+        if: inputs.package == 'create-cencori-app' || inputs.package == 'both'
+        working-directory: packages/create-cencori-app
+        run: |
+          npm ci
+          npm test
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish cencori SDK
+        if: inputs.package == 'cencori' || inputs.package == 'both'
+        working-directory: packages/sdk
+        run: |
+          npm ci
+          npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

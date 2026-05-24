@@ -1,6 +1,5 @@
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Newsreader, Playfair_Display } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -190,16 +189,7 @@ const softwareApplicationSchema = {
   }
 };
 
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  style: "italic",
-  variable: "--font-newsreader",
-});
 
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-});
 
 const websiteSchema = {
   "@context": "https://schema.org",
@@ -217,6 +207,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Google Fonts */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
+
         {/* JSON-LD Structured Data */}
         <script
           type="application/ld+json"
@@ -237,7 +232,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${newsreader.variable} ${playfair.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} font-sans`}>
         <ThemeProvider>
           <PostHogProvider>
             {children}

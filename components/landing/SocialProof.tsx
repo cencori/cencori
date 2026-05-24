@@ -55,29 +55,37 @@ const Marquee = ({ children, direction = "left" }: { children: React.ReactNode; 
 
 export const SocialProof = () => {
     return (
-        <section className="py-6 bg-background overflow-hidden">
-            <div className="max-w-2xl mx-auto px-4 md:px-6">
-                <p className="text-center text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-4">
-                    Works with every major AI provider
-                </p>
+        <section className="bg-background border-b border-border/30 overflow-hidden">
+            <div className="mx-auto max-w-6xl border-x border-border/30 relative py-12 px-6 sm:px-12">
+                {/* Corner Intersection Markers */}
+                <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
 
-                {/* Marquee animation */}
-                <div className="relative">
-                    {/* Gradient masks for fade effect */}
-                    <div className="absolute left-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-                    <div className="absolute right-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+                <div className="max-w-2xl mx-auto">
+                    <p className="text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em] mb-6">
+                        Works with every major AI provider
+                    </p>
 
-                    <Marquee>
-                        {providers.map((provider, index) => (
-                            <div
-                                key={index}
-                                className="flex-shrink-0 opacity-30 hover:opacity-70 transition-opacity px-4"
-                                title={provider.name}
-                            >
-                                <provider.Icon />
-                            </div>
-                        ))}
-                    </Marquee>
+                    {/* Marquee animation */}
+                    <div className="relative">
+                        {/* Gradient masks for fade effect */}
+                        <div className="absolute left-0 top-0 bottom-0 w-16 md:w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+                        <div className="absolute right-0 top-0 bottom-0 w-16 md:w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+
+                        <Marquee>
+                            {providers.map((provider, index) => (
+                                <div
+                                    key={index}
+                                    className="flex-shrink-0 opacity-30 hover:opacity-75 transition-opacity px-4 text-foreground"
+                                    title={provider.name}
+                                >
+                                    <provider.Icon />
+                                </div>
+                            ))}
+                        </Marquee>
+                    </div>
                 </div>
             </div>
         </section>

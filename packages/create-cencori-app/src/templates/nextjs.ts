@@ -535,7 +535,7 @@ code {
 `;
 
     // ── app/api/chat/route.ts ──
-    files['app/api/chat/route.ts'] = `import { cencori } from 'cencori/vercel';
+    files['app/api/chat/route.ts'] = `import { cencori } from 'cencori';
 import { cencoriConfig } from '@/cencori.config';
 import { convertToModelMessages, streamText, type UIMessage } from 'ai';
 
@@ -544,7 +544,7 @@ export async function POST(req: Request) {
     const selectedModel = model || cencoriConfig.defaultModel;
 
     const result = streamText({
-        model: cencori(selectedModel),
+        model: cencori('llama-3.3-70b-versatile'),
         messages: await convertToModelMessages(messages),
         temperature: cencoriConfig.temperature,
         maxOutputTokens: cencoriConfig.maxTokens,
