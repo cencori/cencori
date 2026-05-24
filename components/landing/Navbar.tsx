@@ -267,7 +267,6 @@ export default function Navbar({
             ]
         },
         { title: "Pricing", href: "/pricing" },
-        { title: "Compare Cencori", href: "/compare" },
         { title: "Documentation", href: siteConfig.links.docs },
         { title: "Blog", href: siteConfig.links.company.blog },
     ],
@@ -348,7 +347,6 @@ export default function Navbar({
         solutionsDropdown,
         resourcesDropdown,
         { title: "Pricing", href: "/pricing" },
-        { title: "Compare Cencori", href: "/compare" },
         { title: "Documentation", href: siteConfig.links.docs },
         { title: "Blog", href: siteConfig.links.company.blog },
     ];
