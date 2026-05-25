@@ -18,6 +18,7 @@ import {
     ActivityIcon,
     BadgeDollarSignIcon,
     AiUserIcon,
+    FlowConnectionIcon,
 } from "@hugeicons/core-free-icons";
 import {
     NextjsLogo,
@@ -26,6 +27,7 @@ import {
     CursorLogo,
     ClaudeLogo,
     VercelLogo,
+    CrewAILogo,
 } from "@/components/icons/BrandIcons";
 
 function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -235,17 +237,18 @@ export default function AIBuildersPage() {
                                 </Reveal>
                                 <Reveal delay={0.05}>
                                     <h2 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em] leading-[1.15] mb-4">
-                                        Drop Cencori in with
+                                        Works with
                                         <br />
-                                        <span className="text-muted-foreground">two imports.</span>
+                                        <span className="text-muted-foreground">every AI framework.</span>
                                     </h2>
                                 </Reveal>
                                 <Reveal delay={0.1}>
                                     <p className="text-sm text-muted-foreground leading-[1.7] mb-8 max-w-sm">
-                                        Using the Vercel AI SDK? Keep <code className="text-[12px] font-mono bg-foreground/5 px-1 rounded">streamText()</code> and{" "}
-                                        <code className="text-[12px] font-mono bg-foreground/5 px-1 rounded">useChat()</code> — just swap the model string.
+                                        First-class SDK for Vercel AI SDK and TanStack. OpenAI-compatible endpoint for every other framework — LangChain, CrewAI, AutoGen, LlamaIndex, and more.
                                     </p>
                                 </Reveal>
+
+                                {/* Vercel AI SDK */}
                                 <Reveal delay={0.15}>
                                     <div className="border border-border/20 rounded-lg overflow-hidden">
                                         <div className="flex items-center justify-between px-4 py-2.5 bg-foreground/[0.03] border-b border-border/20">
@@ -276,12 +279,29 @@ export default function AIBuildersPage() {
                                         </pre>
                                     </div>
                                 </Reveal>
+
+                                {/* Universal endpoint */}
                                 <Reveal delay={0.2}>
-                                    <div className="flex flex-wrap gap-2 mt-6">
-                                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-border/20 text-muted-foreground">OpenAI-compatible API</span>
-                                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-border/20 text-muted-foreground">14+ providers</span>
-                                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-border/20 text-muted-foreground">TypeScript SDK</span>
+                                    <div className="mt-5 border border-border/20 rounded-lg overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 py-2.5 bg-foreground/[0.03] border-b border-border/20">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-mono text-emerald-500/60">OPENAI_COMPATIBLE</span>
+                                                <span className="text-[10px] font-mono text-muted-foreground/50">.env</span>
+                                            </div>
+                                            <CopyButton text="OPENAI_BASE_URL=https://api.cencori.com/v1" />
+                                        </div>
+                                        <pre className="text-[12px] font-mono leading-[1.7] text-foreground/80 p-4 overflow-x-auto">
+                                            <code>
+                                                <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-foreground">OPENAI_BASE_URL</span>=<span className="text-emerald-400">https://api.cencori.com/v1</span>{"\n"}
+                                                <span className="text-muted-foreground/40">2</span>{"  "}<span className="text-foreground">OPENAI_API_KEY</span>=<span className="text-emerald-400">cake_your_key_here</span>
+                                            </code>
+                                        </pre>
                                     </div>
+                                </Reveal>
+                                <Reveal delay={0.25}>
+                                    <p className="text-[11px] text-muted-foreground/60 mt-3 leading-relaxed">
+                                        Works with LangChain, LangGraph, LlamaIndex, CrewAI, AutoGen, Dify, and any OpenAI-compatible SDK in any language.
+                                    </p>
                                 </Reveal>
                             </div>
                         </div>
@@ -443,6 +463,29 @@ export default function AIBuildersPage() {
                                 <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-10">Works with your stack</p>
                             </Reveal>
                             <Reveal delay={0.05}>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-6">Frameworks</p>
+                                <div className="flex flex-wrap justify-center gap-x-12 gap-y-8 items-center mb-14">
+                                    {[
+                                        { name: "Vercel AI SDK", Logo: VercelLogo },
+                                        { name: "LangChain", Logo: null },
+                                        { name: "CrewAI", Logo: CrewAILogo },
+                                        { name: "LlamaIndex", Logo: null },
+                                        { name: "TanStack", Logo: ViteLogo },
+                                        { name: "AutoGen", Logo: null },
+                                    ].map((tool) => (
+                                        <div key={tool.name} className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default">
+                                            {tool.Logo ? (
+                                                <tool.Logo className="h-5 w-5 opacity-40 hover:opacity-90 transition-opacity duration-300" size={20} />
+                                            ) : (
+                                                <HugeiconsIcon icon={FlowConnectionIcon} size={18} className="opacity-40 text-muted-foreground" />
+                                            )}
+                                            <span className="text-sm font-medium">{tool.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Reveal>
+                            <Reveal delay={0.1}>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-6">Editors & Platforms</p>
                                 <div className="flex flex-wrap justify-center gap-x-12 gap-y-8 items-center">
                                     {[
                                         { name: "Cursor", Logo: CursorLogo },
