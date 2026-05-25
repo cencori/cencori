@@ -330,17 +330,18 @@ export default function AIBuildersPage() {
                                     { hugeicon: AiUserIcon, title: "Rate Limits & Budgets", desc: "Per-user rate limits and spending caps. Prevent abuse, control costs, and enforce plans without writing billing code." },
                                 ].map((item, i) => (
                                     <Reveal key={item.title} delay={i * 0.05}>
-                                        <div
-                                            className={cn(
-                                                "group p-8 transition-colors duration-300 hover:bg-foreground/[0.02]",
-                                                "border-b border-border/30 last:border-b-0",
-                                                "border-r border-border/30 last:border-r-0",
-                                                i < 4 ? "md:border-b" : "md:border-b-0",
-                                                i % 2 === 0 ? "md:border-r" : "md:border-r-0",
-                                                i < 3 ? "lg:border-b" : "lg:border-b-0",
-                                                i % 3 !== 2 ? "lg:border-r" : "lg:border-r-0",
-                                            )}
-                                        >
+                                    <div
+                                        className={cn(
+                                            "group p-8 transition-colors duration-300 hover:bg-foreground/[0.02]",
+                                            "border-b border-border/30",
+                                            i === 5 && "border-b-0",
+                                            i >= 4 && "md:border-b-0",
+                                            i >= 3 && "lg:border-b-0",
+                                            i % 2 === 0 && "md:border-r md:border-border/30",
+                                            i % 3 !== 2 && "lg:border-r lg:border-border/30",
+                                            i % 3 === 2 && "lg:border-r-0",
+                                        )}
+                                    >
                                             <div className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 text-foreground group-hover:text-emerald-500 transition-colors">
                                                 <HugeiconsIcon icon={item.hugeicon} size={16} />
                                             </div>
