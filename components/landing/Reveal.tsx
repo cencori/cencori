@@ -1,32 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-
-export function useInView(threshold = 0.12) {
-    const ref = useRef<HTMLDivElement>(null);
-    const [visible, setVisible] = useState(false);
-
-    useEffect(() => {
-        const element = ref.current;
-        if (!element) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setVisible(true);
-                }
-            },
-            { threshold }
-        );
-
-        observer.observe(element);
-
-        return () => observer.disconnect();
-    }, [threshold]);
-
-    return { ref, visible };
-}
 
 interface RevealProps {
     children: React.ReactNode;
@@ -35,16 +10,50 @@ interface RevealProps {
 }
 
 export function Reveal({ children, className, delay = 0 }: RevealProps) {
-    const { ref, visible } = useInView();
+    const ref = useRef<HTMLDivElement>(null);
+    const [state, setState] = useState<"entered" | "idle">("entered");
+
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const isAboveFold = rect.top < window.innerHeight + 80;
+        if (!isAboveFold) {
+            setState("idle");
+        }
+    }, []);
+
+    useEffect(() => {
+        if (state !== "idle") return;
+        const el = ref.current;
+        if (!el) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setState("entered");
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.08 }
+        );
+
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [state]);
+
+    const isHidden = state === "idle";
 
     return (
         <div
             ref={ref}
             className={cn(className)}
             style={{
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateY(0)" : "translateY(24px)",
-                transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
+                opacity: isHidden ? 0 : 1,
+                transform: isHidden ? "translateY(20px)" : "translateY(0)",
+                transition: isHidden
+                    ? "none"
+                    : `opacity 0.7s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.7s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
             }}
         >
             {children}

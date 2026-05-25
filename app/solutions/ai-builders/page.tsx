@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Copy, DollarSign, CreditCard, Users } from "lucide-react";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
+import { Reveal } from "@/components/landing/Reveal";
 import { Logo } from "@/components/logo";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -33,34 +34,6 @@ import {
     LlamaIndexLogo,
     DifyLogo,
 } from "@/components/icons/BrandIcons";
-
-function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-    const ref = useRef<HTMLDivElement>(null);
-    const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        const obs = new IntersectionObserver(
-            ([e]) => { if (e.isIntersecting) setVisible(true); },
-            { threshold: 0.12 }
-        );
-        obs.observe(el);
-        return () => obs.disconnect();
-    }, []);
-    return (
-        <div
-            ref={ref}
-            className={className}
-            style={{
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateY(0)" : "translateY(24px)",
-                transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
-            }}
-        >
-            {children}
-        </div>
-    );
-}
 
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
