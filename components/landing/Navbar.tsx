@@ -144,7 +144,7 @@ const mobileSolutionsLinks: MobileNavLink[] = solutionsMenuColumns
 
 const productMenuColumns: NavLink[][] = [
     [
-        { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One endpoint, all your models.", icon: renderMenuIcon(MoleculesIcon) },
+        { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API, 100+ models.", icon: renderMenuIcon(MoleculesIcon) },
         { title: "Models", href: siteConfig.links.products.models, description: "Hosted and mapped model catalog.", icon: renderMenuIcon(AiBrain01Icon) },
 { title: "Compute", href: siteConfig.links.products.compute, description: "GPU and serverless AI workloads.", icon: renderMenuIcon(Pulse01Icon) },
         { title: "Integrations", href: siteConfig.links.products.integrations, description: "SDKs, APIs, and automation tools.", icon: renderMenuIcon(ApiIcon) },

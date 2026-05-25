@@ -8,7 +8,7 @@
 export interface AIModel {
     id: string;
     name: string;
-    type: 'chat' | 'reasoning' | 'code' | 'search' | 'embedding' | 'image';
+    type: string | string[];
     contextWindow: number;
     description?: string;
     free?: boolean;
@@ -34,36 +34,36 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // GPT-5 Series (latest)
-            { id: 'gpt-5.5', name: 'GPT-5.5', type: 'chat', contextWindow: 400000, description: 'New class of intelligence for real work and agents' },
-            { id: 'gpt-5.4', name: 'GPT-5.4 Thinking', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.4 reasoning model' },
-            { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', type: 'chat', contextWindow: 400000, description: 'Most capable GPT-5.4 variant' },
-            { id: 'gpt-5.3-chat-latest', name: 'GPT-5.3 Instant', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.3 instant release' },
-            { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: 'chat', contextWindow: 400000, description: 'Most capable GPT-5.2 variant' },
-            { id: 'gpt-5.2', name: 'GPT-5.2', type: 'chat', contextWindow: 400000, description: 'Latest GPT-5.2 flagship' },
-            { id: 'gpt-5.1', name: 'GPT-5.1', type: 'chat', contextWindow: 400000, description: 'Improved GPT-5 generation' },
-            { id: 'gpt-5-pro', name: 'GPT-5 Pro', type: 'chat', contextWindow: 400000, description: 'High-quality GPT-5 variant' },
-            { id: 'gpt-5', name: 'GPT-5', type: 'chat', contextWindow: 400000, description: 'Flagship model' },
-            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: 'chat', contextWindow: 400000, description: 'Fast and efficient' },
-            { id: 'gpt-5-nano', name: 'GPT-5 Nano', type: 'chat', contextWindow: 400000, description: 'Lowest-latency GPT-5 model' },
+            { id: 'gpt-5.5', name: 'GPT-5.5', type: ['chat'], contextWindow: 400000, description: 'New class of intelligence for real work and agents' },
+            { id: 'gpt-5.4', name: 'GPT-5.4 Thinking', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Latest GPT-5.4 reasoning model' },
+            { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Most capable GPT-5.4 variant' },
+            { id: 'gpt-5.3-chat-latest', name: 'GPT-5.3 Instant', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.3 instant release' },
+            { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: ['chat'], contextWindow: 400000, description: 'Most capable GPT-5.2 variant' },
+            { id: 'gpt-5.2', name: 'GPT-5.2', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.2 flagship' },
+            { id: 'gpt-5.1', name: 'GPT-5.1', type: ['chat'], contextWindow: 400000, description: 'Improved GPT-5 generation' },
+            { id: 'gpt-5-pro', name: 'GPT-5 Pro', type: ['chat'], contextWindow: 400000, description: 'High-quality GPT-5 variant' },
+            { id: 'gpt-5', name: 'GPT-5', type: ['chat'], contextWindow: 400000, description: 'Flagship model' },
+            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: ['chat'], contextWindow: 400000, description: 'Fast and efficient' },
+            { id: 'gpt-5-nano', name: 'GPT-5 Nano', type: ['chat'], contextWindow: 400000, description: 'Lowest-latency GPT-5 model' },
             // GPT-4.1 / GPT-4o Series
-            { id: 'gpt-4.1', name: 'GPT-4.1', type: 'code', contextWindow: 1047576, description: 'Long-context GPT-4.1' },
-            { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: 'chat', contextWindow: 1047576, description: 'Balanced GPT-4.1 model' },
-            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: 'chat', contextWindow: 1047576, description: 'Fast GPT-4.1 nano model' },
-            { id: 'gpt-4o', name: 'GPT-4o', type: 'chat', contextWindow: 128000, description: 'Omni-modal model' },
-            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: 'chat', contextWindow: 128000, description: 'Fast and cost-effective' },
-            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', type: 'chat', contextWindow: 128000, description: 'Legacy GPT-4 model' },
+            { id: 'gpt-4.1', name: 'GPT-4.1', type: ['chat', 'code'], contextWindow: 1047576, description: 'Long-context GPT-4.1' },
+            { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: ['chat'], contextWindow: 1047576, description: 'Balanced GPT-4.1 model' },
+            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: ['chat'], contextWindow: 1047576, description: 'Fast GPT-4.1 nano model' },
+            { id: 'gpt-4o', name: 'GPT-4o', type: ['chat'], contextWindow: 128000, description: 'Omni-modal model' },
+            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: ['chat'], contextWindow: 128000, description: 'Fast and cost-effective' },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', type: ['chat'], contextWindow: 128000, description: 'Legacy GPT-4 model' },
             // O-Series Reasoning (latest)
-            { id: 'o3-pro', name: 'o3 Pro', type: 'reasoning', contextWindow: 200000, description: 'Most advanced reasoning model' },
-            { id: 'o3', name: 'o3', type: 'reasoning', contextWindow: 200000, description: 'Advanced reasoning model' },
-            { id: 'o3-mini', name: 'o3 Mini', type: 'reasoning', contextWindow: 200000, description: 'Fast reasoning model' },
-            { id: 'o4-mini', name: 'o4 Mini', type: 'reasoning', contextWindow: 200000, description: 'Successor to o1-mini' },
-            { id: 'o1', name: 'o1', type: 'reasoning', contextWindow: 200000, description: 'Legacy reasoning model' },
+            { id: 'o3-pro', name: 'o3 Pro', type: ['reasoning', 'code'], contextWindow: 200000, description: 'Most advanced reasoning model' },
+            { id: 'o3', name: 'o3', type: ['reasoning', 'code'], contextWindow: 200000, description: 'Advanced reasoning model' },
+            { id: 'o3-mini', name: 'o3 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Fast reasoning model' },
+            { id: 'o4-mini', name: 'o4 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Successor to o1-mini' },
+            { id: 'o1', name: 'o1', type: ['reasoning'], contextWindow: 200000, description: 'Legacy reasoning model' },
             // Image Generation
-            { id: 'gpt-image-2', name: 'GPT Image 2', type: 'image', contextWindow: 0, description: 'State-of-the-art image generation model' },
-            { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: 'image', contextWindow: 0, description: 'Best text rendering' },
-            { id: 'gpt-image-1', name: 'GPT Image 1', type: 'image', contextWindow: 0, description: 'ChatGPT image generation model' },
-            { id: 'dall-e-3', name: 'DALL-E 3', type: 'image', contextWindow: 0, description: 'High quality images' },
-            { id: 'dall-e-2', name: 'DALL-E 2', type: 'image', contextWindow: 0, description: 'Fast image generation' },
+            { id: 'gpt-image-2', name: 'GPT Image 2', type: ['image'], contextWindow: 0, description: 'State-of-the-art image generation model' },
+            { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: ['image'], contextWindow: 0, description: 'Best text rendering' },
+            { id: 'gpt-image-1', name: 'GPT Image 1', type: ['image'], contextWindow: 0, description: 'ChatGPT image generation model' },
+            { id: 'dall-e-3', name: 'DALL-E 3', type: ['image'], contextWindow: 0, description: 'High quality images' },
+            { id: 'dall-e-2', name: 'DALL-E 2', type: ['image'], contextWindow: 0, description: 'Fast image generation' },
         ],
     },
     {
@@ -75,45 +75,46 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-ant-',
         models: [
             // Claude 4 Series (2025)
-            { id: 'claude-opus-4.7', name: 'Claude Opus 4.7', type: 'chat', contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding' },
-            { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', type: 'chat', contextWindow: 200000, description: 'Latest flagship, enhanced reasoning & coding' },
-            { id: 'claude-opus-4.6', name: 'Claude Opus 4.6', type: 'chat', contextWindow: 1000000, description: 'Latest flagship, agentic coding record-breaker' },
-            { id: 'claude-opus-4', name: 'Claude Opus 4', type: 'chat', contextWindow: 200000, description: 'Most capable Claude model' },
-            { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', type: 'chat', contextWindow: 200000, description: 'Balanced speed & capability' },
-            { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', type: 'chat', contextWindow: 200000, description: 'Enhanced coding & agents' },
-            { id: 'claude-opus-4.5', name: 'Claude Opus 4.5', type: 'chat', contextWindow: 200000, description: 'Latest, most intelligent' },
-            { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5', type: 'chat', contextWindow: 200000, description: 'Fastest Claude model' },
+            { id: 'claude-opus-4.7', name: 'Claude Opus 4.7', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding' },
+            { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 200000, description: 'Latest flagship, enhanced reasoning & coding' },
+            { id: 'claude-opus-4.6', name: 'Claude Opus 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, agentic coding record-breaker' },
+            { id: 'claude-opus-4', name: 'Claude Opus 4', type: ['chat'], contextWindow: 200000, description: 'Most capable Claude model' },
+            { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', type: ['chat'], contextWindow: 200000, description: 'Balanced speed & capability' },
+            { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', type: ['chat'], contextWindow: 200000, description: 'Enhanced coding & agents' },
+            { id: 'claude-opus-4.5', name: 'Claude Opus 4.5', type: ['chat'], contextWindow: 200000, description: 'Latest, most intelligent' },
+            { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5', type: ['chat'], contextWindow: 200000, description: 'Fastest Claude model' },
             // Claude 3.5/3.7 Series
-            { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet', type: 'reasoning', contextWindow: 200000, description: 'Hybrid reasoning model' },
-            { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', type: 'chat', contextWindow: 200000, description: 'Balance of speed and capability' },
-            { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', type: 'chat', contextWindow: 200000, description: 'Fast and efficient' },
+            { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet', type: ['reasoning', 'chat'], contextWindow: 200000, description: 'Hybrid reasoning model' },
+            { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', type: ['chat'], contextWindow: 200000, description: 'Balance of speed and capability' },
+            { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', type: ['chat'], contextWindow: 200000, description: 'Fast and efficient' },
         ],
     },
     {
         id: 'google',
-        name: 'Google AI',
+        name: 'Google',
         icon: '/providers/google.svg',
         website: 'https://ai.google.dev',
         docsUrl: 'https://ai.google.dev/docs',
         keyPrefix: 'AIza',
         models: [
             // Gemini 3.1 Series (Feb 2026)
-            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', type: 'chat', contextWindow: 1000000, description: 'Latest flagship preview, 1M context, enhanced reasoning' },
-            { id: 'gemini-3.1-pro-preview-customtools', name: 'Gemini 3.1 Pro (Custom Tools)', type: 'chat', contextWindow: 1000000, description: 'Optimized for custom tools and bash' },
-            { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image (Nano Banana 2)', type: 'image', contextWindow: 0, description: 'Reasoning-guided image synthesis, up to 4K' },
+            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Latest flagship preview, 1M context, enhanced reasoning' },
+            { id: 'gemini-3.1-pro-preview-customtools', name: 'Gemini 3.1 Pro (Custom Tools)', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Optimized for custom tools and bash' },
+            { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image (Nano Banana 2)', type: ['image'], contextWindow: 0, description: 'Reasoning-guided image synthesis, up to 4K' },
             // Gemini 3 Series (Late 2025)
-            { id: 'gemini-3-pro', name: 'Gemini 3 Pro', type: 'chat', contextWindow: 2000000, description: 'Powerful Gemini model' },
-            { id: 'gemini-3-flash', name: 'Gemini 3 Flash', type: 'chat', contextWindow: 1000000, description: 'Frontier speed & intelligence' },
-            { id: 'gemini-3-deep-think', name: 'Gemini 3 Deep Think', type: 'reasoning', contextWindow: 1000000, description: 'Deep iterative reasoning' },
+            { id: 'gemini-3-pro', name: 'Gemini 3 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 2000000, description: 'Powerful Gemini model' },
+            { id: 'gemini-3-flash', name: 'Gemini 3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Frontier speed & intelligence' },
+            { id: 'gemini-3-deep-think', name: 'Gemini 3 Deep Think', type: ['reasoning', 'chat'], contextWindow: 1000000, description: 'Deep iterative reasoning' },
             // Gemini 2.5 Series (Mid 2025)
-            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', type: 'chat', contextWindow: 1000000, description: 'Enhanced reasoning & coding' },
-            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', type: 'chat', contextWindow: 1000000, description: 'Thinking capabilities' },
-            { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', type: 'chat', contextWindow: 1000000, description: 'Speed optimized' },
+            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Enhanced reasoning & coding' },
+            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Thinking capabilities' },
+            { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', type: ['chat'], contextWindow: 1000000, description: 'Speed optimized' },
             // Gemini 2.0 Series
-            { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', type: 'chat', contextWindow: 1000000, description: 'Fast model' },
-            { id: 'gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', type: 'reasoning', contextWindow: 1000000, description: 'Reasoning variant' },
-            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: 'image', contextWindow: 0, description: 'Fast photorealism' },
-            { id: 'imagen-3', name: 'Imagen 3', type: 'image', contextWindow: 0, description: 'High quality images' },
+            { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', type: ['chat'], contextWindow: 1000000, description: 'Fast model' },
+            { id: 'gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', type: ['reasoning', 'chat'], contextWindow: 1000000, description: 'Reasoning variant' },
+            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: ['image'], contextWindow: 0, description: 'Fast photorealism' },
+            { id: 'imagen-3', name: 'Imagen 3', type: ['image'], contextWindow: 0, description: 'High quality images' },
+            { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest Flash model, speed + reasoning' },
         ],
     },
     {
@@ -125,16 +126,16 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             // Mistral Large 3 (Dec 2025 - MoE)
-            { id: 'mistral-large-latest', name: 'Mistral Large 3', type: 'chat', contextWindow: 128000, description: '675B params, best open-weight multimodal' },
-            { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: 'chat', contextWindow: 128000, description: 'Frontier-class multimodal' },
-            { id: 'mistral-small-latest', name: 'Mistral Small 3', type: 'chat', contextWindow: 32000, description: '24B params, fast' },
+            { id: 'mistral-large-latest', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: '675B params, best open-weight multimodal' },
+            { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: ['chat'], contextWindow: 128000, description: 'Frontier-class multimodal' },
+            { id: 'mistral-small-latest', name: 'Mistral Small 3', type: ['chat'], contextWindow: 32000, description: '24B params, fast' },
             // Ministral (Dec 2025)
-            { id: 'ministral-3b', name: 'Ministral 3B', type: 'chat', contextWindow: 128000, description: 'Compact edge model' },
-            { id: 'ministral-8b', name: 'Ministral 8B', type: 'chat', contextWindow: 128000, description: 'Small efficient model' },
-            { id: 'codestral-latest', name: 'Codestral 25.01', type: 'code', contextWindow: 256000, description: '2.5x faster code generation' },
-            { id: 'devstral-latest', name: 'Devstral 2', type: 'code', contextWindow: 256000, description: 'Frontier code agents' },
+            { id: 'ministral-3b', name: 'Ministral 3B', type: ['chat'], contextWindow: 128000, description: 'Compact edge model' },
+            { id: 'ministral-8b', name: 'Ministral 8B', type: ['chat'], contextWindow: 128000, description: 'Small efficient model' },
+            { id: 'codestral-latest', name: 'Codestral 25.01', type: ['code', 'chat'], contextWindow: 256000, description: '2.5x faster code generation' },
+            { id: 'devstral-latest', name: 'Devstral 2', type: ['code', 'chat'], contextWindow: 256000, description: 'Frontier code agents' },
             // Reasoning
-            { id: 'magistral-medium', name: 'Magistral Medium', type: 'reasoning', contextWindow: 128000, description: 'Multimodal reasoning' },
+            { id: 'magistral-medium', name: 'Magistral Medium', type: ['reasoning', 'chat'], contextWindow: 128000, description: 'Multimodal reasoning' },
         ],
     },
     {
@@ -146,12 +147,12 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'gsk_',
         models: [
             // Llama 4 via Groq (2025)
-            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Latest multimodal Llama' },
-            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: 'chat', contextWindow: 256000, description: 'Advanced Llama 4 model' },
+            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest multimodal Llama' },
+            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: ['chat'], contextWindow: 256000, description: 'Advanced Llama 4 model' },
             // Llama 3.3
-            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: 'chat', contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model', free: true },
-            { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: 'chat', contextWindow: 128000, description: 'Ultra-fast inference', free: true },
-            { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', type: 'chat', contextWindow: 32768, description: 'MoE architecture' },
+            { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: ['chat'], contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model', free: true },
+            { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: ['chat'], contextWindow: 128000, description: 'Ultra-fast inference', free: true },
+            { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', type: ['chat'], contextWindow: 32768, description: 'MoE architecture' },
         ],
     },
     {
@@ -163,11 +164,11 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             // Command A (March 2025 - New flagship)
-            { id: 'command-a-03-2025', name: 'Command A', type: 'chat', contextWindow: 256000, description: 'Most performant, agentic tasks' },
+            { id: 'command-a-03-2025', name: 'Command A', type: ['chat'], contextWindow: 256000, description: 'Most performant, agentic tasks' },
             // Command R+ (Aug 2024 update)
-            { id: 'command-r-plus-08-2024', name: 'Command R+', type: 'chat', contextWindow: 128000, description: 'Complex RAG and multi-step' },
-            { id: 'command-r', name: 'Command R', type: 'chat', contextWindow: 128000, description: 'Balanced performance' },
-            { id: 'command-light', name: 'Command Light', type: 'chat', contextWindow: 4096, description: 'Fast and efficient' },
+            { id: 'command-r-plus-08-2024', name: 'Command R+', type: ['chat'], contextWindow: 128000, description: 'Complex RAG and multi-step' },
+            { id: 'command-r', name: 'Command R', type: ['chat'], contextWindow: 128000, description: 'Balanced performance' },
+            { id: 'command-light', name: 'Command Light', type: ['chat'], contextWindow: 4096, description: 'Fast and efficient' },
         ],
     },
     {
@@ -179,10 +180,10 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             // Llama 4
-            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Latest Llama' },
-            { id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', name: 'Llama 3.3 70B Turbo', type: 'chat', contextWindow: 128000, description: 'Fast Llama inference' },
-            { id: 'Qwen/Qwen2.5-72B-Instruct-Turbo', name: 'Qwen 2.5 72B', type: 'chat', contextWindow: 32000, description: 'Alibaba flagship' },
-            { id: 'deepseek-ai/DeepSeek-V3.1', name: 'DeepSeek V3.1', type: 'chat', contextWindow: 128000, description: 'Hybrid reasoning' },
+            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest Llama' },
+            { id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', name: 'Llama 3.3 70B Turbo', type: ['chat'], contextWindow: 128000, description: 'Fast Llama inference' },
+            { id: 'Qwen/Qwen2.5-72B-Instruct-Turbo', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 32000, description: 'Alibaba flagship' },
+            { id: 'deepseek-ai/DeepSeek-V3.1', name: 'DeepSeek V3.1', type: ['chat'], contextWindow: 128000, description: 'Hybrid reasoning' },
         ],
     },
     {
@@ -194,11 +195,11 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'pplx-',
         models: [
             // Sonar Models (2025)
-            { id: 'sonar-pro', name: 'Sonar Pro', type: 'search', contextWindow: 128000, description: 'Enhanced search, richer context' },
-            { id: 'sonar', name: 'Sonar', type: 'search', contextWindow: 128000, description: 'Default web-connected' },
-            { id: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro', type: 'reasoning', contextWindow: 128000, description: 'Deep inference & research' },
+            { id: 'sonar-pro', name: 'Sonar Pro', type: ['search'], contextWindow: 128000, description: 'Enhanced search, richer context' },
+            { id: 'sonar', name: 'Sonar', type: ['search'], contextWindow: 128000, description: 'Default web-connected' },
+            { id: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro', type: ['reasoning', 'search'], contextWindow: 128000, description: 'Deep inference & research' },
             // Legacy
-            { id: 'llama-3.1-sonar-large-128k-online', name: 'Sonar Large Online', type: 'search', contextWindow: 128000, description: 'Web-connected search' },
+            { id: 'llama-3.1-sonar-large-128k-online', name: 'Sonar Large Online', type: ['search'], contextWindow: 128000, description: 'Web-connected search' },
         ],
     },
     {
@@ -209,11 +210,11 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://openrouter.ai/docs',
         keyPrefix: 'sk-or-',
         models: [
-            { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', type: 'chat', contextWindow: 256000, description: 'Access any model' },
-            { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5 (via OpenRouter)', type: 'chat', contextWindow: 200000, description: 'Unified billing' },
-            { id: 'google/gemini-3-pro', name: 'Gemini 3 Pro (via OpenRouter)', type: 'chat', contextWindow: 2000000, description: 'Meta-provider' },
-            { id: 'x-ai/grok-4.3', name: 'Grok 4.3 (via OpenRouter)', type: 'reasoning', contextWindow: 1000000, description: 'Latest xAI reasoning model' },
-            { id: 'x-ai/grok-4', name: 'Grok 4 (via OpenRouter)', type: 'chat', contextWindow: 256000, description: 'Access xAI models' },
+            { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', type: ['chat'], contextWindow: 256000, description: 'Access any model' },
+            { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5 (via OpenRouter)', type: ['chat'], contextWindow: 200000, description: 'Unified billing' },
+            { id: 'google/gemini-3-pro', name: 'Gemini 3 Pro (via OpenRouter)', type: ['chat'], contextWindow: 2000000, description: 'Meta-provider' },
+            { id: 'x-ai/grok-4.3', name: 'Grok 4.3 (via OpenRouter)', type: ['reasoning'], contextWindow: 1000000, description: 'Latest xAI reasoning model' },
+            { id: 'x-ai/grok-4', name: 'Grok 4 (via OpenRouter)', type: ['chat'], contextWindow: 256000, description: 'Access xAI models' },
         ],
     },
     {
@@ -225,19 +226,19 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'xai-',
         models: [
             // Grok 4.3 Series (April 2026)
-            { id: 'grok-4.3', name: 'Grok 4.3', type: 'reasoning', contextWindow: 1000000, description: 'Latest xAI reasoning model with text and image input' },
+            { id: 'grok-4.3', name: 'Grok 4.3', type: ['reasoning', 'chat'], contextWindow: 1000000, description: 'Latest xAI reasoning model with text and image input' },
             // Grok Voice Series
-            { id: 'grok-voice-think-fast', name: 'Grok Voice Think Fast 1.0', type: 'chat', contextWindow: 256000, description: 'State-of-the-art voice model for complex, multi-step workflows' },
+            { id: 'grok-voice-think-fast', name: 'Grok Voice Think Fast 1.0', type: ['chat'], contextWindow: 256000, description: 'State-of-the-art voice model for complex, multi-step workflows' },
             // Grok 4 Series (July-Nov 2025)
-            { id: 'grok-4', name: 'Grok 4', type: 'chat', contextWindow: 256000, description: 'Enhanced reasoning, real-time search' },
-            { id: 'grok-4.1', name: 'Grok 4.1', type: 'chat', contextWindow: 256000, description: 'Improved multimodal & reasoning' },
-            { id: 'grok-4.1-fast', name: 'Grok 4.1 Fast', type: 'chat', contextWindow: 2000000, description: 'Best agentic tool calling' },
-            { id: 'grok-4-heavy', name: 'Grok 4 Heavy', type: 'chat', contextWindow: 256000, description: 'Maximum capability' },
+            { id: 'grok-4', name: 'Grok 4', type: ['chat', 'reasoning'], contextWindow: 256000, description: 'Enhanced reasoning, real-time search' },
+            { id: 'grok-4.1', name: 'Grok 4.1', type: ['chat', 'reasoning'], contextWindow: 256000, description: 'Improved multimodal & reasoning' },
+            { id: 'grok-4.1-fast', name: 'Grok 4.1 Fast', type: ['chat'], contextWindow: 2000000, description: 'Best agentic tool calling' },
+            { id: 'grok-4-heavy', name: 'Grok 4 Heavy', type: ['chat'], contextWindow: 256000, description: 'Maximum capability' },
             // Grok 3 Series
-            { id: 'grok-3', name: 'Grok 3', type: 'chat', contextWindow: 128000, description: 'DeepSearch, Big Brain Mode' },
-            { id: 'grok-3-mini', name: 'Grok 3 Mini', type: 'chat', contextWindow: 128000, description: 'Fast responses' },
+            { id: 'grok-3', name: 'Grok 3', type: ['chat'], contextWindow: 128000, description: 'DeepSearch, Big Brain Mode' },
+            { id: 'grok-3-mini', name: 'Grok 3 Mini', type: ['chat'], contextWindow: 128000, description: 'Fast responses' },
             // Code
-            { id: 'grok-code-fast-1', name: 'Grok Code Fast', type: 'code', contextWindow: 128000, description: 'Fast agentic coding' },
+            { id: 'grok-code-fast-1', name: 'Grok Code Fast', type: ['code', 'chat'], contextWindow: 128000, description: 'Fast agentic coding' },
         ],
     },
     {
@@ -249,13 +250,13 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             // Llama 4 (2025)
-            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Latest multimodal flagship' },
-            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: 'chat', contextWindow: 256000, description: 'Advanced reasoning' },
+            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest multimodal flagship' },
+            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: ['chat'], contextWindow: 256000, description: 'Advanced reasoning' },
             // Llama 3.3
-            { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', type: 'chat', contextWindow: 128000, description: 'Latest Llama 3 model' },
-            { id: 'llama-3.2-90b-vision', name: 'Llama 3.2 90B Vision', type: 'chat', contextWindow: 128000, description: 'Multimodal understanding' },
-            { id: 'llama-3.1-405b', name: 'Llama 3.1 405B', type: 'chat', contextWindow: 128000, description: 'Largest open model' },
-            { id: 'llama-3.1-70b', name: 'Llama 3.1 70B', type: 'chat', contextWindow: 128000, description: 'Balanced performance' },
+            { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', type: ['chat'], contextWindow: 128000, description: 'Latest Llama 3 model' },
+            { id: 'llama-3.2-90b-vision', name: 'Llama 3.2 90B Vision', type: ['chat'], contextWindow: 128000, description: 'Multimodal understanding' },
+            { id: 'llama-3.1-405b', name: 'Llama 3.1 405B', type: ['chat'], contextWindow: 128000, description: 'Largest open model' },
+            { id: 'llama-3.1-70b', name: 'Llama 3.1 70B', type: ['chat'], contextWindow: 128000, description: 'Balanced performance' },
         ],
     },
     {
@@ -266,10 +267,10 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://huggingface.co/docs',
         keyPrefix: 'hf_',
         models: [
-            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: 'chat', contextWindow: 256000, description: 'Via HF Inference' },
-            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', type: 'chat', contextWindow: 128000, description: 'Via HF Inference' },
-            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', type: 'chat', contextWindow: 32000, description: 'Via HF Inference' },
-            { id: 'mistralai/Mistral-Large-3', name: 'Mistral Large 3', type: 'chat', contextWindow: 128000, description: 'Via HF Inference' },
+            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Via HF Inference' },
+            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', type: ['chat'], contextWindow: 128000, description: 'Via HF Inference' },
+            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 32000, description: 'Via HF Inference' },
+            { id: 'mistralai/Mistral-Large-3', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: 'Via HF Inference' },
         ],
     },
     {
@@ -280,10 +281,10 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://qwen.readthedocs.io',
         keyPrefix: '',
         models: [
-            { id: 'qwen2.5-72b-instruct', name: 'Qwen 2.5 72B', type: 'chat', contextWindow: 128000, description: 'Flagship model' },
-            { id: 'qwen2.5-32b-instruct', name: 'Qwen 2.5 32B', type: 'chat', contextWindow: 128000, description: 'Balanced performance' },
-            { id: 'qwen2.5-coder-32b', name: 'Qwen 2.5 Coder 32B', type: 'code', contextWindow: 128000, description: 'Code specialized' },
-            { id: 'qwq-32b-preview', name: 'QwQ 32B', type: 'reasoning', contextWindow: 32000, description: 'Reasoning model' },
+            { id: 'qwen2.5-72b-instruct', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 128000, description: 'Flagship model' },
+            { id: 'qwen2.5-32b-instruct', name: 'Qwen 2.5 32B', type: ['chat'], contextWindow: 128000, description: 'Balanced performance' },
+            { id: 'qwen2.5-coder-32b', name: 'Qwen 2.5 Coder 32B', type: ['code', 'chat'], contextWindow: 128000, description: 'Code specialized' },
+            { id: 'qwq-32b-preview', name: 'QwQ 32B', type: ['reasoning'], contextWindow: 32000, description: 'Reasoning model' },
         ],
     },
     {
@@ -295,18 +296,18 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // V4 Series (April 2026)
-            { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: 'chat', contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance' },
-            { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: 'chat', contextWindow: 1000000, description: '284B total / 13B active params, fast & economical' },
+            { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance' },
+            { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '284B total / 13B active params, fast & economical' },
             // V3.2 Series (Dec 2025)
-            { id: 'deepseek-v3.2', name: 'DeepSeek V3.2', type: 'chat', contextWindow: 128000, description: 'GPT-5 level, daily driver' },
-            { id: 'deepseek-v3.2-speciale', name: 'DeepSeek V3.2 Speciale', type: 'reasoning', contextWindow: 128000, description: 'Maxed reasoning, competition gold' },
+            { id: 'deepseek-v3.2', name: 'DeepSeek V3.2', type: ['chat', 'reasoning', 'code'], contextWindow: 128000, description: 'GPT-5 level, daily driver' },
+            { id: 'deepseek-v3.2-speciale', name: 'DeepSeek V3.2 Speciale', type: ['reasoning', 'chat'], contextWindow: 128000, description: 'Maxed reasoning, competition gold' },
             // V3.1 (Aug 2025)
-            { id: 'deepseek-v3.1', name: 'DeepSeek V3.1', type: 'chat', contextWindow: 128000, description: 'Hybrid thinking modes' },
+            { id: 'deepseek-v3.1', name: 'DeepSeek V3.1', type: ['chat', 'reasoning'], contextWindow: 128000, description: 'Hybrid thinking modes' },
             // V3 (March 2025 update)
-            { id: 'deepseek-chat', name: 'DeepSeek V3', type: 'chat', contextWindow: 128000, description: '128K context, MIT license' },
-            { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: 'reasoning', contextWindow: 64000, description: 'Reasoning model' },
+            { id: 'deepseek-chat', name: 'DeepSeek V3', type: ['chat'], contextWindow: 128000, description: '128K context, MIT license' },
+            { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: ['reasoning'], contextWindow: 64000, description: 'Reasoning model' },
             // Coder
-            { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2', type: 'code', contextWindow: 128000, description: '338 languages, GPT-4 level' },
+            { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2', type: ['code', 'chat'], contextWindow: 128000, description: '338 languages, GPT-4 level' },
         ],
     },
     {
@@ -317,8 +318,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.ai21.com',
         keyPrefix: '',
         models: [
-            { id: 'jamba-1.5-large', name: 'Jamba 1.5 Large', type: 'chat', contextWindow: 256000, description: 'Hybrid SSM-Transformer' },
-            { id: 'jamba-1.5-mini', name: 'Jamba 1.5 Mini', type: 'chat', contextWindow: 256000, description: 'Fast hybrid model' },
+            { id: 'jamba-1.5-large', name: 'Jamba 1.5 Large', type: ['chat'], contextWindow: 256000, description: 'Hybrid SSM-Transformer' },
+            { id: 'jamba-1.5-mini', name: 'Jamba 1.5 Mini', type: ['chat'], contextWindow: 256000, description: 'Fast hybrid model' },
         ],
     },
     {
@@ -329,8 +330,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.aws.amazon.com/bedrock',
         keyPrefix: '',
         models: [
-            { id: 'anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'Claude 3.5 Sonnet (Bedrock)', type: 'chat', contextWindow: 200000, description: 'Via AWS Bedrock' },
-            { id: 'meta.llama3-1-405b-instruct-v1:0', name: 'Llama 3.1 405B (Bedrock)', type: 'chat', contextWindow: 128000, description: 'Via AWS Bedrock' },
+            { id: 'anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'Claude 3.5 Sonnet (Bedrock)', type: ['chat'], contextWindow: 200000, description: 'Via AWS Bedrock' },
+            { id: 'meta.llama3-1-405b-instruct-v1:0', name: 'Llama 3.1 405B (Bedrock)', type: ['chat'], contextWindow: 128000, description: 'Via AWS Bedrock' },
         ],
     },
     {
@@ -341,9 +342,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.aws.amazon.com/nova',
         keyPrefix: '',
         models: [
-            { id: 'us.amazon.nova-pro-v1:0', name: 'Nova Pro', type: 'chat', contextWindow: 300000, description: 'Flagship Nova model' },
-            { id: 'us.amazon.nova-lite-v1:0', name: 'Nova Lite', type: 'chat', contextWindow: 300000, description: 'Fast Nova model' },
-            { id: 'us.amazon.nova-micro-v1:0', name: 'Nova Micro', type: 'chat', contextWindow: 128000, description: 'Lowest latency Nova' },
+            { id: 'us.amazon.nova-pro-v1:0', name: 'Nova Pro', type: ['chat'], contextWindow: 300000, description: 'Flagship Nova model' },
+            { id: 'us.amazon.nova-lite-v1:0', name: 'Nova Lite', type: ['chat'], contextWindow: 300000, description: 'Fast Nova model' },
+            { id: 'us.amazon.nova-micro-v1:0', name: 'Nova Micro', type: ['chat'], contextWindow: 128000, description: 'Lowest latency Nova' },
         ],
     },
     {
@@ -354,8 +355,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://learn.microsoft.com/azure/ai-services',
         keyPrefix: '',
         models: [
-            { id: 'gpt-4o', name: 'GPT-4o (Azure)', type: 'chat', contextWindow: 128000, description: 'Via Azure AI' },
-            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo (Azure)', type: 'chat', contextWindow: 128000, description: 'Via Azure AI' },
+            { id: 'gpt-4o', name: 'GPT-4o (Azure)', type: ['chat'], contextWindow: 128000, description: 'Via Azure AI' },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo (Azure)', type: ['chat'], contextWindow: 128000, description: 'Via Azure AI' },
         ],
     },
     {
@@ -366,8 +367,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.cerebras.ai',
         keyPrefix: 'csk-',
         models: [
-            { id: 'llama3.1-70b', name: 'Llama 3.1 70B (Cerebras)', type: 'chat', contextWindow: 128000, description: 'World fastest inference' },
-            { id: 'llama3.1-8b', name: 'Llama 3.1 8B (Cerebras)', type: 'chat', contextWindow: 128000, description: 'World fastest inference' },
+            { id: 'llama3.1-70b', name: 'Llama 3.1 70B (Cerebras)', type: ['chat'], contextWindow: 128000, description: 'World fastest inference' },
+            { id: 'llama3.1-8b', name: 'Llama 3.1 8B (Cerebras)', type: ['chat'], contextWindow: 128000, description: 'World fastest inference' },
         ],
     },
     {
@@ -378,8 +379,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://developers.cloudflare.com/workers-ai',
         keyPrefix: '',
         models: [
-            { id: '@cf/meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B (Cloudflare)', type: 'chat', contextWindow: 128000, description: 'Via Workers AI' },
-            { id: '@cf/meta/llama-3.1-8b-instruct', name: 'Llama 3.1 8B (Cloudflare)', type: 'chat', contextWindow: 128000, description: 'Via Workers AI' },
+            { id: '@cf/meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B (Cloudflare)', type: ['chat'], contextWindow: 128000, description: 'Via Workers AI' },
+            { id: '@cf/meta/llama-3.1-8b-instruct', name: 'Llama 3.1 8B (Cloudflare)', type: ['chat'], contextWindow: 128000, description: 'Via Workers AI' },
         ],
     },
     {
@@ -390,8 +391,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://deepinfra.com/docs',
         keyPrefix: '',
         models: [
-            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B (DeepInfra)', type: 'chat', contextWindow: 128000, description: 'High-throughput' },
-            { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3 (DeepInfra)', type: 'chat', contextWindow: 128000, description: 'Via DeepInfra' },
+            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B (DeepInfra)', type: ['chat'], contextWindow: 128000, description: 'High-throughput' },
+            { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3 (DeepInfra)', type: ['chat'], contextWindow: 128000, description: 'Via DeepInfra' },
         ],
     },
     {
@@ -402,8 +403,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.fireworks.ai',
         keyPrefix: '',
         models: [
-            { id: 'accounts/fireworks/models/llama-v3p1-405b-instruct', name: 'Llama 3.1 405B (Fireworks)', type: 'chat', contextWindow: 128000, description: 'Via Fireworks AI' },
-            { id: 'accounts/fireworks/models/qwen2p5-72b-instruct', name: 'Qwen 2.5 72B (Fireworks)', type: 'chat', contextWindow: 128000, description: 'Via Fireworks AI' },
+            { id: 'accounts/fireworks/models/llama-v3p1-405b-instruct', name: 'Llama 3.1 405B (Fireworks)', type: ['chat'], contextWindow: 128000, description: 'Via Fireworks AI' },
+            { id: 'accounts/fireworks/models/qwen2p5-72b-instruct', name: 'Qwen 2.5 72B (Fireworks)', type: ['chat'], contextWindow: 128000, description: 'Via Fireworks AI' },
         ],
     },
     {
@@ -414,8 +415,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.nvidia.com',
         keyPrefix: 'nvapi-',
         models: [
-            { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B (NVIDIA)', type: 'chat', contextWindow: 128000, description: 'Via NVIDIA NIM' },
-            { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Llama 3.1 Nemotron 70B', type: 'chat', contextWindow: 128000, description: 'NVIDIA optimized' },
+            { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B (NVIDIA)', type: ['chat'], contextWindow: 128000, description: 'Via NVIDIA NIM' },
+            { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Llama 3.1 Nemotron 70B', type: ['chat'], contextWindow: 128000, description: 'NVIDIA optimized' },
         ],
     },
     {
@@ -426,8 +427,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.sambanova.ai',
         keyPrefix: '',
         models: [
-            { id: 'Meta-Llama-3.1-405B-Instruct', name: 'Llama 3.1 405B (SambaNova)', type: 'chat', contextWindow: 128000, description: 'High-speed inference' },
-            { id: 'Meta-Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B (SambaNova)', type: 'chat', contextWindow: 128000, description: 'High-speed inference' },
+            { id: 'Meta-Llama-3.1-405B-Instruct', name: 'Llama 3.1 405B (SambaNova)', type: ['chat'], contextWindow: 128000, description: 'High-speed inference' },
+            { id: 'Meta-Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B (SambaNova)', type: ['chat'], contextWindow: 128000, description: 'High-speed inference' },
         ],
     },
     {
@@ -438,8 +439,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://developers.upstage.ai',
         keyPrefix: 'up_',
         models: [
-            { id: 'solar-1-mini-chat', name: 'Solar Mini', type: 'chat', contextWindow: 32000, description: 'Compact and capable' },
-            { id: 'solar-pro', name: 'Solar Pro', type: 'chat', contextWindow: 128000, description: 'Latest Upstage flagship' },
+            { id: 'solar-1-mini-chat', name: 'Solar Mini', type: ['chat'], contextWindow: 32000, description: 'Compact and capable' },
+            { id: 'solar-pro', name: 'Solar Pro', type: ['chat'], contextWindow: 128000, description: 'Latest Upstage flagship' },
         ],
     },
     {
@@ -450,8 +451,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.minimaxi.com',
         keyPrefix: '',
         models: [
-            { id: 'abab6.5-chat', name: 'abab6.5', type: 'chat', contextWindow: 128000, description: 'MoE model' },
-            { id: 'abab7-chat', name: 'abab7', type: 'chat', contextWindow: 128000, description: 'Latest flagship' },
+            { id: 'abab6.5-chat', name: 'abab6.5', type: ['chat'], contextWindow: 128000, description: 'MoE model' },
+            { id: 'abab7-chat', name: 'abab7', type: ['chat'], contextWindow: 128000, description: 'Latest flagship' },
         ],
     },
     {
@@ -462,9 +463,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.moonshot.cn',
         keyPrefix: '',
         models: [
-            { id: 'moonshot-v1-8k', name: 'Moonshot V1 8K', type: 'chat', contextWindow: 8000, description: 'Kimi core model' },
-            { id: 'moonshot-v1-32k', name: 'Moonshot V1 32K', type: 'chat', contextWindow: 32000, description: 'Kimi core model' },
-            { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K', type: 'chat', contextWindow: 128000, description: 'Kimi core model' },
+            { id: 'moonshot-v1-8k', name: 'Moonshot V1 8K', type: ['chat'], contextWindow: 8000, description: 'Kimi core model' },
+            { id: 'moonshot-v1-32k', name: 'Moonshot V1 32K', type: ['chat'], contextWindow: 32000, description: 'Kimi core model' },
+            { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K', type: ['chat'], contextWindow: 128000, description: 'Kimi core model' },
         ],
     },
     {
@@ -475,8 +476,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.stepfun.com',
         keyPrefix: '',
         models: [
-            { id: 'step-1-8k', name: 'Step-1 8K', type: 'chat', contextWindow: 8000, description: 'Flagship model' },
-            { id: 'step-1-128k', name: 'Step-1 128K', type: 'chat', contextWindow: 128000, description: 'Flagship model' },
+            { id: 'step-1-8k', name: 'Step-1 8K', type: ['chat'], contextWindow: 8000, description: 'Flagship model' },
+            { id: 'step-1-128k', name: 'Step-1 128K', type: ['chat'], contextWindow: 128000, description: 'Flagship model' },
         ],
     },
     {
@@ -487,7 +488,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.baseten.co',
         keyPrefix: '',
         models: [
-            { id: 'llama-3-8b-instruct', name: 'Llama 3 8B (Baseten)', type: 'chat', contextWindow: 8000, description: 'Dedicated inference' },
+            { id: 'llama-3-8b-instruct', name: 'Llama 3 8B (Baseten)', type: ['chat'], contextWindow: 8000, description: 'Dedicated inference' },
         ],
     },
     {
@@ -498,8 +499,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://help.aliyun.com/product/2399480.html',
         keyPrefix: '',
         models: [
-            { id: 'qwen-max', name: 'Qwen Max (Alibaba)', type: 'chat', contextWindow: 30000, description: 'Via Model Studio' },
-            { id: 'qwen-plus', name: 'Qwen Plus (Alibaba)', type: 'chat', contextWindow: 30000, description: 'Via Model Studio' },
+            { id: 'qwen-max', name: 'Qwen Max (Alibaba)', type: ['chat'], contextWindow: 30000, description: 'Via Model Studio' },
+            { id: 'qwen-plus', name: 'Qwen Plus (Alibaba)', type: ['chat'], contextWindow: 30000, description: 'Via Model Studio' },
         ],
     },
     {
@@ -510,8 +511,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://cloud.baidu.com/doc/WENXINWORKSHOP',
         keyPrefix: '',
         models: [
-            { id: 'ernie-4.0-8k', name: 'ERNIE 4.0 8K', type: 'chat', contextWindow: 8000, description: 'Via Qianfan' },
-            { id: 'ernie-3.5-8k', name: 'ERNIE 3.5 8K', type: 'chat', contextWindow: 8000, description: 'Via Qianfan' },
+            { id: 'ernie-4.0-8k', name: 'ERNIE 4.0 8K', type: ['chat'], contextWindow: 8000, description: 'Via Qianfan' },
+            { id: 'ernie-3.5-8k', name: 'ERNIE 3.5 8K', type: ['chat'], contextWindow: 8000, description: 'Via Qianfan' },
         ],
     },
 ];
@@ -534,14 +535,20 @@ export function getModelsForProvider(providerId: string): AIModel[] {
  * Get chat/reasoning models for a provider (excludes image models)
  */
 export function getChatModelsForProvider(providerId: string): AIModel[] {
-    return getModelsForProvider(providerId).filter(m => m.type !== 'image');
+    return getModelsForProvider(providerId).filter(m => {
+        const types = Array.isArray(m.type) ? m.type : [m.type];
+        return !types.includes('image');
+    });
 }
 
 /**
  * Get image generation models for a provider
  */
 export function getImageModelsForProvider(providerId: string): AIModel[] {
-    return getModelsForProvider(providerId).filter(m => m.type === 'image');
+    return getModelsForProvider(providerId).filter(m => {
+        const types = Array.isArray(m.type) ? m.type : [m.type];
+        return types.includes('image');
+    });
 }
 
 /**

@@ -1580,7 +1580,7 @@ print(response.choices[0].message.content)`}
                                                 <SelectLabel className="flex items-center gap-2 text-xs font-semibold">
                                                     {provider.name}
                                                 </SelectLabel>
-                                                {provider.models.filter(m => m.type === 'chat' || m.type === 'reasoning' || m.type === 'code').map((model) => (
+                                                {provider.models.filter(m => { const t = Array.isArray(m.type) ? m.type : [m.type]; return t.some(t => t === 'chat' || t === 'reasoning' || t === 'code'); }).map((model) => (
                                                     <SelectItem key={model.id} value={model.id} className="text-xs">
                                                         {model.name}
                                                     </SelectItem>
