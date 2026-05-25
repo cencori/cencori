@@ -22,12 +22,16 @@ import {
 } from "@hugeicons/core-free-icons";
 import {
     NextjsLogo,
+    TanStackLogo,
     ViteLogo,
     VSCodeLogo,
     CursorLogo,
     ClaudeLogo,
     VercelLogo,
     CrewAILogo,
+    LangChainLogo,
+    LlamaIndexLogo,
+    DifyLogo,
 } from "@/components/icons/BrandIcons";
 
 function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -133,8 +137,10 @@ export default function AIBuildersPage() {
 
             <main>
                 {/* ━━━ HERO ━━━ */}
-                <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0">
-                    <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 sm:px-12 py-20 sm:py-28">
+                <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
+
+                    <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 sm:px-12 py-20 sm:py-28 z-10 flex flex-col items-center text-center">
                         <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
@@ -146,28 +152,28 @@ export default function AIBuildersPage() {
                             </p>
                         </Reveal>
                         <Reveal delay={0.05}>
-                            <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4.25rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-6 max-w-3xl">
+                            <h1 className="text-[2.5rem] sm:text-[3.5rem] lg:text-[4.5rem] font-heading font-black leading-[0.95] tracking-[-0.02em] mb-6 max-w-3xl">
                                 The platform for
                                 <br />
                                 <span className="text-muted-foreground">AI-native products.</span>
                             </h1>
                         </Reveal>
                         <Reveal delay={0.1}>
-                            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mb-10 leading-[1.7]">
+                            <p className="text-base text-muted-foreground max-w-[38rem] mb-10 leading-[1.7]">
                                 Gateway, billing, security, and compute — unified behind one API.{" "}
                                 Scaffold a new app with <code className="text-[13px] font-mono bg-foreground/5 px-1.5 py-0.5 rounded text-foreground/80">create-cencori-app</code>{" "}
                                 or drop into your existing stack with the SDK. Start building, not plumbing.
                             </p>
                         </Reveal>
                         <Reveal delay={0.15}>
-                            <div className="flex gap-3">
+                            <div className="flex flex-wrap items-center justify-center gap-3">
                                 <Link href="/login">
-                                    <Button size="sm" className="h-7 text-xs px-3 bg-foreground text-background hover:bg-foreground/90">
+                                    <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
                                         Start Building Free <ArrowRight className="ml-1.5 h-3 w-3" />
                                     </Button>
                                 </Link>
                                 <Link href="/docs">
-                                    <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                                    <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                                         Documentation
                                     </Button>
                                 </Link>
@@ -214,16 +220,44 @@ export default function AIBuildersPage() {
                                     </div>
                                 </Reveal>
                                 <Reveal delay={0.2}>
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-5 text-xs text-muted-foreground">
-                                        <span>Scaffolds</span>
-                                        {["Next.js", "TanStack", "Cencori Agent", "Celo Agent"].map((t, i) => (
-                                            <React.Fragment key={t}>
-                                                {i > 0 && <span className="text-muted-foreground/30">·</span>}
-                                                <span className="font-medium text-foreground/70">{t}</span>
-                                            </React.Fragment>
+                                    <div className="mt-5 grid grid-cols-2 gap-2">
+                                        {[
+                                            { name: "Next.js", icon: NextjsLogo },
+                                            { name: "TanStack", icon: TanStackLogo },
+                                            { name: "Cencori Agent", icon: "cencori" },
+                                            { name: "+ more", icon: null },
+                                        ].map((t) => (
+                                            <div key={t.name} className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/15 bg-foreground/[0.02]">
+                                                {t.icon === "cencori" ? (
+                                                    <Logo variant="mark" className="h-3 opacity-60" />
+                                                ) : typeof t.icon === "function" ? (
+                                                    <t.icon className="h-4 w-4 opacity-60" />
+                                                ) : null}
+                                                <span className="text-[11px] font-medium text-foreground/70">{t.name}</span>
+                                            </div>
                                         ))}
-                                        <span className="text-muted-foreground/30">·</span>
-                                        <span>pre-wired to Gateway</span>
+                                        <div className="col-span-2 flex items-center justify-between px-3 py-2 rounded-md border border-border/15 bg-emerald-500/5 border-emerald-500/15">
+                                            <span className="text-[11px] font-medium text-emerald-500/80">All pre-wired to Gateway</span>
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500/40" />
+                                        </div>
+                                    </div>
+                                </Reveal>
+
+                                <Reveal delay={0.25}>
+                                    <div className="mt-8 grid grid-cols-2 gap-2">
+                                        {[
+                                            { icon: ApiGatewayIcon, label: "Gateway proxy" },
+                                            { icon: AiUserIcon, label: "End-user billing" },
+                                            { icon: AiSecurityIcon, label: "Security filters" },
+                                            { icon: CodeCircleIcon, label: "Agent compute" },
+                                        ].map((item) => (
+                                            <div key={item.label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border/15 bg-foreground/[0.02]">
+                                                <div className="flex items-center justify-center w-6 h-6 rounded-md bg-foreground/5 shrink-0">
+                                                    <HugeiconsIcon icon={item.icon} size={12} className="text-muted-foreground" />
+                                                </div>
+                                                <span className="text-[11px] font-medium text-foreground/70">{item.label}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </Reveal>
                             </div>
@@ -463,14 +497,14 @@ export default function AIBuildersPage() {
                                 <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-10">Works with your stack</p>
                             </Reveal>
                             <Reveal delay={0.05}>
-                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-6">Frameworks</p>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-6">AI Frameworks</p>
                                 <div className="flex flex-wrap justify-center gap-x-12 gap-y-8 items-center mb-14">
                                     {[
                                         { name: "Vercel AI SDK", Logo: VercelLogo },
-                                        { name: "LangChain", Logo: null },
+                                        { name: "LangChain", Logo: LangChainLogo },
                                         { name: "CrewAI", Logo: CrewAILogo },
-                                        { name: "LlamaIndex", Logo: null },
-                                        { name: "TanStack", Logo: ViteLogo },
+                                        { name: "LlamaIndex", Logo: LlamaIndexLogo },
+                                        { name: "TanStack", Logo: TanStackLogo },
                                         { name: "AutoGen", Logo: null },
                                     ].map((tool) => (
                                         <div key={tool.name} className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default">
@@ -493,7 +527,6 @@ export default function AIBuildersPage() {
                                         { name: "Claude", Logo: ClaudeLogo },
                                         { name: "Next.js", Logo: NextjsLogo },
                                         { name: "Vite", Logo: ViteLogo },
-                                        { name: "Vercel", Logo: VercelLogo },
                                     ].map((tool) => (
                                         <div key={tool.name} className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default">
                                             <tool.Logo className="h-5 w-5 opacity-40 hover:opacity-90 transition-opacity duration-300" size={20} />
