@@ -2,13 +2,23 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Copy, DollarSign, CreditCard, Users, BarChart3, Shield, Route, Cpu } from "lucide-react";
+import { ArrowRight, Check, Copy, DollarSign, CreditCard, Users } from "lucide-react";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Logo } from "@/components/logo";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    ApiGatewayIcon,
+    AiSecurityIcon,
+    CodeCircleIcon,
+    ActivityIcon,
+    BadgeDollarSignIcon,
+    AiUserIcon,
+} from "@hugeicons/core-free-icons";
 import {
     NextjsLogo,
     ViteLogo,
@@ -319,27 +329,27 @@ export default function AIBuildersPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                                 {[
-                                    { icon: Route, title: "Multi-Provider Gateway", desc: "Route requests to any LLM through a single OpenAI-compatible endpoint. Automatic fallback, model equivalence mapping, and 14+ providers." },
-                                    { icon: Shield, title: "AI Security", desc: "Prompt injection detection, PII scanning, and content moderation on every request. Zero-config, active by default." },
-                                    { icon: Cpu, title: "Agent Compute", desc: "Serverless code execution for AI agents. Run tools, fetch data, and execute code without managing infrastructure." },
-                                    { icon: BarChart3, title: "Observability", desc: "Full request/response logging, P50/P90/P99 latency, token usage, and cost tracking. See everything in real time." },
-                                    { icon: DollarSign, title: "End-User Billing", desc: "Meter token usage, set markup pricing, and collect payments via Stripe Connect. Monetize your AI product from day one." },
-                                    { icon: Users, title: "Rate Limits & Budgets", desc: "Per-user rate limits and spending caps. Prevent abuse, control costs, and enforce plans without writing billing code." },
+                                    { hugeicon: ApiGatewayIcon, title: "Multi-Provider Gateway", desc: "Route requests to any LLM through a single OpenAI-compatible endpoint. Automatic fallback, model equivalence mapping, and 14+ providers." },
+                                    { hugeicon: AiSecurityIcon, title: "AI Security", desc: "Prompt injection detection, PII scanning, and content moderation on every request. Zero-config, active by default." },
+                                    { hugeicon: CodeCircleIcon, title: "Agent Compute", desc: "Serverless code execution for AI agents. Run tools, fetch data, and execute code without managing infrastructure." },
+                                    { hugeicon: ActivityIcon, title: "Observability", desc: "Full request/response logging, P50/P90/P99 latency, token usage, and cost tracking. See everything in real time." },
+                                    { hugeicon: BadgeDollarSignIcon, title: "End-User Billing", desc: "Meter token usage, set markup pricing, and collect payments via Stripe Connect. Monetize your AI product from day one." },
+                                    { hugeicon: AiUserIcon, title: "Rate Limits & Budgets", desc: "Per-user rate limits and spending caps. Prevent abuse, control costs, and enforce plans without writing billing code." },
                                 ].map((item, i) => (
                                     <Reveal key={item.title} delay={i * 0.05}>
                                         <div
-                                            className={`
-                                                group p-8 transition-colors duration-300 hover:bg-foreground/[0.02]
-                                                border-b border-border/30 last:border-b-0
-                                                border-r border-border/30 last:border-r-0
-                                                ${i < 4 ? 'md:border-b' : 'md:border-b-0'}
-                                                ${i % 2 === 0 ? 'md:border-r' : 'md:border-r-0'}
-                                                ${i < 3 ? 'lg:border-b' : 'lg:border-b-0'}
-                                                ${i % 3 !== 2 ? 'lg:border-r' : 'lg:border-r-0'}
-                                            `}
+                                            className={cn(
+                                                "group p-8 transition-colors duration-300 hover:bg-foreground/[0.02]",
+                                                "border-b border-border/30 last:border-b-0",
+                                                "border-r border-border/30 last:border-r-0",
+                                                i < 4 ? "md:border-b" : "md:border-b-0",
+                                                i % 2 === 0 ? "md:border-r" : "md:border-r-0",
+                                                i < 3 ? "lg:border-b" : "lg:border-b-0",
+                                                i % 3 !== 2 ? "lg:border-r" : "lg:border-r-0",
+                                            )}
                                         >
                                             <div className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 text-foreground group-hover:text-emerald-500 transition-colors">
-                                                <item.icon className="h-4 w-4" />
+                                                <HugeiconsIcon icon={item.hugeicon} size={16} />
                                             </div>
                                             <h3 className="text-sm font-medium mb-2">{item.title}</h3>
                                             <p className="text-[13px] text-muted-foreground leading-[1.7]">{item.desc}</p>
