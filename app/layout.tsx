@@ -79,7 +79,7 @@ const keywords = [
 export const metadata: Metadata = {
   metadataBase: new URL('https://cencori.com'),
   title: {
-    default: "Cencori | Every AI request, under your control.",
+    default: "Cencori | The AI cloud infrastructure.",
     template: "%s - Cencori",
   },
   description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
@@ -94,14 +94,14 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://cencori.com",
     siteName: "Cencori",
-    title: "Cencori | Every AI request, under your control.",
+    title: "Cencori | The AI cloud infrastructure.",
     description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Cencori — Every AI request, under your control.",
+        alt: "Cencori — The AI cloud infrastructure.",
       },
     ],
   },
@@ -111,7 +111,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@cencori",
     creator: "@cencori",
-    title: "Cencori | Every AI request, under your control.",
+    title: "Cencori | The AI cloud infrastructure.",
     description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: ["/og.png"],
   },
@@ -155,7 +155,7 @@ const organizationSchema = {
   "name": "Cencori",
   "url": "https://cencori.com",
   "logo": "https://cencori.com/clight.png",
-  "description": "Cencori is the infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
+  "description": "Cencori is the AI cloud infrastructure to ship AI.",
   "sameAs": [
     "https://x.com/cencori",
     "https://github.com/cencori",
@@ -174,7 +174,7 @@ const softwareApplicationSchema = {
   "name": "Cencori",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Cloud",
-  "description": "The infrastructure for AI production. Ship AI with built-in security, observability, and scale — all in one platform.",
+  "description": "The AI cloud infrastructure to ship AI.",
   "url": "https://cencori.com",
   "offers": {
     "@type": "Offer",

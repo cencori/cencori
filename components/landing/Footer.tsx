@@ -69,7 +69,7 @@ export const Footer = () => {
                             <Logo variant="mark" className="h-4 w-4" />
                         </Link>
                         <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-                            Every AI request, under your control.
+                            The AI cloud infrastructure to ship AI.
                         </p>
                         {/* Newsletter */}
                         <div className="max-w-xs">
