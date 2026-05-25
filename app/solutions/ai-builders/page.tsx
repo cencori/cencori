@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,6 +9,48 @@ import { ArrowRight, ChevronRight, Share2, Database, Cpu, Workflow, Layers, Chec
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Logo } from "@/components/logo";
+import { NextjsLogo, ViteLogo, ReactLogo } from "@/components/icons/BrandIcons";
+
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            ([e]) => { if (e.isIntersecting) setVisible(true); },
+            { threshold: 0.12 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, []);
+    return (
+        <div
+            ref={ref}
+            className={className}
+            style={{
+                opacity: visible ? 1 : 0,
+                transform: visible ? "translateY(0)" : "translateY(24px)",
+                transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
+            }}
+        >
+            {children}
+        </div>
+    );
+}
+
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <button
+            onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+            {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy"}
+        </button>
+    );
+}
 
 export default function AIBuildersPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -199,6 +241,70 @@ export default function AIBuildersPage() {
                                         <div className="px-3 py-1.5 border rounded bg-background text-xs text-muted-foreground">Pinecone</div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Scaffold Section */}
+                <section className="py-20 bg-background border-y border-border/30">
+                    <div className="container mx-auto px-4 md:px-6">
+                        <div className="max-w-5xl mx-auto">
+                            <Reveal>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Start from scratch</p>
+                            </Reveal>
+                            <Reveal delay={0.05}>
+                                <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-4">
+                                    Ship in seconds with <code className="text-sm font-mono bg-foreground/5 px-2 py-0.5 rounded">create-cencori-app</code>
+                                </h2>
+                            </Reveal>
+                            <Reveal delay={0.1}>
+                                <p className="text-muted-foreground text-sm max-w-xl mb-12 leading-relaxed">
+                                    Bootstrap a production-ready Cencori app with one command. Pick your stack — we wire up the Gateway, API keys, streaming, and config.
+                                </p>
+                            </Reveal>
+
+                            {/* Command block */}
+                            <Reveal delay={0.15}>
+                                <div className="mb-14">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-mono text-muted-foreground/50">terminal</span>
+                                        <CopyButton text="npx create-cencori-app my-app" />
+                                    </div>
+                                    <pre className="text-sm sm:text-sm font-mono leading-[1.8] text-foreground/80 bg-foreground/[0.03] border border-border/20 rounded-xl p-5 overflow-x-auto">
+                                        <code>
+                                            <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-emerald-400">$</span> npx create-cencori-app my-app{"\n"}
+                                            <span className="text-muted-foreground/40">2</span>{"  "}{"\n"}
+                                            <span className="text-muted-foreground/40">3</span>{"  "}  <span className="text-violet-400">? </span>Select a template{"  "}<span className="text-muted-foreground/60">nextjs / tanstack / agent / celo-agent</span>{"\n"}
+                                            <span className="text-muted-foreground/40">4</span>{"  "}  <span className="text-violet-400">? </span>Include a demo chat UI?{"  "}<span className="text-muted-foreground/60">Yes / No</span>{"\n"}
+                                            <span className="text-muted-foreground/40">5</span>{"  "}  <span className="text-violet-400">? </span>Enter your API key{"  "}<span className="text-muted-foreground/60">(optional)</span>{"\n"}
+                                            <span className="text-muted-foreground/40">6</span>{"  "}{"\n"}
+                                            <span className="text-muted-foreground/40">7</span>{"  "}  <span className="text-emerald-500/70">✔</span> Project scaffolded{"\n"}
+                                            <span className="text-muted-foreground/40">8</span>{"  "}  <span className="text-emerald-500/70">✔</span> Dependencies installed{"\n"}
+                                            <span className="text-muted-foreground/40">9</span>{"  "}  <span className="text-emerald-500/70">✔</span> Ready to build
+                                        </code>
+                                    </pre>
+                                </div>
+                            </Reveal>
+
+                            {/* Template cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {[
+                                    { name: "Next.js", desc: "Full-stack React with App Router, Vercel AI SDK streaming, and a chat endpoint already wired up.", icon: NextjsLogo },
+                                    { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: ViteLogo },
+                                    { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: ReactLogo },
+                                    { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: ReactLogo },
+                                ].map((tpl, i) => (
+                                    <Reveal key={tpl.name} delay={i * 0.05}>
+                                        <div className="group p-6 border border-border/30 rounded-xl hover:border-primary/20 hover:bg-muted/10 transition-all duration-300">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <tpl.icon className="h-4 w-4 text-muted-foreground opacity-50" />
+                                                <span className="text-sm font-semibold">{tpl.name}</span>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground leading-relaxed">{tpl.desc}</p>
+                                        </div>
+                                    </Reveal>
+                                ))}
                             </div>
                         </div>
                     </div>
