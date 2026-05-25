@@ -356,6 +356,35 @@ export function CustomAgentLogo({ className, ...props }: IconProps) {
     );
 }
 
+// TanStack Logo
+export function TanStackLogo({ className, ...props }: IconProps) {
+    return (
+        <svg viewBox="0 0 200 50" fill="none" className={className} {...props}>
+            <rect x="2" y="2" width="46" height="46" rx="8" fill="#FF4154" />
+            <text x="25" y="32" textAnchor="middle" fill="white" fontSize="22" fontWeight="bold" fontFamily="system-ui">T</text>
+            <text x="60" y="33" fill="currentColor" fontSize="20" fontWeight="bold" fontFamily="system-ui" letterSpacing="1">TanStack</text>
+        </svg>
+    );
+}
+
+// Cencori Mark Logo (sensory mark)
+export function CencoriMarkLogo({ className, ...props }: any) {
+    return (
+        <div className={cn("relative", className)} {...props}>
+            <img
+                src="/black.png"
+                alt=""
+                className="h-full w-auto block dark:hidden object-contain"
+            />
+            <img
+                src="/white.png"
+                alt=""
+                className="h-full w-auto hidden dark:block object-contain"
+            />
+        </div>
+    );
+}
+
 // RagMetrics Logo
 export function RagMetricsLogo({ className, ...props }: any) {
     return (

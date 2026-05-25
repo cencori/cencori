@@ -25,6 +25,8 @@ import {
     ReplitLogo,
     V0Logo,
     BoltLogo,
+    TanStackLogo,
+    CencoriMarkLogo,
 } from "@/components/icons/BrandIcons";
 
 /* ── Scroll reveal ── */
@@ -419,9 +421,9 @@ export default function VibeCodersPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {[
                                 { name: "Next.js", desc: "Full-stack React with App Router, Vercel AI SDK streaming, and a chat endpoint already wired up.", icon: NextjsLogo },
-                                { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: ViteLogo },
-                                { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: ReactLogo },
-                                { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: ReactLogo },
+                                { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: TanStackLogo },
+                                { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: CencoriMarkLogo },
+                                { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: CencoriMarkLogo },
                             ].map((tpl, i) => (
                                 <Reveal key={tpl.name} delay={i * 0.05}>
                                     <div className="group border border-border/20 rounded-lg p-6 cursor-default hover:border-border/50 transition-colors duration-500">
