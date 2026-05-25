@@ -205,30 +205,23 @@ export default function AIBuildersPage() {
                                     </p>
                                 </Reveal>
                                 <Reveal delay={0.15}>
-                                    <div className="border border-border/20 rounded-lg overflow-hidden">
-                                        <div className="flex items-center justify-between px-4 py-2.5 bg-foreground/[0.03] border-b border-border/20">
-                                            <span className="text-[10px] font-mono text-muted-foreground/50">terminal</span>
-                                            <CopyButton text="npx create-cencori-app my-app" />
-                                        </div>
-                                        <pre className="text-[12px] font-mono leading-[1.7] text-foreground/80 p-4 overflow-x-auto">
-                                            <code>
-                                                <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-emerald-400">$</span> npx create-cencori-app my-app{"\n"}
-                                                <span className="text-muted-foreground/40">2</span>{"  "}{"\n"}
-                                                <span className="text-muted-foreground/40">3</span>{"  "}  <span className="text-violet-400">? </span>Select a template{"   "}<span className="text-muted-foreground/60">nextjs / tanstack / agent / celo-agent</span>{"\n"}
-                                                <span className="text-muted-foreground/40">4</span>{"  "}  <span className="text-violet-400">? </span>Include a demo chat UI?{"  "}<span className="text-muted-foreground/60">Yes / No</span>{"\n"}
-                                                <span className="text-muted-foreground/40">5</span>{"  "}{"\n"}
-                                                <span className="text-muted-foreground/40">6</span>{"  "}  <span className="text-emerald-500/70">✔</span> Project scaffolded{"\n"}
-                                                <span className="text-muted-foreground/40">7</span>{"  "}  <span className="text-emerald-500/70">✔</span> Dependencies installed{"\n"}
-                                                <span className="text-muted-foreground/40">8</span>{"  "}  <span className="text-emerald-500/70">✔</span> Ready to build
-                                            </code>
-                                        </pre>
+                                    <div className="flex items-center gap-3 px-4 py-3 border border-border/20 rounded-lg bg-foreground/[0.02]">
+                                        <span className="text-emerald-400 font-mono text-sm shrink-0">$</span>
+                                        <code className="text-sm font-mono text-foreground/80 flex-1">npx create-cencori-app my-app</code>
+                                        <CopyButton text="npx create-cencori-app my-app" />
                                     </div>
                                 </Reveal>
                                 <Reveal delay={0.2}>
-                                    <div className="flex flex-wrap gap-2 mt-6">
-                                        {["Next.js", "TanStack", "Cencori Agent", "Celo Agent"].map((t) => (
-                                            <span key={t} className="text-[11px] px-2.5 py-1 rounded-full border border-border/20 text-muted-foreground">{t}</span>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-5 text-xs text-muted-foreground">
+                                        <span>Scaffolds</span>
+                                        {["Next.js", "TanStack", "Cencori Agent", "Celo Agent"].map((t, i) => (
+                                            <React.Fragment key={t}>
+                                                {i > 0 && <span className="text-muted-foreground/30">·</span>}
+                                                <span className="font-medium text-foreground/70">{t}</span>
+                                            </React.Fragment>
                                         ))}
+                                        <span className="text-muted-foreground/30">·</span>
+                                        <span>pre-wired to Gateway</span>
                                     </div>
                                 </Reveal>
                             </div>
