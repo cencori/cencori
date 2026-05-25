@@ -5,7 +5,7 @@ import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight, Check, Copy, DollarSign, CreditCard, Users, BarChart3 } from "lucide-react";
 import Navbar from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Logo } from "@/components/logo";
@@ -15,6 +15,7 @@ import {
     VSCodeLogo,
     CursorLogo,
     ClaudeLogo,
+    VercelLogo,
 } from "@/components/icons/BrandIcons";
 
 function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -283,6 +284,88 @@ export default function AIBuildersPage() {
                     </div>
                 </section>
 
+                {/* ━━━ INTEGRATE ━━━ */}
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start">
+                            <div>
+                                <Reveal>
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <VercelLogo className="h-4 w-4 text-foreground" />
+                                        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                                            Vercel AI SDK
+                                        </span>
+                                    </div>
+                                </Reveal>
+                                <Reveal delay={0.05}>
+                                    <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6">
+                                        Already have an app?
+                                        <br />
+                                        <span className="text-muted-foreground">Drop Cencori in.</span>
+                                    </h2>
+                                </Reveal>
+                                <Reveal delay={0.1}>
+                                    <p className="text-muted-foreground leading-[1.7] max-w-md mb-10">
+                                        Using the Vercel AI SDK? Keep{" "}
+                                        <code className="text-[13px] text-foreground/70 font-mono">streamText()</code> and{" "}
+                                        <code className="text-[13px] text-foreground/70 font-mono">useChat()</code> — just swap the model to Cencori.
+                                    </p>
+                                </Reveal>
+                                <Reveal delay={0.15}>
+                                    <div className="space-y-3 text-sm text-muted-foreground">
+                                        <p className="group cursor-default">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
+                                            One API for OpenAI, Claude, Gemini
+                                        </p>
+                                        <p className="group cursor-default">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
+                                            Safety filtering on every request
+                                        </p>
+                                        <p className="group cursor-default">
+                                            <span className="text-emerald-500/60 mr-3">&#x2713;</span>
+                                            Cost tracking built-in
+                                        </p>
+                                    </div>
+                                </Reveal>
+                            </div>
+
+                            {/* Code block */}
+                            <Reveal delay={0.1}>
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-[11px] font-mono text-muted-foreground/50">route.ts</span>
+                                        <CopyButton text={[
+                                            "import { cencori } from 'cencori';",
+                                            "import { streamText } from 'ai';",
+                                            "",
+                                            "const result = streamText({",
+                                            "  model: cencori('gpt-4o'),",
+                                            "  messages,",
+                                            "});",
+                                        ].join('\n')} />
+                                    </div>
+                                    <pre className="text-[13px] font-mono leading-[1.8] text-foreground/80 bg-foreground/[0.03] border border-border/20 rounded-lg p-5 overflow-x-auto">
+                                        <code>
+                                            <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-violet-400">import</span> {"{ "}<span className="text-foreground">cencori</span>{" }"} <span className="text-violet-400">from</span> <span className="text-emerald-400">&apos;cencori&apos;</span>;{"\n"}
+                                            <span className="text-muted-foreground/40">2</span>{"  "}<span className="text-violet-400">import</span> {"{ "}<span className="text-foreground">streamText</span>{" }"} <span className="text-violet-400">from</span> <span className="text-emerald-400">&apos;ai&apos;</span>;{"\n"}
+                                            <span className="text-muted-foreground/40">3</span>{"\n"}
+                                            <span className="text-muted-foreground/40">4</span>{"  "}<span className="text-violet-400">const</span> result = <span className="text-blue-400">streamText</span>({"{"}{"\n"}
+                                            <span className="text-muted-foreground/40">5</span>{"    "}model: <span className="text-blue-400">cencori</span>(<span className="text-emerald-400">&apos;gpt-4o&apos;</span>),{"\n"}
+                                            <span className="text-muted-foreground/40">6</span>{"    "}messages,{"\n"}
+                                            <span className="text-muted-foreground/40">7</span>{"  "}{"}"});
+                                        </code>
+                                    </pre>
+                                </div>
+                            </Reveal>
+                        </div>
+                    </div>
+                </section>
+
                 {/* ━━━ BUILD WITH ━━━ */}
                 <section className="bg-background border-b border-border/30">
                     <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
@@ -316,6 +399,51 @@ export default function AIBuildersPage() {
                                     Works with your editor, your framework, your stack. No migration required.
                                 </p>
                             </Reveal>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ━━━ BILL YOUR USERS ━━━ */}
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Monetize your AI</p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                                Bill your users
+                                <br />
+                                <span className="text-muted-foreground">for every token.</span>
+                            </h2>
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="text-muted-foreground text-sm leading-[1.7] max-w-lg mb-16">
+                                Cencori handles metering, rate limits, and Stripe Connect payouts. You set the markup — we do the rest.
+                            </p>
+                        </Reveal>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            {[
+                                { icon: DollarSign, title: "Markup pricing", desc: "Set your margin on every model. Charge $0.01 for a request that costs you $0.002. The markup is automatic." },
+                                { icon: CreditCard, title: "Stripe Connect", desc: "Users pay you via Stripe. Cencori handles the metering and invoicing. No PCI paperwork, no billing code." },
+                                { icon: Users, title: "Per-user budgets", desc: "Set rate limits and spending caps per user. Prevent one customer from blowing through your entire margin." },
+                                { icon: BarChart3, title: "Usage analytics", desc: "See exactly how much each user is consuming, in real time. Drill down by model, endpoint, and day." },
+                            ].map((item, i) => (
+                                <Reveal key={item.title} delay={i * 0.05}>
+                                    <div className="group p-6 border border-border/20 rounded-lg cursor-default hover:border-border/50 transition-colors duration-500">
+                                        <div className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 text-foreground group-hover:text-emerald-500 transition-colors">
+                                            <item.icon className="h-4 w-4" />
+                                        </div>
+                                        <h3 className="text-sm font-medium mb-2">{item.title}</h3>
+                                        <p className="text-[13px] text-muted-foreground leading-[1.7]">{item.desc}</p>
+                                    </div>
+                                </Reveal>
+                            ))}
                         </div>
                     </div>
                 </section>
