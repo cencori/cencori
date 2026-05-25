@@ -25,8 +25,6 @@ import {
     ReplitLogo,
     V0Logo,
     BoltLogo,
-    TanStackLogo,
-    CencoriMarkLogo,
 } from "@/components/icons/BrandIcons";
 
 /* ── Scroll reveal ── */
@@ -367,74 +365,6 @@ export default function VibeCodersPage() {
                                     </pre>
                                 </div>
                             </Reveal>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ━━━ CREATE-CENCORI-APP — Scaffold in seconds ━━━ */}
-                <section className="bg-background border-b border-border/30">
-                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
-                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                        <Reveal>
-                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">
-                                Start from scratch
-                            </p>
-                        </Reveal>
-                        <Reveal delay={0.05}>
-                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-lg">
-                                Ship in seconds, not hours.
-                            </h2>
-                        </Reveal>
-                        <Reveal delay={0.1}>
-                            <p className="text-muted-foreground leading-[1.7] max-w-lg mb-16">
-                                Bootstrap a production-ready Cencori app with one command. Pick your stack — we wire up the Gateway, API keys, streaming, and config.
-                            </p>
-                        </Reveal>
-
-                        {/* Command block */}
-                        <Reveal delay={0.15}>
-                            <div className="mb-16">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[11px] font-mono text-muted-foreground/50">terminal</span>
-                                    <CopyButton text="npx create-cencori-app my-app" />
-                                </div>
-                                <pre className="text-[13px] sm:text-sm font-mono leading-[1.8] text-foreground/80 overflow-x-auto">
-                                    <code>
-                                        <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-emerald-400">$</span> npx create-cencori-app my-app{"\n"}
-                                        <span className="text-muted-foreground/40">2</span>{"  "}{"\n"}
-                                        <span className="text-muted-foreground/40">3</span>{"  "}  <span className="text-violet-400">? </span>Select a template{"  "}<span className="text-muted-foreground/60">nextjs / tanstack / agent / celo-agent</span>{"\n"}
-                                        <span className="text-muted-foreground/40">4</span>{"  "}  <span className="text-violet-400">? </span>Include a demo chat UI?{"  "}<span className="text-muted-foreground/60">Yes / No</span>{"\n"}
-                                        <span className="text-muted-foreground/40">5</span>{"  "}  <span className="text-violet-400">? </span>Enter your API key{"  "}<span className="text-muted-foreground/60">(optional)</span>{"\n"}
-                                        <span className="text-muted-foreground/40">6</span>{"  "}{"\n"}
-                                        <span className="text-muted-foreground/40">7</span>{"  "}  <span className="text-emerald-500/70">✔</span> Project scaffolded{"\n"}
-                                        <span className="text-muted-foreground/40">8</span>{"  "}  <span className="text-emerald-500/70">✔</span> Dependencies installed{"\n"}
-                                        <span className="text-muted-foreground/40">9</span>{"  "}  <span className="text-emerald-500/70">✔</span> Ready to build
-                                    </code>
-                                </pre>
-                            </div>
-                        </Reveal>
-
-                        {/* Template cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {[
-                                { name: "Next.js", desc: "Full-stack React with App Router, Vercel AI SDK streaming, and a chat endpoint already wired up.", icon: NextjsLogo },
-                                { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: TanStackLogo },
-                                { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: CencoriMarkLogo },
-                                { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: CencoriMarkLogo },
-                            ].map((tpl, i) => (
-                                <Reveal key={tpl.name} delay={i * 0.05}>
-                                    <div className="group border border-border/20 rounded-lg p-6 cursor-default hover:border-border/50 transition-colors duration-500">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <tpl.icon className="h-4 w-4 text-muted-foreground opacity-50" />
-                                            <span className="text-sm font-medium">{tpl.name}</span>
-                                        </div>
-                                        <p className="text-[13px] text-muted-foreground leading-[1.7]">{tpl.desc}</p>
-                                    </div>
-                                </Reveal>
-                            ))}
                         </div>
                     </div>
                 </section>
