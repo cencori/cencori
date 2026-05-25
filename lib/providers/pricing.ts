@@ -55,8 +55,8 @@ export async function getPricingFromDB(
 function getDefaultPricing(provider: string): ModelPricing {
     const defaults: Record<string, ModelPricing> = {
         openai: {
-            inputPer1KTokens: 0.001,
-            outputPer1KTokens: 0.002,
+            inputPer1KTokens: 0.0025,
+            outputPer1KTokens: 0.015,
             cencoriMarkupPercentage: 50,
         },
         anthropic: {
@@ -65,9 +65,29 @@ function getDefaultPricing(provider: string): ModelPricing {
             cencoriMarkupPercentage: 50,
         },
         google: {
-            inputPer1KTokens: 0.00025,
-            outputPer1KTokens: 0.00075,
+            inputPer1KTokens: 0.00125,
+            outputPer1KTokens: 0.01,
             cencoriMarkupPercentage: 0,
+        },
+        mistral: {
+            inputPer1KTokens: 0.0004,
+            outputPer1KTokens: 0.002,
+            cencoriMarkupPercentage: 50,
+        },
+        cohere: {
+            inputPer1KTokens: 0.0025,
+            outputPer1KTokens: 0.01,
+            cencoriMarkupPercentage: 50,
+        },
+        deepseek: {
+            inputPer1KTokens: 0.00014,
+            outputPer1KTokens: 0.00028,
+            cencoriMarkupPercentage: 50,
+        },
+        xai: {
+            inputPer1KTokens: 0.00125,
+            outputPer1KTokens: 0.0025,
+            cencoriMarkupPercentage: 50,
         },
         groq: {
             inputPer1KTokens: 0,

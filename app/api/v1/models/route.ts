@@ -211,7 +211,10 @@ export async function GET(req: NextRequest) {
         filteredModels = filteredModels.filter(m => m.owned_by === filterProvider);
     }
     if (filterType) {
-        filteredModels = filteredModels.filter(m => m.type === filterType);
+        filteredModels = filteredModels.filter(m => {
+            const types = Array.isArray(m.type) ? m.type : [m.type];
+            return types.includes(filterType);
+        });
     }
 
     return respond(

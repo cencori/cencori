@@ -131,8 +131,12 @@ export default function VibeCodersPage() {
 
             <main>
                 {/* ━━━ HERO ━━━ */}
-                <section className="pt-28 sm:pt-40 pb-24 sm:pb-32">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0">
+                    <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-8 animate-appear">
                             For Vibe Coders
                         </p>
@@ -156,8 +160,12 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ WORKS WITH — Logos woven into flowing text ━━━ */}
-                <section className="py-20 sm:py-28">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-20 sm:py-28">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <Reveal>
                             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-12">
                                 Works with everything you already use
@@ -239,8 +247,12 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ WHAT YOU GET ━━━ */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <Reveal>
                             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-emerald-500 mb-4">What you get</p>
                         </Reveal>
@@ -285,8 +297,12 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ VERCEL AI SDK — Code as the visual ━━━ */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start">
                             <div>
                                 <Reveal>
@@ -354,8 +370,12 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ PROMPTS — Copy-paste starters ━━━ */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <Reveal>
                             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Get started</p>
                         </Reveal>
@@ -403,8 +423,12 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ PRICING CALLOUT ━━━ */}
-                <section className="py-24 sm:py-32">
-                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <Reveal>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-end">
                                 <div>
@@ -431,9 +455,13 @@ export default function VibeCodersPage() {
                 </section>
 
                 {/* ━━━ BOTTOM CTA ━━━ */}
-                <Reveal>
-                    <section className="py-28 sm:py-36">
-                        <div className="mx-auto max-w-6xl px-4 md:px-6 text-center">
+                <section className="bg-background">
+                    <Reveal>
+                        <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-28 sm:py-36 text-center">
+                            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                             <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-5">
                                 Ready to ship?
                             </h2>
@@ -449,8 +477,8 @@ export default function VibeCodersPage() {
                                 </Link>
                             </div>
                         </div>
-                    </section>
-                </Reveal>
+                    </Reveal>
+                </section>
             </main>
 
             <Footer />

@@ -253,6 +253,13 @@ export default function AIGatewayPage() {
                   </div>
                 ))}
               </div>
+              <Link
+                href="/ai/models"
+                className="group mt-5 inline-flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
+              >
+                Browse all 100+ models
+                <ArrowRightIcon className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+              </Link>
             </div>
           </div>
         </section>
