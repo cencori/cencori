@@ -287,47 +287,66 @@ export default function AIBuildersPage() {
 
                 {/* ━━━ PLATFORM CAPABILITIES ━━━ */}
                 <section className="bg-background border-b border-border/30">
-                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative">
                         <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
                         <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
 
-                        <Reveal>
-                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">The platform</p>
-                        </Reveal>
-                        <Reveal delay={0.05}>
-                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
-                                Everything you need
-                                <br />
-                                <span className="text-muted-foreground">to build AI products.</span>
-                            </h2>
-                        </Reveal>
-                        <Reveal delay={0.1}>
-                            <p className="text-muted-foreground text-sm leading-[1.7] max-w-lg mb-16">
-                                Instead of stitching together providers, vector stores, billing systems, and security middleware — you get one platform with one API.
-                            </p>
-                        </Reveal>
+                        {/* Header */}
+                        <div className="flex flex-col px-6 py-20 sm:px-12 sm:py-28">
+                            <Reveal>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">The platform</p>
+                            </Reveal>
+                            <Reveal delay={0.05}>
+                                <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                                    Everything you need
+                                    <br />
+                                    <span className="text-muted-foreground">to build AI products.</span>
+                                </h2>
+                            </Reveal>
+                            <Reveal delay={0.1}>
+                                <p className="text-muted-foreground text-sm leading-[1.7] max-w-lg">
+                                    Instead of stitching together providers, vector stores, billing systems, and security middleware — you get one platform with one API.
+                                </p>
+                            </Reveal>
+                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                            {[
-                                { icon: Route, title: "Multi-Provider Gateway", desc: "Route requests to any LLM through a single OpenAI-compatible endpoint. Automatic fallback, model equivalence mapping, and 14+ providers." },
-                                { icon: Shield, title: "AI Security", desc: "Prompt injection detection, PII scanning, and content moderation on every request. Zero-config, active by default." },
-                                { icon: Cpu, title: "Agent Compute", desc: "Serverless code execution for AI agents. Run tools, fetch data, and execute code without managing infrastructure." },
-                                { icon: BarChart3, title: "Observability", desc: "Full request/response logging, P50/P90/P99 latency, token usage, and cost tracking. See everything in real time." },
-                                { icon: DollarSign, title: "End-User Billing", desc: "Meter token usage, set markup pricing, and collect payments via Stripe Connect. Monetize your AI product from day one." },
-                                { icon: Users, title: "Rate Limits & Budgets", desc: "Per-user rate limits and spending caps. Prevent abuse, control costs, and enforce plans without writing billing code." },
-                            ].map((item, i) => (
-                                <Reveal key={item.title} delay={i * 0.05}>
-                                    <div className="group p-6 border border-border/20 rounded-lg cursor-default hover:border-border/50 transition-colors duration-500">
-                                        <div className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 text-foreground group-hover:text-emerald-500 transition-colors">
-                                            <item.icon className="h-4 w-4" />
+                        {/* Connected grid */}
+                        <div className="relative border-t border-border/30">
+                            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                                {[
+                                    { icon: Route, title: "Multi-Provider Gateway", desc: "Route requests to any LLM through a single OpenAI-compatible endpoint. Automatic fallback, model equivalence mapping, and 14+ providers." },
+                                    { icon: Shield, title: "AI Security", desc: "Prompt injection detection, PII scanning, and content moderation on every request. Zero-config, active by default." },
+                                    { icon: Cpu, title: "Agent Compute", desc: "Serverless code execution for AI agents. Run tools, fetch data, and execute code without managing infrastructure." },
+                                    { icon: BarChart3, title: "Observability", desc: "Full request/response logging, P50/P90/P99 latency, token usage, and cost tracking. See everything in real time." },
+                                    { icon: DollarSign, title: "End-User Billing", desc: "Meter token usage, set markup pricing, and collect payments via Stripe Connect. Monetize your AI product from day one." },
+                                    { icon: Users, title: "Rate Limits & Budgets", desc: "Per-user rate limits and spending caps. Prevent abuse, control costs, and enforce plans without writing billing code." },
+                                ].map((item, i) => (
+                                    <Reveal key={item.title} delay={i * 0.05}>
+                                        <div
+                                            className={`
+                                                group p-8 transition-colors duration-300 hover:bg-foreground/[0.02]
+                                                border-b border-border/30 last:border-b-0
+                                                border-r border-border/30 last:border-r-0
+                                                ${i < 4 ? 'md:border-b' : 'md:border-b-0'}
+                                                ${i % 2 === 0 ? 'md:border-r' : 'md:border-r-0'}
+                                                ${i < 3 ? 'lg:border-b' : 'lg:border-b-0'}
+                                                ${i % 3 !== 2 ? 'lg:border-r' : 'lg:border-r-0'}
+                                            `}
+                                        >
+                                            <div className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 text-foreground group-hover:text-emerald-500 transition-colors">
+                                                <item.icon className="h-4 w-4" />
+                                            </div>
+                                            <h3 className="text-sm font-medium mb-2">{item.title}</h3>
+                                            <p className="text-[13px] text-muted-foreground leading-[1.7]">{item.desc}</p>
                                         </div>
-                                        <h3 className="text-sm font-medium mb-2">{item.title}</h3>
-                                        <p className="text-[13px] text-muted-foreground leading-[1.7]">{item.desc}</p>
-                                    </div>
-                                </Reveal>
-                            ))}
+                                    </Reveal>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </section>
