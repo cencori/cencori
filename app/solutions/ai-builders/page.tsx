@@ -110,7 +110,7 @@ export default function AIBuildersPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
             <Navbar
                 homeUrl="/"
                 actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
@@ -119,41 +119,44 @@ export default function AIBuildersPage() {
             />
 
             <main>
-                {/* ━━━ HERO — Command-first ━━━ */}
-                <section className="relative overflow-hidden bg-background pt-32 pb-20">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-500/5 via-background to-background pointer-events-none" />
-                    <div className="container relative z-10 mx-auto px-4 md:px-6">
-                        <div className="max-w-4xl mx-auto text-center">
+                {/* ━━━ HERO ━━━ */}
+                <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0">
+                    <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 sm:px-12 py-20 sm:py-28">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                        <div className="max-w-3xl">
                             <Reveal>
-                                <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/5 px-4 py-1.5 mb-8">
-                                    <span className="flex h-2 w-2 rounded-full bg-purple-500" />
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">For AI Builders</span>
-                                </div>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-8">
+                                    For AI Builders
+                                </p>
                             </Reveal>
                             <Reveal delay={0.05}>
-                                <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4.25rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-6">
+                                <h1 className="text-[2.75rem] sm:text-[3.5rem] lg:text-[4.25rem] font-semibold tracking-[-0.035em] leading-[1.05] mb-6 max-w-3xl">
                                     Ship an AI app
                                     <br />
                                     <span className="text-muted-foreground">in one command.</span>
                                 </h1>
                             </Reveal>
                             <Reveal delay={0.1}>
-                                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
-                                    <code className="text-sm font-mono bg-foreground/5 px-1.5 py-0.5 rounded text-foreground/80">npx create-cencori-app</code>{" "}
+                                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mb-10 leading-[1.7]">
+                                    <code className="text-[13px] font-mono bg-foreground/5 px-1.5 py-0.5 rounded text-foreground/80">npx create-cencori-app</code>{" "}
                                     scaffolds a production-ready AI app pre-wired to the Cencori Gateway — API keys, streaming, security, config.{" "}
-                                    <span className="text-foreground/60">Zero boilerplate.</span>
+                                    <span className="text-muted-foreground/60">Zero boilerplate.</span>
                                 </p>
                             </Reveal>
                             <Reveal delay={0.15}>
-                                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                <div className="flex gap-3">
                                     <Link href="/login">
-                                        <Button size="sm" className="h-8 px-4 text-xs rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                                            Start Building Free <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                                        <Button size="sm" className="h-7 text-xs px-3 bg-foreground text-background hover:bg-foreground/90">
+                                            Start Building Free <ArrowRight className="ml-1.5 h-3 w-3" />
                                         </Button>
                                     </Link>
                                     <Link href="/docs/quick-start">
-                                        <Button variant="outline" size="sm" className="h-8 px-4 text-xs rounded-full border-foreground/20 hover:bg-foreground/5">
-                                            Read the docs
+                                        <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                                            Quickstart
                                         </Button>
                                     </Link>
                                 </div>
@@ -162,12 +165,12 @@ export default function AIBuildersPage() {
 
                         {/* Terminal block */}
                         <Reveal delay={0.2}>
-                            <div className="max-w-2xl mx-auto mt-16">
+                            <div className="mt-20 max-w-2xl">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs font-mono text-muted-foreground/50">terminal</span>
+                                    <span className="text-[11px] font-mono text-muted-foreground/50">terminal</span>
                                     <CopyButton text="npx create-cencori-app my-app" />
                                 </div>
-                                <pre className="text-sm font-mono leading-[1.8] text-foreground/80 bg-foreground/[0.03] border border-border/20 rounded-xl p-5 overflow-x-auto">
+                                <pre className="text-[13px] font-mono leading-[1.8] text-foreground/80 bg-foreground/[0.03] border border-border/20 rounded-lg p-5 overflow-x-auto">
                                     <code>
                                         <span className="text-muted-foreground/40">1</span>{"  "}<span className="text-emerald-400">$</span> npx create-cencori-app my-app{"\n"}
                                         <span className="text-muted-foreground/40">2</span>{"  "}{"\n"}
@@ -186,91 +189,111 @@ export default function AIBuildersPage() {
                 </section>
 
                 {/* ━━━ TEMPLATES ━━━ */}
-                <section className="py-24 bg-background border-y border-border/30">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-5xl mx-auto">
-                            <Reveal>
-                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-3">Pick your stack</p>
-                            </Reveal>
-                            <Reveal delay={0.05}>
-                                <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-4">
-                                    Four templates. One command.
-                                </h2>
-                            </Reveal>
-                            <Reveal delay={0.1}>
-                                <p className="text-sm text-muted-foreground max-w-lg mb-12 leading-relaxed">
-                                    Choose the foundation that fits your project. Every template includes Gateway integration, environment config, and a working chat endpoint.
-                                </p>
-                            </Reveal>
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {[
-                                    { name: "Next.js", desc: "Full-stack React with App Router, Vercel AI SDK streaming, and a chat endpoint already wired up.", icon: NextjsLogo },
-                                    { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: ViteLogo },
-                                    { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: VSCodeLogo },
-                                    { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: VSCodeLogo },
-                                ].map((tpl, i) => (
-                                    <Reveal key={tpl.name} delay={0.1 + i * 0.05}>
-                                        <div className="group p-6 border border-border/30 rounded-xl hover:border-primary/20 hover:bg-muted/10 transition-all duration-300">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <tpl.icon className="h-4 w-4 text-muted-foreground opacity-50" />
-                                                <span className="text-sm font-semibold">{tpl.name}</span>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground leading-relaxed">{tpl.desc}</p>
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">Pick your stack</p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                                Four templates.
+                                <br />
+                                <span className="text-muted-foreground">One command.</span>
+                            </h2>
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="text-muted-foreground text-sm leading-[1.7] max-w-lg mb-16">
+                                Choose the foundation that fits your project. Every template includes Gateway integration, environment config, and a working chat endpoint.
+                            </p>
+                        </Reveal>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                                { name: "Next.js", desc: "Full-stack React with App Router, Vercel AI SDK streaming, and a chat endpoint already wired up.", icon: NextjsLogo },
+                                { name: "TanStack", desc: "Lightweight React + Vite + TanStack Query with a local API server. Perfect for SPAs.", icon: ViteLogo },
+                                { name: "Cencori Agent", desc: "Node.js agent starter with Gateway, run receipts, and local debugging. No browser needed.", icon: VSCodeLogo },
+                                { name: "Celo Agent", desc: "Same as above + onchain receipt contracts on Celo Sepolia. Ship agents that prove their work.", icon: VSCodeLogo },
+                            ].map((tpl, i) => (
+                                <Reveal key={tpl.name} delay={0.1 + i * 0.05}>
+                                    <div className="group p-6 border border-border/20 rounded-lg cursor-default hover:border-border/50 transition-colors duration-500">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <tpl.icon className="h-4 w-4 text-muted-foreground opacity-50" />
+                                            <span className="text-sm font-medium">{tpl.name}</span>
                                         </div>
-                                    </Reveal>
-                                ))}
-                            </div>
+                                        <p className="text-[13px] text-muted-foreground leading-[1.7]">{tpl.desc}</p>
+                                    </div>
+                                </Reveal>
+                            ))}
                         </div>
                     </div>
                 </section>
 
                 {/* ━━━ WHAT YOU GET ━━━ */}
-                <section className="py-24 bg-background">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-5xl mx-auto">
-                            <Reveal>
-                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-3">What's inside</p>
-                            </Reveal>
-                            <Reveal delay={0.05}>
-                                <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-12">
-                                    Everything you need to ship.
-                                </h2>
-                            </Reveal>
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
 
-                            <div className="space-y-0">
-                                {[
-                                    { title: "Streaming API route", desc: "A working `/api/chat` endpoint using the Vercel AI SDK. Swap the model, change the prompt, deploy." },
-                                    { title: "Cencori config", desc: "`cencori.config.ts` with all supported models listed. Add providers, set defaults, configure rate limits — all in one file." },
-                                    { title: "Environment setup", desc: "`.env.local` pre-configured with your Cencori API key placeholder. No hunting through docs for variable names." },
-                                    { title: "Security middleware", desc: "PII detection, prompt injection protection, and content moderation wired into the Gateway. Active on every request, zero config." },
-                                    { title: "Optional chat UI", desc: "A clean, dark-mode chat interface if you choose. Built with `useChat()` — streaming responses out of the box." },
-                                ].map((item, i) => (
-                                    <Reveal key={item.title} delay={i * 0.05}>
-                                        <div className="group grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-8 py-6 sm:py-7 cursor-default border-b border-border/10 last:border-0">
-                                            <div className="sm:col-span-1 text-sm text-muted-foreground/30 tabular-nums font-mono">
-                                                {String(i + 1).padStart(2, "0")}
-                                            </div>
-                                            <h3 className="sm:col-span-4 text-sm font-medium">
-                                                {item.title}
-                                            </h3>
-                                            <p className="sm:col-span-7 text-sm text-muted-foreground leading-relaxed">
-                                                {item.desc}
-                                            </p>
+                        <Reveal>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-4">What's inside</p>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-6 max-w-xl">
+                                Everything you need
+                                <br />
+                                <span className="text-muted-foreground">to ship.</span>
+                            </h2>
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <p className="text-muted-foreground text-sm leading-[1.7] max-w-lg mb-20">
+                                No hunting through docs. No copy-pasting config from blog posts. Every file you need, pre-wired and ready to go.
+                            </p>
+                        </Reveal>
+
+                        <div className="space-y-0">
+                            {[
+                                { title: "Streaming API route", desc: "A working `/api/chat` endpoint using the Vercel AI SDK. Swap the model, change the prompt, deploy." },
+                                { title: "Cencori config", desc: "`cencori.config.ts` with all supported models listed. Add providers, set defaults, configure rate limits — all in one file." },
+                                { title: "Environment setup", desc: "`.env.local` pre-configured with your Cencori API key placeholder. No hunting through docs for variable names." },
+                                { title: "Security middleware", desc: "PII detection, prompt injection protection, and content moderation wired into the Gateway. Active on every request, zero config." },
+                                { title: "Optional chat UI", desc: "A clean, dark-mode chat interface if you choose. Built with `useChat()` — streaming responses out of the box." },
+                            ].map((item, i) => (
+                                <Reveal key={item.title} delay={i * 0.05}>
+                                    <div className="group grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-8 py-7 sm:py-9 cursor-default border-b border-border/10 last:border-0">
+                                        <div className="sm:col-span-1 text-sm text-muted-foreground/30 tabular-nums font-mono">
+                                            {String(i + 1).padStart(2, "0")}
                                         </div>
-                                    </Reveal>
-                                ))}
-                            </div>
+                                        <h3 className="sm:col-span-4 text-base font-medium group-hover:text-emerald-500 transition-colors duration-300">
+                                            {item.title}
+                                        </h3>
+                                        <p className="sm:col-span-7 text-sm text-muted-foreground leading-[1.7]">
+                                            {item.desc}
+                                        </p>
+                                    </div>
+                                </Reveal>
+                            ))}
                         </div>
                     </div>
                 </section>
 
                 {/* ━━━ BUILD WITH ━━━ */}
-                <section className="py-20 bg-muted/5 border-y border-border/30">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-3xl mx-auto text-center">
+                <section className="bg-background border-b border-border/30">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-24 sm:py-32">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                        <div className="max-w-2xl mx-auto text-center">
                             <Reveal>
-                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-8">Build with your favorite tools</p>
+                                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground mb-12">Build with your favorite tools</p>
                             </Reveal>
                             <Reveal delay={0.05}>
                                 <div className="flex flex-wrap justify-center gap-10 items-center">
@@ -281,15 +304,15 @@ export default function AIBuildersPage() {
                                         { name: "Next.js", Logo: NextjsLogo },
                                         { name: "Vite", Logo: ViteLogo },
                                     ].map((tool) => (
-                                        <div key={tool.name} className="flex items-center gap-3 text-muted-foreground">
-                                            <tool.Logo className="h-5 w-5 opacity-40" size={20} />
-                                            <span className="text-sm font-medium">{tool.name}</span>
+                                        <div key={tool.name} className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors duration-300 cursor-default">
+                                            <tool.Logo className="h-5 w-5 opacity-40 group-hover:opacity-90 transition-opacity duration-300" size={20} />
+                                            <span className="text-[15px] font-medium">{tool.name}</span>
                                         </div>
                                     ))}
                                 </div>
                             </Reveal>
                             <Reveal delay={0.1}>
-                                <p className="text-xs text-muted-foreground/50 mt-10">
+                                <p className="text-xs text-muted-foreground/50 mt-12 leading-relaxed">
                                     Works with your editor, your framework, your stack. No migration required.
                                 </p>
                             </Reveal>
@@ -298,36 +321,39 @@ export default function AIBuildersPage() {
                 </section>
 
                 {/* ━━━ CTA ━━━ */}
-                <section className="py-28 bg-background">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-2xl mx-auto text-center">
-                            <Reveal>
-                                <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-4">
-                                    Your AI app deserves
-                                    <br />
-                                    <span className="text-muted-foreground">better than boilerplate.</span>
-                                </h2>
-                            </Reveal>
-                            <Reveal delay={0.05}>
-                                <p className="text-muted-foreground text-sm mb-10 max-w-md mx-auto leading-relaxed">
-                                    Scaffold a production-ready app in one command. Free to start, pay when you scale.
-                                </p>
-                            </Reveal>
-                            <Reveal delay={0.1}>
-                                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                    <Link href="/login">
-                                        <Button size="sm" className="h-8 px-5 text-xs rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all">
-                                            Start Building Free <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                                        </Button>
-                                    </Link>
-                                    <Link href="/pricing">
-                                        <Button variant="outline" size="sm" className="h-8 px-5 text-xs rounded-full border-foreground/20">
-                                            View Pricing
-                                        </Button>
-                                    </Link>
-                                </div>
-                            </Reveal>
-                        </div>
+                <section className="bg-background">
+                    <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 sm:px-12 py-28 sm:py-36 text-center">
+                        <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+                        <Reveal>
+                            <h2 className="text-3xl sm:text-[2.75rem] font-semibold tracking-[-0.03em] leading-[1.1] mb-5">
+                                Your AI app deserves
+                                <br />
+                                <span className="text-muted-foreground">better than boilerplate.</span>
+                            </h2>
+                        </Reveal>
+                        <Reveal delay={0.05}>
+                            <p className="text-muted-foreground text-sm leading-[1.7] mb-10 max-w-md mx-auto">
+                                Scaffold a production-ready app in one command. Free to start, pay when you scale.
+                            </p>
+                        </Reveal>
+                        <Reveal delay={0.1}>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                <Link href="/login">
+                                    <Button size="sm" className="h-7 text-xs px-3 bg-foreground text-background hover:bg-foreground/90">
+                                        Start Building Free <ArrowRight className="ml-1.5 h-3 w-3" />
+                                    </Button>
+                                </Link>
+                                <Link href="/pricing">
+                                    <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                                        View Pricing
+                                    </Button>
+                                </Link>
+                            </div>
+                        </Reveal>
                     </div>
                 </section>
             </main>
