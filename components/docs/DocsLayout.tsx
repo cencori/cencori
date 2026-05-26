@@ -15,7 +15,7 @@ export function DocsLayout({ children, className }: DocsLayoutProps) {
     const { isAskAIOpen } = useDocsContext();
 
     return (
-        <div className="mx-auto w-full max-w-[1440px] flex flex-col md:flex-row gap-6 md:gap-8 lg:gap-10 px-4 md:px-8 lg:px-12">
+        <div className="mx-auto w-full max-w-[1440px] flex flex-col md:flex-row gap-4 md:gap-5 lg:gap-6 px-4 md:px-8 lg:px-12">
             <div className="hidden md:block w-[280px] xl:w-[300px] shrink-0">
                 <DocsSidebar />
             </div>
