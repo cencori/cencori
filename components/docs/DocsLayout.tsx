@@ -15,17 +15,17 @@ export function DocsLayout({ children, className }: DocsLayoutProps) {
     const { isAskAIOpen } = useDocsContext();
 
     return (
-        <div className="flex flex-col lg:flex-row">
-            <div className="hidden md:block w-[220px] xl:w-[240px] shrink-0 border-r border-border/30">
+        <div className="flex flex-col md:flex-row">
+            <div className="hidden md:block w-[260px] xl:w-[280px] shrink-0 border-r border-border/30">
                 <DocsSidebar />
             </div>
-            <main className={cn("flex-1 min-w-0 px-6 sm:px-12 py-10 lg:py-14", className)}>
+            <main className={cn("flex-1 min-w-0 px-8 sm:px-16 py-10 lg:py-14", className)}>
                 <div className="mx-auto w-full min-w-0">
                     {children}
                 </div>
             </main>
             {!isAskAIOpen && (
-                <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0 border-l border-border/30">
+                <div className="hidden lg:block w-[260px] xl:w-[280px] shrink-0 border-l border-border/30">
                     <DocsTOC />
                 </div>
             )}
