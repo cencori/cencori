@@ -85,7 +85,7 @@ export default async function DocPage({ params }: DocPageProps) {
         : null;
 
     return (
-        <article className="px-4 py-10 lg:py-0 w-full">
+        <article className="w-full">
             <div className="space-y-3 mb-8">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{doc.section}</p>
                 <h1 className="text-4xl font-bold tracking-tight border-b border-border/40 pb-3">{doc.title}</h1>
