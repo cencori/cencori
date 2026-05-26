@@ -89,7 +89,7 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
     }, [activeSection, sections]);
 
     return (
-        <aside className={cn("w-64 shrink-0 hidden md:block border-r border-border/40 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto bg-background/50 backdrop-blur-sm", className)}>
+        <aside className={cn("w-64 shrink-0 hidden md:block h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto", className)}>
             <div className="px-3 py-6 lg:py-8">
                 <Accordion type="multiple" defaultValue={defaultOpenSections} className="w-full space-y-2">
                     {sections.map((group) => (
@@ -98,10 +98,23 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                                 {group.title}
                             </AccordionTrigger>
                             <AccordionContent className="pb-1 mt-1">
-                                <ul className="relative ml-3.5 border-l border-border/60">
-                                    {group.items.map((item) => (
-                                        <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
-                                    ))}
+                                <ul className="relative ml-3.5">
+                                    {group.items.map((item, itemIndex) => {
+                                        const isActive = pathname === item.href;
+                                        return (
+                                            <li key={itemIndex} className="relative">
+                                                <Link
+                                                    href={item.href}
+                                                    className={cn(
+                                                        "block text-sm py-1.5 pl-3 transition-colors hover:text-foreground",
+                                                        isActive ? "text-primary font-medium" : "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {item.title}
+                                                </Link>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                                 {/* AI Gateway nested inside Platform */}
                                 {group.subGroup && (
@@ -109,7 +122,7 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
                                         <div className="ml-4.5 mt-3 mb-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
                                             {group.subGroup.title}
                                         </div>
-                                        <ul className="relative ml-3.5 border-l border-border/60">
+                                        <ul className="relative ml-3.5">
                                             {group.subGroup.items.map((item) => (
                                                 <SidebarLinkItem key={item.href} item={item} pathname={pathname} />
                                             ))}
