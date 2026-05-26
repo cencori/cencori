@@ -19,7 +19,7 @@ export function DocsLayout({ children, className }: DocsLayoutProps) {
             <div className="hidden md:block w-[280px] xl:w-[300px] shrink-0">
                 <DocsSidebar />
             </div>
-            <main className={cn("flex-1 min-w-0 py-10 lg:py-14", className)}>
+            <main className={cn("flex-1 min-w-0 pt-16 lg:pt-20 pb-10 lg:pb-14", className)}>
                 <div className="mx-auto w-full max-w-3xl min-w-0">
                     {children}
                 </div>
