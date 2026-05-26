@@ -19,21 +19,18 @@ export function DocsLayout({ children, className }: DocsLayoutProps) {
         <motion.div
             layout
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={cn(
-                "flex-1 items-start md:grid",
-                !isAskAIOpen && "md:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[240px_minmax(0,1fr)_240px]",
-                isAskAIOpen && "md:grid-cols-[220px_minmax(0,1fr)]"
-            )}>
-            <div className="hidden md:block border-r border-border/30 h-full">
+            className="flex-1 flex flex-col md:flex-row"
+        >
+            <div className="hidden md:block w-[220px] xl:w-[240px] shrink-0 border-r border-border/30">
                 <DocsSidebar />
             </div>
-            <main className={cn("relative px-6 sm:px-12 py-10 lg:py-14", className)}>
+            <main className={cn("flex-1 min-w-0 px-6 sm:px-12 py-10 lg:py-14", className)}>
                 <div className="mx-auto w-full min-w-0">
                     {children}
                 </div>
             </main>
             {!isAskAIOpen && (
-                <div className="hidden lg:block border-l border-border/30">
+                <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0 border-l border-border/30">
                     <DocsTOC />
                 </div>
             )}
