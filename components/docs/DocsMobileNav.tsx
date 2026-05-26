@@ -60,6 +60,13 @@ export function DocsMobileNav({ onOpenSearch }: DocsMobileNavProps) {
                     </div>
                 </div>
 
+                <button
+                    onClick={onOpenSearch}
+                    className="flex items-center gap-2 h-8 w-24 px-2.5 text-xs font-medium rounded-lg bg-muted/50 border border-border/30 text-muted-foreground hover:bg-muted/70 hover:border-border/50 transition-colors shrink-0"
+                >
+                    <Search className="h-3.5 w-3.5" />
+                    <span>Search...</span>
+                </button>
             </div>
 
         </div>
