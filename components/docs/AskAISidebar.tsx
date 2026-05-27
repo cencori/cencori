@@ -297,10 +297,10 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                     animate={{ x: 0 }}
                     exit={{ x: "100%" }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="fixed top-0 right-0 bottom-0 w-full md:w-[400px] bg-background border-l-0 md:border-l border-border/40 flex flex-col z-[60]"
+                    className="fixed top-0 right-0 bottom-0 w-full md:w-[400px] bg-background border-l border-solid border-border/40 flex flex-col z-[60]"
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-solid border-border/40">
                         <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">Ask AI</span>
                         </div>
