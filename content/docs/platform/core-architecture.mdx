@@ -9,8 +9,8 @@ order: 1
 
 Cencori is not just an "AI Proxy." We are a **Cloud Intelligence Provider (CIP)**.
 
-- **AI Proxy**: A simple pass-through layer that forwards requests. (e.g., Cloudflare AI Gateway).
-- **CIP**: A fully managed infrastructure layer that provides **stateful** intelligence. Cencori maintains context (Memory), enforces security (Scan), and orchestrates multi-step logic (Workflows) *before* requests ever reach a model provider.
+- **AI Proxy**: A simple pass-through layer that forwards requests (e.g., Cloudflare AI Gateway).
+- **CIP**: A fully managed infrastructure layer that provides secure, unified request routing (Gateway Security Shield) and end-user monetization (Billing) at the edge.
 
 ## Request Lifecycle
 
@@ -31,8 +31,7 @@ Understanding the flow of a single request helps clarify where value is added:
 We take data sovereignty seriously.
 
 - **Logs & Analytics**: Stored in our secure US-East (N. Virginia) cluster by default. Enterprise plans support EU-only storage.
-- **AI Memory (Vector Store)**: Embeddings and vector data are encrypted at rest in dedicated isolated clusters.
-- **Ephemeral Processing**: Determining PII or routing logic happens in-memory on edge nodes and is never persisted to disk.
+- **Ephemeral Processing**: Determining PII, security scanning, or routing logic happens in-memory on edge nodes and is never persisted to disk.
 
 ## Global Infrastructure
 
@@ -68,12 +67,10 @@ Why choose Cencori over other solutions?
 | **Security (PII/Injection)** | **Native / Built-in** | Plugin / External | Manual Implementation |
 | **Unified SDK** | **Yes (One API)** | No (Proxy only) | Yes (Abstractions) |
 | **Multi-Provider** | **Native** | Native | Native |
-| **Vector Memory** | **Integrated** | No | External (Vector DB) |
 | **Latency Impact** | **< 15ms** | ~50-100ms | N/A (Client-side) |
 
 ## Glossary
 
 - **Gateway**: The unified entry point for all AI requests.
-- **Memory**: Cencori's managed vector store for RAG and long-term history.
-- **Scan**: The security engine that inspects requests for vulnerabilities.
-- **Namespace**: A logical partition within Memory to isolate data (e.g., per-user or per-document).
+- **Billing**: The economic engine. Meter, limit, and charge users for AI usage.
+- **Scan**: The security engine that inspects requests for vulnerabilities (PII and injection protection).

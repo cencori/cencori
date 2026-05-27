@@ -164,16 +164,12 @@ export function getDocsNavigation(): NavSection[] {
         'Platform',
         'AI',
         'Endpoints',
-        'Memory',
         'Agents',
-        'Agentic Engineering',
-        'Desktop IDEs',
-        'Web Generators',
         'Security',
         'Integrations',
-        'Workflows',
         'Guides',
         'API Reference',
+        'Hackathons',
     ];
 
     for (const sectionTitle of sectionOrder) {
@@ -264,16 +260,12 @@ export function getDocNavigation(currentSlug: string): { prev: Doc | null; next:
                 'Platform',
                 'AI',
                 'Endpoints',
-                'Memory',
                 'Agents',
-                'Agentic Engineering',
-                'Desktop IDEs',
-                'Web Generators',
                 'Security',
                 'Integrations',
-                'Workflows',
                 'Guides',
                 'API Reference',
+                'Hackathons',
             ];
             return sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section);
         }

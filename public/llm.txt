@@ -118,15 +118,8 @@ npx create-cencori-app my-ai-app --template nextjs --dev
 
 Avoid generating code against these surfaces unless the target project already implements and verifies them:
 
-- `cencori.compute.*`
-- `cencori.workflow.*`
-- `cencori.workflows.*`
-- `cencori.steps.*`
-- `cencori.storage.*`
-- speculative workflow APIs like `waitFor()`, `define()`, `sendEvent()`, `transferToHuman()`
 - unsupported TypeScript SDK config fields like `timeout`, `retries`, `maxRetries`, `failover`, `fallbackModels`, `circuitBreaker`
 - undocumented SDK telemetry flags like `CENCORI_TELEMETRY=0`
-- public memory-search/filter/hybrid-search assumptions unless verified in the target project
 
 ## Security Rules
 
@@ -368,20 +361,6 @@ const response = await cencori.ai.generateImage({
 console.log(response.images[0].url);
 ```
 
-### RAG
-
-```typescript
-const response = await cencori.ai.rag({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'What is our refund policy?' }],
-  namespace: 'docs',
-  limit: 5,
-});
-
-console.log(response.message.content);
-console.log(response.sources);
-```
-
 ### Web Telemetry
 
 ```typescript
@@ -553,12 +532,6 @@ Common endpoints:
 - `POST /api/ai/chat`
 - `POST /api/ai/embeddings`
 - `POST /api/ai/images/generate`
-- `POST /api/ai/rag`
-- `POST /api/memory/store`
-- `GET /api/memory/namespaces`
-- `POST /api/memory/namespaces`
-- `GET /api/memory/{id}`
-- `DELETE /api/memory/{id}`
 - `POST /api/v1/telemetry/web`
 
 ### Native Chat Example
@@ -625,7 +598,6 @@ curl https://api.cencori.com/v1/chat/completions \
 
 ### Use `CENCORI_API_KEY` Header For
 - `https://cencori.com/api/ai/*`
-- `https://cencori.com/api/memory/*`
 - `https://cencori.com/api/v1/telemetry/web`
 
 ### Use `Authorization: Bearer ...` For
@@ -642,27 +614,6 @@ await cencori.ai.chat({ model: 'claude-sonnet-4.5', messages });
 await cencori.ai.chat({ model: 'gemini-2.5-flash', messages });
 ```
 
-## Memory Guidance
-
-Public memory flows that are safe to generate today:
-- create namespace
-- list namespaces
-- store memory
-- get/delete memory by ID
-- use `cencori.ai.rag()` or `POST /api/ai/rag` for retrieval-backed generation
-
-Do not assume advanced public memory features like hybrid search, BM25, metadata-operator filtering, import/export CLI, or TTL-specific helper fields unless the target project already verifies them.
-
-If you store memories directly, use `expiresAt` when you need expiry:
-
-```typescript
-await cencori.memory.store({
-  namespace: 'session-123',
-  content: 'User is interested in pricing',
-  expiresAt: '2026-12-31T23:59:59Z',
-});
-```
-
 ## Decision Rules For Code Agents
 
 When integrating Cencori into a project:
@@ -673,10 +624,9 @@ When integrating Cencori into a project:
 4. Prefer `cencori/vercel` when the project already uses Vercel AI SDK.
 5. Prefer the OpenAI-compatible base URL only when a framework expects it.
 6. Preserve the app's existing response contract when replacing another provider.
-7. Do not generate code against `compute`, `workflow`, or speculative deployment APIs.
-8. Do not assume undocumented routing, failover, or evaluation settings are user-configurable.
-9. For existing products, complete the dashboard-to-code checklist before changing application code.
-10. For new apps, prefer `create-cencori-app` over manually assembling a starter.
+7. Do not assume undocumented routing, failover, or evaluation settings are user-configurable.
+8. For existing products, complete the dashboard-to-code checklist before changing application code.
+9. For new apps, prefer `create-cencori-app` over manually assembling a starter.
 
 ## Documentation Links
 
