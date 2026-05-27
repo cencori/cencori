@@ -31,9 +31,7 @@ console.log(response.content);
 | Product | Status | Description |
 |---------|--------|-------------|
 | **AI Gateway** | ✅ Available | Multi-provider routing, security, observability |
-| **Compute** | 🚧 Coming Soon | Serverless functions, GPU access |
-| **Workflow** | 🚧 Coming Soon | Visual AI pipelines, orchestration |
-| **Storage** | 🚧 Coming Soon | Vector database, knowledge base, RAG |
+| **Billing** | ✅ Available | End-user usage monetization and Stripe integration |
 | **Integration** | ✅ Available | SDKs, Vercel AI, TanStack |
 
 ## AI Gateway
@@ -192,59 +190,13 @@ export default function Chat() {
   );
 }
 ```
-
-## Coming Soon
-
-### Compute
-
-```typescript
-// 🚧 Coming Soon
-await cencori.compute.run('my-function', { 
-  input: { data: 'hello' } 
-});
-```
-
-### Workflow
-
-```typescript
-// 🚧 Coming Soon
-await cencori.workflow.trigger('data-enrichment', { 
-  data: { userId: '123' } 
-});
-```
-
-### Memory (Context Store)
-
-```typescript
-// Store a memory with auto-embedding
-await cencori.memory.store({
-  namespace: 'docs',
-  content: 'Refund policy allows returns within 30 days',
-  metadata: { category: 'policy' }
-});
-
-// Semantic search
-const results = await cencori.memory.search({
-  namespace: 'docs',
-  query: 'what is the refund policy?',
-  limit: 5
-});
-
-// RAG helper
-const response = await cencori.ai.rag({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'What is our refund policy?' }],
-  namespace: 'docs'
-});
-```
-
 ## Why Cencori?
 
 - **🛡️ Security Built-in**: PII detection, content filtering, jailbreak protection
 - **📊 Observability**: Every request logged, every token tracked
 - **💰 Cost Control**: Budget alerts, spend caps, per-request costing
 - **🔄 Multi-Provider**: Switch between OpenAI, Anthropic, Google, etc.
-- **⚡ One SDK**: AI, compute, storage, workflows - unified
+- **⚡ One SDK**: AI model routing, security shield, and billing - unified
 
 ## Links
 

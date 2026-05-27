@@ -90,12 +90,7 @@ export default function Navbar({
       title: "Products", sublinks: [
         { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
         { title: "Audit", href: siteConfig.links.products.audit },
-        { title: "Knight", href: siteConfig.links.products.knight },
-        { title: "Sandbox", href: siteConfig.links.products.sandbox },
         { title: "Insights", href: siteConfig.links.products.insights },
-        { title: "Network", href: siteConfig.links.products.network },
-        { title: "Edge", href: siteConfig.links.products.edge },
-        { title: "Enterprise", href: siteConfig.links.products.enterprise },
         { title: "Developer Tools", href: siteConfig.links.products.developerTools },
       ]
     },
@@ -147,18 +142,13 @@ export default function Navbar({
       [
         { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API for every provider with security and observability.", icon: <Shield className="h-4 w-4" /> },
         { title: "Audit", href: siteConfig.links.products.audit, description: "Immutable logs and exportable compliance reports.", icon: <Book className="h-4 w-4" /> },
-        { title: "Knight", href: siteConfig.links.products.knight, description: "Build-time CI scanning and PR enforcement.", icon: <HardHat className="h-4 w-4" /> },
-        { title: "Sandbox", href: siteConfig.links.products.sandbox, description: "Hardened execution environment for model-generated code.", icon: <FlaskConical className="h-4 w-4" /> },
       ],
       [
         { title: "Insights", href: siteConfig.links.products.insights, description: "Analytics, risk dashboards, and alerting.", icon: <Gauge className="h-4 w-4" /> },
-        { title: "Network", href: siteConfig.links.products.network, description: "Opt-in threat intelligence and signature feeds.", icon: <Share2 className="h-4 w-4" /> },
-        { title: "Edge", href: siteConfig.links.products.edge, description: "Platform integrations and edge middleware (Vercel, Supabase).", icon: <Laptop className="h-4 w-4" /> },
-        { title: "Enterprise", href: siteConfig.links.products.enterprise, description: "VPC/on-prem, SLAs, and compliance services.", icon: <Building2 className="h-4 w-4" /> },
         { title: "Developer Tools", href: siteConfig.links.products.developerTools, description: "SDKs, CLI, and quickstarts.", icon: <Code className="h-4 w-4" /> },
       ],
     ],
-    footerCtaPrimary: { title: "Try Protect (Free)", href: "/signup?product=protect" },
+    footerCtaPrimary: { title: "Get Started (Free)", href: "/signup" },
     footerCtaSecondary: { title: "Contact Sales", href: "/contact?topic=enterprise" },
   };
 

@@ -146,20 +146,12 @@ const productMenuColumns: NavLink[][] = [
     [
         { title: "AI Gateway", href: siteConfig.links.products.aiGateway, description: "One API, 100+ models.", icon: renderMenuIcon(MoleculesIcon) },
         { title: "Models", href: siteConfig.links.products.models, description: "Hosted and mapped model catalog.", icon: renderMenuIcon(AiBrain01Icon) },
-{ title: "Compute", href: siteConfig.links.products.compute, description: "GPU and serverless AI workloads.", icon: renderMenuIcon(Pulse01Icon) },
-        { title: "Integrations", href: siteConfig.links.products.integrations, description: "SDKs, APIs, and automation tools.", icon: renderMenuIcon(ApiIcon) },
-    ],
-    [
-        { title: "Workflow", href: siteConfig.links.products.workflow, description: "Visual orchestration for AI systems.", icon: renderMenuIcon(WorkflowCircle01Icon) },
-        { title: "Memory", href: siteConfig.links.products.memory, description: "Semantic retrieval for your data.", icon: renderMenuIcon(NanoTechnologyIcon) },
-        { title: "Edge", href: siteConfig.links.products.edge, description: "Platform and runtime integrations.", icon: renderMenuIcon(Compass01Icon) },
-        { title: "Enterprise", href: siteConfig.links.products.enterprise, description: "Governance for regulated AI teams.", icon: renderMenuIcon(House01Icon) },
-    ],
-    [
         { title: "Audit Logs", href: siteConfig.links.products.audit, description: "Immutable logs and compliance trails.", icon: renderMenuIcon(BookOpen01Icon) },
+    ],
+    [
         { title: "Observability", href: siteConfig.links.products.insights, description: "Analytics and risk dashboards.", icon: renderMenuIcon(ChartIcon) },
-        { title: "Sandbox", href: siteConfig.links.products.sandbox, description: "Safe execution for generated code.", icon: renderMenuIcon(CodeSquareIcon) },
         { title: "Scan", href: siteConfig.links.products.scan, description: "AI security and vuln detection.", icon: renderMenuIcon(VoiceIdIcon) },
+        { title: "Developer Tools", href: siteConfig.links.products.developerTools, description: "SDKs, CLI, and quickstarts.", icon: renderMenuIcon(CodeSquareIcon) },
     ],
 ];
 
@@ -316,7 +308,7 @@ export default function Navbar({
         title: "Products",
         type: "mega",
         columns: productMenuColumns,
-        listClassName: "md:w-[560px] md:grid-cols-2 lg:w-[780px] lg:grid-cols-3",
+        listClassName: "md:w-[400px] md:grid-cols-2 lg:w-[520px] lg:grid-cols-2",
     };
 
     const solutionsDropdown: NavDropdown = {

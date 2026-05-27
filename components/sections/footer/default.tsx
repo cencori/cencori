@@ -41,12 +41,7 @@ export default function FooterSection({
       links: [
         { text: "AI Gateway", href: siteConfig.links.products.aiGateway },
         { text: "Audit", href: siteConfig.links.products.audit },
-        { text: "Knight", href: siteConfig.links.products.knight },
-        { text: "Sandbox", href: siteConfig.links.products.sandbox },
         { text: "Insights", href: siteConfig.links.products.insights },
-        { text: "Network", href: siteConfig.links.products.network },
-        { text: "Edge", href: siteConfig.links.products.edge },
-        { text: "Enterprise", href: siteConfig.links.products.enterprise },
         { text: "Developer Tools", href: siteConfig.links.products.developerTools },
       ],
     },

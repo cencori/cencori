@@ -1,160 +1,122 @@
 ---
 title: "Introduction"
-description: "Cencori is the infrastructure layer of the intelligence era. Build, deploy, and monetize intelligent systems on a single, unified backbone."
+description: "Cencori sits between your app and AI providers. One SDK for routing, security, and billing."
 section: "Getting Started"
 order: 1
 ---
 
-Cencori is the **Backbone of Intelligence**. 
+Cencori sits between your application and AI model providers like OpenAI, Anthropic, and Google. You send requests through Cencori instead of directly to the provider. Cencori routes them, scans them for security issues, logs everything, and bills your end users automatically.
 
-We provide the complete infrastructure layer for the intelligence era — the same way AWS was the foundation of the internet and Stripe was the foundation of mobile commerce. 
-
-In the intelligence era, building a product shouldn't mean spending 6 months solving "plumbing" before writing a single line of application code. Cencori unifies the fragmented AI stack into a single, cohesive platform.
-
-## Defining Intelligence
-
-At Cencori, we don't just build for "AI." We build for **Intelligence** — the capacity of any system to perceive, reason, decide, and act. To us, intelligence is the intersection of three frontiers:
-
-- **Software**: LLMs, autonomous agents, and intelligence-first applications.
-- **Hardware**: Custom silicon, edge computing, and smart devices.
-- **Robotics**: Autonomous drones, self-driving systems, and mechatronics.
-
-Whether you are shipping a B2B SaaS platform, an autonomous drone fleet, or a smart city infrastructure, Cencori provides the backbone that makes that intelligence possible.
-
-Intelligence is the most transformative force in technology. The infrastructure that powers it should be open, complete, and accessible to every builder on earth. 
-
-Cencori solves the three primary gaps in AI production:
-- **The Infrastructure Gap**: Unified access to 100+ models with native training (Compute) and persistence (Memory).
-- **The Security Gap**: Real-time jailbreak detection, PII masking, and audit trails baked into every request.
-- **The Economic Gap**: Native end-user billing that turns AI from a cost center into a high-margin business.
+One SDK. One API key. You stop building proxy servers, PII filters, and billing pipelines — and start shipping your product.
 
 ---
 
-## Products
+## Who it's for
 
-Cencori is a platform of platforms. Each product is built to stand alone, but they achieve compounding value when used together on the same backbone:
+You're building an AI product that real people pay to use — a SaaS with chat, a coding tool, a customer support agent, anything that calls an LLM on behalf of your users.
 
-1. **AI Gateway**: A secure, unified endpoint for 100+ models with dynamic routing, automatic failover, and enterprise-grade security.
-2. **Billing**: The economic engine. Meter, limit, and charge your users for AI usage automatically with native Stripe integration.
-3. **Compute**: GPU-backed infrastructure for training, fine-tuning, and low-latency inference.
-4. **Memory**: Persistent context for AI agents. Vector storage, RAG pipelines, and long-term user profiles.
-5. **Deployment**: Ship intelligent systems from cloud to chip with serverless endpoints and edge deployment.
-6. **Data**: The data flywheel. Explore, clean, version, and monetize training datasets.
+You need to:
+- Call multiple model providers without managing separate API keys and failover logic
+- Stop sensitive data (names, emails, credentials) from leaking into prompts
+- Charge your users based on how much AI they actually consume
+
+Cencori does all three. You add one package and move on.
+
+---
+
+## What you get
+
+### AI Gateway
+
+One endpoint, 100+ models. Send a request with any supported model ID and Cencori routes it to the right provider.
+
+- **Routing & failover** — if a provider is down, requests are rerouted automatically
+- **Security scanning** — PII is masked and prompt injections are blocked before the request leaves Cencori
+- **Logs** — every request is logged with the full prompt, response, token count, cost, and latency
+
+### End-User Billing
+
+Meter AI usage per user and charge them for it. Cencori tracks every token, applies your markup, and handles payments through Stripe Connect.
+
+- **Prepaid wallets** — users load credits, spend them on AI calls, and get cut off when they run out
+- **Spend caps** — set hard limits so one user can't blow through your provider budget
+- **Flexible pricing** — percentage markups, flat fees, or custom tiers per plan
+
+---
+
+## How it works
 
 <GhostContainer maxWidth="full" className="my-20">
 
   <GhostBox variant="muted" className="flex items-center justify-center py-6">
-    <span className="text-sm font-medium tracking-wide">Your Application</span>
+    <span className="text-sm font-medium tracking-wide">Your App</span>
   </GhostBox>
 
-  <GhostArrow />
+  <GhostArrow label="csk_project_key" />
 
-  <GhostBox variant="muted" label="Control Layer" className="p-10 md:p-14">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <GhostBox className="py-14 flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-bold tracking-tight">Gateway</span>
-        <GhostDashedLine className="w-20 my-4" />
-        <GhostGrid items="Route, Failover, Stream" columns={3} />
-      </GhostBox>
-      <GhostBox className="py-14 flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-bold tracking-tight">Security</span>
-        <GhostDashedLine className="w-20 my-4" />
-        <GhostGrid items="PII Mask, Jailbreak, Audit" columns={3} />
-      </GhostBox>
-    </div>
-  </GhostBox>
-
-  <GhostArrow label="secured request" />
-
-  <GhostBox variant="muted" label="Economics Layer" className="p-10 md:p-14">
-    <GhostBox className="py-14 flex flex-col items-center justify-center text-center">
-      <span className="text-2xl font-bold tracking-tight">Billing</span>
-      <GhostDashedLine className="w-20 my-4" />
-      <GhostGrid items="Meter, Charge, Invoice" columns={3} />
-    </GhostBox>
-  </GhostBox>
-
-  <GhostArrow label="metered" />
-
-  <GhostBox variant="muted" label="Intelligence Layer" className="p-10 md:p-14">
+  <GhostBox variant="muted" label="Cencori" className="p-10 md:p-14">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <GhostBox className="py-12 flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-bold tracking-tight">Memory</span>
-        <GhostDashedLine className="w-20 my-4" />
-        <GhostGrid items="Vectors, RAG, Profiles" />
+      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
+        <span className="text-lg font-bold tracking-tight">Route</span>
+        <GhostDashedLine className="w-16 my-3" />
+        <span className="text-xs text-muted-foreground">Pick model, failover, cache</span>
       </GhostBox>
-      <GhostBox className="py-12 flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-bold tracking-tight">Compute</span>
-        <GhostDashedLine className="w-20 my-4" />
-        <GhostGrid items="Train, Fine-tune, Infer" />
+      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
+        <span className="text-lg font-bold tracking-tight">Scan</span>
+        <GhostDashedLine className="w-16 my-3" />
+        <span className="text-xs text-muted-foreground">Block PII, injections</span>
       </GhostBox>
-      <GhostBox className="py-12 flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-bold tracking-tight">Data</span>
-        <GhostDashedLine className="w-20 my-4" />
-        <GhostGrid items="Clean, Version, Publish" />
+      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
+        <span className="text-lg font-bold tracking-tight">Bill</span>
+        <GhostDashedLine className="w-16 my-3" />
+        <span className="text-xs text-muted-foreground">Meter tokens, charge user</span>
       </GhostBox>
     </div>
   </GhostBox>
 
-  <GhostArrow label="production-ready" />
-
-  <GhostBox variant="muted" label="Production Layer" className="p-10 md:p-14">
-    <GhostBox className="py-12 flex flex-col items-center justify-center text-center">
-      <span className="text-2xl font-bold tracking-tight">Deployment</span>
-      <GhostDashedLine className="w-20 my-4" />
-      <GhostGrid items="Serverless, Edge, Agents" />
-    </GhostBox>
-  </GhostBox>
-
-  <GhostArrow />
+  <GhostArrow label="response" />
 
   <GhostBox variant="success" className="flex items-center justify-center py-6">
     <span className="text-sm font-medium tracking-wide">Your Users</span>
   </GhostBox>
 
-  <GhostCaption>The Backbone of Intelligence — from request to revenue</GhostCaption>
-
 </GhostContainer>
 
 ---
 
-## Why Cencori?
+## Try it
 
-- **One SDK, One Key**: Access every Cencori product through a single, unified interface.
-- **Provider Agnostic**: Switch between OpenAI, Anthropic, Google, and open-source models with a single line of code.
-- **Built for Production**: SOC2-ready architecture with tamper-proof logs and real-time observability.
-- **Monetization by Default**: Stop worrying about API costs. Charge your users exactly what they consume, with your own custom markups.
-
----
-
-## The Power of the Backbone
-
-Cencori doesn't just "route" requests. It manages the entire lifecycle of an intelligent action.
+Install the SDK, add your project key, and make a request:
 
 ```typescript
 import { Cencori } from 'cencori';
 
-const cencori = new Cencori();
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
 
-// Gateway + Security + Billing in one call
 const response = await cencori.ai.chat({
   model: 'claude-sonnet-4.5',
-  messages: [{ role: 'user', content: 'Scan this medical record...' }],
-  security: { scanPII: true, jailbreakDetection: true },
-  billing: { userId: 'user_456', plan: 'pro-tier' }
+  messages: [{ role: 'user', content: 'Summarize this document.' }],
+  billing: {
+    userId: 'user_123',
+  },
 });
 
 console.log(response.content);
+console.log(response.usage); // tokens tracked and billed to user_123
 ```
+
+That's it. The request is routed, scanned, logged, and billed — in one call.
 
 ---
 
-## Next Steps
+## Next steps
 
-| Goal | Path |
-|-------|-------------|
-| **Get running in 3 minutes** | [Quick Start](/docs/quick-start) |
-| **Add Cencori to an existing product** | [Existing Product Setup](/docs/getting-started/existing-product) |
-| **Monetize your AI usage** | [End-User Billing](/docs/platform/end-user-billing) |
-| **Secure your production app** | [Security & Scan](/docs/security/scan) |
-| **Explore available models** | [Models](/docs/ai/models) |
+| | |
+| :--- | :--- |
+| **[Quick Start](/docs/quick-start)** | Get a key and make your first request. |
+| **[Add to an existing app](/docs/getting-started/existing-product)** | Wire Cencori into a Next.js or Python backend you already have. |
+| **[AI Gateway](/docs/ai/gateway)** | See all supported models, routing, and failover options. |
+| **[End-User Billing](/docs/platform/end-user-billing)** | Set up Stripe Connect, wallets, and pricing. |
+| **[Security](/docs/security/scan)** | Configure PII masking and prompt injection rules. |

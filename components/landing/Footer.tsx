@@ -11,16 +11,9 @@ import { toast } from "sonner";
 const footerProductLinks: { title: string; href: string; external?: boolean }[] = [
     { title: "AI Gateway", href: siteConfig.links.products.aiGateway },
     { title: "Models", href: siteConfig.links.products.models },
-    { title: "Compute", href: siteConfig.links.products.compute },
-    { title: "Integrations", href: siteConfig.links.products.integrations },
-    { title: "Workflow", href: siteConfig.links.products.workflow },
-    { title: "Memory", href: siteConfig.links.products.memory },
     { title: "Audit Logs", href: siteConfig.links.products.audit },
     { title: "Observability", href: siteConfig.links.products.insights },
-    { title: "Edge", href: siteConfig.links.products.edge },
-    { title: "Sandbox", href: siteConfig.links.products.sandbox },
     { title: "Scan", href: siteConfig.links.products.scan },
-    { title: "Enterprise", href: siteConfig.links.products.enterprise },
     { title: "Compare Cencori", href: "/compare" },
 ];
 
@@ -195,19 +188,6 @@ export const Footer = () => {
                     <div>
                         <h4 className="text-[10px] font-medium uppercase tracking-wider mb-3">Company</h4>
                         <ul className="space-y-1.5">
-                            <li>
-                                <a
-                                    href="https://fohn-ai.vercel.app"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-                                >
-                                    FohnAI
-                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                </a>
-                            </li>
                             <li><Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">About</Link></li>
                             <li><Link href="/manifesto" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Manifesto</Link></li>
                             <li><Link href="/careers" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Careers</Link></li>
