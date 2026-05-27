@@ -72,7 +72,7 @@ export const IntegrationDiagram = () => {
                         <rect x="445" y="155" width="70" height="70" rx="8" className="fill-foreground/5 stroke-foreground/30" strokeWidth="2" strokeDasharray="8 4" />
                         <CornerDots x={445} y={155} width={70} height={70} color="text-foreground/60" />
                         <image
-                            href={resolvedTheme === "dark" ? "/cdark.png" : "/clight.png"}
+                            href={resolvedTheme === "dark" ? "/logo white.svg" : "/logo black.svg"}
                             x="460" y="170" width="40" height="40"
                         />
                     </g>
@@ -210,7 +210,7 @@ export const IntegrationDiagram = () => {
                         <rect x="110" y="65" width="60" height="60" rx="6" className="fill-foreground/5 stroke-foreground/30" strokeWidth="1.5" strokeDasharray="6 3" />
                         <CornerDotsMobile x={110} y={65} width={60} height={60} color="text-foreground/50" />
                         <image
-                            href={resolvedTheme === "dark" ? "/cdark.png" : "/clight.png"}
+                            href={resolvedTheme === "dark" ? "/logo white.svg" : "/logo black.svg"}
                             x="120" y="75" width="40" height="40"
                         />
                     </g>

@@ -160,12 +160,12 @@ export default function AcademyPage() {
                     <div className="border-b border-border/40">
                         <div className="py-24 sm:py-32 text-center">
                             <img
-                                src="/cdark.png"
+                                src="/logo white.svg"
                                 alt="Cencori"
                                 className="h-8 w-auto mx-auto mb-8 hidden dark:block"
                             />
                             <img
-                                src="/clight.png"
+                                src="/logo black.svg"
                                 alt="Cencori"
                                 className="h-8 w-auto mx-auto mb-8 block dark:hidden"
                             />

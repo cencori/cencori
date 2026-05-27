@@ -48,8 +48,8 @@ export const Integrations = () => {
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
                         <div className="w-20 h-20 rounded-2xl bg-background border border-border shadow-[0_0_30px_-10px_rgba(0,0,0,0.3)] dark:shadow-[0_0_30px_-10px_rgba(255,255,255,0.1)] flex items-center justify-center relative group">
                             <div className="absolute inset-0 bg-foreground/5 rounded-2xl" />
-                            <img src="/cdark.png" alt="Cencori" className="w-10 h-auto hidden dark:block" />
-                            <img src="/clight.png" alt="Cencori" className="w-10 h-auto block dark:hidden" />
+                            <img src="/logo white.svg" alt="Cencori" className="w-10 h-auto hidden dark:block" />
+                            <img src="/logo black.svg" alt="Cencori" className="w-10 h-auto block dark:hidden" />
                         </div>
                     </div>
 
@@ -110,8 +110,8 @@ export const Integrations = () => {
                     <div className="absolute top-[150px] left-1/2 -translate-x-1/2 z-20">
                         <div className="w-20 h-20 rounded-2xl bg-background border border-border shadow-lg flex items-center justify-center relative">
                             <div className="absolute inset-0 bg-foreground/5 rounded-2xl" />
-                            <img src="/cdark.png" alt="Cencori" className="w-10 h-auto hidden dark:block" />
-                            <img src="/clight.png" alt="Cencori" className="w-10 h-auto block dark:hidden" />
+                            <img src="/logo white.svg" alt="Cencori" className="w-10 h-auto hidden dark:block" />
+                            <img src="/logo black.svg" alt="Cencori" className="w-10 h-auto block dark:hidden" />
                         </div>
                     </div>
 
