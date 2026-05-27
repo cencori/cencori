@@ -6,8 +6,8 @@ export function Logo({ variant = "full", className = "" }: { variant?: "mark" | 
   // Wordmark logos (icon + text)
   // Legacy logos (clight/cdark)
   
-  let lightSrc = "/clight.png";
-  let darkSrc = "/cdark.png";
+  let lightSrc = "/logo black.svg";
+  let darkSrc = "/logo white.svg";
 
   if (isWordmark) {
     lightSrc = "/logos/bw.png";
