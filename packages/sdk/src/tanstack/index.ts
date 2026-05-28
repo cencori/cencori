@@ -72,6 +72,7 @@ export const CENCORI_CHAT_MODELS = [
     'o4-mini',
     'o1',
     // Anthropic
+    'claude-opus-4.8',
     'claude-3-5-sonnet',
     'claude-3-opus',
     'claude-3-haiku',

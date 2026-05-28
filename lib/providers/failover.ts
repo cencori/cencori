@@ -41,6 +41,7 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'o1': { 'anthropic': 'claude-sonnet-4', 'google': 'gemini-2.5-pro' },
 
     // Anthropic models → fallbacks
+    'claude-opus-4.8': { 'openai': 'gpt-5.5', 'google': 'gemini-3.1-pro-preview' },
     'claude-opus-4': { 'openai': 'gpt-5', 'google': 'gemini-3-pro' },
     'claude-opus-4.5': { 'openai': 'gpt-5', 'google': 'gemini-3-pro' },
     'claude-sonnet-4': { 'openai': 'gpt-4o', 'google': 'gemini-2.5-flash' },
