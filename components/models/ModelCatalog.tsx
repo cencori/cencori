@@ -275,7 +275,7 @@ function flattenModels(): FlatModel[] {
     }
 
     // Models pinned to the top (newly added, remove from this list after a while)
-    const pinnedIds = new Set(['gemini-3.5-flash']);
+    const pinnedIds = new Set(['claude-opus-4.8', 'gemini-3.5-flash']);
     const pinned: FlatModel[] = [];
     const rest: FlatModel[] = [];
 
