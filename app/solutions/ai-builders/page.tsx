@@ -260,7 +260,7 @@ export default function AIBuildersPage() {
                                     <div className="border border-border/20 rounded-lg overflow-hidden">
                                         <div className="flex items-center justify-between px-4 py-2.5 bg-foreground/[0.03] border-b border-border/20">
                                             <div className="flex items-center gap-2">
-                                                <VercelLogo className="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                <Logo variant="mark" className="h-3.5 w-3.5 opacity-50" />
                                                 <span className="text-[10px] font-mono text-muted-foreground/50">route.ts</span>
                                             </div>
                                             <CopyButton text={[
