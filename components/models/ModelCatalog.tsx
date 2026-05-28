@@ -180,6 +180,9 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
     }
     
     // Claude
+    if (id === "claude-opus-4.8") {
+        return { input: "$5.00", output: "$25.00" };
+    }
     if (id.includes("opus")) {
         return { input: "$15.00", output: "$75.00" };
     }
