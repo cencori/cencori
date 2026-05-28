@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
-type Tier = "free" | "pro" | "enterprise";
+type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
 type ScanTier = "scan_free" | "scan" | "scan_team";
 type PaidScanTier = Exclude<ScanTier, "scan_free">;
@@ -56,6 +56,23 @@ const tiers: Array<{
         ],
         highlighted: true,
         cta: "Get Started",
+    },
+    {
+        name: "team",
+        displayName: "Team",
+        description: "For scaling startups and production teams.",
+        price: { monthly: 149, annual: 1490 },
+        features: [
+            "250,000 requests/month",
+            "Unlimited projects",
+            "End-user billing",
+            "Full security pipeline",
+            "PII masking & jailbreak detection",
+            "Team seats & collaboration",
+            "24/7 Priority support",
+        ],
+        cta: "Get Started",
+        ctaVariant: "outline",
     },
     {
         name: "enterprise",
@@ -138,15 +155,15 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "100+ AI models (chat, image, audio, embeddings)",
-                values: { free: true, pro: true, enterprise: true },
+                values: { free: true, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Streaming & tool calling",
-                values: { free: true, pro: true, enterprise: true },
+                values: { free: true, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Structured output",
-                values: { free: true, pro: true, enterprise: true },
+                values: { free: true, pro: true, team: true, enterprise: true },
             },
         ],
     },
@@ -156,19 +173,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Bring your own provider keys (BYOK)",
-                values: { free: true, pro: true, enterprise: true },
+                values: { free: true, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Multi-provider routing",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Failover & circuit breaker",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Semantic cache",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
         ],
     },
@@ -178,19 +195,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Jailbreak detection",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "PII masking & redaction",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Output scanning",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Security incidents & audit trails",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
         ],
     },
@@ -200,11 +217,11 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Request logs & analytics",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Cost tracking",
-                values: { free: false, pro: true, enterprise: true },
+                values: { free: false, pro: true, team: true, enterprise: true },
             },
         ],
     },
@@ -214,23 +231,24 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Active Projects",
-                values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
+                values: { free: "1", pro: "Unlimited", team: "Unlimited", enterprise: "Unlimited" },
             },
             {
                 feature: "Support",
                 values: {
                     free: "Community",
                     pro: "Priority",
+                    team: "24/7 Priority",
                     enterprise: "Dedicated SLA",
                 },
             },
             {
                 feature: "SSO & SAML",
-                values: { free: false, pro: false, enterprise: true },
+                values: { free: false, pro: false, team: false, enterprise: true },
             },
             {
                 feature: "SLA guarantees",
-                values: { free: false, pro: false, enterprise: true },
+                values: { free: false, pro: false, team: false, enterprise: true },
             },
         ],
     },
@@ -517,7 +535,7 @@ export function Pricing() {
                                 {matrixSections.map((section) => (
                                     <React.Fragment key={section.title}>
                                         <tr className="border-y border-border/50 bg-muted/10">
-                                            <td colSpan={4} className="px-5 py-4">
+                                            <td colSpan={tiers.length + 1} className="px-5 py-4">
                                                 <p className="text-sm font-semibold">{section.title}</p>
                                                 <p className="text-xs text-muted-foreground">{section.description}</p>
                                             </td>
