@@ -61,15 +61,26 @@ export function formatCurrency(
     const symbol = CURRENCY_SYMBOLS[currencyCode.toUpperCase()] || currencyCode;
     
     // For AI usage, we often want more than 2 decimals
-    const minDigits = options.minimumFractionDigits ?? (num < 0.01 && num > 0 ? 6 : 2);
     const maxDigits = options.maximumFractionDigits ?? (num < 0.01 && num > 0 ? 8 : 2);
+    const minDigits = Math.min(
+        options.minimumFractionDigits ?? (num < 0.01 && num > 0 ? 6 : 2),
+        maxDigits
+    );
 
-    const formatted = new Intl.NumberFormat('en-US', {
+    let formatted = new Intl.NumberFormat('en-US', {
         style: options.showSymbol === false ? 'decimal' : 'currency',
         currency: currencyCode.toUpperCase(),
         minimumFractionDigits: minDigits,
         maximumFractionDigits: maxDigits,
     }).format(num);
+
+    if (options.showSymbol !== false) {
+        const code = currencyCode.toUpperCase();
+        if (formatted.includes(code)) {
+            // Replace the currency code and any following spaces/non-breaking spaces with just the symbol
+            formatted = formatted.replace(new RegExp(`${code}[\\s\\u00a0]*`), symbol);
+        }
+    }
 
     return formatted;
 }

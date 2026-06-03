@@ -84,7 +84,7 @@ export const Hero = () => {
         <div className="mb-6 flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tracking-wider text-muted-foreground select-none">
 
 
-          <span>Global intelligence running on Cencori: </span>
+          <span>Global AI running on Cencori: </span>
           <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
             {calculatePercentage()}
           </span>

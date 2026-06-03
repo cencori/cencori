@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/currency";
 
 type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
+type Currency = "USD" | "NGN";
 type ScanTier = "scan_free" | "scan" | "scan_team";
 type PaidScanTier = Exclude<ScanTier, "scan_free">;
 type MatrixValue = boolean | string;
@@ -19,7 +21,7 @@ const tiers: Array<{
     name: Tier;
     displayName: string;
     description: string;
-    price: { monthly: number | string; annual: number | string };
+    price: Record<Currency, { monthly: number | string; annual: number | string }>;
     features: string[];
     highlighted?: boolean;
     cta: string;
@@ -29,7 +31,10 @@ const tiers: Array<{
         name: "free",
         displayName: "Free",
         description: "Everything you need to build and test.",
-        price: { monthly: 0, annual: 0 },
+        price: {
+            USD: { monthly: 0, annual: 0 },
+            NGN: { monthly: 0, annual: 0 }
+        },
         features: [
             "1,000 requests/month",
             "1 active project",
@@ -44,7 +49,10 @@ const tiers: Array<{
         name: "pro",
         displayName: "Pro",
         description: "For professional developers and growing products.",
-        price: { monthly: 49, annual: 490 },
+        price: {
+            USD: { monthly: 49, annual: 490 },
+            NGN: { monthly: 39000, annual: 500000 }
+        },
         features: [
             "50,000 requests/month",
             "Unlimited projects",
@@ -61,7 +69,10 @@ const tiers: Array<{
         name: "team",
         displayName: "Team",
         description: "For scaling startups and production teams.",
-        price: { monthly: 149, annual: 1490 },
+        price: {
+            USD: { monthly: 149, annual: 1490 },
+            NGN: { monthly: 150000, annual: 1500000 }
+        },
         features: [
             "250,000 requests/month",
             "Unlimited projects",
@@ -78,7 +89,10 @@ const tiers: Array<{
         name: "enterprise",
         displayName: "Enterprise",
         description: "For large organizations with custom security and scale.",
-        price: { monthly: "Custom", annual: "Custom" },
+        price: {
+            USD: { monthly: "Custom", annual: "Custom" },
+            NGN: { monthly: "Custom", annual: "Custom" }
+        },
         features: [
             "Unlimited requests & projects",
             "Dedicated support & SLAs",
@@ -95,7 +109,7 @@ const tiers: Array<{
 const scanAddons: Array<{
     name: ScanTier;
     displayName: string;
-    price: number;
+    price: Record<Currency, number>;
     description: string;
     features: string[];
     cta: string;
@@ -103,7 +117,7 @@ const scanAddons: Array<{
     {
         name: "scan_free",
         displayName: "Scan Free",
-        price: 0,
+        price: { USD: 0, NGN: 0 },
         description: "Start scanning at no cost with limited usage.",
         features: [
             "Up to 5 imported projects",
@@ -116,7 +130,7 @@ const scanAddons: Array<{
     {
         name: "scan",
         displayName: "Scan",
-        price: 9,
+        price: { USD: 9, NGN: 9000 },
         description: "Unlimited standalone scan access for individual engineers.",
         features: [
             "Unlimited repository imports",
@@ -129,7 +143,7 @@ const scanAddons: Array<{
     {
         name: "scan_team",
         displayName: "Scan Teams",
-        price: 29,
+        price: { USD: 29, NGN: 29000 },
         description: "Unlimited standalone scan access for teams.",
         features: [
             "Everything in Scan",
@@ -264,25 +278,42 @@ function renderMatrixValue(value: MatrixValue) {
     return <span className="text-xs md:text-sm text-foreground/90">{value}</span>;
 }
 
-function getDisplayPrice(tier: (typeof tiers)[number], billingPeriod: BillingPeriod) {
-    if (typeof tier.price.monthly !== "number") {
-        return tier.price.monthly;
+function getDisplayPrice(tier: (typeof tiers)[number], billingPeriod: BillingPeriod, currency: Currency) {
+    const priceObj = tier.price[currency];
+    if (typeof priceObj.monthly !== "number") {
+        return priceObj.monthly;
     }
-    if (billingPeriod === "annual" && tier.price.monthly > 0) {
-        return Math.round(Number(tier.price.annual) / 12);
+    if (billingPeriod === "annual" && priceObj.monthly > 0) {
+        return Math.round(Number(priceObj.annual) / 12);
     }
-    return tier.price.monthly;
+    return priceObj.monthly;
 }
 
-function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPeriod) {
-    if (typeof tier.price.monthly !== "number") {
+function getYearlySavings(tier: (typeof tiers)[number], currency: Currency) {
+    const priceObj = tier.price[currency];
+    if (typeof priceObj.monthly !== "number" || typeof priceObj.annual !== "number") {
+        return null;
+    }
+    if (priceObj.monthly === 0) {
+        return null;
+    }
+    const monthlyTotal = priceObj.monthly * 12;
+    const annualTotal = priceObj.annual;
+    const savings = monthlyTotal - annualTotal;
+    return savings;
+}
+
+function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPeriod, currency: Currency) {
+    const priceObj = tier.price[currency];
+    if (typeof priceObj.monthly !== "number") {
         return "Talk to sales";
     }
-    if (tier.price.monthly === 0) {
+    if (priceObj.monthly === 0) {
         return "Free + you pay for AI usage";
     }
     if (billingPeriod === "annual") {
-        return `Billed ${tier.price.annual}/year`;
+        const formattedAnnual = formatCurrency(priceObj.annual, currency, { maximumFractionDigits: 0 });
+        return `Billed ${formattedAnnual}/year`;
     }
     return "Platform subscription";
 }
@@ -294,9 +325,26 @@ function isPaidScanTier(tier: ScanTier): tier is PaidScanTier {
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
+    const [currency, setCurrency] = useState<Currency>("USD");
     const [orgId, setOrgId] = useState<string | null>(null);
     const [loadingTier, setLoadingTier] = useState<Tier | null>(null);
     const [loadingScanTier, setLoadingScanTier] = useState<ScanTier | null>(null);
+
+    useEffect(() => {
+        try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const isNigeriaTz = tz && (tz === "Africa/Lagos" || tz.includes("Lagos"));
+            
+            const locale = typeof navigator !== "undefined" ? (navigator.language || (navigator.languages && navigator.languages[0]) || "") : "";
+            const isNigeriaLocale = locale.includes("-NG") || locale === "en-NG";
+
+            if (isNigeriaTz || isNigeriaLocale) {
+                setCurrency("NGN");
+            }
+        } catch (e) {
+            console.warn("Timezone/Locale detection failed", e);
+        }
+    }, []);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -423,6 +471,7 @@ export function Pricing() {
                 </div>
 
                 <div className="mb-10 flex justify-center">
+                    {/* Billing Cycle Selector */}
                     <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/90 p-1 backdrop-blur-sm">
                         <button
                             type="button"
@@ -440,13 +489,21 @@ export function Pricing() {
                             type="button"
                             onClick={() => setBillingPeriod("annual")}
                             className={cn(
-                                "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+                                "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
                                 billingPeriod === "annual"
                                     ? "bg-foreground text-background"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            Annual
+                            <span>Annual</span>
+                            <span className={cn(
+                                "rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase",
+                                billingPeriod === "annual"
+                                    ? "bg-background/20 text-background"
+                                    : "bg-emerald-500/10 text-emerald-500"
+                            )}>
+                                Save up to 17%
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -454,7 +511,7 @@ export function Pricing() {
                 <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/95 backdrop-blur-sm">
                     <div className="grid border-b border-border/50 md:grid-cols-2 xl:grid-cols-4">
                         {tiers.map((tier, index) => {
-                            const displayPrice = getDisplayPrice(tier, billingPeriod);
+                            const displayPrice = getDisplayPrice(tier, billingPeriod, currency);
                             return (
                                 <article
                                     key={tier.name}
@@ -475,11 +532,24 @@ export function Pricing() {
                                     </div>
 
                                     <div>
-                                        <p className="text-3xl font-semibold tracking-tight">
-                                            {typeof displayPrice === "number" ? `$${displayPrice}` : displayPrice}
-                                            {typeof displayPrice === "number" && <span className="text-base text-muted-foreground"> /mo</span>}
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">{getSubPriceLabel(tier, billingPeriod)}</p>
+                                        <div className="flex items-baseline gap-2 flex-wrap">
+                                            <p className="text-3xl font-semibold tracking-tight">
+                                                {typeof displayPrice === "number" ? formatCurrency(displayPrice, currency, { maximumFractionDigits: 0 }) : displayPrice}
+                                                {typeof displayPrice === "number" && <span className="text-base text-muted-foreground"> /mo</span>}
+                                            </p>
+                                            {billingPeriod === "annual" && (() => {
+                                                const savings = getYearlySavings(tier, currency);
+                                                if (savings && savings > 0) {
+                                                    return (
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                                                            Save {formatCurrency(savings, currency, { maximumFractionDigits: 0 })}/yr
+                                                        </span>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </div>
+                                        <p className="mt-1 text-xs text-muted-foreground">{getSubPriceLabel(tier, billingPeriod, currency)}</p>
                                     </div>
 
                                     <ul className="space-y-2">
@@ -580,8 +650,8 @@ export function Pricing() {
                                 </div>
 
                                 <p className="text-3xl font-semibold tracking-tight">
-                                    {addon.price === 0 ? "Free" : `$${addon.price}`}
-                                    <span className="text-base text-muted-foreground">{addon.price === 0 ? "" : " /mo"}</span>
+                                    {addon.price[currency] === 0 ? "Free" : formatCurrency(addon.price[currency], currency, { maximumFractionDigits: 0 })}
+                                    <span className="text-base text-muted-foreground">{addon.price[currency] === 0 ? "" : " /mo"}</span>
                                 </p>
 
                                 <ul className="space-y-2">
