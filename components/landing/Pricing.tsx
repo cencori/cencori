@@ -30,7 +30,7 @@ const tiers: Array<{
     {
         name: "free",
         displayName: "Free",
-        description: "Everything you need to build and test.",
+        description: "Everything you need to build, experiment, and test.",
         price: {
             USD: { monthly: 0, annual: 0 },
             NGN: { monthly: 0, annual: 0 }
@@ -521,13 +521,15 @@ export function Pricing() {
                                         index === 1 && "bg-muted/20"
                                     )}
                                 >
-                                    {tier.highlighted && (
-                                        <Badge className="w-fit rounded-full border-0 bg-foreground px-2 py-0.5 text-[10px] text-background">
-                                            Popular
-                                        </Badge>
-                                    )}
                                     <div>
-                                        <p className="text-xl font-semibold">{tier.displayName}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xl font-semibold">{tier.displayName}</p>
+                                            {tier.highlighted && (
+                                                <Badge className="rounded-full border-0 bg-foreground px-2 py-0.5 text-[10px] text-background">
+                                                    Popular
+                                                </Badge>
+                                            )}
+                                        </div>
                                         <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
                                     </div>
 
