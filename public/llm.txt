@@ -187,6 +187,7 @@ export async function POST(req: Request) {
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useState, type FormEvent } from 'react';
 
 function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }) {
@@ -197,7 +198,9 @@ function getMessageText(message: { parts?: Array<{ type: string; text?: string }
 
 export default function Chat() {
   const [input, setInput] = useState('');
-  const { messages, sendMessage, status } = useChat({ api: '/api/chat' });
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

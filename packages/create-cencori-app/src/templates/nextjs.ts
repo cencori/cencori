@@ -28,7 +28,7 @@ export function getNextjsTemplate(options: TemplateOptions): Record<string, stri
             },
             dependencies: {
                 ai: '^6.0.0',
-                ...(options.includeChat ? { '@ai-sdk/react': '^3.0.0' } : {}),
+                ...(options.includeChat ? { '@ai-sdk/react': '^6.0.0' } : {}),
                 cencori: '^1.2.0',
                 next: '^15.0.0',
                 react: '^19.0.0',
@@ -625,6 +625,7 @@ export default function Home() {
         files['components/chat.tsx'] = `'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useRef, useEffect, useState } from 'react';
 
 const ArrowUpIcon = () => (
@@ -642,7 +643,9 @@ function getMessageText(message: { parts: Array<{ type: string; text?: string }>
 
 export function Chat() {
     const [input, setInput] = useState('');
-    const { messages, sendMessage, status, error } = useChat({ api: '/api/chat' });
+    const { messages, sendMessage, status, error } = useChat({
+        transport: new DefaultChatTransport({ api: '/api/chat' }),
+    });
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const isLoading = status !== 'ready';
