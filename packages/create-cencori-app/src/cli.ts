@@ -25,7 +25,7 @@ import { getCeloAgentTemplate } from './templates/celo-agent';
 import packageJson from '../package.json';
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 
 const VERSION = packageJson.version;
 
@@ -71,6 +71,218 @@ async function verifyApiKey(apiKey: string): Promise<'valid' | 'invalid' | 'unkn
     } catch {
         return 'unknown';
     }
+}
+
+function patchChatContent(content: string): string {
+    let patched = content;
+    if (!patched.includes('DefaultChatTransport')) {
+        const useChatImportRegex = /import\s+{[^}]*useChat[^}]*}\s+from\s+['"]@ai-sdk\/react['"];?/g;
+        if (useChatImportRegex.test(patched)) {
+            patched = patched.replace(
+                useChatImportRegex,
+                (match) => `${match}\nimport { DefaultChatTransport } from 'ai';`
+            );
+        } else {
+            patched = `import { DefaultChatTransport } from 'ai';\n${patched}`;
+        }
+    }
+
+    patched = patched.replace(/useChat\(\s*\{([\s\S]*?)\}\s*\)/g, (match, optionsBody) => {
+        if (optionsBody.includes('transport:') || !optionsBody.includes('api:')) {
+            return match;
+        }
+
+        const apiRegex = /api:\s*('[^']+'|"[^"]+"|\`[^\`]+\`|[^\s,]+)/;
+        const apiMatch = optionsBody.match(apiRegex);
+        if (apiMatch) {
+            const apiValue = apiMatch[1];
+            const newOptionsBody = optionsBody.replace(
+                apiRegex,
+                `transport: new DefaultChatTransport({ api: ${apiValue} })`
+            );
+            return `useChat({${newOptionsBody}})`;
+        }
+        return match;
+    });
+
+    return patched;
+}
+
+function findAndPatchFiles(dir: string, modifiedFiles: string[]): void {
+    const ignoredDirs = new Set([
+        'node_modules',
+        '.next',
+        'dist',
+        '.git',
+        'build',
+        'out',
+        '.vercel',
+    ]);
+
+    function traverse(currentDir: string) {
+        if (!fs.existsSync(currentDir)) return;
+        const files = fs.readdirSync(currentDir, { withFileTypes: true });
+
+        for (const file of files) {
+            const fullPath = path.join(currentDir, file.name);
+
+            if (file.isDirectory()) {
+                if (!ignoredDirs.has(file.name)) {
+                    traverse(fullPath);
+                }
+            } else if (file.isFile()) {
+                const ext = path.extname(file.name);
+                if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
+                    const content = fs.readFileSync(fullPath, 'utf8');
+
+                    if (content.includes('useChat') && content.includes('api:') && !content.includes('DefaultChatTransport')) {
+                        const newContent = patchChatContent(content);
+                        if (newContent !== content) {
+                            fs.writeFileSync(fullPath, newContent, 'utf8');
+                            modifiedFiles.push(fullPath);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    traverse(dir);
+}
+
+function detectPackageManager(projectDir: string): { command: string; args: string[] } {
+    if (fs.existsSync(path.join(projectDir, 'pnpm-lock.yaml'))) {
+        return { command: 'pnpm', args: ['install'] };
+    }
+    if (fs.existsSync(path.join(projectDir, 'yarn.lock'))) {
+        return { command: 'yarn', args: ['install'] };
+    }
+    if (fs.existsSync(path.join(projectDir, 'bun.lockb'))) {
+        return { command: 'bun', args: ['install'] };
+    }
+    return { command: 'npm', args: ['install'] };
+}
+
+async function handleUpgrade(): Promise<void> {
+    printBanner();
+    console.log(chalk.cyan.bold('  Upgrade Project') + chalk.gray(' — patching dependencies and source files'));
+    console.log();
+
+    const projectDir = process.cwd();
+    const pkgPath = path.join(projectDir, 'package.json');
+
+    if (!fs.existsSync(pkgPath)) {
+        console.log(chalk.red('  ✖ No package.json found in the current directory.'));
+        console.log(chalk.gray('    Make sure you are running this command from your project root.'));
+        console.log();
+        process.exit(1);
+    }
+
+    let pkg: any;
+    try {
+        pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    } catch (error) {
+        console.log(chalk.red('  ✖ Failed to parse package.json.'));
+        console.log();
+        process.exit(1);
+    }
+
+    const hasCencori = 
+        (pkg.dependencies && pkg.dependencies['cencori']) || 
+        (pkg.devDependencies && pkg.devDependencies['cencori']) ||
+        pkg.name === 'cencori';
+
+    if (!hasCencori) {
+        console.log(chalk.red('  ✖ This does not appear to be a Cencori project.'));
+        console.log(chalk.gray('    No "cencori" dependency found in package.json.'));
+        console.log();
+        process.exit(1);
+    }
+
+    const isNextjs = pkg.dependencies && pkg.dependencies['next'];
+    if (!isNextjs) {
+        console.log(chalk.yellow('  ⚠ Upgrade is currently only supported for Next.js templates.'));
+        console.log(chalk.gray('    No "next" dependency found in package.json.'));
+        console.log();
+        return;
+    }
+
+    const upgradeSpinner = ora({
+        text: 'Upgrading package.json dependencies...',
+        color: 'cyan',
+    }).start();
+
+    let packageJsonChanged = false;
+
+    if (pkg.dependencies) {
+        if (pkg.dependencies['ai'] && pkg.dependencies['ai'] !== '^6.0.0') {
+            pkg.dependencies['ai'] = '^6.0.0';
+            packageJsonChanged = true;
+        }
+        if (pkg.dependencies['@ai-sdk/react'] && pkg.dependencies['@ai-sdk/react'] !== '^6.0.0') {
+            pkg.dependencies['@ai-sdk/react'] = '^6.0.0';
+            packageJsonChanged = true;
+        }
+    }
+
+    if (packageJsonChanged) {
+        try {
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4) + '\n', 'utf8');
+            upgradeSpinner.succeed('Upgraded package.json dependencies');
+        } catch (error) {
+            upgradeSpinner.fail('Failed to write package.json');
+            console.error(chalk.red(`  ${error instanceof Error ? error.message : 'Unknown error'}`));
+            process.exit(1);
+        }
+    } else {
+        upgradeSpinner.info('Dependencies are already up to date');
+    }
+
+    const patchSpinner = ora({
+        text: 'Scanning project files for chat components...',
+        color: 'cyan',
+    }).start();
+
+    const modifiedFiles: string[] = [];
+    try {
+        findAndPatchFiles(projectDir, modifiedFiles);
+        if (modifiedFiles.length > 0) {
+            patchSpinner.succeed(`Patched ${modifiedFiles.length} file(s):`);
+            modifiedFiles.forEach((file) => {
+                console.log(chalk.gray(`    - ${path.relative(projectDir, file)}`));
+            });
+        } else {
+            patchSpinner.info('No files required patching');
+        }
+    } catch (error) {
+        patchSpinner.fail('Failed to patch project files');
+        console.error(chalk.red(`  ${error instanceof Error ? error.message : 'Unknown error'}`));
+        process.exit(1);
+    }
+
+    console.log();
+    const installSpinner = ora({
+        text: 'Running package manager installation...',
+        color: 'cyan',
+    }).start();
+
+    try {
+        const { command, args } = detectPackageManager(projectDir);
+        installSpinner.text = `Installing dependencies with ${command}...`;
+        execSync(`${command} ${args.join(' ')}`, {
+            cwd: projectDir,
+            stdio: 'ignore',
+            env: { ...process.env, ADBLOCK: '1', DISABLE_OPENCOLLECTIVE: '1' },
+        });
+        installSpinner.succeed(`Installed dependencies successfully with ${command}`);
+    } catch (error) {
+        installSpinner.warn('Failed to auto-install dependencies');
+        console.log(chalk.gray('    Please run your package manager install command (e.g. npm install) manually.'));
+    }
+
+    console.log();
+    console.log(chalk.green.bold('  ✔ Upgrade complete!'));
+    console.log();
 }
 
 async function main(): Promise<void> {
@@ -265,6 +477,13 @@ async function main(): Promise<void> {
                 console.log();
                 spawn('npm', ['run', command], { cwd: targetDir, stdio: 'inherit' });
             }
+        });
+
+    program
+        .command('upgrade')
+        .description('Upgrade an existing Cencori project to the latest templates and patch errors')
+        .action(async () => {
+            await handleUpgrade();
         });
 
     program.parse();
