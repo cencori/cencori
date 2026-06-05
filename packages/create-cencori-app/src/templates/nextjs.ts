@@ -28,7 +28,7 @@ export function getNextjsTemplate(options: TemplateOptions): Record<string, stri
             },
             dependencies: {
                 ai: '^6.0.0',
-                ...(options.includeChat ? { '@ai-sdk/react': '^6.0.0' } : {}),
+                ...(options.includeChat ? { '@ai-sdk/react': '^3.0.0' } : {}),
                 cencori: '^1.2.0',
                 next: '^15.0.0',
                 react: '^19.0.0',

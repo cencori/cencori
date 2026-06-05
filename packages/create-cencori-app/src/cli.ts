@@ -219,8 +219,8 @@ async function handleUpgrade(): Promise<void> {
             pkg.dependencies['ai'] = '^6.0.0';
             packageJsonChanged = true;
         }
-        if (pkg.dependencies['@ai-sdk/react'] && pkg.dependencies['@ai-sdk/react'] !== '^6.0.0') {
-            pkg.dependencies['@ai-sdk/react'] = '^6.0.0';
+        if (pkg.dependencies['@ai-sdk/react'] && pkg.dependencies['@ai-sdk/react'] !== '^3.0.0') {
+            pkg.dependencies['@ai-sdk/react'] = '^3.0.0';
             packageJsonChanged = true;
         }
     }
