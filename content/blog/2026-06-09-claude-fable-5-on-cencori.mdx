@@ -1,0 +1,86 @@
+---
+title: "Claude Fable 5 is on Cencori"
+slug: "claude-fable-5-on-cencori"
+date: "2026-06-09"
+excerpt: "Anthropic's Mythos-class model just dropped. Claude Fable 5 delivers state-of-the-art performance across software engineering, knowledge work, and scientific research—with a 1M token context window and adaptive thinking always on. It's live on Cencori today."
+coverImage: "/blog/images/covers/anth.png"
+tags: ["Product", "Anthropic", "AI Models", "Release"]
+category: "changelog"
+published: true
+---
+
+**Claude Fable 5** is live on Cencori.
+
+Anthropic just shipped its most capable model yet. Fable 5 is the generally available release of their Mythos-class architecture—state-of-the-art on nearly every tested benchmark, with exceptional performance in software engineering, knowledge work, scientific research, and vision.
+
+As of today, you can target `claude-fable-5` across the entire Cencori stack.
+
+## What Makes Fable 5 Different
+
+### 1. Mythos-Class Architecture
+
+This isn't an incremental update. Fable 5 is built on Anthropic's new Mythos architecture—the same foundation behind the restricted Claude Mythos 5 (available only through the invitation-only Project Glasswing program). Fable 5 brings that same raw capability to general availability, with production-ready safety guardrails baked in.
+
+### 2. Adaptive Thinking (Always On)
+
+Unlike previous Claude models where extended thinking was opt-in, Fable 5 features **Adaptive Thinking** as a permanent capability. The model dynamically adjusts its reasoning depth based on the complexity of each query—burning more tokens on hard problems, staying lean on simple ones.
+
+### 3. Benchmark Dominance
+
+The numbers speak for themselves. Fable 5 leads on agentic coding, knowledge work, spatial reasoning, multidisciplinary reasoning, and vision tasks. The longer and more complex the task, the larger Fable 5's lead over competing models.
+
+### 4. Built-In Safeguards
+
+Anthropic has been transparent about the tradeoffs: Fable 5's capabilities in areas like cybersecurity could be misused. Queries on a narrow range of sensitive topics will fall back to Opus 4.8 automatically. Users are notified when this happens—and it occurs in less than 5% of sessions.
+
+## Pricing & Specs
+
+| | |
+|---|---|
+| **Input Tokens** | $10.00 / million |
+| **Output Tokens** | $50.00 / million |
+| **Context Window** | 1,000,000 tokens |
+| **Max Output** | 128,000 tokens |
+| **Thinking** | Adaptive (always on) |
+
+## Using Fable 5 in Cencori
+
+We've updated our provider config and model catalog. You can use it today via the SDK, REST API, or by selecting it in your Project Dashboard.
+
+### SDK Example
+
+```typescript
+import { cencori } from '@cencori/sdk';
+
+const response = await cencori.chat.create({
+  model: 'claude-fable-5',
+  messages: [
+    {
+      role: 'user',
+      content: 'Audit this codebase for security vulnerabilities and generate a detailed report with severity ratings.'
+    }
+  ]
+});
+```
+
+### REST API
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-fable-5",
+    "messages": [{"role": "user", "content": "Hello from Fable 5"}]
+  }'
+```
+
+## Where It Fits
+
+Fable 5 sits at the top of the Claude lineup. For production workloads where cost matters more than peak capability, Opus 4.8 ($5/$25 per MTok) and Sonnet 4.6 ($3/$15 per MTok) remain excellent choices—and both are available through Cencori.
+
+For the hardest problems—deep research, complex multi-file refactors, autonomous agent loops—Fable 5 is the new ceiling.
+
+---
+
+*Claude Fable 5 is available now for all Cencori customers. Check your [Model Catalog](/models) to see it in action.*
