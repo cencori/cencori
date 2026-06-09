@@ -74,6 +74,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.anthropic.com',
         keyPrefix: 'sk-ant-',
         models: [
+            // Claude Fable / Mythos 5 (June 2026)
+            { id: 'claude-fable-5', name: 'Claude Fable 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Mythos-class flagship, SOTA benchmarks, adaptive thinking' },
             // Claude 4 Series (2025/2026)
             { id: 'claude-opus-4.8', name: 'Claude Opus 4.8', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, dynamic workflows & effort control' },
             { id: 'claude-opus-4.7', name: 'Claude Opus 4.7', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding' },
