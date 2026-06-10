@@ -8,6 +8,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBridge";
+import Script from "next/script";
 
 // Aggressive keyword targeting
 const keywords = [
@@ -242,6 +243,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </PostHogProvider>
         </ThemeProvider>
         <Analytics />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-EQR3SFLBJJ"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-EQR3SFLBJJ');
+          `}
+        </Script>
       </body>
     </html>
   );
