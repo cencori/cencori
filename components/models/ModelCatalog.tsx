@@ -180,6 +180,9 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
     }
     
     // Claude
+    if (id === "axiveri/africlaude-7b") {
+        return { input: "$0.50", output: "$1.00" };
+    }
     if (id === "claude-fable-5") {
         return { input: "$10.00", output: "$50.00" };
     }
@@ -278,7 +281,7 @@ function flattenModels(): FlatModel[] {
     }
 
     // Models pinned to the top (newly added, remove from this list after a while)
-    const pinnedIds = new Set(['claude-fable-5', 'claude-opus-4.8', 'gemini-3.5-flash']);
+    const pinnedIds = new Set(['axiveri/africlaude-7b', 'claude-fable-5', 'claude-opus-4.8', 'gemini-3.5-flash']);
     const pinned: FlatModel[] = [];
     const rest: FlatModel[] = [];
 
