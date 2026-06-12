@@ -1,0 +1,76 @@
+---
+title: "Africlaude-7B is on Cencori"
+slug: "africlaude-7b-on-cencori"
+date: "2026-06-12"
+excerpt: "Axiveri's Africlaude-7B is now live on Cencori. Built for West African fintech, identity verification, and Pidgin English contexts, it is accessible via our unified API starting today."
+coverImage: "/blog/images/covers/africlaude.png"
+tags: ["Product", "Axiveri", "AI Models", "Release", "Hugging Face"]
+category: "changelog"
+published: true
+---
+
+**Africlaude-7B** is live on Cencori.
+
+Built by Emmanuel Ariyo at Axiveri, Africlaude-7B is a domain-specific model series designed specifically for West African developer contexts. It represents a major step forward for localized intelligence, delivering state-of-the-art results on region-specific benchmarks where massive frontier models typically fall short.
+
+Starting today, you can target `axiveri/africlaude-7b` across our entire API Gateway, with zero new setup required.
+
+## What Makes Africlaude-7B Different
+
+### 1. Pidgin English Mastery
+Mainstream models struggle with Pidgin English grammar, syntax, and colloquialisms. On the AfriclaudeBench v1.0 benchmark, Africlaude-7B scored a **perfect 1.00**, while LLaMA-3.1-8B, Qwen2.5-Coder-7B (Base), and Mistral-7B all scored **0.00**.
+
+### 2. Tailored for Fintech & Identity
+For builders in West Africa, processing localized context is a necessity. Africlaude-7B has been specifically fine-tuned on West African identity documents, address parsing structures, and fintech transactional queries. It achieves a **1.00 on Identity** and **0.86 on Fintech** benchmarks.
+
+### 3. Lightweight and Fast
+Built as a 4-bit QLoRA adapter on the high-performance Qwen2.5-Coder-7B-Instruct base model, Africlaude-7B offers lightning-fast token generation and low latency, making it ideal for real-time customer service and automation loops.
+
+## Pricing & Specs
+
+| | |
+|---|---|
+| **Input Tokens** | $0.50 / million |
+| **Output Tokens** | $1.00 / million |
+| **Context Window** | 32,768 tokens |
+| **Provider** | Hugging Face (via Cencori Gateway) |
+| **Model ID** | `axiveri/africlaude-7b` |
+
+## Using Africlaude-7B in Cencori
+
+You can route requests to Africlaude-7B today using our SDK, REST API, or by selecting it directly from your Project Dashboard.
+
+### SDK Example
+
+```typescript
+import { cencori } from '@cencori/sdk';
+
+const response = await cencori.chat.create({
+  model: 'axiveri/africlaude-7b',
+  messages: [
+    {
+      role: 'user',
+      content: 'Rewrite this transactional notification to be friendly and in clear Nigerian Pidgin.'
+    }
+  ]
+});
+```
+
+### REST API
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "axiveri/africlaude-7b",
+    "messages": [{"role": "user", "content": "How far, wetin be the status of my invoice?"}]
+  }'
+```
+
+## Bridging Open-Weight Innovation
+At Cencori, we believe localized models are the future of domain-specific intelligence. By supporting open weights, adapters, and custom Hugging Face inference pipelines, our Gateway allows you to deploy and route to specialized models just as easily as you would target OpenAI or Anthropic.
+
+---
+
+*Africlaude-7B is available now for all Cencori customers. Check your [Model Catalog](/ai/models) to see it live.*
