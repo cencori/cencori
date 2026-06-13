@@ -270,7 +270,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://huggingface.co/docs',
         keyPrefix: 'hf_',
         models: [
-            { id: 'axiveri/africlaude-7b', name: 'Africlaude-7B', type: ['chat', 'code'], contextWindow: 32768, description: 'Fine-tuned Qwen 2.5 Coder 7B adapter, SOTA benchmarks, optimized for Pidgin English, Fintech, and West African identity tasks' },
+            { id: 'axiveri/africlaude-7b', name: 'Africlaude-7B', type: ['chat', 'code'], contextWindow: 32768, description: 'Standalone fine-tuned model based on Qwen 2.5 Coder 7B, SOTA on Pidgin English & Fintech, robust instruction adherence' },
             { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Via HF Inference' },
             { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', type: ['chat'], contextWindow: 128000, description: 'Via HF Inference' },
             { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 32000, description: 'Via HF Inference' },
