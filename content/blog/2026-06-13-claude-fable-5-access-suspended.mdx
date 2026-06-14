@@ -1,0 +1,34 @@
+---
+title: "Access to Claude Fable 5 Suspended"
+slug: "claude-fable-5-access-suspended"
+date: "2026-06-13"
+excerpt: "Following an emergency export control directive from the U.S. government, Anthropic has suspended all access to Claude Fable 5 and Claude Mythos 5. Learn how Cencori's intelligence infrastructure ensures your applications remain resilient with zero downtime."
+coverImage: "/blog/images/covers/anth.png"
+tags: ["Product", "Anthropic", "Compliance", "Security"]
+category: "changelog"
+published: true
+---
+
+On June 12, 2026, Anthropic suspended access to **Claude Fable 5** and **Claude Mythos 5** for all customers globally. 
+
+This suspension is in compliance with an emergency export control directive issued by the U.S. government, citing national security concerns. The directive was issued following reports of a "non-universal jailbreak" that could potentially allow users to identify software vulnerabilities. Because the regulatory directive restricts access specifically to foreign nationals—and Anthropic does not currently have a mechanism to verify user nationality in real-time—access to these models has been disabled entirely while a compliance resolution is worked out.
+
+To protect our customers' production workloads from failing API requests, **we have removed `claude-fable-5` from Cencori's active model catalog.**
+
+## What This Means for Your Applications
+
+All other Anthropic models, including our pinned flagship **Claude Opus 4.8** ($5.00/$25.00 per MTok) and **Claude Sonnet 4.6** ($3.00/$15.00 per MTok), are **fully unaffected** by this directive and continue to operate normally.
+
+If your application was actively targeting `claude-fable-5`, any direct calls will now return a provider error. We recommend immediately updating your target model to `claude-opus-4.8` or another SOTA alternative (such as `gemini-3.5-flash` or `gpt-4o`).
+
+## Build Resilient AI with Cencori
+
+This disruption highlights exactly why we built Cencori as **intelligence infrastructure**, rather than a simple AI gateway. 
+
+When you build on Cencori, your model consumption is backed by robust enterprise security and decoupled configuration. You can react to upstream provider disruptions instantly:
+
+1. **Fallback Routing**: Update your model routing dynamically via the Cencori Dashboard. Redirect traffic from `claude-fable-5` to `claude-opus-4.8` or alternative models globally without deploying any new code.
+2. **End-User Billing Integrity**: Because Cencori manages your end-user credit quotas and usage tracking at the infrastructure level, migrating models won't break your billing structures or user limits. Your billing configurations remain intact, matching the new model's rates automatically.
+3. **Enterprise Security Guardrails**: Our active compliance and security layer continues to protect all outgoing prompts and incoming completions, ensuring that jailbreak attempts or vulnerability disclosures are blocked before they reach your end users.
+
+We are closely monitoring the situation as Anthropic works with regulators to resolve the directive and restore access. If you need assistance migrating your production configurations or setting up dynamic fallbacks, please reach out to our engineering support team.
