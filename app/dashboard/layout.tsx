@@ -38,6 +38,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import posthog from "posthog-js";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const CommandPalette = dynamic(
   () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
@@ -183,6 +184,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
   const orgSlug = getOrgSlug();
   const projectSlug = getProjectSlug();
+  const isPlayground = pathname.includes("/playground");
 
   const currentOrg = organizations.find((org) => org.slug === orgSlug);
   const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
@@ -235,7 +237,12 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 4, minimumFractionDigits: 2 });
 
   return (
-    <div className="min-h-screen bg-background transition-colors">
+    <div
+      className={cn(
+        "bg-background transition-colors",
+        isPlayground ? "flex h-svh flex-col overflow-hidden" : "min-h-screen"
+      )}
+    >
       <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/40 bg-background px-4 md:px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/dashboard/organizations" className="flex items-center">
@@ -646,7 +653,13 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       {/* Mobile Navigation Bar - only visible on mobile screens */}
       <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} />
 
-      <main className="p-4 md:p-6 pt-20 lg:pt-14">
+      <main
+        className={cn(
+          isPlayground
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0 px-4 md:px-6"
+            : "p-4 md:p-6 pt-20 lg:pt-14"
+        )}
+      >
         {children}
       </main>
       <CommandPalette

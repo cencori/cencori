@@ -703,7 +703,7 @@ export async function POST(req: NextRequest) {
                     promptId: resolvedPrompt.promptId,
                     versionId: resolvedPrompt.versionId,
                     model,
-                    apiKeyId: gatewayCtx.apiKeyId,
+                    apiKeyId: gatewayCtx.apiKeyId ?? undefined,
                     requestId: gatewayCtx.requestId,
                     variablesUsed: body.prompt?.variables || null,
                     latencyMs: Date.now() - startedAt,

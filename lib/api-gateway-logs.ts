@@ -9,7 +9,7 @@ interface GatewayCallerIdentity {
 
 interface LogApiGatewayRequestParams {
     projectId: string;
-    apiKeyId: string;
+    apiKeyId: string | null;
     requestId: string;
     endpoint: string;
     method: string;

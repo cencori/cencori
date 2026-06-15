@@ -26,7 +26,7 @@ export interface GatewayContext {
     supabase: ReturnType<typeof createAdminClient>;
     projectId: string;
     organizationId: string;
-    apiKeyId: string;
+    apiKeyId: string | null;
     environment: string;
     keyType: string;
     tier: string;
@@ -139,6 +139,95 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
     if (!apiKey) {
+        try {
+            // Check if there is an authenticated dashboard user via cookies/session
+            const { createServerClient } = await import('@/lib/supabaseServer');
+            const userSupabase = await createServerClient();
+            const { data: { user } } = await userSupabase.auth.getUser();
+
+            if (user) {
+                // Check if they passed a Project ID via header
+                const playgroundProjectId = req.headers.get('x-playground-project-id');
+                const playgroundEnv = req.headers.get('x-playground-environment') || 'production';
+
+                if (playgroundProjectId) {
+                    // Verify the user has access to this project
+                    const { data: project, error: pError } = await userSupabase
+                        .from('projects')
+                        .select(`
+                            id,
+                            name,
+                            organization_id,
+                            default_model,
+                            default_provider,
+                            end_user_billing_enabled,
+                            organizations!inner(
+                                id,
+                                subscription_tier,
+                                monthly_requests_used,
+                                monthly_request_limit,
+                                credits_balance,
+                                billing_frozen
+                            )
+                        `)
+                        .eq('id', playgroundProjectId)
+                        .single();
+
+                    if (project && !pError) {
+                        // Find an active API key for this project and environment to use as a logging reference
+                        const { data: activeKey } = await supabase
+                            .from('api_keys')
+                            .select('id')
+                            .eq('project_id', project.id)
+                            .eq('environment', playgroundEnv)
+                            .is('revoked_at', null)
+                            .limit(1)
+                            .maybeSingle();
+
+                        const organization = project.organizations as unknown as {
+                            id: string;
+                            subscription_tier: string;
+                            monthly_requests_used: number;
+                            monthly_request_limit: number;
+                            credits_balance: string | number | null;
+                            billing_frozen: boolean | null;
+                        };
+
+                        const organizationId = organization.id;
+                        const tier = organization.subscription_tier || 'free';
+
+                        const context: GatewayContext = {
+                            supabase,
+                            projectId: project.id,
+                            organizationId,
+                            apiKeyId: activeKey?.id || null,
+                            environment: playgroundEnv,
+                            keyType: 'session',
+                            tier,
+                            requestId,
+                            startTime,
+                            clientIp,
+                            countryCode,
+                            projectName: project.name,
+                            defaultModel: project.default_model,
+                            defaultProvider: project.default_provider,
+                            endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
+                            rateLimit: {
+                                status: 'ok',
+                                limit: 120,
+                                remaining: 119,
+                                reset: Date.now() + 60000,
+                            },
+                        };
+
+                        return { success: true, context };
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('[GatewayMiddleware] Playground auth check error:', err);
+        }
+
         return {
             success: false,
             response: addGatewayHeaders(

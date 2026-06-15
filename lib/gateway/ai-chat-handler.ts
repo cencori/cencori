@@ -819,7 +819,7 @@ export async function POST(req: NextRequest) {
                 promptId: resolvedPromptData.promptId,
                 versionId: resolvedPromptData.versionId,
                 model: result.actualModel,
-                apiKeyId: ctx.apiKeyId,
+                apiKeyId: ctx.apiKeyId ?? undefined,
                 requestId,
                 variablesUsed: body.prompt?.variables || null,
                 latencyMs: Date.now() - startTime,
