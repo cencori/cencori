@@ -13,7 +13,7 @@ export type AgentKeyContext = {
  */
 export async function loadAgentKeyContext(
     supabase: SupabaseAdmin,
-    apiKeyId: string
+    apiKeyId: string | null
 ): Promise<AgentKeyContext> {
     const { data, error } = await supabase
         .from('api_keys')

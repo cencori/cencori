@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { detectJailbreak } from '@/lib/safety/jailbreak-detector';
 import { scanOutput } from '@/lib/safety/output-scanner';
 import { checkContent } from '@/lib/safety/content-filter';

@@ -26,6 +26,7 @@ import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { BudgetAlertBanner } from "@/components/dashboard/BudgetAlertBanner";
+import { cn } from "@/lib/utils";
 
 interface ProjectData {
     id: string;
@@ -268,8 +269,14 @@ export default function ProjectLayoutClient({
         { href: `${basePath}/settings`, icon: SettingsIcon, label: "Project Settings" },
     ];
 
+    const isPlayground = pathname.includes("/playground");
+
     return (
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider
+            defaultOpen={false}
+            className={isPlayground ? "min-h-0 flex-1 overflow-hidden" : undefined}
+            style={isPlayground ? { minHeight: "0px" } : undefined}
+        >
             {/* Desktop Sidebar - hidden on mobile */}
             <Sidebar collapsible="icon" expandOnHover className="top-12 h-[calc(100vh-3rem)] hidden lg:block border-r border-border/40">
                 <SidebarContent>
@@ -306,8 +313,13 @@ export default function ProjectLayoutClient({
                 </SheetContent>
             </Sheet>
 
-            <main className="flex w-full flex-1 flex-col overflow-hidden">
-                {project && (
+            <main
+                className={cn(
+                    "flex w-full flex-1 flex-col overflow-hidden",
+                    isPlayground && "min-h-0"
+                )}
+            >
+                {project && !isPlayground && (
                     <BudgetAlertBanner
                         projectId={project.id}
                         settingsHref={`${basePath}/settings`}

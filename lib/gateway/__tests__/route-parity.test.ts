@@ -48,62 +48,62 @@ vi.mock('@/lib/webhooks', () => ({
 }));
 
 vi.mock('@/lib/gateway-middleware', () => ({
-    validateGatewayRequest: (...args: unknown[]) => routeMocks.validateGatewayRequest(...args),
+    validateGatewayRequest: (...args: any[]) => (routeMocks.validateGatewayRequest as any)(...args),
     handleCorsPreFlight: vi.fn(),
-    addGatewayHeaders: (...args: unknown[]) => routeMocks.addGatewayHeaders(...args),
-    logGatewayRequest: (...args: unknown[]) => routeMocks.logGatewayRequest(...args),
-    incrementUsage: (...args: unknown[]) => routeMocks.incrementUsage(...args),
+    addGatewayHeaders: (...args: any[]) => (routeMocks.addGatewayHeaders as any)(...args),
+    logGatewayRequest: (...args: any[]) => (routeMocks.logGatewayRequest as any)(...args),
+    incrementUsage: (...args: any[]) => (routeMocks.incrementUsage as any)(...args),
 }));
 
 vi.mock('@/lib/gateway/input-guard', () => ({
-    runGatewayInputPipeline: (...args: unknown[]) => routeMocks.runGatewayInputPipeline(...args),
+    runGatewayInputPipeline: (...args: any[]) => routeMocks.runGatewayInputPipeline(...args),
 }));
 
 vi.mock('@/lib/gateway/chat-executor', () => ({
-    executeGatewayChat: (...args: unknown[]) => routeMocks.executeGatewayChat(...args),
-    streamGatewayChat: (...args: unknown[]) => routeMocks.streamGatewayChat(...args),
+    executeGatewayChat: (...args: any[]) => routeMocks.executeGatewayChat(...args),
+    streamGatewayChat: (...args: any[]) => routeMocks.streamGatewayChat(...args),
 }));
 
 vi.mock('@/lib/gateway/v1-execute', () => ({
-    runV1ProviderExecution: (...args: unknown[]) => routeMocks.runV1ProviderExecution(...args),
+    runV1ProviderExecution: (...args: any[]) => routeMocks.runV1ProviderExecution(...args),
 }));
 
 vi.mock('@/lib/gateway/providers-setup', () => ({
-    resolveGatewayProvider: (...args: unknown[]) => routeMocks.resolveGatewayProvider(...args),
+    resolveGatewayProvider: (...args: any[]) => routeMocks.resolveGatewayProvider(...args),
 }));
 
 vi.mock('@/lib/end-user-billing', () => ({
-    checkEndUserQuota: (...args: unknown[]) => routeMocks.checkEndUserQuota(...args),
-    recordEndUserUsage: (...args: unknown[]) => routeMocks.recordEndUserUsage(...args),
+    checkEndUserQuota: (...args: any[]) => routeMocks.checkEndUserQuota(...args),
+    recordEndUserUsage: (...args: any[]) => routeMocks.recordEndUserUsage(...args),
 }));
 
 vi.mock('@/lib/api-gateway-logs', () => ({
     extractGatewayCallerIdentity: vi.fn(() => ({})),
-    logApiGatewayRequest: (...args: unknown[]) => routeMocks.logApiGatewayRequest(...args),
+    logApiGatewayRequest: (...args: any[]) => routeMocks.logApiGatewayRequest(...args),
 }));
 
 vi.mock('@/lib/cache/prompt-cache', () => ({
     computeExactCacheKey: vi.fn(() => 'cache-key-contract'),
-    getProjectCacheConfig: (...args: unknown[]) => routeMocks.getProjectCacheConfig(...args),
-    lookupCache: (...args: unknown[]) => routeMocks.lookupCache(...args),
+    getProjectCacheConfig: (...args: any[]) => routeMocks.getProjectCacheConfig(...args),
+    lookupCache: (...args: any[]) => routeMocks.lookupCache(...args),
     storeInCache: vi.fn(),
     recordCacheHit: vi.fn(),
     logCacheEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/config-cache', () => ({
-    getCachedCacheConfig: (...args: unknown[]) => routeMocks.getCachedCacheConfig(...args),
+    getCachedCacheConfig: (...args: any[]) => routeMocks.getCachedCacheConfig(...args),
     setCachedCacheConfig: vi.fn(),
     getCachedAgentConfig: vi.fn(),
     setCachedAgentConfig: vi.fn(),
 }));
 
 vi.mock('@/lib/gateway/agent-context', () => ({
-    loadAgentKeyContext: (...args: unknown[]) => routeMocks.loadAgentKeyContext(...args),
+    loadAgentKeyContext: (...args: any[]) => routeMocks.loadAgentKeyContext(...args),
 }));
 
 vi.mock('@/lib/gateway/output-guard', () => ({
-    runGatewayOutputGuard: (...args: unknown[]) => routeMocks.runGatewayOutputGuard(...args),
+    runGatewayOutputGuard: (...args: any[]) => routeMocks.runGatewayOutputGuard(...args),
 }));
 
 vi.mock('@/lib/integrations/ragmetrics', () => ({
