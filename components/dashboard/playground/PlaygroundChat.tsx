@@ -662,7 +662,7 @@ export function PlaygroundChat({
                                 placeholder="Ask a question..."
                                 rows={2}
                                 disabled={isLoading}
-                                className="max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-xs placeholder:text-muted-foreground/50 focus:outline-none leading-relaxed"
+                                className="max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-base md:text-xs placeholder:text-muted-foreground/50 focus:outline-none leading-relaxed"
                             />
 
                             {/* Input Area Controls Footer */}
@@ -729,7 +729,7 @@ export function PlaygroundChat({
                                                                 placeholder="Search models..."
                                                                 value={modelSearchQuery}
                                                                 onChange={(e) => setModelSearchQuery(e.target.value)}
-                                                                className="w-full h-8 pl-8 pr-3 rounded-lg border border-border/30 bg-muted/40 text-xs placeholder:text-muted-foreground/45 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                                                                className="w-full h-8 pl-8 pr-3 rounded-lg border border-border/30 bg-muted/40 text-base md:text-xs placeholder:text-muted-foreground/45 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
                                                             />
                                                         </div>
 
