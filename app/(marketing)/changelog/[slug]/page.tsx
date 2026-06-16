@@ -9,8 +9,6 @@ import type { Metadata } from "next";
 import { AuthNavbar } from "@/components/landing/AuthNavbar";
 import { Footer } from "@/components/landing/Footer";
 import { ShareButtons } from "@/components/blog/ShareButtons";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { buildOgImageUrl } from "@/lib/og";
 
 interface ChangelogPostPageProps {
@@ -82,7 +80,7 @@ export default async function ChangelogPostPage({ params }: ChangelogPostPagePro
     const nextPost = currentIndex > 0 ? changelogPosts[currentIndex - 1] : null;
 
     return (
-        <div className={`min-h-screen bg-background flex flex-col ${GeistSans.variable} ${GeistMono.variable}`} style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}>
+        <div className="min-h-screen bg-background flex flex-col" style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}>
             <AuthNavbar />
 
             <main className="flex-1 pt-20">

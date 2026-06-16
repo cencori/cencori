@@ -78,8 +78,6 @@
   --sidebar-accent-foreground: #000000;
   --sidebar-border: #e5e5e5;
   --sidebar-ring: #000000;
-  --font-newsreader: "Newsreader", Georgia, serif;
-  --font-playfair: "Playfair Display", Georgia, serif;
 }
 
 .dark {
@@ -114,8 +112,6 @@
   --sidebar-accent-foreground: #f2f2f2;
   --sidebar-border: #262626;
   --sidebar-ring: #f2f2f2;
-  --font-newsreader: "Newsreader", Georgia, serif;
-  --font-playfair: "Playfair Display", Georgia, serif;
 }
 
 @layer base {

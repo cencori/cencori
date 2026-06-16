@@ -45,6 +45,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 !examples/celo-agent-receipts/.env.example
 
 # vercel
@@ -69,3 +70,5 @@ packages/create-cencori-app/dist
 docs/prds/CENCORI_AGENTS_PRD.md
 docs/prds/CENCORI_CELO_AGENTS_HACKATHON_BRIEF.md
 examples/celo-agent-receipts/output/
+pnpm-lock.yaml
+pnpm-workspace.yaml
