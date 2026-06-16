@@ -1,4 +1,4 @@
-import { SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarHeader, SidebarTrigger } from "@/components/docs/ui/sidebar";
 import ThemeSwitcher from "./theme-switcher";
 
 const DocsHeader = () => {
