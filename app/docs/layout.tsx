@@ -8,43 +8,42 @@ import { DocsSidebarWrapper } from "@/components/docs/DocsSidebarWrapper";
 import { buildOgImageUrl } from "@/lib/og";
 
 const docsOgImage = buildOgImageUrl({
-    title: "Documentation",
-    subtitle: "Guides, API reference, and tutorials",
-    type: "docs",
+  title: "Documentation",
+  subtitle: "Guides, API reference, and tutorials",
+  type: "docs",
 });
 
 export const metadata: Metadata = {
-    title: "Documentation",
-    description: "Cencori documentation - guides, API reference, and tutorials.",
-    openGraph: {
-        title: "Documentation | Cencori",
-        description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: [docsOgImage],
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: "Documentation | Cencori",
-        description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: [docsOgImage],
-    },
+  title: "Documentation",
+  description: "Cencori documentation - guides, API reference, and tutorials.",
+  openGraph: {
+    title: "Documentation | Cencori",
+    description:
+      "Cencori documentation - guides, API reference, and tutorials.",
+    images: [docsOgImage],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Documentation | Cencori",
+    description:
+      "Cencori documentation - guides, API reference, and tutorials.",
+    images: [docsOgImage],
+  },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-    return (
-        <DocsProvider>
-            <div
-                className="flex min-h-screen flex-col"
-                style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}
-            >
-                <DocsNavbarWrapper />
+  return (
+    <DocsProvider>
+      <div
+        className="flex min-h-screen flex-col"
+        style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}
+      >
+        <DocsContentWrapper>
+          <DocsLayout>{children}</DocsLayout>
+        </DocsContentWrapper>
 
-                <DocsContentWrapper>
-                    <DocsLayout>{children}</DocsLayout>
-                    <Footer />
-                </DocsContentWrapper>
-
-                <DocsSidebarWrapper />
-            </div>
-        </DocsProvider>
-    );
+        <DocsSidebarWrapper />
+      </div>
+    </DocsProvider>
+  );
 }

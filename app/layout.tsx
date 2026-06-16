@@ -9,9 +9,9 @@ import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBr
 import Script from "next/script";
 import {
   Geist,
-  Geist_Mono,
   Newsreader,
   Playfair_Display,
+  JetBrains_Mono,
 } from "next/font/google";
 import { cn } from "@/lib/cn";
 
@@ -24,9 +24,9 @@ const geistSans = Geist({
   fallback: ["system-ui", "arial"],
 });
 
-const geistMono = Geist_Mono({
+const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   display: "swap",
   fallback: ["ui-monospace", "monospace"],
 });
@@ -254,7 +254,7 @@ export default function RootLayout({
       className={cn(
         "antialiased",
         geistSans.variable,
-        geistMono.variable,
+        mono.variable,
         newsreader.variable,
         playfairDisplay.variable,
       )}
