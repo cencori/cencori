@@ -1,5 +1,3 @@
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -9,6 +7,45 @@ import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBridge";
 import Script from "next/script";
+import {
+  Geist,
+  Geist_Mono,
+  Newsreader,
+  Playfair_Display,
+} from "next/font/google";
+import { cn } from "@/lib/cn";
+
+// Self-hosted Google Fonts via the Next.js standard (next/font) — no render-blocking <link> tags.
+// Variable names are kept in sync with the --font-* chain in app/globals.css.
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist-sans",
+  display: "swap",
+  fallback: ["system-ui", "arial"],
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
+  fallback: ["ui-monospace", "monospace"],
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-newsreader",
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+});
 
 // Aggressive keyword targeting
 const keywords = [
@@ -78,12 +115,13 @@ const keywords = [
 ];
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://cencori.com'),
+  metadataBase: new URL("https://cencori.com"),
   title: {
     default: "Cencori | The AI cloud infrastructure.",
     template: "%s - Cencori",
   },
-  description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
+  description:
+    "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
   keywords: keywords,
   authors: [{ name: "Cencori" }],
   creator: "Cencori",
@@ -96,7 +134,8 @@ export const metadata: Metadata = {
     url: "https://cencori.com",
     siteName: "Cencori",
     title: "Cencori | The AI cloud infrastructure.",
-    description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
+    description:
+      "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: [
       {
         url: "/og.png",
@@ -113,7 +152,8 @@ export const metadata: Metadata = {
     site: "@cencori",
     creator: "@cencori",
     title: "Cencori | The AI cloud infrastructure.",
-    description: "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
+    description:
+      "The moment you ship AI to real users, things get real fast. Cencori gives you security, visibility, and cost control — automatically, from your first request.",
     images: ["/og.png"],
   },
 
@@ -131,9 +171,9 @@ export const metadata: Metadata = {
       index: true,
       follow: true,
       noimageindex: false,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
 
@@ -153,66 +193,73 @@ export const metadata: Metadata = {
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "Cencori",
-  "url": "https://cencori.com",
-  "logo": "https://cencori.com/clight.png",
-  "description": "Cencori is the AI cloud infrastructure to ship AI.",
-  "sameAs": [
+  name: "Cencori",
+  url: "https://cencori.com",
+  logo: "https://cencori.com/clight.png",
+  description: "Cencori is the AI cloud infrastructure to ship AI.",
+  sameAs: [
     "https://x.com/cencori",
     "https://github.com/cencori",
     // Add LinkedIn when available
   ],
-  "contactPoint": {
+  contactPoint: {
     "@type": "ContactPoint",
-    "contactType": "customer service",
-    "url": "https://cencori.com/contact"
-  }
+    contactType: "customer service",
+    url: "https://cencori.com/contact",
+  },
 };
 
 const softwareApplicationSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Cencori",
-  "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Cloud",
-  "description": "The AI cloud infrastructure to ship AI.",
-  "url": "https://cencori.com",
-  "offers": {
+  name: "Cencori",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Cloud",
+  description: "The AI cloud infrastructure to ship AI.",
+  url: "https://cencori.com",
+  offers: {
     "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD",
-    "description": "Free tier available"
+    price: "0",
+    priceCurrency: "USD",
+    description: "Free tier available",
   },
-  "aggregateRating": {
+  aggregateRating: {
     "@type": "AggregateRating",
-    "ratingValue": "5",
-    "ratingCount": "1"
-  }
+    ratingValue: "5",
+    ratingCount: "1",
+  },
 };
-
-
 
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "Cencori",
-  "url": "https://cencori.com",
-  "potentialAction": {
+  name: "Cencori",
+  url: "https://cencori.com",
+  potentialAction: {
     "@type": "SearchAction",
-    "target": "https://cencori.com/docs?q={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
+    target: "https://cencori.com/docs?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn(
+        "antialiased",
+        geistSans.variable,
+        geistMono.variable,
+        newsreader.variable,
+        playfairDisplay.variable,
+      )}
+    >
       <head>
-        {/* Google Fonts */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
-
         {/* JSON-LD Structured Data */}
         <script
           type="application/ld+json"
@@ -233,7 +280,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} font-sans`}>
+      <body className="font-sans">
         <ThemeProvider>
           <PostHogProvider>
             {children}
