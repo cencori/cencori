@@ -41,6 +41,16 @@
             "destination": "/api/v1/metrics"
         },
         {
+            "source": "/v1/responses",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "api.cencori.com"
+                }
+            ],
+            "destination": "/api/v1/responses"
+        },
+        {
             "source": "/v1/billing/:path*",
             "has": [
                 {

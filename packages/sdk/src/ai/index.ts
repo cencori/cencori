@@ -19,7 +19,9 @@ import type {
     GenerateObjectResponse,
     ImageGenerationRequest,
     ImageGenerationResponse,
-    ToolCall
+    ResponsesRequest,
+    ResponsesResponse,
+    ToolCall,
 } from '../types';
 
 // API Response types
@@ -487,6 +489,144 @@ export class AINamespace {
             })),
             latencyMs: data.latency_ms,
         };
+    }
+
+    /**
+     * Send a request to the OpenAI-compatible Responses API.
+     * Supports built-in tools: web_search_preview, file_search, code_interpreter.
+     *
+     * @example
+     * const response = await cencori.ai.responses({
+     *   model: 'gpt-4o',
+     *   input: 'What is the weather in San Francisco?',
+     *   tools: [{ type: 'web_search_preview' }]
+     * });
+     * console.log(response.output[0].content?.[0]?.text);
+     */
+    async responses(request: ResponsesRequest): Promise<ResponsesResponse> {
+        const response = await fetch(`${this.config.baseUrl}/v1/responses`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify({
+                model: request.model,
+                input: request.input,
+                instructions: request.instructions,
+                tools: request.tools,
+                tool_choice: request.tool_choice,
+                temperature: request.temperature,
+                max_output_tokens: request.max_output_tokens,
+                top_p: request.top_p,
+                store: request.store,
+                metadata: request.metadata,
+                previous_response_id: request.previous_response_id,
+                parallel_tool_calls: request.parallel_tool_calls,
+                truncation: request.truncation,
+                stream: false,
+                user: request.user,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+        }
+
+        return response.json() as Promise<ResponsesResponse>;
+    }
+
+    /**
+     * Stream responses from the Responses API via SSE.
+     * Yields parsed events as they arrive.
+     *
+     * @example
+     * for await (const event of cencori.ai.responsesStream({
+     *   model: 'gpt-4o',
+     *   input: 'Tell me about AI',
+     * })) {
+     *   if (event.type === 'response.output_text.delta') {
+     *     process.stdout.write(event.data.delta);
+     *   }
+     * }
+     */
+    async *responsesStream(request: ResponsesRequest): AsyncGenerator<{ type: string; data: Record<string, unknown> }, void, unknown> {
+        const response = await fetch(`${this.config.baseUrl}/v1/responses`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify({
+                model: request.model,
+                input: request.input,
+                instructions: request.instructions,
+                tools: request.tools,
+                tool_choice: request.tool_choice,
+                temperature: request.temperature,
+                max_output_tokens: request.max_output_tokens,
+                top_p: request.top_p,
+                store: request.store,
+                metadata: request.metadata,
+                previous_response_id: request.previous_response_id,
+                parallel_tool_calls: request.parallel_tool_calls,
+                truncation: request.truncation,
+                stream: true,
+                user: request.user,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+        }
+
+        if (!response.body) {
+            throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let eventType = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.trim() === '') {
+                        eventType = '';
+                        continue;
+                    }
+                    if (line.startsWith('event: ')) {
+                        eventType = line.slice(7).trim();
+                        continue;
+                    }
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (!data) continue;
+                        try {
+                            const parsed = JSON.parse(data) as Record<string, unknown>;
+                            yield { type: eventType || 'message', data: parsed };
+                        } catch {
+                            // skip malformed JSON
+                        }
+                        eventType = '';
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
     }
 
     /**
