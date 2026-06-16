@@ -208,6 +208,109 @@ export interface ImageGenerationResponse {
     provider: string;
 }
 
+// ── Responses API (OpenAI-compatible) ──
+
+/**
+ * A response input item for the Responses API.
+ * Can be a message, function call, or function call output.
+ */
+export type ResponseInputItem =
+    | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string }
+    | { type: 'function_call'; id: string; call_id: string; name: string; arguments: string; status?: string }
+    | { type: 'function_call_output'; call_id: string; output: string };
+
+/**
+ * Built-in tool types for the Responses API
+ */
+export type WebSearchTool = {
+    type: 'web_search_preview';
+    search_context_size?: 'low' | 'medium' | 'high';
+    user_location?: { type: 'approximate'; country?: string; city?: string; region?: string };
+};
+
+export type FileSearchTool = {
+    type: 'file_search';
+    max_num_results?: number;
+    filters?: Record<string, unknown>;
+};
+
+export type CodeInterpreterTool = {
+    type: 'code_interpreter';
+};
+
+/**
+ * A tool in the Responses API
+ */
+export type ResponsesTool =
+    | WebSearchTool
+    | FileSearchTool
+    | CodeInterpreterTool
+    | ToolDefinition;
+
+/**
+ * Request for the Responses API
+ */
+export interface ResponsesRequest {
+    model: string;
+    input: string | ResponseInputItem[];
+    instructions?: string;
+    tools?: ResponsesTool[];
+    tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string };
+    temperature?: number;
+    max_output_tokens?: number;
+    top_p?: number;
+    store?: boolean;
+    metadata?: Record<string, string>;
+    previous_response_id?: string;
+    parallel_tool_calls?: boolean;
+    truncation?: 'auto' | 'disabled';
+    stream?: boolean;
+    user?: string;
+}
+
+/**
+ * A single output item from a Responses API response
+ */
+export interface ResponsesOutputItem {
+    id: string;
+    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call';
+    status?: 'completed' | 'failed' | 'in_progress';
+    role?: 'assistant';
+    content?: Array<{ type: 'output_text' | 'refusal'; text?: string; annotations?: Array<unknown> }>;
+    call_id?: string;
+    name?: string;
+    arguments?: string;
+    output?: Record<string, unknown>;
+    error?: string;
+}
+
+/**
+ * Response from the Responses API
+ */
+export interface ResponsesResponse {
+    id: string;
+    object: 'response';
+    created: number;
+    model: string;
+    output: ResponsesOutputItem[];
+    usage: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+    };
+    status: 'completed' | 'failed' | 'in_progress';
+    metadata?: Record<string, string>;
+}
+
+/**
+ * Options for generic API requests
+ */
+export interface RequestOptions {
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    body?: string;
+    headers?: Record<string, string>;
+}
+
 // Placeholder types for future products
 export interface ComputeRunOptions {
     input?: Record<string, unknown>;

@@ -1,0 +1,88 @@
+---
+title: "The Responses API Is Live — Build AI Agents with Built-in Tools"
+slug: "responses-api"
+date: "2026-06-16"
+excerpt: "The OpenAI-compatible Responses API is now available on Cencori. Web search, file search, code interpreter, and function calling — all through a single endpoint. No stitching together separate services."
+coverImage: "/blog/images/covers/resp.png"
+tags: ["Product", "Responses API", "AI Agents", "Release"]
+category: "changelog"
+published: true
+---
+
+**The Responses API is live on Cencori.**
+
+Until today, building an AI agent meant stitching together a chat completion call, a web search API, a vector database query, and a code sandbox — then writing orchestration logic to coordinate them. The Responses API collapses all of that into a single endpoint.
+
+## What Ships
+
+**POST /v1/responses** — an OpenAI-compatible endpoint that unifies chat completions with four built-in agentic tools:
+
+- **web_search_preview** — The model searches the web, reads results, and synthesizes answers. Supports low/medium/high result density and approximate user location for localized results.
+- **file_search** — The model queries your Cencori project's stored memory and knowledge base. Results are injected as context automatically.
+- **code_interpreter** — The model writes and executes Python or JavaScript in a sandboxed environment. Output flows back into the conversation.
+- **function** — Standard tool calling works alongside built-in tools. Same format, same flow.
+
+All four tools run through Cencori's existing infrastructure — the same security pipeline, end-user billing, rate limiting, audit logging, and provider failover that every other gateway request uses.
+
+## Usage
+
+No new SDK version needed. The methods ship in the Cencori SDK you already have installed.
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+// Non-streaming
+const response = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: 'Search the web for competitor Q3 benchmarks and compare them to our internal data.',
+  tools: [
+    { type: 'web_search_preview', search_context_size: 'high' },
+    { type: 'file_search', max_num_results: 10 },
+    { type: 'code_interpreter' },
+  ],
+});
+
+// response.output contains the text answer, search results,
+// retrieved documents, and code output
+console.log(response.output[0].content?.[0]?.text);
+
+// Streaming
+const stream = cencori.ai.responsesStream({
+  model: 'gpt-4o',
+  input: 'Tell me a story.',
+});
+
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.data.delta as string);
+  }
+}
+```
+
+## Streaming
+
+The Responses API supports typed server-sent events for every stage:
+
+```
+response.output_text.delta
+response.output_text.done
+response.function_call_arguments.delta
+response.function_call_arguments.done
+response.web_search_call.completed
+response.file_search_call.completed
+response.code_interpreter_call.completed
+response.done
+```
+
+## OpenAI-Compatible
+
+Existing OpenAI SDK users can point their clients at `https://api.cencori.com/v1` and call `client.responses.create()` — no code changes beyond the base URL.
+
+## Docs
+
+- [Building Agents with the Responses API](/docs/agents/responses) — the front-facing guide
+- [Responses API Reference](/docs/api/responses) — full request/response schema
+
+The Responses API is available now on every Cencori plan. No configuration required — add the tools array and go.

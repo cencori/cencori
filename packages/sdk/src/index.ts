@@ -55,6 +55,14 @@ export type {
     CompletionRequest,
     EmbeddingRequest,
     EmbeddingResponse,
+    ResponsesRequest,
+    ResponsesResponse,
+    ResponsesOutputItem,
+    ResponseInputItem,
+    ResponsesTool,
+    WebSearchTool,
+    FileSearchTool,
+    CodeInterpreterTool,
     RequestOptions,
 } from './types';
 
