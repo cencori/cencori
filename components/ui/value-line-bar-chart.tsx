@@ -14,7 +14,6 @@ import {
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { GeistMono } from "geist/font/mono";
 import { useMotionValueEvent, useSpring } from "framer-motion";
 
 const CHART_MARGIN = 35;
@@ -84,7 +83,7 @@ export function ValueLineBarChart() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span
-            className={cn(GeistMono.className, "text-2xl tracking-tighter")}
+            className={cn("font-mono", "text-2xl tracking-tighter")}
           >
             ${maxValueIndex.value}
           </span>
