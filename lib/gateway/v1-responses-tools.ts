@@ -159,11 +159,20 @@ export async function executeFileSearch(
         const supabase = createAdminClient();
         const maxResults = config.max_num_results || 5;
 
-        const { data } = await supabase
+        let queryBuilder = supabase
             .from('scan_chat_memory')
-            .select('id, content, source, created_at')
+            .select('id, content, source, created_at, metadata')
             .eq('project_id', projectId)
-            .textSearch('content', query, { type: 'websearch' })
+            .textSearch('content', query, { type: 'websearch' });
+
+        // Apply metadata filters when provided (e.g., { source: "file:quarterly-report.pdf" })
+        if (config.filters) {
+            for (const [key, value] of Object.entries(config.filters)) {
+                queryBuilder = queryBuilder.eq(`metadata->>${key}`, String(value));
+            }
+        }
+
+        const { data } = await queryBuilder
             .order('created_at', { ascending: false })
             .limit(maxResults);
 

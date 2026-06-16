@@ -63,6 +63,7 @@ export type {
     WebSearchTool,
     FileSearchTool,
     CodeInterpreterTool,
+    UrlCitation,
     RequestOptions,
 } from './types';
 

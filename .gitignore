@@ -27,7 +27,7 @@ docs/company/VOLUME_7_AGENT_KNOWLEDGE_BASE.md
 # next.js
 /.next/
 /out/
-docs/
+/docs/
 # production
 /build
 
