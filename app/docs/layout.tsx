@@ -1,4 +1,4 @@
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/docs/ui/sidebar";
 import DecorativeBorder from "@/components/docs/layout/decorative-border-svg";
 import DocsHeader from "@/components/docs/sidebar/header";
 import { DocsSidebar } from "@/components/docs/sidebar";

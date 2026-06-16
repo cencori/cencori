@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
+    "@carbon/icons-react": "^11.82.0",
     "@google/genai": "^1.40.0",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
@@ -30,6 +31,7 @@
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@lobehub/icons": "^2.48.0",
+    "@mantine/hooks": "^9.3.1",
     "@octokit/app": "^16.1.2",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/rest": "^22.0.1",

@@ -2,7 +2,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+} from "@/components/docs/ui/sidebar";
 import { source } from "@/lib/source";
 import { NavMain } from "./nav-main";
 import { Logo } from "@/components/logo";
