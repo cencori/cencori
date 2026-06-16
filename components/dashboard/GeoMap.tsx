@@ -11,9 +11,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { geoNaturalEarth1, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import { feature } from "topojson-client";
-import type { Topology, GeometryCollection } from "topojson-specification";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TimeRange } from "./GeoAnalyticsSection";
+
+// `topojson-specification` is only present as a transitive type dependency of
+// @types/topojson-client, so pnpm's strict node_modules layout won't resolve a direct
+// import of it. Derive the Topology type from topojson-client's typed `feature()` instead.
+type Topology = Parameters<typeof feature>[0];
 
 // ISO numeric → alpha-2 mapping for world-atlas topology
 const ISO_NUMERIC_TO_ALPHA2: Record<string, string> = {
@@ -124,9 +128,11 @@ export function GeoMap({ projectId, timeRange = "7d" }: GeoMapProps) {
     // Convert topology to GeoJSON features
     const geoFeatures = useMemo(() => {
         if (!topology) return [];
-        const countriesGeo = topology.objects.countries as GeometryCollection;
+        const countriesGeo = topology.objects.countries;
+        // world-atlas "countries" is a GeometryCollection, so feature() returns a
+        // FeatureCollection; narrow the Feature | FeatureCollection union before reading .features.
         const fc = feature(topology, countriesGeo);
-        return fc.features;
+        return "features" in fc ? fc.features : [];
     }, [topology]);
 
     const handleMouseMove = useCallback(
