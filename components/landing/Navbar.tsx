@@ -247,7 +247,7 @@ export default function Navbar({
         {
             title: "Resources", sublinks: [
                 { title: "Documentation", href: siteConfig.links.docs, icon: renderMenuIcon(BookOpen01Icon) },
-                { title: "API Reference", href: "/docs/api", icon: renderMenuIcon(ApiIcon) },
+                { title: "API Reference", href: "/docs/api/metrics", icon: renderMenuIcon(ApiIcon) },
                 { title: "Academy", href: "/academy", icon: renderMenuIcon(AiBookIcon) },
                 { title: "Newsletter", href: siteConfig.links.company.newsletter, icon: renderMenuIcon(AiMail01Icon) },
                 { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools, icon: renderMenuIcon(CodeCircleIcon) },
@@ -323,7 +323,7 @@ export default function Navbar({
         columns: [
             [
                 { title: "Documentation", href: siteConfig.links.docs, description: "Implementation guides and setup.", icon: renderMenuIcon(BookOpen01Icon) },
-                { title: "API Reference", href: "/docs/api", description: "Endpoints, auth, and schemas.", icon: renderMenuIcon(ApiIcon) },
+                { title: "API Reference", href: "/docs/api/metrics", description: "Endpoints, auth, and schemas.", icon: renderMenuIcon(ApiIcon) },
                 { title: "Academy", href: "/academy", description: "Training for teams and operators.", icon: renderMenuIcon(AiBookIcon) },
             ],
             [
