@@ -1,0 +1,504 @@
+---
+title: "Responses API"
+description: "Build AI agents with built-in tools using Cencori's OpenAI-compatible Responses API. Web search, file search, code interpreter, and function calling in one endpoint."
+section: "API Reference"
+order: 3
+---
+
+## Overview
+
+The Responses API is an OpenAI-compatible endpoint that unifies chat completions with built-in agentic tools. Instead of wiring up web search, file retrieval, and code execution separately, the model can use them natively in a single request-response cycle.
+
+| Endpoint | Path | Best For |
+|----------|------|----------|
+| **Cencori Responses API** | `https://cencori.com/api/v1/responses` | Agentic workflows with built-in tools |
+| **OpenAI-Compatible** | `https://api.cencori.com/v1/responses` | Existing OpenAI Responses API clients |
+
+## When to Use Responses vs Chat
+
+| Use Case | Recommended API |
+|---------|----------------|
+| Standard chat or completion | `POST /v1/chat/completions` or `cencori.ai.chat()` |
+| Agent that needs web search | `POST /v1/responses` with `web_search_preview` tool |
+| Agent that needs to query your knowledge base | `POST /v1/responses` with `file_search` tool |
+| Agent that generates and runs code | `POST /v1/responses` with `code_interpreter` tool |
+| Agent combining multiple tools | `POST /v1/responses` with all tools |
+| Function calling only (no built-in tools) | `POST /v1/chat/completions` |
+
+## Official TypeScript SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+const response = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: 'What is the latest news about AI? Search the web.',
+  tools: [{ type: 'web_search_preview', search_context_size: 'high' }],
+});
+
+console.log(response.output[0].content?.[0]?.text);
+```
+
+### SDK Response Shape
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created": 1728678400,
+  "model": "gpt-4o",
+  "output": [
+    {
+      "id": "msg_xyz",
+      "type": "message",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the latest AI news...",
+          "annotations": []
+        }
+      ]
+    },
+    {
+      "id": "ws_abc",
+      "type": "web_search_call",
+      "status": "completed",
+      "output": {
+        "query": "latest news about AI",
+        "results": [
+          { "title": "...", "url": "...", "snippet": "..." }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "input_tokens": 50,
+    "output_tokens": 150,
+    "total_tokens": 200
+  },
+  "status": "completed"
+}
+```
+
+## HTTP Endpoint
+
+```bash
+curl https://cencori.com/api/v1/responses \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "Search the web for the latest AI breakthroughs and summarize them.",
+    "tools": [
+      { "type": "web_search_preview", "search_context_size": "medium" }
+    ],
+    "temperature": 0.5
+  }'
+```
+
+When using the `api.cencori.com` subdomain, set the base URL to `https://api.cencori.com/v1` — most clients append `/responses` automatically.
+
+## Request Parameters
+
+### Top-level Fields
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `model` | string | Yes | Any model routed through Cencori |
+| `input` | string or array | Yes | Text prompt or array of input items |
+| `instructions` | string | No | System-level instructions for the model |
+| `tools` | array | No | Built-in tools and function definitions |
+| `tool_choice` | string or object | No | `"auto"`, `"none"`, `"required"`, or `{ type: "function", name: "..." }` |
+| `temperature` | number | No | Sampling temperature (0–2) |
+| `max_output_tokens` | number | No | Maximum tokens in the response |
+| `top_p` | number | No | Nucleus sampling |
+| `stream` | boolean | No | Enable SSE streaming |
+| `user` | string | No | End-user identifier for billing and attribution |
+| `previous_response_id` | string | No | Chain responses for multi-turn conversations |
+| `response_format` | object | No | Control output format: `{ type: "text" }`, `{ type: "json_object" }`, or `{ type: "json_schema", json_schema: { name, schema } }` |
+| `metadata` | object | No | Key-value pairs for request tagging |
+| `parallel_tool_calls` | boolean | No | Allow parallel tool calls |
+| `truncation` | string | No | `"auto"` or `"disabled"` |
+
+### Input Items
+
+When `input` is an array, each item follows one of these shapes:
+
+**Message item:**
+```json
+{ "type": "message", "role": "user", "content": "Hello" }
+```
+
+**Function call item (from a previous response):**
+```json
+{ "type": "function_call", "id": "fc_...", "call_id": "call_123", "name": "get_weather", "arguments": "{}" }
+```
+
+**Function call output:**
+```json
+{ "type": "function_call_output", "call_id": "call_123", "output": "{\"temp\": 72}" }
+```
+
+**File item (uploaded inline for file_search):**
+```json
+{ "type": "file", "filename": "quarterly-report.pdf", "content": "Q3 revenue grew 12%...", "mime_type": "text/plain" }
+```
+
+## Built-in Tools
+
+Cencori supports all built-in tools from the OpenAI Responses API specification.
+
+### web_search_preview
+
+Searches the web and injects relevant results as context for the model.
+
+```json
+{
+  "type": "web_search_preview",
+  "search_context_size": "medium",
+  "user_location": {
+    "type": "approximate",
+    "country": "US",
+    "city": "San Francisco",
+    "region": "CA"
+  }
+}
+```
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `search_context_size` | string | `"medium"` | `"low"` (3 results), `"medium"` (8), `"high"` (15) |
+| `user_location` | object | null | Approximate location for localized results |
+
+### file_search
+
+Searches your project's stored memory and knowledge base for relevant context.
+
+```json
+{
+  "type": "file_search",
+  "max_num_results": 5
+}
+```
+
+| Parameter | Type | Default | Notes |
+|-----------|------|---------|-------|
+| `max_num_results` | number | 5 | Maximum number of chunks to retrieve |
+| `filters` | object | null | Metadata filters for scoping the search |
+
+### code_interpreter
+
+Executes Python and JavaScript code generated by the model in a sandboxed environment.
+
+```json
+{
+  "type": "code_interpreter"
+}
+```
+
+Code blocks in the model's response (marked with triple backticks) are automatically detected and executed. The output is returned as a `code_interpreter_call` output item.
+
+### function (standard tool calling)
+
+Standard function/tool definitions work alongside built-in tools:
+
+```json
+{
+  "type": "function",
+  "function": {
+    "name": "get_weather",
+    "description": "Get the current weather",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "location": { "type": "string" }
+      },
+      "required": ["location"]
+    }
+  }
+}
+```
+
+## Response Shape
+
+The response contains an `output` array where each item represents a message, tool call, or tool result:
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created": 1728678400,
+  "model": "gpt-4o",
+  "output": [
+    {
+      "id": "msg_1",
+      "type": "message",
+      "role": "assistant",
+      "status": "completed",
+      "content": [{ "type": "output_text", "text": "The answer is...", "annotations": [] }]
+    },
+    {
+      "id": "fc_1",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_123",
+      "name": "get_weather",
+      "arguments": "{\"location\": \"Paris\"}"
+    }
+  ],
+  "usage": {
+    "input_tokens": 42,
+    "output_tokens": 128,
+    "total_tokens": 170
+  },
+  "status": "completed"
+}
+```
+
+### Output Item Types
+
+| Type | Description |
+|------|-------------|
+| `message` | Assistant text response (may include `url_citation` annotations) |
+| `function_call` | Model requesting a function call |
+| `web_search_call` | Result of a web search operation |
+| `file_search_call` | Result of a file search operation |
+| `code_interpreter_call` | Result of code execution |
+
+### Source Annotations
+
+When the model cites web search results in its output, the `output_text` content item includes `url_citation` annotations with the source URL, title, and character positions:
+
+```json
+{
+  "type": "output_text",
+  "text": "According to [1] the latest breakthroughs include... [2] also reports...",
+  "annotations": [
+    {
+      "type": "url_citation",
+      "start_index": 13,
+      "end_index": 16,
+      "url": "https://example.com/article-1",
+      "title": "Latest AI Breakthroughs"
+    },
+    {
+      "type": "url_citation",
+      "start_index": 59,
+      "end_index": 62,
+      "url": "https://example.com/article-2",
+      "title": "AI News Summary"
+    }
+  ]
+}
+```
+
+Each annotation maps a `[N]` citation in the text to the corresponding search result. Use `start_index` and `end_index` to highlight or link the citation in your UI.
+
+## Structured Output (response_format)
+
+Control the model's output format using the `response_format` parameter.
+
+### JSON Schema Mode
+
+When you need structured, type-safe output, provide a JSON schema:
+
+```typescript
+const response = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: 'Extract the event details from: "Conference is June 20th in Berlin."',
+  response_format: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'event',
+      schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          date: { type: 'string' },
+          location: { type: 'string' },
+        },
+        required: ['name', 'date', 'location'],
+        additionalProperties: false,
+      },
+    },
+  },
+});
+
+// response.output[0].content[0].text is valid JSON matching the schema
+```
+
+The model's output is constrained to produce valid JSON matching your schema. Internally, Cencori converts the schema into a hidden function tool and forces its invocation — the schema is enforced at the model level, not post-processed.
+
+### JSON Object Mode
+
+```json
+{
+  "response_format": { "type": "json_object" }
+}
+```
+
+Guarantees the model returns valid JSON, but without schema enforcement. Prefer `json_schema` for structured data.
+
+## File Uploads
+
+Upload content inline using `file` type input items. The content is indexed into your project's memory store and becomes searchable via `file_search`:
+
+```typescript
+const response = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: [
+    {
+      type: 'file',
+      filename: 'company-policy.md',
+      content: 'All team members must follow the code of conduct...',
+      mime_type: 'text/markdown',
+    },
+    {
+      type: 'message',
+      role: 'user',
+      content: 'What is our policy on code reviews? Search the knowledge base.',
+    },
+  ],
+  tools: [{ type: 'file_search', max_num_results: 5 }],
+});
+```
+
+Uploaded files are chunked and inserted into `scan_chat_memory` with the source prefix `file:<filename>`. They persist for the lifetime of your project and can be discovered by any subsequent `file_search` request.
+
+## Streaming
+
+The Responses API uses server-sent events (SSE) with typed events:
+
+### SDK Streaming
+
+```typescript
+const stream = cencori.ai.responsesStream({
+  model: 'gpt-4o',
+  input: 'Tell me about AI.',
+  tools: [{ type: 'web_search_preview' }],
+});
+
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.data.delta as string);
+  }
+  if (event.type === 'response.web_search_call.completed') {
+    console.log('Search results:', event.data);
+  }
+  if (event.type === 'response.done') {
+    console.log('Final response:', event.data.response);
+  }
+}
+```
+
+### HTTP Streaming
+
+```bash
+curl -N https://cencori.com/api/v1/responses \
+  -H "Authorization: Bearer csk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "Search and summarize the latest AI news.",
+    "tools": [{ "type": "web_search_preview" }],
+    "stream": true
+  }'
+```
+
+### SSE Event Types
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `response.output_text.delta` | `{ delta, index }` | A chunk of generated text |
+| `response.output_text.done` | `{ index, text }` | Text generation complete for this index |
+| `response.function_call_arguments.delta` | `{ delta, index }` | Streaming function arguments |
+| `response.function_call_arguments.done` | `{ id, name, arguments }` | Complete function call |
+| `response.web_search_call.completed` | `{ id, output, status }` | Web search finished |
+| `response.file_search_call.completed` | `{ id, output, status }` | File search finished |
+| `response.code_interpreter_call.completed` | `{ id, output, status }` | Code execution finished |
+| `response.done` | `{ response }` | Full response object (terminal event) |
+
+## Multi-turn Conversations
+
+Chain responses by passing the previous response ID:
+
+```typescript
+const first = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: 'What is the weather in Tokyo?',
+  tools: [{ type: 'web_search_preview' }],
+});
+
+const followUp = await cencori.ai.responses({
+  model: 'gpt-4o',
+  input: [{ type: 'message', role: 'user', content: 'What about Osaka?' }],
+  previous_response_id: first.id,
+});
+```
+
+## OpenAI-Compatible Clients
+
+If you prefer using the OpenAI Python or Node.js SDK directly:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="your_cencori_api_key",
+    base_url="https://api.cencori.com/v1"
+)
+
+response = client.responses.create(
+    model="gpt-4o",
+    input="Search for the latest AI breakthroughs.",
+    tools=[{"type": "web_search_preview"}]
+)
+
+print(response.output[0].content[0].text)
+```
+
+```typescript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env.CENCORI_API_KEY,
+  baseURL: 'https://api.cencori.com/v1',
+});
+
+const response = await client.responses.create({
+  model: 'gpt-4o',
+  input: 'Search for the latest AI breakthroughs.',
+  tools: [{ type: 'web_search_preview' }],
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  const response = await cencori.ai.responses({
+    model: 'gpt-4o',
+    input: 'Hello!',
+  });
+} catch (error) {
+  console.error('Responses API error:', error);
+}
+```
+
+The Responses API returns the same error format as the Chat API:
+
+```json
+{
+  "error": {
+    "message": "Missing input. Provide a string or array of input items.",
+    "type": "invalid_request_error",
+    "code": "missing_input"
+  }
+}
+```
