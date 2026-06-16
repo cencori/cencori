@@ -14,6 +14,7 @@ import {
 } from "@/components/docs/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
+import { getNavItemIcon } from "./nav-icons";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { source } from "@/lib/source";
@@ -192,6 +193,7 @@ export function NavMain({
                     href={singleChild.type === "page" ? singleChild.url : "#"}
                     onClick={handleLinkClick}
                   >
+                    {getNavItemIcon(String(item.name))}
                     <span className="capitalize">{item.name}</span>
                   </Link>
                 </SidebarMenuButton>
@@ -216,6 +218,7 @@ export function NavMain({
                     }
                     isActive={hasActiveChild}
                   >
+                    {getNavItemIcon(String(item.name))}
                     <span className="capitalize">{item.name}</span>
                     <ChevronRight
                       className={cn(
