@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  async redirects() {
+    return [
+      // Docs landing → first page (no index.mdx at the docs root yet)
+      { source: "/docs", destination: "/docs/introduction", permanent: false },
+    ];
+  },
   // Configure images to allow all local paths (Next.js 16 requirement)
   images: {
     localPatterns: [

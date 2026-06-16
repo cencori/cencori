@@ -27,8 +27,13 @@ import { CodeBlock } from "./components/code";
 import { Kbd } from "./components/kbd";
 import { Hr } from "./components/hr";
 import { cn } from "@/lib/utils";
+import { DocsMDXComponents } from "@/components/docs/DocsMDXComponents";
 
 export const mdxComponents: MDXComponents = {
+  // Cencori's custom MDX components (Ghost* diagrams, Card/CardGroup, ModelCatalog,
+  // inline icons) that the existing content relies on. Spread first so the
+  // evilcharts element/HTML styling defined below takes precedence.
+  ...DocsMDXComponents,
   Tab: ({ className, ...props }: React.ComponentProps<"div">) => (
     <div className={cn(className)} {...props} />
   ),
