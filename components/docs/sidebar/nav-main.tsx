@@ -155,7 +155,7 @@ export function NavMain({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Components</SidebarGroupLabel>
+      <SidebarGroupLabel>Documentation</SidebarGroupLabel>
       <SidebarMenu>
         {tree.children.map((item) => {
           if (item.type !== "folder") return null;

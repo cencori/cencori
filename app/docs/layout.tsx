@@ -19,7 +19,8 @@ export default function DocsRouteLayout({
 }) {
   return (
     <DocsProvider>
-      <SidebarProvider>
+      <div className="docs-theme bg-sidebar text-foreground">
+        <SidebarProvider>
         <DocsSidebar />
         <div className={cn("bg-sidebar w-full", "p-0 sm:p-2")}>
           <DecorativeBorder />
@@ -35,8 +36,9 @@ export default function DocsRouteLayout({
             </SidebarInset>
           </div>
         </div>
-      </SidebarProvider>
-      <DocsAskAI />
+        </SidebarProvider>
+        <DocsAskAI />
+      </div>
     </DocsProvider>
   );
 }
