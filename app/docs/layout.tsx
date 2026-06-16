@@ -22,7 +22,7 @@ export default function DocsRouteLayout({
       <div className="docs-theme bg-sidebar text-foreground">
         <SidebarProvider>
         <DocsSidebar />
-        <div className={cn("bg-sidebar w-full", "p-0 sm:p-2")}>
+        <div className={cn("bg-sidebar w-full", "p-0 sm:py-2 sm:pr-2 sm:pl-4")}>
           <DecorativeBorder />
           <div
             className={cn(
