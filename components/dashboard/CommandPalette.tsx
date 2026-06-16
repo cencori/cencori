@@ -395,7 +395,7 @@ export function CommandPalette({
                     id: "api-reference",
                     label: "API Reference",
                     icon: <Code2 className="h-3.5 w-3.5" />,
-                    action: () => navigate("/docs/api"),
+                    action: () => navigate("/docs/api/metrics"),
                     keywords: ["endpoints", "methods", "rest", "sdk"],
                 },
                 {

@@ -171,7 +171,7 @@ export default function Navbar({
     type: "dropdown",
     items: [
       { title: "Documentation", href: siteConfig.links.docs, icon: <BookOpen className="h-4 w-4" /> },
-      { title: "API Reference", href: "/docs/api", icon: <Code className="h-4 w-4" /> },
+      { title: "API Reference", href: "/docs/api/metrics", icon: <Code className="h-4 w-4" /> },
       { title: "SDKs & Quickstarts", href: siteConfig.links.products.developerTools, icon: <Terminal className="h-4 w-4" /> },
       { title: "Guides & Tutorials", href: "/resources/guides", icon: <LifeBuoy className="h-4 w-4" /> },
       { title: "Changelog", href: siteConfig.links.company.changelog, icon: <FileText className="h-4 w-4" /> },

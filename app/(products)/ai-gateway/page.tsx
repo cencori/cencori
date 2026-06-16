@@ -226,7 +226,7 @@ export default function AIGatewayPage() {
 
             {/* Subheadline */}
             <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
-            One endpoint for 100+ models. AI control, security, observability, and monetization. <br/>OpenAI-compatible API. Fast setup. No rewrite.
+            One endpoint for 150+ models. AI control, security, observability, and monetization. <br/>OpenAI-compatible API. Fast setup. No rewrite.
             </p>
 
             {/* CTAs */}
@@ -257,7 +257,7 @@ export default function AIGatewayPage() {
                 href="/ai/models"
                 className="group mt-5 inline-flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
               >
-                Browse all 100+ models
+                Browse all 150+ models
                 <ArrowRightIcon className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
               </Link>
             </div>
