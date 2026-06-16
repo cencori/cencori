@@ -19,8 +19,47 @@ import { runV1ResponsesExecution } from "@/lib/gateway/v1-responses-execute";
 import type { ResponsesRequest } from "@/lib/gateway/v1-responses-execute";
 import type { SubscriptionTier } from "@/lib/entitlements";
 
+import type { ToolCallPayload } from '@/lib/gateway/v1-types';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const createPendingAction = async (
+    supabase: ReturnType<typeof createAdminClient>,
+    agentId: string,
+    toolCall: ToolCallPayload
+): Promise<string | null> => {
+    try {
+        const { data, error } = await supabase.from("agent_actions").insert({
+            agent_id: agentId,
+            type: "tool_call",
+            payload: toolCall,
+            status: "pending",
+        }).select('id').single();
+        if (error) throw error;
+        return data?.id || null;
+    } catch (e) {
+        console.error("Failed to create pending action", e);
+        return null;
+    }
+};
+
+const createExecutedAction = async (
+    supabase: ReturnType<typeof createAdminClient>,
+    agentId: string,
+    toolCall: ToolCallPayload
+) => {
+    try {
+        await supabase.from("agent_actions").insert({
+            agent_id: agentId,
+            type: "tool_call",
+            payload: toolCall,
+            status: "executed",
+        });
+    } catch (e) {
+        console.error("Failed to log action", e);
+    }
+};
 
 const normalizeGatewayModelId = (modelId: string): string => {
     const strippedModel = modelId.startsWith("cencori/")
@@ -78,7 +117,7 @@ export async function POST(req: NextRequest) {
     ) => {
         return respond(
             NextResponse.json(
-                { error: { message, type: 'invalid_request_error', code } },
+                { error: { message, type: 'invalid_request_error', code }, status: 'failed' },
                 { status, headers }
             ),
             code,
@@ -117,6 +156,7 @@ export async function POST(req: NextRequest) {
         // ── Agent resolution ──
         const adminClient = createAdminClient();
         let agentId = req.headers.get("X-Agent-ID");
+        let shadowMode = false;
         let agentConfig: { model?: string | null; system_prompt?: string | null } | null = null;
 
         if (!agentId && gatewayCtx) {
@@ -156,6 +196,7 @@ export async function POST(req: NextRequest) {
             }
 
             const agentRecord = config.agents as unknown as { id: string; project_id: string; is_active: boolean; shadow_mode: boolean };
+            shadowMode = agentRecord.shadow_mode;
 
             if (authenticatedProjectId && agentRecord.project_id !== authenticatedProjectId) {
                 return respond(NextResponse.json({ error: "API key does not have access to this agent" }, { status: 403 }), 'agent_project_scope_denied');
@@ -378,6 +419,16 @@ export async function POST(req: NextRequest) {
             incrementUsage: (chargeUsd) => {
                 void incrementUsage(activeGatewayCtx, chargeUsd);
             },
+            agentId,
+            shadowMode,
+            createPendingAction: agentId
+                ? (toolCall) => createPendingAction(adminClient, agentId, toolCall)
+                : undefined,
+            createExecutedAction: agentId
+                ? (toolCall) => {
+                    void createExecutedAction(adminClient, agentId, toolCall);
+                }
+                : undefined,
         });
 
         if (!execResult.ok) {

@@ -23,6 +23,7 @@ import {
     type ToolCallOutput,
 } from '@/lib/gateway/v1-responses-tools';
 import { storeResponse, getResponse } from '@/lib/gateway/v1-responses-store';
+import type { ToolCallPayload } from '@/lib/gateway/v1-types';
 
 // ── Types ──
 
@@ -52,6 +53,7 @@ export type ResponsesRequest = {
     metadata?: Record<string, string>;
     previous_response_id?: string;
     response_format?: ResponseFormat;
+    include?: string[];
     parallel_tool_calls?: boolean;
     truncation?: 'auto' | 'disabled';
     stream?: boolean;
@@ -75,7 +77,7 @@ export type ResponsesUsage = {
 
 export type ResponsesOutputItem = {
     id: string;
-    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call';
+    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'reasoning';
     status?: 'completed' | 'failed' | 'in_progress';
     role?: 'assistant';
     content?: Array<{
@@ -135,6 +137,10 @@ type V1ResponseExecuteParams = {
         errorMessage?: string;
     }) => void;
     incrementUsage: (chargeUsd: number) => void;
+    agentId?: string | null;
+    shadowMode?: boolean;
+    createPendingAction?: (toolCall: ToolCallPayload) => Promise<string | null>;
+    createExecutedAction?: (toolCall: ToolCallPayload) => void;
 };
 
 export type V1ResponseExecuteResult =
@@ -223,6 +229,7 @@ function buildResponsesJson(params: {
     usage: { promptTokens: number; completionTokens: number; totalTokens: number };
     status?: 'completed' | 'failed';
     annotations?: Array<{ type: string; start_index: number; end_index: number; url: string; title?: string }>;
+    metadata?: Record<string, string>;
 }): ResponsesResponse {
     const output: ResponsesOutputItem[] = [];
 
@@ -269,8 +276,16 @@ function buildResponsesJson(params: {
             input_tokens: params.usage.promptTokens,
             output_tokens: params.usage.completionTokens,
             total_tokens: params.usage.totalTokens,
+            input_tokens_details: {
+                text_tokens: params.usage.promptTokens,
+                cached_tokens: 0,
+            },
+            output_tokens_details: {
+                text_tokens: params.usage.completionTokens,
+            },
         },
         status: params.status || 'completed',
+        ...(params.metadata && Object.keys(params.metadata).length > 0 ? { metadata: params.metadata } : {}),
     };
 }
 
@@ -282,6 +297,7 @@ function providerFailureResult(error: unknown): V1ResponseExecuteResult {
             type: 'invalid_request_error',
             code: failure.error,
         },
+        status: 'failed',
     };
     if (failure.retryAfter != null) {
         body.retry_after = failure.retryAfter;
@@ -328,11 +344,19 @@ export async function runV1ResponsesExecution(
 
         const messages = params.messages ?? parseInputToMessages(body.input, body.instructions);
 
+        // When pre-parsed messages are provided, instructions must be injected manually
+        if (params.messages && body.instructions) {
+            messages.unshift({ role: 'system', content: body.instructions });
+        }
+
         // Inject built-in tool context as system message
         if (preProcessResult.systemContext) {
+            const citationInstruction = builtInTools.some(t => t.type === 'web_search_preview')
+                ? `\n\nWhen citing information from search results, reference them using [N] notation where N is the result number (e.g., [1], [2]).`
+                : '';
             messages.unshift({
                 role: 'system',
-                content: `You have access to the following real-time information. Use it to answer the user's question naturally.\n\n${preProcessResult.systemContext}`,
+                content: `You have access to the following real-time information. Use it to answer the user's question naturally.${citationInstruction}\n\n${preProcessResult.systemContext}`,
             });
         }
 
@@ -389,6 +413,8 @@ export async function runV1ResponsesExecution(
                 : body.tool_choice && typeof body.tool_choice === 'object' && 'name' in body.tool_choice
                 ? { type: 'function' as const, function: { name: (body.tool_choice as { name: string }).name } }
                 : undefined,
+            truncation: body.truncation,
+            parallelToolCalls: body.parallel_tool_calls,
             userId: params.endUserId || undefined,
         };
 
@@ -475,6 +501,27 @@ export async function runV1ResponsesExecution(
                 callId: tc.id,
             }));
 
+            // Shadow mode: create pending actions for tool calls
+            if (params.agentId && openAiToolCalls && openAiToolCalls.length > 0) {
+                if (params.shadowMode && params.createPendingAction) {
+                    for (const tc of openAiToolCalls) {
+                        await params.createPendingAction({
+                            tool_call_id: tc.id,
+                            tool: tc.name,
+                            arguments: tc.arguments,
+                        });
+                    }
+                } else if (params.createExecutedAction) {
+                    for (const tc of openAiToolCalls) {
+                        params.createExecutedAction({
+                            tool_call_id: tc.id,
+                            tool: tc.name,
+                            arguments: tc.arguments,
+                        });
+                    }
+                }
+            }
+
             const providerLogName = resolved.customProviderTag || result.actualProvider;
             params.logSuccess({
                 provider: providerLogName,
@@ -506,9 +553,10 @@ export async function runV1ResponsesExecution(
                 functionCalls: openAiToolCalls,
                 usage: result.usage,
                 annotations,
+                metadata: body.metadata,
             });
 
-            storeResponse(json);
+            if (body.store !== false) storeResponse(json);
 
             return { ok: true, response: NextResponse.json(json) };
         }
@@ -530,7 +578,7 @@ export async function runV1ResponsesExecution(
             async start(controller) {
                 const encoder = new TextEncoder();
                 let fullText = '';
-                const collectedToolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
+                const collectedToolCalls: Record<string, { id: string; name: string; arguments: string }> = {};
                 const collectedBuiltinToolOutputs: ToolCallOutput[] = [...preProcessResult.toolOutputs];
 
                 try {
@@ -556,14 +604,13 @@ export async function runV1ResponsesExecution(
 
                         if (chunk.toolCalls) {
                             for (const tc of chunk.toolCalls) {
-                                const idx = 0;
-                                if (!collectedToolCalls[idx]) {
-                                    collectedToolCalls[idx] = { id: tc.id, name: '', arguments: '' };
+                                const key = tc.id || 'unknown';
+                                if (!collectedToolCalls[key]) {
+                                    collectedToolCalls[key] = { id: key, name: '', arguments: '' };
                                 }
-                                if (tc.id) collectedToolCalls[idx].id = tc.id;
-                                if (tc.function?.name) collectedToolCalls[idx].name += tc.function.name;
+                                if (tc.function?.name) collectedToolCalls[key].name = tc.function.name;
                                 if (tc.function?.arguments) {
-                                    collectedToolCalls[idx].arguments += tc.function.arguments;
+                                    collectedToolCalls[key].arguments += tc.function.arguments;
                                 }
                             }
                         }
@@ -639,6 +686,27 @@ export async function runV1ResponsesExecution(
                                 );
                             }
 
+                            // Shadow mode: create pending/executed actions for tool calls
+                            if (params.agentId && toolCallValues.length > 0) {
+                                if (params.shadowMode && params.createPendingAction) {
+                                    for (const tc of toolCallValues) {
+                                        await params.createPendingAction({
+                                            tool_call_id: tc.id,
+                                            tool: tc.name,
+                                            arguments: tc.arguments,
+                                        });
+                                    }
+                                } else if (params.createExecutedAction) {
+                                    for (const tc of toolCallValues) {
+                                        params.createExecutedAction({
+                                            tool_call_id: tc.id,
+                                            tool: tc.name,
+                                            arguments: tc.arguments,
+                                        });
+                                    }
+                                }
+                            }
+
                             // Calculate costs
                             let promptTokens = 0;
                             let completionTokens = 0;
@@ -699,9 +767,10 @@ export async function runV1ResponsesExecution(
                                 })),
                                 usage: { promptTokens, completionTokens, totalTokens },
                                 annotations,
+                                metadata: body.metadata,
                             });
 
-                            storeResponse(response);
+                            if (body.store !== false) storeResponse(response);
 
                             controller.enqueue(
                                 encoder.encode(
@@ -716,8 +785,21 @@ export async function runV1ResponsesExecution(
                     }
                 } catch (error) {
                     const message = error instanceof Error ? error.message : 'Stream failed';
+                    const failedResponse = buildResponsesJson({
+                        model: body.model || model,
+                        content: fullText || '',
+                        toolOutputs: collectedBuiltinToolOutputs,
+                        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+                        status: 'failed',
+                        metadata: body.metadata,
+                    });
                     controller.enqueue(
-                        encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`)
+                        encoder.encode(
+                            buildResponsesStreamChunk({
+                                type: 'response.done',
+                                data: { response: failedResponse },
+                            })
+                        )
                     );
                     controller.close();
                 }
@@ -756,6 +838,7 @@ function buildAnnotations(
 
     // Gather search results from tool outputs
     const searchResults: Array<{ title: string; url: string }> = [];
+    const fileResults: Array<{ file_name: string }> = [];
     for (const to of toolOutputs) {
         if (to.type === 'web_search_call' && to.output?.results) {
             const results = to.output.results as Array<{ title: string; url: string; snippet: string }>;
@@ -763,11 +846,17 @@ function buildAnnotations(
                 searchResults.push({ title: r.title, url: r.url });
             }
         }
+        if (to.type === 'file_search_call' && to.output?.results) {
+            const results = to.output.results as Array<{ file_name: string; content: string; score: number }>;
+            for (const r of results) {
+                fileResults.push({ file_name: r.file_name });
+            }
+        }
     }
 
-    if (searchResults.length === 0) return annotations;
+    if (searchResults.length === 0 && fileResults.length === 0) return annotations;
 
-    // Scan content for [N] patterns and map to search results
+    // Scan content for [N] patterns and map to web search results
     const citationRegex = /\[(\d+)\]/g;
     let match: RegExpExecArray | null;
     while ((match = citationRegex.exec(content)) !== null) {
@@ -780,6 +869,22 @@ function buildAnnotations(
                 end_index: match.index + match[0].length,
                 url: result.url,
                 title: result.title,
+            });
+        }
+    }
+
+    // Scan for [Source N] patterns and map to file search results
+    const sourceRegex = /\[Source\s+(\d+)\]/gi;
+    while ((match = sourceRegex.exec(content)) !== null) {
+        const idx = parseInt(match[1], 10) - 1;
+        const result = fileResults[idx];
+        if (result) {
+            annotations.push({
+                type: 'url_citation',
+                start_index: match.index,
+                end_index: match.index + match[0].length,
+                url: '',
+                title: result.file_name,
             });
         }
     }

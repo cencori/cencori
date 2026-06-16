@@ -217,7 +217,8 @@ export interface ImageGenerationResponse {
 export type ResponseInputItem =
     | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string }
     | { type: 'function_call'; id: string; call_id: string; name: string; arguments: string; status?: string }
-    | { type: 'function_call_output'; call_id: string; output: string };
+    | { type: 'function_call_output'; call_id: string; output: string }
+    | { type: 'file'; filename: string; content: string; mime_type?: string };
 
 /**
  * Built-in tool types for the Responses API
@@ -264,6 +265,11 @@ export interface ResponsesRequest {
     previous_response_id?: string;
     parallel_tool_calls?: boolean;
     truncation?: 'auto' | 'disabled';
+    response_format?: {
+        type: 'text' | 'json_object' | 'json_schema';
+        json_schema?: { name: string; description?: string; schema: Record<string, unknown>; strict?: boolean };
+    };
+    include?: string[];
     stream?: boolean;
     user?: string;
 }
@@ -271,12 +277,20 @@ export interface ResponsesRequest {
 /**
  * A single output item from a Responses API response
  */
+export type UrlCitation = {
+    type: 'url_citation';
+    start_index: number;
+    end_index: number;
+    url: string;
+    title?: string;
+};
+
 export interface ResponsesOutputItem {
     id: string;
-    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call';
+    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'reasoning';
     status?: 'completed' | 'failed' | 'in_progress';
     role?: 'assistant';
-    content?: Array<{ type: 'output_text' | 'refusal'; text?: string; annotations?: Array<unknown> }>;
+    content?: Array<{ type: 'output_text' | 'refusal'; text?: string; annotations?: UrlCitation[] }>;
     call_id?: string;
     name?: string;
     arguments?: string;

@@ -58,6 +58,10 @@ export interface UnifiedChatRequest {
     tools?: Tool[];
     /** Control tool usage: 'auto' | 'none' | 'required' | specific tool */
     toolChoice?: 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
+    /** Context truncation strategy: 'auto' truncates old messages, 'disabled' fails on overflow */
+    truncation?: 'auto' | 'disabled';
+    /** Whether to allow parallel tool calls (default: true) */
+    parallelToolCalls?: boolean;
 }
 
 /**
