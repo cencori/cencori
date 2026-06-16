@@ -26,7 +26,7 @@ export default function DocsRouteLayout({
           <DecorativeBorder />
           <div
             className={cn(
-              "no-scrollbar bg-background overflow-scroll sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
+              "no-scrollbar bg-background overflow-x-hidden overflow-y-auto sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
               "sm:rounded-tl-md sm:rounded-br-xl sm:rounded-bl-md",
             )}
           >
