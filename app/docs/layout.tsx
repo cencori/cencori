@@ -1,49 +1,42 @@
-import { Metadata } from "next";
-import { DocsLayout } from "@/components/docs/DocsLayout";
-import { DocsNavbarWrapper } from "@/components/docs/DocsNavbarWrapper";
-import { Footer } from "@/components/landing/Footer";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import DecorativeBorder from "@/components/docs/layout/decorative-border-svg";
+import DocsHeader from "@/components/docs/sidebar/header";
+import { DocsSidebar } from "@/components/docs/sidebar";
 import { DocsProvider } from "@/components/docs/DocsContext";
-import { DocsContentWrapper } from "@/components/docs/DocsContentWrapper";
-import { DocsSidebarWrapper } from "@/components/docs/DocsSidebarWrapper";
-import { buildOgImageUrl } from "@/lib/og";
-
-const docsOgImage = buildOgImageUrl({
-  title: "Documentation",
-  subtitle: "Guides, API reference, and tutorials",
-  type: "docs",
-});
+import { DocsAskAI } from "@/components/docs/DocsAskAI";
+import { cn } from "@/lib/utils";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Documentation",
-  description: "Cencori documentation - guides, API reference, and tutorials.",
-  openGraph: {
-    title: "Documentation | Cencori",
-    description:
-      "Cencori documentation - guides, API reference, and tutorials.",
-    images: [docsOgImage],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Documentation | Cencori",
-    description:
-      "Cencori documentation - guides, API reference, and tutorials.",
-    images: [docsOgImage],
-  },
+  title: { default: "Documentation", template: "%s — Cencori Docs" },
+  description: "Cencori documentation — guides, API reference, and tutorials.",
 };
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function DocsRouteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <DocsProvider>
-      <div
-        className="flex min-h-screen flex-col"
-        style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}
-      >
-        <DocsContentWrapper>
-          <DocsLayout>{children}</DocsLayout>
-        </DocsContentWrapper>
-
-        <DocsSidebarWrapper />
-      </div>
+      <SidebarProvider>
+        <DocsSidebar />
+        <div className={cn("bg-sidebar w-full", "p-0 sm:p-2")}>
+          <DecorativeBorder />
+          <div
+            className={cn(
+              "no-scrollbar bg-background overflow-scroll sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
+              "sm:rounded-tl-md sm:rounded-br-xl sm:rounded-bl-md",
+            )}
+          >
+            <SidebarInset>
+              <DocsHeader />
+              <>{children}</>
+            </SidebarInset>
+          </div>
+        </div>
+      </SidebarProvider>
+      <DocsAskAI />
     </DocsProvider>
   );
 }
