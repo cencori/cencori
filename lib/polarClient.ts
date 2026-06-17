@@ -40,6 +40,12 @@ type CreditTopupPackConfig = {
     label: string;
 };
 
+export const PLATFORM_FEE_PERCENT = 0.055;
+
+export function netCreditsAfterFee(gross: number): number {
+    return Math.round(gross * (1 - PLATFORM_FEE_PERCENT) * 100) / 100;
+}
+
 export const CREDIT_TOPUP_PACKS: Record<CreditTopupPack, CreditTopupPackConfig> = {
     starter: {
         productId: POLAR_CONFIG.products.creditsStarter,

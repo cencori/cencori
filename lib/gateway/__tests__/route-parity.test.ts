@@ -98,9 +98,13 @@ vi.mock('@/lib/config-cache', () => ({
     setCachedAgentConfig: vi.fn(),
 }));
 
-vi.mock('@/lib/gateway/agent-context', () => ({
-    loadAgentKeyContext: (...args: any[]) => routeMocks.loadAgentKeyContext(...args),
-}));
+vi.mock('@/lib/gateway/agent-context', async (importOriginal) => {
+    const actual = await importOriginal() as Record<string, unknown>;
+    return {
+        loadAgentKeyContext: (...args: any[]) => routeMocks.loadAgentKeyContext(...args),
+        resolveAgentContext: actual.resolveAgentContext,
+    };
+});
 
 vi.mock('@/lib/gateway/output-guard', () => ({
     runGatewayOutputGuard: (...args: any[]) => routeMocks.runGatewayOutputGuard(...args),
