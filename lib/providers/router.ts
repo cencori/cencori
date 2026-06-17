@@ -77,6 +77,11 @@ export class ProviderRouter {
             return 'xai';
         }
 
+        // Z.AI models
+        if (modelName.startsWith('glm-')) {
+            return 'zai';
+        }
+
         // DeepSeek models
         if (modelName.startsWith('deepseek-')) {
             return 'deepseek';

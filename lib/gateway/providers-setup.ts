@@ -58,6 +58,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
         openrouter: 'OPENROUTER_API_KEY',
         perplexity: 'PERPLEXITY_API_KEY',
         huggingface: 'HUGGINGFACE_API_KEY',
+        zai: 'ZAI_API_KEY',
     };
 
     for (const [provider, envVar] of Object.entries(openAICompatibleEnvVars)) {

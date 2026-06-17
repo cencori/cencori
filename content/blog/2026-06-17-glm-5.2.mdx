@@ -1,0 +1,82 @@
+---
+title: "GLM-5.2 Is Now Available — Open-Weight Frontier Intelligence"
+slug: "glm-5.2"
+date: "2026-06-17"
+excerpt: "Z.AI's flagship GLM-5.2 is live on Cencori. 1M context window, two reasoning effort levels, MIT-licensed weights — with native BYOK support and the same API pricing as GLM-5.1."
+coverImage: "/blog/images/covers/z.png"
+tags: ["Product", "New Model", "GLM-5.2", "Z.AI", "Open Weights"]
+category: "changelog"
+published: true
+authors:
+  - bola
+---
+import { Callout } from "@/components/blog/Callout";
+
+**GLM-5.2 from Z.AI is now available on Cencori as a native provider.**
+
+This is Z.AI's most capable model to date — with significant improvements in coding, agentic tasks, and long-horizon execution. We're adding it as a first-class provider with full BYOK support alongside OpenAI, Anthropic, and Google.
+
+## What Ships
+
+**Native Z.AI provider** — bring your own API key (`ZAI_API_KEY`) and call GLM-5.2 through Cencori's existing gateway pipeline. No OpenRouter middleman, no custom integrations.
+
+- **1M context window** — tested to handle project-scale codebases in a single pass, with stable long-task execution across hundreds of turns
+- **Two reasoning effort levels** — `max` pushes the model's full reasoning capability; `high` balances performance and token efficiency. Controlled via the `reasoning_effort` parameter
+- **128K max output tokens** — generates large codebases, full refactors, and multi-file implementations without truncation
+- **Function calling, structured output, streaming, context caching** — all supported out of the box
+- **MIT-licensed open weights** — available on Hugging Face at `zai-org/GLM-5.2`
+
+## How It Stacks Up
+
+On long-horizon coding benchmarks GLM-5.2 is the strongest open-source model available:
+
+| Benchmark | GLM-5.2 | GLM-5.1 | Claude Opus 4.8 | GPT-5.5 |
+|-----------|---------|---------|-----------------|---------|
+| Terminal-Bench 2.1 | **81.0** | 62.0 | 85.0 | — |
+| SWE-bench Pro | **62.1** | 58.4 | — | — |
+| FrontierSWE | **—** | — | ~top | trails Opus 4.8 by ~1% |
+
+It trails Claude Opus 4.8 by roughly one point on FrontierSWE, outperforms GPT-5.5 and Opus 4.7 across multiple benchmarks, and is the highest-ranked open-source model on all three eval suites.
+
+## Available Now
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: 'glm-5.2',
+  messages: [
+    {
+      role: 'system',
+      content: 'You are a senior software engineer.',
+    },
+    {
+      role: 'user',
+      content: 'Read the current project and produce a system architecture map.',
+    },
+  ],
+  reasoning_effort: 'max',
+});
+```
+
+## Pricing
+
+Same API pricing as GLM-5.1:
+
+| Metric | Price |
+|--------|-------|
+| Input | $0.00105 / 1K tokens |
+| Output | $0.0035 / 1K tokens |
+
+<Callout type="info">
+**Bring your own key.** Set `ZAI_API_KEY` in your environment or configure it in your project settings. The model will appear in the model catalog and playground automatically.
+</Callout>
+
+## Docs
+
+- [GLM-5.2 Provider Docs](/docs/providers/zai)
+- [GLM-5.2 on Z.AI](https://z.ai/blog/glm-5.2)
+- [Open Weights on Hugging Face](https://huggingface.co/zai-org/GLM-5.2)
+- [Download weights](https://huggingface.co/zai-org/GLM-5.2)

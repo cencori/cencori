@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
-import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity, OpenRouter, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek } from "@lobehub/icons";
+import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity, OpenRouter, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, getModelsForProvider, getChatModelsForProvider, getImageModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
     huggingface: <HuggingFace.Color size={20} />,
     qwen: <Qwen.Color size={20} />,
     deepseek: <DeepSeek.Color size={20} />,
+    zai: <ZAI size={20} />,
 };
 
 function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {

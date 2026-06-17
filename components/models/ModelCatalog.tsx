@@ -15,7 +15,7 @@ import {
     Ai21, Bedrock, Nova, Azure, Cerebras,
     Cloudflare, DeepInfra, Fireworks, Nvidia,
     SambaNova, Upstage, Minimax, Moonshot,
-    Stepfun, Baseten, Alibaba, Baidu,
+    Stepfun, Baseten, Alibaba, Baidu, ZAI,
 } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, type AIModel } from "@/lib/providers/config";
 import { Search, ChevronDown, ChevronUp, Copy, Check, Brain } from "lucide-react";
@@ -100,6 +100,7 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     baseten: (s) => <Baseten.Avatar size={s} />,
     alibaba: (s) => <Alibaba.Color size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
+    zai: (s) => <ZAI size={s} />,
 };
 
 function ProviderIcon({ providerId, size = 16 }: { providerId: string; size?: number }) {
@@ -279,7 +280,7 @@ function flattenModels(): FlatModel[] {
     }
 
     // Models pinned to the top (newly added, remove from this list after a while)
-    const pinnedIds = new Set(['axiveri/africlaude-7b', 'claude-opus-4.8', 'gemini-3.5-flash']);
+    const pinnedIds = new Set(['glm-5.2', 'axiveri/africlaude-7b', 'claude-opus-4.8', 'gemini-3.5-flash']);
     const pinned: FlatModel[] = [];
     const rest: FlatModel[] = [];
 
@@ -291,19 +292,7 @@ function flattenModels(): FlatModel[] {
         }
     }
 
-    // Fisher-Yates shuffle for the rest (deterministic seed based on count)
-    const seed = rest.length;
-    let state = seed;
-    const seededRandom = () => {
-        state = (state * 16807 + 1) % 2147483647;
-        return state / 2147483647;
-    };
-
-    for (let i = rest.length - 1; i > 0; i--) {
-        const j = Math.floor(seededRandom() * (i + 1));
-        [rest[i], rest[j]] = [rest[j], rest[i]];
-    }
-
+    // Keep provider-order for the rest (no shuffle)
     const result = [...pinned, ...rest];
     return result.map((m, i) => ({ ...m, index: i }));
 }

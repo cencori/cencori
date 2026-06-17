@@ -33,6 +33,9 @@ INSERT INTO model_pricing (provider, model_name, input_price_per_1k_tokens, outp
 ('anthropic', 'claude-3-sonnet-20240229', 0.00300, 0.01500, 50.00),
 ('anthropic', 'claude-3-haiku-20240307', 0.00025, 0.00125, 50.00),
 
+-- Z.AI Models
+('zai', 'glm-5.2', 0.00105, 0.0035, 50.00),
+
 -- Google Models (migrated from existing hardcoded pricing)
 ('google', 'gemini-1.5-pro', 0.00025, 0.00075, 0.00),
 ('google', 'gemini-2.5-flash', 0.00025, 0.00075, 0.00),

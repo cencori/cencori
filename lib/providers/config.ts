@@ -26,6 +26,17 @@ export interface AIProviderConfig {
 
 export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
     {
+        id: 'zai',
+        name: 'Z.AI',
+        icon: '/providers/zai.svg',
+        website: 'https://z.ai',
+        docsUrl: 'https://docs.z.ai/guides/llm/glm-5.2',
+        keyPrefix: '',
+        models: [
+            { id: 'glm-5.2', name: 'GLM-5.2', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Flagship model, 1M context, coding & agentic, reasoning effort (max/high)' },
+        ],
+    },
+    {
         id: 'openai',
         name: 'OpenAI',
         icon: '/providers/openai.svg',
