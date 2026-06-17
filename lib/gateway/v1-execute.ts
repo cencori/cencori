@@ -173,6 +173,7 @@ export async function runV1ProviderExecution(
                 tier,
                 request: chatRequest,
                 resolved,
+                requestId: params.gatewayCtx.requestId,
             });
 
             let content = result.content;
@@ -289,6 +290,7 @@ export async function runV1ProviderExecution(
                         tier,
                         request: chatRequest,
                         resolved,
+                        requestId: params.gatewayCtx.requestId,
                     })) {
                         if (chunk.delta) {
                             fullText += chunk.delta;

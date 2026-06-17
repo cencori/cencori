@@ -85,6 +85,12 @@ export async function triggerWebhook(
                     signal: AbortSignal.timeout(10000), // 10 second timeout
                 });
 
+                const currentData = await supabase
+                    .from('webhooks')
+                    .select('failure_count')
+                    .eq('id', webhook.id)
+                    .single();
+
                 if (response.ok) {
                     // Success - reset failure count and update last_triggered_at
                     await supabase
@@ -96,10 +102,11 @@ export async function triggerWebhook(
                         .eq('id', webhook.id);
                 } else {
                     // Failed - increment failure count
+                    const currentCount = (currentData?.data?.failure_count as number) || 0;
                     await supabase
                         .from('webhooks')
                         .update({
-                            failure_count: supabase.rpc('increment_failure', { webhook_id: webhook.id }) || 1,
+                            failure_count: currentCount + 1,
                         })
                         .eq('id', webhook.id);
 
@@ -109,12 +116,22 @@ export async function triggerWebhook(
                 // Network error - increment failure count
                 console.error(`[Webhook] Error sending to ${webhook.url}:`, error);
 
-                await supabase
-                    .from('webhooks')
-                    .update({
-                        failure_count: 999, // Will be fixed with proper increment
-                    })
-                    .eq('id', webhook.id);
+                try {
+                    const currentData = await supabase
+                        .from('webhooks')
+                        .select('failure_count')
+                        .eq('id', webhook.id)
+                        .single();
+                    const currentCount = (currentData?.data?.failure_count as number) || 0;
+                    await supabase
+                        .from('webhooks')
+                        .update({
+                            failure_count: currentCount + 1,
+                        })
+                        .eq('id', webhook.id);
+                } catch (innerError) {
+                    console.error('[Webhook] Failed to update failure count:', innerError);
+                }
             }
         });
 

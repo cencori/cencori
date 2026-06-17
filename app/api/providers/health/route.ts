@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllCircuitStates, getCircuitStatus } from '@/lib/providers/circuit-breaker';
+import { getCircuitStatus } from '@/lib/providers/circuit-breaker';
 
 interface ProviderHealth {
     name: string;

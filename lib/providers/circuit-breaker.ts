@@ -201,13 +201,48 @@ export async function getCircuitStatus(provider: string): Promise<CircuitState> 
 }
 
 /**
- * Get health status for all known providers
+ * Get health status for all known providers.
+ * Reads from Redis first (cross-instance), falls back to in-memory.
  */
-export function getAllCircuitStates(): Record<string, CircuitState> {
+export async function getAllCircuitStates(): Promise<Record<string, CircuitState>> {
+    await initRedis();
+
+    const knownProviders = [
+        'openai', 'anthropic', 'google', 'mistral', 'xai',
+        'deepseek', 'cohere', 'groq', 'perplexity', 'together', 'qwen',
+    ];
+
     const states: Record<string, CircuitState> = {};
-    memoryCircuits.forEach((state, provider) => {
-        states[provider] = { ...state };
-    });
+
+    if (redisClient) {
+        const pipeline = knownProviders.map(async (provider) => {
+            try {
+                const data = await redisClient!.get(`${CIRCUIT_PREFIX}${provider}`);
+                if (data) {
+                    return { provider, state: JSON.parse(data) as CircuitState };
+                }
+            } catch {
+                // Redis read failed, fall through to memory
+            }
+            const memory = memoryCircuits.get(provider);
+            if (memory) {
+                return { provider, state: { ...memory } };
+            }
+            return null;
+        });
+
+        const results = await Promise.all(pipeline);
+        for (const result of results) {
+            if (result) {
+                states[result.provider] = result.state;
+            }
+        }
+    } else {
+        memoryCircuits.forEach((state, provider) => {
+            states[provider] = { ...state };
+        });
+    }
+
     return states;
 }
 
