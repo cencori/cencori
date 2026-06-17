@@ -7,6 +7,8 @@ import {
     getCreditTopupCreditsByProductId,
     getLimitForTier,
     getScanTierByProductId,
+    netCreditsAfterFee,
+    PLATFORM_FEE_PERCENT,
     type ScanSubscriptionTier,
     type SubscriptionTier,
 } from '@/lib/polarClient';
@@ -458,28 +460,50 @@ export async function POST(req: NextRequest) {
 
                 const creditsFromMetadata = parsePositiveNumber(metadata.credits_amount);
                 const creditsFromProduct = getCreditTopupCreditsByProductId(payload.productId);
-                const creditsToAdd = creditsFromMetadata ?? creditsFromProduct;
+                const grossCredits = creditsFromMetadata ?? creditsFromProduct;
 
-                if (!creditsToAdd || creditsToAdd <= 0) {
+                if (!grossCredits || grossCredits <= 0) {
                     console.warn('[Polar Webhook] Unable to determine credits amount for top-up order:', payload.id);
                     break;
                 }
 
+                const netCredits = netCreditsAfterFee(grossCredits);
+                const feeCredits = Math.round((grossCredits - netCredits) * 100) / 100;
+
                 const credited = await addCredits(
                     orgId,
-                    creditsToAdd,
+                    netCredits,
                     'topup',
                     `Polar top-up order ${payload.id}`,
                     {
                         polar_order_id: payload.id,
                         polar_customer_id: payload.customerId ?? null,
-                        credits_amount: creditsToAdd,
+                        credits_amount: grossCredits,
+                        net_credits: netCredits,
+                        platform_fee: feeCredits,
+                        platform_fee_pct: PLATFORM_FEE_PERCENT,
                         credit_pack: typeof metadata.credit_pack === 'string' ? metadata.credit_pack : null,
                     }
                 );
 
                 if (!credited) {
                     throw new Error(`Failed to apply credits for order ${payload.id}`);
+                }
+
+                if (feeCredits > 0) {
+                    const { adjustCredits } = await import('@/lib/credits');
+                    await adjustCredits(
+                        orgId,
+                        -feeCredits,
+                        'adjustment',
+                        `Platform fee (${(PLATFORM_FEE_PERCENT * 100).toFixed(1)}%) on order ${payload.id}`,
+                        {
+                            polar_order_id: payload.id,
+                            gross_credits: grossCredits,
+                            net_credits: netCredits,
+                            platform_fee_pct: PLATFORM_FEE_PERCENT,
+                        }
+                    );
                 }
 
                 if (payload.customerId) {
@@ -489,7 +513,7 @@ export async function POST(req: NextRequest) {
                         .eq('id', orgId);
                 }
 
-                trackEvent({ event_type: 'credits.topup', product: 'billing', organization_id: orgId, metadata: { order_id: payload.id, credits_amount: creditsToAdd } });
+                trackEvent({ event_type: 'credits.topup', product: 'billing', organization_id: orgId, metadata: { order_id: payload.id, gross_credits: grossCredits, net_credits: netCredits, platform_fee: feeCredits } });
                 writeAuditLog({
                     organizationId: orgId,
                     category: 'billing',
@@ -497,11 +521,11 @@ export async function POST(req: NextRequest) {
                     resourceType: 'credits',
                     resourceId: payload.id,
                     actorType: 'webhook',
-                    description: `Credits topped up: $${creditsToAdd.toFixed(2)}`,
-                    metadata: { order_id: payload.id, credits_amount: creditsToAdd },
+                    description: `Credits topped up: $${grossCredits.toFixed(2)} ($${netCredits.toFixed(2)} after ${(PLATFORM_FEE_PERCENT * 100).toFixed(1)}% platform fee)`,
+                    metadata: { order_id: payload.id, gross_credits: grossCredits, net_credits: netCredits, platform_fee: feeCredits },
                 });
 
-                console.log(`[Polar Webhook] ✓ Credited org ${orgId} with $${creditsToAdd.toFixed(2)} from order ${payload.id}`);
+                console.log(`[Polar Webhook] ✓ Credited org ${orgId} with $${netCredits.toFixed(2)} (gross: $${grossCredits.toFixed(2)}) from order ${payload.id}`);
                 break;
             }
 

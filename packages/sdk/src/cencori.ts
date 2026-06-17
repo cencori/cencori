@@ -27,6 +27,7 @@
 
 import type { CencoriConfig, RequestOptions } from './types';
 import { AINamespace } from './ai';
+import { AgentsNamespace } from './agents';
 import { ComputeNamespace } from './compute';
 import { WorkflowNamespace } from './workflow';
 import { StorageNamespace } from './storage';
@@ -51,12 +52,26 @@ export class Cencori {
     private config: Required<CencoriConfig>;
 
     /**
-     * AI Gateway - Chat, completions, embeddings with security & observability
+     * AI Gateway - Chat, completions, embeddings, responses with security & observability
      * 
      * @example
      * await cencori.ai.chat({ model: 'gpt-4o', messages: [...] });
      */
     readonly ai: AINamespace;
+
+    /**
+     * Agents - Create and manage AI agents programmatically.
+     * 
+     * @example
+     * const agent = await cencori.agents.create({
+     *   name: 'my-agent',
+     *   config: { model: 'gpt-4o', system_prompt: 'You are a helpful assistant.' }
+     * });
+     * 
+     * @example
+     * const key = await cencori.agents.createKey(agent.id, { name: 'prod-key' });
+     */
+    readonly agents: AgentsNamespace;
 
     /**
      * Compute - Serverless functions & GPU access
@@ -141,6 +156,7 @@ export class Cencori {
 
         // Initialize namespaces
         this.ai = new AINamespace(this.config);
+        this.agents = new AgentsNamespace(this.config);
         this.compute = new ComputeNamespace();
         this.workflow = new WorkflowNamespace();
         this.storage = new StorageNamespace();
@@ -237,6 +253,7 @@ export class Cencori {
 // Export types
 export type { CencoriConfig, ChatRequest, ChatResponse, ChatMessage, RequestOptions } from './types';
 export type { AINamespace } from './ai';
+export type { AgentsNamespace, Agent, AgentConfig, AgentListItem, CreateAgentParams, UpdateAgentParams, AgentKey, CreateAgentKeyParams } from './agents';
 export type { ComputeNamespace } from './compute';
 export type { WorkflowNamespace } from './workflow';
 export type { StorageNamespace } from './storage';

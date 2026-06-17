@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PanelTopIcon } from "@/components/animate-ui/icons/panel-top";
 import { SettingsIcon } from "@/components/animate-ui/icons/settings";
-import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, Bot, DatabaseZap, FileText, Receipt } from "lucide-react";
+import { ScrollText, ShieldAlert, Server, Puzzle, Cpu, Webhook, Boxes, DatabaseZap, FileText, Receipt } from "lucide-react";
 import { BeakerIcon } from "@/components/icons/BeakerIcon";
 import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
@@ -241,7 +241,7 @@ export default function ProjectLayoutClient({
     // Grouped navigation items
     const coreItems: NavItem[] = [
         { href: basePath, icon: PanelTopIcon, label: "Project Overview" },
-        { href: `${basePath}/agents`, icon: Bot, label: "Agents" },
+
         { href: `${basePath}/prompts`, icon: FileText, label: "Prompts" },
         { href: `${basePath}/observability`, icon: ObservabilityIcon, label: "Observability", prefetch: createPrefetch("observability") },
         { href: `${basePath}/logs`, icon: ScrollText, label: "Logs" },
