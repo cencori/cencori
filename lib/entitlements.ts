@@ -54,7 +54,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
     analyticsDashboard: true,
     costTracking: true,
     geoAnalytics: false,
-    failoverAnalytics: false,
+    failoverAnalytics: true,
     promptRegistry: true,
     webhooks: false,
     sso: false,

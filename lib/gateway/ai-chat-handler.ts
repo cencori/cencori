@@ -492,6 +492,7 @@ export async function POST(req: NextRequest) {
                             tier,
                             request: chatRequest,
                             resolved,
+                            requestId: ctx.requestId,
                         })) {
                             streamProvider = chunk.actualProvider;
                             streamModel = chunk.actualModel;
@@ -673,6 +674,7 @@ export async function POST(req: NextRequest) {
                 tier,
                 request: chatRequest,
                 resolved,
+                requestId: ctx.requestId,
             });
         } catch (error) {
             const providerFailure = mapProviderErrorToHttpResponse(error, resolved.providerName);

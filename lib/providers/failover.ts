@@ -83,40 +83,52 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
 // In-memory cache for DB mappings
 let dbMappingsCache: Record<string, Record<string, string>> | null = null;
 let dbMappingsCacheTime = 0;
+let dbMappingsPromise: Promise<Record<string, Record<string, string>>> | null = null;
 const CACHE_TTL_MS = 60 * 1000; // 1 minute
 
 /**
  * Load model mappings from DB (cached)
- * Falls back to hardcoded MODEL_MAPPINGS if DB is unavailable
+ * Falls back to hardcoded MODEL_MAPPINGS if DB is unavailable.
+ * Uses a promise mutex to prevent concurrent DB reads when cache expires.
  */
 async function loadDbMappings(): Promise<Record<string, Record<string, string>>> {
     if (dbMappingsCache && Date.now() - dbMappingsCacheTime < CACHE_TTL_MS) {
         return dbMappingsCache;
     }
 
-    try {
-        const { createAdminClient } = await import('@/lib/supabaseAdmin');
-        const supabase = createAdminClient();
-        const { data, error } = await supabase
-            .from('model_mappings')
-            .select('source_model, target_provider, target_model');
-
-        if (error || !data || data.length === 0) {
-            return MODEL_MAPPINGS;
-        }
-
-        const mappings: Record<string, Record<string, string>> = {};
-        for (const row of data) {
-            if (!mappings[row.source_model]) mappings[row.source_model] = {};
-            mappings[row.source_model][row.target_provider] = row.target_model;
-        }
-
-        dbMappingsCache = mappings;
-        dbMappingsCacheTime = Date.now();
-        return mappings;
-    } catch {
-        return MODEL_MAPPINGS;
+    if (dbMappingsPromise) {
+        return dbMappingsPromise;
     }
+
+    dbMappingsPromise = (async () => {
+        try {
+            const { createAdminClient } = await import('@/lib/supabaseAdmin');
+            const supabase = createAdminClient();
+            const { data, error } = await supabase
+                .from('model_mappings')
+                .select('source_model, target_provider, target_model');
+
+            if (error || !data || data.length === 0) {
+                return MODEL_MAPPINGS;
+            }
+
+            const mappings: Record<string, Record<string, string>> = {};
+            for (const row of data) {
+                if (!mappings[row.source_model]) mappings[row.source_model] = {};
+                mappings[row.source_model][row.target_provider] = row.target_model;
+            }
+
+            dbMappingsCache = mappings;
+            dbMappingsCacheTime = Date.now();
+            return mappings;
+        } catch {
+            return MODEL_MAPPINGS;
+        } finally {
+            dbMappingsPromise = null;
+        }
+    })();
+
+    return dbMappingsPromise;
 }
 
 /** Invalidate the DB mappings cache (call after writes) */
@@ -126,9 +138,18 @@ export function invalidateMappingsCache() {
 }
 
 /**
- * Get fallback model for a given model on a fallback provider
+ * Get fallback model for a given model on a fallback provider.
+ * If a configuredFallbackModel is provided, it takes priority over mappings.
  */
-export async function getFallbackModel(originalModel: string, fallbackProvider: string): Promise<string> {
+export async function getFallbackModel(
+    originalModel: string,
+    fallbackProvider: string,
+    configuredFallbackModel?: string | null
+): Promise<string> {
+    if (configuredFallbackModel) {
+        return configuredFallbackModel;
+    }
+
     const allMappings = await loadDbMappings();
     const mappings = allMappings[originalModel];
 
@@ -217,6 +238,8 @@ export function isNonRetryableError(error: unknown): boolean {
         'bad request',
         'model not found',
         'content filtered',
+        'content_filter',
+        'blocked',
         'safety',
     ];
 

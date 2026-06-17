@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllCircuitStates, getCircuitStatus } from '@/lib/providers/circuit-breaker';
+import { getAllCircuitStates } from '@/lib/providers/circuit-breaker';
 
 const KNOWN_PROVIDERS = [
     'openai',
@@ -15,33 +15,23 @@ const KNOWN_PROVIDERS = [
 
 export async function GET() {
     try {
-        const memoryStates = getAllCircuitStates();
+        const allStates = await getAllCircuitStates();
 
-        const providerStatuses = await Promise.all(
-            KNOWN_PROVIDERS.map(async (provider) => {
-                const memoryState = memoryStates[provider];
-
-                if (memoryState) {
-                    return {
-                        provider,
-                        state: memoryState.state,
-                        failures: memoryState.failures,
-                        lastFailure: memoryState.lastFailure,
-                        lastSuccess: memoryState.lastSuccess,
-                    };
-                }
-
-                const state = await getCircuitStatus(provider);
-
-                return {
-                    provider,
-                    state: state.state,
-                    failures: state.failures,
-                    lastFailure: state.lastFailure,
-                    lastSuccess: state.lastSuccess,
-                };
-            })
-        );
+        const providerStatuses = KNOWN_PROVIDERS.map((provider) => {
+            const state = allStates[provider] || {
+                failures: 0,
+                lastFailure: 0,
+                state: 'closed' as const,
+                lastSuccess: Date.now(),
+            };
+            return {
+                provider,
+                state: state.state,
+                failures: state.failures,
+                lastFailure: state.lastFailure,
+                lastSuccess: state.lastSuccess,
+            };
+        });
 
         const openCircuits = providerStatuses.filter(p => p.state === 'open').length;
         const halfOpenCircuits = providerStatuses.filter(p => p.state === 'half-open').length;

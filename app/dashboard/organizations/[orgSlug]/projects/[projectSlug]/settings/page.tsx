@@ -197,6 +197,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [concurrentRequests, setConcurrentRequests] = useState('10');
   const [enableFallback, setEnableFallback] = useState(true);
   const [fallbackProvider, setFallbackProvider] = useState('anthropic');
+  const [fallbackModel, setFallbackModel] = useState('');
   const [maxRetriesBeforeFallback, setMaxRetriesBeforeFallback] = useState('3');
   const [circuitBreakerEnabled, setCircuitBreakerEnabled] = useState(true);
   const [circuitBreakerFailureThreshold, setCircuitBreakerFailureThreshold] = useState('5');
@@ -294,6 +295,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     circuit_breaker_enabled: boolean;
     circuit_breaker_failure_threshold: number;
     circuit_breaker_timeout_seconds: number;
+    fallback_model: string | null;
     ragmetrics_enabled: boolean;
     ragmetrics_api_key: string;
   }
@@ -320,6 +322,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       setConcurrentRequests(String(s.concurrent_requests || 10));
       setEnableFallback(s.enable_fallback ?? true);
       setFallbackProvider(s.fallback_provider || 'anthropic');
+      setFallbackModel(s.fallback_model || '');
       setMaxRetriesBeforeFallback(String(s.max_retries_before_fallback || 3));
       setCircuitBreakerEnabled(s.circuit_breaker_enabled ?? true);
       setCircuitBreakerFailureThreshold(String(s.circuit_breaker_failure_threshold || 5));
@@ -1086,6 +1089,25 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/40 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">Fallback model</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Leave empty to auto-map from the primary model.</p>
+                </div>
+                <Select value={fallbackModel || '__auto__'} onValueChange={(v) => { setFallbackModel(v === '__auto__' ? '' : v); setProviderSettingsDirty(true); }} disabled={!enableFallback}>
+                  <SelectTrigger className="w-full md:w-56 h-10 md:h-8 text-sm md:text-xs">
+                    <SelectValue placeholder="Auto (default)" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    <SelectItem value="__auto__" className="text-xs">Auto (default)</SelectItem>
+                    {getModelsForProvider(fallbackProvider).map((model) => (
+                      <SelectItem key={model.id} value={model.id} className="text-xs">
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
                 <div className="space-y-0.5">
                   <p className="text-sm md:text-xs font-medium">Max retries before fallback</p>
@@ -1175,6 +1197,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                       concurrent_requests: parseInt(concurrentRequests),
                       enable_fallback: enableFallback,
                       fallback_provider: fallbackProvider,
+                      fallback_model: fallbackModel || null,
                       max_retries_before_fallback: parseInt(maxRetriesBeforeFallback),
                       circuit_breaker_enabled: circuitBreakerEnabled,
                       circuit_breaker_failure_threshold: parseInt(circuitBreakerFailureThreshold),

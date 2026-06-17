@@ -39,6 +39,10 @@ import { executeGatewayChat, streamGatewayChat } from '@/lib/gateway/chat-execut
 function createMockSupabaseForExecutor(options?: {
     enableFallback?: boolean;
     maxRetries?: number;
+    circuitBreakerEnabled?: boolean;
+    circuitBreakerThreshold?: number;
+    circuitBreakerTimeout?: number;
+    fallbackModel?: string;
 }) {
     return {
         from: vi.fn((table: string) => {
@@ -50,7 +54,11 @@ function createMockSupabaseForExecutor(options?: {
                                 data: {
                                     enable_fallback: options?.enableFallback ?? true,
                                     fallback_provider: null,
+                                    fallback_model: options?.fallbackModel ?? null,
                                     max_retries_before_fallback: options?.maxRetries ?? 1,
+                                    circuit_breaker_enabled: options?.circuitBreakerEnabled ?? null,
+                                    circuit_breaker_failure_threshold: options?.circuitBreakerThreshold ?? null,
+                                    circuit_breaker_timeout_seconds: options?.circuitBreakerTimeout ?? null,
                                 },
                                 error: null,
                             }),
@@ -175,6 +183,196 @@ describe('executeGatewayChat failover', () => {
 
         expect(result.content).toBe('circuit fallback');
         expect(primaryChat).not.toHaveBeenCalled();
+    });
+
+    it('throws immediately on non-retryable error without retry or fallback', async () => {
+        mockIsNonRetryableError.mockReturnValue(true);
+        const primaryChat = vi.fn().mockRejectedValue(new Error('invalid api key'));
+
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor() as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => true, getProvider: vi.fn() },
+            } as never,
+        })).rejects.toThrow('invalid api key');
+
+        expect(primaryChat).toHaveBeenCalledTimes(1);
+        expect(mockRecordFailure).not.toHaveBeenCalled();
+        expect(mockTriggerFallbackWebhook).not.toHaveBeenCalled();
+    });
+
+    it('records failure only once when all retries are exhausted', async () => {
+        mockGetFallbackChain.mockReturnValue([]);
+        const primaryChat = vi.fn().mockRejectedValue(new Error('openai down'));
+
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 3 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => false, getProvider: vi.fn() },
+            } as never,
+        })).rejects.toThrow();
+
+        expect(primaryChat).toHaveBeenCalledTimes(3);
+        expect(mockRecordFailure).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws aggregate error when all fallbacks are exhausted', async () => {
+        const primaryChat = vi.fn().mockRejectedValue(new Error('primary down'));
+        const fallbackChat1 = vi.fn().mockRejectedValue(new Error('anthropic down'));
+        const fallbackChat2 = vi.fn().mockRejectedValue(new Error('google down'));
+        const router = {
+            hasProvider: (name: string) => ['anthropic', 'google'].includes(name),
+            getProvider: (name: string) => ({
+                chat: name === 'anthropic' ? fallbackChat1 : fallbackChat2,
+                stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn(),
+            }),
+        };
+
+        mockGetFallbackChain.mockReturnValue(['anthropic', 'google']);
+
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router,
+            } as never,
+        })).rejects.toThrow(/All providers exhausted.*anthropic.*google/s);
+
+        expect(primaryChat).toHaveBeenCalledTimes(1);
+        expect(fallbackChat1).toHaveBeenCalledTimes(1);
+        expect(fallbackChat2).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips fallback provider with open circuit and tries next', async () => {
+        mockIsCircuitOpen.mockImplementation(async (provider: string) => provider === 'anthropic');
+        mockGetFallbackChain.mockReturnValue(['anthropic', 'google']);
+
+        const primaryChat = vi.fn().mockRejectedValue(new Error('openai down'));
+        const anthropicChat = vi.fn().mockRejectedValue(new Error('should not be called'));
+        const googleChat = vi.fn().mockResolvedValue(mockResponse('google ok'));
+        const router = {
+            hasProvider: () => true,
+            getProvider: (name: string) =>
+                name === 'anthropic'
+                    ? { chat: anthropicChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() }
+                    : { chat: googleChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+        };
+
+        const result = await executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router,
+            } as never,
+        });
+
+        expect(result.content).toBe('google ok');
+        expect(anthropicChat).not.toHaveBeenCalled();
+        expect(googleChat).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips fallback when BYOK initialization fails and tries next', async () => {
+        mockGetFallbackChain.mockReturnValue(['anthropic', 'google']);
+        mockInitializeBYOKProviders.mockImplementation(
+            async (_router: unknown, _supabase: unknown, _pid: unknown, _oid: unknown, provider: string) =>
+                ({ success: provider !== 'anthropic' })
+        );
+
+        const primaryChat = vi.fn().mockRejectedValue(new Error('openai down'));
+        const anthropicChat = vi.fn().mockRejectedValue(new Error('should not be called'));
+        const googleChat = vi.fn().mockResolvedValue(mockResponse('google ok'));
+        const router = {
+            hasProvider: (name: string) => false,
+            getProvider: (name: string) =>
+                name === 'google'
+                    ? { chat: googleChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() }
+                    : { chat: anthropicChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+        };
+
+        const result = await executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router,
+            } as never,
+        });
+
+        expect(result.content).toBe('google ok');
+        expect(anthropicChat).not.toHaveBeenCalled();
+        expect(googleChat).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes circuit breaker config from project settings to circuit breaker functions', async () => {
+        mockGetFallbackChain.mockReturnValue([]);
+        const primaryChat = vi.fn().mockRejectedValue(new Error('openai down'));
+
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({
+                maxRetries: 2,
+                circuitBreakerEnabled: true,
+                circuitBreakerThreshold: 3,
+                circuitBreakerTimeout: 30,
+            }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai',
+                model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => false, getProvider: vi.fn() },
+            } as never,
+        })).rejects.toThrow();
+
+        const isCircuitCall = mockIsCircuitOpen.mock.calls.find(([p]) => p === 'openai');
+        expect(isCircuitCall).toBeDefined();
+        const configArg = isCircuitCall![1];
+        expect(configArg).toMatchObject({
+            enabled: true,
+            failureThreshold: 3,
+            timeoutMs: 30000,
+        });
+
+        const recordFailureCall = mockRecordFailure.mock.calls.find(([p]) => p === 'openai');
+        expect(recordFailureCall).toBeDefined();
+        expect(recordFailureCall![1]).toMatchObject({
+            enabled: true,
+            failureThreshold: 3,
+            timeoutMs: 30000,
+        });
     });
 });
 
