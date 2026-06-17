@@ -17,7 +17,7 @@ import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
     Perplexity, OpenRouter, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
-    Minimax, Baidu,
+    Minimax, Baidu, ZAI,
 } from "@lobehub/icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -99,6 +99,7 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     deepseek: (s) => <DeepSeek.Color size={s} />,
     minimax: (s) => <Minimax.Avatar size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
+    zai: (s) => <ZAI size={s} />,
 };
 
 function ProviderIcon({ providerId, size = 14 }: { providerId: string; size?: number }) {

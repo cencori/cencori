@@ -62,6 +62,10 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
         baseURL: 'https://api-inference.huggingface.co/v1/',
         name: 'Hugging Face',
     },
+    zai: {
+        baseURL: 'https://api.z.ai/api/paas/v4/',
+        name: 'Z.AI',
+    },
 };
 
 /**

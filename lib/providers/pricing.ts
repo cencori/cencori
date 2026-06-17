@@ -94,6 +94,11 @@ function getDefaultPricing(provider: string): ModelPricing {
             outputPer1KTokens: 0,
             cencoriMarkupPercentage: 0,
         },
+        zai: {
+            inputPer1KTokens: 0.00105,
+            outputPer1KTokens: 0.0035,
+            cencoriMarkupPercentage: 50,
+        },
         custom: {
             inputPer1KTokens: 0,
             outputPer1KTokens: 0,
