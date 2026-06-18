@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
     ArrowUp,
     Copy,
@@ -12,23 +13,37 @@ import {
     Check,
     ChevronDown,
     Brain,
+    Settings,
+    PanelLeftIcon,
+    Plus,
 } from "lucide-react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
     Perplexity, OpenRouter, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
-    Minimax, Baidu, ZAI,
+    Minimax, Baidu, ZAI, Cerebras,
 } from "@lobehub/icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
-import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
+import { Slider } from "@/components/ui/slider";
 import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { SUPPORTED_PROVIDERS } from "@/lib/providers/config";
 import { cn } from "@/lib/utils";
+import { getSessions, saveSession, deleteSession, generateSessionId } from "@/lib/playground-history";
+import type { PlaygroundSession } from "@/lib/playground-history";
+import { PlaygroundSidebar } from "./PlaygroundSidebar";
 
 interface Message {
     id: string;
@@ -45,12 +60,13 @@ interface Message {
 }
 
 interface PlaygroundChatProps {
-    orgSlug: string;
-    projectSlug: string;
+    orgSlug?: string;
+    projectSlug?: string;
     environment: string;
     projectId: string;
-    orgId: string;
+    orgId?: string;
     subscriptionTier: string;
+    isPublic?: boolean;
 }
 
 // ─── Flat model parsing from catalog ─────────────────────────────────────────
@@ -100,6 +116,7 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     minimax: (s) => <Minimax.Avatar size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
     zai: (s) => <ZAI size={s} />,
+    cerebras: (s) => <Cerebras.Color size={s} />,
 };
 
 function ProviderIcon({ providerId, size = 14 }: { providerId: string; size?: number }) {
@@ -124,6 +141,9 @@ const SUGGESTED_PROMPTS = [
     "Translate 'Hello, how are you?' to Spanish",
 ];
 
+const freeChatModels = chatCatalogModels.filter((m) => m.free);
+const firstFreeModelId = freeChatModels[0]?.id ?? "gpt-4o";
+
 export function PlaygroundChat({
     orgSlug,
     projectSlug,
@@ -131,9 +151,13 @@ export function PlaygroundChat({
     projectId,
     orgId,
     subscriptionTier,
+    isPublic = false,
 }: PlaygroundChatProps) {
     const router = useRouter();
-    const [selectedModels, setSelectedModels] = useState<string[]>(["gpt-4o"]);
+    const { isAuthenticated } = useAuth();
+    const [selectedModels, setSelectedModels] = useState<string[]>(
+        isPublic ? [firstFreeModelId] : ["gpt-4o"]
+    );
     const [activeSelectorIndex, setActiveSelectorIndex] = useState<number | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
@@ -146,6 +170,69 @@ export function PlaygroundChat({
 
     // Upgrade Dialog state
     const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+    const [isPublicProDialogOpen, setIsPublicProDialogOpen] = useState(false);
+
+    // Model config state (per model ID)
+    const [configOpen, setConfigOpen] = useState(false);
+    const [modelConfig, setModelConfigState] = useState<Record<string, {
+        maxTokens: number;
+        temperature: number;
+        frequencyPenalty: number;
+        presencePenalty: number;
+    }>>({});
+    const defaultConfig = { maxTokens: 4096, temperature: 0.7, frequencyPenalty: 0, presencePenalty: 0 };
+    const modelConfigRef = useRef<Record<string, {
+        maxTokens: number;
+        temperature: number;
+        frequencyPenalty: number;
+        presencePenalty: number;
+    }>>({});
+    const setModelConfig = useCallback((value: Record<string, { maxTokens: number; temperature: number; frequencyPenalty: number; presencePenalty: number; }> | ((prev: Record<string, { maxTokens: number; temperature: number; frequencyPenalty: number; presencePenalty: number; }>) => Record<string, { maxTokens: number; temperature: number; frequencyPenalty: number; presencePenalty: number; }>)) => {
+        if (typeof value === 'function') {
+            const next = value(modelConfigRef.current);
+            modelConfigRef.current = next;
+            setModelConfigState(next);
+        } else {
+            modelConfigRef.current = value;
+            setModelConfigState(value);
+        }
+    }, []);
+    const selectedModelsRef = useRef(selectedModels);
+    selectedModelsRef.current = selectedModels;
+
+    // History state
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sessions, setSessions] = useState<PlaygroundSession[]>([]);
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+    // Load sessions from localStorage on mount (signed-in users only)
+    useEffect(() => {
+        if (isPublic && !isAuthenticated) return;
+        setSessions(getSessions());
+    }, []);
+
+    // Auto-save current session when streaming finishes (signed-in users only)
+    const prevLoadingRef = useRef(isLoading);
+    useEffect(() => {
+        if (prevLoadingRef.current && !isLoading && messages.length > 0 && !(isPublic && !isAuthenticated)) {
+            const title = messages.find((m) => m.role === "user")?.content.slice(0, 60) || "Untitled";
+            const session: PlaygroundSession = {
+                id: activeSessionId || generateSessionId(),
+                title,
+                messages: messages.map(({ id, role, content, modelId, metrics, isStreaming }) => ({
+                    id, role, content, modelId, metrics, isStreaming,
+                })),
+                selectedModels: selectedModelsRef.current,
+                modelConfig: JSON.parse(JSON.stringify(modelConfigRef.current)),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            saveSession(session);
+            setSessions(getSessions());
+            if (!activeSessionId) setActiveSessionId(session.id);
+        }
+        prevLoadingRef.current = isLoading;
+    }, [isLoading]);
 
     const abortControllersRef = useRef<AbortController[] | null>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -194,7 +281,11 @@ export function PlaygroundChat({
             const hasProModelSelected = selectedModelObjs.some((m) => !m?.free);
 
             if (hasProModelSelected && isFreeTier) {
-                setIsUpgradeDialogOpen(true);
+                if (isPublic) {
+                    setIsPublicProDialogOpen(true);
+                } else {
+                    setIsUpgradeDialogOpen(true);
+                }
                 return;
             }
 
@@ -256,13 +347,24 @@ export function PlaygroundChat({
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
-                            "X-Playground-Project-Id": projectId,
-                            "X-Playground-Environment": environment,
+                            ...(isPublic
+                                ? {
+                                      "X-Public-Playground": "true",
+                                      "X-Playground-Project-Id": projectId,
+                                  }
+                                : {
+                                      "X-Playground-Project-Id": projectId,
+                                      "X-Playground-Environment": environment,
+                                  }),
                         },
                         body: JSON.stringify({
                             model: modelId,
                             messages: conversation,
                             stream: true,
+                            temperature: (modelConfigRef.current[modelId] ?? defaultConfig).temperature,
+                            maxTokens: (modelConfigRef.current[modelId] ?? defaultConfig).maxTokens,
+                            frequencyPenalty: (modelConfigRef.current[modelId] ?? defaultConfig).frequencyPenalty,
+                            presencePenalty: (modelConfigRef.current[modelId] ?? defaultConfig).presencePenalty,
                         }),
                         signal: controller.signal,
                     });
@@ -402,7 +504,7 @@ export function PlaygroundChat({
             setIsLoading(false);
             abortControllersRef.current = null;
         },
-        [isLoading, messages, selectedModels, projectId, environment, subscriptionTier, orgId, orgSlug]
+        [isLoading, messages, selectedModels, projectId, environment, subscriptionTier, orgId, orgSlug, isPublic]
     );
 
     const stopGeneration = () => {
@@ -413,6 +515,61 @@ export function PlaygroundChat({
     const clearChat = () => {
         if (isLoading) stopGeneration();
         setMessages([]);
+    };
+
+    const handleNewChat = () => {
+        // Save current session if there are messages
+        if (messages.length > 0 && activeSessionId) {
+            const session: PlaygroundSession = {
+                id: activeSessionId,
+                title: messages.find((m) => m.role === "user")?.content.slice(0, 60) || "Untitled",
+                messages: messages.map(({ id, role, content, modelId, metrics, isStreaming }) => ({
+                    id, role, content, modelId, metrics, isStreaming,
+                })),
+                selectedModels: selectedModelsRef.current,
+                modelConfig: JSON.parse(JSON.stringify(modelConfigRef.current)),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            saveSession(session);
+            setSessions(getSessions());
+        }
+        if (isLoading) stopGeneration();
+        setMessages([]);
+        setActiveSessionId(null);
+    };
+
+    const handleSelectSession = (session: PlaygroundSession) => {
+        // Save current session first
+        if (messages.length > 0 && activeSessionId && activeSessionId !== session.id) {
+            const current: PlaygroundSession = {
+                id: activeSessionId,
+                title: messages.find((m) => m.role === "user")?.content.slice(0, 60) || "Untitled",
+                messages: messages.map(({ id, role, content, modelId, metrics, isStreaming }) => ({
+                    id, role, content, modelId, metrics, isStreaming,
+                })),
+                selectedModels: selectedModelsRef.current,
+                modelConfig: JSON.parse(JSON.stringify(modelConfigRef.current)),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            saveSession(current);
+        }
+        // Restore selected session
+        setMessages(session.messages);
+        setSelectedModels(session.selectedModels);
+        setModelConfig(session.modelConfig);
+        setActiveSessionId(session.id);
+        setConfigOpen(false);
+    };
+
+    const handleDeleteSession = (id: string) => {
+        const updated = deleteSession(id);
+        setSessions(updated);
+        if (activeSessionId === id) {
+            setMessages([]);
+            setActiveSessionId(null);
+        }
     };
 
     const regenerate = () => {
@@ -468,7 +625,7 @@ export function PlaygroundChat({
     );
 
     const handleAddModelSlot = () => {
-        if (selectedModels.length >= 3) return;
+        if (selectedModels.length >= 8) return;
         const available = chatCatalogModels.find((m) => !selectedModels.includes(m.id))?.id || selectedModels[0];
         const nextIndex = selectedModels.length;
         setSelectedModels((prev) => [...prev, available]);
@@ -574,14 +731,15 @@ export function PlaygroundChat({
 
                                         {/* Streaming indicator or content */}
                                         {message.isStreaming && !message.content ? (
-                                            <ThinkingIndicator />
+                                            <span className="inline-flex items-center gap-[3px]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </span>
                                         ) : (
-                                            <>
-                                                <ThinkingIndicator finished />
-                                                <div className="prose prose-sm dark:prose-invert max-w-none">
-                                                    <MarkdownRenderer content={message.content} />
-                                                </div>
-                                            </>
+                                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                                                <MarkdownRenderer content={message.content} />
+                                            </div>
                                         )}
 
                                         {/* Metrics + action buttons (only show when not streaming) */}
@@ -812,12 +970,12 @@ export function PlaygroundChat({
                                     })}
 
                                     {/* Add Model (+) Button */}
-                                    {selectedModels.length < 3 && (
+                                    {selectedModels.length < 8 && (
                                         <button
                                             type="button"
                                             onClick={handleAddModelSlot}
                                             className="flex items-center justify-center h-7 w-7 rounded-xl bg-card/40 hover:bg-card/70 text-muted-foreground/60 hover:text-foreground transition-all cursor-pointer border border-dashed border-border/30 hover:border-border/50"
-                                            title="Compare with another model"
+                                            title="Compare models (up to 8)"
                                         >
                                             <HugeiconsIcon icon={PlusSignIcon} size={14} />
                                         </button>
@@ -832,9 +990,9 @@ export function PlaygroundChat({
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 rounded-full text-muted-foreground/60 hover:bg-muted/30 hover:text-foreground transition-all cursor-pointer"
-                                            onClick={clearChat}
-                                            aria-label="Clear chat"
-                                            title="Clear chat"
+                                            onClick={handleNewChat}
+                                            aria-label="New chat"
+                                            title="New chat"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -867,13 +1025,180 @@ export function PlaygroundChat({
                     </div>
                 </div>
             </div>
-            <UpgradeDialog
-                open={isUpgradeDialogOpen}
-                onOpenChange={setIsUpgradeDialogOpen}
-                orgId={orgId}
-                orgSlug={orgSlug}
-                reason="Upgrade to Pro to test premium models directly in the playground."
+            {isPublic ? (
+                <Dialog open={isPublicProDialogOpen} onOpenChange={setIsPublicProDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Pro Model</DialogTitle>
+                            <DialogDescription>
+                                {isAuthenticated
+                                    ? "Use your own project to test Pro models."
+                                    : "This model requires a Cencori account."}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-4 py-2">
+                            {isAuthenticated ? (
+                                <>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                        You&apos;re signed in. Open the dashboard to use Pro models
+                                        with your project and credits.
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <Button asChild size="sm" className="h-8 text-xs">
+                                            <Link href="/dashboard/organizations">Open Dashboard</Link>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            onClick={() => setIsPublicProDialogOpen(false)}
+                                        >
+                                            Continue with Free models
+                                        </Button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Create a free account to test premium models in the playground and
+                                        get full access to Cencori&apos;s AI infrastructure.
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <Button asChild size="sm" className="h-8 text-xs">
+                                            <Link href="/signup">Sign up free</Link>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            onClick={() => setIsPublicProDialogOpen(false)}
+                                        >
+                                            Continue with Free models
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            ) : (
+                <UpgradeDialog
+                    open={isUpgradeDialogOpen}
+                    onOpenChange={setIsUpgradeDialogOpen}
+                    orgId={orgId ?? ""}
+                    orgSlug={orgSlug ?? ""}
+                    reason="Upgrade to Pro to test premium models directly in the playground."
+                />
+            )}
+
+            {/* History Sidebar */}
+            <PlaygroundSidebar
+                open={sidebarOpen}
+                onToggle={() => setSidebarOpen((prev) => !prev)}
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onSelect={handleSelectSession}
+                onNew={handleNewChat}
+                onDelete={handleDeleteSession}
+                showSignupPrompt={isPublic && !isAuthenticated}
             />
+
+            {/* Floating Model Config — one fixed gear, separate cards per model */}
+            <button
+                type="button"
+                onClick={() => setConfigOpen((prev) => !prev)}
+                className={cn(
+                    "fixed right-4 top-16 md:top-1/2 md:-translate-y-1/2 z-50 flex items-center justify-center h-9 w-9 rounded-full border shadow-md transition-all cursor-pointer",
+                    configOpen
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-background text-muted-foreground/70 border-border/40 hover:text-foreground hover:border-border/60"
+                )}
+                title="Model configuration"
+            >
+                <Settings className="h-4 w-4" />
+            </button>
+            {configOpen && (
+                <div className="fixed right-[calc(1rem+2.25rem+0.75rem)] top-16 md:top-1/2 md:-translate-y-1/2 z-50 flex flex-col gap-2">
+                    {selectedModels.map((configModelId) => {
+                        const configModelObj = getModelObj(configModelId);
+                        const mc = modelConfig[configModelId] ?? defaultConfig;
+                        return (
+                            <div key={configModelId} className="w-64 rounded-2xl border border-border/40 bg-popover/95 backdrop-blur-xl shadow-2xl p-4 animate-in fade-in slide-in-from-right-2 duration-150">
+                                <div className="flex items-center gap-1.5 mb-3">
+                                    {configModelObj && (
+                                        <ProviderIcon providerId={configModelObj.providerId} size={11} />
+                                    )}
+                                    <span className="text-[10px] font-semibold text-foreground truncate">
+                                        {configModelObj?.name ?? configModelId}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-2.5">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Max Tokens</label>
+                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.maxTokens}</span>
+                                        </div>
+                                        <Slider
+                                            value={mc.maxTokens}
+                                            min={1}
+                                            max={16384}
+                                            step={256}
+                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, maxTokens: v } }))}
+                                            showValue={false}
+                                            size="sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Temperature</label>
+                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.temperature.toFixed(1)}</span>
+                                        </div>
+                                        <Slider
+                                            value={mc.temperature}
+                                            min={0}
+                                            max={2}
+                                            step={0.1}
+                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, temperature: v } }))}
+                                            showValue={false}
+                                            size="sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Freq Penalty</label>
+                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.frequencyPenalty.toFixed(1)}</span>
+                                        </div>
+                                        <Slider
+                                            value={mc.frequencyPenalty}
+                                            min={0}
+                                            max={2}
+                                            step={0.1}
+                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, frequencyPenalty: v } }))}
+                                            showValue={false}
+                                            size="sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Presence Penalty</label>
+                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.presencePenalty.toFixed(1)}</span>
+                                        </div>
+                                        <Slider
+                                            value={mc.presencePenalty}
+                                            min={0}
+                                            max={2}
+                                            step={0.1}
+                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, presencePenalty: v } }))}
+                                            showValue={false}
+                                            size="sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

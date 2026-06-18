@@ -135,6 +135,130 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
         countryCode = geo.country || null;
     }
 
+    // ── Public Playground (no auth required) ──
+    const publicPlaygroundHeader = req.headers.get('x-public-playground');
+    const playgroundProjectId = req.headers.get('x-playground-project-id');
+
+    if (publicPlaygroundHeader === 'true' && playgroundProjectId) {
+        const demoProjectId = process.env.NEXT_PUBLIC_DEMO_PROJECT_ID;
+        if (!demoProjectId || playgroundProjectId !== demoProjectId) {
+            return {
+                success: false,
+                response: addGatewayHeaders(
+                    NextResponse.json(
+                        { error: 'Invalid or missing public playground configuration' },
+                        { status: 403 }
+                    ),
+                    { requestId }
+                ),
+            };
+        }
+
+        const { data: project, error: pError } = await supabase
+            .from('projects')
+            .select(`
+                id,
+                name,
+                organization_id,
+                default_model,
+                default_provider,
+                end_user_billing_enabled,
+                organizations!inner(
+                    id,
+                    subscription_tier,
+                    monthly_requests_used,
+                    monthly_request_limit,
+                    credits_balance,
+                    billing_frozen
+                )
+            `)
+            .eq('id', demoProjectId)
+            .single();
+
+        if (!project || pError) {
+            return {
+                success: false,
+                response: addGatewayHeaders(
+                    NextResponse.json(
+                        { error: 'Public playground demo project not found' },
+                        { status: 500 }
+                    ),
+                    { requestId }
+                ),
+            };
+        }
+
+        const organization = project.organizations as unknown as {
+            id: string;
+            subscription_tier: string;
+            monthly_requests_used: number;
+            monthly_request_limit: number;
+            credits_balance: string | number | null;
+            billing_frozen: boolean | null;
+        };
+
+        // IP-based rate limiting for public playground (per IP, not per project)
+        const ipRateLimit = await checkRateLimit(`public_playground:${clientIp}`, {
+            requestId,
+            route: req.nextUrl.pathname,
+        });
+
+        if (!ipRateLimit.allowed) {
+            if (ipRateLimit.reason === 'backend_unavailable') {
+                return {
+                    success: false,
+                    response: addGatewayHeaders(
+                        NextResponse.json(
+                            { error: 'Rate limit unavailable' },
+                            { status: 503 }
+                        ),
+                        { requestId }
+                    ),
+                };
+            }
+            return {
+                success: false,
+                response: addGatewayHeaders(
+                    NextResponse.json(
+                        {
+                            error: 'Rate limit exceeded',
+                            message: 'Too many requests. Sign up for a free account to increase your limits.',
+                            retry_after_ms: ipRateLimit.reset - Date.now(),
+                        },
+                        { status: 429 }
+                    ),
+                    { requestId, rateLimit: ipRateLimit }
+                ),
+            };
+        }
+
+        const context: GatewayContext = {
+            supabase,
+            projectId: project.id,
+            organizationId: organization.id,
+            apiKeyId: null,
+            environment: 'production',
+            keyType: 'public_playground',
+            tier: 'free',
+            requestId,
+            startTime,
+            clientIp,
+            countryCode,
+            projectName: project.name,
+            defaultModel: project.default_model,
+            defaultProvider: project.default_provider,
+            endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
+            rateLimit: {
+                status: ipRateLimit.status,
+                limit: ipRateLimit.limit,
+                remaining: ipRateLimit.remaining,
+                reset: ipRateLimit.reset,
+            },
+        };
+
+        return { success: true, context };
+    }
+
     // ── Extract API Key ──
     const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
 

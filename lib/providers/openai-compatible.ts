@@ -66,6 +66,10 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
         baseURL: 'https://api.z.ai/api/paas/v4/',
         name: 'Z.AI',
     },
+    cerebras: {
+        baseURL: 'https://api.cerebras.ai/v1',
+        name: 'Cerebras',
+    },
 };
 
 /**
@@ -125,6 +129,8 @@ export class OpenAICompatibleProvider extends AIProvider {
                 max_tokens: request.maxTokens,
                 stream: false,
                 user: request.userId,
+                frequency_penalty: request.frequencyPenalty,
+                presence_penalty: request.presencePenalty,
             });
 
             // Handle usage - some providers may not return it
@@ -178,6 +184,8 @@ export class OpenAICompatibleProvider extends AIProvider {
                 max_tokens: request.maxTokens,
                 stream: true,
                 user: request.userId,
+                frequency_penalty: request.frequencyPenalty,
+                presence_penalty: request.presencePenalty,
             });
 
             for await (const chunk of stream) {

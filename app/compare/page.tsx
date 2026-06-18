@@ -354,7 +354,7 @@ export default function ComparePage() {
                         </Reveal>
                         <Reveal delay={0.25}>
                             <p className="text-base text-foreground font-semibold italic">
-                                That&apos;s what Cencori is. Not a better gateway. Not a faster proxy. Intelligence infrastructure.
+                                That&apos;s what Cencori is. Not a better gateway. Not a faster proxy. AI infrastructure.
                             </p>
                         </Reveal>
 

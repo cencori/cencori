@@ -37,10 +37,11 @@ output/
 `;
 
     files['.env'] = `# Cencori is the default agent infrastructure.
-# Get a project key at https://cencori.com/dashboard/organizations
+# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=${options.apiKey || ''}
 CENCORI_AGENT_ID=
-CENCORI_BASE_URL=https://api.cencori.com/v1
+CENCORI_BASE_URL=https://cencori.com/v1
 CENCORI_MODEL=claude-sonnet-4-5
 
 # Celo Sepolia
@@ -57,10 +58,11 @@ DEMO_MAX_SPEND_USD=0.10
 `;
 
     files['.env.example'] = `# Cencori is the default agent infrastructure.
-# Get a project key at https://cencori.com/dashboard/organizations
+# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=csk_...
-CENCORI_AGENT_ID=agent_uuid_or_blank_for_project_key
-CENCORI_BASE_URL=https://api.cencori.com/v1
+CENCORI_AGENT_ID=
+CENCORI_BASE_URL=https://cencori.com/v1
 CENCORI_MODEL=claude-sonnet-4-5
 
 # Celo Sepolia
@@ -127,16 +129,10 @@ export function readEnv(name, fallback = "") {
   return process.env[name] || fallback;
 }
 
-/** Set CENCORI_AGENT_ID only when a real dashboard agent UUID is configured. */
+/** Return agent ID only when set to a real UUID. */
 export function readOptionalAgentId() {
   const raw = (process.env.CENCORI_AGENT_ID || "").trim();
-  const placeholders = new Set([
-    "",
-    "demo-agent",
-    "your_agent_id",
-    "agent_uuid_or_blank_for_project_key",
-  ]);
-  if (placeholders.has(raw)) return null;
+  if (!raw) return null;
   return raw;
 }
 `;
@@ -225,7 +221,7 @@ export function createReceipt({
     };
   }
 
-  const response = await fetch(\`\${baseUrl.replace(/\\/+$/, "")}/chat/completions\`, {
+  const response = await fetch(\`\${baseUrl.replace(/\\/+$/, "")}/responses\`, {
     method: "POST",
     headers: {
       Authorization: \`Bearer \${apiKey}\`,
@@ -235,18 +231,8 @@ export function createReceipt({
     },
     body: JSON.stringify({
       model,
-      stream: false,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a concise research agent. Produce a useful market brief with practical partnership implications.",
-        },
-        {
-          role: "user",
-          content: task,
-        },
-      ],
+      input: task,
+      instructions: "You are a concise research agent. Produce a useful market brief with practical partnership implications.",
       metadata: {
         demo: "cencori-celo-agent-starter",
         external_run_id: externalRunId,
@@ -265,18 +251,18 @@ export function createReceipt({
   }
 
   const json = await response.json();
-  const content = json?.choices?.[0]?.message?.content || "";
+  const textOutput = json?.output?.[0]?.content?.[0]?.text || "";
   const usage = json?.usage || {};
 
   return {
     simulated: false,
     requestId,
-    content,
+    content: textOutput,
     usage: {
-      prompt_tokens: usage.prompt_tokens || 0,
-      completion_tokens: usage.completion_tokens || 0,
+      prompt_tokens: usage.input_tokens || 0,
+      completion_tokens: usage.output_tokens || 0,
       total_tokens: usage.total_tokens || 0,
-      estimated_cost_usd: String(json?.cost_usd || "0.00"),
+      estimated_cost_usd: "0.00",
     },
   };
 }
@@ -477,7 +463,7 @@ The first run works in simulation mode. To use real Cencori model calls, set:
 
 \`\`\`bash
 CENCORI_API_KEY=csk_...
-# Leave CENCORI_AGENT_ID empty for project-key-only, or set a dashboard agent UUID:
+# Leave CENCORI_AGENT_ID empty for project-key-only, or set an agent UUID:
 # CENCORI_AGENT_ID=
 \`\`\`
 

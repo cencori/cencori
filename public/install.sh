@@ -252,16 +252,17 @@ async function main() {
                 agentModel = chosen?.model || 'gpt-4o-mini';
             }
 
-            // Project key flow: user needs to get the agent's cake_ key
-            const agentUrl = dashboardUrl ? `${dashboardUrl}/agents/${agentId}` : 'your Cencori dashboard';
-
+            // Project key flow: user needs to create an agent-scoped API key
             p.note(
                 [
-                    `Go to your agent's Configuration tab and click "Generate Key".`,
+                    `Create an API key scoped to this agent:`,
                     '',
-                    `  ${agentUrl}`,
+                    `  curl -X POST ${CENCORI_API.replace('/api/agent/setup', '')}/v1/agents/${agentId}/keys \\`,
+                    `    -H "Authorization: Bearer YOUR_API_KEY" \\`,
+                    `    -H "Content-Type: application/json" \\`,
+                    `    -d '{"name": "cli-agent-key"}'`,
                     '',
-                    `Copy the cake_ key and paste it below.`,
+                    `Copy the full_key value (csk_...) and paste it below.`,
                 ].join('\n'),
                 `Generate key for "${agentName}"`
             );

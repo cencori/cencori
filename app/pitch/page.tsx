@@ -336,7 +336,7 @@ function PitchDeckContent() {
                         One stop shop to building<br />
                         the next generation of <em>AI companies.</em>
                     </div>
-                    <div className="s1-thesis"><strong>The Control Layer for Production AI</strong> — Intelligence Infrastructure</div>
+                    <div className="s1-thesis"><strong>The Control Layer for Production AI</strong> — AI Infrastructure</div>
                     <div className="s1-meta">
                         <div className="s1-meta-item"><label>Raising</label><span>$5,000,000</span></div>
                         <div className="s1-meta-item"><label>Instrument</label><span>SAFE</span></div>

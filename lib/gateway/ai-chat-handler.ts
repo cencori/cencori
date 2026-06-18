@@ -44,6 +44,7 @@ import {
 import { resolvePrompt, logPromptUsage } from '@/lib/prompts/registry';
 import type { ResolvedPrompt } from '@/lib/prompts/types';
 import { evaluateWithRagMetrics, extractRAGContext } from '@/lib/integrations/ragmetrics';
+import { estimateTokenCount } from '@/lib/providers/utils';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 
@@ -129,6 +130,8 @@ export async function POST(req: NextRequest) {
             userId,
             tools,
             toolChoice,
+            frequencyPenalty,
+            presencePenalty,
         } = body;
 
         if (!rawMessages || !Array.isArray(rawMessages)) {
@@ -473,6 +476,8 @@ export async function POST(req: NextRequest) {
             userId,
             tools: tools as Tool[] | undefined,
             toolChoice: toolChoice as UnifiedChatRequest['toolChoice'],
+            frequencyPenalty,
+            presencePenalty,
         };
 
         if (stream === true) {
@@ -484,6 +489,8 @@ export async function POST(req: NextRequest) {
                         let streamProvider = resolved.providerName;
                         let streamModel = resolved.model;
                         let streamUsedFallback = false;
+                        let tokenLimitReached = false;
+                        const effectiveMaxTokens = maxTokens || max_tokens;
 
                         for await (const chunk of streamGatewayChat({
                             supabase,
@@ -498,6 +505,12 @@ export async function POST(req: NextRequest) {
                             streamModel = chunk.actualModel;
                             streamUsedFallback = chunk.usedFallback;
                             fullContent += chunk.delta;
+
+                            // Server-side max_tokens enforcement
+                            // Some providers/models don't respect the max_tokens parameter
+                            if (effectiveMaxTokens && !tokenLimitReached && estimateTokenCount(fullContent) >= effectiveMaxTokens) {
+                                tokenLimitReached = true;
+                            }
 
                             const outputBlock = await runGatewayOutputGuard({
                                 supabase,
@@ -524,6 +537,120 @@ export async function POST(req: NextRequest) {
                             const delta = requestTokenMap
                                 ? deTokenize(chunk.delta, requestTokenMap)
                                 : chunk.delta;
+
+                            if (tokenLimitReached) {
+                                // Enqueue the delta that hit the limit, then finish with "length"
+                                const limitData: Record<string, unknown> = {
+                                    delta,
+                                    finish_reason: "length",
+                                };
+                                controller.enqueue(
+                                    encoder.encode(`data: ${JSON.stringify(limitData)}\n\n`)
+                                );
+                                // Jump to DB logging (same as normal finish block)
+                                const promptTokens = await resolved.provider.countTokens(
+                                    unifiedMessages.map((m) => m.content).join(' '),
+                                    streamModel
+                                );
+                                const completionTokens = await resolved.provider.countTokens(
+                                    fullContent,
+                                    streamModel
+                                );
+                                const pricing = await resolved.provider.getPricing(streamModel);
+                                const cost =
+                                    (promptTokens / 1000) * pricing.inputPer1KTokens
+                                    + (completionTokens / 1000) * pricing.outputPer1KTokens;
+                                const charge = cost * (1 + pricing.cencoriMarkupPercentage / 100);
+
+                                const { data: streamLogData } = await supabase
+                                    .from('ai_requests')
+                                    .insert({
+                                        project_id: ctx.projectId,
+                                        api_key_id: ctx.apiKeyId,
+                                        environment: ctx.environment,
+                                        provider: streamProvider,
+                                        model: streamModel,
+                                        prompt_tokens: promptTokens,
+                                        completion_tokens: completionTokens,
+                                        total_tokens: promptTokens + completionTokens,
+                                        cost_usd: cost,
+                                        provider_cost_usd: cost,
+                                        cencori_charge_usd: charge,
+                                        markup_percentage: pricing.cencoriMarkupPercentage,
+                                        latency_ms: Date.now() - startTime,
+                                        status: streamUsedFallback ? 'success_fallback' : 'success',
+                                        end_user_id: userId,
+                                        request_payload: { messages, model, stream: true },
+                                        response_payload: { content: fullContent },
+                                        ip_address: ctx.clientIp,
+                                        country_code: ctx.countryCode,
+                                    })
+                                    .select('id')
+                                    .single();
+
+                                await chargeUsageCredits(
+                                    supabase,
+                                    ctx.organizationId,
+                                    tier,
+                                    charge,
+                                    streamLogData?.id ?? null,
+                                    ROUTE
+                                );
+                                await incrementMonthlyUsage(
+                                    supabase,
+                                    ctx.organizationId,
+                                    currentUsage
+                                );
+
+                                if (ctx.endUserBillingEnabled && userId && endUserQuota) {
+                                    recordEndUserUsage({
+                                        projectId: ctx.projectId,
+                                        externalUserId: userId,
+                                        environment: ctx.environment,
+                                        tokens: {
+                                            prompt: promptTokens,
+                                            completion: completionTokens,
+                                            total: promptTokens + completionTokens,
+                                        },
+                                        cost: {
+                                            providerUsd: cost,
+                                            cencoriChargeUsd: charge,
+                                        },
+                                        customerMarkupPercentage: endUserQuota.markupPercentage,
+                                        flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                                        currency: endUserQuota.currency,
+                                        pricingModel: endUserQuota.pricingModel,
+                                        pricingTiers: endUserQuota.pricingTiers,
+                                        monthlyTokensUsed: endUserQuota.monthlyTokensUsed,
+                                        platformCommissionPercentage:
+                                            endUserQuota.platformCommissionPercentage,
+                                    });
+                                }
+
+                                if (streamLogData?.id) {
+                                    evaluateWithRagMetrics({
+                                        projectId: ctx.projectId,
+                                        requestId: streamLogData.id,
+                                        prompt: unifiedMessages
+                                            .map((m) => `${m.role}: ${m.content}`)
+                                            .join('\n'),
+                                        response: fullContent,
+                                        context: extractRAGContext(unifiedMessages),
+                                        metadata: {
+                                            model: streamModel,
+                                            provider: streamProvider,
+                                            is_streaming: true,
+                                        },
+                                    }).catch((err) =>
+                                        console.error('[RagMetrics] Evaluation failed:', err)
+                                    );
+                                }
+
+                                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                                controller.close();
+                                return;
+                            }
+
                             const chunkData: Record<string, unknown> = {
                                 delta,
                                 finish_reason: chunk.finishReason,
@@ -708,6 +835,13 @@ export async function POST(req: NextRequest) {
         let content = result.content;
         if (requestTokenMap) {
             content = deTokenize(content, requestTokenMap);
+        }
+
+        // Server-side max_tokens enforcement for non-streaming
+        const nonStreamMaxTokens = maxTokens || max_tokens;
+        if (nonStreamMaxTokens && estimateTokenCount(content) > nonStreamMaxTokens) {
+            content = content.slice(0, nonStreamMaxTokens * 4);
+            result.content = content;
         }
 
         const outputBlock = await runGatewayOutputGuard({

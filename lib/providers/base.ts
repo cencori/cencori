@@ -62,6 +62,8 @@ export interface UnifiedChatRequest {
     truncation?: 'auto' | 'disabled';
     /** Whether to allow parallel tool calls (default: true) */
     parallelToolCalls?: boolean;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
 }
 
 /**

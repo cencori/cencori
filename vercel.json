@@ -2,82 +2,46 @@
     "rewrites": [
         {
             "source": "/v1/chat/completions",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/ai/chat"
         },
         {
             "source": "/v1/completions",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/ai/chat"
         },
         {
             "source": "/v1/models",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/models"
         },
         {
             "source": "/v1/metrics",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/metrics"
         },
         {
             "source": "/v1/responses",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/responses"
         },
         {
+            "source": "/v1/agents",
+            "destination": "/api/v1/agents"
+        },
+        {
+            "source": "/v1/agents/:path*",
+            "destination": "/api/v1/agents/:path*"
+        },
+        {
+            "source": "/v1/agent/actions/poll",
+            "destination": "/api/v1/agent/actions/poll"
+        },
+        {
             "source": "/v1/billing/:path*",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/billing/:path*"
         },
         {
             "source": "/v1/telemetry/scan",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/telemetry/scan"
         },
         {
             "source": "/v1/telemetry/web",
-            "has": [
-                {
-                    "type": "host",
-                    "value": "api.cencori.com"
-                }
-            ],
             "destination": "/api/v1/telemetry/web"
         },
         {

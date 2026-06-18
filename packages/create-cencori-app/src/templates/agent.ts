@@ -35,10 +35,11 @@ output/
 `;
 
     files['.env'] = `# Cencori is the agent infrastructure.
-# Get a project key at https://cencori.com/dashboard/organizations
+# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=${options.apiKey || ''}
 CENCORI_AGENT_ID=
-CENCORI_BASE_URL=https://api.cencori.com/v1
+CENCORI_BASE_URL=https://cencori.com/v1
 CENCORI_MODEL=claude-sonnet-4-5
 
 # Demo controls
@@ -47,10 +48,11 @@ AGENT_MAX_SPEND_USD=0.10
 `;
 
     files['.env.example'] = `# Cencori is the agent infrastructure.
-# Get a project key at https://cencori.com/dashboard/organizations
+# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=csk_...
-CENCORI_AGENT_ID=agent_uuid_or_blank_for_project_key
-CENCORI_BASE_URL=https://api.cencori.com/v1
+CENCORI_AGENT_ID=
+CENCORI_BASE_URL=https://cencori.com/v1
 CENCORI_MODEL=claude-sonnet-4-5
 
 # Demo controls
@@ -88,16 +90,10 @@ export function readEnv(name, fallback = "") {
   return process.env[name] || fallback;
 }
 
-/** Set CENCORI_AGENT_ID only when a real dashboard agent UUID is configured. */
+/** Return agent ID only when set to a real UUID. */
 export function readOptionalAgentId() {
   const raw = (process.env.CENCORI_AGENT_ID || "").trim();
-  const placeholders = new Set([
-    "",
-    "demo-agent",
-    "your_agent_id",
-    "agent_uuid_or_blank_for_project_key",
-  ]);
-  if (placeholders.has(raw)) return null;
+  if (!raw) return null;
   return raw;
 }
 `;
@@ -183,7 +179,7 @@ export function hashRunReceipt(receipt) {
     };
   }
 
-  const response = await fetch(\`\${baseUrl.replace(/\\/+$/, "")}/chat/completions\`, {
+  const response = await fetch(\`\${baseUrl.replace(/\\/+$/, "")}/responses\`, {
     method: "POST",
     headers: {
       Authorization: \`Bearer \${apiKey}\`,
@@ -193,18 +189,8 @@ export function hashRunReceipt(receipt) {
     },
     body: JSON.stringify({
       model,
-      stream: false,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a concise production agent. Return a useful answer and keep the output practical.",
-        },
-        {
-          role: "user",
-          content: task,
-        },
-      ],
+      input: task,
+      instructions: "You are a concise production agent. Return a useful answer and keep the output practical.",
       metadata: {
         demo: "cencori-agent-starter",
         external_run_id: externalRunId,
@@ -223,18 +209,18 @@ export function hashRunReceipt(receipt) {
   }
 
   const json = await response.json();
-  const content = json?.choices?.[0]?.message?.content || "";
+  const textOutput = json?.output?.[0]?.content?.[0]?.text || "";
   const usage = json?.usage || {};
 
   return {
     simulated: false,
     requestId,
-    content,
+    content: textOutput,
     usage: {
-      prompt_tokens: usage.prompt_tokens || 0,
-      completion_tokens: usage.completion_tokens || 0,
+      prompt_tokens: usage.input_tokens || 0,
+      completion_tokens: usage.output_tokens || 0,
       total_tokens: usage.total_tokens || 0,
-      estimated_cost_usd: String(json?.cost_usd || "0.00"),
+      estimated_cost_usd: "0.00",
     },
   };
 }
@@ -311,17 +297,16 @@ console.log("");
 
 Cencori Agent Starter.
 
-This is the default Cencori-native agent scaffold. It is intentionally not tied to one integration. Integrations like Celo, MiniPay, x402, GitHub, Slack, databases, and MCP can be layered on top.
+This scaffold demonstrates connecting an agent to the Cencori AI infrastructure — gateway, billing, security, and observability. Integrations for Celo, MiniPay, Slack, GitHub, databases, and MCP can be layered on top.
 
 \`\`\`text
-Cencori for agent infrastructure.
-Integrations for where agents act.
+Cencori for AI infrastructure.
 \`\`\`
 
 ## What You Get
 
-- Cencori Gateway wired in by default.
-- A default agent task.
+- Cencori Responses API wired in by default.
+- A demo agent task.
 - A structured agent run receipt.
 - A receipt hash for local proof/debugging.
 - Simulation mode when keys are missing, so the starter runs immediately.
@@ -332,11 +317,19 @@ Integrations for where agents act.
 npm run demo
 \`\`\`
 
-The first run works in simulation mode. To use real Cencori model calls, set:
+The first run works in simulation mode. To use real Cencori model calls:
 
 \`\`\`bash
 CENCORI_API_KEY=csk_...
-CENCORI_AGENT_ID=your_agent_id
+\`\`\`
+
+Set \`CENCORI_AGENT_ID\` to an agent UUID to enable agent-scoped features (built-in tools, shadow mode). Create one via the API:
+
+\`\`\`bash
+curl -X POST https://cencori.com/v1/agents \\
+  -H "Authorization: Bearer \${CENCORI_API_KEY}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "my-agent", "config": {"model": "claude-sonnet-4-5", "system_prompt": "You are a helpful assistant."}}'
 \`\`\`
 
 ## Expected Output
@@ -367,7 +360,7 @@ Use this starter for:
 
 ## Add Integrations
 
-For Celo agent economy features, use:
+For Celo agent economy features:
 
 \`\`\`bash
 npx create-cencori-app my-agent --template celo-agent

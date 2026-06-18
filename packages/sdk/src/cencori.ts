@@ -41,7 +41,7 @@ import {
     SafetyError
 } from './errors';
 
-const DEFAULT_BASE_URL = 'https://cencori.com';
+const DEFAULT_BASE_URL = 'https://api.cencori.com';
 
 interface ErrorResponse {
     error?: string;

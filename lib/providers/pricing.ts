@@ -15,8 +15,29 @@ export async function getPricingFromDB(
     model: string
 ): Promise<ModelPricing> {
     const FREE_MODELS = [
+        // Groq free tier
         'llama-3.3-70b-versatile',
-        'llama-3.1-8b-instant'
+        'llama-3.1-8b-instant',
+        'llama-4-maverick',
+        'llama-4-scout',
+        'mixtral-8x7b-32768',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'qwen/qwen3-32b',
+        'moonshotai/kimi-k2-instruct',
+        'groq/compound',
+        'groq/compound-mini',
+        'allam-2-7b',
+        // HuggingFace Inference (rate-limited free)
+        'deepseek-ai/DeepSeek-V4-Flash',
+        'axiveri/africlaude-7b',
+        'meta-llama/Llama-4-Maverick',
+        'meta-llama/Llama-3.3-70B-Instruct',
+        'Qwen/Qwen2.5-72B-Instruct',
+        'mistralai/Mistral-Large-3',
+        // Cerebras free tier
+        'gpt-oss-120b',
+        'zai-glm-4.7',
     ];
     
     // Intercept natively free models before any DB queries for 0-latency pricing

@@ -13,6 +13,26 @@ const MODEL_ALIASES: Record<string, string> = {
     'gpt-5.3': 'gpt-5.3-chat-latest',
 };
 
+// Explicit model-to-provider mapping for models whose IDs would route to the wrong provider via prefix matching
+const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
+    // Cerebras (gpt-oss- conflicts with gpt- → openai)
+    'gpt-oss-120b': 'cerebras',
+    'zai-glm-4.7': 'cerebras',
+    // HuggingFace (deepseek- prefix → deepseek, / prefix → wrong org, llama- → groq)
+    'deepseek-ai/DeepSeek-V4-Flash': 'huggingface',
+    'axiveri/africlaude-7b': 'huggingface',
+    'Qwen/Qwen2.5-72B-Instruct': 'huggingface',
+    'mistralai/Mistral-Large-3': 'huggingface',
+    'meta-llama/Llama-3.3-70B-Instruct': 'huggingface',
+    'meta-llama/Llama-4-Maverick': 'huggingface',
+    // Groq (conflict with openai/qwen/moonshot prefixes)
+    'openai/gpt-oss-120b': 'groq',
+    'openai/gpt-oss-20b': 'groq',
+    'qwen/qwen3-32b': 'groq',
+    'moonshotai/kimi-k2-instruct': 'groq',
+    'allam-2-7b': 'groq',
+};
+
 /**
  * Provider Router Class
  * Manages provider instances and routes requests to the correct provider
@@ -32,6 +52,10 @@ export class ProviderRouter {
      * Returns the provider identifier
      */
     detectProvider(modelName: string): string {
+        // Check explicit model-to-provider overrides first (handles ambiguous prefixes)
+        const override = MODEL_PROVIDER_OVERRIDES[modelName];
+        if (override) return override;
+
         // OpenAI models
         if (modelName.startsWith('gpt-') ||
             modelName.startsWith('o1-') ||
@@ -156,11 +180,26 @@ export class ProviderRouter {
 
     /**
      * Normalize model name
-     * If model has provider prefix, extract just the model name
+     * If model has a provider prefix and it differs from the detected provider,
+     * strip the prefix (routing prefix). If it matches, keep it (namespace).
+     * HuggingFace models always keep their full author/model ID.
      */
-    normalizeModelName(modelName: string): string {
-        const rawModel = modelName.includes('/') ? modelName.split('/').slice(1).join('/') : modelName;
-        return MODEL_ALIASES[rawModel] || rawModel;
+    normalizeModelName(modelName: string, detectedProvider?: string): string {
+        if (modelName.includes('/')) {
+            // HuggingFace model IDs use author/model format — never strip
+            if (detectedProvider === 'huggingface') {
+                return MODEL_ALIASES[modelName] || modelName;
+            }
+            const [prefix] = modelName.split('/');
+            if (detectedProvider && prefix === detectedProvider) {
+                // Prefix matches provider — it's a namespace, keep the full name
+                return MODEL_ALIASES[modelName] || modelName;
+            }
+            // Prefix differs — it's a routing prefix, strip it
+            const rawModel = modelName.split('/').slice(1).join('/');
+            return MODEL_ALIASES[rawModel] || rawModel;
+        }
+        return MODEL_ALIASES[modelName] || modelName;
     }
 }
 
