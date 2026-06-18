@@ -72,3 +72,6 @@ docs/prds/CENCORI_CELO_AGENTS_HACKATHON_BRIEF.md
 examples/celo-agent-receipts/output/
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# fumadocs generated source
+.source

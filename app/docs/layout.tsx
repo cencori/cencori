@@ -1,50 +1,47 @@
-import { Metadata } from "next";
-import { DocsLayout } from "@/components/docs/DocsLayout";
-import { DocsNavbarWrapper } from "@/components/docs/DocsNavbarWrapper";
-import { Footer } from "@/components/landing/Footer";
+import { DocsPageTransition } from "@/components/docs/layout/page-transition";
+import { SidebarInset, SidebarProvider } from "@/components/docs/ui/sidebar";
+import DecorativeBorder from "@/components/docs/layout/decorative-border-svg";
+import DocsHeader from "@/components/docs/sidebar/header";
+import { DocsSidebar } from "@/components/docs/sidebar";
 import { DocsProvider } from "@/components/docs/DocsContext";
-import { DocsContentWrapper } from "@/components/docs/DocsContentWrapper";
-import { DocsSidebarWrapper } from "@/components/docs/DocsSidebarWrapper";
-import { buildOgImageUrl } from "@/lib/og";
-
-const docsOgImage = buildOgImageUrl({
-    title: "Documentation",
-    subtitle: "Guides, API reference, and tutorials",
-    type: "docs",
-});
+import { DocsAskAI } from "@/components/docs/DocsAskAI";
+import { cn } from "@/lib/utils";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Documentation",
-    description: "Cencori documentation - guides, API reference, and tutorials.",
-    openGraph: {
-        title: "Documentation | Cencori",
-        description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: [docsOgImage],
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: "Documentation | Cencori",
-        description: "Cencori documentation - guides, API reference, and tutorials.",
-        images: [docsOgImage],
-    },
+  title: { default: "Documentation", template: "%s — Cencori Docs" },
+  description: "Cencori documentation — guides, API reference, and tutorials.",
 };
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-    return (
-        <DocsProvider>
+export default function DocsRouteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <DocsProvider>
+      <div className="docs-theme font-inter bg-sidebar text-foreground">
+        <SidebarProvider>
+          <DocsSidebar />
+          <div
+            className={cn("bg-sidebar w-full", "p-0 sm:py-2 sm:pr-2 sm:pl-4")}
+          >
+            <DecorativeBorder />
             <div
-                className="flex min-h-screen flex-col"
-                style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}
+              className={cn(
+                "no-scrollbar bg-background overflow-x-hidden overflow-y-auto sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
+                "sm:rounded-tl-md sm:rounded-br-xl sm:rounded-bl-md",
+              )}
             >
-                <DocsNavbarWrapper />
-
-                <DocsContentWrapper>
-                    <DocsLayout>{children}</DocsLayout>
-                    <Footer />
-                </DocsContentWrapper>
-
-                <DocsSidebarWrapper />
+              <SidebarInset>
+                <DocsHeader />
+                <DocsPageTransition>{children}</DocsPageTransition>
+              </SidebarInset>
             </div>
-        </DocsProvider>
-    );
+          </div>
+        </SidebarProvider>
+        <DocsAskAI />
+      </div>
+    </DocsProvider>
+  );
 }
