@@ -1,5 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+
+/* Patch: fumadocs-ui uses @apply -inset-s-4 but Tailwind v4 doesn't auto-generate
+   negative logical property variants. Define it explicitly before the fumadocs imports. */
+@utility -inset-s-4 {
+  inset-inline-start: calc(var(--spacing) * -4);
+}
+
 @import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
 
