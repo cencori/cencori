@@ -29,6 +29,17 @@ import Link from "next/link";
 // Cencori docs surface every page in the sidebar.
 const EXCLUDED_PAGES: string[] = [];
 
+const SIDEBAR_NAME_OVERRIDES: Record<string, string> = {
+    ai: 'AI',
+    api: 'API',
+};
+
+function formatSidebarName(name: string): string {
+    const lower = name.toLowerCase();
+    if (SIDEBAR_NAME_OVERRIDES[lower]) return SIDEBAR_NAME_OVERRIDES[lower];
+    return name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function TreeIndicator({
   activeTrigger,
   hasActiveChild,
@@ -209,7 +220,7 @@ export function NavMain({
                     onClick={handleLinkClick}
                   >
                     {getNavItemIcon(String(item.name))}
-                    <span className="capitalize">{item.name}</span>
+                    <span>{formatSidebarName(String(item.name))}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -234,7 +245,7 @@ export function NavMain({
                     isActive={hasActiveChild}
                   >
                     {getNavItemIcon(String(item.name))}
-                    <span className="capitalize">{item.name}</span>
+                    <span>{formatSidebarName(String(item.name))}</span>
                     <ChevronRight
                       className={cn(
                         "ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90",
