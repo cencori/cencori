@@ -1,9 +1,11 @@
 import { DocsTableOfContents } from "@/components/docs/mdx/components/table-of-content";
 import { FeedbackButtons } from "@/components/docs/mdx/components/feedback-buttons";
+import { DocsCopyPage } from "@/components/docs/layout/docs-copy-button";
 import { MDXNavigation } from "@/components/docs/mdx/components/navigation";
 import { findNeighbour } from "fumadocs-core/page-tree";
 import { mdxComponents } from "@/components/docs/mdx";
 import { notFound } from "next/navigation";
+import { absoluteUrl } from "@/lib/utils";
 import { LinkIcon } from "lucide-react";
 import { source } from "@/lib/source";
 import type { Metadata } from "next";
@@ -12,9 +14,9 @@ export function generateStaticParams() {
   return source.generateParams();
 }
 
-export async function generateMetadata(props: {
-  params: Promise<{ slug?: string[] }>;
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: PageProps<"/docs/[[...slug]]">,
+): Promise<Metadata> {
   const params = await props.params;
   const page = source.getPage(params.slug);
   if (!page) return {};
@@ -28,9 +30,7 @@ export async function generateMetadata(props: {
   };
 }
 
-export default async function Page(props: {
-  params: Promise<{ slug?: string[] }>;
-}) {
+export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params;
   const page = source.getPage(params.slug);
 
@@ -42,6 +42,8 @@ export default async function Page(props: {
   const MDX = doc.body;
   const links = doc.links;
   const neighbours = findNeighbour(source.pageTree, page.url);
+
+  const raw = await page.data.getText("raw");
 
   return (
     <div className="relative mt-10 flex sm:mt-0">
@@ -72,6 +74,7 @@ export default async function Page(props: {
               </div>
             )}
           </div>
+          <div>{raw && <DocsCopyPage mdx={raw} url={absoluteUrl(page.url)} />}</div>
         </div>
         <div className="text-primary/80 mt-8 w-full min-w-0 flex-1 text-[14px] *:data-[slot=alert]:first:mt-0">
           <MDX components={mdxComponents} />

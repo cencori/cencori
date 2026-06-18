@@ -1,38 +1,38 @@
 "use client";
 
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  AiBrain01Icon,
-  ApiIcon,
-  Rocket01Icon,
-  Flag01Icon,
-  Download04Icon,
-  BookOpen01Icon,
-  Award01Icon,
-  PlugSocketIcon,
-  Layers01Icon,
-  Shield01Icon,
-} from "@hugeicons/core-free-icons";
+  HouseIcon,
+  AddMagicIcon,
+  SquareAddonIcon,
+  BookIcon,
+  ShapesIcon,
+  InfoIcon,
+  ChartConfigIcon,
+  BarChartIcon,
+} from "@/assets/icons";
 
-// Maps a docs nav key (root page slug or folder name) → a HugeIcons icon.
-const ICON_MAP: Record<string, typeof AiBrain01Icon> = {
+type IconComponent = React.FC<{ width?: string | number; height?: string | number; className?: string }>;
+
+const ICON_MAP: Record<string, IconComponent> = {
   // Get Started (root pages)
-  introduction: Rocket01Icon,
-  "quick-start": Flag01Icon,
-  installation: Download04Icon,
+  "get-started": HouseIcon,
+  overview: HouseIcon,
+  introduction: HouseIcon,
+  "quick-start": AddMagicIcon,
+  installation: SquareAddonIcon,
   // Folders
-  ai: AiBrain01Icon,
-  api: ApiIcon,
-  "getting-started": BookOpen01Icon,
-  guides: BookOpen01Icon,
-  hackathons: Award01Icon,
-  integrations: PlugSocketIcon,
-  platform: Layers01Icon,
-  security: Shield01Icon,
+  ai: BarChartIcon,
+  api: ChartConfigIcon,
+  "getting-started": BookIcon,
+  guides: BookIcon,
+  hackathons: AddMagicIcon,
+  integrations: SquareAddonIcon,
+  platform: ShapesIcon,
+  security: InfoIcon,
 };
 
 export function getNavItemIcon(key: string, className = "size-4 shrink-0") {
   const norm = key.toLowerCase().replace(/\s+/g, "-");
-  const icon = ICON_MAP[norm] ?? BookOpen01Icon;
-  return <HugeiconsIcon icon={icon} className={className} />;
+  const Icon = ICON_MAP[norm] ?? BookIcon;
+  return <Icon className={className} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { CheckIcon, CopyIcon } from "@/assets/icons";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ const CopyButton = ({
       size="icon"
       onClick={() => copy(code)}
     >
-      {copied ? <Check /> : <Copy />}
+      {copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
     </Button>
   );
 };

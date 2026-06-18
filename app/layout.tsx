@@ -9,14 +9,20 @@ import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBr
 import Script from "next/script";
 import {
   Geist,
+  Inter,
   Newsreader,
   Playfair_Display,
   JetBrains_Mono,
 } from "next/font/google";
 import { cn } from "@/lib/cn";
 
-// Self-hosted Google Fonts via the Next.js standard (next/font) — no render-blocking <link> tags.
-// Variable names are kept in sync with the --font-* chain in app/globals.css.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+  fallback: ["system-ui", "arial"],
+});
+
 const geistSans = Geist({
   subsets: ["latin"],
   variable: "--font-geist-sans",
@@ -254,6 +260,7 @@ export default function RootLayout({
       className={cn(
         "antialiased",
         geistSans.variable,
+        inter.variable,
         mono.variable,
         newsreader.variable,
         playfairDisplay.variable,

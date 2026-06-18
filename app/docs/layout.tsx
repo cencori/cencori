@@ -1,3 +1,4 @@
+import { DocsPageTransition } from "@/components/docs/layout/page-transition";
 import { SidebarInset, SidebarProvider } from "@/components/docs/ui/sidebar";
 import DecorativeBorder from "@/components/docs/layout/decorative-border-svg";
 import DocsHeader from "@/components/docs/sidebar/header";
@@ -19,23 +20,25 @@ export default function DocsRouteLayout({
 }) {
   return (
     <DocsProvider>
-      <div className="docs-theme bg-sidebar text-foreground">
+      <div className="docs-theme font-inter bg-sidebar text-foreground">
         <SidebarProvider>
-        <DocsSidebar />
-        <div className={cn("bg-sidebar w-full", "p-0 sm:py-2 sm:pr-2 sm:pl-4")}>
-          <DecorativeBorder />
+          <DocsSidebar />
           <div
-            className={cn(
-              "no-scrollbar bg-background overflow-x-hidden overflow-y-auto sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
-              "sm:rounded-tl-md sm:rounded-br-xl sm:rounded-bl-md",
-            )}
+            className={cn("bg-sidebar w-full", "p-0 sm:py-2 sm:pr-2 sm:pl-4")}
           >
-            <SidebarInset>
-              <DocsHeader />
-              <>{children}</>
-            </SidebarInset>
+            <DecorativeBorder />
+            <div
+              className={cn(
+                "no-scrollbar bg-background overflow-x-hidden overflow-y-auto sm:h-[calc(100vh-1rem)] sm:overscroll-none sm:border",
+                "sm:rounded-tl-md sm:rounded-br-xl sm:rounded-bl-md",
+              )}
+            >
+              <SidebarInset>
+                <DocsHeader />
+                <DocsPageTransition>{children}</DocsPageTransition>
+              </SidebarInset>
+            </div>
           </div>
-        </div>
         </SidebarProvider>
         <DocsAskAI />
       </div>

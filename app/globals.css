@@ -1,19 +1,21 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/preset.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Docs (evilcharts) utilities — were missing in cencori */
+/* Docs utilities */
 @utility no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
 }
 
 @utility docs-container {
-  @apply mx-auto w-full max-w-2xl px-4;
+    @apply mx-auto w-full max-w-2xl px-4;
 }
 
 @theme inline {
@@ -24,6 +26,7 @@
     --color-foreground: var(--foreground);
     --font-mono: var(--font-mono);
     --font-sans: var(--font-geist-sans);
+    --font-inter: var(--font-inter);
     --font-serif: var(--font-newsreader);
     --font-heading: var(--font-playfair);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -135,7 +138,7 @@
     --color-vesper-string: oklch(0.93 0.1035 175.07);
 }
 
-/* ── Docs route theme (evilcharts OKLCH palette), scoped to .docs-theme only ── */
+/* ── Docs route theme  scoped to .docs-theme only ── */
 .docs-theme {
     --radius: 0.525rem;
     --background: oklch(1 0 0);
@@ -226,6 +229,9 @@
     }
     .maplibregl-popup-tip {
         @apply hidden!;
+    }
+    button {
+        @apply cursor-pointer;
     }
 }
 
