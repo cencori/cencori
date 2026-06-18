@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsList, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { Package } from "lucide-react";
+import { NpmIcon, YarnIcon, BunIcon, PnpmIcon } from "@/assets/icons";
 import { useState } from "react";
 import CopyButton from "./copy-button";
 
@@ -31,31 +31,31 @@ function CommandBlock({ commands }: CommandBlockProps) {
         <div className="flex flex-row items-center justify-between pr-1 pl-2">
           <TabsList>
             <TabsTrigger
-              className="h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#C3292F]"
+              className="flex items-center h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#C3292F]"
               value="npm"
             >
-              <Package className="size-3" />
+              <NpmIcon width="12" height="12" className="shrink-0 overflow-hidden" />
               npm
             </TabsTrigger>
             <TabsTrigger
-              className="h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#3592BD]"
+              className="flex items-center h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#3592BD]"
               value="yarn"
             >
-              <Package className="size-3" />
+              <YarnIcon width="12" height="12" className="shrink-0 overflow-hidden" />
               yarn
             </TabsTrigger>
             <TabsTrigger
-              className="data-[state=active]:text-primary h-5! gap-2 px-1.5 hover:bg-transparent!"
+              className="flex items-center data-[state=active]:text-primary h-5! gap-2 px-1.5 hover:bg-transparent!"
               value="bun"
             >
-              <Package className="size-3" />
+              <BunIcon width="12" height="12" className="shrink-0 overflow-hidden" />
               bun
             </TabsTrigger>
             <TabsTrigger
-              className="h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#FAAF18]"
+              className="flex items-center h-5! gap-2 px-1.5 hover:bg-transparent! data-[state=active]:text-[#FAAF18]"
               value="pnpm"
             >
-              <Package className="size-3" />
+              <PnpmIcon width="12" height="12" className="shrink-0 overflow-hidden" />
               pnpm
             </TabsTrigger>
           </TabsList>

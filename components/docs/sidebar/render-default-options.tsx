@@ -10,6 +10,7 @@ import {
 } from "@/components/docs/ui/sidebar";
 import { getNavItemIcon } from "./nav-icons";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -43,9 +44,17 @@ export function RenderDefaultOptions({
           const isActive = pathname === item.url;
           return (
             <SidebarMenuItem key={item.url}>
+              {isActive && (
+                <motion.span
+                  layoutId="sidebar-pill"
+                  className="absolute inset-0 rounded-md bg-sidebar-accent"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
               <SidebarMenuButton
                 asChild
                 className={cn(
+                  "relative z-10 data-[active=true]:bg-transparent",
                   !isActive &&
                     "text-muted-foreground/90 dark:text-muted-foreground/80 hover:text-primary dark:hover:text-primary",
                 )}

@@ -12,7 +12,11 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/docs/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { getNavItemIcon } from "./nav-icons";
 import { usePathname } from "next/navigation";
@@ -37,7 +41,7 @@ function TreeIndicator({
   return (
     <svg
       className={cn(
-        "text-muted pointer-events-none absolute z-10 ml-[5px] flex h-full w-5! duration-200",
+        "text-muted pointer-events-none absolute z-10 ml-1.25 flex h-full w-5! duration-200",
       )}
     >
       <ellipse
@@ -163,7 +167,8 @@ export function NavMain({
 
           // Filter out pages that are in EXCLUDED_PAGES
           const visibleChildren = item.children.filter(
-            (child) => child.type === "page" && !EXCLUDED_PAGES.includes(child.url),
+            (child) =>
+              child.type === "page" && !EXCLUDED_PAGES.includes(child.url),
           );
 
           // Skip folder if no visible children
@@ -171,18 +176,28 @@ export function NavMain({
 
           // Check if any child is active (matches current pathname)
           const hasActiveChild = item.children.some(
-            (child) => child.type === "page" && child.url === activeTrigger?.url,
+            (child) =>
+              child.type === "page" && child.url === activeTrigger?.url,
           );
 
-          // If there is only one child, show it directly as clickable element 
+          // If there is only one child, show it directly as clickable element
           if (visibleChildren.length === 1) {
             const singleChild = visibleChildren[0];
-            const isActive = singleChild.type === "page" && singleChild.url === pathname;
+            const isActive =
+              singleChild.type === "page" && singleChild.url === pathname;
 
             return (
               <SidebarMenuItem key={item.$id}>
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-pill"
+                    className="absolute inset-0 rounded-md bg-sidebar-accent"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
                 <SidebarMenuButton
                   className={cn(
+                    "relative z-10 data-[active=true]:bg-transparent",
                     !isActive &&
                       "text-muted-foreground/90 dark:text-muted-foreground/80 hover:text-primary dark:hover:text-primary",
                   )}
@@ -250,9 +265,17 @@ export function NavMain({
                           key={subItem.$id}
                           className={cn("relative flex w-full")}
                         >
+                          {isActive && (
+                            <motion.span
+                              layoutId="sidebar-pill"
+                              className="absolute inset-0 rounded-md bg-sidebar-accent"
+                              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                            />
+                          )}
                           <SidebarMenuSubButton
+                            isActive={isActive}
                             className={cn(
-                              "w-full pl-8",
+                              "relative z-10 w-full pl-8 data-[active=true]:bg-transparent",
                               !isActive &&
                                 "text-muted-foreground/90 dark:text-muted-foreground/80 hover:text-primary dark:hover:text-primary",
                             )}

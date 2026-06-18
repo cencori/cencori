@@ -1,0 +1,16 @@
+{
+  "root": true,
+  "pages": [
+    "introduction",
+    "quick-start",
+    "installation",
+    "getting-started",
+    "ai",
+    "api",
+    "platform",
+    "security",
+    "integrations",
+    "guides",
+    "hackathons"
+  ]
+}

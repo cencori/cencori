@@ -7,7 +7,13 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 import { ApiTable, ApiRow, ApiHeading } from "./components/api-reference";
-import { Step, Steps, StepTitle, StepContent, StepDescription } from "./components/steps";
+import {
+  Step,
+  Steps,
+  StepTitle,
+  StepContent,
+  StepDescription,
+} from "./components/steps";
 import { Tabs, TabsList, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { H1, H2, H3, H4, H5, H6 } from "./components/headings";
 import { stripCodeAnnotations } from "@/lib/docs/highlight-code";
@@ -30,9 +36,6 @@ import { cn } from "@/lib/utils";
 import { DocsMDXComponents } from "@/components/docs/DocsMDXComponents";
 
 export const mdxComponents: MDXComponents = {
-  // Cencori's custom MDX components (Ghost* diagrams, Card/CardGroup, ModelCatalog,
-  // inline icons) that the existing content relies on. Spread first so the
-  // evilcharts element/HTML styling defined below takes precedence.
   ...DocsMDXComponents,
   Tab: ({ className, ...props }: React.ComponentProps<"div">) => (
     <div className={cn(className)} {...props} />
@@ -40,7 +43,10 @@ export const mdxComponents: MDXComponents = {
   Tabs: ({ className, ...props }: React.ComponentProps<typeof Tabs>) => {
     return <Tabs className={cn(className)} {...props} />;
   },
-  TabsList: ({ className, ...props }: React.ComponentProps<typeof TabsList>) => (
+  TabsList: ({
+    className,
+    ...props
+  }: React.ComponentProps<typeof TabsList>) => (
     <TabsList
       className={cn(
         "*:data-[slot=tab-indicator]:bg-accent bg-transparent p-0 *:data-[slot=tab-indicator]:rounded-lg *:data-[slot=tab-indicator]:shadow-none",
@@ -49,7 +55,10 @@ export const mdxComponents: MDXComponents = {
       {...props}
     />
   ),
-  TabsPanel: ({ className, ...props }: React.ComponentProps<typeof TabsContent>) => (
+  TabsPanel: ({
+    className,
+    ...props
+  }: React.ComponentProps<typeof TabsContent>) => (
     <TabsContent
       className={cn(
         "relative [&_h3]:text-base [&_h3]:font-medium *:[figure]:first:mt-0 [&>.steps]:mt-6",
@@ -58,7 +67,10 @@ export const mdxComponents: MDXComponents = {
       {...props}
     />
   ),
-  TabsTab: ({ className, ...props }: React.ComponentProps<typeof TabsTrigger>) => (
+  TabsTab: ({
+    className,
+    ...props
+  }: React.ComponentProps<typeof TabsTrigger>) => (
     <TabsTrigger className={cn("rounded-lg", className)} {...props} />
   ),
   pre: ({ className, children, ...props }: React.ComponentProps<"pre">) => {
@@ -103,7 +115,9 @@ export const mdxComponents: MDXComponents = {
 
     // Default codeblock.
     const cleanedCode = __raw__ ? stripCodeAnnotations(__raw__) : "";
-    const isSingleLine = cleanedCode ? cleanedCode.split("\n").length === 1 : false;
+    const isSingleLine = cleanedCode
+      ? cleanedCode.split("\n").length === 1
+      : false;
 
     return (
       <>
