@@ -58,6 +58,8 @@ export class OpenAIProvider extends AIProvider {
                 user: request.userId,
                 tools,
                 tool_choice: request.toolChoice as any,
+                frequency_penalty: request.frequencyPenalty,
+                presence_penalty: request.presencePenalty,
             });
 
             const usage = completion.usage!;
@@ -146,6 +148,8 @@ export class OpenAIProvider extends AIProvider {
                 user: request.userId,
                 tools,
                 tool_choice: request.toolChoice as any,
+                frequency_penalty: request.frequencyPenalty,
+                presence_penalty: request.presencePenalty,
             });
 
             // Track tool calls across chunks (they stream incrementally)

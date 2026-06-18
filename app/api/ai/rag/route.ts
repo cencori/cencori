@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
 
         // Initialize provider
         const providerName = providerRouter.detectProvider(resolvedModel);
-        const normalizedModel = providerRouter.normalizeModelName(resolvedModel);
+        const normalizedModel = providerRouter.normalizeModelName(resolvedModel, providerName);
 
         const byokInitialized = await initializeBYOKProviders(ctx, providerName);
         if (!byokInitialized) {

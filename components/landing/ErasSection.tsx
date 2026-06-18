@@ -45,7 +45,7 @@ export const ErasSection = () => {
                         </Reveal>
                         <Reveal delay={0.05}>
                             <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black leading-[1.05] tracking-[-0.03em] text-foreground text-balance">
-                                Intelligence infrastructure.<br />
+                                AI infrastructure.<br />
                                 <span className="font-serif italic font-normal text-muted-foreground">From model to production.</span>
                             </h2>
                         </Reveal>

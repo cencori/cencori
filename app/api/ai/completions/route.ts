@@ -163,8 +163,8 @@ export async function POST(req: NextRequest) {
 
         // Default to a chat model if none provided
         const requestedModel = model || ctx.defaultModel || 'gpt-3.5-turbo';
-        const normalizedModel = router.normalizeModelName(requestedModel);
         const providerName = router.detectProvider(requestedModel);
+        const normalizedModel = router.normalizeModelName(requestedModel, providerName);
 
         // Ensure prompt exists
         if (!prompt || typeof prompt !== 'string') {

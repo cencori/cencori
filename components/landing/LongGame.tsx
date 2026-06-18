@@ -41,7 +41,7 @@ export const LongGame = () => {
                         </Reveal>
                         <Reveal delay={0.05}>
                             <h2 className="text-3xl sm:text-[2.75rem] font-heading font-black leading-[1.05] tracking-[-0.03em] text-foreground text-balance">
-                                Intelligence infrastructure for every era that follows.
+                                AI infrastructure for every era that follows.
                             </h2>
                         </Reveal>
                     </div>

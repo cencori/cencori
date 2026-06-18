@@ -158,13 +158,11 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://console.groq.com/docs',
         keyPrefix: 'gsk_',
         models: [
-            // Llama 4 via Groq (2025)
-            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest multimodal Llama' },
-            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: ['chat'], contextWindow: 256000, description: 'Advanced Llama 4 model' },
-            // Llama 3.3
             { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', type: ['chat'], contextWindow: 128000, description: 'Groq-hosted versatile Llama 3.3 model', free: true },
             { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', type: ['chat'], contextWindow: 128000, description: 'Ultra-fast inference', free: true },
-            { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', type: ['chat'], contextWindow: 32768, description: 'MoE architecture' },
+            { id: 'groq/compound', name: 'Compound', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI system', free: true },
+            { id: 'groq/compound-mini', name: 'Compound Mini', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI mini', free: true },
+            { id: 'allam-2-7b', name: 'Allam 2 7B', type: ['chat'], contextWindow: 131072, description: 'Arabic-capable small model on Groq', free: true },
         ],
     },
     {
@@ -272,21 +270,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         ],
     },
     {
-        id: 'huggingface',
-        name: 'Hugging Face',
-        icon: '/providers/huggingface.svg',
-        website: 'https://huggingface.co',
-        docsUrl: 'https://huggingface.co/docs',
-        keyPrefix: 'hf_',
-        models: [
-            { id: 'axiveri/africlaude-7b', name: 'Africlaude-7B', type: ['chat', 'code'], contextWindow: 32768, description: 'Standalone fine-tuned model based on Qwen 2.5 Coder 7B, SOTA on Pidgin English & Fintech, robust instruction adherence' },
-            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Via HF Inference' },
-            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', type: ['chat'], contextWindow: 128000, description: 'Via HF Inference' },
-            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 32000, description: 'Via HF Inference' },
-            { id: 'mistralai/Mistral-Large-3', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: 'Via HF Inference' },
-        ],
-    },
-    {
         id: 'qwen',
         name: 'Qwen',
         icon: '/providers/qwen.svg',
@@ -380,8 +363,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.cerebras.ai',
         keyPrefix: 'csk-',
         models: [
-            { id: 'llama3.1-70b', name: 'Llama 3.1 70B (Cerebras)', type: ['chat'], contextWindow: 128000, description: 'World fastest inference' },
-            { id: 'llama3.1-8b', name: 'Llama 3.1 8B (Cerebras)', type: ['chat'], contextWindow: 128000, description: 'World fastest inference' },
+            { id: 'gpt-oss-120b', name: 'GPT OSS 120B (Cerebras)', type: ['chat'], contextWindow: 131072, description: '120B open model, 3000 tok/s inference', free: true },
+            { id: 'zai-glm-4.7', name: 'Z.AI GLM 4.7 (Cerebras)', type: ['chat'], contextWindow: 131072, description: 'Preview, 355B MoE model on Cerebras', free: true },
         ],
     },
     {

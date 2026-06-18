@@ -59,6 +59,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
         perplexity: 'PERPLEXITY_API_KEY',
         huggingface: 'HUGGINGFACE_API_KEY',
         zai: 'ZAI_API_KEY',
+        cerebras: 'CEREBRAS_API_KEY',
     };
 
     for (const [provider, envVar] of Object.entries(openAICompatibleEnvVars)) {
@@ -178,7 +179,7 @@ export async function resolveGatewayProvider(params: {
         }
     } else {
         providerName = router.detectProvider(params.requestedModel);
-        model = router.normalizeModelName(params.requestedModel);
+        model = router.normalizeModelName(params.requestedModel, providerName);
 
         const byokResult = await initializeBYOKProviders(
             router,
