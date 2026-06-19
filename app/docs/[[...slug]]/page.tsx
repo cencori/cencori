@@ -1,4 +1,5 @@
 import { DocsTableOfContents } from "@/components/docs/mdx/components/table-of-content";
+import { TocAskAIButton } from "@/components/docs/layout/toc-ask-ai-button";
 import { FeedbackButtons } from "@/components/docs/mdx/components/feedback-buttons";
 import { DocsCopyPage } from "@/components/docs/layout/docs-copy-button";
 import { MDXNavigation } from "@/components/docs/mdx/components/navigation";
@@ -117,6 +118,10 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         {doc.toc?.length ? (
           <div className="no-scrollbar w-72 overflow-y-auto px-8">
             <DocsTableOfContents toc={doc.toc} />
+            <TocAskAIButton
+              pageTitle={doc.title}
+              pageSlug={page.url.replace(/^\/docs\/?/, "")}
+            />
           </div>
         ) : null}
       </div>

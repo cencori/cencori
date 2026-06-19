@@ -77,7 +77,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 
 export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
     const pathname = usePathname();
-    const { attachedPage, setAttachedPage, userProfile } = useDocsContext();
+    const { attachedPage, setAttachedPage, userProfile, scope } = useDocsContext();
     const [messages, setMessages] = useState<Message[]>([]);
 
     // Use environment variable or default for absolute URLs
@@ -130,8 +130,8 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                         role: m.role,
                         content: m.content,
                     })),
-                    // If we have an attached page, use that as the primary context
                     currentPage: currentAttachment ? `/docs/${currentAttachment.slug}` : pathname,
+                    scope,
                     userName: userProfile?.name,
                 }),
                 signal: abortControllerRef.current.signal,
@@ -303,6 +303,9 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                     <div className="flex items-center justify-between px-4 py-3 border-b border-solid border-border/40">
                         <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">Ask AI</span>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${scope === "page" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                                {scope === "page" ? "This page" : "All docs"}
+                            </span>
                         </div>
                         <div className="flex items-center gap-1">
                             {(messages.length > 0 || attachedPage) && (
