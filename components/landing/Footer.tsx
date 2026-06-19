@@ -172,6 +172,7 @@ export const Footer = () => {
                     <div>
                         <h4 className="text-[10px] font-medium uppercase tracking-wider mb-3">Resources</h4>
                         <ul className="space-y-1.5">
+                            <li><Link href="/playground" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Playground</Link></li>
                             <li><Link href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Documentation</Link></li>
                             <li><Link href="/docs/api/metrics" className="text-xs text-muted-foreground hover:text-foreground transition-colors">API Reference</Link></li>
                             <li><Link href="/academy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Academy</Link></li>

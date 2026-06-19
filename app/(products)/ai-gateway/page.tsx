@@ -593,6 +593,29 @@ export default function AIGatewayPage() {
 
         <BudgetControl />
 
+        {/* Playground Section */}
+        <section className="bg-background border-b border-border/30">
+          <div className="mx-auto max-w-6xl border-x border-border/30 relative px-6 py-16 sm:px-12 text-center">
+            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+
+            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Try it Now</p>
+            <h2 className="text-2xl md:text-3xl font-heading font-semibold tracking-[-0.02em] text-foreground mb-3">
+              Test any model in the <span className="text-muted-foreground">playground</span>
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+              No signup required. Pick a model, tweak parameters, and see results instantly.
+            </p>
+            <Link href="/playground">
+              <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
+                Open Playground
+              </Button>
+            </Link>
+          </div>
+        </section>
+
         <CTA isAuthenticated={isAuthenticated} />
       </main>
 
