@@ -737,9 +737,7 @@ export function PlaygroundChat({
                                                 <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
                                             </span>
                                         ) : (
-                                            <div className="prose prose-sm dark:prose-invert max-w-none">
-                                                <MarkdownRenderer content={message.content} />
-                                            </div>
+                                            <MarkdownRenderer content={message.content} />
                                         )}
 
                                         {/* Metrics + action buttons (only show when not streaming) */}

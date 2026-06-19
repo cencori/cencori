@@ -77,7 +77,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
     };
 
     return (
-        <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+        <div className="prose prose-xs prose-headings:text-foreground dark:prose-invert max-w-none break-words">
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -90,8 +90,8 @@ export function MarkdownRenderer({ content }: { content: string }) {
                             const codeString = String(children).replace(/\n$/, "");
 
                             return (
-                                <div className="my-3 rounded-lg overflow-hidden border border-border/50 bg-muted/30 dark:bg-[#1e1e1e] not-prose">
-                                    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 dark:bg-white/5 border-b border-border/50 dark:border-white/5">
+                                <div className="my-3 rounded-lg overflow-hidden border border-border/50 bg-muted/30 not-prose">
+                                    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b border-border/50">
                                         <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">{language}</span>
                                         <button onClick={() => copyCode(codeString)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                                             <Copy className="h-3 w-3" />
@@ -130,16 +130,8 @@ export function MarkdownRenderer({ content }: { content: string }) {
                     td: ({ node: _node, ...props }) => (
                         <td className="px-4 py-3 align-top" {...props} />
                     ),
-                    p: ({ node: _node, ...props }) => (
-                        <p className="text-sm text-foreground/90 leading-relaxed mb-4 last:mb-0" {...props} />
-                    ),
-                    h1: ({ node: _node, ...props }) => <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />,
-                    h2: ({ node: _node, ...props }) => <h2 className="text-xl font-bold mt-5 mb-3" {...props} />,
-                    h3: ({ node: _node, ...props }) => <h3 className="text-lg font-semibold mt-4 mb-2" {...props} />,
-                    h4: ({ node: _node, ...props }) => <h4 className="text-base font-semibold mt-4 mb-2" {...props} />,
-                    ul: ({ node: _node, ...props }) => <ul className="list-disc pl-4 mb-4 space-y-1" {...props} />,
-                    ol: ({ node: _node, ...props }) => <ol className="list-decimal pl-4 mb-4 space-y-1" {...props} />,
-                    li: ({ node: _node, ...props }) => <li className="pl-1" {...props} />,
+                    strong: ({ node: _node, ...props }) => <strong className="font-semibold text-foreground" {...props} />,
+                    em: ({ node: _node, ...props }) => <em className="text-foreground/90" {...props} />,
                     a: ({ node: _node, ...props }) => (
                         <a className="text-primary hover:underline font-medium cursor-pointer" target="_blank" rel="noopener noreferrer" {...props} />
                     ),
