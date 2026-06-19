@@ -90,7 +90,7 @@ function getCurrentPageDoc(currentPage: string): { title: string; content: strin
     return null;
 }
 
-const SYSTEM_PROMPT = `You are Cencori AI, the expert platform engineer for Cencori.
+const GLOBAL_SYSTEM_PROMPT = `You are Cencori AI, the expert platform engineer for Cencori.
 You have access to the ENTIRE documentation of the platform.
 
 Your goal is to be helpful, concise, and natural. Talk like a senior engineer who knows the platform inside out.
@@ -104,35 +104,63 @@ Guidelines:
 
 If the user asks about something not in the docs, politely explain that it might not be supported yet or suggest a workaround using existing features.`;
 
+const PAGE_SYSTEM_PROMPT = `You are Cencori AI, answering questions STRICTLY about the documentation page the user is currently viewing.
+
+You ONLY have access to the content of this one specific page. Do not reference, invent, or imply knowledge from any other page.
+
+Guidelines:
+1. **Strict Scope**: Only answer based on the page content provided. If the answer isn't on this page, say so clearly.
+2. **Code First**: Reproduce and explain code snippets from the page when relevant.
+3. **Natural Tone**: Answer directly as a senior engineer explaining this specific topic.
+4. **Out-of-scope questions**: If the user asks about something not covered on this page, tell them to use the global "Ask AI" in the top nav for broader questions.
+
+Do not hallucinate content that isn't in the provided page.`;
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { messages, currentPage, userName } = body;
+        const { messages, currentPage, userName, scope = "global" } = body;
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return NextResponse.json({ error: "Messages are required" }, { status: 400 });
         }
 
-        const allDocs = getAllDocsContent();
         const currentPageDoc = getCurrentPageDoc(currentPage);
 
         let contextPrompt = "";
+        let systemPrompt: string;
 
-        if (currentPageDoc) {
-            contextPrompt += `\n=== 📍 CURRENT PAGE CONTEXT (User is reading this right now) ===\n`;
-            contextPrompt += `Title: ${currentPageDoc.title}\n`;
-            contextPrompt += `Slug: ${currentPageDoc.slug}\n`;
-            contextPrompt += `Content:\n${currentPageDoc.content}\n`;
-            contextPrompt += `=== END CURRENT PAGE ===\n\n`;
+        if (scope === "page") {
+            // Strict page scope — only include this page's content
+            systemPrompt = PAGE_SYSTEM_PROMPT;
+            if (currentPageDoc) {
+                contextPrompt += `=== 📄 PAGE CONTENT ===\n`;
+                contextPrompt += `Title: ${currentPageDoc.title}\n`;
+                contextPrompt += `URL: /docs/${currentPageDoc.slug}\n`;
+                contextPrompt += `Content:\n${currentPageDoc.content}\n`;
+                contextPrompt += `=== END PAGE CONTENT ===\n`;
+            } else {
+                contextPrompt += `No page content available.\n`;
+            }
+        } else {
+            // Global scope — full docs + optional current page highlight
+            systemPrompt = GLOBAL_SYSTEM_PROMPT;
+            if (currentPageDoc) {
+                contextPrompt += `\n=== 📍 CURRENT PAGE CONTEXT (User is reading this right now) ===\n`;
+                contextPrompt += `Title: ${currentPageDoc.title}\n`;
+                contextPrompt += `Slug: ${currentPageDoc.slug}\n`;
+                contextPrompt += `Content:\n${currentPageDoc.content}\n`;
+                contextPrompt += `=== END CURRENT PAGE ===\n\n`;
+            }
+            const allDocs = getAllDocsContent();
+            contextPrompt += `=== 📚 FULL PLATFORM DOCUMENTATION ===\n${allDocs}\n=== END DOCUMENTATION ===\n`;
         }
-
-        contextPrompt += `=== 📚 FULL PLATFORM DOCUMENTATION ===\n${allDocs}\n=== END DOCUMENTATION ===\n`;
 
         // Initialize Gemini
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
-            systemInstruction: SYSTEM_PROMPT
+            systemInstruction: systemPrompt
         });
 
         // Add context to the last message or as a preamble

@@ -1,17 +1,14 @@
 "use client";
 
 import { useDocsContext } from "@/components/docs/DocsContext";
-import { usePathname } from "next/navigation";
 import { AddMagicIcon } from "@/assets/icons";
 
 export function AskAITrigger() {
-  const { setAskAIOpen, setAttachedPage } = useDocsContext();
-  const pathname = usePathname();
+  const { setAskAIOpen, setAttachedPage, setScope } = useDocsContext();
 
   const handleClick = () => {
-    const title = document.querySelector("h1")?.textContent ?? "This page";
-    const slug = pathname.replace(/^\/docs\/?/, "");
-    setAttachedPage({ title, slug });
+    setScope("global");
+    setAttachedPage(null);
     setAskAIOpen(true);
   };
 
