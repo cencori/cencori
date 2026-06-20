@@ -13,6 +13,7 @@ function getStartDate(period: TimePeriod): Date {
         case '90d': return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
         case '1y': return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
         case 'all': return new Date(0);
+        default: return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 }
 
@@ -233,14 +234,13 @@ export async function getApiKeysMetrics(period: TimePeriod): Promise<ApiKeysMetr
     return { total, active, byEnvironment, newThisPeriod };
 }
 
-export async function getUsersMetrics(_period: TimePeriod): Promise<UsersMetrics> {
+export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics> {
     const supabase = createAdminClient();
-    void _period;
+    const startDate = getStartDate(period);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const activeWindowStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const listAllUsers = async (): Promise<User[] | null> => {
         const allUsers: User[] = [];
@@ -270,20 +270,21 @@ export async function getUsersMetrics(_period: TimePeriod): Promise<UsersMetrics
     const users = await listAllUsers();
 
     if (!users) {
-        return { total: 0, active: 0, newToday: 0, newThisWeek: 0, newThisMonth: 0 };
+        return { total: 0, active: 0, newToday: 0, newThisWeek: 0, newThisMonth: 0, newThisPeriod: 0 };
     }
 
     // Track only real signed-up users (exclude service/system rows without email).
     const realUsers = users.filter((user) => Boolean(user.email));
 
     const total = realUsers.length;
-    // Active users = signed in within the last 30 days (fixed window, independent from selected chart period).
-    const active = realUsers.filter((u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= activeWindowStart).length;
+    // Active users scoped to the selected time period (fix: was hardcoded to 30 days)
+    const active = realUsers.filter((u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= startDate).length;
     const newToday = realUsers.filter((u) => new Date(u.created_at) >= today).length;
     const newThisWeek = realUsers.filter((u) => new Date(u.created_at) >= thisWeek).length;
     const newThisMonth = realUsers.filter((u) => new Date(u.created_at) >= thisMonth).length;
+    const newThisPeriod = realUsers.filter((u) => new Date(u.created_at) >= startDate).length;
 
-    return { total, active, newToday, newThisWeek, newThisMonth };
+    return { total, active, newToday, newThisWeek, newThisMonth, newThisPeriod };
 }
 
 // Tier pricing (monthly prices in USD) - from components/landing/Pricing.tsx

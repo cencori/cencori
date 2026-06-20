@@ -10,6 +10,16 @@ import type { TimePeriod } from '../lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
+const PERIOD_LABELS: Record<TimePeriod, string> = {
+    '1h': '1h',
+    '24h': '24h',
+    '7d': '7d',
+    '30d': '30d',
+    '90d': '90d',
+    '1y': '1y',
+    'all': 'all time',
+};
+
 export function AdminDashboard() {
     const [period, setPeriod] = useState<TimePeriod>('7d');
     const { data, isLoading, error } = usePlatformMetrics(period);
@@ -170,14 +180,15 @@ export function AdminDashboard() {
                             <MetricsCard
                                 title="Total Users"
                                 value={data.users.total}
-                                subtitle={`${data.users.active} active (30d)`}
+                                subtitle={`${data.users.active} active (${PERIOD_LABELS[period]})`}
                                 subtitleColor="success"
                                 icon={<Users className="h-4 w-4" />}
                             />
                             <MetricsCard
-                                title="New Today"
-                                value={data.users.newToday}
-                                subtitleColor={data.users.newToday > 0 ? 'success' : 'default'}
+                                title="New This Period"
+                                value={data.users.newThisPeriod}
+                                subtitle={PERIOD_LABELS[period]}
+                                subtitleColor={data.users.newThisPeriod > 0 ? 'success' : 'default'}
                             />
                             <MetricsCard
                                 title="New This Week"

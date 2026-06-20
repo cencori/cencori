@@ -63,6 +63,7 @@ export interface UsersMetrics {
     newToday: number;
     newThisWeek: number;
     newThisMonth: number;
+    newThisPeriod: number;
 }
 
 export interface BillingMetrics {
