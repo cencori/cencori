@@ -23,6 +23,20 @@ import {
 } from "@/lib/auth-welcome";
 import Link from "next/link";
 
+function isNetworkError(err: unknown): boolean {
+  if (!(err instanceof TypeError)) return false;
+  const msg = err.message.toLowerCase();
+  return msg === "failed to fetch" || msg.includes("networkerror") || msg.includes("network error") || msg.includes("load failed");
+}
+
+function friendlyError(err: unknown): string {
+  if (isNetworkError(err)) {
+    return "Unable to reach the authentication service. Check your internet connection, disable ad-blockers for this site, or try again.";
+  }
+  if (err instanceof Error) return err.message;
+  return "Unexpected error";
+}
+
 type SignupFormProps = React.ComponentProps<"form">;
 
 export function SignupForm({ className, ...props }: SignupFormProps) {
@@ -100,8 +114,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
 
       navigateAfterAuth(navigationTarget);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unexpected error";
-      setError(msg);
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -136,8 +149,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     } catch (err) {
       clearSignupWelcomeEmailPending();
       clearSignupNewsletterOptInPending();
-      const msg = err instanceof Error ? err.message : "OAuth failed";
-      setError(msg);
+      setError(friendlyError(err));
       setLoading(false);
     }
   }

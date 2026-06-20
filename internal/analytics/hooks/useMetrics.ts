@@ -23,8 +23,8 @@ export function usePlatformMetrics(period: TimePeriod = '7d') {
             if (!response.ok) throw new Error('Failed to fetch platform metrics');
             return response.json();
         },
-        staleTime: 5 * 1000, // 5 seconds
-        refetchInterval: 10 * 1000, // Auto-refresh every 10 seconds for near real-time
+        staleTime: 2 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
     });
 }
 
@@ -136,7 +136,7 @@ export function usePlatformEvents(filters: PlatformEventsFilters = {}) {
             if (!response.ok) throw new Error('Failed to fetch platform events');
             return response.json();
         },
-        staleTime: 5 * 1000,
-        refetchInterval: 5 * 1000,
+        staleTime: 30 * 1000,
+        refetchInterval: 60 * 1000,
     });
 }

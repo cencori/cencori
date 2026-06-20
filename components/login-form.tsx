@@ -17,6 +17,20 @@ import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 
+function isNetworkError(err: unknown): boolean {
+  if (!(err instanceof TypeError)) return false;
+  const msg = err.message.toLowerCase();
+  return msg === "failed to fetch" || msg.includes("networkerror") || msg.includes("network error") || msg.includes("load failed");
+}
+
+function friendlyError(err: unknown): string {
+  if (isNetworkError(err)) {
+    return "Unable to reach the authentication service. Check your internet connection, disable ad-blockers for this site, or try again.";
+  }
+  if (err instanceof Error) return err.message;
+  return "Unexpected error";
+}
+
 type LoginFormProps = React.ComponentProps<"form">;
 
 export function LoginForm({ className, ...props }: LoginFormProps) {
@@ -62,7 +76,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       }
       // Supabase handles the redirect
     } catch (err) {
-      setError(err instanceof Error ? err.message : "SSO login failed");
+      setError(friendlyError(err));
       setLoading(false);
     }
   };
@@ -116,9 +130,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
       navigateAfterAuth(navigationTarget);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unexpected error";
-      setError(msg);
-      setLoading(false)
+      setError(friendlyError(err));
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -145,8 +158,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       // Supabase handles the redirect for OAuth; we don't navigate here.
     } catch (err) {
       clearSignupWelcomeEmailPending();
-      const message = err instanceof Error ? err.message : "OAuth failed";
-      setError(message);
+      setError(friendlyError(err));
       setLoading(false);
     }
   }
