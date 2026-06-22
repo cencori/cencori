@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Jett — Build agents faster than the speed of light",
+  title: "Zett — Build agents faster than the speed of light",
   description:
-    "Jett is the open-source agent framework built on Cencori's AI infrastructure. Define agents as files. Ship in minutes.",
+    "Zett is the open-source agent framework built on Cencori's AI infrastructure. Define agents as files. Ship in minutes.",
 };
 
 export default function RootLayout({

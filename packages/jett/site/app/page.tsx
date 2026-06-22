@@ -5,13 +5,13 @@ export default function Home() {
     <>
       <header className="fixed top-0 inset-x-0 z-50 flex justify-center pt-6">
         <nav className="flex items-center gap-6 px-6 py-3 rounded-full bg-card/80 backdrop-blur-xl border border-border text-sm">
-          <span className="font-semibold tracking-tight text-base">Jett</span>
+          <span className="font-semibold tracking-tight text-base">Zett</span>
           <div className="flex gap-5 text-muted">
             <Link href="/docs" className="hover:text-zinc-100 transition-colors">
               Docs
             </Link>
             <a
-              href="https://github.com/cencori/jett"
+              href="https://github.com/cencori/zett"
               className="hover:text-zinc-100 transition-colors"
             >
               GitHub
@@ -36,7 +36,7 @@ export default function Home() {
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
             <a
-              href="https://github.com/cencori/jett"
+              href="https://github.com/cencori/zett"
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 bg-zinc-100 text-surface font-medium text-sm hover:bg-zinc-200 transition-all active:scale-[0.98]"
             >
               Get Started
@@ -70,7 +70,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted">
-        <p>Jett is open source under the MIT License.</p>
+        <p>Zett is open source under the MIT License.</p>
       </footer>
     </>
   );
@@ -90,6 +90,6 @@ const features = [
   {
     icon: "🚀",
     title: "Instant deploy",
-    body: "Write agents locally, push to production. Jett compiles to a manifest your runtime can load.",
+    body: "Write agents locally, push to production. Zett compiles to a manifest your runtime can load.",
   },
 ];

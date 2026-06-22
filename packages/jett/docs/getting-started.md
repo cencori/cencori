@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-npx jett@latest init my-agent
+npx zett@latest init my-agent
 cd my-agent
 npm install
 ```
@@ -27,7 +27,7 @@ curl -X POST http://localhost:3000 \
 Create `agent/tools/get_weather.ts`:
 
 ```ts
-import { defineTool } from "jett/tools";
+import { defineTool } from "zett/tools";
 import { z } from "zod";
 
 export default defineTool({
