@@ -46,4 +46,4 @@ program
   .option("--out-dir <path>", "Output directory", ".jett")
   .action(buildCommand);
 
-program.parse();
+program.parse(process.argv);

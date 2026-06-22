@@ -44,7 +44,7 @@ export async function runAgent(
   const tools = Object.entries(agent.manifest.tools).map(([name, tool]) => ({
     name,
     description: tool.description,
-    inputSchema: tool.inputSchema?.description?.() ?? {},
+    inputSchema: tool.inputSchema ? {} : undefined,
   }));
 
   emit(createSessionStarted(sessionId, {
@@ -81,8 +81,8 @@ export async function runAgent(
     throw new Error(`Cencori API error (${response.status}): ${error}`);
   }
 
-  const data = await response.json();
-  const outputText = data.output_text ?? JSON.stringify(data);
+  const data = await response.json() as Record<string, unknown>;
+  const outputText = typeof data.output_text === "string" ? data.output_text : JSON.stringify(data);
 
   emit(createStepCompleted("stop", 1, 0, turnId));
   emit(createMessageCompleted(outputText, "stop", 1, 0, turnId));
@@ -119,7 +119,7 @@ export async function* streamAgent(
   const tools = Object.entries(agent.manifest.tools).map(([name, tool]) => ({
     name,
     description: tool.description,
-    inputSchema: tool.inputSchema?.description?.() ?? {},
+    inputSchema: tool.inputSchema ? {} : undefined,
   }));
 
   yield createSessionStarted(sessionId, {

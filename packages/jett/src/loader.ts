@@ -1,5 +1,8 @@
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
+import { createRequire } from "node:module";
+
+const _require = createRequire(import.meta.url);
 import type {
   AgentManifest,
   AgentConfig,
@@ -107,7 +110,7 @@ function loadSessionConfig(agentDir: string): SessionConfig | null {
   const tsPath = resolve(agentDir, "sessions", "config.ts");
   if (existsSync(tsPath)) {
     try {
-      const mod = require(tsPath);
+      const mod = _require(tsPath);
       return mod.default ?? null;
     } catch {
       return null;
@@ -120,7 +123,7 @@ function loadPolicyConfig(agentDir: string): PolicyConfig | null {
   const tsPath = resolve(agentDir, "policies", "index.ts");
   if (existsSync(tsPath)) {
     try {
-      const mod = require(tsPath);
+      const mod = _require(tsPath);
       return mod.default ?? null;
     } catch {
       return null;
