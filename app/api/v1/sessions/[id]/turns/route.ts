@@ -1,0 +1,355 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
+import {
+    validateGatewayRequest,
+    addGatewayHeaders,
+    handleCorsPreFlight,
+    logGatewayRequest,
+    incrementUsage,
+    type GatewayContext,
+} from "@/lib/gateway-middleware";
+import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
+import type { UnifiedMessage } from "@/lib/providers/base";
+import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
+import { toOpenAiErrorBody } from "@/lib/gateway/guard-types";
+import type { ResponsesRequest } from "@/lib/gateway/v1-responses-execute";
+import type { SubscriptionTier } from "@/lib/entitlements";
+import { resolveAgentContext } from "@/lib/gateway/agent-context";
+import { executeSessionTurn, expireStaleSessions } from "@/lib/gateway/session-engine";
+import type { TurnRequestBody } from "@/lib/gateway/session-types";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const normalizeGatewayModelId = (modelId: string): string => {
+    const strippedModel = modelId.startsWith("cencori/")
+        ? modelId.slice("cencori/".length)
+        : modelId;
+
+    const aliases: Record<string, string> = {
+        "gpt-5.4-thinking": "gpt-5.4",
+        "gpt-5.3": "gpt-5.3-chat-latest",
+        "gpt-5.3-instant": "gpt-5.3-chat-latest",
+    };
+
+    return aliases[strippedModel] || strippedModel;
+};
+
+export async function OPTIONS() {
+    return handleCorsPreFlight();
+}
+
+export async function POST(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> },
+) {
+    const endpoint = '/v1/sessions/:id/turns';
+    const startedAt = Date.now();
+    const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    let gatewayCtx: GatewayContext | null = null;
+    const { id: sessionId } = await params;
+
+    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
+        if (!gatewayCtx) return response;
+        void logApiGatewayRequest({
+            projectId: gatewayCtx.projectId,
+            apiKeyId: gatewayCtx.apiKeyId,
+            requestId: gatewayCtx.requestId,
+            endpoint,
+            method: 'POST',
+            statusCode: response.status,
+            startedAt,
+            environment: gatewayCtx.environment,
+            ipAddress: gatewayCtx.clientIp,
+            countryCode: gatewayCtx.countryCode,
+            userAgent: req.headers.get('user-agent'),
+            callerOrigin: callerIdentity.callerOrigin,
+            clientApp: callerIdentity.clientApp,
+            errorCode: errorCode || null,
+            errorMessage: errorMessage || null,
+        });
+        return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
+    };
+
+    const respondError = (status: number, message: string, code = 'invalid_request_error') => {
+        return respond(
+            NextResponse.json({ error: { message, type: 'invalid_request_error', code }, status: 'failed' }, { status }),
+            code,
+            message,
+        );
+    };
+
+    try {
+        const authHeader = req.headers.get("Authorization");
+        const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
+        const isApiKeyAuth = !!providedApiKey;
+
+        let authenticatedProjectId: string | null = null;
+        let authenticatedUserId: string | null = null;
+
+        if (isApiKeyAuth) {
+            const validation = await validateGatewayRequest(req);
+            if (!validation.success) return validation.response;
+            gatewayCtx = validation.context;
+            authenticatedProjectId = gatewayCtx.projectId;
+        } else if (authHeader) {
+            const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+                global: { headers: { Authorization: authHeader } },
+            });
+            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            if (authError || !user) return respondError(401, "Unauthorized", "unauthorized");
+            authenticatedUserId = user.id;
+        } else {
+            return respondError(401, "Missing Authorization", "missing_authorization");
+        }
+
+        if (!gatewayCtx) return respondError(500, "Gateway context missing", "gateway_context_missing");
+
+        // ── Agent resolution ──
+        const adminClient = createAdminClient();
+        void expireStaleSessions(adminClient as never);
+
+        // Fetch session first
+        const { data: session, error: sessionError } = await adminClient
+            .from('sessions')
+            .select('id, project_id, organization_id, status, last_turn_number, agent_id, metadata')
+            .eq('id', sessionId)
+            .single();
+
+        if (sessionError || !session) {
+            return respondError(404, "Session not found", "session_not_found");
+        }
+
+        if (session.project_id !== gatewayCtx.projectId) {
+            return respondError(404, "Session not found", "session_not_found");
+        }
+
+        if (session.status !== 'active') {
+            return respondError(409, `Session is ${session.status}, not active`, "session_not_active");
+        }
+
+        // ── Atomic turn counter: CAS on last_turn_number ──
+        const { data: locked, error: lockError } = await adminClient
+            .from('sessions')
+            .update({ last_turn_number: session.last_turn_number + 1 })
+            .eq('id', sessionId)
+            .eq('last_turn_number', session.last_turn_number)
+            .select('id, last_turn_number')
+            .single();
+
+        if (lockError) {
+            if (lockError.code === 'PGRST116') {
+                return respondError(409, 'Concurrent turn detected. Session was already updated by another request.', 'concurrent_turn');
+            }
+            return respondError(500, lockError.message, 'session_lock_failed');
+        }
+
+        const newTurnNumber = locked.last_turn_number;
+
+        const agentResult = await resolveAgentContext({
+            supabase: adminClient,
+            req,
+            gatewayCtx,
+            authenticatedProjectId,
+            authenticatedUserId,
+            startedAt,
+        });
+
+        let agentId: string | null = session.agent_id || null;
+        let agentConfig: { model?: string | null; system_prompt?: string | null; tools?: string[] | null } | null = null;
+
+        if (agentResult.ok) {
+            agentId = agentResult.agent.agentId;
+            agentConfig = agentResult.agent.agentConfig;
+            gatewayCtx = agentResult.agent.gatewayCtx;
+        } else if (agentResult.errorCode === 'agent_not_found') {
+            // No agent — allowed
+        } else if (agentResult.response) {
+            return respond(agentResult.response, agentResult.errorCode, agentResult.errorMessage);
+        }
+
+        // ── Parse Request Body ──
+        const body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
+
+        if (!body.model && !agentConfig?.model && !gatewayCtx?.defaultModel) {
+            return respondError(400, "Missing model. Provide model in request body or set a default model in project settings.", 'missing_model');
+        }
+        const configuredModel = agentConfig?.model || body.model || gatewayCtx?.defaultModel || '';
+        const model = normalizeGatewayModelId(configuredModel.trim());
+
+        const input = body.input;
+        const instructions = agentConfig?.system_prompt || body.instructions;
+
+        if (!input || (Array.isArray(input) && input.length === 0)) {
+            return respondError(400, "Missing input. Provide a string or array of input items.", 'missing_input');
+        }
+
+        // ── End-User Billing ──
+        const endUserId = body.user?.trim() || null;
+        let endUserQuota: QuotaCheckResult | null = null;
+
+        if (gatewayCtx?.endUserBillingEnabled && endUserId) {
+            endUserQuota = await checkEndUserQuota(
+                gatewayCtx.projectId,
+                endUserId,
+                model,
+                gatewayCtx.environment,
+            );
+
+            const modelNotAllowed =
+                endUserQuota.reason?.startsWith('model_not_allowed:')
+                || Boolean(
+                    endUserQuota.allowedModels
+                    && endUserQuota.allowedModels.length > 0
+                    && !endUserQuota.allowedModels.includes(model)
+                );
+
+            if (modelNotAllowed) {
+                return respondError(
+                    403,
+                    `Model "${model}" is not allowed for this end-user's rate plan`,
+                    'end_user_model_not_allowed',
+                );
+            }
+
+            if (!endUserQuota.allowed) {
+                const retryAfter = endUserQuota.retryAfterSeconds;
+                const headers: Record<string, string> = {};
+                if (retryAfter != null) {
+                    headers['Retry-After'] = String(retryAfter);
+                }
+                const body = {
+                    error: {
+                        message: `End-user quota exceeded: ${endUserQuota.reason || 'limit reached'}`,
+                        type: 'invalid_request_error' as const,
+                        code: 'end_user_quota_exceeded',
+                    },
+                    status: 'failed' as const,
+                };
+                return respond(NextResponse.json(body, { status: 429, headers }));
+            }
+        }
+
+        const maybeRecordEndUserUsage = (usageAndCost: {
+            promptTokens: number; completionTokens: number; totalTokens: number;
+            providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number;
+        }) => {
+            if (gatewayCtx?.endUserBillingEnabled && endUserId && endUserQuota) {
+                recordEndUserUsage({
+                    projectId: gatewayCtx.projectId,
+                    externalUserId: endUserId,
+                    environment: gatewayCtx.environment,
+                    tokens: { prompt: usageAndCost.promptTokens, completion: usageAndCost.completionTokens, total: usageAndCost.totalTokens },
+                    cost: { providerUsd: usageAndCost.providerCostUsd, cencoriChargeUsd: usageAndCost.cencoriChargeUsd },
+                    customerMarkupPercentage: endUserQuota.markupPercentage,
+                    flatRatePerRequest: endUserQuota.flatRatePerRequest,
+                    currency: endUserQuota.currency,
+                    pricingModel: endUserQuota.pricingModel,
+                    pricingTiers: endUserQuota.pricingTiers,
+                    monthlyTokensUsed: endUserQuota.monthlyTokensUsed,
+                    platformCommissionPercentage: endUserQuota.platformCommissionPercentage,
+                });
+            }
+        };
+
+        if (!gatewayCtx) return respondError(500, "Gateway context missing", "gateway_context_missing");
+
+        const activeGatewayCtx = gatewayCtx;
+
+        // ── Convert input to unified messages for security pipeline ──
+        const inputMessages: UnifiedMessage[] = typeof input === 'string'
+            ? [{ role: 'user' as const, content: input }]
+            : (input as Array<{ type: string; role?: string; content?: string }>)
+                .filter((item): item is { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string } =>
+                    item.type === 'message'
+                )
+                .map(item => ({ role: item.role, content: item.content }));
+
+        const inputPipeline = await runGatewayInputPipeline({
+            supabase: adminClient,
+            projectId: gatewayCtx.projectId,
+            apiKeyId: gatewayCtx.apiKeyId,
+            environment: gatewayCtx.environment,
+            tier: (gatewayCtx.tier || "free") as SubscriptionTier,
+            messages: inputMessages,
+            endUserId,
+        });
+
+        if (!inputPipeline.ok) {
+            const errorBody = inputPipeline.assistantMessage
+                ? { ...toOpenAiErrorBody(inputPipeline), message: inputPipeline.assistantMessage, ...(inputPipeline.reasons ? { reasons: inputPipeline.reasons } : {}), ...(inputPipeline.matched_rules ? { matched_rules: inputPipeline.matched_rules } : {}) }
+                : toOpenAiErrorBody(inputPipeline);
+            return respond(NextResponse.json(errorBody, { status: inputPipeline.status }), inputPipeline.code, inputPipeline.message);
+        }
+
+        // Inject agent-configured built-in tools into the request
+        const tools = [...(body.tools || [])];
+        if (agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
+            const existingTypes = new Set<string>(tools.map(t => t.type));
+            for (const toolType of agentConfig.tools) {
+                if (!existingTypes.has(toolType)) {
+                    tools.push({ type: toolType } as never);
+                }
+            }
+        }
+
+        // ── Execute turn ──
+        const execResult = await executeSessionTurn({
+            supabase: adminClient,
+            gatewayCtx: activeGatewayCtx,
+            sessionId,
+            turnNumber: newTurnNumber,
+            model,
+            instructions: instructions || undefined,
+            tools: tools as ResponsesRequest['tools'],
+            tool_choice: body.tool_choice,
+            temperature: body.temperature,
+            max_output_tokens: body.max_output_tokens,
+            response_format: body.response_format,
+            inputMessages: inputPipeline.messages,
+            inputText: inputPipeline.inputText,
+            pauseOnToolCalls: body.pause_on_tool_calls ?? false,
+            endUserId,
+            tier: (gatewayCtx.tier || "free") as SubscriptionTier,
+            logSuccess: (meta) => {
+                void logGatewayRequest(activeGatewayCtx, {
+                    endpoint: "/v1/sessions/:id/turns",
+                    model: meta.model,
+                    provider: meta.provider,
+                    status: meta.status,
+                    promptTokens: meta.promptTokens,
+                    completionTokens: meta.completionTokens,
+                    totalTokens: meta.totalTokens,
+                    costUsd: meta.cencoriChargeUsd,
+                    providerCostUsd: meta.providerCostUsd,
+                    cencoriChargeUsd: meta.cencoriChargeUsd,
+                    markupPercentage: meta.markupPercentage,
+                    endUserId: endUserId || undefined,
+                    errorMessage: meta.errorMessage,
+                });
+            },
+            incrementUsage: (chargeUsd) => {
+                void incrementUsage(activeGatewayCtx, chargeUsd);
+            },
+            recordEndUserUsage: maybeRecordEndUserUsage,
+        });
+
+        if (!execResult.ok) {
+            return respond(
+                NextResponse.json(execResult.body, { status: execResult.status }),
+                "session_turn_failed",
+                (execResult.body as { error?: { message?: string } }).error?.message || "Turn execution failed",
+            );
+        }
+
+        return respond(execResult.response);
+
+    } catch (error: unknown) {
+        console.error("Session Turn Error:", error);
+        const message = error instanceof Error ? error.message : "Internal server error";
+        return respondError(500, message, 'internal_error');
+    }
+}

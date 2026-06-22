@@ -28,6 +28,7 @@
 import type { CencoriConfig, RequestOptions } from './types';
 import { AINamespace } from './ai';
 import { AgentsNamespace } from './agents';
+import { SessionsNamespace } from './sessions';
 import { ComputeNamespace } from './compute';
 import { WorkflowNamespace } from './workflow';
 import { StorageNamespace } from './storage';
@@ -113,6 +114,16 @@ export class Cencori {
     readonly memory: MemoryClient;
 
     /**
+     * Sessions - Durable execution sessions for AI agents with pause/resume and event sourcing
+     * 
+     * @example
+     * const sessions = await cencori.sessions.list({ status: 'active' });
+     * const session = await cencori.sessions.create({ agent_id: 'ag_...' });
+     * await cencori.sessions.submitTurn(session.id, { input: 'Hello' });
+     */
+    readonly sessions: SessionsNamespace;
+
+    /**
      * Telemetry - Report web traffic from your app to the Cencori dashboard
      * 
      * @example
@@ -161,6 +172,7 @@ export class Cencori {
         this.workflow = new WorkflowNamespace();
         this.storage = new StorageNamespace();
         this.memory = new MemoryClient(this.config);
+        this.sessions = new SessionsNamespace(this.config);
         this.telemetry = new TelemetryClient(this.config);
     }
 
@@ -258,5 +270,6 @@ export type { ComputeNamespace } from './compute';
 export type { WorkflowNamespace } from './workflow';
 export type { StorageNamespace } from './storage';
 export type { MemoryClient } from './memory';
+export type { SessionsNamespace, Session, SessionEvent, CreateSessionParams, TurnParams, PaginatedResponse, SessionListParams } from './sessions';
 export type { TelemetryClient, WebTelemetryPayload } from './telemetry';
 
