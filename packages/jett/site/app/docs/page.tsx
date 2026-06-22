@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function DocsHome() {
   return (
     <article className="prose prose-invert prose-zinc max-w-none">
-      <h1>Jett Documentation</h1>
+      <h1>Zett Documentation</h1>
       <p className="text-lg text-muted">
         Build agents faster than the speed of light.
       </p>
@@ -14,7 +14,7 @@ export default function DocsHome() {
         in under a minute.
       </p>
       <pre className="rounded-xl border border-border bg-card p-4 text-sm overflow-x-auto">
-        <code>{`npm create jett my-agent
+        <code>{`npx zett@latest init my-agent
 cd my-agent
 npm run dev`}</code>
       </pre>
@@ -26,7 +26,7 @@ npm run dev`}</code>
       </Link>
       <h2>Project Layout</h2>
       <p>
-        Agents in Jett are defined as files in your project. Each directory is a
+        Agents in Zett are defined as files in your project. Each directory is a
         slot with a specific purpose.
       </p>
       <Link
@@ -35,7 +35,7 @@ npm run dev`}</code>
       >
         Learn about the layout →
       </Link>
-      <h2>Why Jett?</h2>
+      <h2>Why Zett?</h2>
       <ul>
         <li>
           <strong>Filesystem-first</strong> — no SDK boilerplate, no DSL, no

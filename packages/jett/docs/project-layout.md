@@ -21,7 +21,7 @@ my-agent/
 Required config. Defines the model and Cencori integration:
 
 ```ts
-import { defineAgent } from "jett";
+import { defineAgent } from "zett";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
@@ -41,7 +41,7 @@ Required. The system prompt that defines the agent's personality and behavior.
 Optional. TypeScript files exporting a `defineTool` config:
 
 ```ts
-import { defineTool } from "jett/tools";
+import { defineTool } from "zett/tools";
 import { z } from "zod";
 
 export default defineTool({

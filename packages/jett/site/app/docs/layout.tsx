@@ -12,7 +12,7 @@ export default function DocsLayout({
           href="/"
           className="font-semibold tracking-tight text-base mb-6 hover:text-accent transition-colors"
         >
-          ← Jett
+          ← Zett
         </Link>
         <span className="text-xs font-medium tracking-widest uppercase text-muted mb-2">
           Docs

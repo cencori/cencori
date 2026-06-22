@@ -1,9 +1,9 @@
-# Jett
+# Zett
 
 Build agents faster than the speed of light.
 
 ```
-npx jett@latest init my-agent
+npx zett@latest init my-agent
 ```
 
 ```
@@ -25,7 +25,7 @@ my-agent/
 ## Quick Start
 
 ```bash
-npx jett@latest init my-agent
+npx zett@latest init my-agent
 cd my-agent
 npm run dev
 ```
@@ -34,7 +34,7 @@ npm run dev
 
 ```ts
 // agent/agent.ts
-import { defineAgent } from "jett";
+import { defineAgent } from "zett";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
@@ -47,7 +47,7 @@ export default defineAgent({
 
 ```ts
 // agent/tools/get_weather.ts
-import { defineTool } from "jett/tools";
+import { defineTool } from "zett/tools";
 import { z } from "zod";
 
 export default defineTool({

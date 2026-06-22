@@ -17,7 +17,7 @@ export interface SessionStartedEvent {
   type: "session.started";
   data: {
     sessionId: string;
-    runtime?: { agentId: string; modelId: string; jettVersion: string };
+    runtime?: { agentId: string; modelId: string; zettVersion: string };
   };
 }
 

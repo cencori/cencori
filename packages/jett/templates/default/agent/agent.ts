@@ -1,4 +1,4 @@
-import { defineAgent } from "jett";
+import { defineAgent } from "zett";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",

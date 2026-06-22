@@ -1,10 +1,10 @@
 {
-  "name": "jett",
+  "name": "zett",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Build agents faster than the speed of light.",
   "bin": {
-    "jett": "dist/cli/index.js"
+    "zett": "dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -41,7 +41,7 @@
     "test:watch": "vitest"
   },
   "keywords": [
-    "jett",
+    "zett",
     "ai",
     "agent",
     "framework",
@@ -52,7 +52,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cencori/jett.git"
+    "url": "git+https://github.com/cencori/zett.git"
   },
   "homepage": "https://cencori.com",
   "dependencies": {

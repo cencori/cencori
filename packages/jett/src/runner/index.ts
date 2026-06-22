@@ -50,7 +50,7 @@ export async function runAgent(
   emit(createSessionStarted(sessionId, {
     agentId: agent.manifest.config.name ?? "unnamed",
     modelId: model,
-    jettVersion: "0.1.0",
+    zettVersion: "0.1.2",
   }));
 
   emit(createTurnStarted(1, turnId));
@@ -125,7 +125,7 @@ export async function* streamAgent(
   yield createSessionStarted(sessionId, {
     agentId: agent.manifest.config.name ?? "unnamed",
     modelId: model,
-    jettVersion: "0.1.0",
+    zettVersion: "0.1.2",
   });
 
   yield createTurnStarted(1, turnId);
