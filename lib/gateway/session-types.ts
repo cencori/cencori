@@ -34,7 +34,7 @@ export interface SessionEventRecord {
 }
 
 export interface SessionEventPayloadMap {
-    'turn.started': { turn_number: number; model: string; instructions?: string; input_text?: string };
+    'turn.started': { turn_number: number; model: string; instructions?: string; input_text?: string; input_messages?: Array<{ role: string; content: string | null }> };
     'output_text.delta': { delta: string; index?: number };
     'tool_call.started': { tool: string; arguments: Record<string, unknown>; action_id?: string };
     'tool_call.completed': { tool: string; output: unknown; action_id?: string };

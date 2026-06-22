@@ -94,7 +94,7 @@ export async function POST(
 
         const { data: pausedEvent } = await adminClient
             .from('session_events')
-            .select('id')
+            .select('id, payload')
             .eq('session_id', sessionId)
             .eq('turn_number', session.last_turn_number)
             .eq('event_type', 'turn.paused')
@@ -104,10 +104,25 @@ export async function POST(
             return respondError(409, "No pending pause to reject", "no_pending_pause");
         }
 
+        const pausedPayload = pausedEvent.payload as Record<string, unknown>;
+        if (pausedPayload.action_id !== action_id) {
+            return respondError(409, "action_id does not match the paused tool call", "action_id_mismatch");
+        }
+
+        const { data: seqResult } = await adminClient
+            .from('session_events')
+            .select('sequence')
+            .eq('session_id', sessionId)
+            .eq('turn_number', session.last_turn_number)
+            .order('sequence', { ascending: false })
+            .limit(1);
+
+        const nextSeq = (seqResult && seqResult.length > 0 ? seqResult[0].sequence : 0) + 1;
+
         const { error: eventError } = await adminClient.from('session_events').insert({
             session_id: sessionId,
             turn_number: session.last_turn_number,
-            sequence: 9999,
+            sequence: nextSeq,
             event_type: 'turn.resumed',
             payload: { action_id, resolution: 'rejected' },
         });

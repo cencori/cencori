@@ -97,12 +97,13 @@ export async function GET(
 
         // Parse pagination
         const searchParams = req.nextUrl.searchParams;
-        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)));
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50));
         const offset = (page - 1) * limit;
 
         // Filter by turn_number if provided
         const turnFilter = searchParams.get('turn_number');
+        const turnNumber = turnFilter ? parseInt(turnFilter, 10) : NaN;
         let query = adminClient
             .from('session_events')
             .select('id, session_id, turn_number, sequence, event_type, payload, created_at', { count: 'exact' })
@@ -112,8 +113,8 @@ export async function GET(
             .order('id', { ascending: true })
             .range(offset, offset + limit - 1);
 
-        if (turnFilter) {
-            query = query.eq('turn_number', parseInt(turnFilter, 10));
+        if (turnFilter && !isNaN(turnNumber)) {
+            query = query.eq('turn_number', turnNumber);
         }
 
         const { data: events, error, count } = await query;

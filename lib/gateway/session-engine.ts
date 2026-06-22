@@ -160,7 +160,7 @@ function makeStream(params: {
             };
 
             try {
-                await el('turn.started', { turn_number: turnNumber, model: resolved.model, instructions, input_text: inputText });
+                await el('turn.started', { turn_number: turnNumber, model: resolved.model, instructions, input_text: inputText, input_messages: messages.map(m => ({ role: m.role, content: m.content ?? null })) });
 
                 for await (const chunk of streamGatewayChat({
                     supabase, projectId: gatewayCtx.projectId,
@@ -394,15 +394,18 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             }
         }
 
-        // Build messages for the resumed LLM call
-        const messages: UnifiedMessage[] = [];
-        if (instructions) messages.push({ role: 'system', content: instructions } as UnifiedMessage);
-
-        // Add a context message that summarizes what happened (replaces the original user message)
-        const contextSummary = inputText
-            ? `The user asked: "${inputText}".\n\nThe assistant processed this request and called the following functions which have now been approved and executed.`
-            : 'The following function calls were approved and executed. Continue the conversation based on their results.';
-        messages.push({ role: 'system', content: contextSummary } as UnifiedMessage);
+        // Restore original input messages from turn.started payload
+        const storedMessages = (startedEvent.payload as Record<string, unknown>).input_messages as Array<{ role: string; content: string | null }> | undefined;
+        const messages: UnifiedMessage[] = storedMessages && storedMessages.length > 0
+            ? storedMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant' | 'tool', content: m.content } as UnifiedMessage))
+            : [];
+        if (!storedMessages || storedMessages.length === 0) {
+            if (instructions) messages.push({ role: 'system', content: instructions } as UnifiedMessage);
+            const contextSummary = inputText
+                ? `The user asked: "${inputText}".\n\nThe assistant processed this request and called the following functions which have now been approved and executed.`
+                : 'The following function calls were approved and executed. Continue the conversation based on their results.';
+            messages.push({ role: 'system', content: contextSummary } as UnifiedMessage);
+        }
 
         // Add the assistant's tool call message
         if (toolCallEntries.length > 0) {
@@ -452,6 +455,14 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                 };
 
                 try {
+                    // SSE-only turn.resumed — DB insert already happened in approve route
+                    controller.enqueue(encoder.encode(buildSSE('turn.resumed', {
+                        action_id: toolResults[0]?.action_id || '',
+                        resolution: 'approved',
+                        tool_results: toolResults.map(r => ({ action_id: r.action_id })),
+                        resumed_from_turn: turnNumber,
+                    })));
+
                     for await (const chunk of streamGatewayChat({
                         supabase, projectId: gatewayCtx.projectId,
                         organizationId: gatewayCtx.organizationId, tier,
