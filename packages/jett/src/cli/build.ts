@@ -1,23 +1,33 @@
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { loadAgent } from "../loader.js";
+import { discoverAgent } from "../discover/index.js";
 
 export async function buildCommand(options: {
   agentDir: string;
   outDir: string;
 }): Promise<void> {
-  const agentDir = resolve(process.cwd(), options.agentDir);
+  const agentDirPath = resolve(process.cwd(), options.agentDir);
   const outDir = resolve(process.cwd(), options.outDir);
 
   console.log(`\n  Building agent...\n`);
 
-  if (!existsSync(agentDir)) {
-    console.error(`  Agent directory not found: ${agentDir}`);
+  if (!existsSync(agentDirPath)) {
+    console.error(`  Agent directory not found: ${agentDirPath}`);
+    process.exit(1);
+  }
+
+  const { agent: discovered, diagnostics } = discoverAgent(agentDirPath);
+
+  if (diagnostics.some((d) => d.severity === "error")) {
+    for (const d of diagnostics) {
+      console.error(`  ✖ ${d.code}: ${d.message}`);
+    }
     process.exit(1);
   }
 
   try {
-    const agent = await loadAgent(agentDir);
+    const agent = await loadAgent(agentDirPath);
 
     mkdirSync(outDir, { recursive: true });
 
@@ -29,6 +39,13 @@ export async function buildCommand(options: {
       hooks: Object.keys(agent.manifest.hooks),
       channels: Object.keys(agent.manifest.channels),
       schedules: Object.keys(agent.manifest.schedules),
+      discovered: {
+        tools: discovered.tools.map((t) => t.name),
+        skills: discovered.skills.map((s) => s.name),
+        hooks: discovered.hooks.map((h) => h.name),
+        channels: discovered.channels.map((c) => c.name),
+        schedules: discovered.schedules.map((s) => s.name),
+      },
       session: agent.manifest.session,
       policy: agent.manifest.policy,
     };

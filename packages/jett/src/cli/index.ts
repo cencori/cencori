@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { initCommand } from "./init.js";
 import { devCommand } from "./dev.js";
 import { buildCommand } from "./build.js";
+import { showBanner } from "./banner.js";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,8 @@ try {
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   version = pkg.version;
 } catch {}
+
+showBanner();
 
 const program = new Command();
 
