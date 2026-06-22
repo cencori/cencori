@@ -1,6 +1,6 @@
 # Jett
 
-A filesystem-first framework for production agents on Cencori.
+Build agents faster than the speed of light.
 
 ```
 npx jett@latest init my-agent

@@ -1,7 +1,7 @@
 {
   "name": "jett",
   "version": "0.1.0",
-  "description": "A filesystem-first framework for production agents on Cencori.",
+  "description": "Build agents faster than the speed of light.",
   "bin": {
     "jett": "dist/cli/index.js"
   },
