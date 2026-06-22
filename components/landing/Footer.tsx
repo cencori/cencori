@@ -14,6 +14,7 @@ const footerProductLinks: { title: string; href: string; external?: boolean }[] 
     { title: "Audit Logs", href: siteConfig.links.products.audit },
     { title: "Observability", href: siteConfig.links.products.insights },
     { title: "Scan", href: siteConfig.links.products.scan },
+    { title: "Zett", href: "/zett" },
     { title: "Compare Cencori", href: "/compare" },
 ];
 

@@ -8,7 +8,7 @@ export interface Session {
     updated_at: string;
     agent_id: string | null;
     metadata: Record<string, unknown>;
-    total_cost?: number;
+    total_cost: number;
 }
 
 export interface SessionEvent {
@@ -42,6 +42,7 @@ export interface TurnParams {
 
 export interface ApproveRejectParams {
     action_id: string;
+    tool_results?: Array<{ action_id: string; output: string }>;
 }
 
 export interface PaginatedResponse<T> {
@@ -57,7 +58,7 @@ export interface PaginatedResponse<T> {
 export interface SessionListParams {
     page?: number;
     limit?: number;
-    status?: string;
+    status?: 'active' | 'paused' | 'completed' | 'failed';
     agent_id?: string;
 }
 
@@ -144,8 +145,26 @@ export class SessionsNamespace {
         return this.request<PaginatedResponse<SessionEvent>>('GET', `/v1/sessions/${sessionId}/events${qs ? `?${qs}` : ''}`);
     }
 
-    async approve(sessionId: string, params: ApproveRejectParams): Promise<{ id: string; action_id: string; resolution: string; status: string }> {
-        return this.request('POST', `/v1/sessions/${sessionId}/approve`, params);
+    async approve(sessionId: string, params: ApproveRejectParams): Promise<Response> {
+        const url = `${this.config.baseUrl}/v1/sessions/${sessionId}/approve`;
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify(params),
+        });
+    }
+
+    async approveStream(sessionId: string, params: ApproveRejectParams): Promise<ReadableStream<Uint8Array> | null> {
+        const response = await this.approve(sessionId, params);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(`Cencori API error: ${err.error?.message || response.statusText}`);
+        }
+        return response.body;
     }
 
     async reject(sessionId: string, params: ApproveRejectParams): Promise<{ id: string; action_id: string; resolution: string; status: string }> {

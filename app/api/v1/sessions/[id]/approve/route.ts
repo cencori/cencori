@@ -6,6 +6,8 @@ import {
     validateGatewayRequest,
     addGatewayHeaders,
     handleCorsPreFlight,
+    logGatewayRequest,
+    incrementUsage,
     type GatewayContext,
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
@@ -95,10 +97,10 @@ export async function POST(
             return respondError(409, `Session is ${session.status}, not paused`, "session_not_paused");
         }
 
-        // Verify the action_id corresponds to a paused tool call
+        // Fetch the paused event to verify action_id and compute next sequence
         const { data: pausedEvent } = await adminClient
             .from('session_events')
-            .select('id')
+            .select('id, payload')
             .eq('session_id', sessionId)
             .eq('turn_number', session.last_turn_number)
             .eq('event_type', 'turn.paused')
@@ -108,11 +110,37 @@ export async function POST(
             return respondError(409, "No pending pause to approve", "no_pending_pause");
         }
 
+        const pausedPayload = pausedEvent.payload as Record<string, unknown>;
+        if (pausedPayload.action_id !== action_id) {
+            return respondError(409, "action_id does not match the paused tool call", "action_id_mismatch");
+        }
+
+        // If tool_results provided, verify at least one matches the paused action_id
+        if (tool_results && tool_results.length > 0) {
+            const validIds = new Set([action_id, ...Object.keys(pausedPayload.arguments as Record<string, unknown> || {})]);
+            for (const tr of tool_results) {
+                if (!validIds.has(tr.action_id)) {
+                    return respondError(400, `tool_result action_id "${tr.action_id}" does not match any paused tool call`, "invalid_tool_result_action_id");
+                }
+            }
+        }
+
+        // Compute next sequence number for this turn
+        const { data: seqResult } = await adminClient
+            .from('session_events')
+            .select('sequence')
+            .eq('session_id', sessionId)
+            .eq('turn_number', session.last_turn_number)
+            .order('sequence', { ascending: false })
+            .limit(1);
+
+        const nextSeq = (seqResult && seqResult.length > 0 ? seqResult[0].sequence : 0) + 1;
+
         // Append turn.resumed event
         const { error: eventError } = await adminClient.from('session_events').insert({
             session_id: sessionId,
             turn_number: session.last_turn_number,
-            sequence: 9999,
+            sequence: nextSeq,
             event_type: 'turn.resumed',
             payload: { action_id, resolution: 'approved' },
         });
@@ -146,8 +174,25 @@ export async function POST(
                 turnNumber: session.last_turn_number,
                 toolResults: tool_results,
                 tier: (gatewayCtx.tier || "free") as SubscriptionTier,
-                logSuccess: () => {},
-                incrementUsage: () => {},
+                logSuccess: (meta) => {
+                    void logGatewayRequest(gatewayCtx, {
+                        endpoint: "/v1/sessions/:id/approve",
+                        model: meta.model,
+                        provider: meta.provider,
+                        status: meta.status,
+                        promptTokens: meta.promptTokens,
+                        completionTokens: meta.completionTokens,
+                        totalTokens: meta.totalTokens,
+                        costUsd: meta.cencoriChargeUsd,
+                        providerCostUsd: meta.providerCostUsd,
+                        cencoriChargeUsd: meta.cencoriChargeUsd,
+                        markupPercentage: meta.markupPercentage,
+                        errorMessage: meta.errorMessage,
+                    });
+                },
+                incrementUsage: (chargeUsd) => {
+                    void incrementUsage(gatewayCtx, chargeUsd);
+                },
             });
 
             if (!execResult.ok) {
