@@ -17,10 +17,12 @@ const createdTestData: {
     projects: string[];
     apiKeys: string[];
     users: string[];
+    sessions: string[];
 } = {
     projects: [],
     apiKeys: [],
     users: [],
+    sessions: [],
 };
 
 /**
@@ -132,6 +134,42 @@ export async function seedTestApiKey(projectId: string, overrides: Partial<{
 }
 
 /**
+ * Create a test session
+ */
+export async function seedTestSession(overrides: Partial<{
+    projectId: string;
+    organizationId: string;
+    status: string;
+    agentId: string;
+    metadata: Record<string, unknown>;
+}> = {}): Promise<{ id: string; status: string; last_turn_number: number; created_at: string }> {
+    const supabase = getTestSupabaseClient();
+
+    const sessionData = {
+        project_id: overrides.projectId,
+        organization_id: overrides.organizationId,
+        status: overrides.status || 'active',
+        agent_id: overrides.agentId || null,
+        metadata: overrides.metadata || {},
+        last_turn_number: 0,
+    };
+
+    const { data, error } = await supabase
+        .from('sessions')
+        .insert(sessionData)
+        .select('id, status, last_turn_number, created_at')
+        .single();
+
+    if (error) {
+        throw new Error(`Failed to create test session: ${error.message}`);
+    }
+
+    createdTestData.sessions.push(data.id);
+
+    return data;
+}
+
+/**
  * Clean up all test data created during tests
  */
 export async function cleanupTestData(): Promise<void> {
@@ -142,6 +180,19 @@ export async function cleanupTestData(): Promise<void> {
     const supabase = getTestSupabaseClient();
 
     // Clean up in reverse order of dependencies
+
+    // 0. Clean up sessions first (depend on projects)
+    if (createdTestData.sessions.length > 0) {
+        await supabase
+            .from('session_events')
+            .delete()
+            .in('session_id', createdTestData.sessions);
+        await supabase
+            .from('sessions')
+            .delete()
+            .in('id', createdTestData.sessions);
+        createdTestData.sessions = [];
+    }
 
     // 1. Clean up API keys
     if (createdTestData.apiKeys.length > 0) {
