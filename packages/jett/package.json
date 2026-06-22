@@ -1,5 +1,6 @@
 {
   "name": "jett",
+  "type": "module",
   "version": "0.1.0",
   "description": "Build agents faster than the speed of light.",
   "bin": {

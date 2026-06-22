@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, statSync, type Dirent } from "node:fs";
 import { resolve, join, basename, extname, dirname } from "node:path";
 
 export interface DiscoveredSlot {
@@ -73,7 +73,7 @@ export function discoverAgent(agentDir: string): DiscoverResult {
   return { agent, diagnostics };
 }
 
-function discoverFlatModule(root: string, baseName: string, entries: ReturnType<typeof readdirSync>, diagnostics: DiscoverDiagnostic[]): string | undefined {
+function discoverFlatModule(root: string, baseName: string, entries: Dirent[], diagnostics: DiscoverDiagnostic[]): string | undefined {
   const candidates: string[] = [];
 
   for (const entry of entries) {
@@ -98,7 +98,7 @@ function discoverFlatModule(root: string, baseName: string, entries: ReturnType<
   return join(root, candidates[0]);
 }
 
-function discoverInstructions(root: string, entries: ReturnType<typeof readdirSync>, diagnostics: DiscoverDiagnostic[]): string | undefined {
+function discoverInstructions(root: string, entries: Dirent[], diagnostics: DiscoverDiagnostic[]): string | undefined {
   const mdCandidate = entries.find(e => e.isFile() && e.name.toLowerCase() === "instructions.md");
   if (mdCandidate) return join(root, mdCandidate.name);
 
@@ -123,7 +123,7 @@ function discoverInstructions(root: string, entries: ReturnType<typeof readdirSy
   return undefined;
 }
 
-function discoverNamedDirectory(root: string, dirName: string, entries: ReturnType<typeof readdirSync>, slugPattern: RegExp, diagnostics: DiscoverDiagnostic[]): DiscoveredSlot[] {
+function discoverNamedDirectory(root: string, dirName: string, entries: Dirent[], slugPattern: RegExp, diagnostics: DiscoverDiagnostic[]): DiscoveredSlot[] {
   const dirEntry = entries.find(e => e.isDirectory() && e.name === dirName);
   if (!dirEntry) return [];
 
