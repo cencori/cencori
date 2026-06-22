@@ -1,0 +1,17 @@
+{
+  "name": "my-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "jett dev",
+    "build": "jett build"
+  },
+  "dependencies": {
+    "jett": "^0.1.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}
