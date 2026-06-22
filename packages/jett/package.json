@@ -22,7 +22,10 @@
     "./schedules": "./dist/schedules/index.js",
     "./context": "./dist/context/index.js",
     "./agent": "./dist/agent/index.js",
-    "./runner": "./dist/runner/index.js"
+    "./runner": "./dist/runner/index.js",
+    "./auth": "./dist/auth/index.js",
+    "./discover": "./dist/discover/index.js",
+    "./protocol": "./dist/protocol/events.js"
   },
   "typesVersions": {
     "*": {
