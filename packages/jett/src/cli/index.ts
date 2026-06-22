@@ -19,7 +19,7 @@ const program = new Command();
 
 program
   .name("jett")
-  .description("Jett — a filesystem-first framework for production agents")
+  .description("Jett — build agents faster than the speed of light")
   .version(version);
 
 program
