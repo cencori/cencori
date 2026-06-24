@@ -1,7 +1,17 @@
 /**
+ * @deprecated Use Cencori Sessions (/v1/sessions) for durable multi-turn conversations.
+ * 
  * In-memory response store for Responses API multi-turn.
  * Responses are stored with TTL and can be referenced
  * via previous_response_id for conversation chaining.
+ * 
+ * Limitations (replaced by Sessions):
+ *   - No persistence: lost on restart/scale-to-zero
+ *   - Single-process only: doesn't work across instances
+ *   - 30-min hard TTL: can't hold long conversations
+ * 
+ * TODO: Replace previous_response_id usage with session-based chaining
+ *       in v1-responses-execute.ts
  */
 
 import type { ResponsesResponse } from './v1-responses-execute';

@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
@@ -9,9 +8,6 @@ import {
     type GatewayContext,
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -46,25 +42,15 @@ export async function POST(
     };
 
     try {
-        const authHeader = req.headers.get("Authorization");
         const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
-        const isApiKeyAuth = !!providedApiKey;
 
-        if (isApiKeyAuth) {
-            const validation = await validateGatewayRequest(req);
-            if (!validation.success) return validation.response;
-            gatewayCtx = validation.context;
-        } else if (authHeader) {
-            const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-                global: { headers: { Authorization: authHeader } },
-            });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
-            if (authError || !user) return respondError(401, "Unauthorized", "unauthorized");
-        } else {
-            return respondError(401, "Missing Authorization", "missing_authorization");
+        if (!providedApiKey) {
+            return respondError(401, "Missing CENCORI_API_KEY", "missing_api_key");
         }
 
-        if (!gatewayCtx) return respondError(500, "Gateway context missing", "gateway_context_missing");
+        const validation = await validateGatewayRequest(req);
+        if (!validation.success) return validation.response;
+        gatewayCtx = validation.context;
 
         const { action_id } = await req.json() as { action_id: string };
 

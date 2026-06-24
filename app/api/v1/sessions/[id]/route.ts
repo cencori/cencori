@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
@@ -11,9 +10,6 @@ import {
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { expireStaleSessions } from "@/lib/gateway/session-engine";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
 export async function OPTIONS() {
     return handleCorsPreFlight();
 }
@@ -25,31 +21,14 @@ type HandlerContext = {
 };
 
 async function authOrError(req: NextRequest, endpoint: string, startedAt: number, callerIdentity: ReturnType<typeof extractGatewayCallerIdentity>): Promise<NextResponse | HandlerContext> {
-    const authHeader = req.headers.get("Authorization");
     const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
-    const isApiKeyAuth = !!providedApiKey;
-
-    let gatewayCtx: GatewayContext | null = null;
-
-    if (isApiKeyAuth) {
-        const validation = await validateGatewayRequest(req);
-        if (!validation.success) return validation.response;
-        gatewayCtx = validation.context;
-    } else if (authHeader) {
-        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: authHeader } },
-        });
-        const { data: { user }, error: authError } = await userClient.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: { message: "Unauthorized", type: 'invalid_request_error', code: 'unauthorized' }, status: 'failed' }, { status: 401 });
-        }
-    } else {
-        return NextResponse.json({ error: { message: "Missing Authorization", type: 'invalid_request_error', code: 'missing_authorization' }, status: 'failed' }, { status: 401 });
+    if (!providedApiKey) {
+        return NextResponse.json({ error: { message: "Missing CENCORI_API_KEY", type: 'invalid_request_error', code: 'missing_api_key' }, status: 'failed' }, { status: 401 });
     }
 
-    if (!gatewayCtx) {
-        return NextResponse.json({ error: { message: "Gateway context missing", type: 'invalid_request_error', code: 'gateway_context_missing' }, status: 'failed' }, { status: 500 });
-    }
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) return validation.response;
+    const gatewayCtx = validation.context;
 
     const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
         void logApiGatewayRequest({

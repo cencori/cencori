@@ -130,6 +130,7 @@ function makeStream(params: {
     tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string };
     temperature?: number; max_output_tokens?: number;
     pauseOnToolCalls: boolean;
+    needsApprovalToolNames: Set<string>;
     collectedBuiltinToolOutputs: ToolCallOutput[];
     instructions?: string;
     inputText?: string;
@@ -141,7 +142,7 @@ function makeStream(params: {
     const {
         supabase, gatewayCtx, sessionId, turnNumber, resolved,
         messages, functionTools, forceSchemaResult, schemaToolName, tool_choice,
-        temperature, max_output_tokens, pauseOnToolCalls, collectedBuiltinToolOutputs,
+        temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText,
         tier, logSuccess, incrementUsage, recordEndUserUsage,
     } = params;
@@ -210,15 +211,19 @@ function makeStream(params: {
 
                         // Pause if tool calls present and pause is enabled
                         if (pauseOnToolCalls && callValues.length > 0) {
-                            await el('turn.paused', {
-                                reason: 'approval_required',
-                                action_id: callValues[0].id,
-                                tool: callValues[0].name,
-                                arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
-                            });
-                            void updateSessionStatus(supabase, sessionId, 'paused', turnNumber);
-                            controller.close();
-                            return;
+                            const shouldPause = needsApprovalToolNames.size === 0
+                                || callValues.some(tc => needsApprovalToolNames.has(tc.name));
+                            if (shouldPause) {
+                                await el('turn.paused', {
+                                    reason: 'approval_required',
+                                    action_id: callValues[0].id,
+                                    tool: callValues[0].name,
+                                    arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
+                                });
+                                void updateSessionStatus(supabase, sessionId, 'paused', turnNumber);
+                                controller.close();
+                                return;
+                            }
                         }
 
                         // Complete
@@ -245,12 +250,14 @@ function makeStream(params: {
                         void supabase.rpc('increment_session_cost', { session_id: sessionId, cost: cc });
                         if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage: pricing.cencoriMarkupPercentage });
 
+                        void maybeCreateCheckpoint(supabase, sessionId, turnNumber, messages, fullText);
+
                         controller.close();
                     }
                 }
             } catch (error) {
                 const msg = error instanceof Error ? error.message : 'Turn execution failed';
-                await el('turn.completed', { turn_number: turnNumber, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } });
+                await el('turn.failed', { turn_number: turnNumber, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } });
                 void updateSessionStatus(supabase, sessionId, 'failed', turnNumber);
                 logSuccess({ provider: '', model: '', status: 'error', promptTokens: 0, completionTokens: 0, totalTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0, markupPercentage: 0, errorMessage: msg });
                 controller.close();
@@ -277,6 +284,14 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         });
 
         const { functionTools, builtInTools } = extractTools(tools);
+        const needsApprovalToolNames = new Set<string>();
+        if (tools) {
+            for (const t of tools) {
+                if (t.type === 'function' && (t as Tool).needsApproval) {
+                    needsApprovalToolNames.add(t.function.name);
+                }
+            }
+        }
         const messages: UnifiedMessage[] = [...inputMessages];
 
         const pre = builtInTools.length > 0
@@ -305,6 +320,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             messages, functionTools, forceSchemaResult: forceSchema, schemaToolName: schemaName,
             tool_choice, temperature, max_output_tokens,
             pauseOnToolCalls: pauseOnToolCalls ?? false,
+            needsApprovalToolNames,
             collectedBuiltinToolOutputs: [...pre.toolOutputs],
             instructions, inputText,
             tier, logSuccess, incrementUsage, recordEndUserUsage,
@@ -315,10 +331,6 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         const msg = error instanceof Error ? error.message : 'Session engine error';
         return { ok: false, status: 500, body: { error: { message: msg, type: 'invalid_request_error', code: 'session_engine_error' }, status: 'failed' } };
     }
-}
-
-export async function continueSessionTurn(params: TurnExecuteParams): Promise<TurnExecuteResult> {
-    return executeSessionTurn({ ...params, pauseOnToolCalls: false });
 }
 
 export type ResumeTurnParams = {
@@ -501,12 +513,14 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                             void supabase.rpc('increment_session_cost', { session_id: sessionId, cost: cc });
                             if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage: pricing.cencoriMarkupPercentage });
 
+                            void maybeCreateCheckpoint(supabase, sessionId, turnNumber + 1, messages, fullText);
+
                             controller.close();
                         }
                     }
                 } catch (error) {
                     const msg = error instanceof Error ? error.message : 'Resume execution failed';
-                    es('turn.completed', { turn_number: turnNumber + 1, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } });
+                    es('turn.failed', { turn_number: turnNumber + 1, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } });
                     void updateSessionStatus(supabase, sessionId, 'failed', turnNumber + 1);
                     logSuccess({ provider: '', model: '', status: 'error', promptTokens: 0, completionTokens: 0, totalTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0, markupPercentage: 0, errorMessage: msg });
                     controller.close();
@@ -524,40 +538,50 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
     }
 }
 
-export async function replayPausedTurnMessages(
+async function maybeCreateCheckpoint(
     supabase: SupabaseAdmin, sessionId: string, turnNumber: number,
-    newInputMessages: UnifiedMessage[],
-): Promise<UnifiedMessage[]> {
-    const { data: events } = await supabase
-        .from('session_events')
-        .select('event_type, payload, sequence')
-        .eq('session_id', sessionId)
-        .eq('turn_number', turnNumber)
-        .order('sequence', { ascending: true });
+    currentMessages: UnifiedMessage[], fullText: string,
+): Promise<void> {
+    if (turnNumber % 50 !== 0) return;
+    try {
+        const { data: prevCheckpoint } = await supabase
+            .from('session_events')
+            .select('payload')
+            .eq('session_id', sessionId)
+            .eq('event_type', 'turn.checkpoint')
+            .lt('turn_number', turnNumber)
+            .order('turn_number', { ascending: false })
+            .limit(1)
+            .single();
 
-    if (!events) return newInputMessages;
+        const prevMessages: Array<{ role: string; content: string | null }> =
+            prevCheckpoint
+                ? (prevCheckpoint.payload as Record<string, unknown>).messages as Array<{ role: string; content: string | null }>
+                : [];
 
-    const msgs: UnifiedMessage[] = [];
-    let text = '';
-    let hasToolCall = false;
-
-    for (const ev of events) {
-        const p = ev.payload as Record<string, unknown>;
-        switch (ev.event_type) {
-            case 'output_text.delta':
-                text += (p.delta as string) || '';
-                break;
-            case 'tool_call.started':
-                if (!hasToolCall) { msgs.push({ role: 'assistant', content: text }); hasToolCall = true; }
-                break;
+        const messages = [
+            ...prevMessages,
+            ...currentMessages.map(m => ({ role: m.role, content: m.content ?? null })),
+        ];
+        if (fullText) {
+            messages.push({ role: 'assistant', content: fullText });
         }
+
+        await supabase.from('session_events').insert({
+            session_id: sessionId,
+            turn_number: turnNumber,
+            sequence: 0,
+            event_type: 'turn.checkpoint',
+            payload: { turn_number: turnNumber, messages },
+        });
+    } catch (e) {
+        console.error(`[SessionEngine] Failed to create checkpoint at turn ${turnNumber}:`, e);
     }
-    if (text && !hasToolCall) msgs.push({ role: 'assistant', content: text });
-    msgs.push(...newInputMessages);
-    return msgs;
 }
 
-function buildOutput(
+export { maybeCreateCheckpoint };
+
+export function buildOutput(
     text: string,
     calls: Array<{ id: string; name: string; args: string }>,
     toolOutputs: ToolCallOutput[],

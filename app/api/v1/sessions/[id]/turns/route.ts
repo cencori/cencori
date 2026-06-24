@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
@@ -13,6 +12,7 @@ import {
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
+import type { ResponseInputItem } from "@/lib/gateway/v1-responses-execute";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
 import { toOpenAiErrorBody } from "@/lib/gateway/guard-types";
 import type { ResponsesRequest } from "@/lib/gateway/v1-responses-execute";
@@ -20,9 +20,6 @@ import type { SubscriptionTier } from "@/lib/entitlements";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
 import { executeSessionTurn, expireStaleSessions } from "@/lib/gateway/session-engine";
 import type { TurnRequestBody } from "@/lib/gateway/session-types";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const normalizeGatewayModelId = (modelId: string): string => {
     const strippedModel = modelId.startsWith("cencori/")
@@ -83,30 +80,14 @@ export async function POST(
     };
 
     try {
-        const authHeader = req.headers.get("Authorization");
         const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
-        const isApiKeyAuth = !!providedApiKey;
-
-        let authenticatedProjectId: string | null = null;
-        let authenticatedUserId: string | null = null;
-
-        if (isApiKeyAuth) {
-            const validation = await validateGatewayRequest(req);
-            if (!validation.success) return validation.response;
-            gatewayCtx = validation.context;
-            authenticatedProjectId = gatewayCtx.projectId;
-        } else if (authHeader) {
-            const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-                global: { headers: { Authorization: authHeader } },
-            });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
-            if (authError || !user) return respondError(401, "Unauthorized", "unauthorized");
-            authenticatedUserId = user.id;
-        } else {
-            return respondError(401, "Missing Authorization", "missing_authorization");
+        if (!providedApiKey) {
+            return respondError(401, "Missing CENCORI_API_KEY", "missing_api_key");
         }
 
-        if (!gatewayCtx) return respondError(500, "Gateway context missing", "gateway_context_missing");
+        const validation = await validateGatewayRequest(req);
+        if (!validation.success) return validation.response;
+        gatewayCtx = validation.context;
 
         // ── Agent resolution ──
         const adminClient = createAdminClient();
@@ -153,8 +134,8 @@ export async function POST(
             supabase: adminClient,
             req,
             gatewayCtx,
-            authenticatedProjectId,
-            authenticatedUserId,
+            authenticatedProjectId: gatewayCtx.projectId,
+            authenticatedUserId: null,
             startedAt,
         });
 
@@ -262,11 +243,36 @@ export async function POST(
         // ── Convert input to unified messages for security pipeline ──
         const inputMessages: UnifiedMessage[] = typeof input === 'string'
             ? [{ role: 'user' as const, content: input }]
-            : (input as Array<{ type: string; role?: string; content?: string }>)
-                .filter((item): item is { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string } =>
-                    item.type === 'message'
-                )
-                .map(item => ({ role: item.role, content: item.content }));
+            : (input as ResponseInputItem[]).flatMap(item => {
+                if (item.type === 'message') {
+                    return [{ role: item.role, content: item.content }] as UnifiedMessage[];
+                }
+                if (item.type === 'function_call') {
+                    return [{
+                        role: 'assistant',
+                        content: '',
+                        tool_calls: [{
+                            id: item.call_id || item.id,
+                            type: 'function' as const,
+                            function: { name: item.name, arguments: item.arguments },
+                        }],
+                    }] as unknown as UnifiedMessage[];
+                }
+                if (item.type === 'function_call_output') {
+                    return [{
+                        role: 'tool',
+                        content: item.output,
+                        toolCallId: item.call_id,
+                    }] as UnifiedMessage[];
+                }
+                if (item.type === 'file') {
+                    return [{
+                        role: 'user',
+                        content: `[Attached file: ${item.filename}]\n${item.content}`,
+                    }] as UnifiedMessage[];
+                }
+                return [];
+            });
 
         const inputPipeline = await runGatewayInputPipeline({
             supabase: adminClient,

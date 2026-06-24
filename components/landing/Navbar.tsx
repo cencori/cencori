@@ -152,7 +152,6 @@ const productMenuColumns: NavLink[][] = [
         { title: "Observability", href: siteConfig.links.products.insights, description: "Analytics and risk dashboards.", icon: renderMenuIcon(ChartIcon) },
         { title: "Scan", href: siteConfig.links.products.scan, description: "AI security and vuln detection.", icon: renderMenuIcon(VoiceIdIcon) },
         { title: "Developer Tools", href: siteConfig.links.products.developerTools, description: "SDKs, CLI, and quickstarts.", icon: renderMenuIcon(CodeSquareIcon) },
-        { title: "Zett", href: "/zett", description: "Open-source agent framework.", icon: renderMenuIcon(Pulse01Icon) },
     ],
 ];
 

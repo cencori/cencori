@@ -1,0 +1,151 @@
+---
+title: "Cencori Sessions — Durable Execution for AI Agents"
+slug: "sessions"
+date: "2026-06-23"
+excerpt: "Sessions is an event-sourced durable execution layer for AI agents. Turns survive crashes, pause for human approval without burning compute, and resume exactly where they stopped. One API call replaces the entire 'store messages + manage context + handle retries + implement approval gating' stack."
+tags: ["Product", "Sessions", "Durable Execution", "AI Agents", "Release"]
+category: "changelog"
+published: true
+---
+
+**Cencori Sessions is live.**
+
+Every production agent needs durable execution. Network failures crash conversations. Human-in-the-loop approval flows require polling or webhooks. Cold starts lose context. Every team rebuilds the same plumbing: store messages, manage context windows, handle retries, survive crashes.
+
+Sessions collapses all of that into a single API.
+
+## What It Is
+
+Sessions is an event-sourced durable execution layer. Each turn is recorded as an append-only event log. Sessions survive crashes, cold starts, and redeploys. They pause for human approval without consuming compute and resume exactly where they stopped.
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+// Create a session — one call
+const session = await cencori.sessions.create();
+
+// Submit a turn — stream SSE events
+const stream = await cencori.sessions.submitTurnStream(session.id, {
+  input: 'Pull Q3 revenue and email the CFO a summary.',
+  tools: [
+    { type: 'function', function: { name: 'run_sql', parameters: {...} }, needsApproval: true },
+    { type: 'function', function: { name: 'send_email', parameters: {...} }, needsApproval: true },
+  ],
+  pause_on_tool_calls: true,
+});
+
+// Stream handles pause/resume automatically
+for await (const event of parseSSE(stream)) {
+  if (event.type === 'turn.paused') {
+    await notifyHuman(event.data.action_id);
+  }
+}
+```
+
+That's the whole developer surface. No database setup. No message store. No cron jobs for expiry. No polling for approvals.
+
+## The Problem
+
+Building production agents today means stitching together:
+
+1. A model provider call
+2. A database to store conversation history
+3. Context window management (when to trim, when to summarize)
+4. Retry logic for network failures
+5. Some mechanism for human approval of sensitive tool calls
+6. Cleanup for abandoned conversations
+
+Every team builds this stack independently. It works until it doesn't — and when it breaks, you're debugging across six services.
+
+## The Primitive
+
+Sessions provides one primitive: `POST /v1/sessions/:id/turns` submits input and returns an SSE stream. Every event in that stream is persisted to a `session_events` table. If the connection drops, reconnecting replays the event log and picks up where it left off.
+
+### What you get:
+
+- **Crash recovery** — If the server restarts mid-turn, the session resumes from the last persisted event. No context lost.
+- **Free idle time** — When the session pauses waiting for human approval, there is no model call in flight. You pay zero.
+- **Deterministic replay** — Debugging an agent means replaying its event log. Every input, output, tool call, and approval decision is recorded in order.
+- **One API key** — Sessions authenticate through the same `CENCORI_API_KEY` as every other Cencori endpoint.
+
+## Per-Tool Approval
+
+Not all tool calls need human oversight. A web search shouldn't block on approval; sending an email should.
+
+Sessions solves this with `needsApproval` on individual tool definitions:
+
+```json
+{
+  "tools": [
+    { "type": "web_search_preview" },
+    { "type": "function", "function": { "name": "send_email", ... }, "needsApproval": true }
+  ],
+  "pause_on_tool_calls": true
+}
+```
+
+`web_search` runs automatically. `send_email` triggers a pause, waiting for human approval. No extra infrastructure needed.
+
+## How It Works Under the Hood
+
+Every turn calls `POST /v1/responses` internally — the same endpoint you'd call directly. Sessions add durability around the call without duplicating infrastructure:
+
+```
+User → POST /v1/sessions/:id/turns
+         │
+         ├── Session engine
+         │     ├── Append turn.started event
+         │     ├── Call /v1/responses (internal)
+         │     │     ├── Gateway auth
+         │     │     ├── Security pipeline
+         │     │     ├── Provider routing
+         │     │     └── Response streaming
+         │     ├── Relay SSE events, persisting each to session_events
+         │     ├── On tool call with needsApproval:
+         │     │     ├── Append turn.paused, set status = paused
+         │     │     └── End stream (no compute cost)
+         │     └── On turn.completed / turn.failed:
+         │           ├── Append final event
+         │           └── End stream
+```
+
+Every model call routes through the existing gateway — same security pipeline, same billing, same provider failover, same audit logging. Sessions are a layer on top, not a parallel system.
+
+## Pricing
+
+| Resource | Price |
+|----------|-------|
+| Session creation | Free |
+| Active turn | Standard Responses API pricing + platform markup |
+| Paused time | **Free** |
+| Event storage | Included |
+
+You pay for what calls the model. Nothing for what waits.
+
+## What This Unlocks
+
+Sessions means you don't need to choose between a stateless API call and running your own database. The durable execution primitive is a first-class API, accessible from any framework, any runtime, any platform.
+
+- **Multi-turn agents** that survive network failures and redeploys
+- **Human-in-the-loop approvals** without polling or webhooks
+- **Zero-cost idle** — developers don't pay for agents waiting on people
+- **Deterministic replay** — debugging means replaying the event log
+
+## Get Started
+
+The SDK ships in the Cencori package you already have installed:
+
+```bash
+npm install cencori
+```
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+const session = await cencori.sessions.create();
+```
+
+Full API reference: [Sessions API Docs](/docs/api/sessions)
