@@ -30,6 +30,7 @@ export interface ToolFunction {
 export interface Tool {
     type: 'function';
     function: ToolFunction;
+    needsApproval?: boolean;
 }
 
 /**

@@ -9,7 +9,9 @@ export type SessionEventType =
     | 'tool_call.completed'
     | 'turn.paused'
     | 'turn.resumed'
-    | 'turn.completed';
+    | 'turn.completed'
+    | 'turn.failed'
+    | 'turn.checkpoint';
 
 export interface SessionRecord {
     id: string;
@@ -41,6 +43,8 @@ export interface SessionEventPayloadMap {
     'turn.paused': { reason: string; action_id: string; tool: string; arguments: Record<string, unknown> };
     'turn.resumed': { action_id: string; resolution: 'approved' | 'rejected' };
     'turn.completed': { turn_number: number; output?: unknown; usage?: { input_tokens: number; output_tokens: number; total_tokens: number } };
+    'turn.failed': { turn_number: number; output: { error: string }; usage: { input_tokens: number; output_tokens: number; total_tokens: number } };
+    'turn.checkpoint': { turn_number: number; messages: Array<{ role: string; content: string | null }> };
 }
 
 export interface TurnRequestBody {

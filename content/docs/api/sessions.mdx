@@ -1,0 +1,362 @@
+---
+title: "Sessions API"
+description: "Durable execution for AI agents. Sessions survive crashes, pause for human approval, and resume exactly where they stopped — with no idle compute cost."
+section: "API Reference"
+order: 4
+---
+
+## Overview
+
+Sessions is an event-sourced durable execution layer for AI agents. Every turn is checkpointed as an append-only event log. Sessions survive crashes, cold starts, and redeploys. They pause for human approval without consuming compute and resume exactly where they stopped.
+
+**Key idea:** You pay for what calls the model, nothing for what waits.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/sessions` | `POST` | Create a session |
+| `/v1/sessions` | `GET` | List sessions |
+| `/v1/sessions/:id` | `GET` | Get session status |
+| `/v1/sessions/:id/turns` | `POST` | Submit input, stream SSE events |
+| `/v1/sessions/:id/events` | `GET` | Replay event log |
+| `/v1/sessions/:id/approve` | `POST` | Approve a paused tool call |
+| `/v1/sessions/:id/reject` | `POST` | Reject a paused tool call |
+| `/v1/sessions/:id` | `DELETE` | Terminate a session |
+
+## When to Use Sessions vs Responses
+
+| Use Case | Recommended API |
+|----------|----------------|
+| Single-turn agentic request | `POST /v1/responses` |
+| Multi-turn conversation | `POST /v1/sessions/:id/turns` |
+| Agent that must survive crashes | Sessions |
+| Human-in-the-loop approval flow | Sessions with `pause_on_tool_calls` |
+| Deterministic replay / debugging | Sessions |
+| Stateless request (no persistence needed) | `POST /v1/responses` |
+
+## Official TypeScript SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+// Create a session
+const session = await cencori.sessions.create();
+console.log(session.id); // "ses_abc123"
+
+// Submit a turn (streaming)
+const stream = await cencori.sessions.submitTurnStream(session.id, {
+  input: 'What was revenue last week?',
+  tools: [{ type: 'web_search_preview' }],
+});
+
+const reader = stream.getReader();
+const decoder = new TextDecoder();
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const lines = decoder.decode(value).split('\n');
+  for (const line of lines) {
+    if (line.startsWith('event: ')) {
+      console.log('Event:', line.slice(7));
+    } else if (line.startsWith('data: ')) {
+      console.log('Data:', JSON.parse(line.slice(6)));
+    }
+  }
+}
+
+// Get session status
+const status = await cencori.sessions.get(session.id);
+console.log(status.turn_count); // 1
+```
+
+## Raw API
+
+### Create a Session
+
+```http
+POST /v1/sessions
+Content-Type: application/json
+CENCORI_API_KEY: cnc_key_abc123
+
+{
+  "agent_id": "ag_abc123",
+  "metadata": { "user_id": "usr_456" }
+}
+```
+
+**Response:**
+
+```json
+{
+  "id": "ses_abc123",
+  "status": "active",
+  "turn_count": 0,
+  "created_at": "2026-06-23T00:00:00Z",
+  "updated_at": "2026-06-23T00:00:00Z",
+  "agent_id": "ag_abc123",
+  "metadata": { "user_id": "usr_456" }
+}
+```
+
+### Submit a Turn
+
+```http
+POST /v1/sessions/:id/turns
+Content-Type: application/json
+CENCORI_API_KEY: cnc_key_abc123
+
+{
+  "input": "What was revenue last week?",
+  "tools": [{ "type": "web_search_preview" }],
+  "instructions": "Answer concisely with citations.",
+  "model": "gpt-4o",
+  "pause_on_tool_calls": true
+}
+```
+
+The response is a **Server-Sent Events (SSE)** stream:
+
+```
+event: turn.started
+data: {"turn_number": 1}
+
+event: response.output_text.delta
+data: {"delta": "Revenue last week was "}
+
+event: turn.paused
+data: {"reason": "approval_required", "action_id": "tc_abc", "tool": "run_sql", "arguments": {"run_sql": "SELECT ..."}}
+
+event: turn.resumed
+data: {"action_id": "tc_abc", "resolution": "approved"}
+
+event: response.output_text.delta
+data: {"delta": "$4.2M net of refunds."}
+
+event: turn.completed
+data: {"turn_number": 1, "output": {...}, "usage": {...}}
+```
+
+**SSE Event Reference:**
+
+| Event | When | Payload |
+|-------|------|---------|
+| `turn.started` | Turn begins execution | `{ turn_number, model, input_text }` |
+| `output_text.delta` | Text token generated | `{ delta }` |
+| `tool_call.started` | Model requests a tool | `{ tool, arguments, action_id }` |
+| `tool_call.completed` | Built-in tool finishes | `{ tool, output, action_id }` |
+| `turn.paused` | Waiting for approval | `{ reason, action_id, tool, arguments }` |
+| `turn.resumed` | Approved/rejected, continuing | `{ action_id, resolution }` |
+| `turn.completed` | Turn finished successfully | `{ turn_number, output, usage }` |
+| `turn.failed` | Turn encountered an error | `{ turn_number, output: { error }, usage }` |
+
+### Approve a Tool Call
+
+```http
+POST /v1/sessions/:id/approve
+Content-Type: application/json
+CENCORI_API_KEY: cnc_key_abc123
+
+{
+  "action_id": "tc_abc",
+  "tool_results": [
+    { "action_id": "tc_abc", "output": "{\"revenue\": 4200000}" }
+  ]
+}
+```
+
+Returns an SSE stream with the resumed turn's new events.
+
+### Reject a Tool Call
+
+```http
+POST /v1/sessions/:id/reject
+Content-Type: application/json
+CENCORI_API_KEY: cnc_key_abc123
+
+{
+  "action_id": "tc_abc"
+}
+```
+
+**Response:**
+
+```json
+{
+  "id": "ses_abc123",
+  "action_id": "tc_abc",
+  "resolution": "rejected",
+  "status": "completed"
+}
+```
+
+### Get Session
+
+```http
+GET /v1/sessions/:id
+CENCORI_API_KEY: cnc_key_abc123
+```
+
+**Response:**
+
+```json
+{
+  "id": "ses_abc123",
+  "status": "active",
+  "turn_count": 3,
+  "created_at": "2026-06-23T00:00:00Z",
+  "updated_at": "2026-06-23T00:00:00Z",
+  "agent_id": "ag_abc123",
+  "metadata": {},
+  "total_cost": 0.042
+}
+```
+
+### List Sessions
+
+```http
+GET /v1/sessions?status=paused&page=1&limit=20
+CENCORI_API_KEY: cnc_key_abc123
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": "ses_abc123",
+      "status": "paused",
+      "turn_count": 1,
+      "created_at": "2026-06-23T00:00:00Z",
+      "updated_at": "2026-06-23T00:00:00Z",
+      "agent_id": null,
+      "metadata": {},
+      "total_cost": 0.014
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+### Get Events (Event Log)
+
+```http
+GET /v1/sessions/:id/events?turn_number=1&page=1&limit=50
+CENCORI_API_KEY: cnc_key_abc123
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": "evt_abc",
+      "session_id": "ses_abc123",
+      "turn_number": 1,
+      "sequence": 1,
+      "event_type": "turn.started",
+      "payload": { "turn_number": 1, "model": "gpt-4o" },
+      "created_at": "2026-06-23T00:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+### Delete a Session
+
+```http
+DELETE /v1/sessions/:id
+CENCORI_API_KEY: cnc_key_abc123
+```
+
+**Response:**
+
+```json
+{
+  "id": "ses_abc123",
+  "deleted": true
+}
+```
+
+## Per-Tool Approval
+
+Use `needsApproval` on individual tool definitions to control which tools require human approval:
+
+```json
+{
+  "input": "Send an email and check the weather",
+  "pause_on_tool_calls": true,
+  "tools": [
+    { "type": "function", "function": { "name": "send_email", "description": "Send an email", "parameters": { "type": "object", "properties": { "to": { "type": "string" }, "body": { "type": "string" } } } }, "needsApproval": true },
+    { "type": "function", "function": { "name": "get_weather", "description": "Get weather", "parameters": { "type": "object", "properties": { "city": { "type": "string" } } } } }
+  ]
+}
+```
+
+- If **no** tool has `needsApproval` → all tools pause (backward compatible)
+- If **any** tool has `needsApproval: true` → only those tools trigger a pause
+- `pause_on_tool_calls: false` → never pause (ignores `needsApproval`)
+
+## Key Concepts
+
+### Event Sourcing
+
+Session state is never stored as a snapshot. It is reconstructed by replaying events in order. This means no stale state, no merge conflicts, no corruption on crash.
+
+### Checkpointing
+
+Every 50 turns, the engine creates an event log checkpoint. Long-running sessions replay efficiently without scanning millions of events.
+
+### Idle Costs Nothing
+
+When a session is paused (waiting for human approval), no model call is in flight. You pay only for the API calls that execute turns — paused time is free.
+
+### TTL
+
+Sessions expire after 7 days of inactivity. Expired sessions are marked `completed` automatically.
+
+## Pricing
+
+| Resource | Price |
+|----------|-------|
+| Session creation | Free |
+| Active turn | Standard Responses API pricing + platform markup |
+| Paused time | **Free** |
+| Event storage | Included |
+
+## SDK Methods
+
+```typescript
+// Session lifecycle
+cencori.sessions.create(params?)                // POST /v1/sessions
+cencori.sessions.list(params?)                  // GET /v1/sessions
+cencori.sessions.get(sessionId)                 // GET /v1/sessions/:id
+cencori.sessions.delete(sessionId)              // DELETE /v1/sessions/:id
+
+// Turn execution
+cencori.sessions.submitTurn(sessionId, params)  // POST /v1/sessions/:id/turns (raw Response)
+cencori.sessions.submitTurnStream(sessionId, params) // POST /v1/sessions/:id/turns (ReadableStream)
+
+// Event log
+cencori.sessions.getEvents(sessionId, params?)  // GET /v1/sessions/:id/events
+
+// Approval
+cencori.sessions.approve(sessionId, params)     // POST /v1/sessions/:id/approve (raw Response)
+cencori.sessions.approveStream(sessionId, params) // POST /v1/sessions/:id/approve (ReadableStream)
+cencori.sessions.reject(sessionId, params)      // POST /v1/sessions/:id/reject
+```
