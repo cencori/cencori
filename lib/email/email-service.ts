@@ -11,7 +11,7 @@
  */
 
 import { EmailProvider, SendEmailOptions, EmailResult } from './providers/email-provider';
-import { ResendProvider } from './providers/resend-providerr';
+import { ResendProvider } from './providers/resend-provider';
 import { SendByteProvider } from './providers/sendbyte-provider';
 
 export type EmailProviderType = 'resend' | 'sendbyte';
