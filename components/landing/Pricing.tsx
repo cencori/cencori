@@ -51,7 +51,7 @@ const tiers: Array<{
         description: "For professional developers and growing products.",
         price: {
             USD: { monthly: 49, annual: 490 },
-            NGN: { monthly: 39000, annual: 500000 }
+            NGN: { monthly: 39000, annual: 390000 }
         },
         features: [
             "50,000 requests/month",
