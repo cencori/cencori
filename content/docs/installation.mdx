@@ -1,114 +1,126 @@
 ---
 title: "Installation"
-description: "Install the Cencori SDK in your project."
+description: "Configure Cencori Code in your IDE agent or use the OpenAI-compatible endpoint directly."
 section: "Getting Started"
 order: 4
 ---
 
-Install the official Cencori SDK for your preferred language. The SDK is designed to run on the server since it uses your project's secret key.
+Cencori Code is an OpenAI-compatible proxy. For most IDE agents, there is nothing to install — you set a base URL and an API key. If you are building a backend service that calls the API directly, you can use any OpenAI-compatible SDK or plain HTTP.
 
-## TypeScript / Node.js
+## IDE Agents
 
 <Steps>
   <Step>
-    <StepTitle>Install the SDK</StepTitle>
+    <StepTitle>Get your gateway key</StepTitle>
     <StepContent>
       <StepDescription>
-        Add the Cencori SDK to your project using your preferred package manager.
-      </StepDescription>
-      <CommandBlock commands={["cencori"]} />
-    </StepContent>
-  </Step>
-
-  <Step>
-    <StepTitle>Set up your environment variables</StepTitle>
-    <StepContent>
-      <StepDescription>
-        Add your Cencori project key to your environment file. Never expose a `csk_...` key through `NEXT_PUBLIC_*` variables or any browser-side code.
+        Open **Dashboard → API Keys**, click **Generate New Key**, and give it a name. You can create up to 5 keys — one per workflow or machine.
       </StepDescription>
 
       ```bash
-      # .env.local for Next.js, .env for most Node apps
       CENCORI_API_KEY=csk_...
       ```
     </StepContent>
   </Step>
 
   <Step>
-    <StepTitle>Initialize the client</StepTitle>
+    <StepTitle>Set base URL and key in your tool</StepTitle>
     <StepContent>
       <StepDescription>
-        Import and instantiate the client. The SDK automatically reads `CENCORI_API_KEY` from your environment — no explicit configuration needed in most cases.
+        Every tool below uses the same two values.
       </StepDescription>
 
-      ```typescript
-      import { Cencori } from 'cencori';
+      | Setting | Value |
+      |---------|-------|
+      | Base URL | `https://api.cencori.com/v1` |
+      | API Key | `csk_...` |
 
-      const cencori = new Cencori();
+      **Cursor** — Settings → Models → Add model → set base URL and key under OpenAI API.
+
+      **Cline** — Extension Settings → API Provider: `OpenAI Compatible` → base URL and key.
+
+      **Continue** — `.continue/config.json`:
+
+      ```json
+      {
+        "models": [{
+          "provider": "openai",
+          "model": "claude-sonnet-4.5",
+          "apiBase": "https://api.cencori.com/v1",
+          "apiKey": "csk_..."
+        }]
+      }
       ```
 
-      You can also pass options explicitly:
+      **Zed** — `settings.json` under `language_models.openai`:
 
-      ```typescript
-      const cencori = new Cencori({
-        apiKey: process.env.CENCORI_API_KEY,
-        baseUrl: 'https://cencori.com', // optional; this is the default
-        headers: {
-          'X-Trace-ID': 'req_123',
-        },
-      });
+      ```json
+      {
+        "language_models": {
+          "openai": {
+            "api_url": "https://api.cencori.com/v1"
+          }
+        }
+      }
       ```
     </StepContent>
   </Step>
 </Steps>
 
-## Python
+---
 
-```bash
-pip install cencori
-```
+## Programmatic Use
 
-## Go
-
-```bash
-go get github.com/cencori/cencori-go
-```
-
-## OpenAI-Compatible Base URL
-
-For tools that already speak the OpenAI API, install nothing from Cencori and set:
-
-```text
-Base URL: https://api.cencori.com/v1
-API key:  your Cencori project key
-```
-
-In most OpenAI-compatible clients, the base URL should stop at `/v1`; the client appends `/chat/completions`.
-
-## TypeScript Support
-
-The SDK is written in TypeScript and ships full type definitions:
+### OpenAI Node SDK
 
 ```typescript
-import { Cencori, ChatRequest, ChatResponse } from 'cencori';
+import OpenAI from "openai";
 
-const cencori = new Cencori();
+const client = new OpenAI({
+  baseURL: "https://api.cencori.com/v1",
+  apiKey: process.env.CENCORI_API_KEY,
+});
 
-const request: ChatRequest = {
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Hello' }],
-};
-
-const response: ChatResponse = await cencori.ai.chat(request);
+const response = await client.chat.completions.create({
+  model: "claude-sonnet-4.5",
+  messages: [{ role: "user", content: "Hello" }],
+});
 ```
 
-## Requirements
+### OpenAI Python SDK
 
-- Node.js 18+ for the TypeScript SDK.
-- TypeScript 5+ is optional, but recommended.
-- A Cencori project key from **Project > API Keys**.
-- Provider access for the model you want to call. Use managed access if enabled, or add your own provider key in **Project > Providers**.
+```python
+from openai import OpenAI
 
-## Next Steps
+client = OpenAI(
+    base_url="https://api.cencori.com/v1",
+    api_key=os.environ["CENCORI_API_KEY"],
+)
 
-See [Add Cencori to an Existing Product](/docs/getting-started/existing-product) for dashboard-to-code setup, or [Making Your First Request](/docs/getting-started/first-request) to send a request with the SDK.
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello"}],
+)
+```
+
+### cURL
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-v3",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 256
+  }'
+```
+
+---
+
+## Notes
+
+- The base URL must end at `/v1`. The SDK appends `/chat/completions` automatically.
+- Use `Authorization: Bearer csk_...` for all requests to `api.cencori.com/v1`.
+- Keep `csk_` keys on the server. Do not expose them in browser bundles or `NEXT_PUBLIC_*` env vars.
+- Audio, image generation, and embeddings endpoints are not available in the initial release. Text-based chat completions only.

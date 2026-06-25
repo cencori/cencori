@@ -1,123 +1,144 @@
 ---
 title: "Quick Start"
-description: "Get a real Cencori integration running in a new or existing product."
+description: "Subscribe, grab your key, and configure your IDE agent in under 5 minutes."
 section: "Getting Started"
 order: 2
 ---
 
-This guide gets a real Cencori request running. If you already have an app, use [Add Cencori to an Existing Product](/docs/getting-started/existing-product) for the dashboard-to-code path.
+Cencori Code is an OpenAI-compatible proxy. You do not install anything — you point your existing IDE agent at a new base URL and swap in your `csk_` token.
 
-Cencori sits between your app and model providers, so there are two separate setup pieces:
+<Steps>
+  <Step>
+    <StepTitle>Subscribe and generate a key</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Sign up at [cencori.com/signup](/signup) and choose a subscription tier. Once your account is active, open **Dashboard → API Keys** and click **Generate New Key**. Give it a name (e.g. `Laptop` or `Cursor`) so you can track it later.
 
-- **Cencori project key**: authenticates your app to Cencori. This is the `CENCORI_API_KEY` value your code uses.
-- **Provider access**: lets Cencori route to OpenAI, Anthropic, Google, or another provider. Use Cencori managed access when it is enabled for your project, or add your own provider key in **Project > Providers**.
+        Copy the key immediately — it is only shown once.
+      </StepDescription>
 
-If your first request says `Provider 'openai' is not configured`, your Cencori key is valid. You still need provider access for that model.
+      ```bash
+      # Store it in your shell or IDE's secrets manager
+      CENCORI_API_KEY=csk_...
+      ```
+    </StepContent>
+  </Step>
 
-## 1. Create a Project
+  <Step>
+    <StepTitle>Configure your IDE agent</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Pick your tool below. All you are changing is the **base URL** and **API key**.
+      </StepDescription>
 
-1. Sign up at [cencori.com/signup](/signup).
-2. Create an organization and project.
-3. Open the project, then go to **API Keys**.
-4. Generate a **secret key** for server-side use.
+      ### Cursor
 
-Store the key as an environment variable:
+      Open **Cursor → Settings → Models → OpenAI API Key** and set:
 
-```bash
-# .env.local for Next.js, .env for most Node apps
-CENCORI_API_KEY=csk_...
-```
+      ```
+      Base URL:  https://api.cencori.com/v1
+      API Key:   csk_...
+      ```
 
-Keep `csk_...` keys on the server. Do not put them in browser code or `NEXT_PUBLIC_*` variables.
+      Then add the models you want (`claude-sonnet-4.5`, `gpt-4o`, `deepseek-v3`) to your model list.
 
-## 2. Choose a Working Model
+      ### Cline (VS Code)
 
-Choose the model you want to call, then make sure your project can route to it:
+      Open **Cline Extension Settings → API Provider** and select **OpenAI Compatible**, then set:
 
-1. Open **Models** or **Playground** in your project.
-2. Pick one model ID for the first test.
-3. If a free, managed, or catalog model is enabled for your project, use that first.
-4. If you want BYOK or a custom provider, open **Project > Providers** and add the provider before testing.
+      ```
+      Base URL:  https://api.cencori.com/v1
+      API Key:   csk_...
+      ```
 
-For the fastest first test, use one known model such as `gpt-4o`, `claude-sonnet-4.5`, or `gemini-2.5-flash`.
+      ### Continue
 
-## 3. New Product: Scaffold an App
+      Edit `.continue/config.json` in your project root:
 
-If you are starting a new app, use the scaffolder:
+      ```json
+      {
+        "models": [
+          {
+            "title": "Claude Sonnet 4.5 (Cencori)",
+            "provider": "openai",
+            "model": "claude-sonnet-4.5",
+            "apiBase": "https://api.cencori.com/v1",
+            "apiKey": "csk_..."
+          },
+          {
+            "title": "GPT-4o (Cencori)",
+            "provider": "openai",
+            "model": "gpt-4o",
+            "apiBase": "https://api.cencori.com/v1",
+            "apiKey": "csk_..."
+          }
+        ]
+      }
+      ```
 
-```bash
-npx create-cencori-app my-ai-app --template nextjs
-cd my-ai-app
-```
+      ### Zed
 
-Open `.env.local`, paste your Cencori project key, then run:
+      Edit your Zed `settings.json`:
 
-```bash
-npm run dev
-```
+      ```json
+      {
+        "language_models": {
+          "openai": {
+            "api_url": "https://api.cencori.com/v1",
+            "available_models": [
+              { "name": "claude-sonnet-4.5", "max_tokens": 8096 },
+              { "name": "gpt-4o", "max_tokens": 8096 },
+              { "name": "deepseek-v3", "max_tokens": 8096 }
+            ]
+          }
+        }
+      }
+      ```
 
-## 4. Existing Product: Follow the Dashboard-to-Code Guide
+      Set the API key via Zed's **AI Provider** prompt when it appears.
+    </StepContent>
+  </Step>
 
-If you already have a product, do not start with a blank scaffold. Follow [Add Cencori to an Existing Product](/docs/getting-started/existing-product) to wire Cencori into your current backend, OpenAI client, or framework.
+  <Step>
+    <StepTitle>Verify with cURL</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Run this directly to confirm your key and the endpoint are working, with no IDE layer in between.
+      </StepDescription>
 
-The short version:
+      ```bash
+      curl https://api.cencori.com/v1/chat/completions \
+        -H "Authorization: Bearer $CENCORI_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "model": "gpt-4o",
+          "messages": [{"role": "user", "content": "Reply with OK."}],
+          "max_tokens": 10
+        }'
+      ```
 
-1. Pick a model in the dashboard.
-2. Create a `csk_...` key in **API Keys**.
-3. Store it as `CENCORI_API_KEY` on your server.
-4. Change your SDK client or base URL.
-5. Send one request and confirm it appears in **Logs**.
+      A successful response returns a standard OpenAI-shaped JSON body. Your credit balance decreases by the actual cost of the request after the stream settles.
+    </StepContent>
+  </Step>
+</Steps>
 
-## 5. Verify With cURL
+---
 
-This test removes your framework from the equation:
+## Supported models
 
-```bash
-curl https://cencori.com/api/ai/chat \
-  -H "CENCORI_API_KEY: $CENCORI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Say hello in one sentence."}]
-  }'
-```
+| Model ID | Provider | Best for |
+|----------|----------|----------|
+| `claude-sonnet-4.5` | Anthropic | Complex code reasoning, large context |
+| `gpt-4o` | OpenAI | General-purpose, strong all-rounder |
+| `deepseek-v3` | DeepSeek | High-volume, cost-efficient tasks |
 
-For OpenAI-compatible clients:
+---
 
-```bash
-curl https://api.cencori.com/v1/chat/completions \
-  -H "Authorization: Bearer $CENCORI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Say hello in one sentence."}]
-  }'
-```
+## Troubleshooting
 
-## 6. View in Dashboard
-
-All requests are logged in your dashboard with:
-- Full prompt and response
-- Token usage and costs
-- Latency metrics
-- Security scan results
-
-## Common Setup Issues
-
-| Symptom | What it usually means | Fix |
-|---------|------------------------|-----|
-| `Missing API key` or `Invalid API key` | Your Cencori project key is absent, revoked, or in the wrong header | Set `CENCORI_API_KEY`, restart your server, and use `CENCORI_API_KEY` for native endpoints or `Authorization: Bearer ...` for OpenAI-compatible clients |
-| `Provider 'openai' is not configured` | Cencori auth worked, but the project cannot route to that upstream provider | Add provider access in **Project > Providers** or choose a model whose provider is configured |
-| No request appears in Logs | Your app is still calling the provider directly | Check the base URL, SDK import, and server route |
-| Works locally but fails in production | The production environment is missing `CENCORI_API_KEY` | Add the env var to Vercel, Render, Fly, or your host and redeploy |
-| Browser bundle exposes `csk_...` | Secret key was used client-side | Move Cencori calls into a server route; only use publishable keys for browser-specific flows |
-
-## Next Steps
-
-| Topic | Description |
-|-------|-------------|
-| [Add Cencori to an Existing Product](/docs/getting-started/existing-product) | Step-by-step dashboard-to-code setup |
-| [AI Gateway](/docs/ai/gateway) | Learn about multi-provider routing |
-| [Cencori SDK](/docs/ai/sdk) | Explore SDK methods |
-| [Vercel AI SDK](/docs/ai/vercel-sdk) | Use Cencori with `streamText()` and `useChat()` |
-| [Security](/docs/security/scan) | Configure security rules |
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `401 Unauthorized` | Key is invalid or not yet active | Check the key was copied fully; regenerate if needed |
+| `429 Rate Limited` | A rolling window is exhausted | Check which window in the error body; wait for reset or check your plan |
+| Model not found | Model ID typo or not on your tier | Check [supported models](/docs/ai/models) for exact IDs |
+| Request appears in no logs | IDE is still hitting the provider directly | Confirm base URL is set to `https://api.cencori.com/v1` and not the provider's URL |

@@ -1,122 +1,74 @@
 ---
 title: "Get Started"
-description: "Cencori sits between your app and AI providers. One SDK for routing, security, and billing."
+description: "One subscription. One key. Every model your IDE agent needs."
 section: "Getting Started"
 order: 1
 ---
 
-Cencori sits between your application and AI model providers like OpenAI, Anthropic, and Google. You send requests through Cencori instead of directly to the provider. Cencori routes them, scans them for security issues, logs everything, and bills your end users automatically.
+Modern software development runs on AI agent loops. Tools like Cursor, Cline, Continue, and Zed spend your entire workday firing requests — scanning repositories, running test matrices, refactoring large codebases. Managing separate API subscriptions for Anthropic, OpenAI, and DeepSeek while watching unpredictable per-token bills spike mid-workflow is a real problem.
 
-One SDK. One API key. You stop building proxy servers, PII filters, and billing pipelines — and start shipping your product.
+**Cencori Code** fixes it. It is a secure, high-throughput subscription proxy built specifically for power-user engineers. You get one `csk_` gateway token that unlocks a curated catalog of frontier models. Billing is handled through a simple internal credit system — no raw token costs exposed to you, no financial wallet juggling.
 
 ---
 
 ## Who it's for
 
-You're building an AI product that real people pay to use — a SaaS with chat, a coding tool, a customer support agent, anything that calls an LLM on behalf of your users.
+**The Autonomous Agent Runner** — you write code 8–12 hours a day. Your IDE agents run continuously in the background, looking up repositories, spinning up automated tests, and refactoring large code blocks. You hit premium message quotas or see thousands of dollars in utility bills when you give raw vendor keys to your deep, multi-file agent loops. You need a predictable monthly plan that lets you switch between Claude Sonnet 4.5, GPT-4o, and DeepSeek-V3 based on the task.
 
-You need to:
-- Call multiple model providers without managing separate API keys and failover logic
-- Stop sensitive data (names, emails, credentials) from leaking into prompts
-- Charge your users based on how much AI they actually consume
-
-Cencori does all three. You add one package and move on.
-
----
-
-## What you get
-
-### AI Gateway
-
-One endpoint, 100+ models. Send a request with any supported model ID and Cencori routes it to the right provider.
-
-- **Routing & failover** — if a provider is down, requests are rerouted automatically
-- **Security scanning** — PII is masked and prompt injections are blocked before the request leaves Cencori
-- **Logs** — every request is logged with the full prompt, response, token count, cost, and latency
-
-### End-User Billing
-
-Meter AI usage per user and charge them for it. Cencori tracks every token, applies your markup, and handles payments through Stripe Connect.
-
-- **Prepaid wallets** — users load credits, spend them on AI calls, and get cut off when they run out
-- **Spend caps** — set hard limits so one user can't blow through your provider budget
-- **Flexible pricing** — percentage markups, flat fees, or custom tiers per plan
+**The Tactical Technical Hobbyist** — you build production frameworks outside standard business hours. You need instant access to enterprise commercial models but can't justify maintaining separate individual SaaS tiers. You want a transparent entry tier with bounded, lower-volume consumption guardrails.
 
 ---
 
 ## How it works
 
-<GhostContainer maxWidth="full" className="my-20">
+Cencori Code is fully OpenAI-compatible. You do not install a new SDK. You change two values in your IDE agent settings:
 
-  <GhostBox variant="muted" className="flex items-center justify-center py-6">
-    <span className="text-sm font-medium tracking-wide">Your App</span>
-  </GhostBox>
+| Setting | Value |
+|---------|-------|
+| Base URL | `https://api.cencori.com/v1` |
+| API Key | Your `csk_` gateway token |
 
-  <GhostArrow label="csk_project_key" />
-
-  <GhostBox variant="muted" label="Cencori" className="p-10 md:p-14">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
-        <span className="text-lg font-bold tracking-tight">Route</span>
-        <GhostDashedLine className="w-16 my-3" />
-        <span className="text-xs text-muted-foreground">Pick model, failover, cache</span>
-      </GhostBox>
-      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
-        <span className="text-lg font-bold tracking-tight">Scan</span>
-        <GhostDashedLine className="w-16 my-3" />
-        <span className="text-xs text-muted-foreground">Block PII, injections</span>
-      </GhostBox>
-      <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
-        <span className="text-lg font-bold tracking-tight">Bill</span>
-        <GhostDashedLine className="w-16 my-3" />
-        <span className="text-xs text-muted-foreground">Meter tokens, charge user</span>
-      </GhostBox>
-    </div>
-  </GhostBox>
-
-  <GhostArrow label="response" />
-
-  <GhostBox variant="success" className="flex items-center justify-center py-6">
-    <span className="text-sm font-medium tracking-wide">Your Users</span>
-  </GhostBox>
-
-</GhostContainer>
+Your IDE then routes all model requests through the Cencori Code proxy. The proxy authenticates you against your active subscription tier, estimates the worst-case credit cost of the request, locks that reservation atomically, forwards the stream to the upstream provider, and settles the actual credit cost once the stream completes — all in under 30ms of added overhead.
 
 ---
 
-## Try it
+## Supported models
 
-Install the SDK, add your project key, and make a request:
+| Model | Context |
+|-------|---------|
+| `claude-sonnet-4.5` | Anthropic — best for complex code reasoning |
+| `gpt-4o` | OpenAI — strong all-rounder |
+| `deepseek-v3` | DeepSeek — cost-efficient for high-volume tasks |
 
-```typescript
-import { Cencori } from 'cencori';
+---
 
-const cencori = new Cencori({
-  apiKey: process.env.CENCORI_API_KEY,
-});
+## Credits: predictable billing
 
-const response = await cencori.ai.chat({
-  model: 'claude-sonnet-4.5',
-  messages: [{ role: 'user', content: 'Summarize this document.' }],
-  billing: {
-    userId: 'user_123',
-  },
-});
+Usage is measured in **Credits** rather than raw tokens. One Credit equals $0.001. This abstraction lets Cencori adjust upstream margins behind the scenes without changing your subscription plan.
 
-console.log(response.content);
-console.log(response.usage); // tokens tracked and billed to user_123
-```
+Every inbound request goes through a **three-tier rolling window** before it is dispatched:
 
-That's it. The request is routed, scanned, logged, and billed — in one call.
+| Window | Purpose |
+|--------|---------|
+| 5-Hour Rolling | Catches and stops runaway agent loops before they cause financial damage |
+| 7-Day Rolling | Manages sustained delivery across an engineering week |
+| Monthly Billing | Hard cap aligned to your Paystack renewal date |
+
+If any single window is exhausted, the request is blocked immediately with an HTTP `429` response that includes the specific window that was depleted and its reset time.
+
+---
+
+## Key management
+
+You can generate up to **5 named gateway API keys** — one per workflow or machine (e.g., Laptop, Desktop, Remote Server). Keys are masked after creation. The dashboard shows a `last_used_at` timestamp for each key so you can audit live connectivity.
 
 ---
 
 ## Next steps
 
 | | |
-| :--- | :--- |
-| **[Quick Start](/docs/quick-start)** | Get a key and make your first request. |
-| **[Add to an existing app](/docs/getting-started/existing-product)** | Wire Cencori into a Next.js or Python backend you already have. |
-| **[AI Gateway](/docs/ai/gateway)** | See all supported models, routing, and failover options. |
-| **[End-User Billing](/docs/platform/end-user-billing)** | Set up Stripe Connect, wallets, and pricing. |
-| **[Security](/docs/security/scan)** | Configure PII masking and prompt injection rules. |
+|--|--|
+| **[Quick Start](/docs/quick-start)** | Configure your IDE agent in 3 steps. |
+| **[API Keys](/docs/api/api-keys)** | Create and manage your gateway keys. |
+| **[Credits & Rate Limiting](/docs/platform/credits)** | Understand the three-tier rolling window system. |
+| **[Supported Models](/docs/ai/models)** | Full model catalog with credit rates. |
