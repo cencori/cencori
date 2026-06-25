@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { EmailService } from '@/lib/email';
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_BUDGET_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
 
 interface BudgetAlertRequest {
@@ -17,8 +17,11 @@ export async function POST(req: NextRequest) {
         const body: BudgetAlertRequest = await req.json();
         const { to, projectName, threshold, currentSpend, budget, percentUsed } = body;
 
-        if (!RESEND_API_KEY) {
-            console.warn('[Budget Alert] RESEND_API_KEY not configured');
+        let emailService: EmailService;
+        try {
+            emailService = new EmailService();
+        } catch {
+            console.warn('[Budget Alert] Email provider not configured');
             return NextResponse.json({ error: 'Email not configured' }, { status: 500 });
         }
 
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f4f4f5;">
     <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
         <div style="background: white; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            
+
             <div style="text-align: center; margin-bottom: 24px;">
                 <div style="font-size: 32px; margin-bottom: 8px;">${isOverBudget ? '⚠️' : '📊'}</div>
                 <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #18181b;">
@@ -51,8 +54,8 @@ export async function POST(req: NextRequest) {
             </div>
 
             <p style="color: #52525b; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                Your project <strong style="color: #18181b;">${projectName}</strong> has reached 
-                <strong style="color: ${isOverBudget ? '#dc2626' : '#f59e0b'};">${Math.round(percentUsed)}%</strong> 
+                Your project <strong style="color: #18181b;">${projectName}</strong> has reached
+                <strong style="color: ${isOverBudget ? '#dc2626' : '#f59e0b'};">${Math.round(percentUsed)}%</strong>
                 of its monthly budget.
             </p>
 
@@ -82,7 +85,7 @@ export async function POST(req: NextRequest) {
             ` : ''}
 
             <div style="text-align: center;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" 
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard"
                    style="display: inline-block; background: #18181b; color: white; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500;">
                     View Dashboard
                 </a>
@@ -99,30 +102,16 @@ export async function POST(req: NextRequest) {
 </html>
         `.trim();
 
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${RESEND_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                from: FROM_EMAIL,
-                to,
-                subject,
-                html,
-            }),
+        const result = await emailService.send({
+            from: FROM_EMAIL,
+            to,
+            subject,
+            html,
         });
 
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('[Budget Alert] Resend error:', error);
-            return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
-        }
-
-        const result = await response.json();
         console.log(`[Budget Alert] Email sent to ${to.length} recipients:`, result.id);
 
-        return NextResponse.json({ success: true, id: result.id });
+        return NextResponse.json({ success: true, id: result.id, provider: result.provider });
     } catch (error) {
         console.error('[Budget Alert] Error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
