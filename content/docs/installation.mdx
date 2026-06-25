@@ -75,114 +75,206 @@ Install the official Cencori SDK for your preferred language. The SDK is designe
 
   <TabsPanel value="python">
 
-Install the SDK:
+<Steps>
+  <Step>
+    <StepTitle>Install the SDK</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Install the Cencori SDK using pip.
+      </StepDescription>
 
-```bash
-pip install cencori
-```
+      ```bash
+      pip install cencori
+      ```
+    </StepContent>
+  </Step>
 
-Set your API key as an environment variable:
+  <Step>
+    <StepTitle>Set up your environment variables</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Add your Cencori project key to your environment.
+      </StepDescription>
 
-```bash
-export CENCORI_API_KEY=csk_...
-```
+      ```bash
+      export CENCORI_API_KEY=csk_...
+      ```
+    </StepContent>
+  </Step>
 
-Initialize the client:
+  <Step>
+    <StepTitle>Initialize the client</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Import and instantiate the client. The SDK automatically reads <code>CENCORI_API_KEY</code> from your environment.
+      </StepDescription>
 
-```python
-from cencori import Cencori
+      ```python
+      from cencori import Cencori
 
-cencori = Cencori()
-```
+      cencori = Cencori()
+      ```
+    </StepContent>
+  </Step>
+</Steps>
 
   </TabsPanel>
 
   <TabsPanel value="go">
 
-Install the SDK:
+<Steps>
+  <Step>
+    <StepTitle>Install the SDK</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Install the Cencori Go SDK into your module.
+      </StepDescription>
 
-```bash
-go get github.com/cencori/cencori-go
-```
+      ```bash
+      go get github.com/cencori/cencori-go
+      ```
+    </StepContent>
+  </Step>
 
-Set your API key as an environment variable:
+  <Step>
+    <StepTitle>Set up your environment variables</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Add your Cencori project key to your environment.
+      </StepDescription>
 
-```bash
-export CENCORI_API_KEY=csk_...
-```
+      ```bash
+      export CENCORI_API_KEY=csk_...
+      ```
+    </StepContent>
+  </Step>
 
-Initialize the client:
+  <Step>
+    <StepTitle>Initialize the client</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Import and instantiate the client. The SDK automatically reads <code>CENCORI_API_KEY</code> from your environment.
+      </StepDescription>
 
-```go
-import "github.com/cencori/cencori-go/cencori"
+      ```go
+      import "github.com/cencori/cencori-go/cencori"
 
-client := cencori.NewClient()
-```
+      client := cencori.NewClient()
+      ```
+    </StepContent>
+  </Step>
+</Steps>
 
   </TabsPanel>
 
   <TabsPanel value="php">
 
-Install the SDK via Composer:
+<Steps>
+  <Step>
+    <StepTitle>Install the SDK</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Install the Cencori PHP SDK via Composer.
+      </StepDescription>
 
-```bash
-composer require cencori/cencori-php
-```
+      ```bash
+      composer require cencori/cencori-php
+      ```
+    </StepContent>
+  </Step>
 
-Set your API key as an environment variable:
+  <Step>
+    <StepTitle>Set up your environment variables</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Add your Cencori project key to your environment.
+      </StepDescription>
 
-```bash
-export CENCORI_API_KEY=csk_...
-```
+      ```bash
+      export CENCORI_API_KEY=csk_...
+      ```
+    </StepContent>
+  </Step>
 
-Initialize the client:
+  <Step>
+    <StepTitle>Initialize the client</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Import and instantiate the client. The SDK automatically reads <code>CENCORI_API_KEY</code> from your environment.
+      </StepDescription>
 
-```php
-<?php
+      ```php
+      <?php
 
-require_once 'vendor/autoload.php';
+      require_once 'vendor/autoload.php';
 
-$cencori = new \Cencori\Cencori();
-```
+      $cencori = new \Cencori\Cencori();
+      ```
 
-Or pass the key explicitly:
+      You can also pass the key explicitly:
 
-```php
-$cencori = new \Cencori\Cencori([
-    'apiKey' => getenv('CENCORI_API_KEY'),
-]);
-```
+      ```php
+      $cencori = new \Cencori\Cencori([
+          'apiKey' => getenv('CENCORI_API_KEY'),
+      ]);
+      ```
+    </StepContent>
+  </Step>
+</Steps>
 
   </TabsPanel>
 
   <TabsPanel value="rust">
 
-Add the SDK to your `Cargo.toml`:
+<Steps>
+  <Step>
+    <StepTitle>Install the SDK</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Add the Cencori Rust SDK to your <code>Cargo.toml</code>.
+      </StepDescription>
 
-```toml
-[dependencies]
-cencori = "1.2"
-```
+      ```toml
+      [dependencies]
+      cencori = "1.2"
+      ```
+    </StepContent>
+  </Step>
 
-Set your API key as an environment variable:
+  <Step>
+    <StepTitle>Set up your environment variables</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Add your Cencori project key to your environment.
+      </StepDescription>
 
-```bash
-export CENCORI_API_KEY=csk_...
-```
+      ```bash
+      export CENCORI_API_KEY=csk_...
+      ```
+    </StepContent>
+  </Step>
 
-Initialize the client:
+  <Step>
+    <StepTitle>Initialize the client</StepTitle>
+    <StepContent>
+      <StepDescription>
+        Import and instantiate the client. The SDK automatically reads <code>CENCORI_API_KEY</code> from your environment.
+      </StepDescription>
 
-```rust
-use cencori::Cencori;
+      ```rust
+      use cencori::Cencori;
 
-let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
-```
+      let cencori = Cencori::new(None, None, None).unwrap();
+      ```
 
-Or let it read from the environment:
+      Or pass the key explicitly:
 
-```rust
-let cencori = Cencori::new(None, None, None).unwrap();
-```
+      ```rust
+      let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+      ```
+    </StepContent>
+  </Step>
+</Steps>
 
   </TabsPanel>
 </Tabs>
