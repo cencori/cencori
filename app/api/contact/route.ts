@@ -1,6 +1,7 @@
+import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
-import { EmailService, parseReplyTo } from '@/lib/email';
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const CONTACT_FROM_EMAIL = process.env.RESEND_CONTACT_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
 
 const emailRouting: Record<string, string> = {
@@ -11,6 +12,14 @@ const emailRouting: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
     try {
+        if (!RESEND_API_KEY || !CONTACT_FROM_EMAIL) {
+            return NextResponse.json(
+                { error: 'Email not configured' },
+                { status: 500 }
+            );
+        }
+
+        const resend = new Resend(RESEND_API_KEY);
         const body = await request.json();
         const { name, email, company, type, subject, message } = body;
 
@@ -21,26 +30,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        let emailService: EmailService;
-        try {
-            emailService = new EmailService();
-        } catch {
-            return NextResponse.json(
-                { error: 'Email not configured' },
-                { status: 500 }
-            );
-        }
-
-        if (!CONTACT_FROM_EMAIL) {
-            return NextResponse.json(
-                { error: 'Contact from email not configured' },
-                { status: 500 }
-            );
-        }
-
         const targetEmail = emailRouting[type] || emailRouting.general;
 
-        const result = await emailService.send({
+        const { data, error } = await resend.emails.send({
             from: CONTACT_FROM_EMAIL,
             to: [targetEmail],
             replyTo: email,
@@ -58,11 +50,19 @@ export async function POST(request: NextRequest) {
       `,
         });
 
-        return NextResponse.json({ success: true, id: result.id });
+        if (error) {
+            console.error('Resend error:', error);
+            return NextResponse.json(
+                { error: 'Failed to send email' },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({ success: true, id: data?.id });
     } catch (error) {
         console.error('Contact form error:', error);
         return NextResponse.json(
-            { error: 'Failed to send email' },
+            { error: 'Internal server error' },
             { status: 500 }
         );
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { EmailService } from '@/lib/email';
+import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
@@ -11,6 +11,7 @@ import {
     isUserMarketingOptedOut,
 } from '@/lib/user-unsubscribe';
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FALLBACK_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
 const FALLBACK_REPLY_TO = process.env.RESEND_REPLY_TO_EMAIL || '';
 const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN || 'send.cencori.com';
@@ -202,6 +203,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Email body is required' }, { status: 400 });
     }
 
+    if (!RESEND_API_KEY) {
+        return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
+    }
+
     const fromAddress = await getSenderFrom(senderProfileId);
     if (!fromAddress) {
         return NextResponse.json({ error: 'No sender email configured' }, { status: 500 });
@@ -214,12 +219,7 @@ export async function POST(req: NextRequest) {
     });
 
     const admin = createAdminClient();
-    let email: EmailService;
-    try {
-        email = new EmailService();
-    } catch {
-        return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
-    }
+    const resend = new Resend(RESEND_API_KEY);
 
     // === Single Send (test / individual) ===
     if (audienceType === 'single') {
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-            await email.send({
+            const { error: sendError } = await resend.emails.send({
                 from: fromAddress,
                 to: recipientEmail,
                 replyTo: validReplyTo(),
@@ -274,6 +274,15 @@ export async function POST(req: NextRequest) {
                 html: personalizedHtml,
                 text: textBody || undefined,
             });
+
+            if (sendError) {
+                if (sendRecord?.id) {
+                    await admin.from('email_sends').update({
+                        status: 'failed', failure_count: 1, sent_at: new Date().toISOString(),
+                    }).eq('id', sendRecord.id);
+                }
+                return NextResponse.json({ error: sendError.message }, { status: 500 });
+            }
 
             if (sendRecord?.id) {
                 await admin.from('email_sends').update({
@@ -363,25 +372,21 @@ export async function POST(req: NextRequest) {
                 }
                 const personalizedSubject = personalize(subject.trim(), recipient, unsubscribeUrl);
 
-                try {
-                    await email.send({
-                        from: fromAddress,
-                        to: recipient.email,
-                        replyTo: validReplyTo(),
-                        subject: personalizedSubject,
-                        html: personalizedHtml,
-                        text: textBody || undefined,
-                        headers: unsubscribeUrl
-                            ? {
-                                'List-Unsubscribe': `<${unsubscribeUrl}>`,
-                                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-                            }
-                            : undefined,
-                    });
-                    return { ok: true, email: recipient.email };
-                } catch {
-                    return { ok: false, email: recipient.email };
-                }
+                const { error } = await resend.emails.send({
+                    from: fromAddress,
+                    to: recipient.email,
+                    replyTo: validReplyTo(),
+                    subject: personalizedSubject,
+                    html: personalizedHtml,
+                    text: textBody || undefined,
+                    headers: unsubscribeUrl
+                        ? {
+                              'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                          }
+                        : undefined,
+                });
+                return { ok: !error, email: recipient.email };
             })
         );
 

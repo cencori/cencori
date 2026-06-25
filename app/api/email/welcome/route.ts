@@ -1,75 +1,87 @@
+import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { EmailService, parseReplyTo } from '@/lib/email';
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const WELCOME_FROM_EMAIL = process.env.RESEND_WELCOME_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
 const WELCOME_REPLY_TO_EMAIL = process.env.RESEND_WELCOME_REPLY_TO_EMAIL || process.env.RESEND_REPLY_TO_EMAIL || '';
 
-export async function POST(request: NextRequest) {
-    const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+function parseReplyTo(value: string): string | string[] | undefined {
+  const addresses = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 
-    if (userError || !user?.email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (addresses.length === 0) {
+    return undefined;
+  }
+
+  return addresses.length === 1 ? addresses[0] : addresses;
+}
+
+export async function POST(request: NextRequest) {
+  const supabase = await createServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    let requestedEmail: string | null = null;
+    try {
+      const body = await request.json();
+      if (typeof body?.email === 'string') {
+        requestedEmail = body.email;
+      }
+    } catch {
+      // JSON body is optional.
     }
 
-    try {
-        let requestedEmail: string | null = null;
-        try {
-            const body = await request.json();
-            if (typeof body?.email === 'string') {
-                requestedEmail = body.email;
-            }
-        } catch {
-            // JSON body is optional.
-        }
+    const normalizedEmail = user.email.trim().toLowerCase();
+    if (requestedEmail && requestedEmail.trim().toLowerCase() !== normalizedEmail) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
 
-        const normalizedEmail = user.email.trim().toLowerCase();
-        if (requestedEmail && requestedEmail.trim().toLowerCase() !== normalizedEmail) {
-            return NextResponse.json(
-                { error: 'Forbidden' },
-                { status: 403 }
-            );
-        }
+    if (!RESEND_API_KEY) {
+      console.warn('[Welcome Email] RESEND_API_KEY not configured. Skipping send.');
+      return NextResponse.json({ success: false, skipped: true, reason: 'email_not_configured' }, { status: 202 });
+    }
 
-        let emailService: EmailService;
-        try {
-            emailService = new EmailService();
-        } catch {
-            console.warn('[Welcome Email] Email provider not configured. Skipping send.');
-            return NextResponse.json({ success: false, skipped: true, reason: 'email_not_configured' }, { status: 202 });
-        }
+    if (!WELCOME_FROM_EMAIL) {
+      console.warn('[Welcome Email] RESEND_WELCOME_FROM_EMAIL/RESEND_FROM_EMAIL not configured. Skipping send.');
+      return NextResponse.json({ success: false, skipped: true, reason: 'from_email_not_configured' }, { status: 202 });
+    }
 
-        if (!WELCOME_FROM_EMAIL) {
-            console.warn('[Welcome Email] RESEND_WELCOME_FROM_EMAIL/RESEND_FROM_EMAIL not configured. Skipping send.');
-            return NextResponse.json({ success: false, skipped: true, reason: 'from_email_not_configured' }, { status: 202 });
-        }
+    const supabaseAdmin = createAdminClient();
+    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    if (adminUserError || !adminUserData?.user) {
+      console.error('[Welcome Email] Failed to load user metadata:', adminUserError);
+      return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });
+    }
 
-        const supabaseAdmin = createAdminClient();
-        const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(user.id);
-        if (adminUserError || !adminUserData?.user) {
-            console.error('[Welcome Email] Failed to load user metadata:', adminUserError);
-            return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });
-        }
+    const currentUserMetadata = (adminUserData.user.user_metadata ?? {}) as Record<string, unknown>;
+    const existingWelcomeSentAt = currentUserMetadata.welcome_email_sent_at;
+    if (typeof existingWelcomeSentAt === 'string' && existingWelcomeSentAt.length > 0) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: 'already_sent',
+        sentAt: existingWelcomeSentAt,
+      });
+    }
 
-        const currentUserMetadata = (adminUserData.user.user_metadata ?? {}) as Record<string, unknown>;
-        const existingWelcomeSentAt = currentUserMetadata.welcome_email_sent_at;
-        if (typeof existingWelcomeSentAt === 'string' && existingWelcomeSentAt.length > 0) {
-            return NextResponse.json({
-                success: true,
-                skipped: true,
-                reason: 'already_sent',
-                sentAt: existingWelcomeSentAt,
-            });
-        }
-
-        const result = await emailService.send({
-            from: WELCOME_FROM_EMAIL,
-            to: normalizedEmail,
-            replyTo: parseReplyTo(WELCOME_REPLY_TO_EMAIL),
-            subject: 'Welcome to Cencori!',
-            html: `
+    const resend = new Resend(RESEND_API_KEY);
+    const { data, error } = await resend.emails.send({
+      from: WELCOME_FROM_EMAIL,
+      to: normalizedEmail,
+      replyTo: parseReplyTo(WELCOME_REPLY_TO_EMAIL),
+      subject: 'Welcome to Cencori!',
+      html: `
         <!DOCTYPE html>
         <html>
           <head>
@@ -124,25 +136,33 @@ export async function POST(request: NextRequest) {
           </body>
         </html>
       `,
-        });
+    });
 
-        const { error: metadataUpdateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-            user_metadata: {
-                ...currentUserMetadata,
-                welcome_email_sent_at: new Date().toISOString(),
-            },
-        });
-
-        if (metadataUpdateError) {
-            console.error('[Welcome Email] Failed to persist send marker:', metadataUpdateError);
-        }
-
-        return NextResponse.json({ success: true, id: result.id });
-    } catch (error) {
-        console.error('Welcome email error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+    if (error) {
+      console.error('Welcome email error:', error);
+      return NextResponse.json(
+        { error: 'Failed to send welcome email' },
+        { status: 500 }
+      );
     }
+
+    const { error: metadataUpdateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...currentUserMetadata,
+        welcome_email_sent_at: new Date().toISOString(),
+      },
+    });
+
+    if (metadataUpdateError) {
+      console.error('[Welcome Email] Failed to persist send marker:', metadataUpdateError);
+    }
+
+    return NextResponse.json({ success: true, id: data?.id });
+  } catch (error) {
+    console.error('Welcome email error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
