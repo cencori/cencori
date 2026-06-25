@@ -1,0 +1,147 @@
+---
+title: "Rust SDK"
+description: "Official Rust client for Cencori. Ergonomic, type-safe API with sync and async support for chat, agents, memory, and assistant sessions."
+section: "AI"
+order: 2.4
+---
+
+## Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+cencori = "1.2"
+```
+
+## Basic Usage
+
+```rust
+use cencori::{Cencori, types::Message};
+
+let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+
+// Chat
+let response = cencori.ai.chat(
+    vec![Message::user("Hello!")],
+    None, None, None, None,
+).unwrap();
+
+println!("{}", response.content);
+```
+
+## Sessions
+
+```rust
+use cencori::{Cencori, types::CreateSessionParams};
+
+let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+
+// Create a session
+let session = cencori.sessions.create(&CreateSessionParams {
+    agent_id: Some("ag_...".into()),
+    metadata: None,
+}).unwrap();
+
+// Submit a turn
+use cencori::types::TurnParams;
+use serde_json::json;
+let turn = cencori.sessions.submit_turn(&session.id, &TurnParams {
+    input: json!("What is the weather?"),
+    tools: None,
+    instructions: None,
+    agent_id: None,
+    model: None,
+    temperature: None,
+    max_output_tokens: None,
+    tool_choice: None,
+    response_format: None,
+    user: None,
+    pause_on_tool_calls: None,
+    stream: None,
+}).unwrap();
+
+// Approve a pending action
+use cencori::types::ApproveRejectParams;
+cencori.sessions.approve(&session.id, &ApproveRejectParams {
+    action_id: "act_...".into(),
+    tool_results: None,
+}).unwrap();
+```
+
+## Agents
+
+```rust
+use cencori::{Cencori, types::CreateAgentParams};
+
+let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+
+let agent = cencori.agents.create(&CreateAgentParams {
+    name: "my-agent".into(),
+    description: Some("A helpful assistant".into()),
+    config: None,
+}).unwrap();
+```
+
+## Memory
+
+```rust
+use cencori::{Cencori, types::StoreMemoryOptions};
+
+let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+
+cencori.memory.store(&StoreMemoryOptions {
+    namespace: "docs".into(),
+    content: "Refund policy allows returns within 30 days".into(),
+    embedding: None,
+    metadata: None,
+    expires_at: None,
+}).unwrap();
+
+// Semantic search
+use cencori::types::SearchMemoryOptions;
+let results = cencori.memory.search(&SearchMemoryOptions {
+    namespace: "docs".into(),
+    query: "what is our refund policy?".into(),
+    limit: Some(5),
+    threshold: None,
+    filter: None,
+}).unwrap();
+```
+
+## Async Support
+
+All methods have async counterparts prefixed with `async_`:
+
+```rust
+use cencori::{Cencori, types::Message};
+
+#[tokio::main]
+async fn main() {
+    let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
+
+    let response = cencori.ai.async_chat(
+        vec![Message::user("Hello!")],
+        None, None, None, None,
+    ).await.unwrap();
+
+    println!("{}", response.content);
+}
+```
+
+## Configuration
+
+```rust
+use cencori::Cencori;
+use std::collections::HashMap;
+
+let mut headers = HashMap::new();
+headers.insert("X-Custom".into(), "value".into());
+
+let cencori = Cencori::new_with_config(
+    Some("your-api-key"),
+    Some("https://api.cencori.com"),
+    Some(headers),
+    Some(60.0),
+).unwrap();
+```
