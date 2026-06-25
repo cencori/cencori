@@ -1,99 +1,134 @@
 ---
-title: "Credits & Rate Limiting"
-description: "How Cencori Code measures usage, protects you from runaway agent loops, and settles costs."
+title: "Credits System"
+description: "How prepaid credits are purchased, settled, and charged across Cencori models and endpoints."
 section: "Platform"
 order: 4
 ---
 
-## Credits
+## Overview
 
-Cencori Code abstracts away raw per-token costs through an internal unit called a **Credit**.
+Cencori uses an organization-level prepaid wallet for AI usage.
 
-```
-1 Credit = $0.001
-```
+- **1 credit = $1 USD**.
+- Credits are held at the **organization** level (not per project).
+- Every successful AI request deducts usage from your org balance.
+- If your org has no credits left, credit-gated tiers receive a blocked response until top-up.
 
-This fixed mapping means your subscription plan stays stable even when Anthropic, OpenAI, or DeepSeek adjust their upstream pricing. Cencori absorbs those changes behind the scenes without modifying your plan.
+## Billing Model
 
-Credit balances are never shown as raw numbers in the public dashboard. Usage is displayed as simple progress bars across your rolling windows so you always know how much headroom you have left — without staring at a fluctuating dollar meter mid-workflow.
+Cencori billing has two layers:
 
----
+1. **Plan tier** (Free / Pro / Team / Enterprise) for request limits and platform entitlements.
+2. **Credits wallet** for usage-based AI charging.
 
-## Model credit rates
+Credits and plan tier work together. A paid org can still hit limits if:
+- monthly request limit is reached,
+- spend cap is reached, or
+- credits are exhausted.
 
-These internal rates are used to calculate worst-case request cost before dispatch and actual cost after settlement. They are not shown in the user-facing dashboard.
+See [Billing & Usage](/docs/platform/billing) for plan and spend controls.
 
-| Model | Input (Credits / M tokens) | Output (Credits / M tokens) |
-|-------|---------------------------|------------------------------|
-| `claude-sonnet-4.5` | 3,300 | 16,500 |
-| `gpt-4o` | 2,750 | 11,000 |
-| `deepseek-v3` | 300 | 1,100 |
+## Top-Up Flow
 
----
+When a user recharges:
 
-## The three-tier rolling window engine
+1. They select a credit pack in Billing (`Starter`, `Growth`, `Scale` by default).
+2. Checkout is created.
+3. On successful payment, Cencori credits the organization wallet.
+4. A `topup` transaction is written to the transaction history.
 
-Every inbound request must clear three separate rolling windows simultaneously before it is dispatched. This architecture protects you from runaway IDE agent loops and protects the platform from sudden financial exposure.
+> [!NOTE]
+> Top-up settlement is idempotent: duplicate payment events do not double-credit the same order.
 
-### 5-Hour Rolling Window
+## Usage Charging
 
-A short-term throttle. It catches and stops broken automated background scripts or looping agents before they cause severe damage within a single work session.
+For each successful request:
 
-### 7-Day Rolling Window
+1. Cencori computes provider cost from model pricing and token/image/audio usage.
+2. Cencori applies model/provider markup.
+3. Final charge is logged.
+4. Credits are deducted from org balance.
+5. A `usage` transaction is written with a reference to the request log.
 
-A mid-term bucket. It manages sustained delivery across an engineering week. If a long refactoring sprint is chewing through capacity, this window flags it before it compounds over the month.
+Formula:
 
-### Monthly Billing Window
-
-A hard cap aligned to your Paystack renewal date. When this window resets, your full monthly allocation is restored.
-
----
-
-## Request lifecycle
-
-Each request follows a strict 5-step path:
-
-**1. Authorization** — the bearer token is authenticated against the cache layer and matched to your active tier.
-
-**2. Worst-case estimation** — before touching any upstream provider, the proxy calculates the maximum possible credit cost:
-
-```
-Cost_max = (Tokens_input × Rate_input) + (Tokens_max_out × Rate_output)
+```text
+provider_cost + markup = total_charge
 ```
 
-`Tokens_max_out` is taken from your request's `max_tokens` parameter.
+## Example
 
-**3. Atomic reservation** — `Cost_max` is atomically deducted from all three rolling window counters at once. This reservation blocks concurrent microsecond-level racing requests from bypassing the caps.
+Request:
+- Model: `gpt-5.1`
+- Input tokens: 1,000
+- Output tokens: 500
 
-**4. Upstream streaming** — the request is forwarded. The response stream is piped back to your IDE without server-side buffering, keeping added latency under **p95 ≤ 30ms**.
+If the final calculated charge is **0.0245 credits**, then:
+- Your organization balance decreases by **0.0245**.
+- A usage record of **-0.0245** is added to your transaction history.
 
-**5. Settlement** — once the stream completes, the actual cost is calculated from real token counts:
+## Enforcement Behavior
 
-```
-Cost_actual = (Tokens_input × Rate_input) + (Tokens_actual_out × Rate_output)
-```
+Credits are enforced before request execution on credit-gated tiers.
 
-The difference `Cost_max − Cost_actual` is immediately credited back to your rolling windows. An immutable ledger record is written asynchronously for audit purposes.
+- If balance is exhausted, API returns `403` with a credit exhaustion message.
+- Recharge and retry to continue.
 
----
+> [!IMPORTANT]
+> By default, Pro and Team tiers are credit-gated. Free and Enterprise can use separate policy paths based on deployment config.
 
-## Rate limit responses
+## Managed Keys vs BYOK
 
-If any single rolling window lacks the required headroom, the proxy blocks the request immediately:
+Credits do **not** force BYOK. You can run either mode:
 
-```
-HTTP 429 Too Many Requests
-```
+| Mode | Who pays provider bill | How usage is charged in Cencori |
+| :--- | :--- | :--- |
+| Managed keys | Cencori | Org credits are deducted |
+| BYOK | Your org directly with provider | Cencori can still meter platform usage depending on your plan/config |
 
-The response body identifies the specific window that was exhausted and its calculated reset time. No upstream request is made, so no credits are consumed.
+See [Bring Your Own Key (BYOK)](/docs/platform/byok) for setup and tradeoffs.
 
----
+## Monitoring Credits
 
-## Billing
+You can track credits in:
+- **Dashboard navbar**: compact live credit pill.
+- **Billing page**: current balance + recent credit transactions + recharge controls.
+- **Usage and Logs**: request-level cost and token visibility.
 
-Subscriptions are processed through **Paystack**, with native support for:
-- Nigerian Naira (NGN)
-- Global credit cards
-- Instant bank-transfer networks
+## Recommended Operator Checklist
 
-Successful payments trigger an immediate monthly capacity reset. Failed recurring collections or cancellations gracefully step down access at the natural end of the paid billing cycle — no abrupt cutoff mid-session.
+If you operate your own Cencori deployment:
+
+1. Configure Polar credit products (`starter`, `growth`, `scale`).
+2. Set webhook endpoint and subscribe to `order.paid`.
+3. Ensure provider keys are configured for managed mode.
+4. Keep model pricing data current for accurate charging.
+5. Set spend caps and monitor low-balance orgs.
+
+## Troubleshooting
+
+### Payment succeeded but credits not added
+- Verify webhook endpoint is reachable and signed correctly.
+- Confirm `order.paid` events are enabled.
+- Check webhook logs for org resolution and metadata (`purchase_type=credits_topup`).
+
+### Credits not deducted on requests
+- Check whether endpoint is routed through billing middleware/charged path.
+- Confirm request reached a successful completion path.
+- Verify request log contains charge greater than 0.
+
+### `Credit balance exhausted` errors
+- Recharge org wallet.
+- Confirm you are in the intended organization/project context.
+- Verify tier gating policy for your environment.
+
+## FAQ
+
+### Are credits shared between organizations?
+No. Each organization has an isolated wallet.
+
+### Can I use all models after top-up?
+You can use models available in your Cencori catalog and configured provider access path (managed keys or BYOK).
+
+### Is auto-recharge available?
+Not by default in current core flow. Top-up is explicit through billing checkout.

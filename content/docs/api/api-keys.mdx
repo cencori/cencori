@@ -7,20 +7,18 @@ order: 6
 
 ## Overview
 
-You can create up to **5 named gateway API keys** from **Dashboard → API Keys**. Naming keys by workflow or machine (e.g., `Laptop`, `Desktop`, `Remote Server`, `CI`) makes it easy to track which environment is consuming capacity and revoke a single key without disrupting others.
+Cencori API keys are created and revoked in the project dashboard. Public product integrations use those keys to call runtime APIs; they do not create or rotate keys through `https://api.cencori.com/v1`.
 
-Keys are shown in full only at creation time. After that, the dashboard masks the secret and displays a `last_used_at` timestamp so you can audit live connectivity.
+Go to **Project > API Keys**, create a secret key for server-side use, and store it as `CENCORI_API_KEY`.
 
-## Key format
+## Key Types
 
-All gateway keys use the `csk_` prefix:
+| Key | Prefix | Use |
+|-----|--------|-----|
+| Secret key | `csk_...` or `csk_test_...` | Server-side SDKs, API routes, workers, and backend services |
+| Publishable key | `cpk_...` or `cpk_test_...` | Browser/mobile scenarios that explicitly support publishable keys and allowed domains |
 
-| Prefix | Use |
-|--------|-----|
-| `csk_...` | Live subscription key for IDE agents and API calls |
-| `csk_test_...` | Test key for development (limited capacity) |
-
-Use `csk_...` keys for all OpenAI-compatible integrations. Pass them as `Authorization: Bearer csk_...`.
+Use `csk_...` keys for the quick start, SDKs, and OpenAI-compatible integrations unless a guide specifically tells you to use a publishable key.
 
 ## Public Runtime Usage
 

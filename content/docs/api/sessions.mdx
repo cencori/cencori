@@ -33,10 +33,7 @@ Sessions is an event-sourced durable execution layer for AI agents. Every turn i
 | Deterministic replay / debugging | Sessions |
 | Stateless request (no persistence needed) | `POST /v1/responses` |
 
-## Official SDKs
-
-<Tabs>
-<Tab title="TypeScript">
+## Official TypeScript SDK
 
 ```typescript
 import { Cencori } from 'cencori';
@@ -74,124 +71,6 @@ while (true) {
 const status = await cencori.sessions.get(session.id);
 console.log(status.turn_count); // 1
 ```
-
-</Tab>
-<Tab title="PHP">
-
-```php
-<?php
-
-require_once 'vendor/autoload.php';
-
-use Cencori\Cencori;
-
-$cencori = new Cencori(['apiKey' => getenv('CENCORI_API_KEY')]);
-
-// Create a session
-$session = $cencori->sessions->create();
-echo $session['id']; // "ses_abc123"
-
-// Submit a turn (use raw HTTP for streaming)
-$turn = $cencori->sessions->submitTurn($session['id'], [
-    'input' => 'What was revenue last week?',
-    'tools' => [['type' => 'web_search_preview']],
-]);
-
-// Get session status
-$status = $cencori->sessions->get($session['id']);
-echo $status['turn_count']; // 1
-
-// Approve a pending action
-$cencori->sessions->approve($session['id'], [
-    'action_id' => 'tc_abc',
-    'tool_results' => [
-        ['action_id' => 'tc_abc', 'output' => '{"revenue": 4200000}'],
-    ],
-]);
-
-// Reject a pending action
-$cencori->sessions->reject($session['id'], [
-    'action_id' => 'tc_abc',
-]);
-
-// List sessions
-$sessions = $cencori->sessions->list(['status' => 'paused']);
-
-// Get event log
-$events = $cencori->sessions->getEvents($session['id'], ['turn_number' => 1]);
-
-// Delete a session
-$cencori->sessions->delete($session['id']);
-```
-
-</Tab>
-<Tab title="Rust">
-
-```rust
-use cencori::{Cencori, types::CreateSessionParams};
-
-let cencori = Cencori::new(Some("your-api-key"), None, None).unwrap();
-
-// Create a session
-let session = cencori.sessions.create(&CreateSessionParams {
-    agent_id: None,
-    metadata: None,
-}).unwrap();
-println!("{}", session.id); // "ses_abc123"
-
-// Submit a turn
-use cencori::types::TurnParams;
-use serde_json::json;
-let turn = cencori.sessions.submit_turn(&session.id, &TurnParams {
-    input: json!("What was revenue last week?"),
-    tools: None,
-    instructions: None,
-    agent_id: None,
-    model: None,
-    temperature: None,
-    max_output_tokens: None,
-    tool_choice: None,
-    response_format: None,
-    user: None,
-    pause_on_tool_calls: None,
-    stream: None,
-}).unwrap();
-
-// Get session status
-let status = cencori.sessions.get(&session.id).unwrap();
-println!("{}", status.turn_count); // 1
-
-// Approve a pending action
-use cencori::types::ApproveRejectParams;
-cencori.sessions.approve(&session.id, &ApproveRejectParams {
-    action_id: "tc_abc".into(),
-    tool_results: None,
-}).unwrap();
-
-// Reject a pending action
-cencori.sessions.reject(&session.id, &ApproveRejectParams {
-    action_id: "tc_abc".into(),
-    tool_results: None,
-}).unwrap();
-
-// List sessions
-use cencori::types::SessionListParams;
-let sessions = cencori.sessions.list(&SessionListParams {
-    page: None,
-    limit: None,
-    status: Some("paused".into()),
-    agent_id: None,
-}).unwrap();
-
-// Get event log
-let events = cencori.sessions.get_events(&session.id, None, None, Some(1)).unwrap();
-
-// Delete a session
-cencori.sessions.delete(&session.id).unwrap();
-```
-
-</Tab>
-</Tabs>
 
 ## Raw API
 
