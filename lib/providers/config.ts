@@ -45,6 +45,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // GPT-5 Series (latest)
+            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', type: ['chat', 'reasoning'], contextWindow: 1500000, description: 'Next-gen flagship, 1.5M context, limited preview (June 2026)' },
             { id: 'gpt-5.5', name: 'GPT-5.5', type: ['chat'], contextWindow: 400000, description: 'New class of intelligence for real work and agents' },
             { id: 'gpt-5.4', name: 'GPT-5.4 Thinking', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Latest GPT-5.4 reasoning model' },
             { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Most capable GPT-5.4 variant' },
