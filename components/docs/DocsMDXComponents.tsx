@@ -2,6 +2,15 @@ import { cn } from "@/lib/utils";
 import { HTMLAttributes, ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { CodeBlock } from "@/components/codeblock";
+
+function extractCodeText(children: unknown): string {
+  if (typeof children === 'string') return children;
+  if (Array.isArray(children)) return children.map(extractCodeText).join('');
+  if (children && typeof children === 'object' && 'props' in (children as any)) {
+    return extractCodeText((children as any).props.children);
+  }
+  return '';
+}
 import { Check, X, AlertTriangle, Globe, Database, Brain, Zap, Flame, Layout, Server, Shield } from "lucide-react";
 import {
     GhostContainer, GhostBox, GhostBoxTitle, GhostBoxContent,
@@ -217,10 +226,11 @@ export const DocsMDXComponents = {
     pre: ({ ref: _ref, ...props }: ComponentProps<'pre'>) => {
         const codeElement = props.children as { props?: { className?: string; children?: unknown } };
         const className = codeElement?.props?.className ?? '';
-        const code = codeElement?.props?.children ?? props.children;
+        const code = extractCodeText(codeElement?.props?.children ?? props.children);
+        const language = className.replace('language-', '') || 'text';
         return (
             <div className="not-prose my-4">
-                <CodeBlock className={className}>{code as ReactNode}</CodeBlock>
+                <CodeBlock code={code as string} language={language} className={className} />
             </div>
         );
     },
