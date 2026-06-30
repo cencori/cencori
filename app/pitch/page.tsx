@@ -579,8 +579,28 @@ function PitchDeckContent() {
                         inset: auto !important;
                         transform: none !important;
                     }
-                    .nav, .export-btn, .slide-counter, .slide-logo {
+                    .nav, .slide-counter, .slide-logo {
                         display: none !important;
+                    }
+                    .export-btn {
+                        display: block !important;
+                        position: fixed !important;
+                        bottom: 20px !important;
+                        right: 20px !important;
+                        background: #000 !important;
+                        border: 1px solid #000 !important;
+                        color: #fff !important;
+                        border-radius: 99px !important;
+                        padding: 10px 18px !important;
+                        font-size: 10px !important;
+                        font-weight: 700 !important;
+                        box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
+                        z-index: 10001 !important;
+                        letter-spacing: 0.1em !important;
+                    }
+                    .export-btn:hover {
+                        background: #222 !important;
+                        border-color: #222 !important;
                     }
                 }
             `}</style>
