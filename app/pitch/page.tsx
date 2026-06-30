@@ -257,18 +257,18 @@ function PitchDeckContent() {
                 .s2-belief-text strong { color: #000; font-weight: 600; }
 
                 /* SLIDE 3 - THE PROBLEM */
-                .s3 { background: #fff; flex-direction: column; justify-content: center; padding: 0 10%; }
-                .s3-headline { font-family: var(--font-display); font-size: clamp(34px, 4vw, 48px); font-weight: 700; line-height: 1.05; letter-spacing: -0.025em; color: #000; margin-bottom: 32px; }
-                .problem-stack { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-                .problem-layer { background: #fafafa; border: 1px solid #e5e5e5; padding: 22px 30px; display: flex; align-items: center; gap: 30px; border-radius: 8px; }
+                .s3 { background: #fff; flex-direction: column; justify-content: center; padding: 2% 10% 0; }
+                .s3-headline { font-family: var(--font-display); font-size: clamp(34px, 4vw, 48px); font-weight: 700; line-height: 1.05; letter-spacing: -0.025em; color: #000; margin-bottom: 16px; }
+                .problem-stack { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+                .problem-layer { background: #fafafa; border: 1px solid #e5e5e5; padding: 10px 20px; display: flex; align-items: center; gap: 30px; border-radius: 8px; }
                 .problem-layer-num { font-family: var(--font-code); font-size: 11.5px; letter-spacing: .2em; color: #aaa; width: 40px; flex-shrink: 0; }
                 .problem-layer-label { font-family: var(--font-code); font-size: 10px; letter-spacing: .15em; color: #888; text-transform: uppercase; width: 130px; flex-shrink: 0; }
-                .problem-layer-content { font-size: 15px; color: #555; line-height: 1.5; font-weight: 400; flex: 1; }
+                .problem-layer-content { font-size: 14px; color: #555; line-height: 1.4; flex: 1; }
                 .problem-layer-content strong { color: #000; font-weight: 600; }
-                .s3-result { border: 1px solid #e5e5e5; margin-top: 30px; padding: 22px 30px; display: flex; align-items: center; gap: 40px; border-radius: 8px; background: #fafafa; }
+                .s3-result { border: 1px solid #e5e5e5; margin-top: 10px; padding: 10px 20px; display: flex; align-items: center; gap: 40px; border-radius: 8px; background: #fafafa; }
                 .s3-result-label { font-family: var(--font-code); font-size: 11px; letter-spacing: .2em; color: #999; text-transform: uppercase; white-space: nowrap; }
                 .s3-result-list { display: flex; gap: 40px; flex: 1; }
-                .s3-result-item { display: flex; align-items: center; gap: 12px; font-size: 14.5px; color: #555; }
+                .s3-result-item { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: #555; }
                 .s3-result-item strong { color: #000; font-weight: 500; }
  
                 /* SLIDE 4 - THE SOLUTION */
@@ -285,17 +285,17 @@ function PitchDeckContent() {
                 .s4-closing-text strong { color: #000; font-weight: 600; }
  
                 /* SLIDE 5 - WHY NOW */
-                .s5 { background: #fff; flex-direction: column; justify-content: center; padding: 0 10%; }
+                .s5 { background: #fff; flex-direction: column; justify-content: center; padding: 2% 10% 0; }
                 .timeline-eras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #e5e5e5; border: 1px solid #e5e5e5; margin-bottom: 28px; }
-                .s5-content { display: flex; gap: 48px; width: 100%; align-items: stretch; margin-top: 10px; }
-                .s5-charts { width: 44%; display: flex; flex-direction: column; gap: 20px; justify-content: center; }
-                .s5-details { width: 56%; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+                .s5-content { display: flex; gap: 24px; width: 100%; align-items: stretch; margin-top: 5px; }
+                .s5-charts { width: 44%; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+                .s5-details { width: 56%; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
                 
                 /* Charts layout */
-                .chart-container-s5 { background: #fafafa; border: 1px solid #e5e5e5; padding: 24px 28px; border-radius: 8px; }
-                .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+                .chart-container-s5 { background: #fafafa; border: 1px solid #e5e5e5; padding: 14px 20px; border-radius: 8px; }
+                .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
                 .chart-title { font-family: var(--font-code); font-size: 11px; letter-spacing: .15em; color: #888; text-transform: uppercase; margin: 0; }
-                .chart-stat-callout { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: #000; }
+                .chart-stat-callout { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: #000; }
                 
                 /* Stacked Bar Chart */
                 .inference-chart { display: flex; justify-content: space-between; align-items: flex-end; height: 130px; padding: 10px 10px 0; border-bottom: 1px solid #e5e5e5; margin-bottom: 8px; }
@@ -322,12 +322,12 @@ function PitchDeckContent() {
                 .horiz-bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 5px; }
  
                 /* List detail item */
-                .s5-detail-item { border: 1px solid #e5e5e5; padding: 18px 22px; border-radius: 8px; background: #fafafa; display: flex; gap: 18px; align-items: flex-start; transition: border-color 0.2s ease; }
+                .s5-detail-item { border: 1px solid #e5e5e5; padding: 8px 14px; border-radius: 8px; background: #fafafa; display: flex; gap: 12px; align-items: flex-start; transition: border-color 0.2s ease; }
                 .s5-detail-item:hover { border-color: #000; }
-                .s5-icon-box { width: 40px; height: 40px; border-radius: 4px; border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #f0f0f0; }
-                .s5-text-box { display: flex; flex-direction: column; gap: 4px; }
-                .s5-item-title { font-family: var(--font-display); font-size: 15.5px; font-weight: 600; color: #000; }
-                .s5-item-desc { font-size: 13px; color: #555; line-height: 1.45; font-weight: 400; }
+                .s5-icon-box { width: 30px; height: 30px; border-radius: 4px; border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #f0f0f0; }
+                .s5-text-box { display: flex; flex-direction: column; gap: 2px; }
+                .s5-item-title { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: #000; }
+                .s5-item-desc { font-size: 11.5px; color: #555; line-height: 1.35; font-weight: 400; }
                 .s5-item-desc strong { color: #000; font-weight: 500; }
  
                 /* SLIDE 6 - TRACTION */
