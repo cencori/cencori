@@ -1,0 +1,28 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "installation",
+    "quickstart",
+    "---Concepts---",
+    "project-layout",
+    "sessions",
+    "---Authoring---",
+    "agent",
+    "instructions",
+    "tools",
+    "skills",
+    "hooks",
+    "channels",
+    "schedules",
+    "subagents",
+    "policies",
+    "---Runtime---",
+    "running",
+    "events",
+    "---Reference---",
+    "cli",
+    "cencori"
+  ]
+}

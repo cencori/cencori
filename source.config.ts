@@ -1,7 +1,8 @@
 import z from "zod";
 import rehypePrettyCode from "rehype-pretty-code";
 import { transformers } from "./lib/docs/highlight-code";
-import { defineConfig, defineDocs, frontmatterSchema } from "fumadocs-mdx/config";
+import { pageSchema } from "fumadocs-core/source/schema";
+import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 
 export default defineConfig({
   mdxOptions: {
@@ -29,7 +30,7 @@ export const docs = defineDocs({
   docs: {
     // Extend Fumadocs' base schema to tolerate Cencori's existing frontmatter
     // (section/order/lastUpdated) alongside the optional image/links fields.
-    schema: frontmatterSchema.extend({
+    schema: pageSchema.extend({
       section: z.string().optional(),
       order: z.number().optional(),
       lastUpdated: z.string().optional(),
@@ -41,6 +42,18 @@ export const docs = defineDocs({
           github: z.string().optional(),
         })
         .optional(),
+    }),
+  },
+});
+
+// Zett is a separate product (a filesystem-first agent framework) with its own
+// docs design. It gets an independent collection so `content/zett` is rendered
+// at /zett/docs without touching the main Cencori `docs` collection above.
+export const zett = defineDocs({
+  dir: "content/zett",
+  docs: {
+    schema: pageSchema.extend({
+      order: z.number().optional(),
     }),
   },
 });
