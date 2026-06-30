@@ -66,6 +66,21 @@ function PitchDeckContent() {
         }
     }, [searchParams]);
 
+    useEffect(() => {
+        const handleResize = () => {
+            const width = window.innerWidth;
+            if (width < 1100) {
+                const scale = (width - 32) / 1280; // 16px padding on each side
+                document.documentElement.style.setProperty("--slide-zoom", String(scale));
+            } else {
+                document.documentElement.style.removeProperty("--slide-zoom");
+            }
+        };
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
     const [current, setCurrent] = useState(0);
     const total = 10;
 
@@ -523,6 +538,46 @@ function PitchDeckContent() {
                 .s10-contact { display: flex; gap: 44px; border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 28px; }
                 .s10-contact-item label { display: block; font-family: var(--font-code); font-size: 10px; letter-spacing: .15em; color: #999; text-transform: uppercase; margin-bottom: 6px; }
                 .s10-contact-item span { font-size: 14px; color: #000; font-weight: 500; }
+
+                @media (max-width: 1100px) {
+                    .pitch-deck-container {
+                        position: relative !important;
+                        height: auto !important;
+                        min-height: 100vh !important;
+                        overflow-y: auto !important;
+                        background: #f5f5f5 !important;
+                        padding: 40px 0 !important;
+                        box-sizing: border-box !important;
+                    }
+                    .deck {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        gap: 24px !important;
+                        align-items: center !important;
+                        height: auto !important;
+                        position: relative !important;
+                    }
+                    .slide {
+                        position: relative !important;
+                        display: flex !important; /* Show all slides stacked */
+                        width: 1280px !important;
+                        height: 720px !important;
+                        min-height: 720px !important;
+                        max-height: 720px !important;
+                        zoom: var(--slide-zoom, 0.28) !important;
+                        border: 1px solid #e5e5e5 !important;
+                        border-radius: 12px !important;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+                        background: #fff !important;
+                        box-sizing: border-box !important;
+                        overflow: hidden !important;
+                        inset: auto !important;
+                        transform: none !important;
+                    }
+                    .nav, .export-btn, .slide-counter, .slide-logo {
+                        display: none !important;
+                    }
+                }
             `}</style>
 
             <div className="slide-logo">
