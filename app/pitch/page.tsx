@@ -115,7 +115,7 @@ function PitchDeckContent() {
             deck.style.cssText = "height:auto!important;overflow:visible!important;position:relative!important;display:block!important;padding:0!important;margin:0!important;";
         }
         slides.forEach((s) => {
-            (s as HTMLElement).style.cssText = "position:relative!important;display:flex!important;page-break-after:always!important;page-break-inside:avoid!important;break-after:page!important;height:100vh!important;width:100vw!important;min-height:100vh!important;max-height:100vh!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important;zoom:1!important;margin:0!important;border:none!important;box-shadow:none!important;inset:0!important;";
+            (s as HTMLElement).style.cssText = "position:relative!important;display:flex!important;page-break-after:always!important;page-break-inside:avoid!important;break-after:page!important;height:100vh!important;width:100vw!important;min-height:100vh!important;max-height:100vh!important;overflow:hidden!important;box-sizing:border-box!important;transform:scale(0.95)!important;transform-origin:center center!important;zoom:1!important;margin:0!important;border:none!important;box-shadow:none!important;inset:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;";
         });
 
         // Trigger browser print dialog (user can save as PDF)
@@ -208,6 +208,10 @@ function PitchDeckContent() {
                 .export-btn:hover { border-color: #000; color: #000; }
 
                 @media print {
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                     html, body, #__next {
                         width: 100vw !important;
                         height: 100vh !important;
@@ -245,7 +249,8 @@ function PitchDeckContent() {
                         min-height: 100vh !important;
                         max-height: 100vh !important;
                         overflow: hidden !important;
-                        transform: none !important;
+                        transform: scale(0.95) !important;
+                        transform-origin: center center !important;
                         zoom: 1 !important;
                         margin: 0 !important;
                         page-break-after: always !important;
