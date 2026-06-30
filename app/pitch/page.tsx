@@ -406,8 +406,8 @@ function PitchDeckContent() {
                 .s7b-right { width: 56%; display: flex; flex-direction: column; gap: 12px; }
 
                 /* Business model card grids */
-                .biz-model-grid { display: flex; flex-direction: column; gap: 10px; }
-                .biz-card { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 14px; transition: border-color 0.2s; }
+                .biz-model-grid { display: flex; flex-direction: column; gap: 8px; }
+                .biz-card { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 14px; transition: border-color 0.2s; }
                 .biz-card:hover { border-color: #000; }
                 .biz-icon-box { width: 34px; height: 34px; border-radius: 6px; background: #eaeaea; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                 .biz-text-box { display: flex; flex-direction: column; gap: 2px; }
@@ -1177,7 +1177,7 @@ function PitchDeckContent() {
                         <span className="chip-sm light"><HIcon icon={Coins01Icon} size={15} color="#000" /></span>
                         <span className="eyebrow">Business Model & Timeline</span>
                     </div>
-                    <div className="headline-dark" style={{ marginBottom: "2px" }}>Validated Demand $\rightarrow$ Gating & Monetization.</div>
+                    <div className="headline-dark" style={{ marginBottom: "2px" }}>Validated Demand → Gating & Monetization.</div>
                     <div className="body-dark" style={{ fontSize: "13.5px", color: "#666", marginBottom: "8px" }}>Launched Jan 5 in open developer beta. Currently <strong>pre-revenue</strong> with organic validation (15k installs). Gating starts <strong>July 2026</strong>.</div>
                     
                     <div className="s7b-layout">
@@ -1287,7 +1287,7 @@ function PitchDeckContent() {
                                     <span className="fin-chart-title">36-Month ARR Projection</span>
                                     <span className="fin-metric-bold" style={{ color: "#000", fontSize: "14px" }}>Target: $6.8M ARR</span>
                                 </div>
-                                <div className="fin-chart" style={{ display: "block", height: "380px", padding: "0 4px" }}>
+                                <div className="fin-chart" style={{ display: "block", height: "260px", padding: "0 4px" }}>
                                     <svg viewBox="0 0 560 320" style={{ width: "100%", height: "100%" }}>
                                         <defs>
                                             <linearGradient id="area-mono" x1="0%" y1="0%" x2="0%" y2="100%">
