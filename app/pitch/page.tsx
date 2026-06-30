@@ -1717,51 +1717,70 @@ function PitchDeckContent() {
                         <span className="chip-sm light"><HIcon icon={Rocket01Icon} size={15} color="#737373" /></span>
                         <span className="eyebrow">The Ask</span>
                     </div>
-                    <div className="headline-dark">$5M to bring the Lagos node live.</div>
+                    <div className="headline-dark">$5M at a $30M post-money valuation.</div>
                     <div className="ask-grid">
                         <div className="ask-cell featured">
                             <div className="ask-label dark">Raising</div>
-                            <div className="ask-value dark">$5,000,000</div>
-                            <div className="ask-value-sub dark">Phase 1 · SAFE</div>
+                            <div className="ask-value dark" style={{ fontSize: "40px" }}>$5,000,000</div>
+                            <div className="ask-value-sub dark">Phase 1 · SAFE at $30M Post-Valuation</div>
                         </div>
                         <div className="ask-cell">
-                            <div className="ask-label">Deployment</div>
-                            <div className="ask-value" style={{ fontSize: "28px" }}>The Lagos Node</div>
-                            <div className="ask-value-sub">Self-contained, replicable unit of execution</div>
+                            <div className="ask-label">What the Capital Accomplishes</div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11.5px", color: "#555", lineHeight: "1.4" }}>
+                                <tbody>
+                                    <tr style={{ borderBottom: "1px solid #f0f0f0" }}><td style={{ padding: "5px 0" }}><strong>Expand Engineering:</strong> Harden core serverless GPU stack & sovereign hypervisors</td></tr>
+                                    <tr style={{ borderBottom: "1px solid #f0f0f0" }}><td style={{ padding: "5px 0" }}><strong>Enterprise Sales:</strong> Accelerate pipeline for CBN-2027 compliant banking nodes</td></tr>
+                                    <tr style={{ borderBottom: "1px solid #f0f0f0" }}><td style={{ padding: "5px 0" }}><strong>Compliance:</strong> Secure local data residency & security certifications (SOC 2)</td></tr>
+                                    <tr style={{ borderBottom: "1px solid #f0f0f0" }}><td style={{ padding: "5px 0" }}><strong>Compute:</strong> Procure NVIDIA GPU/CPU hardware for the Lagos Node</td></tr>
+                                    <tr style={{ borderBottom: "none" }}><td style={{ padding: "5px 0" }}><strong>Global Partnerships:</strong> Establish telecom & global cloud infrastructure alliances</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                         <div className="ask-cell" style={{ gridColumn: "span 2" }}>
                             <div className="ask-label">Use of Funds</div>
                             <table className="funds-table">
                                 <tbody>
-                                    <tr><td><div className="funds-cell"><HIcon icon={CpuIcon} size={16} color="#9a9a9a" />Hardware procurement: NVIDIA GPUs, multi-core CPUs, NVMe</div></td><td className="funds-amt">$2.0M · 40%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Configuration01Icon} size={16} color="#9a9a9a" />Core software engineering: kernel hardening, hypervisors, runway</div></td><td className="funds-amt">$1.2M · 24%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={UserGroupIcon} size={16} color="#9a9a9a" />Operating runway and team: first key hires, extended runway</div></td><td className="funds-amt">$600K · 12%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Shield01Icon} size={16} color="#9a9a9a" />Capital buffer: FX protection & spare inventory</div></td><td className="funds-amt">$450K · 9%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={DeliveryTruck01Icon} size={16} color="#9a9a9a" />Logistics & compliance: freight, port clearing, import duties</div></td><td className="funds-amt">$400K · 8%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Building06Icon} size={16} color="#9a9a9a" />Facility operations: Tier III+ co-lo, power, interconnects</div></td><td className="funds-amt">$350K · 7%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={CpuIcon} size={16} color="#737373" />Hardware procurement: NVIDIA GPUs, multi-core CPUs, NVMe</div></td><td className="funds-amt">$2.0M · 40%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={Configuration01Icon} size={16} color="#737373" />Core software engineering: kernel hardening, hypervisors, runway</div></td><td className="funds-amt">$1.2M · 24%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={UserGroupIcon} size={16} color="#737373" />Operating runway and team: first key hires, extended runway</div></td><td className="funds-amt">$600K · 12%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={Shield01Icon} size={16} color="#737373" />Capital buffer: FX protection & spare inventory</div></td><td className="funds-amt">$450K · 9%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={DeliveryTruck01Icon} size={16} color="#737373" />Logistics & compliance: freight, port clearing, import duties</div></td><td className="funds-amt">$400K · 8%</td></tr>
+                                    <tr><td><div className="funds-cell"><HIcon icon={Building06Icon} size={16} color="#737373" />Facility operations: Tier III+ co-lo, power, interconnects</div></td><td className="funds-amt">$350K · 7%</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    <div className="s10-milestones">
-                        <div className="s10-milestone">
-                            <div className="s10-milestone-month">Month 1-6</div>
-                            <div className="s10-milestone-text">Hardware procured · co-location secured · gateway scaled</div>
-                        </div>
-                        <div className="s10-milestone">
-                            <div className="s10-milestone-month">Month 6-12</div>
-                            <div className="s10-milestone-text">First anchor bank live on the compliant stack · CBN-ready</div>
-                        </div>
-                        <div className="s10-milestone">
-                            <div className="s10-milestone-month">Month 12-18</div>
-                            <div className="s10-milestone-text">3-5 anchor banks · node cash-flow positive · Compute GA</div>
-                        </div>
-                        <div className="s10-milestone">
-                            <div className="s10-milestone-month">Month 18-24</div>
-                            <div className="s10-milestone-text">Self-funding · Pan-African node #2 in planning</div>
+
+                    <div className="future-glimpse-container" style={{ marginTop: "12px" }}>
+                        <div className="ask-label" style={{ marginBottom: "6px" }}>A Glimpse of the Future</div>
+                        <div className="future-flow" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", border: "1px solid #e5e5e5", borderRadius: "8px", padding: "10px 18px" }}>
+                            <div className="flow-step" style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontFamily: "var(--font-code)", fontSize: "8px", color: "#888", textTransform: "uppercase", fontWeight: "700" }}>Phase 1</div>
+                                <div style={{ fontFamily: "var(--font-display)", fontSize: "13px", fontWeight: "700", color: "#000", marginTop: "2px" }}>Gateway</div>
+                                <div style={{ fontSize: "11px", color: "#666", marginTop: "1px" }}>Unified API & security (Live)</div>
+                            </div>
+                            <div className="flow-arrow" style={{ color: "#aaa", fontSize: "16px", padding: "0 10px" }}>→</div>
+                            <div className="flow-step" style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontFamily: "var(--font-code)", fontSize: "8px", color: "#888", textTransform: "uppercase", fontWeight: "700" }}>Phase 2</div>
+                                <div style={{ fontFamily: "var(--font-display)", fontSize: "13px", fontWeight: "700", color: "#000", marginTop: "2px" }}>Compute</div>
+                                <div style={{ fontSize: "11px", color: "#666", marginTop: "1px" }}>Local GPU/CPU nodes</div>
+                            </div>
+                            <div className="flow-arrow" style={{ color: "#aaa", fontSize: "16px", padding: "0 10px" }}>→</div>
+                            <div className="flow-step" style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontFamily: "var(--font-code)", fontSize: "8px", color: "#888", textTransform: "uppercase", fontWeight: "700" }}>Phase 3</div>
+                                <div style={{ fontFamily: "var(--font-display)", fontSize: "13px", fontWeight: "700", color: "#000", marginTop: "2px" }}>Global AI Cloud</div>
+                                <div style={{ fontSize: "11px", color: "#666", marginTop: "1px" }}>Multi-region mesh</div>
+                            </div>
+                            <div className="flow-arrow" style={{ color: "#aaa", fontSize: "16px", padding: "0 10px" }}>→</div>
+                            <div className="flow-step" style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontFamily: "var(--font-code)", fontSize: "8px", color: "#888", textTransform: "uppercase", fontWeight: "700" }}>Phase 4</div>
+                                <div style={{ fontFamily: "var(--font-display)", fontSize: "13px", fontWeight: "700", color: "#000", marginTop: "2px" }}>Advanced Infrastructure</div>
+                                <div style={{ fontSize: "11px", color: "#666", marginTop: "1px" }}>Silicon-to-agent integration</div>
+                            </div>
                         </div>
                     </div>
-                    <div className="s10-close">
+
+                    <div className="s10-close" style={{ marginTop: "14px" }}>
                         The AI Cloud Infrastructure<br />powering <em>critical systems.</em>
                     </div>
                     <div className="s10-contact">
