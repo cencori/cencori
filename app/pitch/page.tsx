@@ -1737,17 +1737,37 @@ function PitchDeckContent() {
                             </table>
                         </div>
                         <div className="ask-cell" style={{ gridColumn: "span 2" }}>
-                            <div className="ask-label">Use of Funds</div>
-                            <table className="funds-table">
-                                <tbody>
-                                    <tr><td><div className="funds-cell"><HIcon icon={CpuIcon} size={16} color="#737373" />Hardware procurement: NVIDIA GPUs, multi-core CPUs, NVMe</div></td><td className="funds-amt">$2.0M · 40%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Configuration01Icon} size={16} color="#737373" />Core software engineering: kernel hardening, hypervisors, runway</div></td><td className="funds-amt">$1.2M · 24%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={UserGroupIcon} size={16} color="#737373" />Operating runway and team: first key hires, extended runway</div></td><td className="funds-amt">$600K · 12%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Shield01Icon} size={16} color="#737373" />Capital buffer: FX protection & spare inventory</div></td><td className="funds-amt">$450K · 9%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={DeliveryTruck01Icon} size={16} color="#737373" />Logistics & compliance: freight, port clearing, import duties</div></td><td className="funds-amt">$400K · 8%</td></tr>
-                                    <tr><td><div className="funds-cell"><HIcon icon={Building06Icon} size={16} color="#737373" />Facility operations: Tier III+ co-lo, power, interconnects</div></td><td className="funds-amt">$350K · 7%</td></tr>
-                                </tbody>
-                            </table>
+                            <div className="ask-label">Why Cencori Wins (The Investment Thesis)</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", marginTop: "4px" }}>
+                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                    <HIcon icon={CheckmarkBadge01Icon} size={16} color="#10b981" style={{ marginTop: 2, flexShrink: 0 }} />
+                                    <div>
+                                        <div style={{ fontWeight: "700", color: "#000", fontSize: "12.5px" }}>Underwritten CapEx Flow</div>
+                                        <div style={{ fontSize: "11.5px", color: "#555", marginTop: "2px" }}>Tier-1 anchor banks fund local hardware deployments, removing scaling and capital risks from day one.</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                    <HIcon icon={Shield01Icon} size={16} color="#3b82f6" style={{ marginTop: 2, flexShrink: 0 }} />
+                                    <div>
+                                        <div style={{ fontWeight: "700", color: "#000", fontSize: "12.5px" }}>Regulatory Lock-In</div>
+                                        <div style={{ fontSize: "11.5px", color: "#555", marginTop: "2px" }}>The CBN-2027 localization mandate makes our sovereign regional cloud a legal necessity for financial institutions.</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                    <HIcon icon={UserGroupIcon} size={16} color="#8b5cf6" style={{ marginTop: 2, flexShrink: 0 }} />
+                                    <div>
+                                        <div style={{ fontWeight: "700", color: "#000", fontSize: "12.5px" }}>Bottom-Up Developer Gravity</div>
+                                        <div style={{ fontSize: "11.5px", color: "#555", marginTop: "2px" }}>Over 15k+ downloads and 400+ active developers create an organic pipeline that feeds the enterprise funnel.</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                    <HIcon icon={Coins01Icon} size={16} color="#f59e0b" style={{ marginTop: 2, flexShrink: 0 }} />
+                                    <div>
+                                        <div style={{ fontWeight: "700", color: "#000", fontSize: "12.5px" }}>High-Margin Node Economics</div>
+                                        <div style={{ fontSize: "11.5px", color: "#555", marginTop: "2px" }}>Each regional node generates $15K–$30K/mo MRR at 70%+ gross margins once compute is live.</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
