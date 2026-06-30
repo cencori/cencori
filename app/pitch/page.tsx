@@ -109,13 +109,13 @@ function PitchDeckContent() {
 
         // Save original styles
         if (container) {
-            container.style.cssText = "height:auto!important;overflow:visible!important;position:relative!important;";
+            container.style.cssText = "height:auto!important;overflow:visible!important;position:relative!important;padding:0!important;margin:0!important;background:#fff!important;";
         }
         if (deck) {
-            deck.style.cssText = "height:auto!important;overflow:visible!important;position:relative!important;display:block!important;";
+            deck.style.cssText = "height:auto!important;overflow:visible!important;position:relative!important;display:block!important;padding:0!important;margin:0!important;";
         }
         slides.forEach((s) => {
-            (s as HTMLElement).style.cssText = "position:relative!important;display:flex!important;page-break-after:always!important;page-break-inside:avoid!important;break-after:page!important;height:100vh!important;width:100vw!important;min-height:100vh!important;max-height:100vh!important;overflow:hidden!important;box-sizing:border-box!important;";
+            (s as HTMLElement).style.cssText = "position:relative!important;display:flex!important;page-break-after:always!important;page-break-inside:avoid!important;break-after:page!important;height:100vh!important;width:100vw!important;min-height:100vh!important;max-height:100vh!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important;zoom:1!important;margin:0!important;border:none!important;box-shadow:none!important;inset:0!important;";
         });
 
         // Trigger browser print dialog (user can save as PDF)
@@ -208,12 +208,61 @@ function PitchDeckContent() {
                 .export-btn:hover { border-color: #000; color: #000; }
 
                 @media print {
-                    html, body { width: 100%; height: auto; overflow: visible !important; background: #fff; }
-                    .deck { width: 100%; height: auto; position: static; }
-                    .slide { position: relative !important; display: flex !important; width: 100vw; height: 100vh; page-break-after: always; break-after: page; overflow: hidden; }
-                    .slide.active { display: flex !important; }
-                    .nav, .slide-counter, .slide-logo, .export-btn { display: none !important; }
-                    @page { size: landscape; margin: 0; }
+                    html, body, #__next {
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        min-height: 100vh !important;
+                        overflow: visible !important;
+                        background: #fff !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    .pitch-deck-container {
+                        width: 100vw !important;
+                        height: auto !important;
+                        min-height: 100vh !important;
+                        position: relative !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        overflow: visible !important;
+                        background: #fff !important;
+                        --slide-zoom: 1 !important;
+                    }
+                    .deck {
+                        width: 100vw !important;
+                        height: auto !important;
+                        position: relative !important;
+                        display: block !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        overflow: visible !important;
+                    }
+                    .slide {
+                        position: relative !important;
+                        display: flex !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        min-height: 100vh !important;
+                        max-height: 100vh !important;
+                        overflow: hidden !important;
+                        transform: none !important;
+                        zoom: 1 !important;
+                        margin: 0 !important;
+                        page-break-after: always !important;
+                        page-break-inside: avoid !important;
+                        break-after: page !important;
+                        box-sizing: border-box !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        inset: 0 !important;
+                    }
+                    .nav, .slide-counter, .slide-logo, .export-btn {
+                        display: none !important;
+                    }
+                    @page {
+                        size: landscape;
+                        margin: 0;
+                    }
                 }
 
                 .slide-counter { position: fixed; top: 28px; right: 40px; font-family: var(--font-code); font-size: 11px; color: #999; letter-spacing: .1em; z-index: 10000; }
@@ -544,41 +593,41 @@ function PitchDeckContent() {
                 .s10-contact-item label { display: block; font-family: var(--font-code); font-size: 10px; letter-spacing: .15em; color: #999; text-transform: uppercase; margin-bottom: 6px; }
                 .s10-contact-item span { font-size: 14px; color: #000; font-weight: 500; }
 
-                @media (max-width: 340px) {
+                @media screen and (max-width: 340px) {
                     .pitch-deck-container { --slide-zoom: 0.225 !important; }
                 }
-                @media (min-width: 341px) and (max-width: 370px) {
+                @media screen and (min-width: 341px) and (max-width: 370px) {
                     .pitch-deck-container { --slide-zoom: 0.25 !important; }
                 }
-                @media (min-width: 371px) and (max-width: 400px) {
+                @media screen and (min-width: 371px) and (max-width: 400px) {
                     .pitch-deck-container { --slide-zoom: 0.27 !important; }
                 }
-                @media (min-width: 401px) and (max-width: 450px) {
+                @media screen and (min-width: 401px) and (max-width: 450px) {
                     .pitch-deck-container { --slide-zoom: 0.30 !important; }
                 }
-                @media (min-width: 451px) and (max-width: 500px) {
+                @media screen and (min-width: 451px) and (max-width: 500px) {
                     .pitch-deck-container { --slide-zoom: 0.34 !important; }
                 }
-                @media (min-width: 501px) and (max-width: 600px) {
+                @media screen and (min-width: 501px) and (max-width: 600px) {
                     .pitch-deck-container { --slide-zoom: 0.38 !important; }
                 }
-                @media (min-width: 601px) and (max-width: 700px) {
+                @media screen and (min-width: 601px) and (max-width: 700px) {
                     .pitch-deck-container { --slide-zoom: 0.46 !important; }
                 }
-                @media (min-width: 701px) and (max-width: 800px) {
+                @media screen and (min-width: 701px) and (max-width: 800px) {
                     .pitch-deck-container { --slide-zoom: 0.54 !important; }
                 }
-                @media (min-width: 801px) and (max-width: 900px) {
+                @media screen and (min-width: 801px) and (max-width: 900px) {
                     .pitch-deck-container { --slide-zoom: 0.62 !important; }
                 }
-                @media (min-width: 901px) and (max-width: 1000px) {
+                @media screen and (min-width: 901px) and (max-width: 1000px) {
                     .pitch-deck-container { --slide-zoom: 0.70 !important; }
                 }
-                @media (min-width: 1001px) and (max-width: 1100px) {
+                @media screen and (min-width: 1001px) and (max-width: 1100px) {
                     .pitch-deck-container { --slide-zoom: 0.78 !important; }
                 }
 
-                @media (max-width: 1100px) {
+                @media screen and (max-width: 1100px) {
                     .pitch-deck-container {
                         position: relative !important;
                         width: 100% !important;
