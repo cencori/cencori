@@ -1,6 +1,6 @@
 "use client";
 
-import type { PageTree } from "fumadocs-core/server";
+import type { Node as PageTreeNode, Root as PageTreeRoot } from "fumadocs-core/page-tree";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import Link from "next/link";
@@ -12,7 +12,7 @@ function nodeLabel(node: { name?: React.ReactNode }) {
 }
 
 // Whether a node (or any descendant) matches the active filter query.
-function matches(node: PageTree.Node, q: string): boolean {
+function matches(node: PageTreeNode, q: string): boolean {
   if (!q) return true;
   const needle = q.toLowerCase();
   if (node.type === "folder") {
@@ -32,7 +32,7 @@ function Tree({
   pathname,
   query,
 }: {
-  nodes: PageTree.Node[];
+  nodes: PageTreeNode[];
   pathname: string;
   query: string;
 }) {
@@ -84,7 +84,7 @@ function Tree({
   );
 }
 
-export function ZettDocsSidebar({ tree }: { tree: PageTree.Root }) {
+export function ZettDocsSidebar({ tree }: { tree: PageTreeRoot }) {
   const pathname = usePathname();
   const { query, setQuery, mobileOpen, setMobileOpen } = useZettDocs();
 
