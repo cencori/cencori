@@ -185,6 +185,12 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
         return { input: "$0.50", output: "$1.00" };
     }
 
+    if (id === "claude-sonnet-5") {
+        const isIntroActive = new Date().getTime() < new Date("2026-09-01").getTime();
+        return isIntroActive 
+            ? { input: "$2.00", output: "$10.00" } 
+            : { input: "$3.00", output: "$15.00" };
+    }
     if (id === "claude-opus-4.8") {
         return { input: "$5.00", output: "$25.00" };
     }
@@ -280,7 +286,7 @@ function flattenModels(): FlatModel[] {
     }
 
     // Models pinned to the top (newly added, remove from this list after a while)
-    const pinnedIds = new Set(['glm-5.2', 'axiveri/africlaude-7b', 'claude-opus-4.8', 'gemini-3.5-flash']);
+    const pinnedIds = new Set(['claude-sonnet-5', 'glm-5.2', 'axiveri/africlaude-7b', 'claude-opus-4.8', 'gemini-3.5-flash']);
     const pinned: FlatModel[] = [];
     const rest: FlatModel[] = [];
 

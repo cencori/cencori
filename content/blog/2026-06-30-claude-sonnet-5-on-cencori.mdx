@@ -1,0 +1,66 @@
+---
+title: "Claude Sonnet 5 is on Cencori"
+slug: "claude-sonnet-5-on-cencori"
+date: "2026-06-30"
+excerpt: "Anthropic's Claude Sonnet 5 is now live on Cencori. Delivering near-flagship intelligence with top-tier agentic execution, tool use, and software engineering capabilities at an attractive price point."
+coverImage: "/blog/images/covers/antt.png"
+tags: ["Product", "Anthropic", "AI Models", "Release"]
+category: "changelog"
+published: true
+---
+
+**Claude Sonnet 5** is live on Cencori.
+
+Anthropic just released its most agentic Sonnet model to date. Claude Sonnet 5 narrows the gap between the mid-tier and flagship tiers, delivering capabilities in coding, reasoning, and tool use that are close to those of Claude Opus 4.8, but at a significantly lower price point. 
+
+Starting today, you can target `claude-sonnet-5` across our entire unified API Gateway, with all billing trackers and security layers configured automatically.
+
+## Introducing Claude Sonnet 5
+
+For many builders, the agentic era started with Sonnet-class models. Sonnet 5 represents a strict improvement over Sonnet 4.6, delivering autonomous workflows, terminal utilization, and agentic loop execution that can run reliably in complex environments.
+
+### Key Performance Benchmarks
+
+Sonnet 5 sets new standards for mid-tier models across multiple evaluations:
+- **Agentic Coding**: Scores **63.2% on SWE-bench Pro** and **80.4% on Terminal-Bench 2.1**, representing substantial leaps over Sonnet 4.6 (58.1% / 67.0%).
+- **Computer Use**: Achieves **81.2% on OSWorld-Verified** (compared to 78.5% for Sonnet 4.6), demonstrating high reliability for autonomous desktop operations.
+- **Multidisciplinary Reasoning**: Scores **57.4% (with tools) on Humanity's Last Exam**, approaching the 57.9% benchmark of Opus 4.8.
+
+## Pricing & Specs
+
+Anthropic is offering introductory promotional pricing for API developers through **August 31, 2026**. Cencori's billing engine automatically handles this promotion in real-time.
+
+| Metric | Promotional (Through Aug 31, 2026) | Standard (After Aug 31, 2026) |
+|---|---|---|
+| **Input Price** | $2.00 / million tokens | $3.00 / million tokens |
+| **Output Price** | $10.00 / million tokens | $15.00 / million tokens |
+| **Context Window** | 1,000,000 tokens | 1,000,000 tokens |
+| **Model ID** | `claude-sonnet-5` | `claude-sonnet-5` |
+
+## Powering Claude Sonnet 5 with Cencori
+
+Integrating new frontier models is trivial when your applications are built on Cencori's **intelligence infrastructure**:
+
+1. **Decoupled Billing & Credit Quotas**: Cencori manages credit allocations, end-user billing, and budget caps at the proxy level. When you transition your models to `claude-sonnet-5`, Cencori automatically tracks the introductory rates ($2/$10) and transitions to standard rates on September 1, with zero interruptions to your business model.
+2. **Enterprise Security Layer**: Sonnet 5 is built for agentic execution. Cencori's enterprise security guardrails shield your system by sanitizing prompt inputs, detecting jailbreak patterns, and logging all activity in compliant audit tables.
+3. **Seamless Model Failovers**: You can configure failover parameters in the Cencori Dashboard. If your Claude Sonnet 5 usage hits provider rate limits, traffic can automatically route to Claude Opus 4.8 or Gemini 3.5 Pro without breaking active client sessions.
+
+### Using Claude Sonnet 5 in Cencori
+
+You can begin targeting the new model immediately using our TypeScript SDK:
+
+```typescript
+import { cencori } from '@cencori/sdk';
+
+const response = await cencori.chat.create({
+  model: 'claude-sonnet-5',
+  messages: [
+    {
+      role: 'user',
+      content: 'Analyze these database schemas and suggest optimization indices.'
+    }
+  ]
+});
+```
+
+*Claude Sonnet 5 is available now for all Cencori customers. Check your [Model Catalog](/ai/models) to see it in action.*
