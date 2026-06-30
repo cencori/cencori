@@ -435,15 +435,15 @@ function PitchDeckContent() {
                 .fin-chart { display: flex; justify-content: space-around; align-items: flex-end; height: 125px; position: relative; }
 
                 /* SLIDE 8 - MARKET */
-                .s8 { background: #fff; flex-direction: column; justify-content: flex-start; padding: 4% 5% 0; }
-                .s8-layout { display: flex; gap: 32px; width: 100%; align-items: stretch; margin-top: 20px; }
+                .s8 { background: #fff; flex-direction: column; justify-content: flex-start; padding: 2% 5% 0; }
+                .s8-layout { display: flex; gap: 32px; width: 100%; align-items: stretch; margin-top: 10px; }
                 .s8-col-1 { width: 33%; display: flex; flex-direction: column; gap: 12px; }
                 .s8-col-2 { width: 33%; display: flex; flex-direction: column; gap: 12px; }
                 .s8-col-3 { width: 34%; display: flex; flex-direction: column; gap: 12px; }
  
                 /* Funnel / Nested Layers */
-                .market-funnel { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-                .funnel-layer { border: 1px solid #e5e5e5; border-radius: 8px; padding: 20px 24px; background: #fafafa; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+                .market-funnel { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+                .funnel-layer { border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 16px; background: #fafafa; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
                 .funnel-layer:hover { border-color: #000; background: #f5f5f5; transform: translateX(6px); }
                 .funnel-meta { display: flex; flex-direction: column; gap: 4px; }
                 .funnel-title { font-family: var(--font-display); font-size: 16.5px; font-weight: 700; color: #000; }
@@ -499,24 +499,29 @@ function PitchDeckContent() {
  
                 /* SLIDE 9 - TEAM */
                 .s9 { background: #fff; flex-direction: row; }
-                .s9-left { width: 50%; padding: 8% 5% 8% 10%; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; justify-content: center; }
-                .s9-right { width: 50%; padding: 8% 10% 8% 5%; display: flex; flex-direction: column; justify-content: center; }
-                .team-member { display: flex; align-items: flex-start; gap: 24px; margin-top: 24px; }
+                .s9-left { width: 50%; padding: 4% 5% 4% 10%; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; justify-content: center; }
+                .s9-right { width: 50%; padding: 4% 10% 4% 5%; display: flex; flex-direction: column; justify-content: center; }
+                .team-member { display: flex; align-items: flex-start; gap: 24px; margin-top: 16px; }
                 .team-avatar { width: 75px; height: 75px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e5e5; }
                 .team-info { flex: 1; }
                 .team-name { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; color: #000; margin-bottom: 3px; }
-                .team-title { font-family: var(--font-code); font-size: 11px; letter-spacing: .12em; color: #737373; text-transform: uppercase; margin-bottom: 10px; }
-                .team-bio { font-size: 14px; color: #555; line-height: 1.7; font-weight: 400; }
-                .team-divider { border: none; border-top: 1px solid #e5e5e5; margin: 20px 0; }
-                .s9-stat { display: flex; align-items: flex-start; gap: 14px; border: 1px solid #e5e5e5; padding: 20px 24px; margin-bottom: 14px; }
+                .team-title { font-family: var(--font-code); font-size: 11px; letter-spacing: .12em; color: #737373; text-transform: uppercase; margin-bottom: 6px; }
+                .team-bio { font-size: 12.5px; color: #555; line-height: 1.5; font-weight: 400; }
+                .team-divider { border: none; border-top: 1px solid #e5e5e5; margin: 12px 0; }
+                .s9-stat { display: flex; align-items: flex-start; gap: 14px; border: 1px solid #e5e5e5; padding: 12px 18px; margin-bottom: 8px; }
+                .team-name { font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: #000; margin-bottom: 2px; }
+                .team-title { font-family: var(--font-code); font-size: 10px; letter-spacing: .12em; color: #737373; text-transform: uppercase; margin-bottom: 4px; }
+                .team-bio { font-size: 12px; color: #555; line-height: 1.4; font-weight: 400; }
+                .team-divider { border: none; border-top: 1px solid #e5e5e5; margin: 10px 0; }
+                .s9-stat { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #e5e5e5; padding: 10px 14px; margin-bottom: 6px; }
                 .s9-stat-label { font-family: var(--font-code); font-size: 9px; letter-spacing: .12em; color: #737373; text-transform: uppercase; margin-bottom: 6px; }
                 .s9-stat-text { font-size: 14.5px; color: #333; font-weight: 400; line-height: 1.55; }
                 .s9-stat-text strong { font-weight: 600; color: #000; }
  
                 /* SLIDE 10 - THE ASK */
-                .s10 { background: #fff; flex-direction: column; justify-content: center; padding: 0 10%; }
-                .ask-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1px; background: #e5e5e5; margin-top: 36px; border: 1px solid #e5e5e5; }
-                .ask-cell { background: #fff; padding: 32px 30px; }
+                .s10 { background: #fff; flex-direction: column; justify-content: center; padding: 2% 10% 0; }
+                .ask-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1px; background: #e5e5e5; margin-top: 16px; border: 1px solid #e5e5e5; }
+                .ask-cell { background: #fff; padding: 18px 24px; }
                 .ask-cell.featured { background: #fafafa; }
                 .ask-label { font-family: var(--font-code); font-size: 10px; letter-spacing: .2em; color: #888; text-transform: uppercase; margin-bottom: 12px; }
                 .ask-label.dark { color: #737373; }
@@ -529,13 +534,13 @@ function PitchDeckContent() {
                 .funds-table tr:last-child td { border-bottom: none; }
                 .funds-cell { display: flex; align-items: center; gap: 11px; }
                 .funds-amt { text-align: right; color: #000; font-family: var(--font-code); font-size: 12.5px; white-space: nowrap; }
-                .s10-milestones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e5e5e5; border: 1px solid #e5e5e5; margin-top: 22px; }
-                .s10-milestone { background: #fff; padding: 18px 20px; }
+                .s10-milestones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e5e5e5; border: 1px solid #e5e5e5; margin-top: 12px; }
+                .s10-milestone { background: #fff; padding: 10px 14px; }
                 .s10-milestone-month { font-family: var(--font-code); font-size: 9px; letter-spacing: .1em; color: #999; margin-bottom: 8px; text-transform: uppercase; }
                 .s10-milestone-text { font-size: 12px; color: #555; font-weight: 400; line-height: 1.5; }
-                .s10-close { font-family: var(--font-display); font-size: clamp(24px, 3.2vw, 40px); font-weight: 700; color: #000; line-height: 1.05; letter-spacing: -0.03em; margin-top: 32px; }
+                .s10-close { font-family: var(--font-display); font-size: clamp(24px, 3.2vw, 40px); font-weight: 700; color: #000; line-height: 1.05; letter-spacing: -0.03em; margin-top: 16px; }
                 .s10-close em { font-style: normal; color: #aaa; }
-                .s10-contact { display: flex; gap: 44px; border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 28px; }
+                .s10-contact { display: flex; gap: 44px; border-top: 1px solid #e5e5e5; padding-top: 14px; margin-top: 16px; }
                 .s10-contact-item label { display: block; font-family: var(--font-code); font-size: 10px; letter-spacing: .15em; color: #999; text-transform: uppercase; margin-bottom: 6px; }
                 .s10-contact-item span { font-size: 14px; color: #000; font-weight: 500; }
 
