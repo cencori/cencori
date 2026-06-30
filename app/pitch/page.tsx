@@ -400,10 +400,10 @@ function PitchDeckContent() {
                 .gtm-sm-text strong { color: #000; font-weight: 600; }
  
                 /* SLIDE 7b - BUSINESS MODEL & FINANCIALS */
-                .s7b { background: #fff; flex-direction: column; justify-content: flex-start; padding: 4% 6% 0; }
-                .s7b-layout { display: flex; gap: 32px; width: 100%; align-items: stretch; margin-top: 15px; }
+                .s7b { background: #fff; flex-direction: column; justify-content: flex-start; padding: 2% 6% 0; }
+                .s7b-layout { display: flex; gap: 20px; width: 100%; align-items: stretch; margin-top: 8px; }
                 .s7b-left { width: 44%; display: flex; flex-direction: column; gap: 12px; }
-                .s7b-right { width: 56%; display: flex; flex-direction: column; gap: 12px; }
+                .s7b-right { width: 56%; display: flex; flex-direction: column; gap: 8px; }
 
                 /* Business model card grids */
                 .biz-model-grid { display: flex; flex-direction: column; gap: 8px; }
@@ -420,16 +420,16 @@ function PitchDeckContent() {
                 .biz-status-pill.beta { background: #f3e8ff; color: #7c3aed; }
 
                 /* Financial table styles */
-                .financial-table-box { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+                .financial-table-box { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; }
                 .financial-table { width: 100%; border-collapse: collapse; }
                 .financial-table th { text-align: left; font-family: var(--font-code); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #777; border-bottom: 1px solid #eaeaea; padding-bottom: 6px; }
-                .financial-table td { padding: 8px 0; border-bottom: 1px solid #eaeaea; font-size: 12px; color: #444; }
+                .financial-table td { padding: 4px 0; border-bottom: 1px solid #eaeaea; font-size: 12px; color: #444; }
                 .financial-table tr:last-child td { border-bottom: none; }
                 .fin-metric-bold { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: #000; }
                 .fin-metric-code { font-family: var(--font-code); font-size: 11.5px; font-weight: 600; }
 
                 /* CSS Financial line chart */
-                .fin-chart-container { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+                .fin-chart-container { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; }
                 .fin-chart-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eaeaea; padding-bottom: 6px; }
                 .fin-chart-title { font-family: var(--font-code); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #777; }
                 .fin-chart { display: flex; justify-content: space-around; align-items: flex-end; height: 125px; position: relative; }
@@ -1282,12 +1282,12 @@ function PitchDeckContent() {
                             </div>
 
                             {/* Projections Visual line chart */}
-                            <div className="fin-chart-container" style={{ marginTop: "16px" }}>
+                            <div className="fin-chart-container" style={{ marginTop: "8px" }}>
                                 <div className="fin-chart-header">
                                     <span className="fin-chart-title">36-Month ARR Projection</span>
                                     <span className="fin-metric-bold" style={{ color: "#000", fontSize: "14px" }}>Target: $6.8M ARR</span>
                                 </div>
-                                <div className="fin-chart" style={{ display: "block", height: "260px", padding: "0 4px" }}>
+                                <div className="fin-chart" style={{ display: "block", height: "220px", padding: "0 4px" }}>
                                     <svg viewBox="0 0 560 320" style={{ width: "100%", height: "100%" }}>
                                         <defs>
                                             <linearGradient id="area-mono" x1="0%" y1="0%" x2="0%" y2="100%">
