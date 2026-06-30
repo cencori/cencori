@@ -544,22 +544,63 @@ function PitchDeckContent() {
                 .s10-contact-item label { display: block; font-family: var(--font-code); font-size: 10px; letter-spacing: .15em; color: #999; text-transform: uppercase; margin-bottom: 6px; }
                 .s10-contact-item span { font-size: 14px; color: #000; font-weight: 500; }
 
+                @media (max-width: 340px) {
+                    .pitch-deck-container { --slide-zoom: 0.225 !important; }
+                }
+                @media (min-width: 341px) and (max-width: 370px) {
+                    .pitch-deck-container { --slide-zoom: 0.25 !important; }
+                }
+                @media (min-width: 371px) and (max-width: 400px) {
+                    .pitch-deck-container { --slide-zoom: 0.27 !important; }
+                }
+                @media (min-width: 401px) and (max-width: 450px) {
+                    .pitch-deck-container { --slide-zoom: 0.30 !important; }
+                }
+                @media (min-width: 451px) and (max-width: 500px) {
+                    .pitch-deck-container { --slide-zoom: 0.34 !important; }
+                }
+                @media (min-width: 501px) and (max-width: 600px) {
+                    .pitch-deck-container { --slide-zoom: 0.38 !important; }
+                }
+                @media (min-width: 601px) and (max-width: 700px) {
+                    .pitch-deck-container { --slide-zoom: 0.46 !important; }
+                }
+                @media (min-width: 701px) and (max-width: 800px) {
+                    .pitch-deck-container { --slide-zoom: 0.54 !important; }
+                }
+                @media (min-width: 801px) and (max-width: 900px) {
+                    .pitch-deck-container { --slide-zoom: 0.62 !important; }
+                }
+                @media (min-width: 901px) and (max-width: 1000px) {
+                    .pitch-deck-container { --slide-zoom: 0.70 !important; }
+                }
+                @media (min-width: 1001px) and (max-width: 1100px) {
+                    .pitch-deck-container { --slide-zoom: 0.78 !important; }
+                }
+
                 @media (max-width: 1100px) {
                     .pitch-deck-container {
                         position: relative !important;
+                        width: 100% !important;
+                        max-width: 100vw !important;
                         height: auto !important;
                         min-height: 100vh !important;
                         overflow-y: auto !important;
+                        overflow-x: hidden !important;
                         background: #f5f5f5 !important;
-                        padding: 40px 0 !important;
+                        padding: 24px 0 !important;
                         box-sizing: border-box !important;
+                        left: auto !important;
+                        top: auto !important;
                     }
                     .deck {
                         display: flex !important;
                         flex-direction: column !important;
-                        gap: 24px !important;
+                        gap: 0px !important;
                         align-items: center !important;
                         height: auto !important;
+                        width: 100% !important;
+                        overflow-x: hidden !important;
                         position: relative !important;
                     }
                     .slide {
@@ -569,7 +610,9 @@ function PitchDeckContent() {
                         height: 720px !important;
                         min-height: 720px !important;
                         max-height: 720px !important;
-                        zoom: var(--slide-zoom, 0.28) !important;
+                        transform: scale(var(--slide-zoom, 0.28)) !important;
+                        transform-origin: top center !important;
+                        margin-bottom: calc(720px * (var(--slide-zoom, 0.28) - 1) + 20px) !important;
                         border: 1px solid #e5e5e5 !important;
                         border-radius: 12px !important;
                         box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
@@ -577,7 +620,6 @@ function PitchDeckContent() {
                         box-sizing: border-box !important;
                         overflow: hidden !important;
                         inset: auto !important;
-                        transform: none !important;
                     }
                     .nav, .slide-counter, .slide-logo {
                         display: none !important;
