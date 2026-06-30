@@ -49,6 +49,16 @@ export async function getPricingFromDB(
         };
     }
 
+    // Intercept Claude Sonnet 5 to apply time-based promotional pricing
+    if (provider === 'anthropic' && model === 'claude-sonnet-5') {
+        const isIntroActive = new Date().getTime() < new Date("2026-09-01").getTime();
+        return {
+            inputPer1KTokens: isIntroActive ? 0.00200 : 0.00300,
+            outputPer1KTokens: isIntroActive ? 0.01000 : 0.01500,
+            cencoriMarkupPercentage: 50.00,
+        };
+    }
+
     const supabase = createAdminClient();
 
     const { data, error } = await supabase
