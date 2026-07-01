@@ -80,6 +80,14 @@ export default function PitchV2() {
     const [theme, setTheme] = useState<"light" | "dark">("light");
 
     useEffect(() => {
+        const isPrintMode = new URLSearchParams(window.location.search).get("print") === "true";
+        if (!isPrintMode) return;
+
+        document.body.setAttribute("data-ready", "true");
+        return () => document.body.removeAttribute("data-ready");
+    }, []);
+
+    useEffect(() => {
         try {
             const saved = window.localStorage.getItem("cencori-pitch-theme");
             if (saved === "light" || saved === "dark") setTheme(saved);
@@ -400,6 +408,62 @@ export default function PitchV2() {
                 .v2-contact .cv { font-size: 14px; color: var(--ink); font-weight: 500; }
                 .v2-foot { font-family: var(--mono); font-size: 9px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink3); margin-top: 44px; }
 
+                @media print {
+                    html,
+                    body {
+                        width: 1920px !important;
+                        height: auto !important;
+                        margin: 0 !important;
+                        overflow: visible !important;
+                        background: #fff !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .v2 {
+                        position: static !important;
+                        width: 1920px !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        overflow: visible !important;
+                        background: var(--bg) !important;
+                    }
+                    .v2-scroll {
+                        display: block !important;
+                        width: 1920px !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                        background-attachment: scroll !important;
+                    }
+                    .v2-rail,
+                    .v2-brand,
+                    .v2-prog,
+                    .v2-dl,
+                    .v2-theme,
+                    .v2-wall,
+                    .v2-scrollcue {
+                        display: none !important;
+                    }
+                    .v2-sec {
+                        width: 1920px !important;
+                        height: 1080px !important;
+                        min-height: 1080px !important;
+                        padding: 110px 150px !important;
+                        box-sizing: border-box !important;
+                        overflow: hidden !important;
+                        break-after: page !important;
+                        page-break-after: always !important;
+                        opacity: 1 !important;
+                        transform: none !important;
+                    }
+                    .v2-sec:last-child {
+                        break-after: auto !important;
+                        page-break-after: auto !important;
+                    }
+                    .v2-wrap {
+                        max-width: 1160px !important;
+                    }
+                }
+
                 /* responsive wall */
                 .v2-wall { display: none; }
                 @media (max-width: 1080px) {
@@ -438,7 +502,7 @@ export default function PitchV2() {
                 ))}
             </nav>
 
-            <button className="v2-dl" onClick={() => (window.location.href = "/api/pitch/export?format=pdf")}>Download</button>
+            <button className="v2-dl" onClick={() => (window.location.href = "/api/pitch/export?format=pdf&deck=v2")}>Download</button>
 
             <div className="v2-scroll" ref={scrollRef} onScroll={onScroll}>
 
@@ -542,7 +606,7 @@ export default function PitchV2() {
                         <div className="v2-kicker"><span className="n">05</span><span className="bar" /><span className="t">Why Now</span></div>
                         <div className="v2-why-grid">
                             <div className="v2-bigdate">Jan 1<br />2027<small>The clock is the catalyst</small></div>
-                            <p className="v2-lead">The Central Bank of Nigeria's data-localization mandate requires every financial institution to host and process local transaction data inside the country's borders. A hard, dated, non-optional deadline, and the migration window is open now.</p>
+                            <p className="v2-lead">The Central Bank of Nigeria&apos;s data-localization mandate requires every financial institution to host and process local transaction data inside the country&apos;s borders. A hard, dated, non-optional deadline, and the migration window is open now.</p>
                         </div>
                         <div className="v2-timeline">
                             <div className="v2-tl"><div className="v2-tl-node"><HIcon icon={CloudIcon} size={17} color="#8b939c" /><span className="v2-tl-k">Today</span></div><div className="v2-tl-h">Non-compliant by default</div><p>Banks run sensitive workloads on foreign cloud, exposed to FX, egress, and a regulation they cannot yet meet.</p></div>
@@ -675,7 +739,7 @@ export default function PitchV2() {
                             <div><div className="ck">Founder</div><div className="cv">Bola Roy Banjo</div></div>
                             <div><div className="ck">Email</div><div className="cv">bola@cencori.com</div></div>
                             <div><div className="ck">Website</div><div className="cv">cencori.com</div></div>
-                            <div><div className="ck">Round</div><div className="cv">$5M Phase 1 · SAFE</div></div>
+                            <div><div className="ck">Round</div><div className="cv">$500K Pre-seed · SAFE</div></div>
                         </div>
                         <div className="v2-foot">Cencori · 2026 · Confidential</div>
                     </div>
