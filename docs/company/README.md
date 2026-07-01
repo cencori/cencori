@@ -300,7 +300,7 @@ The confidential representation layer for AI agents: identity, positioning, prod
 
 | Document | Audience | Purpose |
 |----------|----------|---------|
-| [SEED_CAPITAL_PLAN_2026.md](./SEED_CAPITAL_PLAN_2026.md) | Leadership, all employees (summary), trusted seed investors under NDA | Canonical $5M seed plan: use of funds, infra priorities, hiring, milestones, operating model |
+| [SEED_CAPITAL_PLAN_2026.md](./SEED_CAPITAL_PLAN_2026.md) | Leadership, all employees (summary), trusted seed investors under NDA | Canonical $500K pre-seed plan: use of funds, infra priorities, hiring, milestones, operating model |
 
 ---
 

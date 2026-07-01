@@ -1015,18 +1015,18 @@ Use this framing:
 
 Current round:
 
-- Type: Seed
+- Type: Pre-seed
 - Instrument: SAFE
-- Amount: $3,000,000
-- Post-money valuation cap: $18,000,000
+- Amount: $500,000
+- Valuation cap: $5,000,000
 - Status: Not yet actively raising
 
 Use of funds:
 
-- Engineering, 50%, $1.5M: 2 senior backend engineers and 1 infrastructure engineer
-- Infrastructure and Compute, 20%, $600K: GPU provisioning and server infrastructure
-- Go-to-Market, 20%, $600K: developer marketing, outbound, expansion
-- Operations and Legal, 10%, $300K
+- Engineering, 50%, $250K: core product velocity and gateway hardening
+- Infrastructure and Compute, 20%, $100K: initial GPU provisioning and server infrastructure
+- Go-to-Market, 20%, $100K: developer marketing, outbound, expansion
+- Operations and Legal, 10%, $50K
 
 Milestones unlocked:
 

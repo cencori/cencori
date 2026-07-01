@@ -446,14 +446,14 @@ export default function PitchV2() {
                 <section id="overview" className="v2-sec">
                     <div className="v2-globe"><HIcon icon={Globe02Icon} size={560} sw={0.5} /></div>
                     <div className="v2-wrap">
-                        <div className="v2-hero-tag">Phase 1 Raise <b>·</b> Lagos Node <b>·</b> Investor Memo</div>
+                        <div className="v2-hero-tag">Pre-seed Raise <b>·</b> Lagos Node <b>·</b> Investor Memo</div>
                         <h1 className="v2-hero-h">The <span className="v2-acc">sovereign</span> AI cloud<br />for emerging markets.</h1>
                         <p className="v2-hero-sub">A hardware-enabled sovereign cloud. Compliant, low-latency AI infrastructure, built in-country.</p>
                         <div className="v2-hero-strip">
-                            <div><div className="v2-stat-k">Raising</div><div className="v2-stat-v acc">$5M</div></div>
+                            <div><div className="v2-stat-k">Raising</div><div className="v2-stat-v acc">$500K</div></div>
+                            <div><div className="v2-stat-k">Valuation</div><div className="v2-stat-v">$5M</div></div>
                             <div><div className="v2-stat-k">Instrument</div><div className="v2-stat-v">SAFE</div></div>
-                            <div><div className="v2-stat-k">Deployment</div><div className="v2-stat-v">Lagos Node</div></div>
-                            <div><div className="v2-stat-k">Catalyst</div><div className="v2-stat-v">CBN, Jan 2027</div></div>
+                            <div><div className="v2-stat-k">Stage</div><div className="v2-stat-v">Pre-seed</div></div>
                         </div>
                     </div>
                     <div className="v2-scrollcue"><span className="dn"><HIcon icon={ArrowDown01Icon} size={14} color="#8b939c" /></span><span>Scroll</span></div>
@@ -646,8 +646,8 @@ export default function PitchV2() {
                 <section id="ask" className="v2-sec alt reveal">
                     <div className="v2-wrap">
                         <div className="v2-kicker"><span className="n">10</span><span className="bar" /><span className="t">The Ask</span></div>
-                        <div className="v2-ask-top"><div className="v2-ask-amt">$5M</div><div className="v2-ask-h">to bring the Lagos node live.</div></div>
-                        <div className="v2-ask-sub">Phase 1 · SAFE · Self-contained, replicable unit of execution</div>
+                        <div className="v2-ask-top"><div className="v2-ask-amt">$500K</div><div className="v2-ask-h">to bring the Lagos node live.</div></div>
+                        <div className="v2-ask-sub">Pre-seed · SAFE · $5M valuation cap</div>
                         <div className="v2-fundbar">
                             <div className="v2-fundseg" style={{ width: "40%", background: acc, opacity: 1 }} />
                             <div className="v2-fundseg" style={{ width: "24%", background: acc, opacity: 0.78 }} />
@@ -657,12 +657,12 @@ export default function PitchV2() {
                             <div className="v2-fundseg" style={{ width: "7%", background: acc, opacity: 0.24 }} />
                         </div>
                         <div className="v2-funds">
-                            <div className="v2-fund"><div className="fh"><HIcon icon={CpuIcon} size={16} /><span className="fa">$2.0M</span><span className="fp">40%</span></div><div className="fl">Hardware procurement: GPUs, multi-core CPUs, NVMe</div></div>
-                            <div className="v2-fund"><div className="fh"><HIcon icon={Configuration01Icon} size={16} /><span className="fa">$1.2M</span><span className="fp">24%</span></div><div className="fl">Core software: kernel hardening, hypervisors, runway</div></div>
-                            <div className="v2-fund"><div className="fh"><HIcon icon={UserGroupIcon} size={16} /><span className="fa">$600K</span><span className="fp">12%</span></div><div className="fl">Operating runway and team: first key hires</div></div>
-                            <div className="v2-fund"><div className="fh"><HIcon icon={Shield01Icon} size={16} /><span className="fa">$450K</span><span className="fp">9%</span></div><div className="fl">Capital buffer: FX protection and spare inventory</div></div>
-                            <div className="v2-fund"><div className="fh"><HIcon icon={DeliveryTruck01Icon} size={16} /><span className="fa">$400K</span><span className="fp">8%</span></div><div className="fl">Logistics: freight, port clearing, import duties</div></div>
-                            <div className="v2-fund"><div className="fh"><HIcon icon={Building06Icon} size={16} /><span className="fa">$350K</span><span className="fp">7%</span></div><div className="fl">Facility: Tier III+ co-lo, power, interconnects</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={CpuIcon} size={16} /><span className="fa">$200K</span><span className="fp">40%</span></div><div className="fl">Hardware procurement: GPUs, multi-core CPUs, NVMe</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={Configuration01Icon} size={16} /><span className="fa">$120K</span><span className="fp">24%</span></div><div className="fl">Core software: kernel hardening, hypervisors, runway</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={UserGroupIcon} size={16} /><span className="fa">$60K</span><span className="fp">12%</span></div><div className="fl">Operating runway and team: first key hires</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={Shield01Icon} size={16} /><span className="fa">$45K</span><span className="fp">9%</span></div><div className="fl">Capital buffer: FX protection and spare inventory</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={DeliveryTruck01Icon} size={16} /><span className="fa">$40K</span><span className="fp">8%</span></div><div className="fl">Logistics: freight, port clearing, import duties</div></div>
+                            <div className="v2-fund"><div className="fh"><HIcon icon={Building06Icon} size={16} /><span className="fa">$35K</span><span className="fp">7%</span></div><div className="fl">Facility: Tier III+ co-lo, power, interconnects</div></div>
                         </div>
                         <div className="v2-miles">
                             <div className="v2-mile"><div className="mm">Month 1 to 6</div><p>Hardware procured, co-location secured, gateway scaled</p></div>

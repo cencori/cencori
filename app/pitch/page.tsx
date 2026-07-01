@@ -714,7 +714,7 @@ function PitchDeckContent() {
                 <div className={`slide s1 ${isPrintMode || current === 0 ? "active" : ""}`}>
                     <div className="kicker">
                         <span className="chip-sm light"><HIcon icon={GlobalIcon} size={15} color="#737373" /></span>
-                        <span className="s1-eyebrow">Phase 1 Raise · $5M · SAFE</span>
+                        <span className="s1-eyebrow">Pre-seed Raise · $500K · SAFE</span>
                     </div>
                     <div className="s1-statline">
                         The AI Cloud Infrastructure<br />
@@ -725,8 +725,8 @@ function PitchDeckContent() {
                         <span><strong>AI Cloud Infrastructure</strong>: powering critical systems across AI, enterprises, and modern computing.</span>
                     </div>
                     <div className="s1-meta">
-                        <div className="s1-meta-item"><label>Raising</label><span>$5,000,000</span></div>
-                        <div className="s1-meta-item"><label>Instrument</label><span>SAFE</span></div>
+                        <div className="s1-meta-item"><label>Raising</label><span>$500,000</span></div>
+                        <div className="s1-meta-item"><label>Valuation</label><span>$5M cap</span></div>
                         <div className="s1-meta-item"><label>CEO</label><span>Bola Roy Banjo</span></div>
                         <div className="s1-meta-item"><label>COO</label><span>Oreofe Ojurereoluwa Daniel</span></div>
                     </div>
@@ -1833,12 +1833,12 @@ function PitchDeckContent() {
                         <span className="chip-sm light"><HIcon icon={Rocket01Icon} size={15} color="#737373" /></span>
                         <span className="eyebrow">The Ask</span>
                     </div>
-                    <div className="headline-dark">$5M at a $30M post-money valuation.</div>
+                    <div className="headline-dark">$500K at a $5M valuation.</div>
                     <div className="ask-grid">
                         <div className="ask-cell featured">
                             <div className="ask-label dark">Raising</div>
-                            <div className="ask-value dark" style={{ fontSize: "40px" }}>$5,000,000</div>
-                            <div className="ask-value-sub dark">Phase 1 · SAFE at $30M Post-Valuation</div>
+                            <div className="ask-value dark" style={{ fontSize: "40px" }}>$500,000</div>
+                            <div className="ask-value-sub dark">Pre-seed · SAFE at $5M Valuation</div>
                         </div>
                         <div className="ask-cell">
                             <div className="ask-label">What the Capital Accomplishes</div>
@@ -1923,7 +1923,7 @@ function PitchDeckContent() {
                         <div className="s10-contact-item"><label>Founder</label><span>Bola Roy Banjo</span></div>
                         <div className="s10-contact-item"><label>Email</label><span>bola@cencori.com</span></div>
                         <div className="s10-contact-item"><label>Website</label><span>cencori.com</span></div>
-                        <div className="s10-contact-item"><label>Round</label><span>$5M Phase 1 · SAFE</span></div>
+                        <div className="s10-contact-item"><label>Round</label><span>$500K Pre-seed · SAFE</span></div>
                     </div>
                 </div>
 
