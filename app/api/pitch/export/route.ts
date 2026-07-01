@@ -4,6 +4,7 @@ import puppeteer from "puppeteer";
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") as "pdf" | "pptx" | "docx" | null;
+    const deck = searchParams.get("deck");
 
     if (!format || format !== "pdf") {
         return NextResponse.json(
@@ -20,9 +21,10 @@ export async function GET(request: NextRequest) {
         
         const page = await browser.newPage();
         
-        // Use localhost for local dev, or the origin from the request
         const origin = request.nextUrl.origin;
-        const printUrl = `${origin}/pitch?print=true`;
+        const deckPath = deck === "v2" ? "/pitch/v2" : "/pitch";
+        const printUrl = new URL(deckPath, origin);
+        printUrl.searchParams.set("print", "true");
 
         // Set viewport to 1080p landscape
         await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
         await page.emulateMediaType("print");
         
         // Navigate and wait for initial network idle
-        await page.goto(printUrl, { waitUntil: "networkidle0" });
+        await page.goto(printUrl.toString(), { waitUntil: "networkidle0" });
         
         // Wait for the client-side hydration to signal it's ready
         await page.waitForSelector("body[data-ready='true']", { timeout: 10000 });
