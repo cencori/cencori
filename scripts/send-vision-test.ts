@@ -49,7 +49,9 @@ async function main() {
         ? replyToRaw.split(',').map(s => s.trim()).filter(s => s.includes('@'))
         : undefined;
 
-    const firstName = recipient.split('@')[0];
+    const { lookupRecipientName } = await import('../lib/email/recipient');
+    const { firstName, resolved } = await lookupRecipientName(recipient);
+
     const unsubscribeUrl = 'https://cencori.com/account/email-preferences';
     const preferencesUrl = 'https://cencori.com/dashboard/organizations';
 
@@ -85,6 +87,7 @@ async function main() {
     console.log(`Sending Vision launch test to ${recipient}...`);
     console.log(`From:    ${from}`);
     if (replyTo) console.log(`Reply-To: ${replyTo.join(', ')}`);
+    console.log(`Greeting: Hi ${firstName},${resolved ? '' : '  (fell back to email prefix)'}`);
 
     const result = await sendbyte.emails.send({
         from,
