@@ -1,9 +1,16 @@
-import { Metadata } from "next";
+import Navbar from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
 
-export const metadata: Metadata = {
-    title: "Pricing",
-};
-
-export default function PricingLayout({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
+export default function PricingLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="min-h-screen bg-background text-foreground">
+            <Navbar homeUrl="/" />
+            {children}
+            <Footer />
+        </div>
+    );
 }
