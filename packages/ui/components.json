@@ -11,11 +11,11 @@
   },
   "iconLibrary": "hugeicons",
   "aliases": {
-    "components": "@workspace/ui/components",
-    "utils": "@workspace/ui/lib/utils",
-    "hooks": "@workspace/ui/hooks",
-    "lib": "@workspace/ui/lib",
-    "ui": "@workspace/ui/components"
+    "components": "@cencori/ui/components",
+    "utils": "@cencori/ui/lib/utils",
+    "hooks": "@cencori/ui/hooks",
+    "lib": "@cencori/ui/lib",
+    "ui": "@cencori/ui/components"
   },
   "rtl": false,
   "menuColor": "default-translucent",

@@ -1,8 +1,8 @@
 {
-  "extends": "@workspace/typescript-config/react-library.json",
+  "extends": "@cencori/typescript-config/react-library.json",
   "compilerOptions": {
     "paths": {
-      "@workspace/ui/*": ["./src/*"]
+      "@cencori/ui/*": ["./src/*"]
     }
   },
   "include": ["."],
