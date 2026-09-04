@@ -217,16 +217,39 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Could not prepare your Porter." }, { status: 500 });
         }
 
+        // The Porter itself. Disabled until its site has been read -- answering before the crawl
+        // would be worse than not answering at all.
+        const { data: porter, error: porterError } = await supabase
+            .from("porters")
+            .insert({
+                project_id: project.id,
+                organization_id: organization.id,
+                name: organizationName,
+                source_url: `https://${host}`,
+                enabled: false,
+                surface: "launcher",
+            })
+            .select("id")
+            .single();
+
+        if (porterError || !porter) {
+            console.error("[Porter onboarding] porter insert failed:", porterError?.message);
+            await supabase.from("projects").delete().eq("id", project.id);
+            await supabase.from("organizations").delete().eq("id", organization.id);
+            return NextResponse.json({ error: "Could not prepare your Porter." }, { status: 500 });
+        }
+
         trackEvent({
             event_type: "onboarding.porter_provisioned",
             product: "porter",
             user_id: user.id,
             organization_id: organization.id,
             project_id: project.id,
-            metadata: { host, allowed_domains: allowedDomains },
+            metadata: { host, allowed_domains: allowedDomains, porter_id: porter.id },
         });
 
         return NextResponse.json({
+            porterId: porter.id,
             organizationSlug: organization.slug,
             projectSlug: project.slug,
             organizationName: organization.name,
