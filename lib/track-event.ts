@@ -27,14 +27,17 @@ export type PlatformEventType =
     | 'subscription.canceled'
     | 'credits.topup'
     // Webhooks
-    | 'webhook.created';
+    | 'webhook.created'
+    // Onboarding
+    | 'onboarding.porter_provisioned';
 
 export type PlatformProduct =
     | 'gateway'
     | 'scan_web'
     | 'scan_cli'
     | 'dashboard'
-    | 'billing';
+    | 'billing'
+    | 'porter';
 
 interface TrackEventOptions {
     event_type: PlatformEventType;

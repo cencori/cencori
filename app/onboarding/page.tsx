@@ -29,6 +29,59 @@ const PLANS = [
   },
 ] as const;
 
+type OnboardingPath = "developer" | "porter";
+
+const PATHS = [
+  {
+    id: "developer",
+    name: "Call models from my code",
+    description: "An API key, one endpoint, sixteen providers",
+  },
+  {
+    id: "porter",
+    name: "Put an AI agent on my site",
+    description: "It reads your site and answers your customers",
+  },
+] as const;
+
+/**
+ * Save the name to auth metadata and the profile row. Both onboarding paths do
+ * this identically; only what happens afterwards differs.
+ */
+async function saveUserName(normalizedFullName: string): Promise<boolean> {
+  const [firstName, ...remainingNameParts] = normalizedFullName.split(" ");
+  const lastName = remainingNameParts.join(" ");
+
+  const { error: metadataError } = await supabase.auth.updateUser({
+    data: {
+      full_name: normalizedFullName,
+      name: normalizedFullName,
+      first_name: firstName,
+      last_name: lastName,
+    },
+  });
+
+  if (metadataError) {
+    console.error("Error saving user name:", metadataError.message);
+    toast.error("Could not save your name. Please try again.");
+    return false;
+  }
+
+  const profileResponse = await fetch("/api/user/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ first_name: firstName, last_name: lastName }),
+  });
+
+  if (!profileResponse.ok) {
+    console.error("Error saving user profile:", await profileResponse.text());
+    toast.error("Could not finish saving your profile. Please try again.");
+    return false;
+  }
+
+  return true;
+}
+
 type ProvisionedOrganization = {
   id: string;
   slug: string;
@@ -50,6 +103,10 @@ function OnboardingContent() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [plan, setPlan] = useState<"free" | "pro">("free");
+  // Which onboarding this is. Null until the fork is answered: the developer path
+  // is today's flow untouched, the porter path asks for a site and nothing else.
+  const [path, setPath] = useState<OnboardingPath | null>(null);
+  const [siteUrl, setSiteUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -58,6 +115,7 @@ function OnboardingContent() {
   const organizationPromiseRef = useRef<Promise<ProvisionedOrganization | null> | null>(null);
   const fullNameInputRef = useRef<HTMLInputElement>(null);
   const orgNameInputRef = useRef<HTMLInputElement>(null);
+  const siteUrlInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (preview) {
@@ -120,37 +178,7 @@ function OnboardingContent() {
           return null;
         }
 
-        const [firstName, ...remainingNameParts] = normalizedFullName.split(" ");
-        const lastName = remainingNameParts.join(" ");
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: {
-            full_name: normalizedFullName,
-            name: normalizedFullName,
-            first_name: firstName,
-            last_name: lastName,
-          },
-        });
-
-        if (metadataError) {
-          console.error("Error saving user name:", metadataError.message);
-          toast.error("Could not save your name. Please try again.");
-          return null;
-        }
-
-        const profileResponse = await fetch("/api/user/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-          }),
-        });
-
-        if (!profileResponse.ok) {
-          console.error("Error saving user profile:", await profileResponse.text());
-          toast.error("Could not finish saving your profile. Please try again.");
-          return null;
-        }
+        if (!(await saveUserName(normalizedFullName))) return null;
 
         const baseSlug = slugify(organizationName) || "org";
         let newSlug = baseSlug;
@@ -250,6 +278,45 @@ function OnboardingContent() {
     setPlan(selectedPlan);
   };
 
+  const handlePorterSubmit = async () => {
+    if (!fullName.trim()) {
+      toast.error("Please enter your name.");
+      fullNameInputRef.current?.focus();
+      return;
+    }
+    if (!siteUrl.trim()) {
+      toast.error("Please enter your website address.");
+      siteUrlInputRef.current?.focus();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!(await saveUserName(fullName.trim().replace(/\s+/g, " ")))) return;
+
+      const response = await fetch("/api/onboarding/porter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl: siteUrl.trim() }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result?.error || "Could not set up your Porter. Please try again.");
+        siteUrlInputRef.current?.focus();
+        return;
+      }
+
+      router.push(`/${result.organizationSlug}/${result.projectSlug}/porter`);
+    } catch (error) {
+      console.error("Error provisioning Porter:", error);
+      toast.error("Could not set up your Porter. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const organization = await ensureOrganization();
     if (!organization) return;
@@ -276,7 +343,13 @@ function OnboardingContent() {
         <div className="text-center mb-8">
           <Logo variant="mark" className="h-6 mx-auto mb-5" />
           <h1 className="text-2xl font-semibold text-white">Glad to have you!</h1>
-          <p className="text-zinc-400 mt-1 text-sm">Set up your organization to get started</p>
+          <p className="text-zinc-400 mt-1 text-sm">
+            {path === null
+              ? "Two ways in. Pick the one that sounds like you."
+              : path === "porter"
+                ? "Tell us where it lives and we'll take it from there"
+                : "Set up your organization to get started"}
+          </p>
         </div>
 
         <div className="rounded-xl bg-black p-6 space-y-6">
@@ -299,61 +372,136 @@ function OnboardingContent() {
             />
           </div>
 
-          <div>
-            <label htmlFor="orgName" className="block text-sm font-medium text-zinc-300 mb-1.5">
-              Organization Name
-            </label>
-            <Input
-              ref={orgNameInputRef}
-              id="orgName"
-              placeholder="e.g. Acme Corp"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              disabled={loading || Boolean(provisionedOrganization)}
-              className="h-10 border-white/10 bg-zinc-900 text-white placeholder:text-zinc-500 transition-colors hover:border-white/[0.16] focus-visible:border-white/25 focus-visible:ring-white/[0.06]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">
-              Choose your plan
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {PLANS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handlePlanSelect(p.id)}
-                  disabled={loading}
-                  aria-pressed={plan === p.id}
-                  className={`relative rounded-lg border p-4 text-left transition-colors ${
-                    plan === p.id
-                      ? "border-blue-500/45 bg-zinc-900"
-                      : "border-white/[0.06] bg-zinc-900/50 hover:border-white/10 hover:bg-zinc-900/80"
-                  } disabled:cursor-wait disabled:opacity-60`}
-                >
-                  {p.popular && (
-                    <span className="absolute -top-2.5 right-3 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold text-black">
-                      Popular
-                    </span>
-                  )}
-                  <span className="text-sm font-medium text-white">{p.name}</span>
-                  <p className="text-xs text-zinc-500 mt-0.5">{p.description}</p>
-                </button>
-              ))}
+          {path === null && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">
+                What do you want to do?
+              </label>
+              <div className="grid gap-3">
+                {PATHS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setPath(option.id)}
+                    className="rounded-lg border border-white/[0.06] bg-zinc-900/50 p-4 text-left transition-colors hover:border-white/10 hover:bg-zinc-900/80"
+                  >
+                    <span className="text-sm font-medium text-white">{option.name}</span>
+                    <p className="text-xs text-zinc-500 mt-0.5">{option.description}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full h-10 bg-white text-black hover:bg-zinc-200 font-medium disabled:opacity-50"
-          >
-            {loading ? (
-              <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin mr-2" />
-            ) : null}
-            Continue
-          </Button>
+          {path === "developer" && (
+            <>
+              <div>
+                <label htmlFor="orgName" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Organization Name
+                </label>
+                <Input
+                  ref={orgNameInputRef}
+                  id="orgName"
+                  placeholder="e.g. Acme Corp"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  disabled={loading || Boolean(provisionedOrganization)}
+                  className="h-10 border-white/10 bg-zinc-900 text-white placeholder:text-zinc-500 transition-colors hover:border-white/[0.16] focus-visible:border-white/25 focus-visible:ring-white/[0.06]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-3">
+                  Choose your plan
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PLANS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handlePlanSelect(p.id)}
+                      disabled={loading}
+                      aria-pressed={plan === p.id}
+                      className={`relative rounded-lg border p-4 text-left transition-colors ${
+                        plan === p.id
+                          ? "border-blue-500/45 bg-zinc-900"
+                          : "border-white/[0.06] bg-zinc-900/50 hover:border-white/10 hover:bg-zinc-900/80"
+                      } disabled:cursor-wait disabled:opacity-60`}
+                    >
+                      {p.popular && (
+                        <span className="absolute -top-2.5 right-3 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold text-black">
+                          Popular
+                        </span>
+                      )}
+                      <span className="text-sm font-medium text-white">{p.name}</span>
+                      <p className="text-xs text-zinc-500 mt-0.5">{p.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full h-10 bg-white text-black hover:bg-zinc-200 font-medium disabled:opacity-50"
+              >
+                {loading ? (
+                  <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin mr-2" />
+                ) : null}
+                Continue
+              </Button>
+            </>
+          )}
+
+          {path === "porter" && (
+            <>
+              <div>
+                <label htmlFor="siteUrl" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Your website
+                </label>
+                <Input
+                  ref={siteUrlInputRef}
+                  id="siteUrl"
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="e.g. acme.com"
+                  value={siteUrl}
+                  onChange={(e) => setSiteUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handlePorterSubmit();
+                  }}
+                  disabled={loading}
+                  className="h-10 border-white/10 bg-zinc-900 text-white placeholder:text-zinc-500 transition-colors hover:border-white/[0.16] focus-visible:border-white/25 focus-visible:ring-white/[0.06]"
+                />
+                <p className="text-xs text-zinc-500 mt-1.5">
+                  We read this site so your Porter can answer questions about it.
+                </p>
+              </div>
+
+              <Button
+                onClick={handlePorterSubmit}
+                disabled={loading}
+                className="w-full h-10 bg-white text-black hover:bg-zinc-200 font-medium disabled:opacity-50"
+              >
+                {loading ? (
+                  <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin mr-2" />
+                ) : null}
+                Continue
+              </Button>
+            </>
+          )}
+
+          {path !== null && !provisionedOrganization && (
+            <button
+              type="button"
+              onClick={() => setPath(null)}
+              disabled={loading}
+              className="w-full text-center text-xs text-zinc-500 transition-colors hover:text-zinc-300 disabled:opacity-50"
+            >
+              Back
+            </button>
+          )}
+          {path !== null && (
           <p className="text-xs text-muted-foreground text-center mt-4">
             By continuing, you agree to the{" "}
             <Link href="/terms" className="underline underline-offset-2 hover:text-zinc-400 transition-colors">
@@ -364,6 +512,7 @@ function OnboardingContent() {
               Privacy Policy
             </Link>.
           </p>
+          )}
         </div>
       </div>
 
