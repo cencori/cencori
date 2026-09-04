@@ -303,7 +303,12 @@ function OnboardingContent() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result?.error || "Could not set up your Porter. Please try again.");
+        // `detail` is the database's own message, and is only sent outside production.
+        console.error("[Porter onboarding] failed:", result);
+        toast.error(
+          [result?.error, result?.detail].filter(Boolean).join(" — ") ||
+            "Could not set up your Porter. Please try again."
+        );
         siteUrlInputRef.current?.focus();
         return;
       }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
+import { createAdminClient } from "@/lib/supabaseAdmin";
 import { slugify } from "@/lib/utils";
 import { isReservedSlug, isReservedProjectSlug } from "@/lib/reserved-slugs";
 import { trackEvent } from "@/lib/track-event";
@@ -24,7 +25,25 @@ type PorterProvisionRequest = {
     siteUrl?: unknown;
 };
 
-type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+/**
+ * Region is required in practice even though the column is nullable: its default of 'auto' is not
+ * a value projects_region_check accepts, so omitting it inserts a row the constraint then rejects.
+ * 'europe' is the general group most of the estate already uses, and a general group is the honest
+ * choice when a site's address tells us nothing about where its customers are.
+ */
+const DEFAULT_PROJECT_REGION = "europe";
+
+/**
+ * Outside production, hand the database's own words back to the caller. Provisioning touches four
+ * tables and the failure the customer sees is deliberately vague; while this is being built, the
+ * reason belongs on screen rather than only in a server log nobody is watching.
+ */
+function withDetail(message: string, detail?: string): { error: string; detail?: string } {
+    if (process.env.NODE_ENV === "production" || !detail) return { error: message };
+    return { error: message, detail };
+}
 
 /** Accept "acme.com", "acme.com/help", or a full URL, and reject anything that isn't web. */
 function parseSiteUrl(raw: string): { host: string } | null {
@@ -71,7 +90,7 @@ function allowedDomainsForHost(host: string): string[] {
     return Array.from(new Set([bare, `www.${bare}`]));
 }
 
-async function findFreeOrganizationSlug(supabase: ServerClient, baseSlug: string): Promise<string | null> {
+async function findFreeOrganizationSlug(supabase: AdminClient, baseSlug: string): Promise<string | null> {
     for (let attempt = 0; attempt < 10; attempt += 1) {
         const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt}`;
         if (isReservedSlug(candidate)) continue;
@@ -89,7 +108,7 @@ async function findFreeOrganizationSlug(supabase: ServerClient, baseSlug: string
 }
 
 async function findFreeProjectSlug(
-    supabase: ServerClient,
+    supabase: AdminClient,
     organizationId: string,
     baseSlug: string
 ): Promise<string | null> {
@@ -112,12 +131,18 @@ async function findFreeProjectSlug(
 
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createServerClient();
-
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        // Who is asking comes from their session; what gets written goes through the service role.
+        // Provisioning has to create an organization, a membership, a project and a Porter as one
+        // act, and the RLS on projects requires a membership that does not exist until midway
+        // through -- so the sequence cannot be expressed as four authenticated client calls.
+        // Authorization is not weakened by this: everything created below is owned by this user.
+        const session = await createServerClient();
+        const { data: { user }, error: userError } = await session.auth.getUser();
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        const supabase = createAdminClient();
 
         const body = (await request.json()) as PorterProvisionRequest;
         if (typeof body.siteUrl !== "string") {
@@ -157,7 +182,7 @@ export async function POST(request: NextRequest) {
 
         if (organizationError || !organization) {
             console.error("[Porter onboarding] organization insert failed:", organizationError?.message);
-            return NextResponse.json({ error: "Could not create your account." }, { status: 500 });
+            return NextResponse.json(withDetail("Could not create your account.", organizationError?.message), { status: 500 });
         }
 
         const { error: memberError } = await supabase
@@ -167,13 +192,16 @@ export async function POST(request: NextRequest) {
         if (memberError) {
             console.error("[Porter onboarding] membership insert failed:", memberError.message);
             await supabase.from("organizations").delete().eq("id", organization.id);
-            return NextResponse.json({ error: "Could not finish setting up your account." }, { status: 500 });
+            return NextResponse.json(withDetail("Could not finish setting up your account.", memberError.message), { status: 500 });
         }
 
         const projectSlug = await findFreeProjectSlug(supabase, organization.id, "production");
         if (!projectSlug) {
             await supabase.from("organizations").delete().eq("id", organization.id);
-            return NextResponse.json({ error: "Could not prepare your workspace." }, { status: 409 });
+            return NextResponse.json(
+                withDetail("Could not prepare your workspace.", "no free project slug after 10 attempts"),
+                { status: 409 }
+            );
         }
 
         const { data: project, error: projectError } = await supabase
@@ -184,6 +212,7 @@ export async function POST(request: NextRequest) {
                 description: `Porter for ${host}`,
                 organization_id: organization.id,
                 visibility: "private",
+                region: DEFAULT_PROJECT_REGION,
             })
             .select("id, slug")
             .single();
@@ -191,7 +220,10 @@ export async function POST(request: NextRequest) {
         if (projectError || !project) {
             console.error("[Porter onboarding] project insert failed:", projectError?.message);
             await supabase.from("organizations").delete().eq("id", organization.id);
-            return NextResponse.json({ error: "Could not prepare your workspace." }, { status: 500 });
+            return NextResponse.json(
+                withDetail("Could not prepare your workspace.", projectError?.message),
+                { status: 500 }
+            );
         }
 
         // The key ships in the page source of the customer's site, so it is domain
@@ -214,7 +246,7 @@ export async function POST(request: NextRequest) {
             console.error("[Porter onboarding] key insert failed:", keyError.message);
             await supabase.from("projects").delete().eq("id", project.id);
             await supabase.from("organizations").delete().eq("id", organization.id);
-            return NextResponse.json({ error: "Could not prepare your Porter." }, { status: 500 });
+            return NextResponse.json(withDetail("Could not prepare your Porter.", keyError.message), { status: 500 });
         }
 
         // The Porter itself. Disabled until its site has been read -- answering before the crawl
@@ -236,7 +268,7 @@ export async function POST(request: NextRequest) {
             console.error("[Porter onboarding] porter insert failed:", porterError?.message);
             await supabase.from("projects").delete().eq("id", project.id);
             await supabase.from("organizations").delete().eq("id", organization.id);
-            return NextResponse.json({ error: "Could not prepare your Porter." }, { status: 500 });
+            return NextResponse.json(withDetail("Could not prepare your Porter.", porterError?.message), { status: 500 });
         }
 
         trackEvent({
