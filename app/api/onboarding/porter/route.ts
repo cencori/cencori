@@ -5,6 +5,7 @@ import { slugify } from "@/lib/utils";
 import { isReservedSlug, isReservedProjectSlug } from "@/lib/reserved-slugs";
 import { trackEvent } from "@/lib/track-event";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
+import { inferPorterFromSite } from "@/lib/porter/inference";
 
 /**
  * Provision everything a Porter needs from a single URL.
@@ -107,19 +108,29 @@ async function findFreeOrganizationSlug(supabase: AdminClient, baseSlug: string)
     return null;
 }
 
+/**
+ * projects.slug is unique across the whole table, not per organization -- projects_slug_key, not a
+ * composite -- so a name another customer took years ago is a name this one cannot have. The
+ * candidates below try the semantically right slug first, then fall back to the organization's own
+ * name, which is derived from a domain and so is already distinctive, before resorting to numbers.
+ */
 async function findFreeProjectSlug(
     supabase: AdminClient,
-    organizationId: string,
-    baseSlug: string
+    organizationSlug: string
 ): Promise<string | null> {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt}`;
+    const candidates = [
+        "production",
+        organizationSlug,
+        `${organizationSlug}-production`,
+        ...Array.from({ length: 8 }, (_, i) => `${organizationSlug}-${i + 2}`),
+    ];
+
+    for (const candidate of candidates) {
         if (isReservedProjectSlug(candidate)) continue;
 
         const { data, error } = await supabase
             .from("projects")
             .select("slug")
-            .eq("organization_id", organizationId)
             .eq("slug", candidate)
             .maybeSingle();
 
@@ -158,7 +169,10 @@ export async function POST(request: NextRequest) {
         }
         const { host } = parsed;
 
-        const organizationName = organizationNameFromHost(host);
+        // Read the homepage before deciding what anything is called. Everything this returns is
+        // optional: a site that will not load leaves the hostname-derived name in place.
+        const inferred = await inferPorterFromSite(`https://${host}`, host);
+        const organizationName = inferred.name?.slice(0, 80) || organizationNameFromHost(host);
         const organizationSlug = await findFreeOrganizationSlug(
             supabase,
             slugify(organizationName) || slugify(host) || "porter"
@@ -195,7 +209,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(withDetail("Could not finish setting up your account.", memberError.message), { status: 500 });
         }
 
-        const projectSlug = await findFreeProjectSlug(supabase, organization.id, "production");
+        const projectSlug = await findFreeProjectSlug(supabase, organization.slug);
         if (!projectSlug) {
             await supabase.from("organizations").delete().eq("id", organization.id);
             return NextResponse.json(
@@ -258,8 +272,15 @@ export async function POST(request: NextRequest) {
                 organization_id: organization.id,
                 name: organizationName,
                 source_url: `https://${host}`,
+                system_prompt: inferred.systemPrompt ?? null,
                 enabled: false,
                 surface: "launcher",
+                // Inferred values only. What the customer edits later lands in brand_overrides, so
+                // a re-crawl can refresh this without undoing anything they chose.
+                brand: inferred.brand,
+                actions: inferred.contactEmail
+                    ? [{ type: "email", to: inferred.contactEmail, source: "inferred" }]
+                    : [],
             })
             .select("id")
             .single();
@@ -277,7 +298,14 @@ export async function POST(request: NextRequest) {
             user_id: user.id,
             organization_id: organization.id,
             project_id: project.id,
-            metadata: { host, allowed_domains: allowedDomains, porter_id: porter.id },
+            metadata: {
+                host,
+                allowed_domains: allowedDomains,
+                porter_id: porter.id,
+                inferred_name: Boolean(inferred.name),
+                inferred_brand_color: Boolean(inferred.brand.color),
+                inferred_contact: Boolean(inferred.contactEmail),
+            },
         });
 
         return NextResponse.json({
