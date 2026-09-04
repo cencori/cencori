@@ -9,6 +9,10 @@
             "destination": "/api/v1/chat/completions"
         },
         {
+            "source": "/v1/porter/chat",
+            "destination": "/api/v1/porter/chat"
+        },
+        {
             "source": "/v1/completions",
             "destination": "/api/ai/completions"
         },
