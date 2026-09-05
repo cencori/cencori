@@ -18,6 +18,16 @@ import { toast } from "@/components/ui/toast";
 
 type PorterAction = { type?: string; to?: string; source?: string };
 
+type Turn = {
+    id: string;
+    askedAt: string;
+    question: string;
+    answer: string;
+    status: string;
+    latencyMs: number | null;
+    grounded: boolean;
+};
+
 type PorterRow = {
     id: string;
     name: string;
@@ -99,6 +109,17 @@ export default function PorterPage({
             toast.error("Could not copy. Select the snippet and copy it manually.");
         }
     };
+
+    const { data: turns } = useQuery({
+        queryKey: ["porter-turns", porter?.id],
+        enabled: Boolean(porter?.id),
+        queryFn: async (): Promise<Turn[]> => {
+            const response = await fetch(`/api/porter/${porter!.id}/conversations?limit=25`);
+            if (!response.ok) return [];
+            const body = await response.json();
+            return (body.turns ?? []) as Turn[];
+        },
+    });
 
     const readSite = useMutation({
         mutationFn: async (porterId: string) => {
@@ -186,6 +207,39 @@ export default function PorterPage({
                 <p className="mt-8 font-mono text-xs text-muted-foreground">
                     Read {lastRead.indexed} pages · {lastRead.skipped} skipped · {lastRead.failed} failed
                 </p>
+            )}
+
+            {porter && turns && turns.length > 0 && (
+                <section className="mt-10">
+                    <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                        What people asked
+                    </h2>
+                    <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+                        The most recent {turns.length} question{turns.length === 1 ? "" : "s"}. An answer
+                        marked <em>unsourced</em> was given without any of your pages to draw on.
+                    </p>
+
+                    <ul className="mt-5 divide-y divide-border border-y border-border">
+                        {turns.map((turn) => (
+                            <li key={turn.id} className="py-4">
+                                <div className="flex items-baseline justify-between gap-4">
+                                    <p className="text-sm font-medium">{turn.question}</p>
+                                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                                        {new Date(turn.askedAt).toLocaleString()}
+                                    </span>
+                                </div>
+                                <p className="mt-1.5 max-w-prose text-sm text-muted-foreground">
+                                    {turn.answer || "No answer was returned."}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-3 font-mono text-[11px] text-muted-foreground">
+                                    {turn.status !== "success" && <span>{turn.status}</span>}
+                                    {!turn.grounded && <span>unsourced</span>}
+                                    {turn.latencyMs != null && <span>{(turn.latencyMs / 1000).toFixed(1)}s</span>}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
             )}
 
             {porter && (
