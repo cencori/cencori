@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractCencoriApiKeyFromHeaders, hashApiKey } from "@/lib/api-keys";
 import { POST as gatewayChatCompletions } from "@/app/api/v1/chat/completions/route";
+import { buildGroundedPrompt, findPorterPassages } from "@/lib/porter/knowledge";
 
 /**
  * Chat with a Porter.
@@ -44,10 +45,7 @@ function readHistory(raw: unknown): PorterTurn[] {
     return turns;
 }
 
-/**
- * What a Porter is told about itself when it has no pages yet. Once the crawl lands, retrieved
- * passages join this and the instruction to decline gets something to work with.
- */
+/** What a Porter is told about itself, before any retrieved pages are added to it. */
 function buildSystemPrompt(porter: { name: string; system_prompt: string | null; source_url: string }): string {
     if (porter.system_prompt?.trim()) return porter.system_prompt.trim();
     return [
@@ -122,8 +120,17 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    // Retrieval is fail-open: a Porter that cannot reach its own pages answers worse rather than
+    // failing, and the prompt it gets in that case tells it to decline instead of guessing.
+    const passages = await findPorterPassages(
+        admin,
+        porter.project_id,
+        body.message,
+        new URL(porter.source_url).hostname,
+    );
+
     const messages = [
-        { role: "system", content: buildSystemPrompt(porter) },
+        { role: "system", content: buildGroundedPrompt(buildSystemPrompt(porter), passages) },
         ...readHistory(body.history),
         { role: "user", content: body.message.slice(0, MAX_MESSAGE_CHARS) },
     ];
