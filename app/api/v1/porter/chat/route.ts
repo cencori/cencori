@@ -4,6 +4,7 @@ import { extractCencoriApiKeyFromHeaders, hashApiKey } from "@/lib/api-keys";
 import { POST as gatewayChatCompletions } from "@/app/api/v1/chat/completions/route";
 import { buildGroundedPrompt, findPorterPassages } from "@/lib/porter/knowledge";
 import { checkPorterRateLimit } from "@/lib/porter/rate-limit";
+import { handleCorsPreFlight } from "@/lib/gateway-middleware";
 
 /**
  * Chat with a Porter.
@@ -57,27 +58,38 @@ function buildSystemPrompt(porter: { name: string; system_prompt: string | null;
     ].join(" ");
 }
 
+// The widget runs on the customer's domain and calls this from a browser, so every reply -- the
+// refusals included -- has to be readable cross-origin or the page sees an opaque network error
+// instead of the reason.
+function withCors(response: NextResponse, origin: string | null): NextResponse {
+    response.headers.set("Access-Control-Allow-Origin", origin || "*");
+    response.headers.set("Vary", "Origin");
+    return response;
+}
+
+export function OPTIONS() {
+    return handleCorsPreFlight();
+}
+
 export async function POST(req: NextRequest) {
+    const origin = req.headers.get("origin");
     let body: PorterChatRequest;
     try {
         body = (await req.json()) as PorterChatRequest;
     } catch {
-        return NextResponse.json({ error: { message: "Invalid JSON body." } }, { status: 400 });
+        return withCors(NextResponse.json({ error: { message: "Invalid JSON body." } }, { status: 400 }), origin);
     }
 
     if (typeof body.porterId !== "string" || !body.porterId.trim()) {
-        return NextResponse.json({ error: { message: "porterId is required." } }, { status: 400 });
+        return withCors(NextResponse.json({ error: { message: "porterId is required." } }, { status: 400 }), origin);
     }
     if (typeof body.message !== "string" || !body.message.trim()) {
-        return NextResponse.json({ error: { message: "message is required." } }, { status: 400 });
+        return withCors(NextResponse.json({ error: { message: "message is required." } }, { status: 400 }), origin);
     }
 
     const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
     if (!apiKey) {
-        return NextResponse.json(
-            { error: { message: "Missing API key. Send your publishable key as a bearer token." } },
-            { status: 401 }
-        );
+        return withCors(NextResponse.json({ error: { message: "Missing API key. Send your publishable key as a bearer token." } }, { status: 401 }), origin);
     }
 
     const admin = createAdminClient();
@@ -89,7 +101,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
     if (porterError || !porter) {
-        return NextResponse.json({ error: { message: "Porter not found." } }, { status: 404 });
+        return withCors(NextResponse.json({ error: { message: "Porter not found." } }, { status: 404 }), origin);
     }
 
     // The key has to belong to the Porter's own project, or one customer's publishable key would
@@ -103,10 +115,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
     if (!key) {
-        return NextResponse.json(
-            { error: { message: "This key cannot be used with this Porter." } },
-            { status: 403 }
-        );
+        return withCors(NextResponse.json({ error: { message: "This key cannot be used with this Porter." } }, { status: 403 }), origin);
     }
 
     // Before retrieval and before the provider: the two expensive things this route does are the
@@ -118,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     const rate = await checkPorterRateLimit(porter.id, visitorIp);
     if (!rate.allowed) {
-        return NextResponse.json(
+        return withCors(NextResponse.json(
             {
                 error: {
                     message:
@@ -129,11 +138,11 @@ export async function POST(req: NextRequest) {
                 },
             },
             { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
-        );
+        ), origin);
     }
 
     if (!porter.enabled) {
-        return NextResponse.json(
+        return withCors(NextResponse.json(
             {
                 error: {
                     message: "This Porter is not ready yet. Its site has not been read.",
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
                 },
             },
             { status: 409 }
-        );
+        ), origin);
     }
 
     // Retrieval is fail-open: a Porter that cannot reach its own pages answers worse rather than

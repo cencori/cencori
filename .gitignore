@@ -87,3 +87,7 @@ eve
 AUDIT.md
 # Claude Code local config and worktrees (never commit)
 .claude/
+
+# Local Porter demo page: holds a real publishable key so the widget can be driven
+# against a dev server. Scaffolding, not a deliverable.
+public/porter-demo.html
