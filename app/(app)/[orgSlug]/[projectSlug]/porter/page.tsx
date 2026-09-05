@@ -13,6 +13,8 @@ import { supabase } from "@/lib/supabaseClient";
  * view, the live preview and the snippet replace this as the later steps land.
  */
 
+type PorterAction = { type?: string; to?: string; source?: string };
+
 type PorterRow = {
     id: string;
     name: string;
@@ -20,6 +22,10 @@ type PorterRow = {
     enabled: boolean;
     surface: string;
     created_at: string;
+    system_prompt: string | null;
+    brand: { color?: string; logo?: string } | null;
+    brand_overrides: Record<string, unknown> | null;
+    actions: PorterAction[] | null;
 };
 
 export default function PorterPage({
@@ -30,7 +36,10 @@ export default function PorterPage({
     const { orgSlug, projectSlug } = use(params);
 
     const { data: porter, isLoading } = useQuery({
-        queryKey: ["porter", orgSlug, projectSlug],
+        // The key names the shape being fetched, not just the row. staleTime is five minutes and
+        // refetchOnMount is off, so widening the select below without changing this key serves the
+        // narrower cached row and the new columns silently render as absent.
+        queryKey: ["porter", orgSlug, projectSlug, "with-brand"],
         queryFn: async (): Promise<PorterRow | null> => {
             const { data: project } = await supabase
                 .from("projects")
@@ -43,7 +52,7 @@ export default function PorterPage({
 
             const { data } = await supabase
                 .from("porters")
-                .select("id, name, source_url, enabled, surface, created_at")
+                .select("id, name, source_url, enabled, surface, created_at, system_prompt, brand, brand_overrides, actions")
                 .eq("project_id", project.id)
                 .maybeSingle();
 
@@ -90,6 +99,77 @@ export default function PorterPage({
                         </dd>
                     </div>
                 </dl>
+            )}
+
+            {porter && (
+                <section className="mt-10">
+                    <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Read from your site
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        Taken from {porter.source_url} when your Porter was created. Editing any of it
+                        later keeps your version through the weekly refresh.
+                    </p>
+
+                    <dl className="mt-5 divide-y divide-border border-y border-border">
+                        <div className="flex items-center justify-between gap-6 py-3">
+                            <dt className="text-sm text-muted-foreground">Name</dt>
+                            <dd className="text-sm font-medium">{porter.name}</dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-6 py-3">
+                            <dt className="text-sm text-muted-foreground">Brand colour</dt>
+                            <dd className="flex items-center gap-2 font-mono text-xs">
+                                {porter.brand?.color ? (
+                                    <>
+                                        <span
+                                            aria-hidden
+                                            className="inline-block size-4 rounded border border-border"
+                                            style={{ background: porter.brand.color }}
+                                        />
+                                        {porter.brand.color}
+                                    </>
+                                ) : (
+                                    <span className="text-muted-foreground">none found</span>
+                                )}
+                            </dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-6 py-3">
+                            <dt className="text-sm text-muted-foreground">Logo</dt>
+                            <dd className="flex min-w-0 items-center gap-3">
+                                {porter.brand?.logo ? (
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={porter.brand.logo}
+                                            alt=""
+                                            className="size-8 rounded border border-border object-cover"
+                                        />
+                                        <span className="truncate font-mono text-xs text-muted-foreground">
+                                            {porter.brand.logo}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="font-mono text-xs text-muted-foreground">none found</span>
+                                )}
+                            </dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-6 py-3">
+                            <dt className="text-sm text-muted-foreground">Escalates to</dt>
+                            <dd className="font-mono text-xs">
+                                {porter.actions?.find((a) => a.type === "email")?.to ?? (
+                                    <span className="text-muted-foreground">no address on the page</span>
+                                )}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <div className="mt-6">
+                        <p className="text-sm text-muted-foreground">What it has been told about you</p>
+                        <p className="mt-2 rounded border border-border bg-muted/40 p-4 text-sm leading-relaxed">
+                            {porter.system_prompt ?? "Nothing yet — your site could not be read."}
+                        </p>
+                    </div>
+                </section>
             )}
 
             <p className="mt-8 text-sm text-muted-foreground">
