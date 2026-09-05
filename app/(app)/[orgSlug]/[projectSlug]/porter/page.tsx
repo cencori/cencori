@@ -2,8 +2,11 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 
 /**
  * Placeholder for the Porter workspace.
@@ -35,6 +38,9 @@ export default function PorterPage({
 }) {
     const { orgSlug, projectSlug } = use(params);
 
+    const queryClient = useQueryClient();
+    const [lastRead, setLastRead] = useState<{ indexed: number; skipped: number; failed: number } | null>(null);
+
     const { data: porter, isLoading } = useQuery({
         // The key names the shape being fetched, not just the row. staleTime is five minutes and
         // refetchOnMount is off, so widening the select below without changing this key serves the
@@ -58,6 +64,25 @@ export default function PorterPage({
 
             return (data as PorterRow) ?? null;
         },
+    });
+
+    const readSite = useMutation({
+        mutationFn: async (porterId: string) => {
+            const response = await fetch(`/api/porter/${porterId}/crawl`, { method: "POST" });
+            const result = await response.json();
+            if (!response.ok) throw new Error([result?.error, result?.detail].filter(Boolean).join(" — "));
+            return result as { indexed: number; skipped: number; failed: number; answering: boolean };
+        },
+        onSuccess: async (result) => {
+            setLastRead(result);
+            if (result.indexed === 0) {
+                toast.error("Nothing could be read from that site.");
+            } else {
+                toast.success(`Read ${result.indexed} page${result.indexed === 1 ? "" : "s"}.`);
+            }
+            await queryClient.invalidateQueries({ queryKey: ["porter", orgSlug, projectSlug, "with-brand"] });
+        },
+        onError: (error: Error) => toast.error(error.message || "Could not read the site."),
     });
 
     const value = (text: string) => (isLoading ? "…" : text);
@@ -99,6 +124,34 @@ export default function PorterPage({
                         </dd>
                     </div>
                 </dl>
+            )}
+
+            {porter && !porter.enabled && (
+                <div className="mt-8 rounded border border-border p-5">
+                    <p className="text-sm font-medium">Your Porter has not read your site yet</p>
+                    <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                        It will follow links from {porter.source_url}, up to 25 pages, and answer only from
+                        what it finds there. Nothing is published to your site by doing this.
+                    </p>
+                    <Button
+                        className="mt-4"
+                        disabled={readSite.isPending}
+                        onClick={() => readSite.mutate(porter.id)}
+                    >
+                        {readSite.isPending ? "Reading your site…" : "Read my site"}
+                    </Button>
+                    {lastRead && lastRead.indexed === 0 && (
+                        <p className="mt-3 font-mono text-xs text-muted-foreground">
+                            {lastRead.skipped} skipped · {lastRead.failed} failed · nothing indexed
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {porter?.enabled && lastRead && (
+                <p className="mt-8 font-mono text-xs text-muted-foreground">
+                    Read {lastRead.indexed} pages · {lastRead.skipped} skipped · {lastRead.failed} failed
+                </p>
             )}
 
             {porter && (
