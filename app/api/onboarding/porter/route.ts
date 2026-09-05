@@ -282,6 +282,9 @@ export async function POST(request: NextRequest) {
                 name: siteName,
                 source_url: `https://${host}`,
                 system_prompt: inferred.systemPrompt ?? null,
+                // Kept so the console can show the snippet later. Safe: it is domain locked and
+                // belongs in the customer's page source anyway.
+                publishable_key: apiKey,
                 enabled: false,
                 surface: "launcher",
                 // Inferred values only. What the customer edits later lands in brand_overrides, so

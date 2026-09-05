@@ -26,6 +26,7 @@ type PorterRow = {
     surface: string;
     created_at: string;
     system_prompt: string | null;
+    publishable_key: string | null;
     brand: { color?: string; logo?: string } | null;
     brand_overrides: Record<string, unknown> | null;
     actions: PorterAction[] | null;
@@ -45,7 +46,7 @@ export default function PorterPage({
         // The key names the shape being fetched, not just the row. staleTime is five minutes and
         // refetchOnMount is off, so widening the select below without changing this key serves the
         // narrower cached row and the new columns silently render as absent.
-        queryKey: ["porter", orgSlug, projectSlug, "with-brand"],
+        queryKey: ["porter", orgSlug, projectSlug, "with-snippet"],
         queryFn: async (): Promise<PorterRow | null> => {
             const { data: project } = await supabase
                 .from("projects")
@@ -58,13 +59,46 @@ export default function PorterPage({
 
             const { data } = await supabase
                 .from("porters")
-                .select("id, name, source_url, enabled, surface, created_at, system_prompt, brand, brand_overrides, actions")
+                .select("id, name, source_url, enabled, surface, created_at, system_prompt, brand, brand_overrides, actions, publishable_key")
                 .eq("project_id", project.id)
                 .maybeSingle();
 
             return (data as PorterRow) ?? null;
         },
     });
+
+    const [copied, setCopied] = useState(false);
+
+    const snippet = porter?.publishable_key
+        ? `<script src="https://cdn.cencori.com/porter.js"\n        data-porter="${porter.id}"\n        data-key="${porter.publishable_key}"\n        defer></script>`
+        : null;
+
+    const issueKey = useMutation({
+        mutationFn: async (porterId: string) => {
+            const response = await fetch(`/api/porter/${porterId}/key`, { method: "POST" });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result?.error || "Could not issue a key.");
+            return result;
+        },
+        onSuccess: async () => {
+            toast.success("A new key is ready. The old one no longer works.");
+            await queryClient.invalidateQueries({
+                queryKey: ["porter", orgSlug, projectSlug, "with-snippet"],
+            });
+        },
+        onError: (error: Error) => toast.error(error.message),
+    });
+
+    const copySnippet = async () => {
+        if (!snippet) return;
+        try {
+            await navigator.clipboard.writeText(snippet);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.error("Could not copy. Select the snippet and copy it manually.");
+        }
+    };
 
     const readSite = useMutation({
         mutationFn: async (porterId: string) => {
@@ -80,7 +114,7 @@ export default function PorterPage({
             } else {
                 toast.success(`Read ${result.indexed} page${result.indexed === 1 ? "" : "s"}.`);
             }
-            await queryClient.invalidateQueries({ queryKey: ["porter", orgSlug, projectSlug, "with-brand"] });
+            await queryClient.invalidateQueries({ queryKey: ["porter", orgSlug, projectSlug, "with-snippet"] });
         },
         onError: (error: Error) => toast.error(error.message || "Could not read the site."),
     });
@@ -152,6 +186,65 @@ export default function PorterPage({
                 <p className="mt-8 font-mono text-xs text-muted-foreground">
                     Read {lastRead.indexed} pages · {lastRead.skipped} skipped · {lastRead.failed} failed
                 </p>
+            )}
+
+            {porter && (
+                <section className="mt-10">
+                    <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Put it on your site
+                    </h2>
+                    <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+                        Paste this once, anywhere in the page. It only works on{" "}
+                        {(porter.source_url || "").replace(/^https?:\/\//, "")} — the key is locked to
+                        that domain, so it is safe to leave in your page source.
+                    </p>
+
+                    {snippet ? (
+                        <>
+                            <pre className="mt-4 overflow-x-auto rounded border border-border bg-muted/40 p-4 text-xs leading-relaxed">
+                                <code>{snippet}</code>
+                            </pre>
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <Button size="sm" onClick={copySnippet}>
+                                    {copied ? "Copied" : "Copy snippet"}
+                                </Button>
+                                <a
+                                    className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground"
+                                    href={`mailto:?subject=${encodeURIComponent(
+                                        `Please add this to ${(porter.source_url || "").replace(/^https?:\/\//, "")}`
+                                    )}&body=${encodeURIComponent(
+                                        `Hi — please paste this line into our site. It adds an assistant that answers questions from our own pages.\n\n${snippet}\n\nIt only works on our domain, so it is safe to leave in the page source.`
+                                    )}`}
+                                >
+                                    Send to a developer
+                                </a>
+                                <button
+                                    type="button"
+                                    className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+                                    disabled={issueKey.isPending}
+                                    onClick={() => issueKey.mutate(porter.id)}
+                                >
+                                    {issueKey.isPending ? "Issuing…" : "Replace the key"}
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="mt-4 rounded border border-border p-5">
+                            <p className="text-sm">This Porter has no key yet.</p>
+                            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                                Porters created before keys were kept cannot show their original one, because
+                                only its hash was stored. Issue a new one to get your snippet.
+                            </p>
+                            <Button
+                                className="mt-4"
+                                disabled={issueKey.isPending}
+                                onClick={() => issueKey.mutate(porter.id)}
+                            >
+                                {issueKey.isPending ? "Issuing…" : "Issue a key"}
+                            </Button>
+                        </div>
+                    )}
+                </section>
             )}
 
             {porter && (
