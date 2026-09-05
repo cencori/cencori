@@ -70,10 +70,8 @@ function parseSiteUrl(raw: string): { host: string } | null {
 }
 
 /**
- * "shop.acme-bank.com" -> "Acme Bank". The registrable label is the closest thing
- * to a company name a URL carries on its own. Step 3 replaces this with the real
- * title read from the page; until then it is the name the customer sees, so it is
- * worth getting close rather than falling back to the raw host.
+ * "shop.acme-bank.com" -> "Acme Bank". The registrable label is the closest thing a URL carries to
+ * a company name on its own, and it is the fallback when the page itself will not say.
  */
 function organizationNameFromHost(host: string): string {
     const withoutWww = host.replace(/^www\./, "");
@@ -91,10 +89,9 @@ function allowedDomainsForHost(host: string): string[] {
     return Array.from(new Set([bare, `www.${bare}`]));
 }
 
-async function findFreeOrganizationSlug(supabase: AdminClient, baseSlug: string): Promise<string | null> {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt}`;
-        if (isReservedSlug(candidate)) continue;
+async function findFreeOrganizationSlug(supabase: AdminClient, candidates: string[]): Promise<string | null> {
+    for (const candidate of candidates) {
+        if (!candidate || isReservedSlug(candidate)) continue;
 
         const { data, error } = await supabase
             .from("organizations")
@@ -109,28 +106,23 @@ async function findFreeOrganizationSlug(supabase: AdminClient, baseSlug: string)
 }
 
 /**
- * projects.slug is unique across the whole table, not per organization -- projects_slug_key, not a
- * composite -- so a name another customer took years ago is a name this one cannot have. The
- * candidates below try the semantically right slug first, then fall back to the organization's own
- * name, which is derived from a domain and so is already distinctive, before resorting to numbers.
+ * A project is named after the site it serves. Since 20260905 a project slug only has to be unique
+ * inside its organization, so the obvious name is available rather than taken by whoever registered
+ * first -- and the URL reads /{person}/{site} the way a deployment dashboard does, instead of
+ * repeating one name twice or trailing a number nobody chose.
  */
 async function findFreeProjectSlug(
     supabase: AdminClient,
-    organizationSlug: string
+    organizationId: string,
+    candidates: string[]
 ): Promise<string | null> {
-    const candidates = [
-        "production",
-        organizationSlug,
-        `${organizationSlug}-production`,
-        ...Array.from({ length: 8 }, (_, i) => `${organizationSlug}-${i + 2}`),
-    ];
-
     for (const candidate of candidates) {
-        if (isReservedProjectSlug(candidate)) continue;
+        if (!candidate || isReservedProjectSlug(candidate)) continue;
 
         const { data, error } = await supabase
             .from("projects")
             .select("slug")
+            .eq("organization_id", organizationId)
             .eq("slug", candidate)
             .maybeSingle();
 
@@ -172,11 +164,24 @@ export async function POST(request: NextRequest) {
         // Read the homepage before deciding what anything is called. Everything this returns is
         // optional: a site that will not load leaves the hostname-derived name in place.
         const inferred = await inferPorterFromSite(`https://${host}`, host);
-        const organizationName = inferred.name?.slice(0, 80) || organizationNameFromHost(host);
-        const organizationSlug = await findFreeOrganizationSlug(
-            supabase,
-            slugify(organizationName) || slugify(host) || "porter"
-        );
+        const siteName = inferred.name?.slice(0, 80) || organizationNameFromHost(host);
+        const siteSlug = slugify(siteName) || slugify(host.replace(/^www\./, "").split(".")[0]);
+
+        // The organization is the person and the project is the site, which is the shape a
+        // deployment dashboard uses: /{who}/{what}. Naming the organization after the site instead
+        // produces /stripe/stripe, and leaves nowhere sensible to put a second site later.
+        const personName = String(
+            user.user_metadata?.full_name || user.user_metadata?.name || ""
+        ).trim();
+        const organizationName = personName || siteName;
+        const organizationSlug = await findFreeOrganizationSlug(supabase, [
+            slugify(organizationName),
+            // Meaningful before numeric: someone's name taken by another account should fall to
+            // their site, not to a suffix they did not choose.
+            `${slugify(organizationName)}-${siteSlug}`,
+            siteSlug,
+            ...Array.from({ length: 6 }, (_, i) => `${slugify(organizationName)}-${i + 2}`),
+        ]);
         if (!organizationSlug) {
             return NextResponse.json({ error: "Could not prepare your account. Please try again." }, { status: 409 });
         }
@@ -209,7 +214,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(withDetail("Could not finish setting up your account.", memberError.message), { status: 500 });
         }
 
-        const projectSlug = await findFreeProjectSlug(supabase, organization.slug);
+        const projectSlug = await findFreeProjectSlug(supabase, organization.id, [
+            siteSlug,
+            `${siteSlug}-site`,
+            ...Array.from({ length: 6 }, (_, i) => `${siteSlug}-${i + 2}`),
+        ]);
         if (!projectSlug) {
             await supabase.from("organizations").delete().eq("id", organization.id);
             return NextResponse.json(
@@ -221,7 +230,7 @@ export async function POST(request: NextRequest) {
         const { data: project, error: projectError } = await supabase
             .from("projects")
             .insert({
-                name: organizationName,
+                name: siteName,
                 slug: projectSlug,
                 description: `Porter for ${host}`,
                 organization_id: organization.id,
@@ -270,7 +279,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 project_id: project.id,
                 organization_id: organization.id,
-                name: organizationName,
+                name: siteName,
                 source_url: `https://${host}`,
                 system_prompt: inferred.systemPrompt ?? null,
                 enabled: false,
