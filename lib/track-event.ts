@@ -30,7 +30,8 @@ export type PlatformEventType =
     | 'webhook.created'
     // Onboarding
     | 'onboarding.porter_provisioned'
-    | 'porter.site_read';
+    | 'porter.site_read'
+    | 'porter.key_issued';
 
 export type PlatformProduct =
     | 'gateway'
