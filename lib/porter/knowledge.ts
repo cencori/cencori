@@ -1,5 +1,8 @@
 import { crawlWeb } from '@/lib/web/crawl';
 import { createWebDataStore } from '@/lib/web/store';
+import { fetchWebResource } from '@/lib/web/fetch';
+import { extractWebDocument } from '@/lib/web/html';
+import { indexWebDocument } from '@/lib/web/index';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 
 /**
@@ -17,6 +20,16 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 /** A first read is deliberately shallow. Depth and breadth are what the paid plans buy. */
 const CRAWL_MAX_PAGES = 25;
 const CRAWL_MAX_DEPTH = 2;
+
+/**
+ * A Porter promises a weekly refresh, so its pages come due seven days after they were last read.
+ * The public corpus schedules itself by how often a page changes; a customer's own site is a
+ * product promise rather than an estimate, and one interval is easier to explain than four.
+ */
+const RECRAWL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** One sweep should not spend an hour on one large site while every other Porter waits. */
+const RECRAWL_BATCH = 40;
 
 /** Enough context to answer from, small enough to leave the model room to be brief. */
 const RETRIEVAL_LIMIT = 5;
@@ -90,6 +103,7 @@ export async function readPorterSite(
     const failed = pages.length - indexed - skipped;
 
     if (indexed > 0) {
+        await scheduleNextRefresh(supabase, porter.project_id);
         await supabase
             .from('porters')
             .update({
@@ -102,6 +116,96 @@ export async function readPorterSite(
     }
 
     return { indexed, skipped, failed, pages };
+}
+
+/**
+ * Put this project's pages in the queue for a refresh a week from now.
+ *
+ * indexWebDocument leaves next_crawl_at null -- the public indexer sets one and the project indexer
+ * does not -- so without this a Porter's pages are read once and never looked at again, and the
+ * weekly refresh is a promise with no mechanism behind it.
+ */
+export async function scheduleNextRefresh(supabase: AdminClient, projectId: string): Promise<void> {
+    const { error } = await supabase
+        .from('web_documents')
+        .update({ next_crawl_at: new Date(Date.now() + RECRAWL_INTERVAL_MS).toISOString() })
+        .eq('project_id', projectId)
+        .eq('visibility', 'project');
+
+    if (error) console.warn('[Porter] could not schedule refresh', error.message);
+}
+
+export type PorterRefreshSummary = {
+    checked: number;
+    changed: number;
+    unchanged: number;
+    failed: number;
+};
+
+/**
+ * Re-read the pages that have come due.
+ *
+ * This is deliberately not the public recrawl sweep. That one hands its work to a public crawl job,
+ * which re-indexes whatever it fetches as a public document -- pointing it at project pages would
+ * move a customer's site into the shared corpus. Re-reading here keeps every page in the collection
+ * it belongs to.
+ *
+ * A page whose readable text has not moved is not written again. Nothing embeds documents yet, so
+ * today that saves a write; when embeddings arrive it is the difference between refreshing a
+ * thousand-page site and re-embedding it.
+ *
+ * The comparison is on the extracted text rather than web_documents.content_hash, which is a sha256
+ * of the raw response bytes. On any modern site that hash moves on every fetch -- nonces, CSRF
+ * tokens, cache-busting asset URLs -- so using it would report every page as changed forever and
+ * quietly make this whole function a no-op with extra steps. Measured on two Stripe pages: the raw
+ * hash differed across back-to-back fetches; the extracted text was identical.
+ */
+export async function refreshPorterKnowledge(
+    supabase: AdminClient,
+    porter: { organization_id: string; project_id: string },
+    limit = RECRAWL_BATCH,
+): Promise<PorterRefreshSummary> {
+    const summary: PorterRefreshSummary = { checked: 0, changed: 0, unchanged: 0, failed: 0 };
+
+    const { data: due } = await supabase
+        .from('web_documents')
+        .select('id, canonical_url, content')
+        .eq('project_id', porter.project_id)
+        .eq('visibility', 'project')
+        .not('next_crawl_at', 'is', null)
+        .lte('next_crawl_at', new Date().toISOString())
+        .order('next_crawl_at', { ascending: true })
+        .limit(limit);
+
+    if (!due || due.length === 0) return summary;
+
+    const store = createWebDataStore(supabase);
+    const nextCrawlAt = new Date(Date.now() + RECRAWL_INTERVAL_MS).toISOString();
+
+    for (const row of due) {
+        summary.checked += 1;
+        try {
+            const resource = await fetchWebResource(String(row.canonical_url));
+            const document = extractWebDocument(resource);
+
+            if (document.content === row.content) {
+                summary.unchanged += 1;
+            } else {
+                await indexWebDocument(store, porter.organization_id, porter.project_id, document);
+                summary.changed += 1;
+            }
+        } catch (error) {
+            // A page that has moved or gone is not a reason to abandon the rest of the site. It is
+            // simply looked at again next week, which is also how a temporary outage resolves.
+            summary.failed += 1;
+            console.warn('[Porter] refresh failed for', row.canonical_url, error instanceof Error ? error.message : error);
+        }
+
+        // Reschedule whatever happened, so one unreachable page cannot be retried on every sweep.
+        await supabase.from('web_documents').update({ next_crawl_at: nextCrawlAt }).eq('id', row.id);
+    }
+
+    return summary;
 }
 
 /**
