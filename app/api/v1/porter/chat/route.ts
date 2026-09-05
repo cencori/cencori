@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractCencoriApiKeyFromHeaders, hashApiKey } from "@/lib/api-keys";
 import { POST as gatewayChatCompletions } from "@/app/api/v1/chat/completions/route";
 import { buildGroundedPrompt, findPorterPassages } from "@/lib/porter/knowledge";
+import { checkPorterRateLimit } from "@/lib/porter/rate-limit";
 
 /**
  * Chat with a Porter.
@@ -105,6 +106,29 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
             { error: { message: "This key cannot be used with this Porter." } },
             { status: 403 }
+        );
+    }
+
+    // Before retrieval and before the provider: the two expensive things this route does are the
+    // two an abusive caller wants it to do.
+    const visitorIp =
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        req.headers.get("x-real-ip") ||
+        "unknown";
+
+    const rate = await checkPorterRateLimit(porter.id, visitorIp);
+    if (!rate.allowed) {
+        return NextResponse.json(
+            {
+                error: {
+                    message:
+                        rate.scope === "visitor"
+                            ? "You have sent a lot of messages. Give it a moment and try again."
+                            : "This assistant is handling too many messages right now. Try again shortly.",
+                    code: "rate_limited",
+                },
+            },
+            { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
         );
     }
 
