@@ -31,7 +31,8 @@ export type PlatformEventType =
     // Onboarding
     | 'onboarding.porter_provisioned'
     | 'porter.site_read'
-    | 'porter.key_issued';
+    | 'porter.key_issued'
+    | 'porter.created';
 
 export type PlatformProduct =
     | 'gateway'

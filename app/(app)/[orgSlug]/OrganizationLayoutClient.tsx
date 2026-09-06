@@ -161,7 +161,7 @@ export default function OrganizationLayoutClient({
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && scopedArea === "settings";
     const isOrganizationSettingsView = !isInsideProject && scopedArea === "settings";
-    const [activeView, setActiveView] = useState<"main" | "observability" | "ai-gateway" | "project-settings" | "settings">(() => {
+    const [activeView, setActiveView] = useState<"main" | "observability" | "ai-gateway" | "porter" | "project-settings" | "settings">(() => {
         if (isInsideProject && pathname.includes("/observability")) return "observability";
         if (pathname.includes("/ai-gateway")) return "ai-gateway";
         if (isProjectSettingsView) return "project-settings";
@@ -208,6 +208,8 @@ export default function OrganizationLayoutClient({
             setActiveView("observability");
         } else if (pathname.includes("/ai-gateway")) {
             setActiveView("ai-gateway");
+        } else if (isInsideProject && pathname.includes("/porter")) {
+            setActiveView("porter");
         } else if (isProjectSettingsView) {
             setActiveView("project-settings");
         } else if (isOrganizationSettingsView) {
@@ -270,6 +272,18 @@ export default function OrganizationLayoutClient({
         { section: "reliability", href: `${observabilityHref}?section=reliability`, icon: <HugeiconsIcon icon={Activity03Icon} className="!h-5 !w-5" />, label: "Reliability" },
         { section: "security", href: `${observabilityHref}?section=security`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
         { section: "intelligence", href: `${observabilityHref}?section=intelligence`, icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Intelligence" },
+    ];
+
+    // Porter is in the sidebar for everyone, whether or not this project has one. A developer who
+    // came for the gateway is exactly the person who should discover it, and a section that appears
+    // only once you already have the thing can never be how you find it. Landing a Porter customer
+    // on their Porter is a destination question, answered on sign-in, not by hiding navigation.
+    const porterSubItems = [
+        { href: `${basePath}/porter`, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
+        { href: `${basePath}/porter/knowledge`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Knowledge" },
+        { href: `${basePath}/porter/conversations`, icon: <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />, label: "Conversations" },
+        { href: `${basePath}/porter/install`, icon: <HugeiconsIcon icon={PuzzleIcon} className="!h-5 !w-5" />, label: "Install" },
+        { href: `${basePath}/porter/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
     ];
 
     const projectSubItems = [
@@ -388,6 +402,29 @@ export default function OrganizationLayoutClient({
                                             </SidebarMenuItem>
                                         ))}
                                     </>
+                                ) : activeView === "porter" ? (
+                                    <>
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton
+                                                onClick={() => setActiveView("main")}
+                                                size="sm"
+                                                className="gap-1 text-muted-foreground"
+                                            >
+                                                <ChevronLeft className="!h-5 !w-5" />
+                                                <span className="text-sm">Back</span>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                        {porterSubItems.map((item) => (
+                                            <SidebarMenuItem key={item.href}>
+                                                <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
+                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                                                        {item.icon}
+                                                        <span className="text-sm">{item.label}</span>
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        ))}
+                                    </>
                                 ) : activeView === "project-settings" ? (
                                     <>
                                         <SidebarMenuItem>
@@ -488,6 +525,18 @@ export default function OrganizationLayoutClient({
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>
                                         ))}
+                                        {/* 3b. Porter toggle */}
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton
+                                                onClick={() => setActiveView("porter")}
+                                                size="sm"
+                                                className="gap-1"
+                                            >
+                                                <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />
+                                                <span className="text-sm">Porter</span>
+                                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
                                         {/* 4. AI Gateway toggle */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
