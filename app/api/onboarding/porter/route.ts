@@ -35,15 +35,27 @@ function withDetail(message: string, detail?: string): { error: string; detail?:
     return { error: message, detail };
 }
 
-/** slugify, then add a number if it is taken -- the rule both console creation forms use. */
+/**
+ * slugify, then fall back if it is taken.
+ *
+ * A word before a number, where there is a sensible one: stripe-project reads like a name somebody
+ * chose and stripe-2 reads like a queue position. Numbers still follow, because the word can be
+ * taken too, but they are the last resort rather than the first.
+ */
 async function findFreeSlug(
     base: string,
     isReserved: (slug: string) => boolean,
     isTaken: (slug: string) => Promise<boolean | null>,
+    preferred?: string,
 ): Promise<string | null> {
     const root = base || "porter";
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        const candidate = attempt === 0 ? root : `${root}-${attempt + 1}`;
+    const candidates = [
+        root,
+        ...(preferred ? [`${root}-${preferred}`] : []),
+        ...Array.from({ length: 8 }, (_, i) => `${root}-${i + 2}`),
+    ];
+
+    for (const candidate of candidates) {
         if (isReserved(candidate)) continue;
         const taken = await isTaken(candidate);
         if (taken === null) return null;
@@ -137,6 +149,7 @@ export async function POST(request: NextRequest) {
                     .eq("organization_id", organization.id).eq("slug", slug).maybeSingle();
                 return error ? null : Boolean(data);
             },
+            "project",
         );
         if (!projectSlug) {
             await supabase.from("organizations").delete().eq("id", organization.id);
