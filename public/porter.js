@@ -25,6 +25,9 @@
     }
 
     var base = script.getAttribute("data-base") || "https://api.cencori.com";
+    // The key opens a session; the session carries the conversation. Chat never sees the key again.
+    var sessionToken = null;
+    var sessionExpiresAt = 0;
     var accent = "#111111";
     var history = [];
     var busy = false;
@@ -248,6 +251,37 @@
         while (history.length > 20) history.shift();
     }
 
+    /**
+     * Get a session, reusing the one we have while it lasts.
+     *
+     * A session is minted once and covers every message after it, so the checks that cost the
+     * server real work happen at the start of a conversation rather than on every line typed.
+     */
+    function session() {
+        if (sessionToken && Date.now() < sessionExpiresAt) {
+            return Promise.resolve(sessionToken);
+        }
+        return fetch(base + "/api/v1/porter/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+            body: JSON.stringify({ porterId: porterId }),
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    return response.json().then(function (b) {
+                        throw new Error((b && b.error && b.error.message) || "Could not start a conversation.");
+                    });
+                }
+                return response.json();
+            })
+            .then(function (body) {
+                sessionToken = body.token;
+                // Renew a minute early rather than discovering the expiry mid-question.
+                sessionExpiresAt = Date.now() + Math.max((body.expiresIn || 1800) - 60, 60) * 1000;
+                return sessionToken;
+            });
+    }
+
     function ask() {
         if (busy || !input || !input.value.trim()) return;
         var question = input.value.trim();
@@ -264,15 +298,22 @@
         log.appendChild(thinkingRow);
         scroll();
 
-        fetch(base + "/api/v1/porter/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
-            body: JSON.stringify({ porterId: porterId, message: question, history: history, stream: true }),
-        })
+        session()
+            .then(function (token) {
+                return fetch(base + "/api/v1/porter/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                    body: JSON.stringify({ message: question, history: history, stream: true }),
+                });
+            })
             .then(function (response) {
                 if (!response.ok) {
                     return response.json().then(function (body) {
-                        throw new Error((body && body.error && body.error.message) || "Something went wrong.");
+                        var error = body && body.error;
+                        // A session that has aged out is not an error worth showing: drop it so the
+                        // next attempt mints a fresh one.
+                        if (error && error.code === "session_invalid") sessionToken = null;
+                        throw new Error((error && error.message) || "Something went wrong.");
                     });
                 }
                 return stream(response, thinkingRow).then(function (answer) {

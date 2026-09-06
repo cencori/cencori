@@ -34,6 +34,13 @@ function getRedisClient(): Redis | null {
     return redis;
 }
 
+/**
+ * Minting a session is throttled harder than sending a message. A visitor mints one and then talks;
+ * a script has to keep coming back for another, so this is the cheaper thing to make expensive.
+ */
+const SESSION_LIMIT = 5;
+const SESSION_WINDOW_SECONDS = 300;
+
 export type PorterRateLimitResult =
     | { allowed: true }
     | { allowed: false; scope: 'visitor' | 'porter'; retryAfterSeconds: number };
@@ -54,6 +61,29 @@ async function hit(
         exceeded: count > limit,
         retryAfterSeconds: ttl > 0 ? ttl : windowSeconds,
     };
+}
+
+export async function checkPorterSessionLimit(
+    porterId: string,
+    visitorIp: string,
+): Promise<PorterRateLimitResult> {
+    const client = getRedisClient();
+    if (!client) return { allowed: true };
+
+    try {
+        const result = await hit(
+            client,
+            `porter_session:${porterId}:${visitorIp}`,
+            SESSION_LIMIT,
+            SESSION_WINDOW_SECONDS,
+        );
+        return result.exceeded
+            ? { allowed: false, scope: 'visitor', retryAfterSeconds: result.retryAfterSeconds }
+            : { allowed: true };
+    } catch (error) {
+        console.warn('[Porter] session limit unavailable', error instanceof Error ? error.message : error);
+        return { allowed: true };
+    }
 }
 
 export async function checkPorterRateLimit(
