@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { extractCencoriApiKeyFromHeaders, hashApiKey } from "@/lib/api-keys";
+import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { readPorterSession } from "@/lib/porter/session";
 import { POST as gatewayChatCompletions } from "@/app/api/v1/chat/completions/route";
 import { buildGroundedPrompt, findPorterPassages } from "@/lib/porter/knowledge";
 import { checkPorterRateLimit } from "@/lib/porter/rate-limit";
@@ -9,16 +10,19 @@ import { handleCorsPreFlight } from "@/lib/gateway-middleware";
 /**
  * Chat with a Porter.
  *
- * The browser sends a porter id and a message. It never sends a model, a system prompt or a
- * temperature, because anything the page can name a visitor with devtools can change -- and the
- * page is on the customer's own site, where the publishable key is readable by design.
+ * Takes a session token from /v1/porter/session, not a publishable key. Everything a key would have
+ * proved -- that it belongs to this Porter's project, that the origin is allowed, that the Porter is
+ * ready -- was checked when the session was minted and is signed into the token. Verifying it is an
+ * HMAC rather than the two database reads this route used to perform on every single message.
  *
- * So this route is a resolver, not a second gateway. It turns an id into a configuration and hands
- * the request to /v1/chat/completions unchanged in every other respect, which is what keeps a
- * Porter turn subject to the same admission control, guards, cache, routing, logging and metering
- * as any other call. The one thing it adds is proving that the key presented belongs to the same
- * project as the Porter being addressed; the domain lock on that key is enforced downstream, where
- * it already is for every publishable key.
+ * The browser still never names a model, a system prompt or a temperature. Anything the page can
+ * name, a visitor with devtools can change, and the page is on the customer's own site where all of
+ * this is readable by design.
+ *
+ * So this remains a resolver rather than a second gateway: it turns a Porter into a configuration
+ * and hands the request to /v1/chat/completions unchanged in every other respect, which is what
+ * keeps a Porter turn subject to the same admission control, guards, cache, routing, logging and
+ * metering as any other call.
  */
 
 const DEFAULT_PORTER_MODEL = "groq/compound";
@@ -26,7 +30,6 @@ const MAX_MESSAGE_CHARS = 8000;
 const MAX_HISTORY = 20;
 
 type PorterChatRequest = {
-    porterId?: unknown;
     message?: unknown;
     history?: unknown;
     stream?: unknown;
@@ -80,42 +83,52 @@ export async function POST(req: NextRequest) {
         return withCors(NextResponse.json({ error: { message: "Invalid JSON body." } }, { status: 400 }), origin);
     }
 
-    if (typeof body.porterId !== "string" || !body.porterId.trim()) {
-        return withCors(NextResponse.json({ error: { message: "porterId is required." } }, { status: 400 }), origin);
-    }
     if (typeof body.message !== "string" || !body.message.trim()) {
         return withCors(NextResponse.json({ error: { message: "message is required." } }, { status: 400 }), origin);
     }
 
-    const apiKey = extractCencoriApiKeyFromHeaders(req.headers);
-    if (!apiKey) {
-        return withCors(NextResponse.json({ error: { message: "Missing API key. Send your publishable key as a bearer token." } }, { status: 401 }), origin);
+    const session = readPorterSession(extractCencoriApiKeyFromHeaders(req.headers));
+    if (!session) {
+        // Expired or absent rather than wrong: the widget's answer to either is to open a new
+        // session, so the code says which door to try rather than only that this one is shut.
+        return withCors(
+            NextResponse.json(
+                {
+                    error: {
+                        message: "Your session has expired. Start a new one.",
+                        code: "session_invalid",
+                    },
+                },
+                { status: 401 }
+            ),
+            origin
+        );
     }
 
     const admin = createAdminClient();
 
-    const { data: porter, error: porterError } = await admin
+    // Everything below reads from the token. The Porter's prompt is the one thing still worth a
+    // read, because a customer editing it should take effect on the next message rather than the
+    // next session.
+    const { data: porter } = await admin
         .from("porters")
-        .select("id, project_id, name, system_prompt, model, source_url, enabled")
-        .eq("id", body.porterId)
+        .select("id, project_id, name, system_prompt, model, source_url, enabled, publishable_key")
+        .eq("id", session.p)
         .maybeSingle();
 
-    if (porterError || !porter) {
-        return withCors(NextResponse.json({ error: { message: "Porter not found." } }, { status: 404 }), origin);
-    }
-
-    // The key has to belong to the Porter's own project, or one customer's publishable key would
-    // address another's Porter. This is a lookup rather than a full gateway validation on purpose:
-    // validating here as well would spend the request's rate limit twice.
-    const { data: key } = await admin
-        .from("api_keys")
-        .select("id")
-        .eq("key_hash", hashApiKey(apiKey))
-        .eq("project_id", porter.project_id)
-        .maybeSingle();
-
-    if (!key) {
-        return withCors(NextResponse.json({ error: { message: "This key cannot be used with this Porter." } }, { status: 403 }), origin);
+    if (!porter || !porter.enabled) {
+        return withCors(
+            NextResponse.json(
+                {
+                    error: {
+                        message: "This Porter is not ready yet. Its site has not been read.",
+                        code: "porter_not_ready",
+                    },
+                },
+                { status: 409 }
+            ),
+            origin
+        );
     }
 
     // Before retrieval and before the provider: the two expensive things this route does are the
@@ -125,7 +138,7 @@ export async function POST(req: NextRequest) {
         req.headers.get("x-real-ip") ||
         "unknown";
 
-    const rate = await checkPorterRateLimit(porter.id, visitorIp);
+    const rate = await checkPorterRateLimit(session.p, visitorIp);
     if (!rate.allowed) {
         return withCors(NextResponse.json(
             {
@@ -141,26 +154,10 @@ export async function POST(req: NextRequest) {
         ), origin);
     }
 
-    if (!porter.enabled) {
-        return withCors(NextResponse.json(
-            {
-                error: {
-                    message: "This Porter is not ready yet. Its site has not been read.",
-                    code: "porter_not_ready",
-                },
-            },
-            { status: 409 }
-        ), origin);
-    }
-
     // Retrieval is fail-open: a Porter that cannot reach its own pages answers worse rather than
-    // failing, and the prompt it gets in that case tells it to decline instead of guessing.
-    const passages = await findPorterPassages(
-        admin,
-        porter.project_id,
-        body.message,
-        new URL(porter.source_url).hostname,
-    );
+    // failing, and the prompt it gets in that case tells it to decline instead of guessing. Both
+    // the project and the host come from the token, already verified when the session was minted.
+    const passages = await findPorterPassages(admin, session.j, body.message, session.h);
 
     const messages = [
         { role: "system", content: buildGroundedPrompt(buildSystemPrompt(porter), passages) },
@@ -168,11 +165,26 @@ export async function POST(req: NextRequest) {
         { role: "user", content: body.message.slice(0, MAX_MESSAGE_CHARS) },
     ];
 
-    // Same headers, so the gateway sees the same key and the same Origin and applies the domain
-    // lock exactly as it would for a direct call. Only the body is ours.
+    // The gateway needs a key of its own: the session token authenticates the visitor to Porter,
+    // not Porter to the gateway. The Porter's publishable key is what pays for and scopes the call,
+    // and the Origin travels with it so the domain lock applies exactly as it would for any other
+    // publishable request.
+    if (!porter.publishable_key) {
+        console.error("[Porter chat] porter has no publishable key:", porter.id);
+        return withCors(
+            NextResponse.json({ error: { message: "This Porter is not installable yet." } }, { status: 409 }),
+            origin
+        );
+    }
+
+    // Everything the gateway reads stays as it arrived -- the Origin above all, so the domain lock
+    // applies -- except the credential, which becomes the Porter's own key.
+    const delegatedHeaders = new Headers(req.headers);
+    delegatedHeaders.set("Authorization", `Bearer ${porter.publishable_key}`);
+
     const delegated = new NextRequest(new URL("/api/v1/chat/completions", req.url), {
         method: "POST",
-        headers: req.headers,
+        headers: delegatedHeaders,
         body: JSON.stringify({
             model: porter.model || DEFAULT_PORTER_MODEL,
             messages,
