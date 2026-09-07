@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { readPorterSite } from "@/lib/porter/knowledge";
+import { readPorterPages, readPorterSite } from "@/lib/porter/knowledge";
 import { trackEvent } from "@/lib/track-event";
 
 export const runtime = "nodejs";
@@ -53,7 +53,21 @@ export async function POST(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const summary = await readPorterSite(admin, porter);
+        // A list means the customer has already chosen; following links from it would read pages
+        // they unchecked. Without one, fall back to following links from the site's front door.
+        let urls: string[] = [];
+        try {
+            const body = (await request.json()) as { urls?: unknown };
+            if (Array.isArray(body?.urls)) {
+                urls = body.urls.filter((url): url is string => typeof url === "string");
+            }
+        } catch {
+            urls = [];
+        }
+
+        const summary = urls.length > 0
+            ? await readPorterPages(admin, porter, urls)
+            : await readPorterSite(admin, porter);
 
         trackEvent({
             event_type: "porter.site_read",
