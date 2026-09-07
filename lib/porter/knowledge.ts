@@ -3,6 +3,7 @@ import { createWebDataStore } from '@/lib/web/store';
 import { fetchWebResource } from '@/lib/web/fetch';
 import { extractWebDocument } from '@/lib/web/html';
 import { indexWebDocument } from '@/lib/web/index';
+import { parseSitemap } from '@/lib/web/sitemap';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 
 /**
@@ -116,6 +117,132 @@ export async function readPorterSite(
     }
 
     return { indexed, skipped, failed, pages };
+}
+
+/** What a customer is shown before anything is read, so they can say what not to read. */
+export type DiscoveredLinks = {
+    total: number;
+    /** Grouped by first path segment, because "87 pages under /docs" is a decision and 87 URLs is not. */
+    groups: { path: string; urls: string[] }[];
+    source: 'sitemap' | 'homepage';
+};
+
+/**
+ * Find out what a site contains without reading any of it.
+ *
+ * Crawling first and asking afterwards spends a customer's page allowance on whatever the crawler
+ * happened to reach. A sitemap is the site telling us what it thinks it has, so it is tried first;
+ * a site without one falls back to the links on its homepage, which is worse but is what there is.
+ *
+ * Nothing is indexed here and nothing is written. This is a question, not a crawl.
+ */
+export async function discoverPorterLinks(host: string): Promise<DiscoveredLinks> {
+    const origin = `https://${host}`;
+    let urls: string[] = [];
+    let source: DiscoveredLinks['source'] = 'sitemap';
+
+    try {
+        const sitemap = await fetchWebResource(`${origin}/sitemap.xml`, { timeoutMs: 8_000 });
+        urls = parseSitemap(sitemap.body, origin, 2_000).map(entry => entry.url);
+    } catch {
+        urls = [];
+    }
+
+    if (urls.length === 0) {
+        source = 'homepage';
+        try {
+            const home = extractWebDocument(await fetchWebResource(origin, { timeoutMs: 8_000 }));
+            urls = home.links.map(link => link.url);
+        } catch {
+            urls = [];
+        }
+    }
+
+    // Only this site, only pages, and each address once.
+    const seen = new Set<string>();
+    const kept: string[] = [];
+    for (const raw of urls) {
+        let url: URL;
+        try {
+            url = new URL(raw);
+        } catch {
+            continue;
+        }
+        const bareHost = url.hostname.replace(/^www\./, '');
+        if (bareHost !== host.replace(/^www\./, '')) continue;
+        if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|pdf|zip|mp4|woff2?)$/i.test(url.pathname)) continue;
+        // Keyed on the bare host: a sitemap that lists both www and apex would otherwise spend the
+        // page allowance twice on identical pages. A redirect to whichever the site prefers costs
+        // one hop and is handled by the fetcher.
+        const clean = `https://${bareHost}${url.pathname}`.replace(/\/$/, '') || `https://${bareHost}`;
+        if (seen.has(clean)) continue;
+        seen.add(clean);
+        kept.push(clean);
+    }
+
+    const groups = new Map<string, string[]>();
+    for (const url of kept) {
+        const segment = new URL(url).pathname.split('/').filter(Boolean)[0];
+        const key = segment ? `/${segment}` : '/';
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(url);
+        else groups.set(key, [url]);
+    }
+
+    return {
+        total: kept.length,
+        source,
+        groups: Array.from(groups.entries())
+            .map(([path, groupUrls]) => ({ path, urls: groupUrls }))
+            .sort((a, b) => b.urls.length - a.urls.length),
+    };
+}
+
+/**
+ * Read exactly these pages.
+ *
+ * crawlWeb follows links from a handful of seeds, which is right when nobody has said what they
+ * want. Once a customer has chosen, following links would read pages they unchecked -- so this
+ * fetches the list and nothing else.
+ */
+export async function readPorterPages(
+    supabase: AdminClient,
+    porter: { id: string; organization_id: string; project_id: string },
+    urls: string[],
+): Promise<PorterCrawlSummary> {
+    const store = createWebDataStore(supabase);
+    const pages: PorterCrawlSummary['pages'] = [];
+
+    for (const url of urls.slice(0, CRAWL_MAX_PAGES)) {
+        try {
+            const document = extractWebDocument(await fetchWebResource(url));
+            if (document.content.length < 20) {
+                pages.push({ url, status: 'skipped', error: 'Page did not contain enough indexable text' });
+                continue;
+            }
+            await indexWebDocument(store, porter.organization_id, porter.project_id, document);
+            pages.push({ url, status: 'indexed' });
+        } catch (error) {
+            pages.push({ url, status: 'failed', error: error instanceof Error ? error.message : 'Could not read the page' });
+        }
+    }
+
+    const indexed = pages.filter(page => page.status === 'indexed').length;
+
+    if (indexed > 0) {
+        await scheduleNextRefresh(supabase, porter.project_id);
+        await supabase
+            .from('porters')
+            .update({ collection_id: `project:${porter.project_id}`, enabled: true })
+            .eq('id', porter.id);
+    }
+
+    return {
+        indexed,
+        skipped: pages.filter(page => page.status === 'skipped').length,
+        failed: pages.filter(page => page.status === 'failed').length,
+        pages,
+    };
 }
 
 /**
