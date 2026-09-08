@@ -19,6 +19,8 @@ import { getCachedApiKeyConfig, setCachedApiKeyConfig } from '@/lib/config-cache
 import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
+import { isPorterApiKey } from '@/lib/porter/credentials';
+import { consumePorterGatewayDelegation } from '@/lib/porter/gateway-request';
 import {
     isProjectIngressAllowed,
     loadProjectNetworkPolicy,
@@ -173,6 +175,7 @@ async function enforceProjectIngressPolicy(params: {
  * Call this at the top of every AI endpoint POST handler.
  */
 export async function validateGatewayRequest(req: NextRequest): Promise<GatewayValidationResult> {
+    const porterDelegation = consumePorterGatewayDelegation(req);
     const startTime = Date.now();
     const requestId = crypto.randomUUID();
     const supabase = createAdminClient();
@@ -442,7 +445,8 @@ return {
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
     // Try cache first for performance
-    const cachedKey = await getCachedApiKeyConfig(keyHash);
+    // Porter delegation must observe revocation/rotation immediately.
+    const cachedKey = porterDelegation ? null : await getCachedApiKeyConfig(keyHash);
     let keyData = cachedKey?.data;
     let keyError = null;
 
@@ -543,8 +547,22 @@ return {
         };
     }
 
-    // ── Domain validation for publishable keys ──
-    if (keyData.key_type === 'publishable') {
+    const porterKey = isPorterApiKey(keyData);
+    if ((porterKey && !porterDelegation) || (porterDelegation && (
+        !porterKey || porterDelegation.projectId !== keyData.project_id || porterDelegation.keyHash !== keyHash
+    ))) {
+        return {
+            success: false,
+            response: addGatewayHeaders(NextResponse.json({
+                error: 'This key only authorizes Porter endpoints.',
+                code: 'porter_key_scope',
+            }, { status: 403 }), { requestId }),
+        };
+    }
+
+    // The public session boundary checked the embed domain, or console membership
+    // authorized the preview. Only the in-process capability can bypass this check.
+    if (keyData.key_type === 'publishable' && !porterDelegation) {
         const origin = req.headers.get('origin') || req.headers.get('referer');
         const allowedDomains = keyData.allowed_domains as string[] | null;
 
@@ -818,7 +836,9 @@ return {
         defaultModel: project.default_model,
         defaultProvider: project.default_provider,
         endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
-        agentId: (keyData.agent_id as string | null | undefined) ?? null,
+        // A historical key-to-agent association must not replace Porter's
+        // server-selected model, grounding prompt, or tool policy.
+        agentId: porterDelegation ? null : (keyData.agent_id as string | null | undefined) ?? null,
         rateLimit: {
             status: rateLimitResult.status,
             limit: rateLimitResult.limit,

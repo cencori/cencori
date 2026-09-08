@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
+import { isPorterApiKey } from '@/lib/porter/credentials';
 
 interface WebTelemetryPayload {
     host: string;
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
         .select(`
             id,
             project_id,
+            client_app,
             projects!inner(
                 id,
                 organization_id
@@ -60,6 +62,13 @@ export async function POST(req: NextRequest) {
 
     if (keyError || !keyData) {
         return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    if (isPorterApiKey(keyData)) {
+        return NextResponse.json(
+            { error: 'This key can only be used with Porter.', code: 'porter_key_scope' },
+            { status: 403 }
+        );
     }
 
     const project = keyData.projects as unknown as {

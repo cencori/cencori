@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import crypto from "crypto";
+import { isPorterApiKey } from "@/lib/porter/credentials";
 
 // POST /api/agent/setup/validate
 // Called by the install script to validate an API key and return agent info
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     // First, check if the key exists at all
     const { data: basicKey, error: basicError } = await supabase
         .from("api_keys")
-        .select("id, project_id, agent_id, revoked_at")
+        .select("id, project_id, agent_id, revoked_at, client_app")
         .eq("key_hash", keyHash)
         .single();
 
@@ -30,6 +31,13 @@ export async function GET(req: NextRequest) {
     if (basicKey.revoked_at) {
         console.error("[validate] Key is revoked:", basicKey.id);
         return NextResponse.json({ error: "API key has been revoked" }, { status: 401 });
+    }
+
+    if (isPorterApiKey(basicKey)) {
+        return NextResponse.json(
+            { error: "This key can only be used with Porter.", code: "porter_key_scope" },
+            { status: 403 }
+        );
     }
 
     const { data: keyData, error } = await supabase
@@ -60,7 +68,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
 
-    const project = keyData.projects as any;
+    const project = keyData.projects as unknown as {
+        id: string;
+        name: string;
+        slug: string;
+        organizations: { name: string; slug: string };
+    };
     const org = project.organizations;
 
     // If key is tied to a specific agent, return that agent's info directly
@@ -138,13 +151,20 @@ export async function POST(req: NextRequest) {
     // Verify the API key is valid and belongs to this project
     const { data: keyData } = await supabase
         .from("api_keys")
-        .select("id, project_id")
+        .select("id, project_id, client_app")
         .eq("key_hash", keyHash)
         .is("revoked_at", null)
         .single();
 
     if (!keyData || keyData.project_id !== project_id) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (isPorterApiKey(keyData)) {
+        return NextResponse.json(
+            { error: "This key can only be used with Porter.", code: "porter_key_scope" },
+            { status: 403 }
+        );
     }
 
     // Create the agent

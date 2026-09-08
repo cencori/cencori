@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { checkEndUserQuota } from '@/lib/end-user-billing';
+import { isPorterApiKey } from '@/lib/porter/credentials';
 import crypto from 'crypto';
 
 function buildQuotaResponse(endUserId: string, quota: Awaited<ReturnType<typeof checkEndUserQuota>>) {
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
                 id,
                 environment,
                 key_type,
+                client_app,
                 projects!inner(
                     id,
                     end_user_billing_enabled
@@ -65,6 +67,13 @@ export async function GET(req: NextRequest) {
 
         if (keyError || !keyData) {
             return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        }
+
+        if (isPorterApiKey(keyData)) {
+            return NextResponse.json(
+                { error: 'This key can only be used with Porter.', code: 'porter_key_scope' },
+                { status: 403 }
+            );
         }
 
         const project = keyData.projects as unknown as {
@@ -124,6 +133,7 @@ export async function POST(req: NextRequest) {
                 id,
                 environment,
                 key_type,
+                client_app,
                 projects!inner(
                     id,
                     end_user_billing_enabled
@@ -135,6 +145,13 @@ export async function POST(req: NextRequest) {
 
         if (keyError || !keyData) {
             return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        }
+
+        if (isPorterApiKey(keyData)) {
+            return NextResponse.json(
+                { error: 'This key can only be used with Porter.', code: 'porter_key_scope' },
+                { status: 403 }
+            );
         }
 
         const project = keyData.projects as unknown as {

@@ -19,6 +19,7 @@ import crypto from "crypto";
 import { addGatewayHeaders } from "@/lib/gateway-middleware";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { isPorterApiKey } from "@/lib/porter/credentials";
 
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
             const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
             const { data, error } = await adminClient
                 .from('api_keys')
-                .select('id, project_id, environment')
+                .select('id, project_id, environment, client_app')
                 .eq('key_hash', keyHash)
                 .is('revoked_at', null)
                 .single();
@@ -82,6 +83,14 @@ export async function GET(req: NextRequest) {
                     NextResponse.json({ error: "Invalid API Key" }, { status: 401 }),
                     'invalid_api_key',
                     'Invalid API key'
+                );
+            }
+
+            if (isPorterApiKey(data)) {
+                return respond(
+                    NextResponse.json({ error: 'This key can only be used with Porter.', code: 'porter_key_scope' }, { status: 403 }),
+                    'porter_key_scope',
+                    'This key can only be used with Porter'
                 );
             }
 

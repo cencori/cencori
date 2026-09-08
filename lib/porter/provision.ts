@@ -74,8 +74,8 @@ export async function createPorterForProject(
     const inferred = await inferPorterFromSite(`https://${host}`, host);
     const name = inferred.name?.slice(0, 80) || nameFromHost(host);
 
-    // The key ships in the page source of the customer's site, so it is domain locked at creation:
-    // gateway-middleware rejects it from any other origin.
+    // Public credentials only authorize Porter. The session endpoint checks the
+    // embed domain; general gateway endpoints reject this first-party scope.
     const allowedDomains = allowedDomainsForHost(host);
     const keyPrefix = 'cpk_';
     const apiKey = generateApiKey(keyPrefix);
@@ -87,6 +87,7 @@ export async function createPorterForProject(
         key_prefix: apiKey.substring(0, keyPrefix.length + 4) + '...',
         environment: 'production',
         key_type: 'publishable',
+        client_app: 'porter',
         allowed_domains: allowedDomains,
     });
 

@@ -20,6 +20,8 @@ const redis = redisConfigured
     } as unknown as Redis);
 
 const CONFIG_PREFIX = 'cfg:';
+// Do not reuse entries cached before Porter credentials gained an explicit scope.
+const API_KEY_CACHE_PREFIX = `${CONFIG_PREFIX}key:v2:`;
 
 // TTLs - balance between freshness and speed
 const TTL = {
@@ -102,7 +104,7 @@ export async function getCachedApiKeyConfig(keyHash: string): Promise<{
     data: any;
     fromCache: boolean;
 } | null> {
-    const cacheKey = `${CONFIG_PREFIX}key:${keyHash}`;
+    const cacheKey = `${API_KEY_CACHE_PREFIX}${keyHash}`;
     const local = getLocal<any>(cacheKey);
     if (local.found) return { data: local.value, fromCache: true };
     
@@ -119,7 +121,7 @@ export async function getCachedApiKeyConfig(keyHash: string): Promise<{
 }
 
 export async function setCachedApiKeyConfig(keyHash: string, data: any): Promise<void> {
-    const cacheKey = `${CONFIG_PREFIX}key:${keyHash}`;
+    const cacheKey = `${API_KEY_CACHE_PREFIX}${keyHash}`;
     setLocal(cacheKey, data, TTL.API_KEY);
     try {
         await redis.set(cacheKey, data, { ex: TTL.API_KEY });
@@ -129,7 +131,7 @@ export async function setCachedApiKeyConfig(keyHash: string, data: any): Promise
 }
 
 export async function invalidateApiKeyCache(keyHash: string): Promise<void> {
-    const cacheKey = `${CONFIG_PREFIX}key:${keyHash}`;
+    const cacheKey = `${API_KEY_CACHE_PREFIX}${keyHash}`;
     deleteLocal(cacheKey);
     try {
         await redis.del(cacheKey);

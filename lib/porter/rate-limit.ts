@@ -13,8 +13,9 @@ import { Redis } from '@upstash/redis';
  * The Porter limit caps the blast radius when the requests come from many addresses, which is what
  * an actual attack looks like.
  *
- * Both fail open. Redis being unreachable should not silence a customer's support widget, and money
- * is not what these bound -- credits and spend caps do that, in the gateway, on every request.
+ * These throttle request frequency; they do not enforce a monetary entitlement.
+ * Redis failures retain the existing fail-open policy. Product billing and a
+ * cumulative spend ceiling must be enforced independently of these counters.
  */
 
 const VISITOR_LIMIT = 12;
@@ -45,21 +46,29 @@ export type PorterRateLimitResult =
     | { allowed: true }
     | { allowed: false; scope: 'visitor' | 'porter'; retryAfterSeconds: number };
 
+// Increment and initialize expiry atomically. Subsequent traffic, including
+// denied requests, must never move the end of the current fixed window.
+const HIT_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if count == 1 or ttl < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+    ttl = tonumber(ARGV[1])
+end
+return {count, ttl}
+`;
+
 async function hit(
     client: Redis,
     key: string,
     limit: number,
     windowSeconds: number,
 ): Promise<{ exceeded: boolean; retryAfterSeconds: number }> {
-    const pipeline = client.pipeline();
-    pipeline.incr(key);
-    pipeline.expire(key, windowSeconds);
-    pipeline.ttl(key);
-    const [count, , ttl] = await pipeline.exec<[number, number, number]>();
+    const [count, ttl] = await client.eval<[number], [number, number]>(HIT_SCRIPT, [key], [windowSeconds]);
 
     return {
         exceeded: count > limit,
-        retryAfterSeconds: ttl > 0 ? ttl : windowSeconds,
+        retryAfterSeconds: Math.max(1, ttl),
     };
 }
 

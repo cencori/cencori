@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { refreshPorterKnowledge } from "@/lib/porter/knowledge";
+import { PorterRefreshError, refreshPorterKnowledge, type PorterRefreshSummary } from "@/lib/porter/knowledge";
 
 export const runtime = "nodejs";
 // Several sites, fetched one page at a time, none of them ours to hurry.
@@ -8,6 +8,16 @@ export const maxDuration = 300;
 
 /** How many Porters one sweep will look at. The rest come round on the next run. */
 const PORTERS_PER_RUN = 20;
+// Leave a minute for the current page and the final lease release before the platform timeout.
+const WORK_BUDGET_MS = 240_000;
+
+type ClaimedPorter = {
+    id: string;
+    organization_id: string;
+    project_id: string;
+    source_url: string;
+    lease_token: string;
+};
 
 /**
  * The weekly refresh.
@@ -32,38 +42,75 @@ async function run(request: NextRequest) {
     }
 
     const admin = createAdminClient();
-
-    const { data: porters, error } = await admin
-        .from("porters")
-        .select("id, organization_id, project_id, source_url")
-        .eq("enabled", true)
-        .order("updated_at", { ascending: true })
-        .limit(PORTERS_PER_RUN);
-
-    if (error) {
-        console.error("[Cron] Could not list Porters:", error.message);
-        return NextResponse.json({ error: "Could not list Porters" }, { status: 500 });
-    }
-
+    const deadlineMs = Date.now() + WORK_BUDGET_MS;
+    const processed: string[] = [];
     const results: Array<Record<string, unknown>> = [];
+    const errors: string[] = [];
+    let refreshed = 0;
+    let failed = 0;
 
-    for (const porter of porters ?? []) {
+    while (processed.length < PORTERS_PER_RUN && Date.now() < deadlineMs) {
+        let porter: ClaimedPorter;
         try {
-            const summary = await refreshPorterKnowledge(admin, porter);
-            if (summary.checked > 0) {
-                results.push({ porter: porter.id, host: porter.source_url, ...summary });
-            }
+            // Claim only work that can start now; the database skips idle sites and active leases.
+            const { data, error } = await admin.rpc("claim_porter_recrawl", { p_exclude_ids: [...processed] });
+            if (error) throw new Error(error.message);
+            const claimed = (data as ClaimedPorter[] | null)?.[0];
+            if (!claimed) break;
+            porter = claimed;
+            processed.push(porter.id);
+        } catch (failure) {
+            console.error("[Cron] Could not claim a Porter refresh:", failure);
+            errors.push("claim_failed");
+            failed += 1;
+            break;
+        }
+
+        let summary: PorterRefreshSummary | null = null;
+        let refreshError: string | null = null;
+        let releaseError: string | null = null;
+        try {
+            summary = await refreshPorterKnowledge(admin, porter, undefined, { deadlineMs });
+            if (summary.failed > 0) refreshError = `${summary.failed} page(s) could not be refreshed`;
         } catch (failure) {
             console.error("[Cron] Porter refresh failed for", porter.id, failure);
-            results.push({ porter: porter.id, error: "refresh_failed" });
+            refreshError = failure instanceof Error ? failure.message : "refresh_failed";
+            if (failure instanceof PorterRefreshError) summary = failure.summary;
         }
+
+        try {
+            const { data, error } = await admin.rpc("finish_porter_recrawl", {
+                p_porter_id: porter.id,
+                p_lease_token: porter.lease_token,
+                p_summary: summary,
+                p_error: refreshError,
+            });
+            if (error) throw new Error(error.message);
+            if (data !== true) throw new Error("Porter refresh lease was replaced before completion");
+        } catch (failure) {
+            console.error("[Cron] Could not finish Porter refresh for", porter.id, failure);
+            releaseError = "release_failed";
+        }
+
+        if (summary && summary.checked > 0) refreshed += 1;
+        if (refreshError || releaseError) failed += 1;
+        results.push({
+            porter: porter.id,
+            host: porter.source_url,
+            ...summary,
+            ...(refreshError ? { error: refreshError } : {}),
+            ...(releaseError ? { release_error: releaseError } : {}),
+        });
     }
 
     return NextResponse.json({
-        porters: porters?.length ?? 0,
-        refreshed: results.length,
+        porters: processed.length,
+        refreshed,
+        failed,
+        deadlineReached: Date.now() >= deadlineMs,
         results,
-    });
+        ...(errors.length ? { errors } : {}),
+    }, { status: failed > 0 ? 500 : 200 });
 }
 
 export async function POST(request: NextRequest) {
