@@ -1,417 +1,540 @@
 /**
- * Porter — an agent that answers on the site it was built from.
+ * Porter, on a website or inside the console.
  *
- *   <script src="https://cdn.cencori.com/porter.js"
- *           data-porter="prtr_…" data-key="pk_live_…" defer></script>
+ * <script src="https://cdn.cencori.com/porter.js" data-porter="…" data-key="cpk_…" defer></script>
  *
- * Everything renders inside a shadow root, so the host page's CSS cannot reach in and none of this
- * leaks out. That is what makes the same line work on a WordPress theme and inside a React app.
- *
- * The script carries no opinion about what the Porter says. It sends an id and a message; the
- * server decides the model, the prompt and the pages, because anything named here is editable by
- * anyone with devtools on a page whose source already contains the key.
+ * window.CencoriPorter.mount({ target, porterId, apiKey, inline: true })
+ * returns { destroy(), reset() }. Console callers supply getSession instead of apiKey.
  */
 (function () {
     "use strict";
 
-    var script = document.currentScript;
-    if (!script) return;
+    var currentScript = document.currentScript;
 
-    var porterId = script.getAttribute("data-porter");
-    var apiKey = script.getAttribute("data-key");
-    if (!porterId || !apiKey) {
-        console.warn("[Porter] data-porter and data-key are both required");
-        return;
-    }
-
-    var base = script.getAttribute("data-base") || "https://api.cencori.com";
-    // The key opens a session; the session carries the conversation. Chat never sees the key again.
-    var sessionToken = null;
-    var sessionExpiresAt = 0;
-    var accent = "#111111";
-    var history = [];
-    var busy = false;
-    var opened = false;
-
-    // ── shadow root ──────────────────────────────────────────────────────────
-    var host = document.createElement("div");
-    host.setAttribute("data-porter-host", "");
-    // The host page may have z-index wars; sit above them without joining in.
-    host.style.cssText = "position:fixed;z-index:2147483000;bottom:0;right:0;";
-    var root = host.attachShadow({ mode: "open" });
-    document.body.appendChild(host);
-
-    // Kept separate so the accent can be replaced once config arrives: :host{all:initial} below
-    // resets custom properties, so the variable has to be declared inside the shadow styles.
-    var vars = document.createElement("style");
-    vars.textContent = ":host{--accent:#111111;--accent-ink:#ffffff}";
-    root.appendChild(vars);
-
-    /**
-     * Pick text that can be read on the brand colour. A customer whose site is bright yellow should
-     * not get white-on-yellow because the fallback assumed a dark accent.
-     */
-    function inkFor(hex) {
-        var value = String(hex || "").replace("#", "");
-        if (value.length === 3) {
-            value = value[0] + value[0] + value[1] + value[1] + value[2] + value[2];
+    function safeUrl(value) {
+        try {
+            var url = new URL(value);
+            return /^(https?:)$/.test(url.protocol) && !url.username && !url.password ? url.href : null;
+        } catch (_error) {
+            return null;
         }
-        if (!/^[0-9a-f]{6}$/i.test(value)) return "#ffffff";
-        var r = parseInt(value.slice(0, 2), 16) / 255;
-        var g = parseInt(value.slice(2, 4), 16) / 255;
-        var b = parseInt(value.slice(4, 6), 16) / 255;
-        var lin = function (c) {
-            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        };
-        var luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-        return luminance > 0.45 ? "#0a0a0a" : "#ffffff";
     }
 
-    var style = document.createElement("style");
-    style.textContent = [
-        // Tokens mirror the scaffold: a message from the visitor is the foreground colour inverted,
-        // and a reply is plain text, because bubbles on both sides read like a toy.
-        ":host{all:initial;--bg:#ffffff;--fg:#0a0a0a;--card:#ffffff;--border:#e4e4e8;--muted:#8a8a93}",
-        "@media (prefers-color-scheme:dark){:host{--bg:#0a0a0a;--fg:#fafafa;--card:#1a1a1a;--border:#2a2a30;--muted:#8a8a93}}",
-        "*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}",
-
-        ".launcher{position:fixed;right:20px;bottom:20px;height:52px;max-width:min(280px,calc(100vw - 40px));",
-        "padding:0 20px;border:0;border-radius:26px;background:var(--accent);color:var(--accent-ink);",
-        "font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.22);",
-        "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}",
-        ".launcher:focus-visible{outline:2px solid var(--accent);outline-offset:3px}",
-
-        ".panel{position:fixed;right:20px;bottom:20px;width:min(400px,calc(100vw - 40px));height:min(580px,calc(100vh - 40px));",
-        "display:flex;flex-direction:column;background:var(--bg);color:var(--fg);border-radius:16px;overflow:hidden;",
-        "box-shadow:0 18px 60px rgba(0,0,0,.28);border:1px solid var(--border)}",
-
-        ".head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}",
-        ".head img{width:24px;height:24px;border-radius:6px;object-fit:cover}",
-        ".head .name{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-        ".head button{border:0;background:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:4px;border-radius:6px}",
-        ".head button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}",
-
-        ".log{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:1.5rem}",
-        ".row{display:flex;flex-direction:column}",
-        ".row.you{align-items:flex-end}",
-        ".row.them{align-items:flex-start}",
-        ".msg{max-width:85%;padding:.4rem .75rem;line-height:1.4;font-size:.875rem;white-space:pre-wrap;",
-        "word-wrap:break-word;border-radius:.875rem}",
-        ".msg.you{background:var(--fg);color:var(--bg);border-bottom-right-radius:.25rem}",
-        ".msg.them{background:transparent;color:var(--fg);padding:0;max-width:100%}",
-
-        ".dots{display:flex;align-items:center;gap:4px;color:var(--muted);padding:0}",
-        ".dots i{width:4px;height:4px;border-radius:50%;background:currentColor;animation:pulse 1.4s infinite ease-in-out both}",
-        ".dots i:nth-child(1){animation-delay:-.32s}.dots i:nth-child(2){animation-delay:-.16s}",
-        "@keyframes pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1.2)}}",
-        "@media (prefers-reduced-motion:reduce){.dots i{animation:none;opacity:.5}}",
-
-        ".foot{padding:12px 16px 0}",
-        ".form{display:flex;align-items:center;gap:.5rem;background:var(--card);border:1px solid var(--border);",
-        "border-radius:9999px;padding:.5rem .5rem .5rem 1rem;transition:border-color .2s ease}",
-        ".form:focus-within{border-color:var(--accent)}",
-        ".form input{flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--fg);",
-        "font-size:.95rem;height:24px;line-height:24px}",
-        ".form input::placeholder{color:var(--muted)}",
-        ".form button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;",
-        "border-radius:50%;background:var(--fg);color:var(--bg);border:none;cursor:pointer;",
-        "transition:transform .1s ease,background-color .2s ease}",
-        ".form button:not(:disabled):hover{transform:scale(1.05)}",
-        ".form button:disabled{background:var(--border);color:var(--muted);cursor:not-allowed}",
-        ".form button svg{width:16px;height:16px}",
-
-        ".by{padding:10px 0 12px;font-size:.7rem;color:var(--muted);text-align:center}",
-        ".by a{color:var(--muted);text-decoration:none}",
-        ".by a:hover{text-decoration:underline}",
-    ].join("");
-    root.appendChild(style);
-
-    var launcher = document.createElement("button");
-    launcher.className = "launcher";
-    launcher.type = "button";
-    launcher.setAttribute("aria-haspopup", "dialog");
-    launcher.textContent = "Ask a question";
-    root.appendChild(launcher);
-
-    var panel = null;
-    var log = null;
-    var input = null;
-    var send = null;
-    var config = { name: "Assistant", greeting: "", ready: false, brand: {} };
-
-    function el(tag, cls, text) {
-        var node = document.createElement(tag);
-        if (cls) node.className = cls;
-        if (text != null) node.textContent = text;
-        return node;
+    function messageOf(body, fallback) {
+        var error = body && body.error;
+        return (typeof error === "string" ? error : error && error.message) || fallback;
     }
 
-    function scroll() {
-        if (log) log.scrollTop = log.scrollHeight;
-    }
-
-    function addMessage(who, text) {
-        var row = el("div", "row " + who);
-        var node = el("div", "msg " + who, text);
-        row.appendChild(node);
-        log.appendChild(row);
-        scroll();
-        return node;
-    }
-
-    function buildPanel() {
-        panel = el("div", "panel");
-        panel.setAttribute("role", "dialog");
-        panel.setAttribute("aria-modal", "false");
-        panel.setAttribute("aria-label", config.name + " assistant");
-
-        var head = el("div", "head");
-        if (config.brand && config.brand.logo) {
-            var logo = document.createElement("img");
-            logo.src = config.brand.logo;
-            logo.alt = "";
-            head.appendChild(logo);
+    function tokenLifetime(token) {
+        try {
+            var payload = token.replace(/^prts_/, "").split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+            return Math.max(0, JSON.parse(atob(payload)).e - Date.now() / 1000);
+        } catch (_error) {
+            return 1800;
         }
-        head.appendChild(el("div", "name", config.name));
-        var close = el("button", null, "×");
-        close.type = "button";
-        close.setAttribute("aria-label", "Close");
-        close.addEventListener("click", toggle);
-        head.appendChild(close);
-        panel.appendChild(head);
+    }
 
-        log = el("div", "log");
-        // Answers arrive a token at a time; announcing politely stops a screen reader
-        // interrupting itself on every chunk.
-        log.setAttribute("role", "log");
-        log.setAttribute("aria-live", "polite");
-        panel.appendChild(log);
-
-        var foot = el("div", "foot");
-        var form = el("div", "form");
-        input = document.createElement("input");
-        input.type = "text";
-        input.placeholder = config.ready ? "Ask a question..." : "Not ready yet";
-        input.setAttribute("aria-label", "Your question");
-        input.disabled = !config.ready;
-        input.addEventListener("keydown", function (event) {
-            if (event.key === "Enter") ask();
+    // A caller-owned session promise may outlive its widget. Stop waiting when the mount is gone.
+    function abortable(promise, signal) {
+        return new Promise(function (resolve, reject) {
+            function aborted() { reject(new DOMException("Request cancelled", "AbortError")); }
+            if (signal.aborted) { aborted(); return; }
+            signal.addEventListener("abort", aborted, { once: true });
+            Promise.resolve(promise).then(resolve, reject).finally(function () {
+                signal.removeEventListener("abort", aborted);
+            });
         });
-        send = el("button");
-        send.type = "button";
-        send.disabled = !config.ready;
-        send.setAttribute("aria-label", "Send message");
-        send.innerHTML =
-            '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
-            '<path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor" stroke-width="1.75" ' +
-            'stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        send.addEventListener("click", ask);
-        form.appendChild(input);
-        form.appendChild(send);
-        foot.appendChild(form);
-        panel.appendChild(foot);
-
-        var by = el("div", "by");
-        var link = document.createElement("a");
-        link.href = "https://cencori.com";
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.textContent = "Powered by Cencori";
-        by.appendChild(link);
-        panel.appendChild(by);
-
-        root.appendChild(panel);
-        addMessage("them", config.greeting);
-        if (!config.ready) addMessage("them", "This assistant has not read its website yet.");
     }
 
-    function toggle() {
-        opened = !opened;
-        if (opened) {
-            if (!panel) buildPanel();
-            panel.style.display = "flex";
-            launcher.style.display = "none";
-            if (input && !input.disabled) input.focus();
-        } else {
-            if (panel) panel.style.display = "none";
-            launcher.style.display = "";
-            launcher.focus();
+    function mount(options) {
+        if (!options || !options.target || !options.porterId) {
+            throw new Error("Porter needs a target element and porterId.");
         }
-    }
-
-    launcher.addEventListener("click", toggle);
-    document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && opened) toggle();
-    });
-
-    /** Keep the exchange, bounded: the server caps it too, and an unbounded array is a slow leak. */
-    function remember(question, answer) {
-        history.push({ role: "user", content: question });
-        history.push({ role: "assistant", content: answer });
-        while (history.length > 20) history.shift();
-    }
-
-    /**
-     * Get a session, reusing the one we have while it lasts.
-     *
-     * A session is minted once and covers every message after it, so the checks that cost the
-     * server real work happen at the start of a conversation rather than on every line typed.
-     */
-    function session() {
-        if (sessionToken && Date.now() < sessionExpiresAt) {
-            return Promise.resolve(sessionToken);
+        if (!options.apiKey && !options.getSession) {
+            throw new Error("Porter needs an apiKey or getSession callback.");
         }
-        return fetch(base + "/api/v1/porter/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
-            body: JSON.stringify({ porterId: porterId }),
-        })
-            .then(function (response) {
-                if (!response.ok) {
-                    return response.json().then(function (b) {
-                        throw new Error((b && b.error && b.error.message) || "Could not start a conversation.");
-                    });
-                }
-                return response.json();
-            })
-            .then(function (body) {
-                sessionToken = body.token;
-                // Renew a minute early rather than discovering the expiry mid-question.
-                sessionExpiresAt = Date.now() + Math.max((body.expiresIn || 1800) - 60, 60) * 1000;
-                return sessionToken;
-            });
-    }
+        var base = safeUrl(options.baseUrl || "https://api.cencori.com");
+        if (!base) throw new Error("Porter needs an HTTP or HTTPS base URL.");
+        base = base.replace(/\/$/, "");
+        var inline = options.inline === true;
+        var destroyed = false;
+        var generation = 0;
+        var history = [];
+        var credential = null;
+        var busy = false;
+        var opened = inline;
+        var config = null;
+        var startup = null;
+        var active = null;
+        var activeReader = null;
+        var timers = new Set();
+        var host = document.createElement("div");
+        host.setAttribute("data-porter-host", options.porterId);
+        host.style.cssText = inline
+            ? "display:block;width:100%;height:100%;min-height:0;"
+            : "position:fixed;z-index:2147483000;bottom:0;right:0;";
+        var root = host.attachShadow({ mode: "open" });
+        options.target.appendChild(host);
 
-    function ask() {
-        if (busy || !input || !input.value.trim()) return;
-        var question = input.value.trim();
-        input.value = "";
-        addMessage("you", question);
+        function el(tag, className, text) {
+            var node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text != null) node.textContent = text;
+            return node;
+        }
 
-        busy = true;
-        send.disabled = true;
+        var style = el("style");
+        style.textContent = [
+            ":host{all:initial;--paper:#fbfaf7;--surface:#fff;--ink:#282823;--muted:#797971;--line:#e8e6df;--accent:#77796a;color-scheme:light}",
+            "@media(prefers-color-scheme:dark){:host{--paper:#20211e;--surface:#262723;--ink:#eeeee7;--muted:#a4a49a;--line:#3b3c35;color-scheme:dark}}",
+            "*{box-sizing:border-box}button,input,a{-webkit-tap-highlight-color:transparent}",
+            "button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:default}",
+            "button:focus-visible,a:focus-visible{outline:2px solid var(--muted);outline-offset:4px}",
+            ".panel,.launcher{font-family:'SF Pro Display','Geist Sans','Helvetica Neue',sans-serif;color:var(--ink);font-size:14px;line-height:1.6}",
+            ".launcher{position:fixed;right:24px;bottom:24px;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 48px);padding:13px 18px;",
+            "background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px #00000008;animation:porter-in .4s both}",
+            ".launcher-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;font-size:13px}",
+            ".mark{width:8px;height:8px;flex:none;border-radius:2px;background:var(--accent)}",
+            ".panel{display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:12px;",
+            "animation:porter-in .38s cubic-bezier(.16,1,.3,1) both}",
+            ".panel.floating{position:fixed;right:24px;bottom:24px;width:min(400px,calc(100vw - 32px));height:min(620px,calc(100dvh - 48px));box-shadow:0 12px 48px #0000000a}",
+            ".panel.inline{width:100%;height:100%;min-height:0;border-radius:12px}",
+            ".head{display:flex;align-items:center;gap:12px;padding:20px 22px;border-bottom:1px solid var(--line);flex:none}",
+            ".logo{width:30px;height:30px;object-fit:contain;border-radius:5px}.identity{flex:1;min-width:0}",
+            ".name{display:block;font-size:13px;font-weight:600;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+            ".eyebrow{display:block;font-size:10px;letter-spacing:.015em;color:var(--muted)}",
+            ".icon{display:flex;align-items:center;justify-content:center;flex:none;width:30px;height:30px;border:0;border-radius:4px;background:transparent;color:var(--muted)}",
+            ".icon svg{width:15px;height:15px}.icon:hover{color:var(--ink);background:var(--paper)}",
+            ".log{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:28px 22px 20px;display:flex;flex-direction:column;gap:24px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}",
+            ".row{animation:porter-in .28s both;flex:none}.row.you{align-self:flex-end;max-width:88%}",
+            ".msg{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65}",
+            ".you .msg{padding:10px 14px;background:var(--paper);border:1px solid var(--line);border-radius:8px 8px 2px 8px}",
+            ".welcome .msg{font-family:'Newsreader','Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:25px;line-height:1.35;letter-spacing:-.035em;max-width:290px}",
+            ".welcome{padding:8px 0 14px}.welcome-note{margin:14px 0 0;color:var(--muted);font-size:11px;line-height:1.6}",
+            ".error .msg{color:var(--muted);font-size:13px}.citation{color:inherit;text-underline-offset:3px;font-size:.85em}",
+            ".sources{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}",
+            ".sources-label{font-family:'Geist Mono','SF Mono',monospace;font-size:8px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}",
+            ".sources ul{list-style:none;padding:0;margin:6px 0 0;display:flex;flex-direction:column;gap:5px}",
+            ".source{display:flex;align-items:baseline;gap:8px;font-size:11px;line-height:1.4;color:var(--muted);text-decoration:none}.source:hover{color:var(--ink)}",
+            ".source-number{font-family:'Geist Mono','SF Mono',monospace;font-size:9px;flex:none}.source-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+            ".thinking{display:flex;align-items:center;gap:5px;height:24px;color:var(--muted)}",
+            ".thinking i{display:block;width:4px;height:4px;background:currentColor;border-radius:50%;animation:porter-pulse 1.4s infinite}",
+            ".thinking i:nth-child(2){animation-delay:.16s}.thinking i:nth-child(3){animation-delay:.32s}",
+            ".foot{padding:14px 18px 0;flex:none}.form{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 13px;border:1px solid var(--line);border-radius:7px;background:var(--paper)}",
+            ".form:focus-within{border-color:var(--muted)}.form input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:13px;height:28px;color:var(--ink)}",
+            ".form input::placeholder{color:var(--muted)}.send{border:0;border-radius:4px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex:none;background:var(--ink);color:var(--surface)}",
+            ".send:disabled{opacity:.25}.send svg{width:16px;height:16px}.send,.launcher{transition:transform .18s ease}.send:active,.launcher:active{transform:scale(.97)}",
+            ".by{padding:12px 0 15px;text-align:center;font-size:9px;letter-spacing:.02em;color:var(--muted)}.by a{color:inherit;text-decoration:none}.by a:hover{text-decoration:underline;text-underline-offset:3px}",
+            ".notice{display:flex;flex:1;flex-direction:column;justify-content:center;align-items:flex-start;padding:28px;color:var(--muted);font-size:13px}.notice p{margin:0}.retry{margin-top:14px;background:transparent;border:0;padding:0;color:var(--ink);text-decoration:underline;text-underline-offset:4px}",
+            "[hidden]{display:none!important}@keyframes porter-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}",
+            "@keyframes porter-pulse{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}",
+            "@media(max-width:480px){.panel.floating{right:16px;bottom:16px;height:min(620px,calc(100dvh - 32px))}.launcher{right:16px;bottom:16px}}",
+            "@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}",
+        ].join("");
+        root.appendChild(style);
+        var accentStyle = el("style");
+        root.appendChild(accentStyle);
+        var launcher = null;
+        if (!inline) {
+            launcher = el("button", "launcher");
+            launcher.type = "button";
+            launcher.hidden = true;
+            launcher.setAttribute("aria-haspopup", "dialog");
+            launcher.setAttribute("aria-expanded", "false");
+            launcher.appendChild(el("span", "mark"));
+            launcher.appendChild(el("span", "launcher-label", "Ask a question"));
+            launcher.addEventListener("click", toggle);
+            root.appendChild(launcher);
+        }
+        var panel = null;
+        var log = null;
+        var input = null;
+        var send = null;
 
-        var thinkingRow = el("div", "row them");
-        var thinking = el("div", "msg them dots");
-        thinking.innerHTML = "<i></i><i></i><i></i>";
-        thinkingRow.appendChild(thinking);
-        log.appendChild(thinkingRow);
-        scroll();
+        function timedController(milliseconds) {
+            var controller = new AbortController();
+            var timer = setTimeout(function () { controller.abort(); timers.delete(timer); }, milliseconds);
+            timers.add(timer);
+            controller.signal.addEventListener("abort", function () { clearTimeout(timer); timers.delete(timer); }, { once: true });
+            return { controller: controller, finish: function () { clearTimeout(timer); timers.delete(timer); } };
+        }
 
-        session()
-            .then(function (token) {
-                return fetch(base + "/api/v1/porter/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-                    body: JSON.stringify({ message: question, history: history, stream: true }),
+        async function session(signal, renew) {
+            if (renew) credential = null;
+            if (credential && Date.now() < credential.expiresAt) return credential.token;
+            var result;
+            if (options.getSession) {
+                result = await abortable(options.getSession(), signal);
+            } else {
+                var response = await fetch(base + "/api/v1/porter/session", {
+                    method: "POST", signal: signal,
+                    headers: { "Content-Type": "application/json", Authorization: "Bearer " + options.apiKey },
+                    body: JSON.stringify({ porterId: options.porterId }),
                 });
-            })
-            .then(function (response) {
-                if (!response.ok) {
-                    return response.json().then(function (body) {
-                        var error = body && body.error;
-                        // A session that has aged out is not an error worth showing: drop it so the
-                        // next attempt mints a fresh one.
-                        if (error && error.code === "session_invalid") sessionToken = null;
-                        throw new Error((error && error.message) || "Something went wrong.");
-                    });
-                }
-                return stream(response, thinkingRow).then(function (answer) {
-                    remember(question, answer);
-                });
-            })
-            .catch(function (error) {
-                thinkingRow.remove();
-                addMessage("them", error.message || "Something went wrong.");
-            })
-            .then(function () {
-                busy = false;
-                if (send) send.disabled = false;
-                if (input) input.focus();
-            });
-    }
+                result = await response.json();
+                if (!response.ok) throw new Error(messageOf(result, "Could not start a conversation."));
+            }
+            if (signal.aborted) throw new DOMException("Request cancelled", "AbortError");
+            if (!result || typeof result.token !== "string" || !result.token) throw new Error("Could not start a conversation.");
+            var seconds = typeof result.expiresIn === "number" ? result.expiresIn : 1800;
+            if (seconds <= 0) throw new Error("This preview session has expired. Refresh the page to continue.");
+            credential = { token: result.token, expiresAt: Date.now() + (seconds - Math.min(60, seconds / 10)) * 1000 };
+            return credential.token;
+        }
 
-    /** Read an OpenAI-shaped SSE body and paint it as it arrives. */
-    function stream(response, placeholder) {
-        var reader = response.body && response.body.getReader();
-        if (!reader) {
-            return response.json().then(function (body) {
-                placeholder.remove();
-                var choice = body && body.choices && body.choices[0];
-                var content = (choice && choice.message && choice.message.content) || "";
-                addMessage("them", content);
+        function scroll() { if (log) log.scrollTop = log.scrollHeight; }
+
+        function addMessage(who, text) {
+            var row = el("div", "row " + who);
+            row.appendChild(el("p", "msg", text));
+            log.appendChild(row);
+            scroll();
+            return row;
+        }
+
+        function welcome() {
+            if (!log || !config) return;
+            var row = addMessage("them welcome", config.greeting || "How can I help?");
+            row.appendChild(el("p", "welcome-note", config.ready ? "A little guidance, straight from the source." : "This assistant has not read its website yet."));
+        }
+
+        function iconButton(label, path) {
+            var button = el("button", "icon");
+            button.type = "button";
+            button.setAttribute("aria-label", label);
+            button.title = label;
+            // The paths are constants in this file; remote content only ever becomes text nodes.
+            button.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="' + path + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            return button;
+        }
+
+        function buildPanel() {
+            if (panel) panel.remove();
+            panel = el("section", "panel " + (inline ? "inline" : "floating"));
+            panel.setAttribute("aria-label", (config ? config.name : "Porter") + " assistant");
+            if (!inline) { panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "false"); }
+            root.appendChild(panel);
+            if (!config) return;
+            var head = el("header", "head");
+            var logoUrl = safeUrl(config.brand && config.brand.logo);
+            if (logoUrl) {
+                var logo = el("img", "logo");
+                logo.src = logoUrl; logo.alt = "";
+                logo.addEventListener("error", function () { logo.remove(); }, { once: true });
+                head.appendChild(logo);
+            } else {
+                head.appendChild(el("span", "mark"));
+            }
+            var identity = el("div", "identity");
+            identity.appendChild(el("span", "name", config.name || "Assistant"));
+            identity.appendChild(el("span", "eyebrow", "Answers from this website"));
+            head.appendChild(identity);
+            var restart = iconButton("Start a new conversation", "M4 7a6 6 0 1 1 0 6M4 3v4h4");
+            restart.addEventListener("click", reset);
+            head.appendChild(restart);
+            if (!inline) {
+                var close = iconButton("Close assistant", "M5 5l10 10M15 5L5 15");
+                close.addEventListener("click", toggle);
+                head.appendChild(close);
+            }
+            panel.appendChild(head);
+            log = el("div", "log");
+            log.setAttribute("role", "log"); log.setAttribute("aria-live", "polite");
+            panel.appendChild(log);
+            welcome();
+            var foot = el("div", "foot");
+            var form = el("form", "form");
+            input = el("input"); input.type = "text"; input.maxLength = 4000;
+            input.placeholder = config.ready ? "Ask a question…" : "Not ready yet";
+            input.setAttribute("aria-label", "Your question"); input.disabled = !config.ready;
+            send = el("button", "send"); send.type = "submit";
+            send.setAttribute("aria-label", "Send message"); send.disabled = true;
+            send.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 15V5M5 10l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            input.addEventListener("input", function () { send.disabled = busy || !config.ready || !input.value.trim(); });
+            form.addEventListener("submit", function (event) { event.preventDefault(); void ask(); });
+            form.appendChild(input); form.appendChild(send); foot.appendChild(form); panel.appendChild(foot);
+            var by = el("div", "by", "Powered by ");
+            var link = el("a", null, "Cencori"); link.href = "https://cencori.com"; link.target = "_blank"; link.rel = "noopener noreferrer";
+            by.appendChild(link); panel.appendChild(by);
+        }
+
+        function toggle() {
+            if (!config || destroyed || inline) return;
+            opened = !opened;
+            if (opened && !panel) buildPanel();
+            if (panel) panel.hidden = !opened;
+            launcher.hidden = opened;
+            launcher.setAttribute("aria-expanded", String(opened));
+            if (opened && input && !input.disabled) input.focus();
+            if (!opened) launcher.focus();
+        }
+
+        function escape(event) { if (event.key === "Escape" && opened && !inline) toggle(); }
+        if (!inline) document.addEventListener("keydown", escape);
+
+        function sourcesOf(response) {
+            try {
+                var encoded = response.headers.get("X-Porter-Sources");
+                if (!encoded) return [];
+                var bytes = Uint8Array.from(atob(encoded), function (character) { return character.charCodeAt(0); });
+                var sources = JSON.parse(new TextDecoder().decode(bytes));
+                if (!Array.isArray(sources)) return [];
+                return sources.slice(0, 30).map(function (source) {
+                    var url = source && typeof source.url === "string" && safeUrl(source.url);
+                    return url ? { url: url, title: typeof source.title === "string" ? source.title.slice(0, 300) : new URL(url).hostname } : null;
+                });
+            } catch (_error) { return []; }
+        }
+
+        function renderAnswer(row, answer, sources) {
+            var message = row.querySelector(".msg");
+            message.textContent = "";
+            var pattern = /\[(\d+)\]/g;
+            var match;
+            var cursor = 0;
+            var cited = new Set();
+            while ((match = pattern.exec(answer))) {
+                message.appendChild(document.createTextNode(answer.slice(cursor, match.index)));
+                var index = Number(match[1]) - 1;
+                var source = sources[index];
+                if (source) {
+                    var citation = el("a", "citation", match[0]);
+                    citation.href = source.url; citation.target = "_blank"; citation.rel = "noopener noreferrer";
+                    citation.setAttribute("aria-label", "Source " + (index + 1) + ": " + source.title);
+                    message.appendChild(citation); cited.add(index);
+                } else { message.appendChild(document.createTextNode(match[0])); }
+                cursor = pattern.lastIndex;
+            }
+            message.appendChild(document.createTextNode(answer.slice(cursor)));
+            if (!cited.size) return;
+            var sourceBlock = el("div", "sources");
+            sourceBlock.appendChild(el("span", "sources-label", "Sources"));
+            var list = el("ul");
+            cited.forEach(function (index) {
+                var item = el("li");
+                var link = el("a", "source"); link.href = sources[index].url; link.target = "_blank"; link.rel = "noopener noreferrer";
+                link.appendChild(el("span", "source-number", String(index + 1).padStart(2, "0")));
+                link.appendChild(el("span", "source-title", sources[index].title || new URL(sources[index].url).hostname));
+                item.appendChild(link); list.appendChild(item);
+            });
+            sourceBlock.appendChild(list); row.appendChild(sourceBlock);
+        }
+
+        async function readAnswer(response, row, signal) {
+            if (!(response.headers.get("Content-Type") || "").includes("text/event-stream")) {
+                var body = await response.json();
+                if (body.error) throw new Error(messageOf(body, "Could not finish this answer."));
+                var choice = body.choices && body.choices[0];
+                if (choice && choice.finish_reason && choice.finish_reason !== "stop") throw new Error("The answer was cut short. Please try again.");
+                var content = choice && choice.message && choice.message.content;
+                if (typeof content !== "string" || !content.trim()) throw new Error("No answer came back. Please try again.");
                 return content;
-            });
-        }
-
-        var decoder = new TextDecoder();
-        var buffer = "";
-        var answer = "";
-        var node = null;
-
-        function pump() {
-            return reader.read().then(function (result) {
-                if (result.done) return;
-                buffer += decoder.decode(result.value, { stream: true });
-                var lines = buffer.split("\n");
-                buffer = lines.pop() || "";
-
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim();
-                    if (line.indexOf("data:") !== 0) continue;
-                    var payload = line.slice(5).trim();
-                    if (!payload || payload === "[DONE]") continue;
-                    try {
-                        var chunk = JSON.parse(payload);
-                        var delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
-                        var piece = delta && delta.content;
-                        if (!piece) continue;
-                        if (!node) {
-                            placeholder.remove();
-                            node = addMessage("them", "");
-                        }
-                        answer += piece;
-                        node.textContent = answer;
-                        scroll();
-                    } catch (error) {
-                        /* a partial frame; the next read completes it */
+            }
+            var reader = response.body && response.body.getReader();
+            if (!reader) throw new Error("This browser could not read the answer. Please try again.");
+            activeReader = reader;
+            var decoder = new TextDecoder();
+            var buffer = "";
+            var data = [];
+            var answer = "";
+            var completed = false;
+            function frame() {
+                if (!data.length) return;
+                var payload = data.join("\n"); data = [];
+                if (payload.trim() === "[DONE]") { completed = true; return; }
+                var chunk;
+                try { chunk = JSON.parse(payload); } catch (_error) { throw new Error("The answer was interrupted. Please try again."); }
+                if (chunk.error) throw new Error(messageOf(chunk, "Could not finish this answer. Please try again."));
+                var choice = chunk.choices && chunk.choices[0];
+                if (choice && choice.finish_reason && choice.finish_reason !== "stop") throw new Error("The answer was cut short. Please try again.");
+                var piece = choice && choice.delta && choice.delta.content;
+                if (typeof piece === "string") {
+                    answer += piece;
+                    row.querySelector(".msg").textContent = answer;
+                    scroll();
+                }
+            }
+            function line(value) {
+                value = value.replace(/\r$/, "");
+                if (!value) { frame(); return; }
+                if (value.indexOf("data:") === 0) data.push(value.slice(5).replace(/^ /, ""));
+            }
+            try {
+                while (!completed) {
+                    var result = await abortable(reader.read(), signal);
+                    if (result.done) {
+                        buffer += decoder.decode();
+                        if (buffer) line(buffer);
+                        frame();
+                        break;
+                    }
+                    buffer += decoder.decode(result.value, { stream: true });
+                    var end;
+                    while ((end = buffer.indexOf("\n")) !== -1) {
+                        line(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+                        if (completed) break;
                     }
                 }
-                return pump();
-            });
+                if (!completed) throw new Error("The answer was interrupted. Please try again.");
+                if (!answer.trim()) throw new Error("No answer came back. Please try again.");
+                return answer;
+            } finally {
+                void reader.cancel().catch(function () {});
+                if (activeReader === reader) activeReader = null;
+            }
         }
 
-        return pump().then(function () {
-            if (!node) {
-                placeholder.remove();
-                addMessage("them", answer || "No answer came back.");
+        async function ask() {
+            if (destroyed || busy || !config || !config.ready || !input || !input.value.trim()) return;
+            var question = input.value.trim();
+            var turnGeneration = generation;
+            input.value = ""; input.disabled = true; send.disabled = true; busy = true;
+            log.setAttribute("aria-busy", "true");
+            addMessage("you", question);
+            var reply = addMessage("them", "");
+            var dots = el("span", "thinking");
+            dots.setAttribute("aria-label", "Preparing an answer");
+            dots.innerHTML = "<i></i><i></i><i></i>"; reply.querySelector(".msg").appendChild(dots);
+            var task = timedController(120000); active = task.controller;
+            var signal = task.controller.signal;
+            try {
+                var response;
+                for (var attempt = 0; attempt < 2; attempt++) {
+                    var token = await session(signal, attempt > 0);
+                    response = await fetch(base + "/api/v1/porter/chat", {
+                        method: "POST", signal: signal,
+                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                        body: JSON.stringify({ message: question, history: history, stream: true }),
+                    });
+                    if (response.status !== 401 || attempt === 1) break;
+                    if (response.body) void response.body.cancel().catch(function () {});
+                }
+                if (!response.ok) {
+                    var errorBody = await response.json().catch(function () { return null; });
+                    throw new Error(messageOf(errorBody, "Could not send your question. Please try again."));
+                }
+                var sources = sourcesOf(response);
+                var answer = await readAnswer(response, reply, signal);
+                if (destroyed || turnGeneration !== generation) return;
+                renderAnswer(reply, answer, sources);
+                history.push({ role: "user", content: question }, { role: "assistant", content: answer });
+                history = history.slice(-20);
+                scroll();
+            } catch (error) {
+                if (destroyed || turnGeneration !== generation) return;
+                reply.remove();
+                addMessage("them error", signal.aborted ? "That took too long. Please try again." : error.message || "Could not finish this answer. Please try again.");
+                input.value = question;
+            } finally {
+                task.finish();
+                if (active === task.controller) active = null;
+                if (!destroyed && turnGeneration === generation) {
+                    busy = false; input.disabled = !config.ready; send.disabled = !config.ready || !input.value.trim();
+                    log.setAttribute("aria-busy", "false");
+                    if (opened && !input.disabled) input.focus();
+                }
             }
-            return answer;
-        });
+        }
+
+        function reset() {
+            if (destroyed) return;
+            generation += 1;
+            if (active) active.abort();
+            if (activeReader) void activeReader.cancel().catch(function () {});
+            history = []; credential = null; busy = false;
+            if (log) { log.textContent = ""; log.setAttribute("aria-busy", "false"); welcome(); }
+            if (input) { input.value = ""; input.disabled = !config.ready; send.disabled = true; }
+        }
+
+        function destroy() {
+            if (destroyed) return;
+            destroyed = true; generation += 1;
+            if (startup) startup.abort();
+            if (active) active.abort();
+            if (activeReader) void activeReader.cancel().catch(function () {});
+            timers.forEach(function (timer) { clearTimeout(timer); }); timers.clear();
+            document.removeEventListener("keydown", escape);
+            host.remove(); history = []; credential = null;
+        }
+
+        async function load() {
+            var task = timedController(20000); startup = task.controller;
+            if (inline) {
+                buildPanel();
+                var loading = el("div", "notice"); loading.setAttribute("role", "status");
+                loading.appendChild(el("p", null, "Getting your assistant ready…")); panel.appendChild(loading);
+            }
+            try {
+                var auth = options.apiKey || await session(task.controller.signal, false);
+                var response = await fetch(base + "/api/v1/porter/config?porter=" + encodeURIComponent(options.porterId), {
+                    signal: task.controller.signal, headers: { Authorization: "Bearer " + auth },
+                });
+                if (response.status === 401 && !options.apiKey) {
+                    auth = await session(task.controller.signal, true);
+                    response = await fetch(base + "/api/v1/porter/config?porter=" + encodeURIComponent(options.porterId), {
+                        signal: task.controller.signal, headers: { Authorization: "Bearer " + auth },
+                    });
+                }
+                var body = await response.json();
+                if (!response.ok) throw new Error(messageOf(body, "This assistant is unavailable right now."));
+                if (destroyed) return;
+                config = body;
+                var color = body.brand && body.brand.color;
+                if (typeof color === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)) accentStyle.textContent = ":host{--accent:" + color + "}";
+                if (inline) buildPanel();
+                else {
+                    var name = typeof body.name === "string" ? body.name : "";
+                    launcher.querySelector(".launcher-label").textContent = name && name.length <= 18 ? "Ask " + name : "Ask a question";
+                    launcher.setAttribute("aria-label", name ? "Ask " + name : "Ask a question");
+                    launcher.hidden = false;
+                }
+            } catch (error) {
+                if (destroyed) return;
+                if (!inline) { destroy(); return; }
+                buildPanel();
+                var notice = el("div", "notice"); notice.setAttribute("role", "alert");
+                notice.appendChild(el("p", null, task.controller.signal.aborted ? "The assistant took too long to load." : error.message || "This assistant is unavailable right now."));
+                var retry = el("button", "retry", "Try again"); retry.type = "button";
+                retry.addEventListener("click", function () { void load(); }, { once: true });
+                notice.appendChild(retry); panel.appendChild(notice);
+            } finally {
+                task.finish(); if (startup === task.controller) startup = null;
+            }
+        }
+
+        void load();
+        return { destroy: destroy, reset: reset };
     }
 
-    // ── config, then show the launcher ───────────────────────────────────────
-    fetch(base + "/api/v1/porter/config?porter=" + encodeURIComponent(porterId), {
-        headers: { Authorization: "Bearer " + apiKey },
-    })
-        .then(function (response) {
-            if (!response.ok) throw new Error("config");
-            return response.json();
-        })
-        .then(function (body) {
-            config = body;
-            accent = (body.brand && body.brand.color) || accent;
-            vars.textContent =
-                ":host{--accent:" + accent + ";--accent-ink:" + inkFor(accent) + "}";
+    if (!window.CencoriPorter) window.CencoriPorter = { mount: mount };
 
-            // "Ask Northern Rivers Mutual Insurance Group" truncates to nonsense. Past a length a
-            // button can hold, the generic label says the same thing and still fits.
-            var name = body.name || "";
-            launcher.textContent = name && name.length <= 18 ? "Ask " + name : "Ask a question";
-            launcher.setAttribute("aria-label", name ? "Ask " + name : "Ask a question");
-        })
-        .catch(function () {
-            // A Porter that cannot describe itself should not put a broken button on someone's site.
-            host.remove();
-        });
+    // Loading this file without data attributes registers the library for a framework-owned mount.
+    if (currentScript && currentScript.getAttribute("data-porter")) {
+        var apiKey = currentScript.getAttribute("data-key");
+        var givenSession = currentScript.getAttribute("data-session");
+        var porterId = currentScript.getAttribute("data-porter");
+        var baseUrl = currentScript.getAttribute("data-base") || "https://api.cencori.com";
+        var getSession;
+        if (givenSession && !apiKey) {
+            var firstSession = givenSession;
+            getSession = async function () {
+                if (firstSession) {
+                    var token = firstSession; firstSession = null;
+                    return { token: token, expiresIn: tokenLifetime(token) };
+                }
+                // Older same-origin preview snippets can renew through their membership check.
+                if (new URL(baseUrl).origin !== window.location.origin) throw new Error("This preview session has expired. Refresh the page to continue.");
+                var response = await fetch(baseUrl.replace(/\/$/, "") + "/api/porter/" + encodeURIComponent(porterId) + "/preview-session", { method: "POST" });
+                var body = await response.json();
+                if (!response.ok) throw new Error(messageOf(body, "Could not renew the preview."));
+                return body;
+            };
+        }
+        function boot() {
+            if (!apiKey && !getSession) return;
+            window.CencoriPorter.mount({ target: document.body, porterId: porterId, apiKey: apiKey, getSession: getSession, baseUrl: baseUrl });
+        }
+        if (document.body) boot();
+        else document.addEventListener("DOMContentLoaded", boot, { once: true });
+    }
 })();

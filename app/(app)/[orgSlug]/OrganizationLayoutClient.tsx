@@ -158,6 +158,9 @@ export default function OrganizationLayoutClient({
     const projectSlug = isInsideProject ? orgSubSegment : (projects?.[0]?.slug || null);
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
+    // Same shape as the playground: the section fills the viewport and scrolls inside itself rather
+    // than growing the window. See isFixedHeight in app/(app)/layout.tsx.
+    const isFixedHeight = isPlayground || pathname.includes("/porter");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && scopedArea === "settings";
     const isOrganizationSettingsView = !isInsideProject && scopedArea === "settings";
@@ -344,7 +347,7 @@ export default function OrganizationLayoutClient({
     return (
         <SidebarProvider
             defaultOpen
-            className={isPlayground ? "h-full min-h-0 overflow-hidden" : undefined}
+            className={isFixedHeight ? "h-full min-h-0 overflow-hidden" : undefined}
         >
             {!isProjectCreation && (
                 <Sidebar className="top-12 hidden h-[calc(100vh-3rem)] border-r border-sidebar-border/70 bg-sidebar lg:block">
@@ -714,7 +717,7 @@ export default function OrganizationLayoutClient({
             <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
                 <div
                     key={pathname}
-                    className={isPlayground
+                    className={isFixedHeight
                         ? "flex min-h-0 flex-1 flex-col overflow-hidden animate-fade-in"
                         : "animate-fade-in"
                     }

@@ -6,6 +6,8 @@ import { POST as gatewayChatCompletions } from "@/app/api/v1/chat/completions/ro
 import { buildGroundedPrompt, findPorterPassages } from "@/lib/porter/knowledge";
 import { checkPorterRateLimit } from "@/lib/porter/rate-limit";
 import { handleCorsPreFlight } from "@/lib/gateway-middleware";
+import { createPorterGatewayRequest } from "@/lib/porter/gateway-request";
+import { PORTER_MODEL_IDS } from "@/lib/porter/models";
 
 /**
  * Chat with a Porter.
@@ -19,10 +21,9 @@ import { handleCorsPreFlight } from "@/lib/gateway-middleware";
  * name, a visitor with devtools can change, and the page is on the customer's own site where all of
  * this is readable by design.
  *
- * So this remains a resolver rather than a second gateway: it turns a Porter into a configuration
- * and hands the request to /v1/chat/completions unchanged in every other respect, which is what
- * keeps a Porter turn subject to the same admission control, guards, cache, routing, logging and
- * metering as any other call.
+ * It resolves the Porter's configuration, strips visitor-controlled gateway options,
+ * and delegates in process to the same admission control, guards, cache, routing,
+ * logging, and metering used by other gateway calls.
  */
 
 const DEFAULT_PORTER_MODEL = "groq/compound";
@@ -131,6 +132,15 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    if (porter.project_id !== session.j) {
+        return withCors(NextResponse.json({ error: { message: "This session is for a different project." } }, { status: 403 }), origin);
+    }
+
+    const model = porter.model || DEFAULT_PORTER_MODEL;
+    if (!PORTER_MODEL_IDS.includes(model)) {
+        return withCors(NextResponse.json({ error: { message: "This Porter's model is unavailable." } }, { status: 409 }), origin);
+    }
+
     // Before retrieval and before the provider: the two expensive things this route does are the
     // two an abusive caller wants it to do.
     const visitorIp =
@@ -165,10 +175,8 @@ export async function POST(req: NextRequest) {
         { role: "user", content: body.message.slice(0, MAX_MESSAGE_CHARS) },
     ];
 
-    // The gateway needs a key of its own: the session token authenticates the visitor to Porter,
-    // not Porter to the gateway. The Porter's publishable key is what pays for and scopes the call,
-    // and the Origin travels with it so the domain lock applies exactly as it would for any other
-    // publishable request.
+    // The gateway resolves project billing and guards from this scoped key. It
+    // accepts it only with the in-process authorization created below.
     if (!porter.publishable_key) {
         console.error("[Porter chat] porter has no publishable key:", porter.id);
         return withCors(
@@ -177,20 +185,34 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    // Everything the gateway reads stays as it arrived -- the Origin above all, so the domain lock
-    // applies -- except the credential, which becomes the Porter's own key.
-    const delegatedHeaders = new Headers(req.headers);
-    delegatedHeaders.set("Authorization", `Bearer ${porter.publishable_key}`);
+    // The pages the answer was drawn from, so a reader can check it rather than trust it. A header
+    // rather than the body because the body is a stream: the sources are known before the first
+    // token and would otherwise have to wait for the last.
+    const sources = passages.map((passage) => ({ title: passage.title, url: passage.url }));
 
-    const delegated = new NextRequest(new URL("/api/v1/chat/completions", req.url), {
-        method: "POST",
-        headers: delegatedHeaders,
-        body: JSON.stringify({
-            model: porter.model || DEFAULT_PORTER_MODEL,
+    const delegated = createPorterGatewayRequest({
+        requestUrl: req.url,
+        porterId: porter.id,
+        projectId: porter.project_id,
+        apiKey: porter.publishable_key,
+        visitorIp,
+        body: {
+            model,
             messages,
             stream: body.stream === true,
-        }),
+        },
     });
 
-    return gatewayChatCompletions(delegated);
+    const response = await gatewayChatCompletions(delegated);
+
+    // Base64 so a page title with a newline or a non-ASCII character cannot break the header.
+    const withSources = new Response(response.body, response);
+    withSources.headers.set(
+        "X-Porter-Sources",
+        Buffer.from(JSON.stringify(sources)).toString("base64")
+    );
+    withSources.headers.set("Access-Control-Allow-Origin", origin || "*");
+    withSources.headers.set("Access-Control-Expose-Headers", "X-Porter-Sources");
+    withSources.headers.set("Vary", "Origin");
+    return withSources;
 }

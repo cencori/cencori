@@ -249,6 +249,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const projectSlug = getProjectSlug;
   const isPlayground = pathname.includes("/playground");
   const isOnboardingFlow = pathname.includes("/onboarding");
+  // Routes that own the viewport instead of scrolling it: chrome pinned, content scrolling inside
+  // its own panels. A playground and a Porter workspace both want this, and both want it for the
+  // same reason -- they are tools you operate rather than documents you read.
+  const isFixedHeight = isPlayground || pathname.includes("/porter");
 
   const currentOrg = organizations.find((org) => org.slug === orgSlug);
   const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
@@ -304,7 +308,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     <div
       className={cn(
         "dashboard-theme bg-background transition-colors font-inter",
-        isPlayground ? "flex h-svh flex-col overflow-hidden" : "min-h-screen"
+        isFixedHeight ? "flex h-svh flex-col overflow-hidden" : "min-h-screen"
       )}
     >
       {!isOnboardingFlow && (
@@ -534,7 +538,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
       <main
         className={cn(
-          isPlayground
+          isFixedHeight
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
             : isOnboardingFlow
               ? "p-4 md:p-6"

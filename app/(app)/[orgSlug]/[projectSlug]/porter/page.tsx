@@ -1,19 +1,31 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { hostOf, usePorter } from "./shared";
-import { PorterHeader, NoPorter } from "./PorterHeader";
-
-type Turn = { id: string; question: string; grounded: boolean; status: string };
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
+import { PORTER_MODELS } from "@/lib/porter/models";
+import { PORTER_QUERY_KEY, hostOf, usePorter } from "./shared";
+import { NoPorter } from "./PorterHeader";
+import { PorterCanvas } from "./PorterCanvas";
 
 /**
- * The state of a Porter in one screen.
+ * A Porter's home: what it is on the left, what it looks like on the right.
  *
- * Everything here is a summary that leads somewhere else. The detail lives on the pages the sidebar
- * lists, so this can answer the only question someone opens it for -- is it working, and is anyone
- * using it -- without becoming the place every feature accumulates.
+ * The right pane is a canvas the widget floats on -- a workbench for dressing it, where a change
+ * shows immediately. It is deliberately not the page preview: that lives at /porter-preview, runs
+ * the real porter.js, and answers a different question. It also cannot be embedded here at all,
+ * since the app sends X-Frame-Options DENY on its own routes.
+ *
+ * The left pane holds what shapes the Porter. Numbers and transcripts belong to Conversations, and
+ * repeating them here made this the page everything accumulates in rather than the page you land on.
  */
 export default function PorterOverviewPage({
     params,
@@ -22,78 +34,121 @@ export default function PorterOverviewPage({
 }) {
     const { orgSlug, projectSlug } = use(params);
     const { data: porter, isLoading } = usePorter(orgSlug, projectSlug);
+    const queryClient = useQueryClient();
+    // Held locally so the picker moves the moment it is clicked, rather than after a round trip.
+    const [model, setModel] = useState<string | null | undefined>(undefined);
 
-    const { data: turns } = useQuery({
-        queryKey: ["porter-turns", porter?.id],
-        enabled: Boolean(porter?.id),
-        queryFn: async (): Promise<Turn[]> => {
-            const response = await fetch(`/api/porter/${porter!.id}/conversations?limit=50`);
-            if (!response.ok) return [];
-            return ((await response.json()).turns ?? []) as Turn[];
+    const saveModel = useMutation({
+        mutationFn: async ({ porterId, value }: { porterId: string; value: string | null }) => {
+            const response = await fetch(`/api/porter/${porterId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ model: value }),
+            });
+            if (!response.ok) {
+                throw new Error((await response.json())?.error || "Could not save that.");
+            }
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: PORTER_QUERY_KEY(orgSlug, projectSlug) }),
+        onError: (error: Error) => {
+            setModel(undefined);
+            toast.error(error.message);
         },
     });
 
-    if (isLoading) return <div className="mx-auto w-full max-w-3xl px-6 py-12 text-sm text-muted-foreground">…</div>;
-    if (!porter) return <div className="mx-auto w-full max-w-3xl px-6 py-12"><NoPorter orgSlug={orgSlug} projectSlug={projectSlug} /></div>;
+    if (isLoading) {
+        return <div className="px-6 py-10 text-sm text-muted-foreground">…</div>;
+    }
+    if (!porter) {
+        return (
+            <div className="mx-auto w-full max-w-3xl px-6 py-12">
+                <NoPorter orgSlug={orgSlug} projectSlug={projectSlug} />
+            </div>
+        );
+    }
 
     const base = `/${orgSlug}/${projectSlug}/porter`;
-    const unsourced = (turns ?? []).filter((turn) => !turn.grounded).length;
-
-    const state = !porter.enabled
-        ? { label: "Not answering", detail: "Its site has not been read yet.", href: `${base}/knowledge`, action: "Read the site" }
-        : !porter.publishable_key
-            ? { label: "Ready, not installed", detail: "It can answer, but has no snippet to install.", href: `${base}/install`, action: "Get the snippet" }
-            : { label: "Answering", detail: `Live on ${hostOf(porter)} once the snippet is on the page.`, href: `${base}/install`, action: "View the snippet" };
 
     return (
-        <div className="mx-auto w-full max-w-3xl px-6 py-12">
-            <PorterHeader porter={porter} title={porter.name} />
+        <div className="flex h-full min-h-0">
+            {/* Left: what it is */}
+            <div className="w-full shrink-0 overflow-y-auto border-r border-border/30 lg:w-[420px]">
+                <div className="space-y-8 p-6">
+                    <section>
+                        <h2 className="text-sm font-medium">{porter.name}</h2>
+                        <a
+                            href={porter.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 inline-block font-mono text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            {hostOf(porter)}
+                        </a>
+                        {!porter.enabled && (
+                            <p className="mt-3 text-sm text-muted-foreground">
+                                It has no pages to answer from yet.
+                            </p>
+                        )}
+                        {!porter.enabled && (
+                            <Link
+                                href={`${base}/knowledge`}
+                                className="mt-2 inline-block text-sm underline underline-offset-4"
+                            >
+                                Choose what it reads
+                            </Link>
+                        )}
+                    </section>
 
-            <div className="rounded border border-border p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-3">
-                    <p className="text-sm font-medium">{state.label}</p>
-                    <Link href={state.href} className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground">
-                        {state.action}
-                    </Link>
+                    <section>
+                        <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Model
+                        </h3>
+                        <Select
+                            value={(model === undefined ? porter.model : model) ?? "auto"}
+                            disabled={saveModel.isPending}
+                            onValueChange={(value) => {
+                                const next = value === "auto" ? null : value;
+                                setModel(next);
+                                saveModel.mutate({ porterId: porter.id, value: next });
+                            }}
+                        >
+                            <SelectTrigger className="mt-2 h-9 w-full text-sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PORTER_MODELS.map((option) => (
+                                    <SelectItem key={option.id ?? "auto"} value={option.id ?? "auto"}>
+                                        <span className="flex flex-col items-start">
+                                            <span className="text-sm">{option.name}</span>
+                                            <span className="text-[11px] text-muted-foreground">{option.note}</span>
+                                        </span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </section>
+
+                    <section>
+                        <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Instructions
+                        </h3>
+                        <p className="mt-2 rounded-md border border-border bg-muted/30 p-3 text-[13px] leading-relaxed text-muted-foreground">
+                            {porter.system_prompt ?? "Nothing yet — your site could not be read."}
+                        </p>
+                        <Link
+                            href={`${base}/settings`}
+                            className="mt-2 inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                        >
+                            Edit in settings
+                        </Link>
+                    </section>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{state.detail}</p>
             </div>
 
-            <dl className="mt-8 grid gap-px overflow-hidden rounded border border-border bg-border sm:grid-cols-3">
-                <div className="bg-background p-4">
-                    <dt className="text-xs text-muted-foreground">Questions asked</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums">{turns?.length ?? "—"}</dd>
-                </div>
-                <div className="bg-background p-4">
-                    <dt className="text-xs text-muted-foreground">Answered without sources</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums">{turns ? unsourced : "—"}</dd>
-                </div>
-                <div className="bg-background p-4">
-                    <dt className="text-xs text-muted-foreground">Refresh</dt>
-                    <dd className="mt-1 text-2xl font-semibold">Weekly</dd>
-                </div>
-            </dl>
-
-            {turns && turns.length > 0 && (
-                <section className="mt-8">
-                    <div className="flex items-baseline justify-between gap-4">
-                        <h2 className="text-sm font-medium">Recent questions</h2>
-                        <Link href={`${base}/conversations`} className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground">
-                            All conversations
-                        </Link>
-                    </div>
-                    <ul className="mt-3 divide-y divide-border border-y border-border">
-                        {turns.slice(0, 5).map((turn) => (
-                            <li key={turn.id} className="flex items-baseline justify-between gap-4 py-3">
-                                <p className="text-sm">{turn.question}</p>
-                                {!turn.grounded && (
-                                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">unsourced</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
+            {/* Right: what it looks like */}
+            <div className="relative hidden min-w-0 flex-1 lg:block">
+                <PorterCanvas porter={porter} />
+            </div>
         </div>
     );
 }
