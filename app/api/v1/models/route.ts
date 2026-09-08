@@ -9,6 +9,7 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { getManagedProviderNames } from '@/lib/gateway/providers-setup';
 import { hasStaticPricing } from '@/lib/providers/pricing';
 import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
+import { isPorterApiKey } from '@/lib/porter/credentials';
 
 /**
  * GET /api/v1/models
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
         const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
         const { data: keyData, error: keyError } = await supabase
             .from('api_keys')
-            .select('id, project_id, environment, allowed_models, sponsored_models')
+            .select('id, project_id, environment, client_app, allowed_models, sponsored_models')
             .eq('key_hash', keyHash)
             .is('revoked_at', null)
             .single();
@@ -126,6 +127,14 @@ export async function GET(req: NextRequest) {
                 }, { status: 401 }),
                 'invalid_api_key',
                 'Invalid API key'
+            );
+        }
+
+        if (isPorterApiKey(keyData)) {
+            return respond(
+                NextResponse.json({ error: { message: 'This key can only be used with Porter.', code: 'porter_key_scope' } }, { status: 403 }),
+                'porter_key_scope',
+                'This key can only be used with Porter'
             );
         }
 

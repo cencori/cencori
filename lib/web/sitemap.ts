@@ -22,7 +22,12 @@ function elementValue(block: string, name: string): string | null {
     return match ? decodeXml(match[1]) : null;
 }
 
-export function parseSitemap(value: string, baseUrl: string, limit = 50_000): SitemapEntry[] {
+export function parseSitemap(
+    value: string,
+    baseUrl: string,
+    limit = 50_000,
+    normalize: (value: string, base: string) => string = normalizeWebUrl,
+): SitemapEntry[] {
     const entries: SitemapEntry[] = [];
     const seen = new Set<string>();
     const sitemapIndex = /<sitemapindex(?:\s[^>]*)?>/i.test(value);
@@ -35,7 +40,7 @@ export function parseSitemap(value: string, baseUrl: string, limit = 50_000): Si
         const location = elementValue(match[1], 'loc');
         if (!location) continue;
         try {
-            const url = normalizeWebUrl(location, baseUrl);
+            const url = normalize(location, baseUrl);
             if (seen.has(url)) continue;
             seen.add(url);
             const lastModifiedRaw = elementValue(match[1], 'lastmod');
@@ -58,7 +63,7 @@ export function parseSitemap(value: string, baseUrl: string, limit = 50_000): Si
         const locPattern = /<loc(?:\s[^>]*)?>([\s\S]*?)<\/loc>/gi;
         while ((match = locPattern.exec(value)) !== null && entries.length < limit) {
             try {
-                const url = normalizeWebUrl(decodeXml(match[1]), baseUrl);
+                const url = normalize(decodeXml(match[1]), baseUrl);
                 if (!seen.has(url)) {
                     seen.add(url);
                     entries.push({ url, kind: 'page', lastModified: null });

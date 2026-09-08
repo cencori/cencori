@@ -5,6 +5,7 @@ import { addGatewayHeaders } from '@/lib/gateway-middleware';
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { fetchAllRows } from '@/lib/supabase-paginate';
+import { isPorterApiKey } from '@/lib/porter/credentials';
 
 interface MetricsResponse {
     period: string;
@@ -155,7 +156,7 @@ export async function GET(req: NextRequest) {
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
     const { data: keyData, error: keyError } = await supabase
         .from('api_keys')
-        .select('id, project_id, environment, projects!inner(id, name, organization_id)')
+        .select('id, project_id, environment, client_app, projects!inner(id, name, organization_id)')
         .eq('key_hash', keyHash)
         .is('revoked_at', null)
         .single();
@@ -165,6 +166,14 @@ export async function GET(req: NextRequest) {
             NextResponse.json({ error: 'Invalid API key' }, { status: 401 }),
             'invalid_api_key',
             'Invalid API key'
+        );
+    }
+
+    if (isPorterApiKey(keyData)) {
+        return respond(
+            NextResponse.json({ error: 'This key can only be used with Porter.', code: 'porter_key_scope' }, { status: 403 }),
+            'porter_key_scope',
+            'This key can only be used with Porter'
         );
     }
 

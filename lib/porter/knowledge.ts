@@ -4,6 +4,7 @@ import { fetchWebResource } from '@/lib/web/fetch';
 import { extractWebDocument } from '@/lib/web/html';
 import { indexWebDocument } from '@/lib/web/index';
 import { parseSitemap } from '@/lib/web/sitemap';
+import { normalizePorterHost, normalizePorterUrl } from '@/lib/porter/urls';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 
 /**
@@ -125,6 +126,8 @@ export type DiscoveredLinks = {
     /** Grouped by first path segment, because "87 pages under /docs" is a decision and 87 URLs is not. */
     groups: { path: string; urls: string[] }[];
     source: 'sitemap' | 'homepage';
+    /** Discovery stopped at its request, page, or time budget. */
+    truncated?: boolean;
 };
 
 /**
@@ -140,13 +143,34 @@ export async function discoverPorterLinks(host: string): Promise<DiscoveredLinks
     const origin = `https://${host}`;
     let urls: string[] = [];
     let source: DiscoveredLinks['source'] = 'sitemap';
+    const deadline = Date.now() + 32_000;
+    const pending = [`${origin}/sitemap.xml`];
+    const visited = new Set<string>();
+    const normalize = (value: string, base: string) => {
+        const url = normalizePorterUrl(new URL(value, base).toString(), host);
+        if (!url) throw new Error('Sitemap URL is outside the Porter site');
+        return url;
+    };
 
-    try {
-        const sitemap = await fetchWebResource(`${origin}/sitemap.xml`, { timeoutMs: 8_000 });
-        urls = parseSitemap(sitemap.body, origin, 2_000).map(entry => entry.url);
-    } catch {
-        urls = [];
+    while (pending.length && visited.size < 8 && urls.length < 2_000 && Date.now() < deadline) {
+        const url = pending.shift()!;
+        const canonical = normalize(url, origin);
+        if (visited.has(canonical)) continue;
+        visited.add(canonical);
+        try {
+            const sitemap = await fetchWebResource(url, { timeoutMs: Math.min(8_000, deadline - Date.now()) });
+            for (const entry of parseSitemap(sitemap.body, url, 2_000, normalize)) {
+                if (entry.kind === 'sitemap') {
+                    if (!visited.has(entry.url) && !pending.includes(entry.url)) pending.push(entry.url);
+                } else if (urls.length < 2_000) {
+                    urls.push(entry.url);
+                }
+            }
+        } catch {
+            // A failed child must not discard pages discovered in other sitemaps.
+        }
     }
+    const truncated = pending.length > 0 || urls.length >= 2_000;
 
     if (urls.length === 0) {
         source = 'homepage';
@@ -162,19 +186,10 @@ export async function discoverPorterLinks(host: string): Promise<DiscoveredLinks
     const seen = new Set<string>();
     const kept: string[] = [];
     for (const raw of urls) {
-        let url: URL;
-        try {
-            url = new URL(raw);
-        } catch {
-            continue;
-        }
-        const bareHost = url.hostname.replace(/^www\./, '');
-        if (bareHost !== host.replace(/^www\./, '')) continue;
-        if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|pdf|zip|mp4|woff2?)$/i.test(url.pathname)) continue;
-        // Keyed on the bare host: a sitemap that lists both www and apex would otherwise spend the
-        // page allowance twice on identical pages. A redirect to whichever the site prefers costs
-        // one hop and is handled by the fetcher.
-        const clean = `https://${bareHost}${url.pathname}`.replace(/\/$/, '') || `https://${bareHost}`;
+        const clean = normalizePorterUrl(raw, host);
+        if (!clean) continue;
+        const url = new URL(clean);
+        if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|pdf|zip|mp4|woff2?|xml|gz)$/i.test(url.pathname)) continue;
         if (seen.has(clean)) continue;
         seen.add(clean);
         kept.push(clean);
@@ -192,6 +207,7 @@ export async function discoverPorterLinks(host: string): Promise<DiscoveredLinks
     return {
         total: kept.length,
         source,
+        truncated,
         groups: Array.from(groups.entries())
             .map(([path, groupUrls]) => ({ path, urls: groupUrls }))
             .sort((a, b) => b.urls.length - a.urls.length),
@@ -267,7 +283,16 @@ export type PorterRefreshSummary = {
     changed: number;
     unchanged: number;
     failed: number;
+    /** Selected due pages left untouched when the run's time budget ended. */
+    deferred: number;
 };
+
+export class PorterRefreshError extends Error {
+    constructor(message: string, public readonly summary: PorterRefreshSummary) {
+        super(message);
+        this.name = 'PorterRefreshError';
+    }
+}
 
 /**
  * Re-read the pages that have come due.
@@ -289,30 +314,44 @@ export type PorterRefreshSummary = {
  */
 export async function refreshPorterKnowledge(
     supabase: AdminClient,
-    porter: { organization_id: string; project_id: string },
+    porter: { id: string; organization_id: string; project_id: string },
     limit = RECRAWL_BATCH,
+    options: { deadlineMs?: number } = {},
 ): Promise<PorterRefreshSummary> {
-    const summary: PorterRefreshSummary = { checked: 0, changed: 0, unchanged: 0, failed: 0 };
+    const summary: PorterRefreshSummary = { checked: 0, changed: 0, unchanged: 0, failed: 0, deferred: 0 };
 
-    const { data: due } = await supabase
+    const { data: due, error: queryError } = await supabase
         .from('web_documents')
-        .select('id, canonical_url, content')
+        .select('id, canonical_url, content, porter_knowledge_documents!inner(porter_id)')
+        .eq('porter_knowledge_documents.porter_id', porter.id)
         .eq('project_id', porter.project_id)
         .eq('visibility', 'project')
         .not('next_crawl_at', 'is', null)
         .lte('next_crawl_at', new Date().toISOString())
         .order('next_crawl_at', { ascending: true })
+        .order('id', { ascending: true })
         .limit(limit);
 
+    if (queryError) {
+        throw new PorterRefreshError(`Could not list due Porter pages: ${queryError.message}`, summary);
+    }
     if (!due || due.length === 0) return summary;
 
     const store = createWebDataStore(supabase);
     const nextCrawlAt = new Date(Date.now() + RECRAWL_INTERVAL_MS).toISOString();
 
     for (const row of due) {
+        if (options.deadlineMs !== undefined && Date.now() >= options.deadlineMs) {
+            summary.deferred = due.length - summary.checked;
+            break;
+        }
         summary.checked += 1;
         try {
-            const resource = await fetchWebResource(String(row.canonical_url));
+            const resource = await fetchWebResource(String(row.canonical_url), {
+                timeoutMs: options.deadlineMs === undefined
+                    ? undefined
+                    : Math.min(15_000, options.deadlineMs - Date.now()),
+            });
             const document = extractWebDocument(resource);
 
             if (document.content === row.content) {
@@ -329,7 +368,16 @@ export async function refreshPorterKnowledge(
         }
 
         // Reschedule whatever happened, so one unreachable page cannot be retried on every sweep.
-        await supabase.from('web_documents').update({ next_crawl_at: nextCrawlAt }).eq('id', row.id);
+        const { error: scheduleError } = await supabase
+            .from('web_documents')
+            .update({ next_crawl_at: nextCrawlAt })
+            .eq('id', row.id)
+            .eq('project_id', porter.project_id)
+            .eq('visibility', 'project');
+        if (scheduleError) {
+            summary.deferred = due.length - summary.checked;
+            throw new PorterRefreshError(`Could not reschedule Porter page: ${scheduleError.message}`, summary);
+        }
     }
 
     return summary;
@@ -349,27 +397,25 @@ export async function findPorterPassages(
     host: string,
 ): Promise<PorterPassage[]> {
     try {
-        const store = createWebDataStore(supabase);
-        const searchOptions = {
-            limit: RETRIEVAL_LIMIT,
-            // Scoped to the Porter's own site, not merely to its project. search_cencori_web_v2
-            // also matches public documents from unrelated crawls -- a search of one customer's
-            // project for "stripe" returned a GitHub Docs page -- and a Porter citing somebody
-            // else's website would be worse than a Porter that says it does not know.
-            domain: host,
-            freshAfter: null,
-            language: null,
-            queryEmbedding: null,
+        const search = async (question: string): Promise<Record<string, unknown>[]> => {
+            const { data, error } = await supabase.rpc('search_porter_knowledge', {
+                p_project_id: projectId,
+                p_query: question,
+                p_host: normalizePorterHost(host),
+                p_limit: RETRIEVAL_LIMIT,
+            });
+            if (error) throw new Error(error.message);
+            return (data ?? []) as Record<string, unknown>[];
         };
 
         // The store searches full text, which requires every term to match, so a whole question
         // finds nothing while its subject alone finds plenty. Ask with the question first, since a
         // full match is the best match, then fall back to just the words that carry meaning.
-        let rows = await store.searchDocuments(projectId, query, searchOptions);
+        let rows = await search(query);
         if (rows.length === 0) {
             const reduced = keywordsOf(query);
             if (reduced && reduced !== query) {
-                rows = await store.searchDocuments(projectId, reduced, searchOptions);
+                rows = await search(reduced);
             }
         }
 

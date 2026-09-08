@@ -58,6 +58,7 @@ vi.mock('@/lib/supabaseAdmin', () => ({
 }));
 
 import { validateGatewayRequest } from '@/lib/gateway-middleware';
+import { createPorterGatewayRequest } from '@/lib/porter/gateway-request';
 
 const TEST_API_KEY = 'cenc_live_test_key_abc123';
 
@@ -70,12 +71,14 @@ function buildKeyData(overrides?: {
     allowedDomains?: string[] | null;
     allowedModels?: string[] | null;
     sponsoredModels?: string[] | null;
+    clientApp?: string | null;
 }) {
     return {
         id: 'key-val-1',
         project_id: 'proj-val-1',
         environment: 'production',
         key_type: overrides?.keyType ?? 'secret',
+        client_app: overrides?.clientApp ?? null,
         allowed_domains: overrides?.allowedDomains ?? null,
         allowed_models: overrides?.allowedModels ?? null,
         sponsored_models: overrides?.sponsoredModels ?? null,
@@ -401,5 +404,91 @@ describe('validateGatewayRequest', () => {
         const result = await validateGatewayRequest(authRequest('/api/ai/chat'));
         expect(result.success).toBe(true);
         expect(mockSupabaseFrom).not.toHaveBeenCalledWith('api_keys');
+    });
+
+    describe('Porter gateway delegation', () => {
+        function porterRequest(projectId = 'proj-val-1') {
+            return createPorterGatewayRequest({
+                requestUrl: 'https://cencori.com/api/v1/porter/chat',
+                porterId: 'porter-1', projectId, apiKey: TEST_API_KEY, visitorIp: '127.0.0.1',
+                body: { model: 'groq/compound', messages: [{ role: 'user', content: 'Opening hours?' }], stream: false },
+            });
+        }
+
+        beforeEach(() => {
+            mockSupabaseFrom.mockImplementation(() => ({
+                select: () => ({ eq: () => ({ is: () => ({
+                    single: async () => ({ data: { ...buildKeyData({
+                        clientApp: 'porter', keyType: 'publishable', allowedDomains: ['customer.example'],
+                    }), agent_id: 'historical-agent' }, error: null }),
+                }) }) }),
+            }));
+        });
+
+        it.each(['/api/v1/chat/completions', '/api/v1/responses', '/api/v1/embeddings', '/api/ai/chat', '/api/v1/web/search'])(
+            'rejects a public Porter key at %s, even from the allowed domain', async path => {
+                const request = authRequest(path, { origin: 'https://customer.example' });
+                request.headers.set('X-Porter-Internal', 'true');
+                request.headers.set('X-Cencori-App', 'porter');
+                const result = await validateGatewayRequest(request);
+                expect(result.success).toBe(false);
+                if (!result.success) {
+                    expect(result.response.status).toBe(403);
+                    expect((await result.response.json()).code).toBe('porter_key_scope');
+                }
+                expect(mockCheckRateLimit).not.toHaveBeenCalled();
+            }
+        );
+
+        it('also rejects a scoped key served from the cache', async () => {
+            mockGetCachedApiKeyConfig.mockResolvedValue({ data: buildKeyData({ clientApp: 'porter' }) });
+            const result = await validateGatewayRequest(authRequest('/api/v1/chat/completions'));
+            expect(result.success).toBe(false);
+            if (!result.success) expect((await result.response.json()).code).toBe('porter_key_scope');
+        });
+
+        it('accepts trusted preview delegation without adding console origins to the key', async () => {
+            const result = await validateGatewayRequest(porterRequest());
+            expect(result.success).toBe(true);
+            if (result.success) expect(result.context.agentId).toBeNull();
+            expect(mockGetCachedApiKeyConfig).not.toHaveBeenCalled();
+            expect(mockCheckRateLimit).toHaveBeenCalled();
+            expect(mockCheckSpendCap).toHaveBeenCalledWith('proj-val-1');
+        });
+
+        it('does not transfer authorization when a request is copied', async () => {
+            const request = porterRequest();
+            const clone = new NextRequest(request.clone());
+            const result = await validateGatewayRequest(clone);
+            expect(result.success).toBe(false);
+            expect((await validateGatewayRequest(request)).success).toBe(true);
+        });
+
+        it('consumes delegation once', async () => {
+            const request = porterRequest();
+            expect((await validateGatewayRequest(request)).success).toBe(true);
+            expect((await validateGatewayRequest(request)).success).toBe(false);
+        });
+
+        it('rejects a capability bound to another project', async () => {
+            const result = await validateGatewayRequest(porterRequest('another-project'));
+            expect(result.success).toBe(false);
+        });
+
+        it('rejects changing the key after delegation is created', async () => {
+            const request = porterRequest();
+            request.headers.set('Authorization', 'Bearer a-different-key');
+            const result = await validateGatewayRequest(request);
+            expect(result.success).toBe(false);
+        });
+
+        it('still enforces the project spend cap on trusted Porter calls', async () => {
+            mockCheckSpendCap.mockResolvedValue({
+                allowed: false, reason: 'cap reached', status: { currentSpend: 10, spendCap: 10 },
+            });
+            const result = await validateGatewayRequest(porterRequest());
+            expect(result.success).toBe(false);
+            if (!result.success) expect((await result.response.json()).code).toBe('spend_cap_reached');
+        });
     });
 });
