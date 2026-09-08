@@ -17,6 +17,8 @@ export type PorterAction = { type?: string; to?: string; source?: string };
 export type Porter = {
     id: string;
     name: string;
+    greeting: string | null;
+    model: string | null;
     source_url: string;
     enabled: boolean;
     surface: string;
@@ -31,7 +33,7 @@ export type Porter = {
 
 export function usePorter(orgSlug: string, projectSlug: string) {
     return useQuery({
-        queryKey: ["porter", orgSlug, projectSlug, "workspace"],
+        queryKey: ["porter", orgSlug, projectSlug, "workspace-v3"],
         queryFn: async (): Promise<Porter | null> => {
             const { data: project } = await supabase
                 .from("projects")
@@ -45,7 +47,7 @@ export function usePorter(orgSlug: string, projectSlug: string) {
             const { data } = await supabase
                 .from("porters")
                 .select(
-                    "id, name, source_url, enabled, surface, created_at, system_prompt, publishable_key, collection_id, brand, brand_overrides, actions"
+                    "id, name, greeting, model, source_url, enabled, surface, created_at, system_prompt, publishable_key, collection_id, brand, brand_overrides, actions"
                 )
                 .eq("project_id", project.id)
                 .maybeSingle();
@@ -56,7 +58,7 @@ export function usePorter(orgSlug: string, projectSlug: string) {
 }
 
 export const PORTER_QUERY_KEY = (orgSlug: string, projectSlug: string) =>
-    ["porter", orgSlug, projectSlug, "workspace"] as const;
+    ["porter", orgSlug, projectSlug, "workspace-v3"] as const;
 
 export function snippetFor(porter: Porter): string | null {
     if (!porter.publishable_key) return null;

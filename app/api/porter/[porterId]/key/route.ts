@@ -72,6 +72,7 @@ export async function POST(
             key_prefix: apiKey.substring(0, keyPrefix.length + 4) + "...",
             environment: "production",
             key_type: "publishable",
+            client_app: "porter",
             allowed_domains: allowedDomains,
         });
 

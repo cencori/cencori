@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     const { data: porter } = await admin
         .from("porters")
-        .select("id, project_id, enabled")
+        .select("id, project_id, enabled, publishable_key")
         .eq("id", body.porterId)
         .maybeSingle();
 
@@ -104,13 +104,19 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // The key has to belong to this Porter's project, or one customer's publishable key would open
-    // a conversation with another's Porter.
+    // Only the current Porter credential may mint sessions. A sibling project's
+    // ordinary key (or a rotated/revoked Porter key) is not an embed credential.
+    if (apiKey !== porter.publishable_key) {
+        return withCors(NextResponse.json({ error: { message: "This key cannot be used with this Porter." } }, { status: 403 }), origin);
+    }
     const { data: key } = await admin
         .from("api_keys")
         .select("allowed_domains")
         .eq("key_hash", hashApiKey(apiKey))
         .eq("project_id", porter.project_id)
+        .eq("client_app", "porter")
+        .eq("key_type", "publishable")
+        .is("revoked_at", null)
         .maybeSingle();
 
     if (!key) {
@@ -133,7 +139,7 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    if (allowed.length > 0 && (!host || !allowed.includes(host))) {
+    if (!host || !allowed.includes(host)) {
         return withCors(
             NextResponse.json(
                 { error: { message: "Domain not allowed for this key.", code: "domain_not_allowed" } },
