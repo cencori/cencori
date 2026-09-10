@@ -4,18 +4,46 @@ import { fetchAllRows } from '@/lib/supabase-paginate';
 import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, PlatformEventsMetrics, CaptureMetrics } from './types';
 import type { User } from '@supabase/supabase-js';
 
-/** Exact row count for a table+window, bypassing the 1000-row read ceiling. */
+/**
+ * Exact row count for a table+window, bypassing the 1000-row read ceiling.
+ * Returns null when the count fails, so a timed-out query is never rendered as
+ * a confident "0" — see the analytics_* RPCs in
+ * supabase/migrations/20260910_140000_analytics_aggregates.sql.
+ */
 async function exactCount(
     table: string,
     tsColumn: string,
     startISO: string,
-): Promise<number> {
+): Promise<number | null> {
     const supabase = createAdminClient();
-    const { count } = await supabase
+    const { count, error } = await supabase
         .from(table)
         .select('*', { count: 'exact', head: true })
         .gte(tsColumn, startISO);
-    return count || 0;
+    if (error) {
+        console.error(`[Analytics] Count failed for ${table}:`, error.message);
+        return null;
+    }
+    return count ?? 0;
+}
+
+/**
+ * Call a DB-side analytics rollup. These aggregate in SQL so we never ship rows
+ * to Node: an `ai_requests` row carries request/response payloads (~5.5 KB), so
+ * a 30d window used to be a ~70 MB paginated walk that timed out in production
+ * and silently rendered as zeros.
+ *
+ * Returns null if the RPC is missing (migration not applied yet) or errors, so
+ * callers can fall back and/or report the section as unavailable.
+ */
+async function callAnalyticsRpc<T>(fn: string, startISO: string): Promise<T | null> {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc(fn, { p_start: startISO });
+    if (error) {
+        console.error(`[Analytics] RPC ${fn} failed:`, error.message);
+        return null;
+    }
+    return (data ?? null) as T | null;
 }
 
 function getStartDate(period: TimePeriod): Date {
@@ -32,43 +60,92 @@ function getStartDate(period: TimePeriod): Date {
     }
 }
 
+const EMPTY_GATEWAY_METRICS: AIGatewayMetrics = {
+    totalRequests: 0,
+    successfulRequests: 0,
+    errorRequests: 0,
+    filteredRequests: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    avgLatency: 0,
+    requestsByProvider: {},
+    requestsByModel: {},
+    streamingRequests: null,
+    nonStreamingRequests: null,
+    timeSeries: [],
+};
+
+type GatewayRollup = {
+    total_requests: number;
+    successful_requests: number;
+    error_requests: number;
+    filtered_requests: number;
+    total_tokens: number;
+    total_cost: number;
+    avg_latency: number;
+    requests_by_provider: Record<string, number>;
+    requests_by_model: Record<string, number>;
+};
+
 export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGatewayMetrics> {
+    const startISO = getStartDate(period).toISOString();
+
+    // The streaming split is a separate call: the flag lives on request_payload,
+    // and reading that column inside the rollup detoasts every row in the window
+    // (that is what timed the first version out). Its own RPC is served by a
+    // partial index, and a failure there costs the split, not the whole section.
+    const [rollup, streaming] = await Promise.all([
+        callAnalyticsRpc<GatewayRollup>('analytics_gateway_metrics', startISO),
+        callAnalyticsRpc<number>('analytics_gateway_streaming', startISO),
+    ]);
+
+    if (rollup) {
+        const totalRequests = Number(rollup.total_requests) || 0;
+        const streamingRequests = streaming === null ? null : Number(streaming) || 0;
+        return {
+            totalRequests,
+            successfulRequests: Number(rollup.successful_requests) || 0,
+            errorRequests: Number(rollup.error_requests) || 0,
+            filteredRequests: Number(rollup.filtered_requests) || 0,
+            totalTokens: Number(rollup.total_tokens) || 0,
+            totalCost: Number(rollup.total_cost) || 0,
+            avgLatency: Math.round(Number(rollup.avg_latency) || 0),
+            requestsByProvider: rollup.requests_by_provider || {},
+            requestsByModel: rollup.requests_by_model || {},
+            streamingRequests,
+            nonStreamingRequests: streamingRequests === null ? null : totalRequests - streamingRequests,
+            timeSeries: [],
+        };
+    }
+
+    // Fallback for a database that hasn't had the aggregates migration applied.
+    // Explicit (narrow) column list: the payload columns are what made the old
+    // select('*') walk unaffordable.
+    return getAIGatewayMetricsByScan(startISO);
+}
+
+/** Pre-RPC fallback. Streaming split stays null here — it lives on request_payload. */
+async function getAIGatewayMetricsByScan(startISO: string): Promise<AIGatewayMetrics> {
     const supabase = createAdminClient();
-    const startDate = getStartDate(period);
 
     type GatewayRow = {
-        status: string | null; total_tokens: number | null; cost_usd: string;
-        latency_ms: number | null; provider: string | null; model: string | null; stream: boolean | null;
+        status: string | null; total_tokens: number | null; cost_usd: number | string | null;
+        latency_ms: number | null; provider: string | null; model: string | null;
     };
     let requests: GatewayRow[];
     try {
         // Paginate past the 1000-row ceiling so platform totals are real.
-        // select('*') (not an explicit column list) so a drifted schema missing an
-        // optional column like `stream` can't 400 the whole query.
         requests = await fetchAllRows<GatewayRow>((from, to) =>
             supabase
                 .from('ai_requests')
-                .select('*')
-                .gte('created_at', startDate.toISOString())
+                .select('status, total_tokens, cost_usd, latency_ms, provider, model')
+                .gte('created_at', startISO)
                 .order('created_at', { ascending: true })
                 .range(from, to)
         );
     } catch (error) {
         console.error('[Analytics] Error fetching AI requests:', error);
-        return {
-            totalRequests: 0,
-            successfulRequests: 0,
-            errorRequests: 0,
-            filteredRequests: 0,
-            totalTokens: 0,
-            totalCost: 0,
-            avgLatency: 0,
-            requestsByProvider: {},
-            requestsByModel: {},
-            streamingRequests: 0,
-            nonStreamingRequests: 0,
-            timeSeries: [],
-        };
+        return { ...EMPTY_GATEWAY_METRICS, unavailable: true };
     }
 
     const totalRequests = requests.length;
@@ -80,7 +157,7 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
         (r) => r.status === 'filtered' || r.status === 'blocked'
     ).length;
     const totalTokens = requests.reduce((sum, r) => sum + (r.total_tokens || 0), 0);
-    const totalCost = requests.reduce((sum, r) => sum + (parseFloat(r.cost_usd) || 0), 0);
+    const totalCost = requests.reduce((sum, r) => sum + (parseFloat(String(r.cost_usd)) || 0), 0);
     const avgLatency = totalRequests > 0
         ? requests.reduce((sum, r) => sum + (r.latency_ms || 0), 0) / totalRequests
         : 0;
@@ -99,9 +176,6 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
         requestsByModel[model] = (requestsByModel[model] || 0) + 1;
     });
 
-    const streamingRequests = requests.filter(r => r.stream === true).length;
-    const nonStreamingRequests = totalRequests - streamingRequests;
-
     return {
         totalRequests,
         successfulRequests,
@@ -112,27 +186,61 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
         avgLatency: Math.round(avgLatency),
         requestsByProvider,
         requestsByModel,
-        streamingRequests,
-        nonStreamingRequests,
+        streamingRequests: null,
+        nonStreamingRequests: null,
         timeSeries: [],
     };
 }
+
+type SecurityRollup = {
+    total_incidents: number;
+    incidents_by_type: Record<string, number>;
+    incidents_by_severity: { low: number; medium: number; high: number; critical: number };
+};
 
 export async function getSecurityMetrics(period: TimePeriod): Promise<SecurityMetrics> {
     const supabase = createAdminClient();
     const startDate = getStartDate(period);
 
-    const { data: incidents, error } = await supabase
-        .from('security_incidents')
-        .select('*')
-        .gte('created_at', startDate.toISOString());
+    const rollup = await callAnalyticsRpc<SecurityRollup>(
+        'analytics_security_metrics',
+        startDate.toISOString(),
+    );
+    if (rollup) {
+        return {
+            totalIncidents: Number(rollup.total_incidents) || 0,
+            incidentsByType: rollup.incidents_by_type || {},
+            incidentsBySeverity: {
+                low: Number(rollup.incidents_by_severity?.low) || 0,
+                medium: Number(rollup.incidents_by_severity?.medium) || 0,
+                high: Number(rollup.incidents_by_severity?.high) || 0,
+                critical: Number(rollup.incidents_by_severity?.critical) || 0,
+            },
+            timeSeries: [],
+        };
+    }
 
-    if (error || !incidents) {
+    // Fallback: narrow column list — `input_text` alone runs to ~14 KB/row —
+    // and paginate, so totals aren't capped at the 1000-row read ceiling.
+    let incidents: { incident_type: string | null; severity: string | null }[];
+    try {
+        incidents = await fetchAllRows<{ incident_type: string | null; severity: string | null }>(
+            (from, to) =>
+                supabase
+                    .from('security_incidents')
+                    .select('incident_type, severity')
+                    .gte('created_at', startDate.toISOString())
+                    .order('created_at', { ascending: true })
+                    .range(from, to)
+        );
+    } catch (error) {
+        console.error('[Analytics] Error fetching security incidents:', error);
         return {
             totalIncidents: 0,
             incidentsByType: {},
             incidentsBySeverity: { low: 0, medium: 0, high: 0, critical: 0 },
             timeSeries: [],
+            unavailable: true,
         };
     }
 
@@ -159,26 +267,96 @@ export async function getSecurityMetrics(period: TimePeriod): Promise<SecurityMe
     };
 }
 
+interface ActiveEntities {
+    activeOrganizations: number;
+    activeProjects: number;
+    activeApiKeys: number;
+}
+
+type ActiveEntitiesRollup = {
+    active_organizations: number;
+    active_projects: number;
+    active_api_keys: number;
+};
+
+// The org/project/API-key sections each need the same distinct counts over the
+// same window; memoize briefly so one dashboard load makes one DB call.
+const ACTIVE_ENTITIES_TTL_MS = 10_000;
+const activeEntitiesCache = new Map<TimePeriod, { at: number; value: Promise<ActiveEntities> }>();
+
+async function getActiveEntities(period: TimePeriod): Promise<ActiveEntities> {
+    const cached = activeEntitiesCache.get(period);
+    if (cached && Date.now() - cached.at < ACTIVE_ENTITIES_TTL_MS) {
+        return cached.value;
+    }
+
+    const value = loadActiveEntities(period);
+    activeEntitiesCache.set(period, { at: Date.now(), value });
+    return value;
+}
+
+async function loadActiveEntities(period: TimePeriod): Promise<ActiveEntities> {
+    const startISO = getStartDate(period).toISOString();
+
+    const rollup = await callAnalyticsRpc<ActiveEntitiesRollup>('analytics_active_entities', startISO);
+    if (rollup) {
+        return {
+            activeOrganizations: Number(rollup.active_organizations) || 0,
+            activeProjects: Number(rollup.active_projects) || 0,
+            activeApiKeys: Number(rollup.active_api_keys) || 0,
+        };
+    }
+
+    // Fallback: one lean scan (ids only) instead of three payload-heavy ones.
+    // PostgREST types an embedded parent as an array even though it resolves to
+    // at most one row, so accept either shape.
+    type EmbeddedProject = { organization_id: string | null };
+    type UsageRow = {
+        project_id: string | null;
+        api_key_id: string | null;
+        projects: EmbeddedProject | EmbeddedProject[] | null;
+    };
+    const organizationId = (projects: UsageRow['projects']): string | null =>
+        (Array.isArray(projects) ? projects[0]?.organization_id : projects?.organization_id) ?? null;
+    const supabase = createAdminClient();
+    const usage = await fetchAllRows<UsageRow>((from, to) =>
+        supabase
+            .from('ai_requests')
+            .select('project_id, api_key_id, projects(organization_id)')
+            .gte('created_at', startISO)
+            .order('created_at', { ascending: true })
+            .range(from, to)
+    ).catch((error) => {
+        console.error('[Analytics] Error fetching gateway usage for active entities:', error);
+        return [] as UsageRow[];
+    });
+
+    const orgIds = new Set<string>();
+    const projectIds = new Set<string>();
+    const apiKeyIds = new Set<string>();
+    usage.forEach((row) => {
+        const orgId = organizationId(row.projects);
+        if (orgId) orgIds.add(orgId);
+        if (row.project_id) projectIds.add(row.project_id);
+        if (row.api_key_id) apiKeyIds.add(row.api_key_id);
+    });
+
+    return {
+        activeOrganizations: orgIds.size,
+        activeProjects: projectIds.size,
+        activeApiKeys: apiKeyIds.size,
+    };
+}
+
 export async function getOrganizationsMetrics(period: TimePeriod): Promise<OrganizationsMetrics> {
     const supabase = createAdminClient();
     const startDate = getStartDate(period);
 
     const { data: orgs } = await supabase.from('organizations').select('id, owner_id, subscription_tier, created_at');
     const { data: members } = await supabase.from('organization_members').select('user_id');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const activeOrgs = await fetchAllRows<any>((from, to) =>
-        supabase
-            .from('ai_requests')
-            .select('project_id, projects!inner(organization_id)')
-            .gte('created_at', startDate.toISOString())
-            .order('created_at', { ascending: true })
-            .range(from, to)
-    ).catch(() => []);
 
     const total = orgs?.length || 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const activeOrgIds = new Set(activeOrgs?.map((r: any) => r.projects?.organization_id).filter(Boolean));
-    const active = activeOrgIds.size;
+    const active = (await getActiveEntities(period)).activeOrganizations;
 
     const byTier: Record<string, number> = {};
     orgs?.forEach(o => {
@@ -214,18 +392,9 @@ export async function getProjectsMetrics(period: TimePeriod): Promise<ProjectsMe
     const startDate = getStartDate(period);
 
     const { data: projects } = await supabase.from('projects').select('id, status, visibility, created_at');
-    const activeProjects = await fetchAllRows<{ project_id: string | null }>((from, to) =>
-        supabase
-            .from('ai_requests')
-            .select('project_id')
-            .gte('created_at', startDate.toISOString())
-            .order('created_at', { ascending: true })
-            .range(from, to)
-    ).catch(() => []);
 
     const total = projects?.length || 0;
-    const activeProjectIds = new Set(activeProjects?.map(r => r.project_id));
-    const active = activeProjectIds.size;
+    const active = (await getActiveEntities(period)).activeProjects;
 
     const byStatus = {
         active: projects?.filter(p => p.status === 'active').length || 0,
@@ -247,22 +416,9 @@ export async function getApiKeysMetrics(period: TimePeriod): Promise<ApiKeysMetr
     const startDate = getStartDate(period);
 
     const { data: keys } = await supabase.from('api_keys').select('id, environment, created_at, last_used_at');
-    const keyUsage = await fetchAllRows<{ api_key_id: string | null }>((from, to) =>
-        supabase
-            .from('ai_requests')
-            .select('api_key_id')
-            .gte('created_at', startDate.toISOString())
-            .order('created_at', { ascending: true })
-            .range(from, to)
-    ).catch(() => []);
 
     const total = keys?.length || 0;
-    const activeKeyIds = new Set(
-        (keyUsage || [])
-            .map((request) => request.api_key_id)
-            .filter(Boolean)
-    );
-    const active = activeKeyIds.size;
+    const active = (await getActiveEntities(period)).activeApiKeys;
 
     const byEnvironment = {
         production: keys?.filter(k => k.environment === 'production').length || 0,
@@ -522,12 +678,32 @@ export async function getPlatformEventsMetrics(period: TimePeriod): Promise<Plat
     };
 }
 
+type CaptureRollup = {
+    gateway_requests: number;
+    governance_decisions: number;
+    memories: number;
+    agent_sessions: number;
+};
+
 /**
  * Workload capture per product — the numerator behind "% of global AI on
- * Cencori". Uses exact COUNT (head:true) so it never hits the 1000-row ceiling.
+ * Cencori". One DB-side call; falls back to four exact COUNTs (which never hit
+ * the 1000-row ceiling) if the aggregates migration isn't applied. A field is
+ * null when its count failed, so an unreadable table renders as "—" rather than
+ * as a confident zero.
  */
 export async function getCaptureMetrics(period: TimePeriod): Promise<CaptureMetrics> {
     const startISO = getStartDate(period).toISOString();
+
+    const rollup = await callAnalyticsRpc<CaptureRollup>('analytics_capture_metrics', startISO);
+    if (rollup) {
+        return {
+            gatewayRequests: Number(rollup.gateway_requests) || 0,
+            governanceDecisions: Number(rollup.governance_decisions) || 0,
+            memories: Number(rollup.memories) || 0,
+            agentSessions: Number(rollup.agent_sessions) || 0,
+        };
+    }
 
     const [gatewayRequests, governanceDecisions, memories, agentSessions] = await Promise.all([
         exactCount('ai_requests', 'created_at', startISO),            // model traffic
