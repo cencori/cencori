@@ -19,7 +19,7 @@
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import { decryptApiKey } from '@/lib/encryption';
 
-export type STTProvider = 'openai' | 'deepgram' | 'assemblyai' | 'spitch';
+export type STTProvider = 'openai' | 'deepgram' | 'assemblyai' | 'spitch' | 'groq';
 
 export interface TranscribeRequest {
     file: File;
@@ -86,6 +86,12 @@ export const STT_MODELS: Record<string, ModelInfo> = {
     'nova-3': { provider: 'deepgram', description: 'Deepgram Nova-3 (fast, diarization)', diarization: true },
     'assemblyai-universal': { provider: 'assemblyai', description: 'AssemblyAI Universal (long-form, diarization)', diarization: true },
     'spitch-stt': { provider: 'spitch', description: 'Spitch STT — Yoruba, Hausa, Igbo, English, Amharic', diarization: false },
+    // Groq's free developer plan bills nothing and rate-limits instead, so these
+    // are the only zero-cost transcription models in the catalog. Listed in
+    // free-models.ts, which getUsageUnitPricingFromDB checks before it looks for
+    // a per-minute rate.
+    'whisper-large-v3': { provider: 'groq', description: 'Whisper Large v3 on Groq — free, highest accuracy', diarization: false },
+    'whisper-large-v3-turbo': { provider: 'groq', description: 'Whisper Large v3 Turbo on Groq — free, fastest', diarization: false },
 };
 
 export function listTranscriptionModels() {
@@ -124,6 +130,7 @@ const ENV_KEYS: Record<STTProvider, string | undefined> = {
     deepgram: process.env.DEEPGRAM_API_KEY,
     assemblyai: process.env.ASSEMBLYAI_API_KEY,
     spitch: process.env.SPITCH_API_KEY,
+    groq: process.env.GROQ_API_KEY,
 };
 
 async function getProviderKey(ctx: GatewayContext, provider: STTProvider): Promise<string | null> {
@@ -173,6 +180,12 @@ export async function transcribeAudio(ctx: GatewayContext, req: TranscribeReques
             break;
         case 'spitch':
             result = await transcribeSpitch(apiKey, model, req);
+            break;
+        case 'groq':
+            // Groq serves the OpenAI transcription API verbatim — same multipart
+            // form, same verbose_json response — so the OpenAI adapter is reused
+            // against a different base URL rather than duplicated.
+            result = await transcribeOpenAICompatible('groq', GROQ_TRANSCRIBE_URL, apiKey, model, req);
             break;
         default:
             throw new TranscribeRequestError('bad_request', `Unsupported provider: ${provider}`);
@@ -228,7 +241,25 @@ interface WhisperVerbose {
     segments?: Array<{ start?: number; end?: number; text?: string }>;
 }
 
-async function transcribeOpenAI(apiKey: string, model: string, req: TranscribeRequest): Promise<TranscriptionResult> {
+const OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
+const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+function transcribeOpenAI(apiKey: string, model: string, req: TranscribeRequest): Promise<TranscriptionResult> {
+    return transcribeOpenAICompatible('openai', OPENAI_TRANSCRIBE_URL, apiKey, model, req);
+}
+
+/**
+ * The OpenAI `/audio/transcriptions` contract, which Groq reimplements exactly.
+ * `provider` is threaded through so errors and the returned record name the
+ * service that actually ran the request.
+ */
+async function transcribeOpenAICompatible(
+    provider: Extract<STTProvider, 'openai' | 'groq'>,
+    url: string,
+    apiKey: string,
+    model: string,
+    req: TranscribeRequest,
+): Promise<TranscriptionResult> {
     const form = new FormData();
     form.append('file', req.file);
     form.append('model', model);
@@ -238,13 +269,13 @@ async function transcribeOpenAI(apiKey: string, model: string, req: TranscribeRe
     if (req.prompt) form.append('prompt', req.prompt);
     if (typeof req.temperature === 'number') form.append('temperature', String(req.temperature));
 
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const res = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}` },
         body: form,
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
-    if (!res.ok) return upstreamError('openai', res);
+    if (!res.ok) return upstreamError(provider, res);
     const data = (await res.json()) as WhisperVerbose;
 
     const segments = (data.segments || []).map((s) => ({
@@ -258,7 +289,7 @@ async function transcribeOpenAI(apiKey: string, model: string, req: TranscribeRe
         durationSeconds: duration,
         language: data.language,
         segments: segments.length ? segments : undefined,
-        provider: 'openai',
+        provider,
         model,
     };
 }

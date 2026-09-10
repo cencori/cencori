@@ -194,10 +194,24 @@ const VISION_MODELS: Record<string, ModelInfo> = {
     // the live models on 2026-08-20 — both named the shapes, colours and
     // left-to-right order in a generated test image — rather than inferred from
     // the "vl"/"omni" in their ids.
-    'nvidia/nemotron-nano-12b-v2-vl:free': { provider: 'openrouter', apiModel: 'nvidia/nemotron-nano-12b-v2-vl:free', description: 'Free vision — 12B VL, 128k context' },
+    // `nvidia/nemotron-nano-12b-v2-vl:free` was removed on 2026-09-10 — the id
+    // 404s upstream, so it had stopped being a vision option some weeks earlier.
     'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { provider: 'openrouter', apiModel: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', description: 'Free vision — 30B omni-modal reasoning, 256k context' },
-    // B.AI — DeepSeek V4 Flash Vision (exp), routed through b.ai
-    'deepseek-v4-flash-vision-exp': { provider: 'bai', apiModel: 'deepseek-v4-flash-vision-exp', description: 'Vision-capable DeepSeek V4 Flash (exp) — image + text input via B.AI' },
+    // Added 2026-09-10, each verified the same way as the two above: a generated
+    // image of a red circle, blue square and green triangle, which all four
+    // named correctly in left-to-right order. Checked and rejected in the same
+    // pass: `google/gemma-4-*:free` (429 on every attempt, so unverifiable) and
+    // `nvidia/nemotron-3.5-content-safety:free` (accepts images but answers with
+    // a safety verdict rather than a description).
+    'inclusionai/ling-3.0-flash-vl:free': { provider: 'openrouter', apiModel: 'inclusionai/ling-3.0-flash-vl:free', description: 'Free vision — vision-language, 262k context' },
+    'nex-agi/nex-n2.5-pro:free': { provider: 'openrouter', apiModel: 'nex-agi/nex-n2.5-pro:free', description: 'Free vision — larger Nex model, 262k context' },
+    'nex-agi/nex-n2.5-mini:free': { provider: 'openrouter', apiModel: 'nex-agi/nex-n2.5-mini:free', description: 'Free vision — fast Nex model, 262k context' },
+    'dots-studio/dots-3-note-preview:free': { provider: 'openrouter', apiModel: 'dots-studio/dots-3-note-preview:free', description: 'Free vision — 512k context' },
+    // `deepseek-v4-flash-vision-exp` (B.AI) was removed 2026-09-10. This list is
+    // served publicly by GET /api/ai/vision, and B.AI had stopped honouring the
+    // zero-credit promo for it — every request returns "credit insufficient
+    // balance: balance=0 required=4" — so it was advertising a vision model
+    // nobody could call. Restore it with a funded account and a pricing row.
 };
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
