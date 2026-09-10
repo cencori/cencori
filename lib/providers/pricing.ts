@@ -29,6 +29,14 @@ export async function getUsageUnitPricingFromDB(
     model: string,
     unit: UsageUnit,
 ): Promise<UsageUnitPricing> {
+    // Free audio models (Groq's Whisper on its free developer plan) carry no
+    // per-minute or per-character row, and this function fails closed without
+    // one. Intercept them the same way getPricingFromDB does for token pricing,
+    // or they 503 instead of transcribing.
+    if (isExplicitlyFree(provider, model)) {
+        return { unitPriceUsd: 0, cencoriMarkupPercentage: 0 };
+    }
+
     const supabase = createAdminClient();
     const column = unit === 'characters' ? 'price_per_1k_chars' : 'price_per_minute';
     const { data, error } = await supabase

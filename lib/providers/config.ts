@@ -34,7 +34,9 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             { id: 'glm-5.2', name: 'GLM-5.2', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Flagship model, 1M context, coding & agentic, reasoning effort (max/high)' },
-            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning — free via B.AI promo', free: true },
+            // The one visible GLM-5.3 Flash row. Served through B.AI (see the bai
+            // provider block) but shown under Z.AI, which actually makes the model.
+            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning — free', free: true },
         ],
     },
     {
@@ -126,6 +128,19 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', type: ['chat'], contextWindow: 1000000, description: 'Speed optimized' },
             { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: ['image'], contextWindow: 0, description: 'Fast photorealism' },
             { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest Flash model, speed + reasoning' },
+            // Gemma — open-weight, served on the same Gemini API key. Google
+            // publishes no paid rate for these, so they are free at every tier
+            // and cannot be withdrawn by a billing change. The endpoint 500s
+            // intermittently (measured 2026-09-10); worth a retry, not a
+            // delisting.
+            //
+            // Deliberately NOT tagged `vision`. Gemma 4 is a multimodal
+            // checkpoint and OpenRouter reports image+video input for it, but
+            // every image request to the Gemini API endpoint failed on
+            // 2026-09-10 (500 INTERNAL, then empty 404s) while text on the same
+            // model succeeded. Tag it once an image actually round-trips.
+            { id: 'gemma-4-31b-it', name: 'Gemma 4 31B', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Open-weight Google model, 262k context — free', free: true },
+            { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Open-weight Google MoE, 262k context — free', free: true },
         ],
     },
     {
@@ -145,8 +160,10 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'ministral-8b', name: 'Ministral 8B', type: ['chat'], contextWindow: 128000, description: 'Small efficient model' },
             { id: 'codestral-latest', name: 'Codestral 25.01', type: ['code', 'chat'], contextWindow: 256000, description: '2.5x faster code generation' },
             { id: 'devstral-latest', name: 'Devstral 2', type: ['code', 'chat'], contextWindow: 256000, description: 'Frontier code agents' },
-            // Reasoning
-            { id: 'magistral-medium', name: 'Magistral Medium', type: ['reasoning', 'chat'], contextWindow: 128000, description: 'Multimodal reasoning' },
+            // Reasoning: `magistral-medium` removed 2026-09-10 — Mistral answers
+            // "Invalid model: magistral-medium". The model still exists as
+            // `magistral-medium-latest`; re-add it under that id together with a
+            // pricing row, not on its own.
         ],
     },
     {
@@ -161,6 +178,12 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Groq production model' },
             { id: 'groq/compound', name: 'Compound', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI system', free: true },
             { id: 'groq/compound-mini', name: 'Compound Mini', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI mini', free: true },
+            // Free on Groq's developer plan, which bills nothing and rate-limits
+            // instead. gpt-oss-120b/20b above stay paid on purpose — they carry
+            // active pricing rows (see free-models.ts).
+            { id: 'openai/gpt-oss-safeguard-20b', name: 'GPT OSS Safeguard 20B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Safety-classification variant of GPT OSS 20B — free', free: true },
+            { id: 'qwen/qwen3.8-27b', name: 'Qwen 3.8 27B', type: ['chat', 'reasoning', 'code'], contextWindow: 131072, description: 'Qwen 3.8 on Groq, fast reasoning — free', free: true },
+            { id: 'qwen/qwen3.6-27b', name: 'Qwen 3.6 27B', type: ['chat', 'reasoning', 'code'], contextWindow: 131072, description: 'Qwen 3.6 on Groq — free', free: true },
             { id: 'allam-2-7b', name: 'Allam 2 7B', type: ['chat'], contextWindow: 131072, description: 'Arabic-capable small model on Groq' },
         ],
     },
@@ -185,13 +208,17 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://together.ai',
         docsUrl: 'https://docs.together.ai',
         keyPrefix: '',
-        models: [
-            // Llama 4
-            { id: 'meta-llama/Llama-4-Maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest Llama' },
-            { id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', name: 'Llama 3.3 70B Turbo', type: ['chat'], contextWindow: 128000, description: 'Fast Llama inference' },
-            { id: 'Qwen/Qwen2.5-72B-Instruct-Turbo', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 32000, description: 'Alibaba flagship' },
-            { id: 'deepseek-ai/DeepSeek-V3.1', name: 'DeepSeek V3.1', type: ['chat'], contextWindow: 128000, description: 'Hybrid reasoning' },
-        ],
+        // Emptied 2026-09-10. None of these were callable: they carried no
+        // pricing rows, and TOGETHER_API_KEY returns 401 Unauthorized, so the
+        // managed key could not serve them either. Their upstream status was
+        // never confirmed — the key is invalid, so it could not be checked —
+        // and they were removed as unusable rather than as retired.
+        //
+        // The provider entry stays so a customer can still bring their own
+        // Together key; BYOK routing does not depend on this list. To restore
+        // the managed catalog: fix TOGETHER_API_KEY, re-read Together's live
+        // model list, then add back only the ids that exist, each with pricing.
+        models: [],
     },
     {
         id: 'perplexity',
@@ -248,48 +275,58 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // in pricing.ts — the two lists must stay in sync or the catalog test
             // fails). They replace the Groq Llama and Cerebras models that used to
             // carry the free tier: Groq decommissioned the former and the Cerebras
-            // account is unfunded (402 on every model).
+            // account is unfunded (402 on every model, re-confirmed 2026-09-10).
             //
-            // Every id below returned a 200 with real content on 2026-08-20. The
-            // `:free` listings are rate-limited and can 429 under load, so they are
-            // a fallback pool rather than a capacity guarantee. Excluded after
-            // testing: `z-ai/glm-5.2:free` and `google/gemma-4-*:free` (429 from
-            // upstream on repeat attempts).
+            // Every id below returned a 200 on 2026-09-10, checked against
+            // https://openrouter.ai/api/v1/models. Five ids that used to sit here
+            // had already 404'd upstream by then and were removed; run
+            // `npm run sync:free-models` to catch the next round before users do.
+            //
+            // The real constraint is not the model count — it is the account cap.
+            // OpenRouter allows 50 `:free` requests/day across ALL of these
+            // combined until 10 credits are purchased, then 1,000/day. Adding
+            // models here does not add capacity.
             //
             // Most of these are reasoning models that spend the first tokens on a
             // hidden reasoning trace, so a small max_tokens returns empty content.
-            // `poolside/laguna-s-2.1:free` and `nvidia/nemotron-nano-12b-v2-vl:free`
-            // answer cleanly at low budgets, which is why the first-test and
-            // default paths use those two.
+            // `poolside/laguna-s-2.1:free` answers cleanly at low budgets, which is
+            // why the first-test path uses it.
+
+            // OpenRouter's own pool router: one id fanned out across every
+            // zero-cost listing. It cannot go stale when a single model is
+            // withdrawn, so it is the default free model (DEFAULT_FREE_MODEL).
+            { id: 'openrouter/free', name: 'Auto (free pool)', type: ['chat', 'reasoning'], contextWindow: 200000, description: 'Automatically routes across the whole free pool. Survives any single free model being withdrawn — the most reliable free option', free: true },
+
             { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S 2.1 (free)', type: ['chat'], contextWindow: 262144, description: 'Free tier. Clean short answers, no reasoning preamble', free: true },
             { id: 'poolside/laguna-xs-2.1:free', name: 'Laguna XS 2.1 (free)', type: ['chat'], contextWindow: 262144, description: 'Free tier. Smallest Laguna', free: true },
-            { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'Nemotron Nano 12B VL (free)', type: ['chat', 'vision'], contextWindow: 128000, description: 'Free tier. Reads images; answers cleanly at low token budgets', free: true },
-            { id: 'nvidia/nemotron-nano-9b-v2:free', name: 'Nemotron Nano 9B (free)', type: ['chat'], contextWindow: 128000, description: 'Free tier. Small, fast', free: true },
-            { id: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nemotron 3 Nano 30B (free)', type: ['chat', 'reasoning'], contextWindow: 256000, description: 'Free tier. 30B MoE reasoning model', free: true },
-            { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni 30B (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 256000, description: 'Free tier. Omni-modal; reads images', free: true },
-            { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super 120B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. 120B MoE, strongest free reasoning', free: true },
+            { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni 30B (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 256000, description: 'Free tier. Omni-modal; reads images and audio', free: true },
+            { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super 120B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. 120B MoE, strongest free reasoning; overloads under load', free: true },
             { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'Nemotron 3 Ultra 550B (free)', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Free tier. 550B MoE, 1M context; overloads under load', free: true },
             { id: 'nvidia/nemotron-3.5-lightning:free', name: 'Nemotron 3.5 Lightning (free)', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Free tier. 1M context, low latency', free: true },
-            { id: 'openai/gpt-oss-20b:free', name: 'GPT OSS 20B (free)', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Free tier. 20B open-weight reasoning model', free: true },
+            { id: 'nvidia/nemotron-3.5-content-safety:free', name: 'Nemotron 3.5 Content Safety (free)', type: ['chat'], contextWindow: 128000, description: 'Free tier. Content-safety classifier — returns a safety verdict, not prose', free: true },
+            { id: 'inclusionai/ling-3.0-flash-vl:free', name: 'Ling 3.0 Flash VL (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Vision-language; reads images', free: true },
+            { id: 'inclusionai/ling-3.0-flash-sante:free', name: 'Ling 3.0 Flash Santé (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Health/life-sciences tuned', free: true },
+            { id: 'inclusionai/ling-3.0-flash-fin:free', name: 'Ling 3.0 Flash Fin (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Finance tuned', free: true },
+            { id: 'nex-agi/nex-n2.5-pro:free', name: 'Nex N2.5 Pro (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Larger Nex model; reads images', free: true },
+            { id: 'nex-agi/nex-n2.5-mini:free', name: 'Nex N2.5 Mini (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Fast Nex model; reads images', free: true },
+            // Also available direct from Google (google:gemma-4-*), which is not
+            // subject to OpenRouter's account cap and is the better route when
+            // these 429 — they do so often.
+            { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Open-weight 31B model; often rate-limited — the Gemma 4 31B listing is the more reliable route', free: true },
+            { id: 'google/gemma-4-26b-a4b-it:free', name: 'Gemma 4 26B A4B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Open-weight 26B MoE; often rate-limited — the Gemma 4 26B A4B listing is the more reliable route', free: true },
             { id: 'cohere/north-mini-code:free', name: 'North Mini Code (free)', type: ['code', 'chat'], contextWindow: 256000, description: 'Free tier. Code-specialised', free: true },
-            { id: 'dots-studio/dots-3-note-preview:free', name: 'Dots 3 Note Preview (free)', type: ['chat', 'reasoning'], contextWindow: 512000, description: 'Free tier. 512k context', free: true },
-            { id: 'liquid/lfm-2.5-2.6b:free', name: 'LFM 2.5 2.6B (free)', type: ['chat'], contextWindow: 128000, description: 'Free tier. Tiny, cheapest to run', free: true },
+            { id: 'dots-studio/dots-3-note-preview:free', name: 'Dots 3 Note Preview (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 512000, description: 'Free tier. 512k context; reads images', free: true },
+            { id: 'liquid/lfm-2.5-2.6b:free', name: 'LFM 2.5 2.6B (free)', type: ['chat'], contextWindow: 65536, description: 'Free tier. Tiny, cheapest to run', free: true },
 
-            // ── Stealth preview ───────────────────────────────────────────
-            // `stealth/ox-alpha` is an anonymous frontier model OpenRouter is
-            // stress-testing publicly. Verified against
-            // https://openrouter.ai/api/v1/models on 2026-08-21:
-            // 1,048,576 context / 131,072 max output, text+image+video input,
-            // mandatory reasoning (efforts max/high/low), tools and structured
-            // output supported, priced $0/$0 for the duration of the preview.
+            // Removed 2026-09-10 after they began 404ing upstream:
+            // nvidia/nemotron-nano-12b-v2-vl:free, nvidia/nemotron-nano-9b-v2:free,
+            // nvidia/nemotron-3-nano-30b-a3b:free, openai/gpt-oss-20b:free, and
+            // stealth/ox-alpha — the anonymous preview ended, exactly as its note
+            // here predicted it would.
             //
-            // Caveats worth surfacing to users: the operator is anonymous and
-            // retains prompts/completions (not used for training), so it must not
-            // be presented as a zero-data-retention option; the preview can end
-            // without notice, at which point the id starts 404ing upstream like
-            // any retired model. Community fingerprinting points at a GLM 5.x
-            // checkpoint but nothing is confirmed — do not document a lineage.
-            { id: 'stealth/ox-alpha', name: 'Ox Alpha (stealth preview)', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1048576, description: 'Anonymous stealth preview. Coding & long-horizon agentic work, text/image/video input, reasoning effort low→max. Free while the preview lasts; provider retains prompts', free: true },
+            // Not listed: thinkingmachines/inkling:free and inkling-small:free.
+            // They are priced $0 but 403 with "only available on agentic
+            // harnesses", so they are not callable through a gateway.
         ],
     },
     {
@@ -319,16 +356,17 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://llama.meta.com',
         docsUrl: 'https://llama.meta.com/docs',
         keyPrefix: '',
-        models: [
-            // Llama 4 (2025)
-            { id: 'llama-4-maverick', name: 'Llama 4 Maverick', type: ['chat'], contextWindow: 256000, description: 'Latest multimodal flagship' },
-            { id: 'llama-4-scout', name: 'Llama 4 Scout', type: ['chat'], contextWindow: 256000, description: 'Advanced reasoning' },
-            // Llama 3.3
-            { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', type: ['chat'], contextWindow: 128000, description: 'Latest Llama 3 model' },
-            { id: 'llama-3.2-90b-vision', name: 'Llama 3.2 90B Vision', type: ['chat'], contextWindow: 128000, description: 'Multimodal understanding' },
-            { id: 'llama-3.1-405b', name: 'Llama 3.1 405B', type: ['chat'], contextWindow: 128000, description: 'Largest open model' },
-            { id: 'llama-3.1-70b', name: 'Llama 3.1 70B', type: ['chat'], contextWindow: 128000, description: 'Balanced performance' },
-        ],
+        // Emptied 2026-09-10. These had two independent faults: no pricing rows,
+        // and the bare `llama-*` ids resolve to the `groq` provider under the
+        // prefix heuristic in router.ts, so a request never reached Meta in the
+        // first place. Meta publishes no first-party inference API — this
+        // provider is served by TOGETHER_API_KEY, which returns 401 — so there
+        // was no working path to any of them.
+        //
+        // If Llama is wanted back, serve it from a provider that actually hosts
+        // it (Groq and OpenRouter both do) rather than under a `meta` namespace
+        // with no endpoint behind it.
+        models: [],
     },
     {
         id: 'qwen',
@@ -337,12 +375,17 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://qwenlm.ai',
         docsUrl: 'https://qwen.readthedocs.io',
         keyPrefix: '',
-        models: [
-            { id: 'qwen2.5-72b-instruct', name: 'Qwen 2.5 72B', type: ['chat'], contextWindow: 128000, description: 'Flagship model' },
-            { id: 'qwen2.5-32b-instruct', name: 'Qwen 2.5 32B', type: ['chat'], contextWindow: 128000, description: 'Balanced performance' },
-            { id: 'qwen2.5-coder-32b', name: 'Qwen 2.5 Coder 32B', type: ['code', 'chat'], contextWindow: 128000, description: 'Code specialized' },
-            { id: 'qwq-32b-preview', name: 'QwQ 32B', type: ['reasoning'], contextWindow: 32000, description: 'Reasoning model' },
-        ],
+        // Emptied 2026-09-10. All four Qwen 2.5 / QwQ ids were removed after
+        // Qwen's live catalog was checked with a working key: it returns 165
+        // models and none of these are among them, so every request for one
+        // failed upstream. The earlier note that the key was unfunded was
+        // wrong — the key works; the models are gone.
+        //
+        // Repopulating this is real work, not a paste: current ids are
+        // `qwen3.8-max`, `qwen3.8-flash`, `qwen-flash`, `qwen-coder-plus` and
+        // similar, and each needs a model_pricing row before it is callable.
+        // Listing them without pricing would only trade a dead id for a 503.
+        models: [],
     },
     {
         id: 'deepseek',
@@ -354,8 +397,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         models: [
             // V4 Series (April 2026)
             { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance' },
-            { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '284B total / 13B active params, fast & economical — free via B.AI promo', free: true },
-            { id: 'deepseek-v4-flash-vision-exp', name: 'DeepSeek V4 Flash Vision (exp)', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Vision-capable DeepSeek V4 Flash experimental — image + text input — free via B.AI promo', free: true },
+            // DeepSeek V4 Flash (+ vision-exp) removed 2026-09-10 — the B.AI promo
+            // that made them free has ended; see the bai provider block.
             // V3.2 Series (Dec 2025)
             // V3.1 (Aug 2025)
             // V3 (March 2025 update)
@@ -411,17 +454,28 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://b.ai',
         docsUrl: 'https://b.ai/docs',
         keyPrefix: 'sk-',
-        // Backend provider for DeepSeek and GLM models rebranded under their
-        // public-facing provider names. The catalog entries under 'deepseek' and
-        // 'zai' are for UI branding; these entries are needed so the pricing
-        // catalog test maps active DB rows to catalog entries. Users should
-        // never see 'B.AI' as a selectable provider — the router overrides in
-        // router.ts steer these model IDs here transparently.
-        models: [
-            { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash (via B.AI)', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fast & economical, routed through B.AI — free', free: true },
-            { id: 'deepseek-v4-flash-vision-exp', name: 'DeepSeek V4 Flash Vision exp (via B.AI)', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Vision-capable DeepSeek V4 Flash, routed through B.AI — free', free: true },
-            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash (via B.AI)', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, routed through B.AI — free', free: true },
-        ],
+        // Backend provider for GLM (and formerly DeepSeek) models that are shown
+        // to customers under their real vendor's name. The router overrides in
+        // router.ts steer the model ids here transparently.
+        //
+        // This list is EMPTY on purpose, and must stay that way. Anything added
+        // here becomes a visible catalog row: components/models/ModelCatalog.tsx
+        // flattens every provider's `models` with no de-duplication, and because
+        // these ids are free, publicProviderLabel brands them "Cencori" — the
+        // same label the `zai` entry gets. The result was two rows with the same
+        // id, the same provider and no way to tell them apart, which is what
+        // `glm-5.3-flash` looked like here until 2026-09-10.
+        //
+        // Pricing does NOT come from this list. B.AI keeps its own rows under the
+        // `bai` namespace (20260830_170000_bai_deepseek_glm_catalog.sql) and the
+        // free override lives in free-models.ts as `bai:glm-5.3-flash` — which
+        // must stay, because the router resolves the model to `bai` before
+        // pricing is looked up. Removing the catalog row does not remove either.
+        //
+        // Also gone from here on 2026-09-10: deepseek-v4-flash and its vision
+        // variant, whose zero-credit promo ended ("credit insufficient balance:
+        // balance=0 required=4"). Their paid `bai` pricing rows are still active.
+        models: [],
     },
     {
         id: 'centaur',
@@ -430,15 +484,12 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: '',
         docsUrl: '',
         keyPrefix: '',
-        // Stealth preview from a partner lab, served under a codename for one
-        // week while they finish tuning. Free to customers for that window
-        // (see EXPLICITLY_FREE_MODELS) — when it lifts, this entry needs real
-        // pricing rows and probably a new model id. Specs below are what the
-        // partner has confirmed so far; context window is an unconfirmed
-        // placeholder pending their final card.
-        models: [
-            { id: 'centaur', name: 'Centaur', type: ['chat', 'reasoning'], contextWindow: 128000, description: 'Stealth preview. Frontier reasoning model under a codename — free while the preview lasts.', free: true },
-        ],
+        // Emptied 2026-09-10. The stealth preview's agreed free window closed on
+        // 2026-08-29 and the endpoint now answers "Incorrect API key provided",
+        // so the model had been advertised as free for twelve days after it
+        // stopped being reachable. If the partnership resumes, re-add with a
+        // real model id and pricing rows rather than restoring the codename.
+        models: [],
     },
     // ── Voice providers (BYOK) ──────────────────────────────────
     // Models are chosen per-call on the Voice endpoints, so these carry no
