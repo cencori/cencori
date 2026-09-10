@@ -16,10 +16,11 @@ describe('free model tier', () => {
         provider.models.filter(model => model.free).map(model => [provider.id, model.id] as const)
     );
 
-    // Centair ships under a codename while the partner lab stays anonymous;
-    // MODEL_ALIASES rewrites it to the id their endpoint actually serves.
-    // Everything else in the free tier must pass through unchanged.
-    const ALIASED_FREE_MODELS = new Set(['centaur']);
+    // Nothing in the free tier is aliased right now. Centaur was — it shipped
+    // under a codename that MODEL_ALIASES rewrote to `julian-origin` — but it
+    // left the free tier on 2026-09-10 when its preview window closed and its
+    // key stopped working. If another codenamed model arrives, add it here.
+    const ALIASED_FREE_MODELS = new Set<string>();
 
     // B.AI models are branded under deepseek/zai but routed through bai
     // (MODEL_PROVIDER_OVERRIDES in router.ts). Their catalog entries under
@@ -43,11 +44,24 @@ describe('free model tier', () => {
         }
     });
 
-    it('rewrites the centaur codename to its upstream id and keeps both free', () => {
-        expect(router.detectProvider('centaur')).toBe('centaur');
+    it('no longer advertises the retired Centaur preview as free', () => {
+        // The routing and alias plumbing stays in router.ts so a revived
+        // partnership does not need it rebuilt, but neither id may be free: the
+        // window closed 2026-08-29 and the endpoint rejects the key.
         expect(router.normalizeModelName('centaur', 'centaur')).toBe('julian-origin');
-        expect(isExplicitlyFree('centaur', 'centaur')).toBe(true);
-        expect(isExplicitlyFree('centaur', 'julian-origin')).toBe(true);
+        expect(isExplicitlyFree('centaur', 'centaur')).toBe(false);
+        expect(isExplicitlyFree('centaur', 'julian-origin')).toBe(false);
+    });
+
+    it('no longer advertises the ended B.AI DeepSeek promo as free', () => {
+        // B.AI now answers "credit insufficient balance" for these; only
+        // GLM-5.3 Flash is still served at zero credits.
+        for (const provider of ['deepseek', 'bai']) {
+            expect(isExplicitlyFree(provider, 'deepseek-v4-flash')).toBe(false);
+            expect(isExplicitlyFree(provider, 'deepseek-v4-flash-vision-exp')).toBe(false);
+        }
+        expect(isExplicitlyFree('bai', 'glm-5.3-flash')).toBe(true);
+        expect(isExplicitlyFree('zai', 'glm-5.3-flash')).toBe(true);
     });
 
     it('sends `:free` ids to OpenRouter rather than the vendor in their prefix', () => {
