@@ -6,9 +6,10 @@ import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, S
 import { usePlatformMetrics } from '../hooks/useMetrics';
 import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import type { TimePeriod } from '../lib/types';
+import type { CaptureMetrics, TimePeriod } from '../lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const PERIOD_LABELS: Record<TimePeriod, string> = {
     '1h': '1h',
@@ -20,9 +21,28 @@ const PERIOD_LABELS: Record<TimePeriod, string> = {
     'all': 'all time',
 };
 
+// A metric whose query failed reads as "—". A zero here would claim "no
+// traffic", which is exactly how a timed-out query used to look.
+const UNAVAILABLE = '—';
+const UNAVAILABLE_NOTE = 'query failed · not zero';
+
+function metric(value: number | null): number | string {
+    return value === null ? UNAVAILABLE : value;
+}
+
+/** Governed share of gateway traffic; null when either side is unreadable. */
+function governedShare(capture: CaptureMetrics): number | null {
+    const { gatewayRequests, governanceDecisions } = capture;
+    if (gatewayRequests === null || governanceDecisions === null) return null;
+    if (gatewayRequests === 0) return 0;
+    return Math.min(100, (governanceDecisions / gatewayRequests) * 100);
+}
+
 export function AdminDashboard() {
     const [period, setPeriod] = useState<TimePeriod>('7d');
     const { data, isLoading, error } = usePlatformMetrics(period);
+    const gatewayDown = Boolean(data?.aiGateway.unavailable);
+    const securityDown = Boolean(data?.security.unavailable);
 
     if (error) {
         return (
@@ -67,11 +87,8 @@ export function AdminDashboard() {
                             tokens={data.aiGateway.totalTokens}
                             requests={data.aiGateway.totalRequests}
                             cost={data.aiGateway.totalCost}
-                            governedShare={
-                                data.capture.gatewayRequests > 0
-                                    ? Math.min(100, (data.capture.governanceDecisions / data.capture.gatewayRequests) * 100)
-                                    : 0
-                            }
+                            governedShare={governedShare(data.capture)}
+                            unavailable={data.aiGateway.unavailable}
                             period={period}
                         />
                     </MetricsSection>
@@ -84,26 +101,30 @@ export function AdminDashboard() {
                         <MetricsGrid columns={4}>
                             <MetricsCard
                                 title="Gateway"
-                                value={data.capture.gatewayRequests}
-                                subtitle={`${data.aiGateway.totalTokens.toLocaleString()} tokens · model traffic`}
-                                subtitleColor="success"
+                                value={metric(data.capture.gatewayRequests)}
+                                subtitle={
+                                    data.aiGateway.unavailable
+                                        ? 'model traffic · unavailable'
+                                        : `${data.aiGateway.totalTokens.toLocaleString()} tokens · model traffic`
+                                }
+                                subtitleColor={data.aiGateway.unavailable ? 'warning' : 'success'}
                                 icon={<Activity className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Governance"
-                                value={data.capture.governanceDecisions}
+                                value={metric(data.capture.governanceDecisions)}
                                 subtitle="governed events · enterprise usage"
                                 icon={<Shield className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Memory"
-                                value={data.capture.memories}
+                                value={metric(data.capture.memories)}
                                 subtitle="memories · state captured"
                                 icon={<Database className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Agents"
-                                value={data.capture.agentSessions}
+                                value={metric(data.capture.agentSessions)}
                                 subtitle="sessions · agent workloads"
                                 icon={<Bot className="h-4 w-4" />}
                             />
@@ -118,30 +139,32 @@ export function AdminDashboard() {
                         <MetricsGrid columns={4}>
                             <MetricsCard
                                 title="Total Requests"
-                                value={data.aiGateway.totalRequests}
-                                subtitle={`${data.aiGateway.successfulRequests} successful`}
-                                subtitleColor="success"
+                                value={gatewayDown ? UNAVAILABLE : data.aiGateway.totalRequests}
+                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.successfulRequests} successful`}
+                                subtitleColor={gatewayDown ? 'warning' : 'success'}
                                 icon={<Activity className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Total Cost"
-                                value={`$${data.aiGateway.totalCost.toFixed(2)}`}
-                                subtitle={`${data.aiGateway.totalTokens.toLocaleString()} tokens`}
+                                value={gatewayDown ? UNAVAILABLE : `$${data.aiGateway.totalCost.toFixed(2)}`}
+                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.totalTokens.toLocaleString()} tokens`}
+                                subtitleColor={gatewayDown ? 'warning' : 'default'}
                                 icon={<DollarSign className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Avg Latency"
-                                value={`${data.aiGateway.avgLatency}ms`}
-                                subtitle={`${data.aiGateway.streamingRequests} streaming`}
+                                value={gatewayDown ? UNAVAILABLE : `${data.aiGateway.avgLatency}ms`}
+                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${metric(data.aiGateway.streamingRequests)} streaming`}
+                                subtitleColor={gatewayDown ? 'warning' : 'default'}
                                 icon={<Zap className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Error Rate"
-                                value={`${data.aiGateway.totalRequests > 0
+                                value={gatewayDown ? UNAVAILABLE : `${data.aiGateway.totalRequests > 0
                                     ? ((data.aiGateway.errorRequests / data.aiGateway.totalRequests) * 100).toFixed(1)
                                     : 0}%`}
-                                subtitle={`${data.aiGateway.errorRequests} errors, ${data.aiGateway.filteredRequests} filtered`}
-                                subtitleColor={data.aiGateway.errorRequests > 0 ? 'error' : 'success'}
+                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.errorRequests} errors, ${data.aiGateway.filteredRequests} filtered`}
+                                subtitleColor={gatewayDown ? 'warning' : data.aiGateway.errorRequests > 0 ? 'error' : 'success'}
                             />
                         </MetricsGrid>
 
@@ -168,22 +191,26 @@ export function AdminDashboard() {
                         <MetricsGrid columns={4}>
                             <MetricsCard
                                 title="Total Incidents"
-                                value={data.security.totalIncidents}
+                                value={securityDown ? UNAVAILABLE : data.security.totalIncidents}
+                                subtitle={securityDown ? UNAVAILABLE_NOTE : undefined}
+                                subtitleColor="warning"
                                 icon={<Shield className="h-4 w-4" />}
                             />
                             <MetricsCard
                                 title="Critical"
-                                value={data.security.incidentsBySeverity.critical}
+                                value={securityDown ? UNAVAILABLE : data.security.incidentsBySeverity.critical}
                                 subtitleColor={data.security.incidentsBySeverity.critical > 0 ? 'error' : 'default'}
                             />
                             <MetricsCard
                                 title="High"
-                                value={data.security.incidentsBySeverity.high}
+                                value={securityDown ? UNAVAILABLE : data.security.incidentsBySeverity.high}
                                 subtitleColor={data.security.incidentsBySeverity.high > 0 ? 'warning' : 'default'}
                             />
                             <MetricsCard
                                 title="Medium / Low"
-                                value={`${data.security.incidentsBySeverity.medium} / ${data.security.incidentsBySeverity.low}`}
+                                value={securityDown
+                                    ? UNAVAILABLE
+                                    : `${data.security.incidentsBySeverity.medium} / ${data.security.incidentsBySeverity.low}`}
                             />
                         </MetricsGrid>
                     </MetricsSection>
@@ -399,8 +426,15 @@ export function AdminDashboard() {
 
 // Throughput hero — the headline "AI running on Cencori" counter (Panel 1)
 function ThroughputHero({
-    tokens, requests, cost, governedShare, period,
-}: { tokens: number; requests: number; cost: number; governedShare: number; period: TimePeriod }) {
+    tokens, requests, cost, governedShare, unavailable, period,
+}: {
+    tokens: number;
+    requests: number;
+    cost: number;
+    governedShare: number | null;
+    unavailable?: boolean;
+    period: TimePeriod;
+}) {
     const subStat = (label: string, value: string) => (
         <div>
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
@@ -416,18 +450,20 @@ function ThroughputHero({
                     </p>
                     <div className="mt-2 flex items-baseline gap-2">
                         <span className="font-mono text-4xl sm:text-5xl font-semibold tabular-nums">
-                            {tokens.toLocaleString()}
+                            {unavailable ? UNAVAILABLE : tokens.toLocaleString()}
                         </span>
                         <span className="text-sm text-muted-foreground">tokens processed</span>
                     </div>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                        The numerator behind &ldquo;% of global AI on Cencori.&rdquo;
+                    <p className={cn('mt-1.5 text-xs', unavailable ? 'text-amber-500' : 'text-muted-foreground')}>
+                        {unavailable
+                            ? 'Gateway metrics query failed — this is not zero traffic.'
+                            : 'The numerator behind “% of global AI on Cencori.”'}
                     </p>
                 </div>
                 <div className="flex gap-6 sm:gap-8">
-                    {subStat('Requests', requests.toLocaleString())}
-                    {subStat('Cost', `$${cost.toFixed(2)}`)}
-                    {subStat('Governed', `${governedShare.toFixed(0)}%`)}
+                    {subStat('Requests', unavailable ? UNAVAILABLE : requests.toLocaleString())}
+                    {subStat('Cost', unavailable ? UNAVAILABLE : `$${cost.toFixed(2)}`)}
+                    {subStat('Governed', governedShare === null ? UNAVAILABLE : `${governedShare.toFixed(0)}%`)}
                 </div>
             </div>
         </div>

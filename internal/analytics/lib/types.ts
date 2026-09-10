@@ -17,9 +17,12 @@ export interface AIGatewayMetrics {
     avgLatency: number;
     requestsByProvider: Record<string, number>;
     requestsByModel: Record<string, number>;
-    streamingRequests: number;
-    nonStreamingRequests: number;
+    // null = the streaming split couldn't be read (it lives on request_payload).
+    streamingRequests: number | null;
+    nonStreamingRequests: number | null;
     timeSeries: TimeSeriesDataPoint[];
+    /** True when the query failed — render "—", not a zero that reads as "no traffic". */
+    unavailable?: boolean;
 }
 
 export interface SecurityMetrics {
@@ -32,6 +35,8 @@ export interface SecurityMetrics {
         critical: number;
     };
     timeSeries: TimeSeriesDataPoint[];
+    /** True when the query failed — render "—", not a zero that reads as "no incidents". */
+    unavailable?: boolean;
 }
 
 export interface OrganizationsMetrics {
@@ -127,10 +132,11 @@ export interface PlatformEventsMetrics {
  * Cencori". Each field is a workload a Cencori product captures.
  */
 export interface CaptureMetrics {
-    gatewayRequests: number;      // model traffic captured
-    governanceDecisions: number;  // enterprise AI usage captured (governed events)
-    memories: number;             // state captured
-    agentSessions: number;        // agent workloads captured
+    // null = the count failed (render "—"); 0 = genuinely no workload captured.
+    gatewayRequests: number | null;      // model traffic captured
+    governanceDecisions: number | null;  // enterprise AI usage captured (governed events)
+    memories: number | null;             // state captured
+    agentSessions: number | null;        // agent workloads captured
 }
 
 export interface PlatformOverviewMetrics {
