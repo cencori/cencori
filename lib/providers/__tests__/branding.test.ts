@@ -10,7 +10,10 @@ import {
 import { RateLimitError, ServiceUnavailableError } from '../errors';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 
-const FREE_MODEL = 'nvidia/nemotron-nano-12b-v2-vl:free';
+// A live free model. Kept current deliberately: the previous constant here
+// (`nvidia/nemotron-nano-12b-v2-vl:free`) went on passing this file long after
+// the id had 404'd upstream, which is how the dead free listings escaped notice.
+const FREE_MODEL = 'poolside/laguna-s-2.1:free';
 const FREE_PROVIDER = 'openrouter';
 
 describe('public provider identity', () => {

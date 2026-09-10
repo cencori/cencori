@@ -27,6 +27,12 @@ const MODEL_ALIASES: Record<string, string> = {
     'centaur': 'julian-origin',
 };
 
+/**
+ * Providers whose model ids are genuinely `vendor/model` upstream, so the part
+ * before the slash must be preserved rather than read as a routing prefix.
+ */
+const NAMESPACED_MODEL_ID_PROVIDERS = new Set(['huggingface', 'openrouter', 'groq']);
+
 // Explicit model-to-provider mapping for models whose IDs would route to the wrong provider via prefix matching
 const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     // Cerebras (gpt-oss- conflicts with gpt- → openai)
@@ -44,8 +50,16 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'openai/gpt-oss-120b': 'groq',
     'openai/gpt-oss-20b': 'groq',
     'qwen/qwen3-32b': 'groq',
+    'qwen/qwen3.8-27b': 'groq',
+    'qwen/qwen3.6-27b': 'groq',
+    'openai/gpt-oss-safeguard-20b': 'groq',
     'moonshotai/kimi-k2-instruct': 'groq',
     'allam-2-7b': 'groq',
+    // Google Gemma, served on the Gemini API. No `gemini-` prefix to match on,
+    // and the bare `gemma-4-31b` above is the (unfunded) Cerebras id — these
+    // carry the `-it` suffix Google publishes.
+    'gemma-4-31b-it': 'google',
+    'gemma-4-26b-a4b-it': 'google',
     // Maximo AI (defaults to openai)
     'maximo-atlas-1.2': 'maximo',
     'maximo-atlas-1.1': 'maximo',
@@ -248,15 +262,21 @@ export class ProviderRouter {
      */
     normalizeModelName(modelName: string, detectedProvider?: string): string {
         if (modelName.includes('/')) {
-            // HuggingFace model IDs use author/model format — never strip
-            if (detectedProvider === 'huggingface') {
-                return MODEL_ALIASES[modelName] || modelName;
-            }
-            // OpenRouter ids are always `vendor/model` and the vendor half is
-            // part of the id it expects upstream, not a routing prefix. Stripping
-            // it would send `nvidia/nemotron-...` upstream as `nemotron-...`,
-            // which OpenRouter does not serve.
-            if (detectedProvider === 'openrouter') {
+            // For these providers the `vendor/` half is part of the id the
+            // provider expects upstream, not a routing prefix to strip:
+            //
+            //  - huggingface: ids are always `author/model`.
+            //  - openrouter:  ids are always `vendor/model`. Stripping would send
+            //    `nvidia/nemotron-...` upstream as `nemotron-...`, which
+            //    OpenRouter does not serve.
+            //  - groq:        Groq namespaces the open-weight models it hosts by
+            //    their originating lab (`openai/gpt-oss-120b`, `qwen/qwen3.8-27b`,
+            //    `moonshotai/kimi-k2-instruct`) and rejects the bare form with
+            //    "model does not exist". Only `groq/compound*` survived stripping,
+            //    because there the prefix happens to equal the provider name — so
+            //    the paid gpt-oss models 404'd upstream while looking correctly
+            //    routed. Verified against Groq on 2026-09-10.
+            if (NAMESPACED_MODEL_ID_PROVIDERS.has(detectedProvider ?? '')) {
                 return MODEL_ALIASES[modelName] || modelName;
             }
             const [prefix] = modelName.split('/');

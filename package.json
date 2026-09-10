@@ -34,6 +34,7 @@
     "web:corpus:seed": "npm run build:web-corpus && node dist-workers/web-seed-corpus.mjs",
     "web:eval": "npm run build:web-eval && node dist-workers/web-eval.mjs",
     "web:model:install": "node scripts/web-model-install.mjs",
+    "sync:free-models": "node scripts/sync-openrouter-free-models.mjs",
     "dev:web": "node --env-file=.env.web.local node_modules/next/dist/bin/next dev",
     "web:worker": "npm run build:web-worker && node dist-workers/web-crawler.mjs",
     "web:worker:start": "node dist-workers/web-crawler.mjs",
