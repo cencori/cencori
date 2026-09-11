@@ -1,0 +1,1473 @@
+.site {
+  --ink: #050505;
+  --carbon: #0a0a0a;
+  --graphite: #151515;
+  --steel: #878b88;
+  --line: rgba(255, 255, 255, 0.18);
+  --paper: #e9e8e2;
+  --paper-line: rgba(8, 8, 8, 0.18);
+  --signal: #64ff9b;
+  width: 100%;
+  min-width: 0;
+  overflow: clip;
+  color: #f4f4ef;
+  background: var(--ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  line-height: 1.25;
+  text-rendering: geometricPrecision;
+}
+
+.site *,
+.site *::before,
+.site *::after {
+  box-sizing: border-box;
+}
+
+.site a,
+.site button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.site a:focus-visible,
+.site button:focus-visible {
+  outline: 1px solid var(--signal);
+  outline-offset: 4px;
+}
+
+.site a {
+  text-decoration: none;
+}
+
+.site button {
+  font: inherit;
+}
+
+.hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--ink);
+}
+
+.heroImage,
+.heroShade {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+}
+
+.heroImage {
+  background-image: url("/brand/cencori-hero.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.015);
+  animation: imageArrival 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 46%,
+    rgba(0, 0, 0, 0.72) 68%,
+    rgba(0, 0, 0, 0.28) 87%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 46%,
+    rgba(0, 0, 0, 0.72) 68%,
+    rgba(0, 0, 0, 0.28) 87%,
+    transparent 100%
+  );
+}
+
+.heroShade {
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0%, transparent 58%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.38) 0%, transparent 21%, transparent 58%, rgba(5, 5, 5, 0.92) 100%);
+}
+
+@keyframes imageArrival {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+.nav {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
+  align-items: center;
+  min-height: 5rem;
+  padding: 0 2.25rem;
+  animation: fadeDown 0.8s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.brand {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.logo {
+  display: block;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.brandLogo {
+  width: 7.2rem;
+}
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  gap: clamp(1.1rem, 2vw, 2rem);
+  padding: 0.68rem 1.1rem;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.desktopNav a {
+  position: relative;
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+  color: #fff;
+}
+
+.desktopNav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.35rem;
+  height: 1px;
+  background: var(--signal);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 220ms ease;
+}
+
+.desktopNav a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.navActions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.navCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.2rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  color: #050505;
+  background: #f3f3ef;
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+  transition: background 180ms ease;
+}
+
+.gatewayCopy a svg,
+.navCta:hover {
+  background: #e4e4de;
+}
+
+.menuButton,
+.mobileMenu {
+  display: none;
+}
+
+.heroContent {
+  align-self: end;
+  width: min(52rem, 70vw);
+  padding: 4rem 2.25rem 3.25rem;
+  animation: heroCopyArrival 1.1s 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes heroCopyArrival {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sectionLabel,
+.sectionLabelDark {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  max-width: 16ch;
+  margin: 0 0 1.35rem;
+  font-size: clamp(2.4rem, 3.6vw, 3.75rem);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.06em;
+  text-wrap: balance;
+}
+
+.belief,
+.gateway,
+.belief {
+  position: relative;
+  height: 260vh;
+}
+
+.sectionLabel,
+.sectionLabelDark {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.sectionLabelDark {
+  border-color: var(--paper-line);
+  color: rgba(8, 8, 8, 0.55);
+}
+
+.beliefSticky {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 2.1rem 2.25rem 2.4rem;
+}
+
+.sectionEyebrow {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.developers .sectionEyebrow {
+  color: rgba(8, 8, 8, 0.55);
+}
+
+.beliefStatement {
+  align-self: center;
+  max-width: 18ch;
+  margin: 4rem 0 10rem;
+  font-size: clamp(3.2rem, 6.65vw, 7.4rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.065em;
+}
+
+/* Readable by default: the dim start state only applies once the scroll
+   effect is live, so no-JS and reduced-motion render the full statement. */
+.beliefStatement[data-reveal="on"] .thesisWord {
+  opacity: 0.14;
+  will-change: opacity;
+}
+
+.partners,
+.gatewayCopy a,
+.developers {
+  position: relative;
+  color: #080808;
+  background: var(--paper);
+}
+
+.mission {
+  position: relative;
+  background: var(--ink);
+}
+
+.mission[data-pin="on"] {
+  height: 340vh;
+}
+
+/* One rule per breakpoint. The pane is exactly one screen tall (a definite
+   height, not a pin-gated min-height, or the visual has nothing to resolve
+   against) and carries no side or bottom padding, so the image reaches all
+   three edges. The gutters live on .mission .pinHeader instead. */
+.missionSticky {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100svh;
+  padding: 2.1rem 0 0;
+}
+
+.mission[data-pin="on"] .missionSticky {
+  position: sticky;
+  top: 0;
+}
+
+.mission .sectionEyebrow {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mission .pinLead {
+  color: #f4f4ef;
+}
+
+.mission .pinHeader {
+  padding: 0 2.25rem;
+}
+
+.mission .pinBody {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-self: stretch;
+  min-height: 0;
+  padding: clamp(3rem, 6vh, 6rem) 0 0;
+}
+
+.mission .pinGrid {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.pinGrid.missionGrid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.missionVisual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: #0b0b0b;
+  isolation: isolate;
+}
+
+.missionVisual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), transparent 54%, rgba(0, 0, 0, 0.14));
+  content: "";
+  pointer-events: none;
+}
+
+.missionImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+  filter: saturate(0.82) contrast(1.04) brightness(0.8);
+  transform: scale(1.002);
+}
+
+/* The pin is opt-in: JS adds it only once it has measured that the composition
+   fits the viewport, so a pane can never hide its own lower half. */
+.developers[data-pin="on"] {
+  height: 340vh;
+}
+
+.developersSticky {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 2.1rem 2.25rem 2.4rem;
+}
+
+.developers[data-pin="on"] .developersSticky {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Transparent to layout on desktop, where the whole pane pins. On mobile it
+   becomes the header's scroll runway: the header sticks for its duration and
+   then scrolls away naturally, pushed out by the cards that follow. */
+.pinStage {
+  display: contents;
+}
+
+.pinHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(2rem, 4vw, 5rem);
+}
+
+.pinBody {
+  align-self: center;
+  width: 100%;
+}
+
+.pinLead {
+  max-width: 52ch;
+  margin: 0;
+  transform-origin: 0 0;
+  color: rgba(8, 8, 8, 0.9);
+  font-size: clamp(1.5rem, 2.05vw, 2.35rem);
+  font-weight: 600;
+  line-height: 1.26;
+  letter-spacing: -0.028em;
+  text-wrap: pretty;
+}
+
+/* Both tiers dim the words; only the pinned tier moves the block and
+   withholds the cards. */
+[data-choreo] .leadWord {
+  opacity: 0.12;
+  will-change: opacity;
+}
+
+[data-choreo] .pinLead {
+  will-change: transform;
+}
+
+[data-choreo] .pinCard {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+.pinGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.25rem, 2vw, 2.25rem);
+  align-items: start;
+}
+
+.pinPoster {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 52vh;
+  border-radius: 0.9rem;
+  overflow: hidden;
+}
+
+.pinPosterImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.001);
+  filter: saturate(0.94) brightness(0.96);
+  transition:
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 500ms ease;
+  will-change: transform;
+}
+
+.pinPoster:hover .pinPosterImage {
+  transform: scale(1.012);
+  filter: saturate(1.04) brightness(1.02);
+}
+
+.pinStatement {
+  padding: clamp(1.4rem, 2vw, 2.1rem) 0 0;
+}
+
+.pinStatement h2 {
+  margin: 0;
+  color: inherit;
+  font-size: clamp(1.2rem, 1.6vw, 1.85rem);
+  font-weight: 500;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.gateway {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 2.1rem 2.25rem 5rem;
+}
+
+.gatewayGrid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: clamp(3rem, 8vw, 10rem);
+  align-items: center;
+  min-height: calc(100vh - 10rem);
+  min-height: calc(100dvh - 10rem);
+  padding: 6rem 3.5rem;
+}
+
+.monoTag {
+  margin: 0 0 1.4rem;
+  color: var(--signal);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+
+.gatewayCopy h2 {
+  max-width: 10ch;
+  margin: 0;
+  font-size: clamp(3.2rem, 5.6vw, 6.6rem);
+  font-weight: 500;
+  line-height: 0.93;
+  letter-spacing: -0.065em;
+}
+
+.gatewayCopy > p:not(.monoTag) {
+  max-width: 31rem;
+  margin: 2rem 0 2.4rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.95rem;
+  line-height: 1.58;
+}
+
+.trace {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #0d0e0d;
+  box-shadow: 2rem 2rem 0 rgba(255, 255, 255, 0.035);
+}
+
+.traceHeader,
+.traceFooter,
+.traceRow {
+  display: grid;
+  align-items: center;
+  font-family: var(--font-mono), monospace;
+}
+
+.traceHeader {
+  grid-template-columns: 1fr auto;
+  min-height: 3.6rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--line);
+  color: rgba(255, 255, 255, 0.43);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+}
+
+.traceRow {
+  grid-template-columns: 5.4rem 1rem 1fr 1.15fr;
+  min-height: 5.25rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.65rem;
+}
+
+.traceRow > span {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.traceRow i {
+  width: 0.35rem;
+  height: 0.35rem;
+  background: #5c605d;
+}
+
+.traceRow .traceActive {
+  background: var(--signal);
+  box-shadow: 0 0 0.7rem rgba(100, 255, 155, 0.7);
+}
+
+.traceRow strong {
+  font-weight: 400;
+}
+
+.traceRow code {
+  justify-self: end;
+  color: rgba(255, 255, 255, 0.42);
+  font-family: inherit;
+}
+
+.traceFooter {
+  grid-template-columns: 1fr auto;
+  min-height: 3.75rem;
+  padding: 0 1rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.traceFooter span:last-child {
+  color: var(--signal);
+}
+
+/* Height is the rail itself: the hairlines are the section's edges. */
+.partners {
+  padding: 0 2.25rem;
+}
+
+/* Fixed-width cells rather than fractions of the row, so each one can be a
+   true square. Stretching three cells across the page would make each square
+   as tall as it is wide - roughly 640px - which is why the size is capped. */
+.partnerRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(7.5rem, 12vw, 12rem);
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--paper-line);
+  border-bottom: 1px solid var(--paper-line);
+  list-style: none;
+}
+
+.partnerRail li {
+  display: flex;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 1.8vw, 1.75rem);
+}
+
+/* Every cell is ruled on both sides, so the group reads as a closed set of
+   boxes rather than an open row. */
+.partnerRail li {
+  border-left: 1px solid var(--paper-line);
+}
+
+.partnerRail li:last-child {
+  border-right: 1px solid var(--paper-line);
+}
+
+.partnerLogo[data-invert] {
+  filter: invert(1);
+}
+
+.partnerLogo {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(clamp(1.5rem, 2.4vw, 2.4rem) * var(--logo-scale, 1));
+  object-fit: contain;
+}
+
+.gatewayCopy a,
+.developers {
+  position: relative;
+  color: #080808;
+  background: var(--paper);
+}
+
+.mission {
+  position: relative;
+  background: var(--ink);
+}
+
+.mission[data-pin="on"] {
+  height: 340vh;
+}
+
+/* One rule per breakpoint. The pane is exactly one screen tall (a definite
+   height, not a pin-gated min-height, or the visual has nothing to resolve
+   against) and carries no side or bottom padding, so the image reaches all
+   three edges. The gutters live on .mission .pinHeader instead. */
+.missionSticky {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100svh;
+  padding: 2.1rem 0 0;
+}
+
+.mission[data-pin="on"] .missionSticky {
+  position: sticky;
+  top: 0;
+}
+
+.mission .sectionEyebrow {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mission .pinLead {
+  color: #f4f4ef;
+}
+
+.mission .pinHeader {
+  padding: 0 2.25rem;
+}
+
+.mission .pinBody {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-self: stretch;
+  min-height: 0;
+  padding: clamp(3rem, 6vh, 6rem) 0 0;
+}
+
+.mission .pinGrid {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.pinGrid.missionGrid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.missionVisual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: #0b0b0b;
+  isolation: isolate;
+}
+
+.missionVisual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), transparent 54%, rgba(0, 0, 0, 0.14));
+  content: "";
+  pointer-events: none;
+}
+
+.missionImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+  filter: saturate(0.82) contrast(1.04) brightness(0.8);
+  transform: scale(1.002);
+}
+
+/* The pin is opt-in: JS adds it only once it has measured that the composition
+   fits the viewport, so a pane can never hide its own lower half. */
+.developers[data-pin="on"] {
+  height: 340vh;
+}
+
+.developersSticky {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 2.1rem 2.25rem 2.4rem;
+}
+
+.developers[data-pin="on"] .developersSticky {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Transparent to layout on desktop, where the whole pane pins. On mobile it
+   becomes the header's scroll runway: the header sticks for its duration and
+   then scrolls away naturally, pushed out by the cards that follow. */
+.pinStage {
+  display: contents;
+}
+
+.pinHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(2rem, 4vw, 5rem);
+}
+
+.pinBody {
+  align-self: center;
+  width: 100%;
+}
+
+.pinLead {
+  max-width: 52ch;
+  margin: 0;
+  transform-origin: 0 0;
+  color: rgba(8, 8, 8, 0.9);
+  font-size: clamp(1.5rem, 2.05vw, 2.35rem);
+  font-weight: 600;
+  line-height: 1.26;
+  letter-spacing: -0.028em;
+  text-wrap: pretty;
+}
+
+/* Both tiers dim the words; only the pinned tier moves the block and
+   withholds the cards. */
+[data-choreo] .leadWord {
+  opacity: 0.12;
+  will-change: opacity;
+}
+
+[data-choreo] .pinLead {
+  will-change: transform;
+}
+
+[data-choreo] .pinCard {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+.pinGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.25rem, 2vw, 2.25rem);
+  align-items: start;
+}
+
+.pinPoster {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 52vh;
+  border-radius: 0.9rem;
+  overflow: hidden;
+}
+
+.pinPosterImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.001);
+  filter: saturate(0.94) brightness(0.96);
+  transition:
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 500ms ease;
+  will-change: transform;
+}
+
+.pinPoster:hover .pinPosterImage {
+  transform: scale(1.012);
+  filter: saturate(1.04) brightness(1.02);
+}
+
+.pinStatement {
+  padding: clamp(1.4rem, 2vw, 2.1rem) 0 0;
+}
+
+.pinStatement h2 {
+  margin: 0;
+  color: inherit;
+  font-size: clamp(1.2rem, 1.6vw, 1.85rem);
+  font-weight: 500;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.gateway {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 2.1rem 2.25rem 5rem;
+}
+
+.gatewayGrid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: clamp(3rem, 8vw, 10rem);
+  align-items: center;
+  min-height: calc(100vh - 10rem);
+  min-height: calc(100dvh - 10rem);
+  padding: 6rem 3.5rem;
+}
+
+.monoTag {
+  margin: 0 0 1.4rem;
+  color: var(--signal);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+
+.gatewayCopy h2 {
+  max-width: 10ch;
+  margin: 0;
+  font-size: clamp(3.2rem, 5.6vw, 6.6rem);
+  font-weight: 500;
+  line-height: 0.93;
+  letter-spacing: -0.065em;
+}
+
+.gatewayCopy > p:not(.monoTag) {
+  max-width: 31rem;
+  margin: 2rem 0 2.4rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.95rem;
+  line-height: 1.58;
+}
+
+.trace {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #0d0e0d;
+  box-shadow: 2rem 2rem 0 rgba(255, 255, 255, 0.035);
+}
+
+.traceHeader,
+.traceFooter,
+.traceRow {
+  display: grid;
+  align-items: center;
+  font-family: var(--font-mono), monospace;
+}
+
+.traceHeader {
+  grid-template-columns: 1fr auto;
+  min-height: 3.6rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--line);
+  color: rgba(255, 255, 255, 0.43);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+}
+
+.traceRow {
+  grid-template-columns: 5.4rem 1rem 1fr 1.15fr;
+  min-height: 5.25rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.65rem;
+}
+
+.traceRow > span {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.traceRow i {
+  width: 0.35rem;
+  height: 0.35rem;
+  background: #5c605d;
+}
+
+.traceRow .traceActive {
+  background: var(--signal);
+  box-shadow: 0 0 0.7rem rgba(100, 255, 155, 0.7);
+}
+
+.traceRow strong {
+  font-weight: 400;
+}
+
+.traceRow code {
+  justify-self: end;
+  color: rgba(255, 255, 255, 0.42);
+  font-family: inherit;
+}
+
+.traceFooter {
+  grid-template-columns: 1fr auto;
+  min-height: 3.75rem;
+  padding: 0 1rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.traceFooter span:last-child {
+  color: var(--signal);
+}
+
+.industryMatrix {
+  border-top: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.matrixHead,
+.matrixRow {
+  display: grid;
+  grid-template-columns: 1.55fr repeat(3, 0.65fr);
+}
+
+.matrixHead {
+  min-height: 3.5rem;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.53rem;
+  letter-spacing: 0.09em;
+}
+
+.matrixRow {
+  min-height: 5.8rem;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  transition: background 180ms ease, padding 180ms ease;
+}
+
+.matrixRow:hover {
+  padding: 0 1rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.matrixRow span:first-child {
+  font-size: clamp(1.2rem, 2.2vw, 2.35rem);
+  letter-spacing: -0.045em;
+}
+
+.matrixRow small {
+  display: inline-block;
+  width: 2.4rem;
+  color: var(--signal);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+.matrixRow span:not(:first-child) {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+.footer {
+  padding: 7rem 2.25rem 1.4rem;
+  background: #060606;
+}
+
+.footerMeta {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-top: 2.5rem;
+  color: rgba(255, 255, 255, 0.37);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.footerMeta > div {
+  justify-self: end;
+  display: flex;
+  gap: 1rem;
+}
+
+@media (max-width: 1180px) {
+  .nav {
+    grid-template-columns: 1fr auto;
+  }
+
+  .desktopNav {
+    display: none;
+  }
+
+  .navActions {
+    grid-column: 2;
+  }
+
+  .gatewayGrid {
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+  .pinGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  /* Option 1: the header pins on its own, the cards leave the pinned pane and
+     scroll up over it. Full-width squares are far taller than a viewport, so
+     they can never live inside a sticky pane. */
+  /* Mobile uses the desktop arrangement: the whole pane pins. Two-up cards
+     put the first row inside the held frame and the third below it, so the
+     third arriving is what carries everything upward. */
+  .developers[data-pin="on"],
+  .mission[data-pin="on"] {
+    height: 280vh;
+  }
+
+  .developersSticky {
+    display: grid;
+    padding: 2.1rem 1.25rem 2rem;
+  }
+
+  .missionSticky {
+    display: grid;
+    height: 100vh;
+    height: 100svh;
+    padding: 2.1rem 0 0;
+  }
+
+  .developers[data-pin="on"] .developersSticky,
+  .mission[data-pin="on"] .missionSticky {
+    position: sticky;
+    top: 0;
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  .pinHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  /* Rests docked just under the eyebrow, so the collapse carries it up to sit
+     beneath the label and the two then leave together as one block. */
+  .pinLead {
+    align-self: start;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0.75rem 0 0;
+    font-size: 1.3rem;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+  }
+
+  .pinBody {
+    align-self: start;
+    padding: 1.75rem 0 0;
+  }
+
+  .pinGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+
+  .pinGrid.missionGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .mission .pinHeader {
+    padding: 0 1.25rem;
+  }
+
+  .mission .pinBody {
+    padding-top: clamp(2rem, 4vh, 3.5rem);
+  }
+
+  .missionVisual {
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .missionImage {
+    object-position: 60% center;
+  }
+
+  .pinStatement {
+    padding-top: 0.6rem;
+  }
+
+  .pinStatement h2 {
+    font-size: clamp(0.9rem, 3.2vw, 1.1rem);
+    line-height: 1.28;
+  }
+
+  .nav,
+  .heroContent,
+  .beliefSticky,
+  .developersSticky,
+  .gateway,
+  .partners,
+  .footer {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .nav {
+    min-height: 4.5rem;
+  }
+
+  .navActions {
+    display: none;
+  }
+
+  .menuButton {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .mobileMenu {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: 7rem 1.25rem 2rem;
+    background: #070707;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-1rem);
+    transition: opacity 240ms ease, transform 240ms ease;
+  }
+
+  .mobileMenuOpen {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .mobileMenu nav {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobileMenu nav a {
+    display: flex;
+    align-items: baseline;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: clamp(2.4rem, 11vw, 5rem);
+    letter-spacing: -0.06em;
+  }
+
+  .mobileMenuFooter {
+    display: grid;
+  }
+
+  .mobileMenuCta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.85rem;
+    border-radius: 999px;
+    color: #050505;
+    background: #f3f3ef;
+    font-size: 0.95rem;
+    letter-spacing: -0.005em;
+    transition: background 180ms ease;
+  }
+
+  .mobileMenuCta:hover {
+    background: #e4e4de;
+  }
+
+  .heroContent {
+    width: min(44rem, 78vw);
+  }
+
+  .hero h1 {
+    font-size: clamp(2.4rem, 5.5vw, 3.25rem);
+  }
+
+  .gatewayGrid,
+  .gatewayGrid {
+    min-height: auto;
+    padding: 7rem 0 3rem;
+  }
+
+  .gatewayCopy h2 {
+    max-width: 12ch;
+  }
+
+  .industryMatrix {
+    overflow-x: auto;
+  }
+
+  .matrixHead,
+  .matrixRow {
+    min-width: 48rem;
+  }
+
+}
+
+@media (max-width: 640px) {
+  .developersSticky,
+  .developers[data-pin="on"] .developersSticky {
+    padding: 1.5rem 1.25rem 4.5rem;
+  }
+
+  .missionSticky {
+    height: 100vh;
+    height: 100svh;
+    padding: 1.5rem 0 0;
+  }
+
+  /* Developers only. Three stacked full-width cards cannot fit a pinned frame,
+     so that section scrolls. Mission carries a single visual and fits, so it
+     keeps the pin and the full choreography. */
+  .developers,
+  .developers[data-pin="on"] {
+    height: auto;
+    min-height: 100svh;
+  }
+
+  .developersSticky,
+  .developers[data-pin="on"] .developersSticky {
+    display: block;
+    position: static;
+    min-height: 100svh;
+  }
+
+  .developers .pinBody,
+  .mission .pinBody {
+    padding-top: 2.5rem;
+  }
+
+  .developers .pinGrid,
+  .mission .pinGrid {
+    grid-template-columns: 1fr;
+    gap: 2.75rem;
+  }
+
+  .developers .pinPoster,
+  .mission .pinPoster {
+    max-height: none;
+  }
+
+  .developers .pinStatement,
+  .mission .pinStatement {
+    padding-top: 1rem;
+  }
+
+  .heroImage {
+    background-position: 62% center;
+  }
+
+  .heroShade {
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.78), rgba(0,0,0,0.12)),
+      linear-gradient(180deg, rgba(0,0,0,0.35), transparent 46%, rgba(5,5,5,0.92));
+  }
+
+  .brand {
+    gap: 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  .brandLogo {
+    width: 6rem;
+  }
+
+  .heroContent {
+    width: 100%;
+    padding-top: 3rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .hero h1 {
+    margin-top: 0;
+    font-size: clamp(2.45rem, 10.5vw, 2.9rem);
+    line-height: 0.94;
+  }
+
+  .belief {
+    height: 220vh;
+  }
+
+  .sectionLabel span:last-child,
+  .sectionLabelDark span:last-child {
+    text-align: right;
+  }
+
+  .beliefStatement {
+    margin: 2.5rem 0 7rem;
+    font-size: clamp(2.9rem, 13.5vw, 4.8rem);
+  }
+
+  .pinStatement h2 {
+    font-size: clamp(1.05rem, 4.2vw, 1.35rem);
+  }
+
+  .gateway {
+    padding-bottom: 4rem;
+  }
+
+  .gatewayCopy h2 {
+    font-size: clamp(3.1rem, 14vw, 4.8rem);
+  }
+
+  .trace {
+    margin-inline: -1.25rem;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+
+  .traceRow {
+    grid-template-columns: 4.4rem 0.8rem 1fr;
+    min-height: 4.6rem;
+    padding-inline: 0.8rem;
+    font-size: 0.57rem;
+  }
+
+  .traceRow code {
+    display: none;
+  }
+
+  .footer {
+    padding-top: 5rem;
+  }
+
+  .footerMeta {
+    grid-template-columns: 1fr auto;
+    gap: 1.2rem;
+  }
+
+  .footerMeta > span:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroImage,
+  .nav,
+  .heroContent {
+    animation: none;
+  }
+
+  .site *,
+  .site *::before,
+  .site *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
