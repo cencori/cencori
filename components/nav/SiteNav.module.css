@@ -1,0 +1,539 @@
+.navShell {
+  --ink: #050505;
+  --carbon: #0a0a0a;
+  --graphite: #151515;
+  --steel: #878b88;
+  --line: rgba(255, 255, 255, 0.18);
+  --paper: #e9e8e2;
+  --paper-line: rgba(8, 8, 8, 0.18);
+  --signal: #64ff9b;
+  position: relative;
+  z-index: 30;
+}
+
+.siteNavSolid {
+  position: sticky;
+  top: 0;
+  --ink: #050505;
+  --carbon: #0a0a0a;
+  --graphite: #151515;
+  --steel: #878b88;
+  --line: rgba(255, 255, 255, 0.18);
+  --paper: #e9e8e2;
+  --paper-line: rgba(8, 8, 8, 0.18);
+  --signal: #64ff9b;
+  background: transparent;
+}
+
+.nav {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
+  align-items: center;
+  min-height: 5rem;
+  padding: 0 2.25rem;
+  transition: background-color 180ms ease;
+  animation: fadeDown 0.8s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.navShellOpen .nav {
+  background: var(--ink);
+}
+
+.navSolid {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
+  align-items: center;
+  min-height: 5rem;
+  padding: 0 2.25rem;
+  background: transparent;
+}
+
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.brand {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.logo {
+  display: block;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.brandLogo {
+  width: 7.2rem;
+}
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  gap: clamp(1.1rem, 2vw, 2rem);
+  padding: 0.68rem 1.1rem;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background-color 180ms ease;
+}
+
+.navShellOpen .desktopNav {
+  background: transparent;
+}
+
+.navTrigger {
+  position: relative;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+  letter-spacing: -0.005em;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+}
+
+.navTrigger::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.35rem;
+  height: 1px;
+  background: var(--signal);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 220ms ease;
+}
+
+.navTrigger:hover::after,
+.navTrigger:focus-visible::after,
+.navTrigger[data-active]::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.navBackdrop {
+  position: fixed;
+  inset: 5rem 0 0;
+  z-index: 1;
+  background: rgba(5, 5, 5, 0.48);
+  backdrop-filter: blur(12px) saturate(0.72);
+  -webkit-backdrop-filter: blur(12px) saturate(0.72);
+  pointer-events: none;
+  animation: navBackdropIn 180ms ease both;
+}
+
+.navBackdropSolid {
+  position: fixed;
+  inset: 5rem 0 0;
+  z-index: 1;
+  background: rgba(5, 5, 5, 0.48);
+  backdrop-filter: blur(12px) saturate(0.72);
+  -webkit-backdrop-filter: blur(12px) saturate(0.72);
+  pointer-events: none;
+  animation: navBackdropIn 180ms ease both;
+}
+
+.megaMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  min-height: 29rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f4f4ef;
+  background: var(--ink);
+  box-shadow: 0 2.5rem 5rem rgba(0, 0, 0, 0.28);
+  animation: megaMenuIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.megaMenuInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.72fr);
+  gap: clamp(3rem, 7vw, 8rem);
+  width: min(100%, 90rem);
+  min-height: 29rem;
+  margin: 0 auto;
+  padding: 3.2rem 2.25rem 3.7rem;
+  animation: megaContentIn 320ms 40ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.megaKicker {
+  margin: 0 0 1.7rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.megaLinkList {
+  display: grid;
+}
+
+.megaPrimary .megaLinkList {
+  justify-items: start;
+  gap: 0.4rem;
+}
+
+.megaPrimaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(1.75rem, 2.45vw, 2.65rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+  transition: color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.megaPrimaryLink svg {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0;
+  stroke: var(--signal);
+  stroke-width: 1.4;
+  fill: none;
+  transform: translate(-0.35rem, 0.35rem);
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.megaPrimaryLink:hover,
+.megaPrimaryLink:focus-visible {
+  color: #fff;
+  transform: translateX(0.35rem);
+}
+
+.megaPrimaryLink:hover svg,
+.megaPrimaryLink:focus-visible svg {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.megaSecondaryLink {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 3.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.88rem;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.megaSecondaryLink:hover,
+.megaSecondaryLink:focus-visible {
+  border-color: rgba(100, 255, 155, 0.55);
+  color: #fff;
+}
+
+@keyframes navBackdropIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes megaMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.65rem);
+  }
+}
+
+@keyframes megaContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.8rem);
+  }
+}
+
+.navActions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.navCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.2rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  color: #050505;
+  background: #f3f3ef;
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+  transition: background 180ms ease;
+}
+
+.navCta:hover {
+  background: #e4e4de;
+}
+
+.menuButton,
+.mobileMenu {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .navShellOpen .nav {
+    background: transparent;
+  }
+
+  .navBackdrop,
+  .megaMenu {
+    display: none;
+  }
+
+  .nav,
+  .navSolid {
+    grid-template-columns: 1fr auto;
+  }
+
+  .desktopNav {
+    display: none;
+  }
+
+  .navActions {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Header stays above the overlay so brand and Menu/Close remain tappable. */
+  .nav,
+  .navSolid {
+    z-index: 11;
+  }
+
+  .nav,
+  .navSolid {
+    min-height: 4.5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .navActions {
+    display: none;
+  }
+
+  .menuButton {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-family: var(--font-mono), monospace;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .mobileMenu {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: 7rem 1.25rem 2rem;
+    background: #070707;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-1rem);
+    transition: opacity 240ms ease, transform 240ms ease;
+  }
+
+  .mobileMenuOpen {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .mobileMenuScroll {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .mobileMenuList {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobileMenu .mobileMenuList a,
+  .mobileMenu .mobileMenuList button {
+    display: flex;
+    align-items: baseline;
+    padding: 0.7rem 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-size: clamp(2.4rem, 11vw, 5rem);
+    line-height: 1.04;
+    letter-spacing: -0.06em;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mobileSub {
+    animation: mobileSubIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobileMenu .mobileBack {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.75rem;
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+  }
+
+  .mobileBack span {
+    display: inline-block;
+    transition: transform 200ms ease;
+  }
+
+  .mobileBack:hover span,
+  .mobileBack:focus-visible span {
+    transform: translateX(-0.25rem);
+  }
+
+  .mobileKicker {
+    margin: 0 0 0.5rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-family: var(--font-mono), monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .mobileSubLabel {
+    margin: 2.25rem 0 0.25rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+  }
+
+  .mobileSecondaryList {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobileSecondaryList a {
+    padding: 0.55rem 0;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  @keyframes mobileSubIn {
+    from {
+      opacity: 0;
+      transform: translateX(1.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .mobileMenuFooter {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .mobileSocials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 0;
+    padding: 0.25rem 0.15rem 0;
+    list-style: none;
+  }
+
+  .mobileSocials a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.6);
+    transition: color 180ms ease;
+  }
+
+  .mobileSocials a:hover,
+  .mobileSocials a:focus-visible {
+    color: #f4f4ef;
+  }
+
+  .mobileSocials svg {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .mobileMenuCta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.85rem;
+    border-radius: 999px;
+    color: #050505;
+    background: #f3f3ef;
+    font-size: 0.95rem;
+    letter-spacing: -0.005em;
+    transition: background 180ms ease;
+  }
+
+  .mobileMenuCta:hover {
+    background: #e4e4de;
+  }
+}
+
+@media (max-width: 640px) {
+  .brand {
+    gap: 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  .brandLogo {
+    width: 6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav,
+  .navBackdrop,
+  .megaMenu,
+  .megaMenuInner {
+    animation: none;
+  }
+}
