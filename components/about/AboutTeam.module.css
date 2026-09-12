@@ -1,0 +1,99 @@
+.team {
+  position: relative;
+  height: 180dvh;
+  background: #050505;
+}
+
+.pin {
+  position: sticky;
+  top: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.label {
+  position: absolute;
+  top: 2.1rem;
+  left: 2.25rem;
+  z-index: 2;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100dvh;
+}
+
+.card {
+  position: relative;
+  min-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  background: #0b0b0b;
+}
+
+.image {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.scrim {
+  position: absolute;
+  inset: auto 0 0;
+  height: 45%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
+}
+
+.meta {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  padding: 2rem 2.25rem 2.4rem;
+}
+
+.name {
+  margin: 0 0 0.35rem;
+  color: #f4f4ef;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.role {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 700px) {
+  .team {
+    height: 160dvh;
+  }
+
+  .label {
+    left: 1.25rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    min-height: 50dvh;
+  }
+
+  .meta {
+    padding: 1.5rem 1.25rem 1.75rem;
+  }
+}

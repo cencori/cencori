@@ -1,0 +1,41 @@
+.hero {
+  position: relative;
+  height: 200dvh;
+}
+
+.pin {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 1.25rem 1.25rem calc(1.25rem + 8vh);
+  text-align: center;
+}
+
+.inner {
+  display: grid;
+  justify-items: center;
+  gap: 1.75rem;
+  will-change: transform, opacity, filter;
+}
+
+.label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+
+.statement {
+  max-width: 46ch;
+  margin: 0;
+  color: #f4f4ef;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
