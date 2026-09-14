@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { expireStaleSessions } from '@/lib/gateway/session-engine';
+import { expireStaleSessions } from '@/lib/gateway/session-expiry';
 import { processUsageQueue } from '@/lib/queue';
 
 async function run(req: NextRequest) {
