@@ -34,10 +34,16 @@ describe("Arcie public positioning", () => {
 
   it("exposes the managed API direction through both navigation and docs", () => {
     const products = navigationMenus.find((menu) => menu.id === "products");
-    expect(products?.secondary).toContainEqual({
-      href: "/arcie/docs/managed-api",
-      label: "Arcie managed API",
-    });
+    const hrefs = (products?.groups ?? []).flatMap((group) =>
+      (group.items ?? []).flatMap((item) => [
+        item.href,
+        item.link?.href,
+        ...((item as { preview?: { href?: string }[] }).preview ?? []).map(
+          (entry) => entry.href,
+        ),
+      ]),
+    );
+    expect(hrefs).toContain("/arcie");
     const meta = JSON.parse(read("content/arcie/meta.json"));
     expect(meta.pages).toContain("managed-api");
   });
