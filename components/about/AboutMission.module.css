@@ -1,0 +1,111 @@
+.mission {
+  position: relative;
+  height: 300dvh;
+  background: #f4f4ef;
+}
+
+.pin {
+  position: sticky;
+  top: 0;
+  display: grid;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  display: grid;
+  width: 100%;
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  width: 100%;
+  min-height: 100dvh;
+  padding-right: 2.25rem;
+}
+
+.label {
+  grid-column: 1;
+  align-self: start;
+  margin: 0;
+  padding: 2.1rem 2.25rem 0;
+  color: rgba(5, 5, 5, 0.5);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.statement {
+  grid-column: 1;
+  align-self: end;
+  margin: 0;
+  padding: 2rem 2.25rem 2.4rem;
+  color: #050505;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+}
+
+.statement[data-reveal="on"] .word {
+  opacity: 0.14;
+  will-change: opacity;
+}
+
+.visual {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
+  justify-self: center;
+  width: min(100%, 100dvh);
+  aspect-ratio: 1 / 1;
+  margin: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #e2e2dc;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+@media (max-width: 900px) {
+  .pin {
+    overflow-y: auto;
+  }
+
+  .frame {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    min-height: 100dvh;
+    padding-right: 0;
+  }
+
+  .label {
+    padding: 2.1rem 1.25rem 0;
+  }
+
+  .statement {
+    padding: 2rem 1.25rem;
+  }
+
+  .visual {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    height: 100%;
+    min-height: 40dvh;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+}

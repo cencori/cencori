@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import Navbar from "@/components/landing/Navbar";
+import { SiteNav } from "@/components/nav/SiteNav";
 import { useDocsContext } from "./DocsContext";
-import { Logo } from "@/components/logo";
-import { siteConfig } from "@/config/site";
 import { Search, Sparkles } from "lucide-react";
 import { DocsSearchModal } from "@/components/docs/DocsSearchModal";
 import { AskAISidebar } from "@/components/docs/AskAISidebar";
@@ -48,78 +46,7 @@ function DocsSearchTrigger({ onClick }: { onClick: () => void }) {
 
 export function DocsNavbarWrapper() {
     const { isAskAIOpen, setAskAIOpen, setUserProfile: setContextUserProfile } = useDocsContext();
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [userProfile, setUserProfile] = useState<UserProfile>({ name: null, avatar: null, email: null });
     const [searchOpen, setSearchOpen] = useState(false);
-
-    useEffect(() => {
-        const checkUser = async () => {
-            const { data } = await supabase.auth.getSession();
-            if (data?.session) {
-                setIsAuthenticated(true);
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    const profile = { name: name as string | null, avatar: avatar as string | null, email: user.email ?? null };
-                    setUserProfile(profile);
-                    setContextUserProfile(profile);
-                }
-            } else {
-                setIsAuthenticated(false);
-                setIsAuthenticated(false);
-                setUserProfile({ name: null, avatar: null, email: null });
-                setContextUserProfile(null);
-            }
-        };
-        checkUser();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-            if (session) {
-                setIsAuthenticated(true);
-                const { user } = session;
-                if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    const profile = { name: name as string | null, avatar: avatar as string | null, email: user.email ?? null };
-                    setUserProfile(profile);
-                    setContextUserProfile(profile);
-                }
-            } else {
-                setIsAuthenticated(false);
-                setIsAuthenticated(false);
-                setUserProfile({ name: null, avatar: null, email: null });
-                setContextUserProfile(null);
-            }
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
-
-    const unauthenticatedActions = [
-        { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
-        {
-            text: "Get Started",
-            href: siteConfig.links.getStartedUrl,
-            isButton: true,
-            variant: "default",
-        },
-    ];
-
-    const authenticatedActions = [
-        {
-            text: userProfile.name || "User",
-            href: "#",
-            isButton: false,
-            isAvatar: true,
-            avatarSrc: userProfile.avatar,
-            avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
-        },
-    ];
 
     // Expose toggle to window for other components (like TOC) to use
     useEffect(() => {
@@ -157,20 +84,7 @@ export function DocsNavbarWrapper() {
 
     return (
         <>
-            <Navbar
-                logo={<Logo variant="wordmark" className="h-4" />}
-                name=""
-                homeUrl="/"
-                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
-                isAuthenticated={isAuthenticated}
-                userProfile={isAuthenticated ? userProfile : undefined}
-                searchSlot={searchSlot}
-                containerClassName="container"
-
-                className={isAskAIOpen ? "md:right-[400px]" : "right-0"}
-                layout
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            />
+            <SiteNav solid />
             <DocsMobileNav onOpenSearch={() => setSearchOpen(true)} />
             <DocsSearchModal open={searchOpen} onOpenChange={setSearchOpen} />
         </>

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { arcieBrand } from "@/lib/arcie-brand";
 
 // Arcie counterpart of /api/docs/ai — same streaming contract, but grounded in
 // content/arcie and speaking as the Arcie expert.
@@ -93,10 +94,11 @@ function getCurrentPageDoc(currentPage: string): { title: string; content: strin
     return null;
 }
 
-const GLOBAL_SYSTEM_PROMPT = `You are Arcie AI, the expert guide for Arcie — Cencori's open-source framework for building production agents as files.
+const GLOBAL_SYSTEM_PROMPT = `You are Arcie AI, the expert guide for ${arcieBrand.definition}.
+Arcie unifies an open-source framework and a managed API. The framework is available; the managed API is in development, not a launched API contract. Do not invent managed endpoints, SDK methods, pricing, release dates, or durability guarantees. Current Cencori Sessions integration is not the managed Agent API.
 You have access to the ENTIRE Arcie documentation.
 
-Your goal is to be helpful, concise, and natural. Talk like a senior engineer who knows the framework inside out.
+Your goal is to be helpful, concise, and natural. Talk like a senior engineer who knows the agent infrastructure inside out.
 
 Guidelines:
 1. **Context Awareness**: The user is currently viewing a specific page. If they ask "what is this?" or "how do I use this?", refer to the "CURRENT PAGE CONTEXT" first.

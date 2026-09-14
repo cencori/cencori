@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import Navbar from "@/components/landing/Navbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { Reveal } from "@/components/landing/Reveal";
 import { Check, X, Shield, ArrowRight, Activity, DollarSign, Lock, HeartHandshake, Layers } from "lucide-react";
 import Link from "next/link";
@@ -177,7 +177,7 @@ export default function ComparePage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
-            <Navbar homeUrl="/" />
+            <SiteNav solid />
 
             <main className="relative z-10 pt-28 pb-24 sm:pt-36 sm:pb-32">
                 <div className="max-w-screen-xl mx-auto px-4 md:px-6">
@@ -383,7 +383,7 @@ export default function ComparePage() {
                 </div>
             </main>
 
-            <Footer />
+            <SiteFooter />
         </div>
     );
 }

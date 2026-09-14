@@ -1,11 +1,25 @@
 ---
 title: Introduction
-description: Zett is a filesystem-first framework for building production agents on Cencori.
+description: Arcie—Cencori’s model-agnostic agent infrastructure. An open-source framework and a managed API in development.
 ---
 
-Zett lets you **define agents as files**. There's no SDK to wire up and no DSL to
-learn — every part of an agent is a file in a predictable place, and Zett turns
-that directory into a running agent backed by [Cencori](/).
+**Arcie—Cencori’s model-agnostic agent infrastructure.**
+
+An open-source framework and a managed API for building agents that reason, use
+tools, remember and act. One agent system, with two entry points: operate the
+framework yourself or use a Cencori-managed service.
+
+<Callout type="info">
+The open-source framework is available today. The [managed API](/arcie/docs/managed-api)
+is in development. These docs distinguish existing framework capabilities from
+the managed service direction; they do not describe a launched Agent API.
+</Callout>
+
+## Open-source framework
+
+The framework lets you **define agents as files**. Every part of an agent lives
+in a predictable place. Arcie discovers the files, assembles a manifest and runs
+the agent loop, including custom tools and subagents.
 
 ```bash
 npx arcie@latest init my-agent
@@ -19,18 +33,18 @@ _behaves_ are all expressed as files inside an `agent/` directory:
 ```text
 my-agent/
 └── agent/
-    ├── agent.ts         # the model + Cencori config
+    ├── agent.ts         # model + configuration
     ├── instructions.md  # the system prompt
     ├── tools/           # what it can do
     ├── skills/          # what it knows
     ├── subagents/       # who it delegates to
     ├── channels/        # where it lives (HTTP, Slack…)
     ├── schedules/       # when it acts on its own
-    ├── sessions/        # durable-execution config
+    ├── sessions/        # memory + session configuration
     └── policies/        # security, budgets, guardrails
 ```
 
-Zett discovers these slots, validates them, and assembles an **agent manifest** —
+Arcie discovers these slots, validates them, and assembles an **agent manifest** —
 the single object the runtime executes. Add a file, get a capability. Delete a
 file, remove it. Your agent is always exactly what's on disk.
 
@@ -42,16 +56,37 @@ file, remove it. Your agent is always exactly what's on disk.
   precisely how an agent changed.
 - **Composable.** Subagents are just nested agent folders. Knowledge is just
   markdown. Scaling up is adding directories, not rewriting code.
-- **Production-backed.** Execution runs through Cencori's gateway and Sessions
-  API, so you get billing, security policies, observability, and durable sessions
-  without building any of it.
+- **Model-agnostic.** Connect to supported model providers rather than designing
+  your agent around one vendor. Model and tool capabilities still vary by provider.
+- **Connected to Cencori.** Use Gateway and Sessions for model routing,
+  conversation state, usage accounting and project controls.
+
+## Managed API
+
+We’re building a managed API as another entry point to Arcie, not a competing
+framework. Developers will supply instructions, tools and tasks while Cencori
+operates the agent engine and connected execution infrastructure.
+
+The intended boundary is operational responsibility: API users should not need
+to install the framework or adopt its folder structure. Shared execution semantics
+and portability between self-operated and managed agents are design goals, not
+capabilities these docs claim are complete today.
+
+Read the [managed API direction](/arcie/docs/managed-api).
 
 ## How it fits with Cencori
 
-Zett is the authoring layer; **Cencori is the runtime**. When your agent takes a
-turn, Zett loads the manifest and calls the Cencori Sessions API, which routes the
-model request, applies your security and budget policies, and streams events back.
-You bring the agent definition; Cencori brings the infrastructure.
+Arcie is the agent layer; **Cencori supplies the connected infrastructure**.
+
+- **Gateway** supplies model access and request controls.
+- **Sessions** supplies conversation state and the turn/event interface used by
+  the framework runner.
+- **Memory** is the persistent-context layer.
+- **Compute** supplies environments for deployed agent code and tools.
+
+In the current framework, custom tool code executes in the process running
+Arcie. Calling the Sessions API does not by itself move that code to Cencori or
+turn the run into a fully managed, recoverable background task.
 
 ## Next steps
 
@@ -60,5 +95,5 @@ You bring the agent definition; Cencori brings the infrastructure.
 - [Project Layout](/arcie/docs/project-layout) — the full `agent/` directory reference.
 
 <Callout>
-Zett is open source under the MIT license. Source: [github.com/cencori/arcie](https://github.com/cencori/arcie).
+The Arcie framework is open source under the MIT license. Source: [github.com/cencori/arcie](https://github.com/cencori/arcie).
 </Callout>

@@ -5,7 +5,6 @@ import { Download, Check, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Footer } from "@/components/landing/Footer";
 
 export default function BrandPageContent() {
     return (
@@ -85,8 +84,6 @@ export default function BrandPageContent() {
                     </div>
                 </section>
             </main>
-
-            <Footer />
         </>
     );
 }

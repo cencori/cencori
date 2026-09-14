@@ -4,11 +4,11 @@ description: instructions.md — the always-on system prompt that shapes your ag
 ---
 
 `agent/instructions.md` is the agent's **system prompt** — the always-on context
-that defines its personality, rules, and approach. Zett loads it verbatim as the
+that defines its personality, rules, and approach. Arcie loads it verbatim as the
 manifest's `instructions` string and sends it with every turn.
 
 ```md
-You are a helpful AI agent built with Zett on Cencori.
+You are a helpful AI agent built with Arcie on Cencori.
 
 Be concise, accurate, and use your tools when appropriate.
 Never fabricate data — if you don't know, say so.
@@ -18,7 +18,7 @@ That's it: plain Markdown, no front-matter required.
 
 ## Resolution order
 
-When loading an agent, Zett looks for instructions in this order:
+When loading an agent, Arcie looks for instructions in this order:
 
 1. `instructions.md`
 2. `instructions.ts` (or another supported module extension)
