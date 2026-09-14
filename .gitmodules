@@ -1,0 +1,3 @@
+[submodule "cencori-go"]
+	path = cencori-go
+	url = https://github.com/cencori/cencori-go.git
