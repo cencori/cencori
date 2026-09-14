@@ -1,5 +1,5 @@
-import Navbar from "@/components/landing/Navbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 
 export default function PricingLayout({
     children,
@@ -8,9 +8,9 @@ export default function PricingLayout({
 }) {
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <Navbar homeUrl="/" />
+            <SiteNav solid />
             {children}
-            <Footer />
+            <SiteFooter />
         </div>
     );
 }

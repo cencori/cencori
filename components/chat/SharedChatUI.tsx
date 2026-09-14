@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
 import { toast } from "@/components/ui/toast";
-import Navbar from "@/components/landing/Navbar";
-import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/nav/SiteNav";
 import { siteConfig } from "@/config/site";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -24,82 +23,7 @@ interface SharedChatUIProps {
 }
 
 export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [userProfile, setUserProfile] = useState<{ name: string | null; avatar: string | null; email: string | null }>({ name: null, avatar: null, email: null });
     const [input, setInput] = useState("");
-
-
-    useEffect(() => {
-        const checkUser = async () => {
-            const { data, error } = await supabase.auth.getSession();
-            if (data?.session) {
-                setIsAuthenticated(true);
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null, email: user.email ?? null });
-                }
-            } else {
-                setIsAuthenticated(false);
-                setUserProfile({ name: null, avatar: null, email: null });
-            }
-        };
-        checkUser();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: any | null) => {
-            if (session) {
-                setIsAuthenticated(true);
-                const { user } = session;
-                if (user) {
-                    const meta = user.user_metadata ?? {};
-                    const avatar = meta.avatar_url ?? meta.picture ?? null;
-                    const name = meta.name ?? user.email?.split("@")[0] ?? null;
-                    setUserProfile({ name: name as string | null, avatar: avatar as string | null, email: user.email ?? null });
-                }
-            } else {
-                setIsAuthenticated(false);
-                setUserProfile({ name: null, avatar: null, email: null });
-            }
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
-
-    const handleCopyUrl = () => {
-        navigator.clipboard.writeText(window.location.href);
-        toast.success("Link copied to clipboard");
-    };
-
-    const unauthenticatedActions = [
-        { text: "Sign in", href: siteConfig.links.signInUrl, isButton: false },
-        {
-            text: "Get Started",
-            href: siteConfig.links.getStartedUrl,
-            isButton: true,
-            variant: "default",
-        },
-    ];
-
-    const authenticatedActions = [
-        {
-            text: "Dashboard",
-            href: "/dashboard",
-            isButton: true,
-            variant: "default",
-        },
-        {
-            text: userProfile.name || "User",
-            href: "#",
-            isButton: false,
-            isAvatar: true,
-            avatarSrc: userProfile.avatar,
-            avatarFallback: (userProfile.name || "U").slice(0, 2).toUpperCase(),
-        },
-    ];
 
 
     // Initialize local state with props, but allow updates
@@ -135,7 +59,6 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                 body: JSON.stringify({
                     messages: [...localMessages, userMessage],
                     currentPage: "Shared Chat", // Context for the AI
-                    userName: userProfile?.name,
                 }),
                 signal: abortControllerRef.current.signal,
             });
@@ -212,12 +135,7 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center">
-            <Navbar
-                homeUrl="/"
-                actions={isAuthenticated ? authenticatedActions : unauthenticatedActions}
-                isAuthenticated={isAuthenticated}
-                userProfile={isAuthenticated ? userProfile : undefined}
-            />
+            <SiteNav solid />
 
             {/* Chat Content */}
             <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">

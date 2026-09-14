@@ -1,6 +1,6 @@
 import { Metadata } from "next";
-import { AuthNavbar } from "@/components/landing/AuthNavbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { ModelCatalog } from "@/components/models/ModelCatalog";
 import { SUPPORTED_PROVIDERS } from "@/lib/providers/config";
 import { buildOgImageUrl } from "@/lib/og";
@@ -34,7 +34,7 @@ export default function ModelsPage() {
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
-            <AuthNavbar />
+            <SiteNav solid />
 
             <main className="flex-1 pt-20">
                 <div className="container mx-auto px-4 max-w-6xl py-8 sm:py-12">
@@ -53,7 +53,7 @@ export default function ModelsPage() {
                 </div>
             </main>
 
-            <Footer />
+            <SiteFooter />
         </div>
     );
 }

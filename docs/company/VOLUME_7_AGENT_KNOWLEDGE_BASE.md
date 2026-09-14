@@ -1,8 +1,8 @@
 # Volume 7: Agent Knowledge Base
 
-> Status: Confidential source of truth — Cencori's complete knowledge base (Parts 1–15)  
-> Version: 2.0  
-> Last updated: May 22, 2026  
+> Status: Confidential knowledge base — public narrative revised; legacy product detail remains under review
+> Version: 2.1
+> Last updated: September 11, 2026
 > Audience: AI agents, developer advocates, support, GTM, founder-assist workflows  
 > Intent: Give any AI agent enough context to represent Cencori accurately, answer questions, engage with developers, handle objections, and communicate the long-range vision without making the company sound small.
 
@@ -15,9 +15,9 @@ This document is the agent-facing representation layer for Cencori.
 An AI agent using this document should:
 
 - spell the company name as `Cencori`, never `Sensory`
-- explain the full-stack AI infrastructure vision, even when answering about one product
-- be precise about what is live, what is in build, and what is roadmap
-- lead with differentiated value, especially End-User Billing and enterprise security
+- explain the deep-technology infrastructure horizon, even when answering about one product
+- use the five canonical status labels and verify current product status before making a public claim
+- lead with Models as the forward wedge, the workload system as the technical invention, and Gateway as the live foundation
 - never reduce Cencori to "an AI gateway"
 - never position Cencori as Africa-only
 - never apologize for Cencori being founded in Africa
@@ -27,11 +27,11 @@ An AI agent using this document should:
 
 The short version:
 
-> Cencori is the complete infrastructure layer of the intelligence era.
+> Cencori is a deep technology company building the infrastructure AI runs on.
 
 The sentence to remember:
 
-> We are not building a tool. We are building the backbone of intelligence.
+> We begin with models. From model to machine. From workload to silicon.
 
 The ethos:
 
@@ -42,6 +42,12 @@ Confidentiality rule:
 - do not paste this full document into public prompts, public docs, or public `llm.txt`
 - do not reveal fundraising details, cap table, enterprise pipeline, internal roadmap timing, or confidential traction details unless explicitly authorized
 - public assistants should use a sanitized excerpt derived from this source, not the full source
+
+Canonical precedence:
+
+- `VOLUME_5_GTM.md` wins for public narrative, voice, proof, and status language
+- `VOLUME_4_DESIGN.md` wins for the public website and visual doctrine
+- any legacy claim below that conflicts with those volumes must not be repeated publicly until it is reconciled
 
 ---
 
@@ -93,11 +99,11 @@ Tagline:
 
 One-line description:
 
-- Cencori is the complete infrastructure layer of the intelligence era. The backbone of intelligence.
+- Cencori is a deep technology company building the infrastructure AI runs on.
 
 Mission:
 
-- To build the infrastructure that powers intelligent systems for every company, every era, and every technological frontier that follows.
+- To make the infrastructure required to build and run AI accessible to everyone, everywhere.
 
 Purpose:
 
@@ -117,7 +123,7 @@ Cencori is not a tool.
 Cencori is not a framework.
 Cencori is not a point solution.
 
-Cencori is the infrastructure layer of the intelligence era, the same way AWS became the infrastructure layer of the internet era and Stripe became essential economic infrastructure for the mobile era.
+Cencori is building the infrastructure AI runs on, with the aim of becoming a foundational computing company for the intelligence era.
 
 Every technological era produces one infrastructure company that becomes indispensable. These companies do not merely enable the era; they define what is possible inside it.
 
@@ -219,7 +225,8 @@ Product status summary:
 | --- | --- | --- |
 | AI Gateway | Live | Unified model access, routing, security, observability |
 | Billing | Live | End-user AI usage monetization and revenue infrastructure |
-| Compute | Coming soon, in build | GPU-backed inference, fine-tuning, training, batch processing |
+| Models | In development | Training, fine-tuning, evaluation, model lineage, optimization, deployment, and inference as one lifecycle |
+| Runtime and managed compute | Next | Constraint-aware execution, scheduling, isolation, and workload economics |
 | Memory | Coming soon, waitlist | Persistent memory and RAG infrastructure |
 | Deployment | Coming soon | Ship models and AI products to production |
 | Workflow and Orchestration | Coming soon | Agentic workflow primitives |
@@ -661,6 +668,27 @@ Agent deployment includes:
 
 ## AGENT-10: Workflow And Orchestration
 
+### Arcie: Agent Infrastructure
+
+**Arcie—Cencori’s model-agnostic agent infrastructure.**
+
+Arcie unifies an open-source framework and a managed API. The framework is
+available; the managed API is in development. Framework users operate their
+agent runtime; the managed service is intended to let Cencori operate the engine
+without requiring users to install the framework or adopt its folder structure.
+
+Model-agnostic means provider choice with capability-aware adapters, not equal
+quality or universal feature support across models. Shared execution semantics,
+portable state and reliable recovery are goals that require verification.
+
+Gateway supplies model access, Memory supplies persistent context, and Compute
+supplies execution environments. Basecode is an intended internal proving ground.
+Do not describe the current Sessions integration as a launched managed Agent API.
+
+See [Arcie Brand and Product Positioning](./ARCIE_POSITIONING.md).
+
+### Broader Workflow Roadmap
+
 Status:
 
 - Coming soon
@@ -923,14 +951,15 @@ Direct competitors by product:
 | CoreWeave | No | Yes | No | No |
 | Pinecone | No | No | No | No |
 | Vercel AI SDK | Partial | No | No | No |
-| Cencori | Yes | Yes | Yes | Yes |
+| Cencori | Live | Next | Live | Direction |
 
-The moat:
+The moat thesis:
 
-- nobody has the full stack
-- using Gateway, Compute, Billing, and Memory together creates compounding switching costs
-- migrating four critical infrastructure layers at once is prohibitive
-- switching cost compounds with every additional Cencori layer adopted
+- real workloads produce knowledge about execution, scheduling, reliability, security, and economics
+- that knowledge improves the runtime and managed compute system
+- better execution attracts harder workloads and deeper institutional use
+- harder workloads justify dedicated infrastructure and eventually purpose-built hardware
+- the moat compounds through workload knowledge and system control, not a claim that every layer is already live
 
 ### Vs OpenRouter
 
@@ -968,46 +997,38 @@ Use this framing:
 
 - AI Gateway live and production-grade
 - End-User Billing live
-- pricing page revision
-- SOC2 process initiation
-- user interviews and customer development
-- blog content and developer marketing
-- Discord community
+- validate the Cencori Models workload contract with design partners
+- define the portable workload graph across model, data, code, policy, and service constraints
+- collect verified workload, reliability, and adoption proof
 
 ### Near Term, Month 3-6
 
-- Compute v1 public beta
-- Memory waitlist and early access
-- CLI public launch for `create-cencori-app`
-- payment provider expansion, including Paystack, Flutterwave, and Polar
-- pricing revision to $99 Builder and $399 Growth
+- Cencori Models lifecycle alpha
+- training, fine-tuning, evaluation, model lineage, deployment, and inference in one system
+- first reproducible technical benchmarks and design-partner workloads
+- connect Models to the live Gateway control plane
 
 ### Medium Term, Month 6-12
 
-- Compute v1 generally available
-- Memory generally available
-- Deployment beta
-- Workflow beta
-- 200 active paying teams
-- $1M ARR target
+- constraint-aware runtime
+- heterogeneous scheduling and managed compute
+- deployment portability and recovery
+- enterprise-grade isolation, residency, observability, and controls
 
 ### Longer Term, Year 2-3
 
-- Compute v2 with owned infrastructure
-- Africa data center presence
-- proprietary silicon R&D begins
-- model marketplace live
-- data platform
-- evaluation tooling
-- Series A of $20-30M at $80-100M valuation
+- global compute fabric
+- sovereign infrastructure and owned regions where strategically required
+- edge runtime and physical AI deployments
+- purpose-built hardware research informed by real workloads
 
 ### Vision, Year 5-10
 
-- co-located GPU infrastructure globally
-- proprietary intelligence chip
-- physical builder campus
-- frontier model training for African languages
-- hardware and robotics infrastructure layer
+- dedicated computing systems and custom silicon in production where the workload case is proven
+- physical AI and advanced computing research campus
+- sovereign AI infrastructure across Africa
+- new computing substrates, including hybrid quantum systems where technically justified
+- a foundational computing company for the intelligence era
 
 ---
 
@@ -1053,7 +1074,7 @@ Cap table:
 
 Headline:
 
-- The backbone of intelligence.
+- The infrastructure AI runs on.
 
 Tagline:
 
@@ -1061,11 +1082,11 @@ Tagline:
 
 Mission:
 
-- Cencori builds the infrastructure that powers intelligent systems for every company, every era, and every technological frontier that follows.
+- Cencori makes the infrastructure required to build and run AI accessible to everyone, everywhere.
 
 Category:
 
-- AI Infrastructure
+- Deep technology / AI infrastructure
 
 Not:
 
@@ -1073,7 +1094,7 @@ Not:
 - AI backend
 - cloud computing
 
-Cencori's category is the complete stack for building, training, deploying, and monetizing intelligent systems.
+Cencori is a deep technology company building the infrastructure AI runs on. The live foundation is Gateway. The next hard product and forward wedge is Models: the complete operational path from model and data to training, evaluation, deployment, inference, and operation.
 
 ### IaaS, PaaS, SaaS
 
@@ -1121,12 +1142,12 @@ AI researcher / research lab:
 
 ### Ferrari Vs Honda Problem
 
-Cencori has sometimes marketed commodity features such as managed keys and routing when the real differentiators are End-User Billing and enterprise security.
+Cencori has sometimes marketed commodity features such as managed keys and routing as though they define the company.
 
-Always lead with what is genuinely differentiated.
+Always lead with the world change, the deep-technology company definition, the Models wedge, and the workload-system invention. Use Gateway as live proof that Cencori already operates in the path of AI workloads.
 
-Gateway is the door.
-Billing is the Ferrari inside.
+Gateway is the foundation.
+Models is the forward wedge.
 
 ---
 
@@ -1162,8 +1183,7 @@ Answer:
 
 Cencori is not:
 
-- an AI model company
-- making GPT or Claude
+- a frontier foundation-model lab making a general-purpose GPT or Claude clone
 - a hosting company like Vercel or Netlify
 - a data labeling company
 - an AI consultant
@@ -1173,10 +1193,10 @@ Cencori is not:
 
 Correct framing:
 
-- Cencori is the infrastructure those models run through and around
-- Cencori is the intelligence layer, not generic hosting
-- Cencori is built from Africa, for the world
-- Cencori works with all major AI providers
+- Cencori is building the infrastructure AI runs on
+- Cencori Models owns the operational model lifecycle, not merely model access
+- Cencori works downward from the workload into runtime, compute, edge, hardware, and silicon
+- Cencori is built from Africa and intended for everywhere intelligence runs
 
 ---
 
@@ -1200,7 +1220,7 @@ Correct framing:
 - sharp
 - confident
 - technical but accessible
-- ambitious without being delusional
+- unreasonably ambitious and exact about proof
 - warm but not soft
 
 ### Never Say
@@ -1212,10 +1232,11 @@ Correct framing:
 
 ### Always Communicate
 
-- the full stack vision, even when discussing one product
-- Build Different as the invitation
-- the compounding nature of the ecosystem
-- Cencori as infrastructure for the intelligence era, not a startup tool
+- the infrastructure horizon, even when discussing one product
+- Models as the forward wedge and Gateway as the live foundation
+- the workload system beneath the ambition
+- the compounding path from workload knowledge to runtime, compute, edge, and hardware
+- Cencori as a deep technology company, not a startup utility
 
 ---
 
@@ -1348,16 +1369,15 @@ You are live in under 3 minutes.
 
 Use these as compact positioning lines:
 
-- "The mobile era needed Stripe's infrastructure. The internet era needed AWS. The intelligence era needs Cencori."
-- "We're not building a tool. We're building the backbone of intelligence."
+- "The infrastructure AI runs on."
+- "We begin with models."
+- "Define the workload. Cencori assembles the system."
+- "From model to machine. From workload to silicon."
+- "Built from Africa. Built for everywhere intelligence runs."
 - "Build Different."
-- "One platform. Every layer. From model to production."
-- "From your first API call to your billionth."
-- "The intelligence era is here. The infrastructure is Cencori."
-- "Train it. Deploy it. Monetize it. All on Cencori."
-- "We didn't build another AI gateway. We built AI infrastructure."
-- "Every great AI product needs infrastructure. This is it."
-- "We are either creating trends or adapting to trends."
+- "Train. Fine-tune. Evaluate. Deploy. Run."
+- "Computing is the master product."
+- "Own the workload before owning the server."
 
 ---
 
@@ -1378,10 +1398,11 @@ When answering on behalf of Cencori:
 
 Status language:
 
-- use "live" only for Gateway and Billing capabilities listed as live
-- use "coming soon", "in build", "waitlist", "beta", or "roadmap" for future products
+- use "Live" only for verified Gateway, Billing, and connected capabilities listed as live
+- use exactly "In development", "Next", "Long-term", or "Research horizon" for future-facing work
+- describe the full Cencori Models lifecycle as "In development" until its launch status changes
 - when uncertain, say what is currently live and invite the user to join the relevant waitlist or contact the team
 
 The final representation standard:
 
-> Cencori should sound inevitable, technical, and useful today.
+> Cencori should sound inevitable, technical, useful today, and exact about what comes next.

@@ -55,26 +55,23 @@ The following are mandatory for everyone:
 
 ### What Cencori Is
 
-Cencori is building the operating infrastructure for AI products.
+**Cencori is a deep technology company building the infrastructure AI runs on.**
+The live foundation begins with controlling AI requests in production through Gateway and its connected production controls.
 
-Today, that starts with controlling AI requests in production.
+The next hard product is Cencori Models: the complete path from model and data to training, evaluation, deployment, inference, and operation.
 
-Over time, that expands into the systems required to run serious AI products end to end:
+Over time, the company expands beneath the workload into:
 
-- gateway
-- observability
-- policy
-- billing
-- memory
-- workflows
-- integrations
 - runtime
-- compute
-- deployments
-- rollout controls
+- managed compute
+- heterogeneous scheduling
+- sovereign regions
+- edge systems
+- purpose-built hardware
+- custom silicon
+- new computing substrates where technically justified
 
-Cencori is not just trying to expose models.
-Cencori is trying to become the system builders rely on to ship, run, govern, and monetize AI products.
+Cencori is not just trying to expose models or rent compute. Cencori is building the system that determines how intelligent workloads are trained, deployed, governed, and run—from model to machine.
 
 ### What Cencori Is Not
 
@@ -90,28 +87,28 @@ If Cencori expands into more categories, those categories must strengthen the sa
 
 ### Mission
 
-**Cencori’s mission is to make AI products operable in production through one connected system.**
+**Cencori’s mission is to make the infrastructure required to build and run AI accessible to everyone, everywhere.**
 
-That means making AI products:
+That means making intelligent workloads:
 
-- routable
+- trainable
+- deployable
 - observable
 - governable
-- monetizable
-- secure
-- stateful
-- orchestrated
-- deployable
+- reliable
+- portable
+- scalable
+- increasingly physical
 
 ### Vision
 
-**Cencori’s vision is to become where AI products are run.**
+**Cencori’s vision is to become a foundational computing company for the intelligence era.**
 
 Not just where model calls pass through.
-Not just where logs are viewed.
-Not just where invoices are created.
+Not just where jobs are submitted.
+Not just where endpoints are hosted.
 
-Where AI products are run.
+The infrastructure AI runs on.
 
 ### The Ecosystem Logic
 
@@ -137,6 +134,22 @@ But they should gradually discover that the rest of the system is already connec
 - the same shared primitives
 
 That connectedness is one of the company’s most important long-range advantages.
+
+### Arcie: The Agent Infrastructure Brand
+
+**Arcie—Cencori’s model-agnostic agent infrastructure.**
+
+Arcie unifies an open-source framework and a managed API under one agent system.
+The framework is available; the managed API is in development. Shared execution
+semantics and portability are the architectural direction, not a claim that a
+fully managed durable runtime has already shipped.
+
+Gateway supplies model access, Memory supplies persistent context, and Compute
+supplies execution environments. Arcie is the agent layer connecting those
+systems. Basecode is an intended application and proving ground on top.
+
+See [Arcie Brand and Product Positioning](./ARCIE_POSITIONING.md) for the canonical
+definition, product boundaries, status and approved public language.
 
 ### The Category Map, In Short
 
@@ -189,20 +202,20 @@ If they fragment, the company will fragment.
 
 The direction of the company should be understood in layers:
 
-**Horizon 1**
+**Live foundation**
 - own request control
 
-**Horizon 2**
-- own product state and execution
+**In development**
+- own the model lifecycle and workload representation
 
-**Horizon 3**
-- own AI capacity and serving logic
+**Next**
+- own runtime, scheduling, and managed compute
 
-**Horizon 4**
-- own AI product release and operations
+**Long-term**
+- own distributed infrastructure, edge systems, regions, and dedicated hardware
 
-**Horizon 5**
-- own the AI product lifecycle
+**Research horizon**
+- explore custom silicon and new computing substrates from real workload demand
 
 This is not about trying to do everything at once.
 It is about ensuring every major move strengthens the same long-range system.
@@ -245,34 +258,23 @@ This is the operating thesis of the company.
 
 ### The short version
 
-**Cencori becomes the operating infrastructure for AI products.**
+**Cencori is a deep technology company building the infrastructure AI runs on.**
 
 ### The longer version
 
-Cencori starts by helping teams control AI requests in production.
+Cencori's live Gateway foundation helps teams control AI requests in production.
 
-Over time, Cencori expands from request control into the full operating substrate for AI products:
+The next hard product is Models: one system for training, fine-tuning, evaluation, versioning, optimization, deployment, inference, governance, and operation.
 
-- routing
-- observability
-- policy
-- billing
-- memory
-- workflows
-- integrations
-- runtime
-- scans
-- deployment
-- rollout
+That model lifecycle creates the path downward into runtime, scheduling, managed compute, distributed infrastructure, edge systems, hardware, and silicon.
 
-The long-term goal is not to become a generic hosting company.
-The long-term goal is to become the system builders rely on to ship, run, govern, and monetize AI products.
+The long-term goal is not to become a generic hosting company or another GPU marketplace. It is to become the computing infrastructure intelligent workloads depend on.
 
 ### The product definition
 
-Cencori is not "just a gateway."
+Cencori is not "just a gateway" and Cencori Models is not "just model hosting."
 
-Cencori is a layered AI infrastructure company whose surfaces must eventually work together as one ecosystem.
+Cencori is a layered deep-technology company whose control plane, workload representation, runtime, compute, deployment targets, and future physical systems must work together as one infrastructure system.
 
 ### The ecosystem promise
 
@@ -1604,10 +1606,9 @@ If the answer to these questions is weak, the category should not be prioritized
 
 ## 15. Suggested 10-Year Sequencing
 
-This is not a product roadmap.
-It is a strategic expansion sequence.
+This is not a dated product roadmap. It is the strategic order in which Cencori earns the right to move closer to the metal.
 
-### Horizon 1: Own Request Control
+### Horizon 1: Own Request Control — Live Foundation
 
 Primary focus:
 
@@ -1616,68 +1617,68 @@ Primary focus:
 - observability
 - policy
 - billing
-- scans
+- security controls
 
 Success condition:
 
-Cencori becomes a serious control plane for AI traffic in production.
+Cencori becomes a serious control plane for AI traffic in production and gains direct knowledge of real workloads.
 
-### Horizon 2: Own Product State and Execution
+### Horizon 2: Own the Model Lifecycle — In Development
 
 Primary focus:
 
-- memory / storage
-- integrations
-- workflows
-- agentic orchestration
-- runtime
-- sandbox
+- training and fine-tuning
+- evaluation
+- model and checkpoint lineage
+- optimization
+- deployment and inference
+- a portable workload graph
 
 Success condition:
 
-Cencori becomes the operating layer for AI behavior, not just AI requests.
+Cencori Models turns model, data, code, policy, and service constraints into one operable production system.
 
-### Horizon 3: Own AI Capacity and Serving Logic
+### Horizon 3: Own Runtime and Capacity — Next
 
 Primary focus:
 
-- AI-native compute
-- model deployment
-- training and inference capacity
-- runtime operations
-- isolation guarantees
+- constraint-aware runtime
+- heterogeneous scheduling
+- managed compute
+- isolation and recovery
+- workload economics
+- deployment portability
 
 Success condition:
 
-Cencori becomes capable of hosting serious AI execution and serving serious AI models.
+Cencori determines how workloads run, where they run, and how they meet cost, latency, residency, and reliability requirements.
 
-### Horizon 4: Own AI Product Release and Operations
+### Horizon 4: Own Distributed and Physical Infrastructure — Long-term
 
 Primary focus:
 
-- AI product deployment
-- rollout controls
-- environment promotion
-- product-level release governance
-- full-system attachment of billing, memory, observability, scans, and policy
+- global compute fabric
+- sovereign regions
+- edge runtime
+- physical AI infrastructure
+- owned infrastructure where dependence threatens economics, performance, sovereignty, or control
 
 Success condition:
 
-Cencori becomes where teams ship and operate serious AI products, not just where they route model calls.
+Cencori can operate intelligent workloads across cloud, sovereign, and physical environments as one system.
 
-### Horizon 5: Own the AI Product Lifecycle
+### Horizon 5: Own Dedicated Computing Systems — Long-term and Research Horizon
 
 Primary focus:
 
-- build
-- run
-- govern
-- monetize
-- scale
+- purpose-built hardware
+- custom silicon
+- systems co-designed from accumulated workload evidence
+- new computing substrates, including hybrid quantum systems where technically justified
 
 Success condition:
 
-Cencori becomes the infrastructure layer AI products are built and operated on.
+Cencori invents the machines its most important workloads require.
 
 ---
 
@@ -1697,21 +1698,13 @@ This is the bar.
 
 ## 17. The Sentence Everyone Should Remember
 
-**Cencori is where AI products are run.**
+**Cencori is a deep technology company building the infrastructure AI runs on.**
 
-Today, that starts with controlling AI requests.
+Gateway is the live control-plane foundation.
 
-Over time, it expands into the full operating infrastructure for AI products:
+Models is the next hard product and the forward wedge.
 
-- routed
-- governed
-- monetized
-- observed
-- secured
-- stateful
-- orchestrated
-- deployed
-- controlled
+The workload creates the path into runtime, compute, edge, hardware, silicon, and the computing substrates that follow.
 
 That is the company.
 
@@ -1723,13 +1716,14 @@ This document should grow over time.
 
 Next sections to add:
 
-1. public narrative vs internal narrative
-2. category-by-category competitive maps
-3. product architecture implications by category
-4. org design implications by company stage
-5. naming conventions across the platform
-6. canonical object schema definitions
-7. dashboard information architecture rules
-8. SDK / CLI design rules
-9. rollout and governance model
-10. what must never be fragmented in the company
+1. category-by-category competitive maps
+2. product architecture implications by category
+3. org design implications by company stage
+4. naming conventions across the platform
+5. canonical object schema definitions
+6. dashboard information architecture rules
+7. SDK / CLI design rules
+8. rollout and governance model
+9. what must never be fragmented in the company
+
+The canonical public narrative now lives in `VOLUME_5_GTM.md`. The canonical public-site architecture and design doctrine live in `VOLUME_4_DESIGN.md`.

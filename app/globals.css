@@ -326,6 +326,18 @@
         @apply border-border outline-ring/50;
     }
 
+    /* Hide the document scrollbar app-wide. Scrolling itself is unaffected. */
+    html {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    html::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+    }
+
     body {
         @apply bg-background text-foreground font-medium;
         font-weight: 500;

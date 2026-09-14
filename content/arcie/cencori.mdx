@@ -1,11 +1,18 @@
 ---
 title: Cencori Integration
-description: How Zett agents authenticate, bill, stay safe, and deploy on Cencori.
+description: How the Arcie framework connects to Cencori model access, sessions, billing and deployment.
 ---
 
-Zett is the authoring layer; **[Cencori](/) is the runtime**. When an agent takes a
-turn, Zett loads its manifest and calls the Cencori Sessions API, which routes the
-model request and applies your project's billing, security, and observability.
+**Arcie is Cencori’s model-agnostic agent infrastructure**, with an open-source
+framework and a managed API in development.
+
+This page covers the framework’s existing Cencori integration. The runner calls
+the Cencori Sessions API for model turns and streams events back. Custom tool
+code runs in the process operating Arcie, not automatically inside Cencori.
+
+The [managed API](/arcie/docs/managed-api) is a separate entry point being built
+under the same brand. Using Sessions today does not mean your agent is already
+running on that managed service.
 
 ## Authentication
 
@@ -41,7 +48,7 @@ export default defineAgent({
 - **`billing.budget`** — a spend cap for the agent, e.g. `"50.00/month"`.
 - **`billing.endUserMarkup`** — markup applied when billing your own end users
   through Cencori.
-- **`security.policy`** — the basarcie safety posture; per-agent
+- **`security.policy`** — the baseline safety posture; per-agent
   [policies](/arcie/docs/policies) tighten it further.
 
 ## Outbound auth helpers
@@ -64,18 +71,20 @@ can be resolved lazily per request.
 
 ## Deploying
 
-1. `arcie build` compiles the agent to `.arcie/manifest.json`.
-2. The manifest — config, instructions, tools, policies, sessions — is what Cencori
-   executes.
-3. Set `CENCORI_API_KEY` / `CENCORI_PROJECT_ID` in your deployment environment.
+1. `arcie build` produces `.arcie/server.mjs`, the headless runtime bundle, and
+   `.arcie/manifest.json`, the agent manifest.
+2. Run the bundle in your deployment environment. It includes the framework
+   runner and custom tool code; uploading a manifest alone does not host those tools.
+3. Set `CENCORI_API_KEY` / `CENCORI_PROJECT_ID` when using Cencori Sessions.
 
 ```bash
-npm run build           # → .arcie/manifest.json
+npm run build           # → .arcie/server.mjs + .arcie/manifest.json
+node .arcie/server.mjs
 ```
 
 What you get from Cencori at run time:
 
-- **Sessions** — durable execution, memory, and human approval ([Sessions](/arcie/docs/sessions)).
+- **Sessions** — conversation state, turn events and approval interfaces ([Sessions](/arcie/docs/sessions)). Persisted turns do not by themselves guarantee recovery of arbitrary tool execution.
 - **Billing** — budgets and Monetization enforced per project.
 - **Security** — input/output guards and policy enforcement ([Policies](/arcie/docs/policies)).
 - **Observability** — every turn, tool call, and token logged.

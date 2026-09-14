@@ -1,6 +1,6 @@
 import { Metadata } from "next";
-import { AuthNavbar } from "@/components/landing/AuthNavbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { buildOgImageUrl } from "@/lib/og";
 
 const academyOgImage = buildOgImageUrl({
@@ -26,9 +26,9 @@ export default function AcademyLayout({
 }) {
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <AuthNavbar />
+            <SiteNav solid />
             {children}
-            <Footer />
+            <SiteFooter />
         </div>
     );
 }
