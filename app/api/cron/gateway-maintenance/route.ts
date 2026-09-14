@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { expireStaleSessions } from '@/lib/gateway/session-expiry';
 import { processUsageQueue } from '@/lib/queue';
+import { cronDisabled } from '@/lib/cron';
 
 async function run(req: NextRequest) {
+    const off = cronDisabled();
+    if (off) return off;
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
         return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
