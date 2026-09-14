@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
       './node_modules/onnxruntime-node/bin/napi-v3/win32/**/*',
       './node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/**/*',
       './node_modules/onnxruntime-web/**/*',
+      './node_modules/@huggingface/transformers/**/*',
+      './node_modules/onnxruntime-common/**/*',
+      './node_modules/onnxruntime-node/dist/**/*',
+      './node_modules/sharp/**/*',
+      './node_modules/@img/sharp-*/**/*',
     ],
   },
   // Transformers.js includes native ONNX binaries and runtime model loading.
