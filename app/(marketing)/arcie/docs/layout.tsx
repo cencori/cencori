@@ -8,10 +8,11 @@ import { ArcieDocsAskAI } from "@/components/arcie/docs/ask-ai";
 import { arcieNavTree } from "@/lib/arcie-source";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
+import { arcieBrand } from "@/lib/arcie-brand";
 
 export const metadata: Metadata = {
   title: { default: "Arcie Docs", template: "%s — Arcie" },
-  description: "Arcie — build production agents as files. Documentation.",
+  description: `${arcieBrand.definition}. Documentation for the open-source framework and the managed API direction. The managed API is in development.`,
 };
 
 export default function ArcieDocsLayout({

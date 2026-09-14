@@ -7,6 +7,9 @@
   --paper: #e9e8e2;
   --paper-line: rgba(8, 8, 8, 0.18);
   --signal: #64ff9b;
+}
+
+.site {
   width: 100%;
   min-width: 0;
   overflow: clip;
@@ -105,268 +108,10 @@
   }
 }
 
-.navShell {
-  position: relative;
-  z-index: 30;
-}
-
-.nav {
-  position: relative;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
-  align-items: center;
-  min-height: 5rem;
-  padding: 0 2.25rem;
-  transition: background-color 180ms ease;
-  animation: fadeDown 0.8s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.navShellOpen .nav {
-  background: var(--ink);
-}
-
-@keyframes fadeDown {
-  from {
-    opacity: 0;
-    transform: translateY(-1rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.brand {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-}
-
-.logo {
-  display: block;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-.brandLogo {
-  width: 7.2rem;
-}
-
-.desktopNav {
-  display: flex;
-  align-items: center;
-  gap: clamp(1.1rem, 2vw, 2rem);
-  padding: 0.68rem 1.1rem;
-  background: rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: background-color 180ms ease;
-}
-
-.navShellOpen .desktopNav {
-  background: transparent;
-}
-
-.navTrigger {
-  position: relative;
-  padding: 0;
-  border: 0;
-  font-size: 0.92rem;
-  letter-spacing: -0.005em;
-  color: #fff;
-  background: transparent;
-  cursor: pointer;
-}
-
-.navTrigger::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -0.35rem;
-  height: 1px;
-  background: var(--signal);
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 220ms ease;
-}
-
-.navTrigger:hover::after,
-.navTrigger:focus-visible::after,
-.navTrigger[data-active]::after {
-  transform: scaleX(1);
-  transform-origin: left;
-}
-
-.navBackdrop {
-  position: fixed;
-  inset: 5rem 0 0;
-  z-index: 1;
-  background: rgba(5, 5, 5, 0.48);
-  backdrop-filter: blur(12px) saturate(0.72);
-  -webkit-backdrop-filter: blur(12px) saturate(0.72);
-  pointer-events: none;
-  animation: navBackdropIn 180ms ease both;
-}
-
-.megaMenu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  left: 0;
-  z-index: 2;
-  min-height: 29rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f4f4ef;
-  background: var(--ink);
-  box-shadow: 0 2.5rem 5rem rgba(0, 0, 0, 0.28);
-  animation: megaMenuIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.megaMenuInner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.72fr);
-  gap: clamp(3rem, 7vw, 8rem);
-  width: min(100%, 90rem);
-  min-height: 29rem;
-  margin: 0 auto;
-  padding: 3.2rem 2.25rem 3.7rem;
-  animation: megaContentIn 320ms 40ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.megaKicker {
-  margin: 0 0 1.7rem;
-  color: rgba(255, 255, 255, 0.42);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.megaLinkList {
-  display: grid;
-}
-
-.megaPrimary .megaLinkList {
-  justify-items: start;
-  gap: 0.4rem;
-}
-
-.megaPrimaryLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(1.75rem, 2.45vw, 2.65rem);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.05em;
-  transition: color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.megaPrimaryLink svg {
-  width: 1rem;
-  height: 1rem;
-  opacity: 0;
-  stroke: var(--signal);
-  stroke-width: 1.4;
-  fill: none;
-  transform: translate(-0.35rem, 0.35rem);
-  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.megaPrimaryLink:hover,
-.megaPrimaryLink:focus-visible {
-  color: #fff;
-  transform: translateX(0.35rem);
-}
-
-.megaPrimaryLink:hover svg,
-.megaPrimaryLink:focus-visible svg {
-  opacity: 1;
-  transform: translate(0, 0);
-}
-
-.megaSecondaryLink {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 1.5rem;
-  min-height: 3.15rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 0.88rem;
-  transition: color 180ms ease, border-color 180ms ease;
-}
-
-.megaSecondaryLink small {
-  color: rgba(255, 255, 255, 0.32);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.47rem;
-  letter-spacing: 0.1em;
-}
-
-.megaSecondaryLink:hover,
-.megaSecondaryLink:focus-visible {
-  border-color: rgba(100, 255, 155, 0.55);
-  color: #fff;
-}
-
-@keyframes navBackdropIn {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes megaMenuIn {
-  from {
-    opacity: 0;
-    transform: translateY(-0.65rem);
-  }
-}
-
-@keyframes megaContentIn {
-  from {
-    opacity: 0;
-    transform: translateY(-0.8rem);
-  }
-}
-
-.navActions {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 1.4rem;
-}
-
-.navCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2.2rem;
-  padding: 0 1rem;
-  border-radius: 999px;
-  color: #050505;
-  background: #f3f3ef;
-  font-size: 0.92rem;
-  letter-spacing: -0.005em;
-  transition: background 180ms ease;
-}
-
-.gatewayCopy a svg,
-.navCta:hover {
+.gatewayCopy a svg {
   background: #e4e4de;
 }
 
-.menuButton,
-.mobileMenu {
-  display: none;
-}
 
 .heroContent {
   align-self: end;
@@ -469,7 +214,8 @@
 
 .partners,
 .gatewayCopy a,
-.developers {
+.developers,
+.stories {
   position: relative;
   color: #080808;
   background: var(--paper);
@@ -791,14 +537,45 @@
   color: var(--signal);
 }
 
-/* Height is the rail itself: the hairlines are the section's edges. */
+/* Label lives in a fixed header above the rail, so the logos can scroll
+   underneath it indefinitely without ever carrying the caption away. */
 .partners {
-  padding: 0 2.25rem;
+  padding: 3.5rem 2.25rem 0;
 }
 
-/* Fixed-width cells rather than fractions of the row, so each one can be a
-   true square. Stretching three cells across the page would make each square
-   as tall as it is wide - roughly 640px - which is why the size is capped. */
+.partnerHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  max-width: 80rem;
+  margin: 0 auto 1.5rem;
+}
+
+.partnerLabel {
+  min-width: 0;
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: rgba(8, 8, 8, 0.55);
+  text-wrap: balance;
+}
+
+/* Static centred rail for now. When the roster grows to ~10 logos,
+   swap this for a duplicated marquee track scrolling under the fixed
+   header above. */
+.partnerViewport {
+  overflow: hidden;
+  margin: 0 -2.25rem;
+  border-top: 1px solid var(--paper-line);
+  border-bottom: 1px solid var(--paper-line);
+}
+
+/* Fixed-width cells rather than fractions of the row, so each one stays a
+   true square as more logos join. */
 .partnerRail {
   display: grid;
   grid-auto-flow: column;
@@ -807,8 +584,6 @@
   align-items: center;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--paper-line);
-  border-bottom: 1px solid var(--paper-line);
   list-style: none;
 }
 
@@ -818,11 +593,6 @@
   align-items: center;
   justify-content: center;
   padding: clamp(1rem, 1.8vw, 1.75rem);
-}
-
-/* Every cell is ruled on both sides, so the group reads as a closed set of
-   boxes rather than an open row. */
-.partnerRail li {
   border-left: 1px solid var(--paper-line);
 }
 
@@ -840,6 +610,96 @@
   height: auto;
   max-height: calc(clamp(1.5rem, 2.4vw, 2.4rem) * var(--logo-scale, 1));
   object-fit: contain;
+}
+
+.stories {
+  padding: clamp(4rem, 8vw, 7rem) 2.25rem clamp(5rem, 8vw, 7rem);
+}
+
+.stories .sectionEyebrow {
+  color: rgba(8, 8, 8, 0.55);
+}
+
+.storiesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+.storiesAll {
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(8, 8, 8, 0.35);
+  padding-bottom: 0.25rem;
+  color: #080808;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: border-color 180ms ease, opacity 180ms ease;
+}
+
+.storiesAll:hover {
+  border-color: #080808;
+}
+
+.storiesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.25rem, 2vw, 2.25rem);
+  max-width: 80rem;
+  margin: clamp(2.5rem, 4vw, 4rem) auto 0;
+  align-items: start;
+}
+
+.storyCard {
+  display: block;
+  color: inherit;
+}
+
+.storyCover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: #d8d7d1;
+}
+
+.storyImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.001);
+  filter: saturate(0.94) brightness(0.97);
+  transition:
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 500ms ease;
+}
+
+.storyCard:hover .storyImage {
+  transform: scale(1.03);
+  filter: saturate(1.04) brightness(1.02);
+}
+
+.storyName {
+  display: block;
+  margin-top: 1.1rem;
+  font-size: clamp(1.02rem, 1.2vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.storyDate {
+  display: block;
+  margin-top: 0.6rem;
+  color: rgba(8, 8, 8, 0.55);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .gatewayCopy a,
@@ -1216,101 +1076,7 @@
   font-size: 0.75rem;
 }
 
-.footer {
-  position: relative;
-  overflow: hidden;
-  padding: 7rem 2.25rem 1.4rem;
-  background: #060606;
-}
-
-/* The wordmark itself, run full-bleed along the footer's base and set barely
-   above the ground, with the legal row reading over the top of it. */
-.footerWordmark {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 0;
-  width: 100%;
-  height: auto;
-  opacity: 0.055;
-  pointer-events: none;
-  user-select: none;
-}
-
-.footerSocials,
-.footerMeta {
-  position: relative;
-  z-index: 1;
-}
-
-.footerMeta {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  margin-top: 2.5rem;
-  color: rgba(255, 255, 255, 0.52);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-}
-
-.footerMeta > div {
-  justify-self: end;
-  display: flex;
-  gap: 1rem;
-}
-
-/* Own row, right-aligned above the legal links, so the two never compete for
-   width on narrow screens. */
-.footerSocials {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1.35rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.footerSocials a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.52);
-  transition: color 180ms ease;
-}
-
-.footerSocials a:hover {
-  color: #f4f4ef;
-}
-
-.footerSocials svg {
-  width: 1.05rem;
-  height: 1.05rem;
-}
-
 @media (max-width: 1180px) {
-  .navShellOpen .nav {
-    background: transparent;
-  }
-
-  .navBackdrop,
-  .megaMenu {
-    display: none;
-  }
-
-  .nav {
-    grid-template-columns: 1fr auto;
-  }
-
-  .desktopNav {
-    display: none;
-  }
-
-  .navActions {
-    grid-column: 2;
-  }
-
   .gatewayGrid {
     padding-inline: 0;
   }
@@ -1323,6 +1089,16 @@
 }
 
 @media (max-width: 900px) {
+  .storiesHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+
+  .storiesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem 0.85rem;
+  }
   /* Option 1: the header pins on its own, the cards leave the pinned pane and
      scroll up over it. Full-width squares are far taller than a viewport, so
      they can never live inside a sticky pane. */
@@ -1415,93 +1191,19 @@
     line-height: 1.28;
   }
 
-  .nav,
   .heroContent,
   .beliefSticky,
   .developersSticky,
   .gateway,
   .partners,
-  .footer {
+  .stories {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
   }
 
-  .nav {
-    min-height: 4.5rem;
-  }
-
-  .navActions {
-    display: none;
-  }
-
-  .menuButton {
-    justify-self: end;
-    display: flex;
-    align-items: center;
-    padding: 0;
-    border: 0;
-    color: #fff;
-    background: transparent;
-    font-family: var(--font-mono), monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-
-  .mobileMenu {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    display: grid;
-    grid-template-rows: 1fr auto;
-    padding: 7rem 1.25rem 2rem;
-    background: #070707;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-1rem);
-    transition: opacity 240ms ease, transform 240ms ease;
-  }
-
-  .mobileMenuOpen {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-
-  .mobileMenuList {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .mobileMenuList a {
-    display: flex;
-    align-items: baseline;
-    padding: 0.7rem 0;
-    border-bottom: 1px solid var(--line);
-    font-size: clamp(2.4rem, 11vw, 5rem);
-    letter-spacing: -0.06em;
-  }
-
-  .mobileMenuFooter {
-    display: grid;
-  }
-
-  .mobileMenuCta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.85rem;
-    border-radius: 999px;
-    color: #050505;
-    background: #f3f3ef;
-    font-size: 0.95rem;
-    letter-spacing: -0.005em;
-    transition: background 180ms ease;
-  }
-
-  .mobileMenuCta:hover {
-    background: #e4e4de;
+  .partnerViewport {
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
   }
 
   .heroContent {
@@ -1534,6 +1236,14 @@
 }
 
 @media (max-width: 640px) {
+  .storiesGrid {
+    grid-template-columns: 1fr;
+    gap: 2.75rem;
+  }
+
+  .storyName {
+    font-size: clamp(1.02rem, 4.4vw, 1.15rem);
+  }
   .developersSticky,
   .developers[data-pin="on"] .developersSticky {
     padding: 1.5rem 1.25rem 4.5rem;
@@ -1543,6 +1253,12 @@
     height: 100vh;
     height: 100svh;
     padding: 1.5rem 0 0;
+  }
+
+  /* Shorter runway to match the earlier phone timings: less scrolling
+     through the held frame before the visual arrives. */
+  .mission[data-pin="on"] {
+    height: 220vh;
   }
 
   /* Developers only. Three stacked full-width cards cannot fit a pinned frame,
@@ -1590,15 +1306,6 @@
     background:
       linear-gradient(90deg, rgba(0,0,0,0.78), rgba(0,0,0,0.12)),
       linear-gradient(180deg, rgba(0,0,0,0.35), transparent 46%, rgba(5,5,5,0.92));
-  }
-
-  .brand {
-    gap: 0.6rem;
-    font-size: 0.76rem;
-  }
-
-  .brandLogo {
-    width: 6rem;
   }
 
   .heroContent {
@@ -1657,27 +1364,15 @@
     display: none;
   }
 
-  .footer {
-    padding-top: 5rem;
+  .partnerHead {
+    margin-bottom: 1.25rem;
   }
 
-  .footerMeta {
-    grid-template-columns: 1fr auto;
-    gap: 1.2rem;
-  }
-
-  .footerMeta > span:nth-child(2) {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .heroImage,
-  .nav,
-  .heroContent,
-  .navBackdrop,
-  .megaMenu,
-  .megaMenuInner {
+  .heroContent {
     animation: none;
   }
 

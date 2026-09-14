@@ -165,7 +165,7 @@ Defines the technical system model for Cencori, including primitives, system bou
 - `ENG-09` Reliability, Auditability, and Control
 - `ENG-10` Engineering Cross-Reference Map
 
-### Volume 4: Design Volume
+### Volume 4: Public Site Architecture and Design Doctrine
 
 **Audience**
 
@@ -176,7 +176,7 @@ Defines the technical system model for Cencori, including primitives, system bou
 
 **Purpose**
 
-Defines how the ecosystem feels coherent in UX, language, interaction patterns, information architecture, and visual system design.
+Defines the canonical public-site architecture, page layouts, visual doctrine, motion language, and redesign review standard.
 
 **Document**
 
@@ -184,17 +184,22 @@ Defines how the ecosystem feels coherent in UX, language, interaction patterns, 
 
 **Module Table of Contents**
 
-- `DES-01` Purpose of the Design Volume
-- `DES-02` Design’s Role in the Company System
-- `DES-03` Ecosystem Feel as a Product Requirement
-- `DES-04` Navigation, Information Architecture, and Cross-Category Movement
-- `DES-05` Shared Objects and Consistent Interaction Language
-- `DES-06` Empty States, Onboarding, and Progressive Discovery
-- `DES-07` Multi-Surface Design Rules
-- `DES-08` Design System Implications
-- `DES-09` Design Cross-Reference Map
+- `DES-01` Design Objective
+- `DES-02` Current-Site Diagnosis
+- `DES-03` Primary Navigation
+- `DES-04` Site Map
+- `DES-05` Homepage Narrative Layout
+- `DES-06` Models Page Layout
+- `DES-07` Infrastructure Page Layout
+- `DES-08` Industries Page Layout
+- `DES-09` Research and Company Layouts
+- `DES-10` Visual Doctrine
+- `DES-11` Layout System
+- `DES-12` Footer Architecture
+- `DES-13` Launch Scope
+- `DES-14` Design Review Test
 
-### Volume 5: GTM Volume
+### Volume 5: Public Narrative and GTM
 
 **Audience**
 
@@ -206,7 +211,7 @@ Defines how the ecosystem feels coherent in UX, language, interaction patterns, 
 
 **Purpose**
 
-Defines how Cencori should be explained, sold, positioned, and expanded externally without breaking internal truth.
+Defines the canonical public narrative, Models wedge, technical invention, infrastructure horizon, Africa thesis, proof architecture, voice, and status language.
 
 **Document**
 
@@ -214,15 +219,15 @@ Defines how Cencori should be explained, sold, positioned, and expanded external
 
 **Module Table of Contents**
 
-- `GTM-01` Purpose of the GTM Volume
-- `GTM-02` GTM’s Role in the Company System
-- `GTM-03` What Cencori Is, Publicly and Precisely
-- `GTM-04` Wedge Narrative vs Long-Range Narrative
-- `GTM-05` Category Storytelling Without Overselling
-- `GTM-06` Ecosystem Messaging
-- `GTM-07` Competitive Framing
-- `GTM-08` Common Misunderstandings and Corrections
-- `GTM-09` Sales and Marketing Cross-Reference Map
+- `GTM-01` Purpose
+- `GTM-02` The Public Narrative System
+- `GTM-03` Message Hierarchy
+- `GTM-04` Audience Translation
+- `GTM-05` Competitive Framing
+- `GTM-06` Calls to Action
+- `GTM-07` Public Status Language
+- `GTM-08` Public Narrative Test
+- `GTM-09` Cross-Reference Map
 
 ### Volume 6: Canonical Models & References
 
@@ -293,6 +298,14 @@ The confidential representation layer for AI agents: identity, positioning, prod
 - `AGENT-22` FAQ
 - `AGENT-23` Key Quotes And Statements
 - `AGENT-24` Response Discipline
+
+---
+
+## Product Positioning References
+
+| Document | Purpose |
+| --- | --- |
+| [ARCIE_POSITIONING.md](./ARCIE_POSITIONING.md) | Arcie’s canonical identity: Cencori’s model-agnostic agent infrastructure, with an open-source framework and a managed API in development |
 
 ---
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { AuthNavbar } from "@/components/landing/AuthNavbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { NewsletterSignupForm } from "@/components/newsletter/NewsletterSignupForm";
 import { siteConfig } from "@/config/site";
 
@@ -80,7 +80,7 @@ export default async function NewsletterPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <AuthNavbar />
+      <SiteNav solid />
 
       <main className="pt-20">
         <section className="py-24 md:py-32">
@@ -139,7 +139,7 @@ export default async function NewsletterPage() {
         </section>
       </main>
 
-      <Footer />
+      <SiteFooter />
     </div>
   );
 }

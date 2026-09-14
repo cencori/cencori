@@ -35,9 +35,34 @@ function TransparentAboutNav() {
 
 export function MarketingNav() {
   const pathname = usePathname();
+  if (pathname === "/thesis" || pathname.startsWith("/thesis/")) {
+    return <ThesisScrollNav />;
+  }
   const transparent = TRANSPARENT_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
   if (!transparent) return <SiteNav solid />;
   return <TransparentAboutNav />;
+}
+
+// Thesis: transparent at the top, soft-fades to solid page background on scroll.
+function ThesisScrollNav() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <div
+      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-300 ${
+        scrolled ? "bg-background/90 backdrop-blur-md" : "bg-transparent"
+      }`}
+    >
+      <SiteNav />
+    </div>
+  );
 }

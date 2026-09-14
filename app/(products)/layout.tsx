@@ -1,5 +1,5 @@
-import Navbar from "@/components/landing/Navbar";
-import { Footer } from "@/components/landing/Footer";
+import { SiteNav } from "@/components/nav/SiteNav";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 
 export default function ProductsLayout({
     children,
@@ -7,10 +7,10 @@ export default function ProductsLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <Navbar homeUrl="/" />
-            {children}
-            <Footer />
+        <div className="flex min-h-screen flex-col bg-background text-foreground">
+            <SiteNav solid />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
         </div>
     );
 }

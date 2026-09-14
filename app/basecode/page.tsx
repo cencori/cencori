@@ -1,7 +1,8 @@
-import Navbar from "@/components/landing/Navbar";
+import { SiteNav } from "@/components/nav/SiteNav";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import Link from "next/link";
 import { BasecodePlans } from "./BasecodePlans";
 
 export default function BasecodePage() {
@@ -34,10 +35,7 @@ export default function BasecodePage() {
             "linear-gradient(180deg, rgba(10, 12, 14, 0.62) 0%, rgba(10, 12, 14, 0.34) 56%, rgba(10, 12, 14, 0.72) 100%)",
         }}
       />
-      <Navbar
-        homeUrl="/"
-        className="border-b-0 bg-transparent backdrop-blur-none"
-      />
+      <SiteNav solid />
       <main className="relative pt-24 md:pt-28">
         <header className="mx-auto mb-6 max-w-4xl px-5 text-left md:mb-8 md:px-8">
           <p className="mb-5 flex items-center gap-2 text-lg font-semibold tracking-[-0.04em]">
@@ -56,6 +54,7 @@ export default function BasecodePage() {
           >
             <a href="#download">Download for macOS</a>
           </Button>
+          <Link href="/basecode/docs" className="ml-4 text-sm text-white/80 underline underline-offset-4 hover:text-white">Documentation</Link>
         </header>
         <section className="mx-5 max-w-4xl overflow-hidden rounded-lg border border-white/15 bg-white/[0.03] shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:mx-auto">
           <Image

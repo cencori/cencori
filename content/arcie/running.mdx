@@ -3,9 +3,13 @@ title: Running Agents
 description: Execute an agent from your own code with runAgent and streamAgent, and read ambient state at runtime.
 ---
 
-Zett executes agents against the **Cencori Sessions API**. The `arcie/runner`
+Arcie’s framework runner connects to the **Cencori Sessions API**. The `arcie/runner`
 subpath gives you two entry points: `runAgent` (await a full result) and
 `streamAgent` (consume events as they arrive).
+
+The runner executes custom tools in its own process and sends results back to
+continue the model turn. This framework interface is not the Cencori-managed
+[Agent API](/arcie/docs/managed-api), which is in development.
 
 ## `runAgent`
 

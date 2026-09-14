@@ -40,7 +40,7 @@ export default defineAgent({
 Write the system prompt in `agent/instructions.md`:
 
 ```md
-You are a helpful AI agent built with Zett on Cencori.
+You are a helpful AI agent built with Arcie on Cencori.
 Be concise, accurate, and use your tools when appropriate.
 ```
 
@@ -60,7 +60,7 @@ curl -N -X POST http://localhost:3000 \
   -d '{"message": "Hello!", "stream": true}'
 ```
 
-You'll see Zett [protocol events](/arcie/docs/events) — `session.started`,
+You'll see Arcie [protocol events](/arcie/docs/events) — `session.started`,
 `message.appended` deltas, `message.completed`, and so on.
 
 ## 5. Add a tool

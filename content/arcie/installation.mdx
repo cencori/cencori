@@ -1,12 +1,13 @@
 ---
 title: Installation
-description: Create a new Zett agent project and install its dependencies.
+description: Create a new Arcie agent project and install its dependencies.
 ---
 
 ## Requirements
 
-- **Node.js 18 or newer** (Zett uses native `fetch`, `crypto.randomUUID`, and ES modules).
-- A **Cencori account** and project API key for running agents — see [Cencori integration](/arcie/docs/cencori).
+- **Node.js 18 or newer** (Arcie uses native `fetch`, `crypto.randomUUID`, and ES modules).
+- A provider API key for local model access, or a **Cencori account** and project
+  API key for the Cencori Sessions integration — see [Cencori integration](/arcie/docs/cencori).
 
 ## Scaffold a project
 
@@ -56,7 +57,7 @@ npm install
 npm run dev
 ```
 
-The generated `package.json` wires the Zett CLI into your scripts:
+The generated `package.json` wires the Arcie CLI into your scripts:
 
 ```json
 {
@@ -73,7 +74,7 @@ The generated `package.json` wires the Zett CLI into your scripts:
 
 ## Configure Cencori
 
-Running an agent calls the Cencori Sessions API, which needs a key:
+When using the Cencori Sessions integration, configure a project key:
 
 ```bash
 export CENCORI_API_KEY=csk_...
@@ -81,8 +82,10 @@ export CENCORI_PROJECT_ID=proj_...   # optional; sent as X-Project-ID
 ```
 
 <Callout type="info">
-`CENCORI_API_KEY` is required at run time. Without it, `arcie dev` and `runAgent`
-throw `Cencori API key required`. See [Cencori integration](/arcie/docs/cencori).
+The Cencori Sessions path requires `CENCORI_API_KEY`. The framework also includes
+a local development model server that connects directly to supported providers;
+that path uses provider credentials rather than a Cencori key. Neither path is
+the [managed Agent API](/arcie/docs/managed-api), which is in development.
 </Callout>
 
 Next: the [Quickstart](/arcie/docs/quickstart) walks through your first request end to end.
