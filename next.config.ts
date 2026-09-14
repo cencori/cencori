@@ -8,6 +8,19 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Vercel functions run linux/x64. onnxruntime-node ships prebuilt binaries
+  // for every platform (darwin/win32/arm64 ≈ 130MB) plus a 90MB browser
+  // build (onnxruntime-web) that Node never loads — nft traces them into
+  // every serverless function and blows the 250MB limit. Exclude the dead
+  // weight; the linux/x64 binary stays in case embeddings run in-function.
+  outputFileTracingExcludes: {
+    '*': [
+      './node_modules/onnxruntime-node/bin/napi-v3/darwin/**/*',
+      './node_modules/onnxruntime-node/bin/napi-v3/win32/**/*',
+      './node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/**/*',
+      './node_modules/onnxruntime-web/**/*',
+    ],
+  },
   // Transformers.js includes native ONNX binaries and runtime model loading.
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
   serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node"],
