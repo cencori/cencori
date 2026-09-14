@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { triggerAnomalyWebhook } from '@/lib/webhooks/trigger';
 import { createWebhookEvent, signPayload } from '@/lib/webhooks/deliver';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
+import { cronDisabled } from '@/lib/cron';
 
 function mean(arr: number[]): number {
     if (arr.length === 0) return 0;
@@ -159,6 +160,8 @@ async function detectAnomalies(
 }
 
 async function run(req: NextRequest) {
+    const off = cronDisabled();
+    if (off) return off;
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.get('authorization');
 

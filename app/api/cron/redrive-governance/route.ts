@@ -13,8 +13,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { redriveGovernanceDeadletter } from '@/lib/governance/delivery';
+import { cronDisabled } from '@/lib/cron';
 
 async function run(req: NextRequest) {
+    const off = cronDisabled();
+    if (off) return off;
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.get('authorization');
 

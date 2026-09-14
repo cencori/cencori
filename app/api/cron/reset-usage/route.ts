@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resetMonthlyUsage } from '@/lib/usage';
+import { cronDisabled } from '@/lib/cron';
 
 async function run(req: NextRequest) {
+    const off = cronDisabled();
+    if (off) return off;
     try {
         const cronSecret = process.env.CRON_SECRET;
         const authHeader = req.headers.get('authorization');
