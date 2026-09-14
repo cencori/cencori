@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { authorizeWebCrawlAdmin } from '@/lib/web/internal-auth';
-import { getPublicCrawlJob } from '@/lib/web/frontier';
+import { getPublicCrawlJob } from '@/lib/web/job-reads';
 import { WebRuntimeError } from '@/lib/web/errors';
 import { createWebDataStore } from '@/lib/web/store';
 
