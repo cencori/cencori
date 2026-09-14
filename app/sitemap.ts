@@ -16,6 +16,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     // Product pages - these target specific keywords
     const productPages = [
+        { url: `${baseUrl}/basecode`, priority: 0.8, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/basecode/docs`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/ai`, priority: 0.9, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/audit`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/knight`, priority: 0.8, changeFrequency: 'weekly' as const },
@@ -30,6 +32,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Marketing/Company pages
     const companyPages = [
         { url: `${baseUrl}/about`, priority: 0.7, changeFrequency: 'monthly' as const },
+        { url: `${baseUrl}/thesis`, priority: 0.9, changeFrequency: 'monthly' as const },
+        { url: `${baseUrl}/manifesto`, priority: 0.7, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/blog`, priority: 0.8, changeFrequency: 'daily' as const },
         { url: `${baseUrl}/blog/engineering`, priority: 0.7, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/blog/product`, priority: 0.7, changeFrequency: 'weekly' as const },
@@ -44,6 +48,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${baseUrl}/events`, priority: 0.5, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/partners`, priority: 0.6, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/shipped`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/stories`, priority: 0.7, changeFrequency: 'weekly' as const },
     ];
 
     // Auth pages (lower priority, still indexed)

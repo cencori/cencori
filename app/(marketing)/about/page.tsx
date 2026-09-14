@@ -3,6 +3,7 @@ import { AboutAfrica } from "@/components/about/AboutAfrica";
 import { AboutHero } from "@/components/about/AboutHero";
 import { AboutMission } from "@/components/about/AboutMission";
 import { AboutTeam } from "@/components/about/AboutTeam";
+import { AboutThesis } from "@/components/about/AboutThesis";
 
 export const metadata: Metadata = {
   title: "About | Cencori",
@@ -16,6 +17,7 @@ export default function AboutPage() {
       <AboutHero />
       <AboutMission />
       <AboutAfrica />
+      <AboutThesis />
       <AboutTeam />
     </main>
   );

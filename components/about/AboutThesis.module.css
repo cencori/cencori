@@ -1,0 +1,85 @@
+.thesis {
+  position: relative;
+  height: 250dvh;
+  background: #f4f4ef;
+}
+
+.pin {
+  position: sticky;
+  top: 0;
+  display: grid;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.frame {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: 100%;
+  min-height: 100dvh;
+  padding: 2.1rem 2.25rem 2.4rem;
+}
+
+.label {
+  margin: 0;
+  justify-self: start;
+  color: rgba(5, 5, 5, 0.5);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.body {
+  display: grid;
+  justify-items: start;
+  align-content: end;
+  gap: 2.5rem;
+  text-align: left;
+}
+
+.statement {
+  max-width: none;
+  margin: 0;
+  color: #050505;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: clamp(1.9rem, 4.2vw, 3.75rem);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.statement[data-reveal="on"] .word {
+  opacity: 0.14;
+  will-change: opacity;
+}
+
+.link {
+  color: rgba(5, 5, 5, 0.55);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+  transition: color 180ms ease;
+}
+
+.link:hover {
+  color: #050505;
+}
+
+@media (max-width: 900px) {
+  .pin {
+    overflow-y: auto;
+  }
+
+  .frame {
+    padding: 2.1rem 1.25rem 2.4rem;
+  }
+
+  .statement {
+    font-size: clamp(1.7rem, 8vw, 2.5rem);
+  }
+}

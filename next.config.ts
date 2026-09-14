@@ -23,6 +23,15 @@ const nextConfig: NextConfig = {
       { source: "/llms.txt", destination: "/llm.txt" },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/blog/computing-infrastructure-global-ai-runs-on",
+        destination: "/thesis",
+        permanent: true,
+      },
+    ];
+  },
   // Configure images to allow all local paths (Next.js 16 requirement)
   images: {
     localPatterns: [

@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Footer } from "@/components/landing/Footer";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { Reveal } from "@/components/landing/Reveal";
 import { PartnerConfig } from "@/types/partner";
 
@@ -137,7 +137,7 @@ export function PartnerTemplate({ config }: PartnerTemplateProps) {
                 </div>
             </main>
 
-            <Footer />
+            <SiteFooter />
         </>
     );
 }

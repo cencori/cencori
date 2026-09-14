@@ -1,6 +1,6 @@
 "use client";
 
-import Navbar from "@/components/landing/Navbar";
+import { SiteNav } from "@/components/nav/SiteNav";
 import { PlaygroundChat } from "@/components/dashboard/playground/PlaygroundChat";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,7 @@ export default function PublicPlaygroundPage() {
     if (!DEMO_PROJECT_ID) {
         return (
             <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
-                <Navbar />
+                <SiteNav solid />
                 <main className="flex min-h-0 flex-1 flex-col items-center justify-center pt-20 px-4">
                     <div className="max-w-md text-center space-y-3">
                         <h1 className="text-sm font-semibold">Playground not configured</h1>
@@ -33,7 +33,7 @@ export default function PublicPlaygroundPage() {
                 "selection:bg-foreground selection:text-background"
             )}
         >
-            <Navbar />
+            <SiteNav solid />
             <main className="flex min-h-0 flex-1 flex-col pt-12">
                 <PlaygroundChat
                     environment="production"

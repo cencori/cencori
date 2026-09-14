@@ -1,0 +1,70 @@
+---
+title: Managed API
+description: The managed entry point to Arcie. Product direction; in development, not a launched API reference.
+---
+
+**Arcie—Cencori’s model-agnostic agent infrastructure.**
+
+The open-source framework and the managed API belong to one agent system. The
+framework gives developers control of their agent code and execution. The API
+is being built for developers who want Cencori to operate the agent engine.
+
+<Callout type="info">
+**In development.** This page describes the managed API direction, not a
+production API contract. No managed Agent API endpoints, SDK methods, pricing,
+availability dates or service guarantees are announced here. For current
+framework usage, start with the [quickstart](/arcie/docs/quickstart).
+</Callout>
+
+## The intended developer experience
+
+Build the product around your agents. Supply instructions, tools, knowledge and
+tasks through an API rather than maintaining the agent orchestration service
+yourself. Installing the Arcie framework should not be a prerequisite.
+
+The managed service is intended to handle the agent loop, session state, tool
+coordination and connected execution environments. The runtime must distinguish
+tools hosted in its environment from tools invoked through external services.
+
+## One system, two entry points
+
+| Entry point | Developer responsibility | Execution responsibility |
+| --- | --- | --- |
+| Open-source framework | Agent files, custom tools, application logic and runtime operation | The process running Arcie, locally or in a deployment |
+| Managed API (in development) | Agent configuration, connected tools, application logic and permissions | Cencori-operated agent engine and configured execution infrastructure |
+
+Shared agent semantics and a path between these modes are the architectural
+direction. Automatic migration or identical behavior across deployments is not
+a current guarantee.
+
+## Model-agnostic, not capability-blind
+
+The goal is provider choice without rebuilding the surrounding product. The
+runtime must still account for differences in tool calling, context limits,
+reasoning behavior and other provider capabilities. Supporting a model does not
+mean it can perform every task as well as another model.
+
+Different models for specialized subagents and safe model changes during a
+long-running task are engineering goals for the managed service, not promised
+features of the current API.
+
+## What needs to be proven
+
+- Long-running tasks continue without an application holding a connection open.
+- Runs can be inspected, steered, paused, canceled and resumed.
+- Recovery preserves checkpoints and does not blindly repeat completed external actions.
+- Tools execute within explicit permissions, isolation and spending limits.
+- Usage and execution events support debugging, accounting and end-user billing.
+- Model adapters preserve supported capabilities and fail clearly when a capability is unavailable.
+
+Task completion, recovery behavior and cost per successful task must be measured
+before the managed service is described as production-ready.
+
+## How it connects to Cencori
+
+Gateway supplies model access. Sessions supplies turn and event interfaces.
+Memory supplies persistent context. Compute supplies execution environments.
+Arcie connects those layers into agent behavior; it does not replace them.
+
+The framework’s existing use of Cencori Sessions is a foundation, not evidence
+that this managed Agent API is already available.

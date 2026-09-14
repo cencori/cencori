@@ -194,16 +194,46 @@
   gap: 0.4rem;
 }
 
+.megaMenuInnerSingle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.megaMenuInnerCompany {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  gap: clamp(2.5rem, 5vw, 5rem);
+}
+
+.megaMenuInnerCompany .productGroupLabel {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.megaMenuInnerCompany .deployLink {
+  color: #fff;
+}
+
+.megaMenuInnerCompany .staticGroup {
+  justify-self: start;
+  min-width: 12rem;
+  padding-top: 0;
+}
+
 .megaPrimaryLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
+  display: inline-grid;
+  justify-items: start;
+  gap: 0;
   color: rgba(255, 255, 255, 0.92);
   font-size: clamp(1.75rem, 2.45vw, 2.65rem);
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -0.05em;
   transition: color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.megaPrimaryLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .megaPrimaryLink svg {
@@ -245,6 +275,223 @@
 .megaSecondaryLink:focus-visible {
   border-color: rgba(100, 255, 155, 0.55);
   color: #fff;
+}
+
+.megaMenuInnerProducts {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 3vw, 3rem);
+}
+
+.megaMenuInnerInfra {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.55fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 3vw, 3rem);
+}
+
+.megaMenuInnerInfra .staticGroup {
+  order: 2;
+}
+
+.megaMenuInnerInfra .productPreview {
+  order: 3;
+}
+
+.singleGroup {
+  min-width: 0;
+}
+
+.staticGroup {
+  min-width: 0;
+}
+
+.staticGroup .megaLinkList {
+  gap: 0.15rem;
+}
+
+.deployLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.deployLink svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  opacity: 0;
+  stroke: var(--signal);
+  stroke-width: 1.9;
+  fill: none;
+  transform: translate(-0.25rem, 0.25rem);
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.deployLink:hover,
+.deployLink:focus-visible {
+  color: #fff;
+  transform: translateX(0.25rem);
+}
+
+.deployLink:hover svg,
+.deployLink:focus-visible svg {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.productsGroups {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(1rem, 2vw, 1.5rem);
+  align-items: start;
+}
+
+.productGroupLabel {
+  margin: 0 0 1.1rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.productGroup .megaLinkList {
+  gap: 1.15rem;
+}
+
+.productItem {
+  display: inline-block;
+  justify-self: start;
+  color: rgba(255, 255, 255, 0.72);
+  transition: color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.productItemLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: clamp(1.35rem, 1.9vw, 1.9rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.productItemLabel svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  opacity: 0;
+  stroke: var(--signal);
+  stroke-width: 1.9;
+  fill: none;
+  transform: translate(-0.3rem, 0.3rem);
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.productTagline {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.88rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: color 180ms ease;
+}
+
+.productItem:hover,
+.productItem:focus-visible,
+.productItemActive {
+  color: #fff;
+  transform: translateX(0.3rem);
+}
+
+.productItem:hover .productItemLabel svg,
+.productItem:focus-visible .productItemLabel svg,
+.productItemActive .productItemLabel svg {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.productPreview {
+  padding-left: clamp(1.5rem, 3vw, 2.75rem);
+}
+
+.productPreviewBody {
+  animation: productPreviewIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.productPreviewTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.productPreviewDesc {
+  margin: 0.8rem 0 0;
+  max-width: 24rem;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+.productChips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 1.5rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.productChips li {
+  animation: productChipIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--chip-index, 0) * 28ms);
+}
+
+.productChips a {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+  transition: color 180ms ease;
+}
+
+.productChips a:hover,
+.productChips a:focus-visible {
+  color: #fff;
+}
+
+@keyframes productChipIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.3rem);
+  }
+}
+
+.productPreviewLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.4rem;
+  border-bottom: 1px solid rgba(100, 255, 155, 0.5);
+  padding-bottom: 0.2rem;
+  color: #fff;
+  font-size: 0.88rem;
+  transition: border-color 180ms ease, opacity 180ms ease;
+}
+
+.productPreviewLink:hover,
+.productPreviewLink:focus-visible {
+  border-color: var(--signal);
+}
+
+@keyframes productPreviewIn {
+  from {
+    opacity: 0;
+    transform: translateX(0.65rem);
+  }
 }
 
 @keyframes navBackdropIn {
@@ -392,7 +639,7 @@
     border: 0;
     color: #fff;
     background: transparent;
-    font-size: clamp(2.4rem, 11vw, 5rem);
+    font-size: clamp(2rem, 9vw, 4rem);
     line-height: 1.04;
     letter-spacing: -0.06em;
     text-align: left;
@@ -401,6 +648,38 @@
 
   .mobileSub {
     animation: mobileSubIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobileSub .mobileMenuList a {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .mobileMenuDesc {
+    display: block;
+    max-width: 26rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  .mobileMenu .mobileMenuList .mobileChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    padding: 0.25rem 0 0.9rem;
+  }
+
+  .mobileMenu .mobileMenuList .mobileChips a {
+    padding: 0;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
   }
 
   .mobileMenu .mobileBack {

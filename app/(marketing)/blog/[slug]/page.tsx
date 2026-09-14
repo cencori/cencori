@@ -50,6 +50,9 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
     const { slug } = await params;
+    if (slug === "computing-infrastructure-global-ai-runs-on") {
+        redirect("/thesis");
+    }
     const post = getPostBySlug(slug);
 
     if (!post || !post.published) notFound();

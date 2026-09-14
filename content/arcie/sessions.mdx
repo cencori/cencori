@@ -3,10 +3,14 @@ title: Sessions
 description: Durable execution — configure turn limits, memory, and human approval for your agent's sessions.
 ---
 
-Every run of a Zett agent happens inside a **Cencori session**. A session is the
-durable unit of execution: it holds the conversation, survives across turns, and
-is where memory and human-in-the-loop approvals live. Zett creates and drives
-sessions through the Cencori Sessions API on your behalf.
+When using the Cencori Sessions integration, an Arcie agent runs inside a
+**Cencori session**. A session holds conversation state across turns and exposes
+approval interfaces. Arcie creates and drives sessions on your behalf; its
+runner handles tool execution and memory processing.
+
+Persisted session state is not a guarantee that arbitrary tool work survives a
+process crash. A fully managed agent service is the [managed API direction](/arcie/docs/managed-api),
+currently in development.
 
 ## Configuring sessions
 
