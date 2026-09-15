@@ -33,9 +33,15 @@ function TransparentAboutNav() {
   );
 }
 
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact"];
+
 export function MarketingNav() {
   const pathname = usePathname();
-  if (pathname === "/thesis" || pathname.startsWith("/thesis/")) {
+  if (
+    SCROLL_SOLID_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+  ) {
     return <ThesisScrollNav />;
   }
   const transparent = TRANSPARENT_ROUTES.some(
@@ -59,7 +65,7 @@ function ThesisScrollNav() {
   return (
     <div
       className={`fixed inset-x-0 top-0 z-40 transition-colors duration-300 ${
-        scrolled ? "bg-background/90 backdrop-blur-md" : "bg-transparent"
+        scrolled ? "bg-background" : "bg-transparent"
       }`}
     >
       <SiteNav />
