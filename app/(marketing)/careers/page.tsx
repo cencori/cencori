@@ -1,21 +1,18 @@
-import React from 'react';
-import Link from "next/link";
-import { siteConfig } from "@/config/site";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 export default function CareersPage() {
+  const router = useRouter();
   return (
-    <div className="container mx-auto py-12 px-4 max-w-4xl">
-      <h1 className="text-4xl font-bold mb-6">Careers: Join Our Team</h1>
-      <p className="text-zinc-400 mb-8">
-        Open roles, benefits, hiring philosophy, and how to apply.
+    <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-4">
+      <p className="text-center text-zinc-400">
+        No listings at the moment
       </p>
-
-      <section>
-        <h2 className="text-2xl font-semibold mb-4">Current Openings</h2>
-        <p className="text-zinc-300 leading-relaxed">
-          We are always looking for talented individuals to join our growing team. Visit our <Link href="#" className="text-blue-400 hover:underline">Job Board</Link> to see current openings.
-        </p>
-      </section>
+      <Button onClick={() => router.back()} className="h-9 rounded-full px-8 text-sm">
+        Go back
+      </Button>
     </div>
   );
 }
