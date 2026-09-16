@@ -235,10 +235,12 @@ function BuildCardVisual({
   slide,
   isActive,
   reducedMotion,
+  eager = false,
 }: {
   slide: BuildSlide;
   isActive: boolean;
   reducedMotion: boolean;
+  eager?: boolean;
 }) {
   return (
     <>
@@ -252,27 +254,16 @@ function BuildCardVisual({
           } ${isActive ? "scale-100" : "scale-110"}`}
           draggable={false}
           fill
+          loading={eager ? "eager" : "lazy"}
           sizes="(max-width: 640px) 90vw, 70vw"
           src={slide.image}
+          unoptimized
         />
       ) : (
         <span
           aria-hidden="true"
           className="absolute inset-0"
           style={{ background: slide.gradient }}
-        />
-      )}
-      {!slide.image && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px)",
-            backgroundSize: "44px 44px",
-            maskImage:
-              "radial-gradient(80% 80% at 50% 40%, black 30%, transparent 100%)",
-          }}
         />
       )}
       <span
@@ -303,6 +294,7 @@ export function DevelopersBuild() {
   const dragStartX = useRef<number | null>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enteredRef = useRef(false);
+  const mobileImagePreloads = useRef<HTMLImageElement[]>([]);
 
   // The loop still wraps, but nothing ever pops: a card leaving the
   // 7-visible window stays mounted while it shrinks/fades out, and a card
@@ -370,6 +362,22 @@ export function DevelopersBuild() {
   }, []);
 
   useEffect(() => {
+    if (!window.matchMedia("(max-width: 639px)").matches) return;
+
+    mobileImagePreloads.current = SLIDES.flatMap((item) => {
+      if (!item.image) return [];
+      const image = new window.Image();
+      image.decoding = "async";
+      image.src = item.image;
+      return [image];
+    });
+
+    return () => {
+      mobileImagePreloads.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
@@ -434,6 +442,7 @@ export function DevelopersBuild() {
             }
           >
             <BuildCardVisual
+              eager
               isActive={false}
               reducedMotion={reducedMotion}
               slide={nextSlide}
@@ -477,6 +486,7 @@ export function DevelopersBuild() {
               whileDrag={reducedMotion ? undefined : { scale: 0.985 }}
             >
               <BuildCardVisual
+                eager
                 isActive
                 reducedMotion={reducedMotion}
                 slide={slide}
@@ -578,6 +588,7 @@ export function DevelopersBuild() {
                   }
                 >
                   <BuildCardVisual
+                    eager={isActive}
                     isActive={isActive}
                     reducedMotion={reducedMotion}
                     slide={s}
