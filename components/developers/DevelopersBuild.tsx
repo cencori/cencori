@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   AppWindow,
   ArrowLeft,
@@ -217,19 +217,7 @@ const CARD_CLEANUP_MS = 1000;
 
 type BuildSlide = (typeof SLIDES)[number];
 
-const MOBILE_CARD_VARIANTS = {
-  enter: (direction: 1 | -1) => ({
-    x: direction > 0 ? "100%" : "-100%",
-    opacity: 0.68,
-    scale: 0.97,
-  }),
-  center: { x: 0, opacity: 1, scale: 1 },
-  exit: (direction: 1 | -1) => ({
-    x: direction > 0 ? "-28%" : "28%",
-    opacity: 0,
-    scale: 0.985,
-  }),
-};
+const MOBILE_SLIDES = [SLIDES[SLIDES.length - 1], ...SLIDES, SLIDES[0]];
 
 function BuildCardVisual({
   slide,
@@ -294,7 +282,13 @@ export function DevelopersBuild() {
   const dragStartX = useRef<number | null>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enteredRef = useRef(false);
-  const mobileImagePreloads = useRef<HTMLImageElement[]>([]);
+  const activeRef = useRef(0);
+  const mobileRailRef = useRef<HTMLDivElement>(null);
+  const mobileScrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const mobileScrollInitialized = useRef(false);
+  const mobileLastScrollLeft = useRef(0);
 
   // The loop still wraps, but nothing ever pops: a card leaving the
   // 7-visible window stays mounted while it shrinks/fades out, and a card
@@ -314,17 +308,49 @@ export function DevelopersBuild() {
           CARD_CLEANUP_MS,
         );
       }
+      activeRef.current = target;
       setActive(target);
     },
     [active, reducedMotion],
   );
 
+  const getMobileStep = useCallback(() => {
+    const rail = mobileRailRef.current;
+    const card = rail?.querySelector<HTMLElement>("[data-mobile-slide]");
+    if (!rail || !card) return 0;
+    const styles = window.getComputedStyle(rail);
+    const gap = Number.parseFloat(styles.columnGap || styles.gap) || 0;
+    return card.offsetWidth + gap;
+  }, []);
+
+  const scrollMobileBy = useCallback(
+    (delta: 1 | -1) => {
+      const rail = mobileRailRef.current;
+      if (
+        !rail ||
+        !window.matchMedia("(max-width: 639px)").matches
+      ) {
+        return false;
+      }
+      const step = getMobileStep();
+      if (!step) return false;
+      rail.scrollBy({
+        behavior: reducedMotion ? "auto" : "smooth",
+        left: delta * step,
+      });
+      return true;
+    },
+    [getMobileStep, reducedMotion],
+  );
+
   const next = useCallback(() => {
+    if (scrollMobileBy(1)) return;
     navigate((active + 1) % SLIDES.length, 1);
-  }, [navigate, active]);
+  }, [navigate, active, scrollMobileBy]);
   const prev = useCallback(() => {
+    if (scrollMobileBy(-1)) return;
     navigate((active - 1 + SLIDES.length) % SLIDES.length, -1);
-  }, [navigate, active]);
+  }, [navigate, active, scrollMobileBy]);
   const select = useCallback(
     (target: number) => {
       const forwardDistance =
@@ -336,21 +362,56 @@ export function DevelopersBuild() {
     [active, navigate],
   );
 
-  const handleMobileDragEnd = useCallback(
-    (
-      _: MouseEvent | TouchEvent | PointerEvent,
-      info: PanInfo,
-    ) => {
-      const projectedOffset = info.offset.x + info.velocity.x * 0.16;
-      if (projectedOffset < -56) next();
-      else if (projectedOffset > 56) prev();
-    },
-    [next, prev],
-  );
+  const handleMobileScroll = useCallback(() => {
+    const rail = mobileRailRef.current;
+    if (!rail || !mobileScrollInitialized.current) return;
+    const step = getMobileStep();
+    if (!step) return;
+
+    const rawIndex = Math.round(rail.scrollLeft / step);
+    const logicalIndex =
+      rawIndex <= 0
+        ? SLIDES.length - 1
+        : rawIndex >= SLIDES.length + 1
+          ? 0
+          : rawIndex - 1;
+
+    if (logicalIndex !== activeRef.current) {
+      setDirection(
+        rail.scrollLeft >= mobileLastScrollLeft.current ? 1 : -1,
+      );
+      activeRef.current = logicalIndex;
+      setActive(logicalIndex);
+    }
+    mobileLastScrollLeft.current = rail.scrollLeft;
+
+    if (mobileScrollEndTimer.current) {
+      clearTimeout(mobileScrollEndTimer.current);
+    }
+    mobileScrollEndTimer.current = setTimeout(() => {
+      const currentRail = mobileRailRef.current;
+      if (!currentRail) return;
+      const currentStep = getMobileStep();
+      if (!currentStep) return;
+      const settledIndex = Math.round(currentRail.scrollLeft / currentStep);
+      const loopTarget =
+        settledIndex === 0
+          ? SLIDES.length * currentStep
+          : settledIndex === SLIDES.length + 1
+            ? currentStep
+            : null;
+      if (loopTarget == null) return;
+      currentRail.scrollTo({ behavior: "auto", left: loopTarget });
+      mobileLastScrollLeft.current = loopTarget;
+    }, 90);
+  }, [getMobileStep]);
 
   useEffect(
     () => () => {
       if (settleTimer.current) clearTimeout(settleTimer.current);
+      if (mobileScrollEndTimer.current) {
+        clearTimeout(mobileScrollEndTimer.current);
+      }
     },
     [],
   );
@@ -362,20 +423,23 @@ export function DevelopersBuild() {
   }, []);
 
   useEffect(() => {
-    if (!window.matchMedia("(max-width: 639px)").matches) return;
-
-    mobileImagePreloads.current = SLIDES.flatMap((item) => {
-      if (!item.image) return [];
-      const image = new window.Image();
-      image.decoding = "async";
-      image.src = item.image;
-      return [image];
-    });
-
-    return () => {
-      mobileImagePreloads.current = [];
+    const rail = mobileRailRef.current;
+    if (!rail) return;
+    const syncPosition = () => {
+      const step = getMobileStep();
+      if (!step) return;
+      const left = (activeRef.current + 1) * step;
+      rail.scrollTo({ behavior: "auto", left });
+      mobileLastScrollLeft.current = left;
+      mobileScrollInitialized.current = true;
     };
-  }, []);
+    const frame = window.requestAnimationFrame(syncPosition);
+    window.addEventListener("resize", syncPosition);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", syncPosition);
+    };
+  }, [getMobileStep]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -387,7 +451,6 @@ export function DevelopersBuild() {
   }, [next, prev]);
 
   const slide = SLIDES[active];
-  const nextSlide = SLIDES[(active + 1) % SLIDES.length];
 
   return (
     <section className="relative px-4 py-20 sm:py-28">
@@ -426,73 +489,38 @@ export function DevelopersBuild() {
           </div>
         </div>
 
-        <div className="relative mt-8 h-[360px] overflow-hidden sm:hidden">
-          <motion.div
-            animate={{ opacity: 0.62, scale: 0.98 }}
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-[calc(100%-24px)] w-[calc(100%-34px)] origin-left overflow-hidden rounded-lg border border-white/10"
-            initial={
-              reducedMotion ? false : { opacity: 0, scale: 0.965 }
-            }
-            key={`mobile-peek-${nextSlide.title}`}
-            transition={
-              reducedMotion
-                ? { duration: 0 }
-                : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-            }
-          >
-            <BuildCardVisual
-              eager
-              isActive={false}
-              reducedMotion={reducedMotion}
-              slide={nextSlide}
-            />
-          </motion.div>
-
-          <AnimatePresence custom={direction} initial={false}>
-            <motion.div
-              animate="center"
-              aria-label={`${slide.title}: ${slide.headline}`}
-              aria-roledescription="slide"
-              className="absolute inset-y-0 left-0 z-10 w-[calc(100%-34px)] touch-pan-y overflow-hidden rounded-lg border border-white/15 text-left"
-              custom={direction}
-              drag={reducedMotion ? false : "x"}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragDirectionLock
-              dragElastic={0.72}
-              dragMomentum={false}
-              exit="exit"
-              initial="enter"
-              key={`mobile-active-${slide.title}`}
-              onDragEnd={handleMobileDragEnd}
-              transition={
-                reducedMotion
-                  ? { duration: 0 }
-                  : {
-                      x: {
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 34,
-                        mass: 0.85,
-                      },
-                      opacity: { duration: 0.24, ease: "easeOut" },
-                      scale: {
-                        duration: 0.36,
-                        ease: [0.22, 1, 0.36, 1],
-                      },
-                    }
-              }
-              variants={MOBILE_CARD_VARIANTS}
-              whileDrag={reducedMotion ? undefined : { scale: 0.985 }}
-            >
-              <BuildCardVisual
-                eager
-                isActive
-                reducedMotion={reducedMotion}
-                slide={slide}
-              />
-            </motion.div>
-          </AnimatePresence>
+        <div
+          aria-label="Possibilities carousel"
+          className="relative mt-8 flex h-[360px] snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain pr-[34px] sm:hidden [scrollbar-width:none] [will-change:scroll-position] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+          onScroll={handleMobileScroll}
+          ref={mobileRailRef}
+        >
+          {MOBILE_SLIDES.map((mobileSlide, rawIndex) => {
+            const isClone =
+              rawIndex === 0 || rawIndex === MOBILE_SLIDES.length - 1;
+            return (
+              <div
+                aria-hidden={isClone || undefined}
+                aria-label={
+                  isClone
+                    ? undefined
+                    : `${mobileSlide.title}: ${mobileSlide.headline}`
+                }
+                aria-roledescription={isClone ? undefined : "slide"}
+                className="relative h-[360px] w-[calc(100%-34px)] shrink-0 snap-start snap-always overflow-hidden rounded-lg border border-white/15 text-left [contain:layout_paint]"
+                data-mobile-slide
+                key={`${mobileSlide.title}-${rawIndex}`}
+                role={isClone ? undefined : "group"}
+              >
+                <BuildCardVisual
+                  eager
+                  isActive
+                  reducedMotion={reducedMotion}
+                  slide={mobileSlide}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <div className="relative mt-8 hidden sm:block">
