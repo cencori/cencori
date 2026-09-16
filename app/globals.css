@@ -196,7 +196,9 @@
     }
 }
 
-.dark {
+.dark,
+.developers-theme {
+    color-scheme: dark;
     --background: #000000;
     --foreground: #f2f2f2;
     --card: #000000;

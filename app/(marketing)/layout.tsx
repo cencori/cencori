@@ -1,16 +1,9 @@
-import { MarketingFooter } from "@/components/marketing/MarketingFooter";
-import { MarketingNav } from "@/components/nav/MarketingNav";
+import { MarketingShell } from "@/components/marketing/MarketingShell";
 
 export default function MarketingLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
-        <div className="marketing-theme flex min-h-screen flex-col bg-background text-foreground [--border:#b8b8b8] dark:[--border:#4a4a4a]">
-            <MarketingNav />
-            <main className="flex-1">{children}</main>
-            <MarketingFooter />
-        </div>
-    );
+  return <MarketingShell>{children}</MarketingShell>;
 }
