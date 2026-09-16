@@ -76,9 +76,17 @@ function getMenuSections(
   return [{ links: [...primary, ...secondary] }];
 }
 
-export function SiteFooter() {
+export function SiteFooter({ bottomGlow }: { bottomGlow?: React.ReactNode }) {
   return (
     <footer className={styles.footer}>
+      {bottomGlow ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-0 overflow-hidden"
+        >
+          {bottomGlow}
+        </div>
+      ) : null}
       <div className={styles.footerMain}>
         <nav aria-label="Footer" className={styles.footerNav}>
           {navigationMenus

@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { navigationMenus, type NavigationMenuId } from "./nav-data";
+import { usePathname } from "next/navigation";
+import {
+  developerNavigationMenus,
+  navigationMenus,
+} from "./nav-data";
 import { socials } from "./socials";
 import styles from "./SiteNav.module.css";
 
@@ -30,17 +34,24 @@ function mobileLabel(label: string): string {
 }
 
 export function MobileMenu({
+  menus,
   open,
   sub,
   onSelectSub,
   onNavigate,
 }: {
+  menus:
+    | typeof navigationMenus
+    | typeof developerNavigationMenus;
   open: boolean;
-  sub: NavigationMenuId | null;
-  onSelectSub: (id: NavigationMenuId | null) => void;
+  sub: string | null;
+  onSelectSub: (id: string | null) => void;
   onNavigate: () => void;
 }) {
-  const subData = navigationMenus.find((menu) => menu.id === sub);
+  const subData = menus.find((menu) => menu.id === sub);
+  const pathname = usePathname();
+  const isDevelopers =
+    pathname === "/developers" || pathname?.startsWith("/developers/");
 
   return (
     <div
@@ -48,7 +59,7 @@ export function MobileMenu({
       id="future-menu"
     >
       <div className={styles.mobileMenuScroll}>
-        {subData ? (
+        {subData && !("href" in subData) ? (
           <div key={subData.id} className={styles.mobileSub}>
             <button
               className={styles.mobileBack}
@@ -98,7 +109,7 @@ export function MobileMenu({
                   </>
                 ) : null}
               </div>
-            ) : (
+            ) : "primary" in subData ? (
               <>
             <div
               aria-label={`${subData.label} links`}
@@ -125,19 +136,25 @@ export function MobileMenu({
               </>
             ) : null}
               </>
-            )}
+            ) : null}
           </div>
         ) : (
           <div aria-label="Mobile navigation" className={styles.mobileMenuList}>
-            {navigationMenus.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onSelectSub(item.id)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
+            {menus.map((item) =>
+              "href" in item ? (
+                <Link href={item.href} key={item.id} onClick={onNavigate}>
+                  {item.label}
+                </Link>
+              ) : (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectSub(item.id)}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ),
+            )}
           </div>
         )}
       </div>
@@ -160,11 +177,20 @@ export function MobileMenu({
         </ul>
         <Link
           className={styles.mobileMenuCta}
-          href="/contact"
+          href={isDevelopers ? "/signup" : "/contact"}
           onClick={onNavigate}
         >
-          Talk to us
+          {isDevelopers ? "Sign up" : "Talk to us"}
         </Link>
+        {isDevelopers ? (
+          <Link
+            className={styles.mobileMenuLogin}
+            href="/login"
+            onClick={onNavigate}
+          >
+            Log in
+          </Link>
+        ) : null}
       </div>
     </div>
   );

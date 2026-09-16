@@ -33,7 +33,7 @@ function TransparentAboutNav() {
   );
 }
 
-const SCROLL_SOLID_ROUTES = ["/thesis", "/contact"];
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers"];
 
 export function MarketingNav() {
   const pathname = usePathname();

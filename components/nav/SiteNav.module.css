@@ -99,6 +99,12 @@
   background: transparent;
 }
 
+.desktopNavBare {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .navTrigger {
   position: relative;
   padding: 0;
@@ -539,6 +545,22 @@
   background: #e4e4de;
 }
 
+.navLogin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  padding: 0 0.5rem;
+  color: #fff;
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  transition: opacity 180ms ease;
+}
+
+.navLogin:hover {
+  opacity: 0.65;
+}
+
 .menuButton,
 .mobileMenu {
   display: none;
@@ -794,6 +816,17 @@
 
   .mobileMenuCta:hover {
     background: #e4e4de;
+  }
+
+  .mobileMenuLogin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    color: #fff;
+    font-size: 0.95rem;
+    letter-spacing: -0.005em;
+    text-decoration: none;
   }
 }
 
