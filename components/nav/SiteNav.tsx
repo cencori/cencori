@@ -4,9 +4,14 @@ import { ArrowUpRight03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { MobileMenu } from "./MobileMenu";
-import { navigationMenus, type NavigationMenuId } from "./nav-data";
+import {
+  developerNavigationMenus,
+  navigationMenus,
+  type DeveloperDropdownMenu,
+} from "./nav-data";
 import styles from "./SiteNav.module.css";
 
 function CencoriLogo({ className = "" }: { className?: string }) {
@@ -194,10 +199,12 @@ function MegaMenu({
   menu,
   onNavigate,
 }: {
-  menu: (typeof navigationMenus)[number];
+  menu:
+    | (typeof navigationMenus)[number]
+    | DeveloperDropdownMenu;
   onNavigate: () => void;
 }) {
-  if (menu.id === "products") {
+  if (menu.id === "products" || menu.id === "dev-products") {
     return (
       <GroupedMegaMenu
         id={menu.id}
@@ -208,13 +215,16 @@ function MegaMenu({
     );
   }
 
-  if (menu.id === "infrastructure") {
+  if (
+    menu.id === "infrastructure" ||
+    menu.id === "dev-solutions"
+  ) {
     return (
       <GroupedMegaMenu
         id={menu.id}
         label={menu.label}
         groups={menu.groups}
-        staticGroups={menu.staticGroups}
+        staticGroups={"staticGroups" in menu ? menu.staticGroups : undefined}
         onNavigate={onNavigate}
       />
     );
@@ -312,9 +322,13 @@ export function SiteNav({
   solid?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<NavigationMenuId | null>(null);
-  const [mobileSub, setMobileSub] = useState<NavigationMenuId | null>(null);
-  const activeMenuData = navigationMenus.find((menu) => menu.id === activeMenu);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [mobileSub, setMobileSub] = useState<string | null>(null);
+  const pathname = usePathname();
+  const isDevelopers =
+    pathname === "/developers" || pathname?.startsWith("/developers/");
+  const menus = isDevelopers ? developerNavigationMenus : navigationMenus;
+  const activeMenuData = menus.find((menu) => menu.id === activeMenu);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -354,40 +368,73 @@ export function SiteNav({
       <header className={solid ? styles.navSolid : styles.nav}>
         <Link className={styles.brand} href="/" aria-label="Cencori home">
           <CencoriLogo className={styles.brandLogo} />
+          {isDevelopers ? (
+            <span className="font-inter text-lg font-medium normal-case tracking-tight">
+              Developers
+            </span>
+          ) : null}
         </Link>
 
-        <div aria-label="Primary navigation" className={styles.desktopNav}>
-          {navigationMenus.map((menu) => (
-            <button
-              aria-controls={`mega-menu-${menu.id}`}
-              aria-expanded={activeMenu === menu.id}
-              className={styles.navTrigger}
-              data-active={activeMenu === menu.id ? "" : undefined}
-              key={menu.id}
-              onClick={() =>
-                setActiveMenu((current) =>
-                  current === menu.id ? null : menu.id,
-                )
-              }
-              onFocus={() => setActiveMenu(menu.id)}
-              onMouseEnter={() => setActiveMenu(menu.id)}
-              type="button"
-            >
-              {menu.label}
-            </button>
-          ))}
+        <div
+          aria-label="Primary navigation"
+          className={
+            isDevelopers
+              ? `${styles.desktopNav} ${styles.desktopNavBare}`
+              : styles.desktopNav
+          }
+        >
+          {menus.map((menu) =>
+            "href" in menu ? (
+              <Link
+                className={`${styles.navTrigger} no-underline`}
+                href={menu.href}
+                key={menu.id}
+              >
+                {menu.label}
+              </Link>
+            ) : (
+              <button
+                aria-controls={`mega-menu-${menu.id}`}
+                aria-expanded={activeMenu === menu.id}
+                className={styles.navTrigger}
+                data-active={activeMenu === menu.id ? "" : undefined}
+                key={menu.id}
+                onClick={() =>
+                  setActiveMenu((current) =>
+                    current === menu.id ? null : menu.id,
+                  )
+                }
+                onFocus={() => setActiveMenu(menu.id)}
+                onMouseEnter={() => setActiveMenu(menu.id)}
+                type="button"
+              >
+                {menu.label}
+              </button>
+            ),
+          )}
         </div>
 
         <div className={styles.navActions}>
-          <Link className={styles.navCta} href="/contact">
-            Talk to us
-            <HugeiconsIcon
-              color="currentColor"
-              icon={ArrowUpRight03Icon}
-              size={14}
-              strokeWidth={1.9}
-            />
-          </Link>
+          {isDevelopers ? (
+            <>
+              <Link className={styles.navLogin} href="/login">
+                Log in
+              </Link>
+              <Link className={styles.navCta} href="/signup">
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <Link className={styles.navCta} href="/contact">
+              Talk to us
+              <HugeiconsIcon
+                color="currentColor"
+                icon={ArrowUpRight03Icon}
+                size={14}
+                strokeWidth={1.9}
+              />
+            </Link>
+          )}
         </div>
 
         <button
@@ -404,7 +451,7 @@ export function SiteNav({
         </button>
       </header>
 
-      {activeMenuData ? (
+      {activeMenuData && !("href" in activeMenuData) ? (
         <>
           <div
             className={solid ? styles.navBackdropSolid : styles.navBackdrop}
@@ -415,6 +462,7 @@ export function SiteNav({
       ) : null}
 
       <MobileMenu
+        menus={menus}
         onNavigate={closeMobile}
         onSelectSub={setMobileSub}
         open={menuOpen}

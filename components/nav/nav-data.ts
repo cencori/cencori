@@ -801,3 +801,158 @@ export const navigationMenus = [
 ] as const;
 
 export type NavigationMenuId = (typeof navigationMenus)[number]["id"];
+
+export const developerNavigationMenus = [
+  {
+    id: "dev-home",
+    label: "Home",
+    href: "/",
+  },
+  {
+    id: "dev-products",
+    label: "Products",
+    eyebrow: "Products",
+    groups: [
+      {
+        label: "Models & inference",
+        items: [
+          {
+            href: "/ai-gateway",
+            label: "AI Gateway",
+            tagline: "One API for every model",
+            description:
+              "100+ frontier models, one API.",
+          },
+          {
+            href: "/models",
+            label: "Models",
+            tagline: "Train · fine-tune · deploy",
+            description:
+              "Build, train and run models on Cencori infrastructure.",
+          },
+          {
+            href: "/developers/inference",
+            label: "Inference",
+            tagline: "Fast, scalable serving",
+            description:
+              "Production inference with autoscaling and regional pinning.",
+          },
+          {
+            href: "/models/fine-tuning",
+            label: "Fine-tuning",
+            tagline: "Adapt models to your data",
+            description:
+              "Fine-tune open models on your data and deploy them instantly.",
+          },
+        ],
+      },
+      {
+        label: "Agents & memory",
+        items: [
+          {
+            href: "/agents",
+            label: "Agents",
+            tagline: "Deploy · operate · observe",
+            description: "Build anywhere. Run agents on Cencori.",
+          },
+          {
+            href: "/developers/agent-deployment",
+            label: "Agent Deployment",
+            tagline: "Ship agents to production",
+            description:
+              "Deploy persistent agents with scheduling, triggers and approvals.",
+          },
+          {
+            href: "/memory",
+            label: "Memory",
+            tagline: "Stateful AI",
+            description:
+              "Give your agents long-term memory across sessions and runs.",
+          },
+          {
+            href: "/developers/observability",
+            label: "Observability",
+            tagline: "Traces, evals & costs",
+            description:
+              "Trace every call, evaluate quality and control spend in one place.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "dev-solutions",
+    label: "Solutions",
+    eyebrow: "Solutions",
+    groups: [
+      {
+        label: "By what you're building",
+        items: [
+          {
+            href: "/agents",
+            label: "AI Agents",
+            tagline: "Autonomous systems",
+            description:
+              "Deploy agents that act, remember and ask for approval.",
+          },
+          {
+            href: "/developers/apis",
+            label: "Chat Apps",
+            tagline: "Assistants & copilots",
+            description:
+              "Build chat experiences on any frontier model with one API.",
+          },
+          {
+            href: "/developers/voice",
+            label: "Voice Apps",
+            tagline: "Call centers & companions",
+            description:
+              "Realtime voice pipelines for support, sales and beyond.",
+          },
+          {
+            href: "/developers/multimodal",
+            label: "Multimodal Apps",
+            tagline: "Vision & audio",
+            description:
+              "Apps that see, hear and reason over rich media.",
+          },
+          {
+            href: "/models/fine-tuning",
+            label: "Custom Models",
+            tagline: "Your data, your model",
+            description:
+              "Fine-tune and host models tailored to your domain.",
+          },
+          {
+            href: "/solutions/enterprise",
+            label: "Enterprise",
+            tagline: "Scale with confidence",
+            description:
+              "SSO, VPC, audit trails and SLAs for regulated teams.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "dev-pricing",
+    label: "Pricing",
+    href: "/pricing",
+  },
+  {
+    id: "dev-docs",
+    label: "Documentations",
+    href: "/docs",
+  },
+] as const;
+
+export type DeveloperNavigationMenuId =
+  (typeof developerNavigationMenus)[number]["id"];
+
+export type DeveloperNavigationMenu =
+  (typeof developerNavigationMenus)[number];
+
+export type DeveloperDropdownMenu = Extract<
+  DeveloperNavigationMenu,
+  { readonly eyebrow: string }
+>;
