@@ -772,7 +772,7 @@ export const navigationMenus = [
           { label: "Publications", href: "/research/publications" },
           { label: "Open Research", href: "/research/open-research" },
           { label: "Partnerships", href: "/research/partnerships" },
-          { label: "Notes", href: "/blog/engineering" },
+          { label: "Notes", href: "/newsroom/research" },
           { label: "Cencori Labs", href: "/research/labs" },
         ],
       },
@@ -943,6 +943,11 @@ export const developerNavigationMenus = [
     id: "dev-docs",
     label: "Documentations",
     href: "/docs",
+  },
+  {
+    id: "dev-blog",
+    label: "Blog",
+    href: "/developers/blog",
   },
 ] as const;
 

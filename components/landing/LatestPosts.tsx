@@ -6,7 +6,7 @@ const POSTS = [
     title: "Introducing Cencori Web",
     excerpt:
       "Search, fetch, extract, and crawl the web through infrastructure we own — with evidence, citations, and no third-party search API.",
-    href: "/blog/introducing-cencori-web",
+    href: "/newsroom/introducing-cencori-web",
     date: "Aug 8, 2026",
     category: "Product",
   },
@@ -14,7 +14,7 @@ const POSTS = [
     title: "Introducing Cencori MCP",
     excerpt:
       "Cencori is now native to every MCP client — web search, memory, agents, and multimodal tools through one secure server.",
-    href: "/blog/introducing-cencori-mcp",
+    href: "/newsroom/introducing-cencori-mcp",
     date: "Aug 8, 2026",
     category: "Product",
   },
@@ -22,7 +22,7 @@ const POSTS = [
     title: "Building an AI Security Layer",
     excerpt:
       "How we approach prompt injection, PII, and output filtering for production AI products.",
-    href: "/blog/building-ai-security-layer",
+    href: "/newsroom/building-ai-security-layer",
     date: "Feb 2026",
     category: "Security",
   },

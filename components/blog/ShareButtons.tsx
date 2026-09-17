@@ -8,7 +8,7 @@ interface ShareButtonsProps {
 }
 
 export function ShareButtons({ title, slug }: ShareButtonsProps) {
-    const url = `https://cencori.com/blog/${slug}`;
+    const url = `https://cencori.com/newsroom/${slug}`;
     const encodedUrl = encodeURIComponent(url);
     const encodedTitle = encodeURIComponent(title);
 

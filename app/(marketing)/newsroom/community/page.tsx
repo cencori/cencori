@@ -1,25 +1,25 @@
 import { Suspense } from "react";
-import { getPostsByCategory } from "@/lib/blog";
+import { getPostsByCategory, getBlogCategoryMeta } from "@/lib/blog";
 import { BlogList } from "@/components/blog/BlogList";
 import { BlogTabs } from "@/components/blog/BlogTabs";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Customers | Blog",
-    description: "How teams are building with Cencori.",
+    title: "Community | Newsroom",
+    description: "Community stories and highlights from the Cencori ecosystem.",
 };
 
-export default function CustomersBlogPage() {
-    const posts = getPostsByCategory("customers");
+export default function CommunityBlogPage() {
+    const posts = getPostsByCategory("community");
 
     return (
         <main className="flex-1 pt-20">
                 <div className="border-b border-border/40">
                     <div className="container mx-auto py-8 px-4 max-w-5xl space-y-5">
                         <div>
-                            <h1 className="text-lg font-semibold">Blog</h1>
+                            <h1 className="text-lg font-semibold">Newsroom</h1>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Updates, announcements, and engineering insights
+                                {getBlogCategoryMeta("community")?.blurb}
                             </p>
                         </div>
                         <Suspense>

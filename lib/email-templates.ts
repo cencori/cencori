@@ -351,7 +351,7 @@ ${linksBlock}
 ${ctaBlock}
 ${signOffBlock}
 <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;">
-<p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;"><a href="https://cencori.com/docs" style="color:#888;text-decoration:underline;">Docs</a> &nbsp;&middot;&nbsp; <a href="https://cencori.com/blog" style="color:#888;text-decoration:underline;">Blog</a></p>
+<p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;"><a href="https://cencori.com/docs" style="color:#888;text-decoration:underline;">Docs</a> &nbsp;&middot;&nbsp; <a href="https://cencori.com/newsroom" style="color:#888;text-decoration:underline;">Newsroom</a></p>
 <p style="margin:0 0 8px;font-size:12px;color:#999;text-align:center;">${launchIconRow()}</p>
 <p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;line-height:1.5;">Making AI infrastructure accessible &mdash; so builders can build and scale with confidence.</p>
 <p style="margin:0 0 12px;font-size:11px;color:#aaa;text-align:center;line-height:1.5;">${footerContext}</p>

@@ -44,7 +44,7 @@ const OUTPUTS = [
   { href: "/research/publications", title: "Publications", blurb: "Papers, technical reports, benchmarks." },
   { href: "/research/open-research", title: "Open Research", blurb: "Datasets, models, tools, open-source work." },
   { href: "/research/partnerships", title: "Research Partnerships", blurb: "Universities, labs, institutional collaborations." },
-  { href: "/blog/engineering", title: "Research Notes", blurb: "Engineering and scientific writing." },
+  { href: "/newsroom/research", title: "Research Notes", blurb: "Engineering and scientific writing." },
   { href: "/research/labs", title: "Cencori Labs", blurb: "Future identity for a substantial research org." },
 ];
 

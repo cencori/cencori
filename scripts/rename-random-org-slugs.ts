@@ -48,7 +48,7 @@ const RESERVED = new Set<string>([
     'design', 'privacy-policy', 'terms-of-service',
     'about', 'arcie', 'blog', 'brand', 'careers', 'changelog', 'contact',
     'customers', 'developers', 'enterprise', 'events', 'examples',
-    'manifesto', 'memory', 'partners', 'press', 'scan', 'security',
+    'manifesto', 'memory', 'newsroom', 'partners', 'press', 'scan', 'security',
     'shipped', 'subscribe',
     'ai-gateway', 'audit', 'compute', 'developer-tools', 'edge',
     'insights', 'integration', 'product-knight', 'product-network',

@@ -66,7 +66,7 @@ export default async function ConfirmedPage({ searchParams }: PageProps) {
                     <Link href="/">Back to home</Link>
                 </Button>
                 <Button asChild variant="outline">
-                    <Link href="/blog">Read the blog</Link>
+                    <Link href="/newsroom">Read the news</Link>
                 </Button>
             </div>
         </div>

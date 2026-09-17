@@ -626,7 +626,7 @@ export function CommandPalette({
           id: "blog",
           label: "Blog",
           icon: <FileText className="h-3.5 w-3.5" />,
-          action: () => navigate("/blog"),
+          action: () => navigate("/newsroom"),
           keywords: ["articles", "news", "posts"],
         },
         {

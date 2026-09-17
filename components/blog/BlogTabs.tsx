@@ -11,16 +11,15 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BLOG_CATEGORY_ORDER } from "./blog-client";
 
 const TABS = [
     { slug: "all", label: "All" },
-    { slug: "engineering", label: "Engineering" },
-    { slug: "product", label: "Product" },
-    { slug: "community", label: "Community" },
-    { slug: "customers", label: "Customers" },
-    { slug: "changelog", label: "Changelog" },
-    { slug: "press", label: "Press" },
-] as const;
+    ...BLOG_CATEGORY_ORDER.map((label) => ({
+        slug: label.toLowerCase(),
+        label,
+    })),
+];
 
 export function BlogTabs() {
     const pathname = usePathname();
@@ -29,9 +28,11 @@ export function BlogTabs() {
     const [query, setQuery] = useState(searchParams.get("q") || "");
 
     const getHref = (slug: string) => {
-        if (slug === "all") return "/blog";
-        if (slug === "changelog" || slug === "press") return `/${slug}`;
-        return `/blog/${slug}`;
+        if (slug === "all") return "/newsroom";
+        if (slug === "changelog") return `/${slug}`;
+        // Press lives in the hub feed now (/press redirects to /newsroom).
+        if (slug === "press") return "/newsroom";
+        return `/newsroom/${slug}`;
     };
 
     const activeCategory = (() => {
