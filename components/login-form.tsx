@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { isAuthFormTarget, resolveAuthRedirectTargets } from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -95,6 +95,49 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     }
     router.push(target);
   };
+
+  // Already signed in (e.g. in another tab) → skip the form entirely.
+  // getSession() returns null when the session is expired, so expired
+  // sessions correctly stay on the form.
+  useEffect(() => {
+    let cancelled = false;
+    const redirectIfSignedIn = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!cancelled && data.session?.user) {
+          const { navigationTarget } = resolveAuthRedirectTargets(
+            redirectParam,
+            { defaultPath: "/dashboard" },
+          );
+          const destination = isAuthFormTarget(navigationTarget)
+            ? "/dashboard"
+            : navigationTarget;
+          window.location.assign(destination);
+        }
+      } catch {
+        // Stay on the form — the user can still sign in manually.
+      }
+    };
+    void redirectIfSignedIn();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!cancelled && event === "SIGNED_IN" && session?.user) {
+        const { navigationTarget } = resolveAuthRedirectTargets(
+          redirectParam,
+          { defaultPath: "/dashboard" },
+        );
+        const destination = isAuthFormTarget(navigationTarget)
+          ? "/dashboard"
+          : navigationTarget;
+        window.location.assign(destination);
+      }
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [redirectParam]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

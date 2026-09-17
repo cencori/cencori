@@ -1,6 +1,9 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/login-form"
 import Link from "next/link"
+import { createServerClient } from "@/lib/supabaseServer";
+import { getSafeSignedInDestination } from "@/lib/auth-redirect";
 
 function LoginPageContent() {
   return (
@@ -26,7 +29,17 @@ function LoginPageContent() {
   )
 }
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>;
+}) {
+  const params = await searchParams;
+  const supabase = await createServerClient();
+  const { data } = await supabase.auth.getUser();
+  if (data.user) {
+    redirect(getSafeSignedInDestination(params?.redirect));
+  }
   return (
     <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
       <LoginPageContent />
