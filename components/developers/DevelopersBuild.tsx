@@ -34,7 +34,7 @@ const SLIDES = [
       "Ship copilots, assistants, search, internal tools and customer-facing AI with routing, fallbacks and guardrails built in.",
     cta: "Build apps",
     href: "/developers/apis",
-    image: "/developers/build-apps.webp",
+    image: "/Frame222.jpg",
     gradient:
       "radial-gradient(120% 100% at 20% 0%, #2b3fd6 0%, #101a5e 45%, #05081f 100%)",
   },
