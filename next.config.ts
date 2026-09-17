@@ -54,6 +54,23 @@ const nextConfig: NextConfig = {
         destination: "/thesis",
         permanent: true,
       },
+      // Blog hub moved to /newsroom.
+      {
+        source: "/blog",
+        destination: "/newsroom",
+        permanent: true,
+      },
+      {
+        source: "/blog/:path*",
+        destination: "/newsroom/:path*",
+        permanent: true,
+      },
+      // Press coverage lives in the newsroom hub (Press tab) now.
+      {
+        source: "/press",
+        destination: "/newsroom",
+        permanent: true,
+      },
     ];
   },
   // Configure images to allow all local paths (Next.js 16 requirement)

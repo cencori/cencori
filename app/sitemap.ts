@@ -34,14 +34,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${baseUrl}/about`, priority: 0.7, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/thesis`, priority: 0.9, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/manifesto`, priority: 0.7, changeFrequency: 'monthly' as const },
-        { url: `${baseUrl}/blog`, priority: 0.8, changeFrequency: 'daily' as const },
-        { url: `${baseUrl}/blog/engineering`, priority: 0.7, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/blog/product`, priority: 0.7, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/blog/community`, priority: 0.6, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/blog/customers`, priority: 0.6, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom`, priority: 0.8, changeFrequency: 'daily' as const },
+        { url: `${baseUrl}/newsroom/company`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/research`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/engineering`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/product`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/security`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/developers`, priority: 0.7, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/community`, priority: 0.6, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/newsroom/customers`, priority: 0.6, changeFrequency: 'weekly' as const },
+        { url: `${baseUrl}/developers/blog`, priority: 0.7, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/careers`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/changelog`, priority: 0.7, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/press`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/contact`, priority: 0.6, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/contact/sales`, priority: 0.7, changeFrequency: 'monthly' as const },
         { url: `${baseUrl}/customers`, priority: 0.7, changeFrequency: 'monthly' as const },
@@ -73,7 +77,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }));
 
     // Dynamic Blog Posts (use correct URL based on category)
-    const allPosts = getAllPosts().filter((p) => p.category !== "press");
+    const allPosts = getAllPosts();
     const blogPages = allPosts.map((post) => ({
         url: `${baseUrl}${getPostUrl(post)}`,
         lastModified: post.date || currentDate,

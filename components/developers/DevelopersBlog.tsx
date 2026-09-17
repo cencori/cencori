@@ -12,10 +12,10 @@ export function DevelopersBlog() {
       <div className="mx-auto max-w-6xl">
         <div className="flex items-baseline justify-between">
           <h2 className="text-xl font-medium tracking-tight text-muted-foreground">
-            Blogs
+            News
           </h2>
           <Link
-            href="/blog"
+            href="/developers/blog"
             className="inline-flex items-center gap-1 text-[15px] font-medium text-white transition-colors hover:text-white/70"
           >
             View all

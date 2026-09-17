@@ -4,6 +4,10 @@ import path from 'path';
 import matter from 'gray-matter';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import readingTime from 'reading-time';
+import type { BlogCategory, BlogCategoryMeta } from './blog-categories';
+
+export type { BlogCategory, BlogCategoryMeta };
+export { BLOG_CATEGORIES, getBlogCategoryMeta } from './blog-categories';
 
 const BLOG_DIR = path.join(process.cwd(), 'content', 'blog');
 const AUTHORS_DIR = path.join(process.cwd(), 'content', 'authors');
@@ -17,24 +21,6 @@ export interface Author {
   twitter?: string;
   github?: string;
 }
-
-export type BlogCategory =
-  | 'engineering'
-  | 'product'
-  | 'community'
-  | 'customers'
-  | 'changelog'
-  | 'press';
-
-export const BLOG_CATEGORIES: { slug: BlogCategory | 'all'; label: string }[] = [
-  { slug: 'all', label: 'All' },
-  { slug: 'engineering', label: 'Engineering' },
-  { slug: 'product', label: 'Product' },
-  { slug: 'community', label: 'Community' },
-  { slug: 'customers', label: 'Customers' },
-  { slug: 'changelog', label: 'Changelog' },
-  { slug: 'press', label: 'Press' },
-];
 
 export interface BlogPostFrontmatter {
   title: string;
@@ -149,7 +135,7 @@ export function getPostsByCategory(category: BlogCategory): BlogPost[] {
  */
 export function getPostUrl(post: BlogPost | BlogPostFrontmatter): string {
   if (post.category === 'changelog') return `/changelog/${post.slug}`;
-  return `/blog/${post.slug}`;
+  return `/newsroom/${post.slug}`;
 }
 
 /**

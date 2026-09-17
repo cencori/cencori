@@ -12,7 +12,7 @@ interface ChangelogListProps {
 }
 
 function postUrl(post: BlogPost): string {
-    return post.category === "changelog" ? `/changelog/${post.slug}` : `/blog/${post.slug}`;
+    return post.category === "changelog" ? `/changelog/${post.slug}` : `/newsroom/${post.slug}`;
 }
 
 export function ChangelogList({ posts }: ChangelogListProps) {

@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     // metadataBase (cencori.com). Building an absolute URL here from
     // NEXT_PUBLIC_APP_URL leaked cencori.vercel.app into the card tags in
     // production, and X's crawler gets a 404 on that domain — no preview card.
-    const ogImage = post.coverImage ?? `/blog/og/v1/${post.slug}.jpg`;
+    const ogImage = post.coverImage ?? `/newsroom/og/v1/${post.slug}.jpg`;
 
     return {
         title: post.title,
@@ -77,7 +77,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             content={content}
             toc={toc}
             breadcrumb={
-                <Link href="/blog" className="text-primary hover:underline transition-colors">
+                <Link href="/newsroom" className="text-primary hover:underline transition-colors">
                     Blog
                 </Link>
             }

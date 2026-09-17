@@ -96,7 +96,7 @@ export async function GET(
           : 64;
   const category = post.category
     ? post.category.charAt(0).toUpperCase() + post.category.slice(1)
-    : "Blog";
+    : "Newsroom";
   const date = new Date(post.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -113,7 +113,7 @@ export async function GET(
       path.join(
         process.cwd(),
         "public",
-        "blog",
+        "newsroom",
         "og",
         "backgrounds",
         `${backgroundNumber}.jpg`,

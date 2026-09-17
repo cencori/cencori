@@ -1,5 +1,5 @@
 /**
- * Shared post view for /blog/[slug] and /changelog/[slug].
+ * Shared post view for /newsroom/[slug] and /changelog/[slug].
  *
  * Everything both pages need to render a post — layout, header, cover
  * image, MDX content, TOC sidebar, share buttons, prev/next navigation.
@@ -30,7 +30,7 @@ interface PostViewProps {
     content: ReactNode;
     /** Optional TOC entries. When empty (or omitted) the TOC is hidden. */
     toc?: BlogTocEntry[];
-    /** Rendered breadcrumb — e.g. `<Link href="/blog">Blog</Link>`. */
+    /** Rendered breadcrumb — e.g. `<Link href="/newsroom">Newsroom</Link>`. */
     breadcrumb: ReactNode;
     /** Show the "Copy as Markdown" pill in the top-right. Default: true. */
     showCopyMarkdown?: boolean;

@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: ChangelogPostPageProps): Prom
     // Relative on purpose — see the note in blog/[slug]/page.tsx. Absolute
     // URLs built from NEXT_PUBLIC_APP_URL pointed X's crawler at
     // cencori.vercel.app, which 404s for Twitterbot.
-    const ogImage = post.coverImage ?? `/blog/og/v1/${post.slug}.jpg`;
+    const ogImage = post.coverImage ?? `/newsroom/og/v1/${post.slug}.jpg`;
 
     return {
         title: post.title,
@@ -76,7 +76,7 @@ export default async function ChangelogPostPage({ params }: ChangelogPostPagePro
             toc={toc}
             breadcrumb={
                 <>
-                    <Link href="/blog" className="text-primary hover:underline transition-colors">
+                    <Link href="/newsroom" className="text-primary hover:underline transition-colors">
                         Blog
                     </Link>
                     <span>/</span>

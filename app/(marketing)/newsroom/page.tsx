@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import { CapabilityStub } from "@/components/marketing/CapabilityStub";
+import { getAllPosts } from "@/lib/blog";
+import { BlogFilters } from "@/components/blog/BlogFilters";
 
 export const metadata: Metadata = {
   title: "Newsroom | Cencori",
-  description: "Announcements and company news from Cencori.",
+  description: "Updates, announcements, and engineering insights.",
 };
 
-export default function NewsroomPage() {
+export default function BlogPage() {
+  const allPosts = getAllPosts();
+
   return (
-    <CapabilityStub
-      eyebrow="Company"
-      title="Newsroom"
-      blurb="Announcements and company news from Cencori."
-      backHref="/about"
-      backLabel="About Cencori"
-    />
+    <main className="flex-1 pt-20">
+      <div className="container mx-auto max-w-5xl px-4 pb-8 pt-4 md:py-8">
+        <BlogFilters posts={allPosts} />
+      </div>
+    </main>
   );
 }

@@ -7,7 +7,7 @@ interface PressCardProps {
 }
 
 export function PressCard({ post }: PressCardProps) {
-    const href = post.externalUrl || `/blog/${post.slug}`;
+    const href = post.externalUrl || `/newsroom/${post.slug}`;
     const isExternal = !!post.externalUrl;
 
     return (

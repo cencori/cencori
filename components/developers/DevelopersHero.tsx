@@ -56,7 +56,7 @@ export function DevelopersHero() {
         >
           <Link
             className="group inline-flex items-center gap-2 rounded-full bg-white/5 py-2 pr-3 pl-4 text-[13px] text-white/80 backdrop-blur transition-colors hover:text-white"
-            href="/blog/claude-fable-5-1-on-cencori"
+            href="/newsroom/claude-fable-5-1-on-cencori"
           >
             Claude Fable 5.1 is on Cencori
             <HugeiconsIcon
