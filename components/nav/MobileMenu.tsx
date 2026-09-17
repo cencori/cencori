@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import {
   developerNavigationMenus,
   navigationMenus,
@@ -52,6 +54,25 @@ export function MobileMenu({
   const pathname = usePathname();
   const isDevelopers =
     pathname === "/developers" || pathname?.startsWith("/developers/");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && data.session?.user) setIsAuthenticated(true);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === "SIGNED_IN" && session?.user) setIsAuthenticated(true);
+      else if (event === "SIGNED_OUT") setIsAuthenticated(false);
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div
@@ -177,12 +198,12 @@ export function MobileMenu({
         </ul>
         <Link
           className={styles.mobileMenuCta}
-          href={isDevelopers ? "/signup" : "/contact"}
+          href={isDevelopers ? (isAuthenticated ? "/dashboard" : "/signup") : "/contact"}
           onClick={onNavigate}
         >
-          {isDevelopers ? "Sign up" : "Talk to us"}
+          {isDevelopers ? (isAuthenticated ? "Dashboard" : "Sign up") : "Talk to us"}
         </Link>
-        {isDevelopers ? (
+        {isDevelopers && !isAuthenticated ? (
           <Link
             className={styles.mobileMenuLogin}
             href="/login"

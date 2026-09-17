@@ -211,6 +211,65 @@ function isProtectedPagePath(pathname: string): boolean {
 }
 
 /**
+ * Auth entry points. Exact match only (trailing slash tolerated) — sub-paths
+ * like `/signup/verify` are part of an in-progress flow and must not bounce.
+ */
+const AUTH_PAGE_PATHS = ["/login", "/signup"];
+
+function normalizeAuthPath(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
+}
+
+function isAuthPagePath(pathname: string): boolean {
+  return AUTH_PAGE_PATHS.includes(normalizeAuthPath(pathname));
+}
+
+/**
+ * Destination for an already-signed-in visitor landing on /login or /signup.
+ * Honors a safe `?redirect=` target, otherwise falls back to /dashboard.
+ * Only relative same-origin paths are honored here besides explicit
+ * cencori.com absolute URLs (open-redirect defense). Auth pages themselves
+ * are never valid targets — they would loop.
+ */
+function resolveSignedInDestination(
+  redirectParam: string | null,
+  origin: string,
+  currentHostname: string,
+): string {
+  const fallback = "/dashboard";
+  if (!redirectParam) return fallback;
+  const raw = redirectParam.trim();
+  if (!raw) return fallback;
+
+  if (raw.startsWith("/") && !raw.startsWith("//")) {
+    try {
+      const target = new URL(raw, origin);
+      if (isAuthPagePath(target.pathname)) return fallback;
+      return `${target.pathname}${target.search}${target.hash}`;
+    } catch {
+      return fallback;
+    }
+  }
+
+  try {
+    const candidate = new URL(raw);
+    const targetHost = candidate.hostname.toLowerCase();
+    const current = currentHostname.toLowerCase();
+    const allowed =
+      targetHost === current ||
+      targetHost === "cencori.com" ||
+      targetHost.endsWith(".cencori.com");
+    if (!allowed) return fallback;
+    if (isAuthPagePath(candidate.pathname)) return fallback;
+    return candidate.toString();
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Refresh whenever the visitor actually has a session.
  *
  * This used to list `/dashboard` and `/internal` — but the URL polish handled
@@ -574,6 +633,25 @@ export async function proxy(request: NextRequest) {
     loginUrl.search = "";
     loginUrl.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);
     return applySecurityHeaders(NextResponse.redirect(loginUrl));
+  }
+
+  // Signed-in visitors should never see the sign-in / sign-up forms again.
+  // This covers the developers-page flow (and any other entry point): clicking
+  // "Log in" while a valid session exists — e.g. signed in in another tab —
+  // lands straight on the dashboard (or the safe ?redirect= target) instead
+  // of the login page. Expired sessions have userId === null, so they still
+  // see the form as expected.
+  if (!isFile && !isScanSubdomain && userId && isAuthPagePath(pathname)) {
+    const destination = resolveSignedInDestination(
+      request.nextUrl.searchParams.get("redirect"),
+      request.nextUrl.origin,
+      request.nextUrl.hostname,
+    );
+    const redirectUrl =
+      /^https?:\/\//i.test(destination)
+        ? new URL(destination)
+        : new URL(destination, request.nextUrl.origin);
+    return applySecurityHeaders(NextResponse.redirect(redirectUrl));
   }
 
   if (needsApiAccessCheck) {

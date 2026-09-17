@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { MobileMenu } from "./MobileMenu";
 import {
   developerNavigationMenus,
@@ -329,6 +330,29 @@ export function SiteNav({
     pathname === "/developers" || pathname?.startsWith("/developers/");
   const menus = isDevelopers ? developerNavigationMenus : navigationMenus;
   const activeMenuData = menus.find((menu) => menu.id === activeMenu);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Auth-aware actions: a signed-in visitor on /developers should go straight
+  // to the dashboard, not through the sign-in form again (e.g. signed in in
+  // another tab — the session is shared via cookies). Expired sessions report
+  // no user, so the Log in / Sign up links remain.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && data.session?.user) setIsAuthenticated(true);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === "SIGNED_IN" && session?.user) setIsAuthenticated(true);
+      else if (event === "SIGNED_OUT") setIsAuthenticated(false);
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -416,14 +440,20 @@ export function SiteNav({
 
         <div className={styles.navActions}>
           {isDevelopers ? (
-            <>
-              <Link className={styles.navLogin} href="/login">
-                Log in
+            isAuthenticated ? (
+              <Link className={styles.navCta} href="/dashboard">
+                Dashboard
               </Link>
-              <Link className={styles.navCta} href="/signup">
-                Sign up
-              </Link>
-            </>
+            ) : (
+              <>
+                <Link className={styles.navLogin} href="/login">
+                  Log in
+                </Link>
+                <Link className={styles.navCta} href="/signup">
+                  Sign up
+                </Link>
+              </>
+            )
           ) : (
             <Link className={styles.navCta} href="/contact">
               Talk to us

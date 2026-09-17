@@ -99,3 +99,53 @@ export function resolveAuthRedirectTargets(
     };
 }
 
+/**
+ * Destination for an already-signed-in visitor landing on /login or /signup.
+ * Server-component safe (no window access). Honors a relative `?redirect=`
+ * target, otherwise falls back to /dashboard. Auth pages themselves are never
+ * valid targets — they would loop. Sub-paths like /signup/verify are left
+ * untouched by callers (only exact /login and /signup should bounce).
+ */
+export function getSafeSignedInDestination(
+    redirectParam: string | null | undefined,
+): string {
+    const fallback = "/dashboard";
+    if (!redirectParam) return fallback;
+    const raw = redirectParam.trim();
+    if (!raw) return fallback;
+    if (!raw.startsWith("/") || raw.startsWith("//")) return fallback;
+    try {
+        const target = new URL(raw, "http://localhost");
+        const pathname =
+            target.pathname.length > 1 && target.pathname.endsWith("/")
+                ? target.pathname.slice(0, -1)
+                : target.pathname;
+        if (pathname === "/login" || pathname === "/signup") return fallback;
+        return `${target.pathname}${target.search}${target.hash}`;
+    } catch {
+        return fallback;
+    }
+}
+
+/** True when the post-auth target would loop back onto an auth form. */
+export function isAuthFormTarget(target: string): boolean {
+    try {
+        const url = new URL(
+            target.startsWith("/") ? target : `/${target}`,
+            "http://localhost",
+        );
+        const pathname =
+            url.pathname.length > 1 && url.pathname.endsWith("/")
+                ? url.pathname.slice(0, -1)
+                : url.pathname;
+        return (
+            pathname === "/login" ||
+            pathname === "/signup" ||
+            pathname.startsWith("/login/") ||
+            pathname.startsWith("/signup/")
+        );
+    } catch {
+        return false;
+    }
+}
+

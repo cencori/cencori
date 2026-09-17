@@ -1,6 +1,9 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { SignupForm } from "@/components/signup-form";
 import Link from "next/link";
+import { createServerClient } from "@/lib/supabaseServer";
+import { getSafeSignedInDestination } from "@/lib/auth-redirect";
 
 function SignupPageContent() {
   return (
@@ -26,7 +29,17 @@ function SignupPageContent() {
   );
 }
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>;
+}) {
+  const params = await searchParams;
+  const supabase = await createServerClient();
+  const { data } = await supabase.auth.getUser();
+  if (data.user) {
+    redirect(getSafeSignedInDestination(params?.redirect));
+  }
   return (
     <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
       <SignupPageContent />
