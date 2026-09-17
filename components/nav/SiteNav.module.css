@@ -561,6 +561,24 @@
   opacity: 0.65;
 }
 
+.navConsole {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  transition: background 180ms ease;
+}
+
+.navConsole:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .menuButton,
 .mobileMenu {
   display: none;
@@ -827,6 +845,24 @@
     font-size: 0.95rem;
     letter-spacing: -0.005em;
     text-decoration: none;
+  }
+
+  .mobileMenuConsole {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.85rem;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 0.95rem;
+    letter-spacing: -0.005em;
+    text-decoration: none;
+    transition: background 180ms ease;
+  }
+
+  .mobileMenuConsole:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 

@@ -212,6 +212,15 @@ export function MobileMenu({
             Log in
           </Link>
         ) : null}
+        {!isDevelopers ? (
+          <Link
+            className={styles.mobileMenuConsole}
+            href={isAuthenticated ? "/dashboard" : "/signup"}
+            onClick={onNavigate}
+          >
+            Console
+          </Link>
+        ) : null}
       </div>
     </div>
   );

@@ -455,15 +455,23 @@ export function SiteNav({
               </>
             )
           ) : (
-            <Link className={styles.navCta} href="/contact">
-              Talk to us
-              <HugeiconsIcon
-                color="currentColor"
-                icon={ArrowUpRight03Icon}
-                size={14}
-                strokeWidth={1.9}
-              />
-            </Link>
+            <>
+              <Link
+                className={styles.navConsole}
+                href={isAuthenticated ? "/dashboard" : "/signup"}
+              >
+                Console
+              </Link>
+              <Link className={styles.navCta} href="/contact">
+                Talk to us
+                <HugeiconsIcon
+                  color="currentColor"
+                  icon={ArrowUpRight03Icon}
+                  size={14}
+                  strokeWidth={1.9}
+                />
+              </Link>
+            </>
           )}
         </div>
 
