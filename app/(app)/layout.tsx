@@ -18,6 +18,7 @@ import {
 import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { CommandPaletteProvider, useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
+import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
@@ -149,6 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <MobileSheetProvider>
             <OrganizationProjectProvider>
               <EnvironmentProvider>
+                <ThemeScope name="dashboard-theme" />
                 <LayoutContent
                   user={typedUser}
                   avatar={avatar}

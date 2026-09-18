@@ -6,6 +6,7 @@ import { DocsSidebar } from "@/components/docs/sidebar";
 import { DocsProvider } from "@/components/docs/DocsContext";
 import { DocsAskAI } from "@/components/docs/DocsAskAI";
 import { cn } from "@/lib/utils";
+import { ThemeScope } from "@/components/theme-scope";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -34,6 +35,7 @@ export default function DocsRouteLayout({
 }) {
   return (
     <DocsProvider>
+      <ThemeScope name="docs-theme" />
       <div className="docs-theme font-inter bg-sidebar text-foreground">
         <SidebarProvider>
           <DocsSidebar />
