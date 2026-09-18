@@ -10,7 +10,7 @@
 @import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(html.dark .dashboard-theme *, html.dark .docs-theme *, html .editorial-dark *));
 
 /* Docs utilities */
 @utility no-scrollbar {
@@ -196,8 +196,14 @@
     }
 }
 
-.dark,
-.developers-theme {
+/* Dark mode lives in the dashboard (and docs) only. `next-themes` still
+ * toggles the global `.dark` class, but nothing outside these scopes
+ * responds to it — marketing and every other surface keep the light palette.
+ * `.editorial-dark` is the opt-in always-dark scope for marketing surfaces. */
+.developers-theme,
+.editorial-dark,
+:where(html.dark) .dashboard-theme,
+:where(html.dark) .docs-theme {
     color-scheme: dark;
     --background: #000000;
     --foreground: #f2f2f2;

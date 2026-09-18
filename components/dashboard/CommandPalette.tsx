@@ -18,7 +18,6 @@ import {
   ScrollText,
   Play,
   CreditCard,
-  Plug,
   Home,
   Plus,
   FileText,
@@ -195,6 +194,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   orgSlug?: string | null;
   projectSlug?: string | null;
+  consoleMode?: boolean;
 }
 
 interface CommandItem {
@@ -227,6 +227,7 @@ export function CommandPalette({
   onOpenChange,
   orgSlug,
   projectSlug,
+  consoleMode = false,
 }: CommandPaletteProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
@@ -313,40 +314,36 @@ export function CommandPalette({
             id: "project-overview",
             label: "Project overview",
             icon: <Home className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-`/${orgSlug}/${projectSlug}`,
-            ),
+            action: () => navigate(consoleMode ? "/home" : `/${orgSlug}/${projectSlug}`),
           keywords: ["dashboard", "home", "main"],
           },
           {
             id: "playground",
             label: "AI Playground",
             icon: <Play className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/playground`,
-              ),
+            action: () => navigate(
+              consoleMode
+                ? "/ai-gateway/playground"
+                : `/${orgSlug}/${projectSlug}/ai-gateway/playground`,
+            ),
             keywords: ["test", "chat", "try", "sandbox", "experiment"],
           },
           {
             id: "api-keys",
             label: "API Keys",
             icon: <Key className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/settings?tab=api`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/settings?tab=api" : `/${orgSlug}/${projectSlug}/settings?tab=api`,
+            ),
             keywords: ["token", "secret", "credentials", "key"],
           },
           {
             id: "project-observability",
             label: "Observability",
             icon: <ObservabilityIcon className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/observability`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/observability" : `/${orgSlug}/${projectSlug}/observability`,
+            ),
             keywords: [
               "observability",
               "analytics",
@@ -361,30 +358,27 @@ export function CommandPalette({
             id: "logs",
             label: "Request Logs",
             icon: <ScrollText className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/logs`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/logs" : `/${orgSlug}/${projectSlug}/logs`,
+            ),
             keywords: ["history", "requests", "debug", "trace"],
           },
           {
             id: "security",
             label: "Security",
             icon: <ShieldCheckIcon className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/security`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/security" : `/${orgSlug}/${projectSlug}/security`,
+            ),
             keywords: ["protection", "firewall", "rules", "safety"],
           },
           {
             id: "project-settings",
             label: "Project Settings",
             icon: <Settings className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/${projectSlug}/settings`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/settings" : `/${orgSlug}/${projectSlug}/settings`,
+            ),
             keywords: ["configure", "options", "preferences"],
           },
         ],
@@ -401,73 +395,62 @@ export function CommandPalette({
             id: "all-projects",
             label: "All Projects",
             icon: <FolderKanban className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/~/projects`),
+            action: () => navigate(consoleMode ? "/projects" : `/${orgSlug}/~/projects`),
             keywords: ["list", "browse", "view"],
           },
           {
             id: "new-project",
             label: "Create new project",
             icon: <Plus className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/~/projects/new`),
+            action: () => navigate(consoleMode ? "/projects/new" : `/${orgSlug}/~/projects/new`),
             keywords: ["add", "create", "start"],
           },
           {
             id: "import-github",
             label: "Import from GitHub",
             icon: <GitHubLogo className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(
-                `/${orgSlug}/~/projects/import/github`,
-              ),
+            action: () => navigate(
+              consoleMode ? "/projects/import/github" : `/${orgSlug}/~/projects/import/github`,
+            ),
             keywords: ["repository", "repo", "git", "clone"],
           },
           {
             id: "org-analytics",
             label: "Organization Analytics",
             icon: <ChartBarIcon className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/analytics`),
+            action: () => navigate(consoleMode ? "/usage" : `/${orgSlug}/~/usage`),
             keywords: ["stats", "metrics", "usage"],
           },
           {
             id: "providers",
             label: "AI Providers",
             icon: <Cpu className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/~/providers`),
+            action: () => navigate(
+              consoleMode ? "/organization/providers" : `/${orgSlug}/~/providers`,
+            ),
             keywords: ["openai", "anthropic", "claude", "gpt", "models"],
-          },
-          {
-            id: "integrations",
-            label: "Integrations",
-            icon: <Plug className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/~/integrations`),
-            keywords: ["connect", "apps", "services"],
           },
           {
             id: "teams",
             label: "Team Members",
             icon: <UserGroupIcon className="h-3.5 w-3.5" />,
-            action: () => navigate(`/${orgSlug}/~/teams`),
+            action: () => navigate(consoleMode ? "/teams" : `/${orgSlug}/~/teams`),
             keywords: ["users", "invite", "members", "access"],
           },
           {
             id: "billing",
             label: "Billing & Usage",
             icon: <CreditCard className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/~/billing`),
+            action: () => navigate(consoleMode ? "/billing" : `/${orgSlug}/~/billing`),
             keywords: ["payment", "invoice", "plan", "subscription", "upgrade"],
           },
           {
             id: "org-settings",
             label: "Organization Settings",
             icon: <Settings className="h-3.5 w-3.5" />,
-            action: () =>
-              navigate(`/${orgSlug}/settings`),
+            action: () => navigate(
+              consoleMode ? "/organization/settings" : `/${orgSlug}/~/settings`,
+            ),
             keywords: ["configure", "options"],
           },
         ],
@@ -483,7 +466,7 @@ export function CommandPalette({
           id: "switch-org",
           label: "Switch organization",
           icon: <Building2 className="h-3.5 w-3.5" />,
-          action: () => navigate("/dashboard"),
+          action: () => navigate(consoleMode ? "/projects" : "/dashboard"),
           keywords: ["change", "select", "workspace"],
         },
         {
@@ -669,7 +652,7 @@ export function CommandPalette({
 
     return groups;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, onOpenChange, orgSlug, projectSlug]);
+  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode]);
 
   // Smart search: filter items based on label and keywords
   const filteredGroups = React.useMemo(() => {

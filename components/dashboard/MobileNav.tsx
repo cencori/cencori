@@ -4,18 +4,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
-import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronsUpDown, HelpCircle, ExternalLink, CircleUserRound, CreditCard, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, HelpCircle, ExternalLink, CircleUserRound, CreditCard, PlusCircle, Settings } from "lucide-react";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabaseClient";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
+import { getConsoleRoute } from "@/lib/console/routing";
 
 interface MobileNavProps {
     onMenuClick: () => void;
@@ -27,8 +30,13 @@ interface MobileNavProps {
 export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const { organizations, projects } = useOrganizationProject();
-    const { setEnvironment, isTestMode } = useEnvironment();
+    const {
+        organizations,
+        projects,
+        activeOrganization,
+        activeProject,
+        selectProject,
+    } = useOrganizationProject();
     const { theme, setTheme } = useTheme();
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackText, setFeedbackText] = useState("");
@@ -44,9 +52,13 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
         return match ? match[1] : null;
     };
 
-    const orgSlug = getOrgSlug();
+    const consoleRoute = getConsoleRoute(pathname);
+    const orgSlug = consoleRoute ? activeOrganization?.slug ?? null : getOrgSlug();
+    const resolvedProjectSlug = consoleRoute?.scope === "project"
+        ? activeProject?.slug ?? projectSlug
+        : projectSlug;
     const currentOrg = organizations.find((org) => org.slug === orgSlug);
-    const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
+    const currentProject = projects.find((proj) => proj.slug === resolvedProjectSlug && proj.orgSlug === orgSlug);
 
     // Get available orgs and projects for dropdowns
     const availableOrgs = organizations;
@@ -55,57 +67,19 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
     return (
         <div className="sticky top-12 z-50 lg:hidden border-b border-border/40 bg-background">
             <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
-                {/* Organization selector dropdown */}
-                {orgSlug && (
-                    <>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0">
-                                    {currentOrg?.name || "Organization"}
-                                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-48">
-                                {availableOrgs.map((org) => (
-                                    <DropdownMenuItem
-                                        key={org.id}
-                                        className="text-xs cursor-pointer"
-                                        onClick={() => router.push(`/${org.slug}/~/projects`)}
-                                    >
-                                        {org.name}
-                                    </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuItem
-                                    className="text-xs cursor-pointer text-primary"
-                                    onClick={() => router.push("/onboarding")}
-                                >
-                                    + New organization
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        {currentOrg?.subscription_tier && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
-                                {currentOrg.subscription_tier}
-                            </span>
-                        )}
-                    </>
-                )}
-
                 {/* Project selector dropdown */}
-                {projectSlug && (
-                    <>
-                        <span className="text-muted-foreground/50 text-xs shrink-0">/</span>
-                        <DropdownMenu>
+                {resolvedProjectSlug && (
+                    <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0">
-                                    {currentProject?.name || projectSlug}
+                                    {currentProject?.name || resolvedProjectSlug}
                                     <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="w-48">
                                 <DropdownMenuItem
                                     className="text-xs cursor-pointer"
-                                    onClick={() => router.push(`/${orgSlug}/~/projects`)}
+                                    onClick={() => router.push(consoleRoute ? "/projects" : `/${orgSlug}/~/projects`)}
                                 >
                                     All projects
                                 </DropdownMenuItem>
@@ -113,44 +87,25 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                                     <DropdownMenuItem
                                         key={proj.id}
                                         className="text-xs cursor-pointer"
-                                        onClick={() => router.push(`/${orgSlug}/${proj.slug}`)}
+                                        onClick={async () => {
+                                            if (consoleRoute && await selectProject(proj.id)) {
+                                                router.refresh();
+                                                return;
+                                            }
+                                            router.push(`/${orgSlug}/${proj.slug}`);
+                                        }}
                                     >
                                         {proj.name}
                                     </DropdownMenuItem>
                                 ))}
                                 <DropdownMenuItem
                                     className="text-xs cursor-pointer text-primary"
-                                    onClick={() => router.push(`/${orgSlug}/~/projects/new`)}
+                                    onClick={() => router.push(consoleRoute ? "/projects/new" : `/${orgSlug}/~/projects/new`)}
                                 >
                                     + New project
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
-                        </DropdownMenu>
-                    </>
-                )}
-
-                {/* Environment Toggle */}
-                {projectSlug && (
-                    <div className="flex items-center bg-muted/30 rounded-full p-0.5 border border-border/40 ml-2 shrink-0">
-                        <button
-                            onClick={() => setEnvironment("production")}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${!isTestMode
-                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                : "text-muted-foreground"
-                                }`}
-                        >
-                            Prod
-                        </button>
-                        <button
-                            onClick={() => setEnvironment("test")}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${isTestMode
-                                ? "bg-orange-500/10 text-orange-500 border border-orange-500/20"
-                                : "text-muted-foreground"
-                                }`}
-                        >
-                            Dev
-                        </button>
-                    </div>
+                    </DropdownMenu>
                 )}
 
                 {/* Spacer */}
@@ -252,6 +207,54 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                                     {user.email}
                                 </p>
                             </div>
+                        )}
+                        {currentOrg && (
+                            <>
+                                <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Organization</p>
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger className="min-h-11 cursor-pointer px-2 py-1.5 text-xs">
+                                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[10px] font-semibold">
+                                            {currentOrg.name.slice(0, 1).toUpperCase()}
+                                        </span>
+                                        <span className="min-w-0 flex-1 text-left">
+                                            <span className="block truncate font-medium">{currentOrg.name}</span>
+                                            <span className="block text-[10px] text-muted-foreground">Organization</span>
+                                        </span>
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent className="w-56 p-1">
+                                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Organizations</p>
+                                        <div className="max-h-52 overflow-y-auto">
+                                            {availableOrgs.map((org) => (
+                                                <DropdownMenuItem
+                                                    key={org.id}
+                                                    className="cursor-pointer py-1.5 text-xs"
+                                                    onClick={async () => {
+                                                        const firstProject = projects.find((project) => project.organization_id === org.id);
+                                                        if (consoleRoute && firstProject && await selectProject(firstProject.id)) {
+                                                            router.push("/home");
+                                                            router.refresh();
+                                                            return;
+                                                        }
+                                                        router.push(firstProject ? `/${org.slug}/${firstProject.slug}` : `/${org.slug}/~/projects`);
+                                                    }}
+                                                >
+                                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[9px] font-semibold">
+                                                        {org.name.slice(0, 1).toUpperCase()}
+                                                    </span>
+                                                    <span className="truncate">{org.name}</span>
+                                                    {org.id === currentOrg.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </div>
+                                        <div className="my-1 border-t border-border/40" />
+                                        <DropdownMenuItem className="cursor-pointer py-1.5 text-xs" onClick={() => router.push("/onboarding")}>
+                                            <PlusCircle className="h-3.5 w-3.5" />
+                                            New organization
+                                        </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                                <div className="my-1 border-t border-border/40" />
+                            </>
                         )}
                         <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Account</p>
                         <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/account/profile")}>

@@ -1,9 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
 
-import { getPostBySlug, getAllPosts, parseMDX, extractToc } from "@/lib/blog";
-import { PostView } from "@/components/blog/PostView";
+import { getPostBySlug, getAllPosts, parseMDX } from "@/lib/blog";
+import { NewsPostView } from "@/components/blog/NewsPostView";
 
 interface BlogPostPageProps {
     params: Promise<{
@@ -63,26 +62,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     }
 
     const content = await parseMDX(post.content);
-    const toc = extractToc(post.content);
 
-    // Prev / next across all non-changelog posts
-    const allPosts = getAllPosts().filter((p) => p.published && p.category !== "changelog");
-    const currentIndex = allPosts.findIndex((p) => p.slug === slug);
-    const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
-    const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+    // Same category first, then newest — getAllPosts is already date-desc
+    // and Array.sort is stable, so each group keeps newest-first order.
+    const morePosts = getAllPosts()
+        .filter(
+            (p) => p.published && p.slug !== slug && p.category !== "changelog",
+        )
+        .sort((a, b) => Number(a.category !== post.category) - Number(b.category !== post.category))
+        .slice(0, 3);
 
-    return (
-        <PostView
-            post={post}
-            content={content}
-            toc={toc}
-            breadcrumb={
-                <Link href="/newsroom" className="text-primary hover:underline transition-colors">
-                    Blog
-                </Link>
-            }
-            prevPost={prevPost}
-            nextPost={nextPost}
-        />
-    );
+    return <NewsPostView post={post} content={content} morePosts={morePosts} />;
 }

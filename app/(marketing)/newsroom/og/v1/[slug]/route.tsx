@@ -1,9 +1,14 @@
 import { ImageResponse } from "next/og";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import sharp from "sharp";
 
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import { getPostBySlug } from "@/lib/blog";
+import {
+  CencoriMark,
+  getBackgroundNumber,
+  getFallbackPosts,
+  loadBackground,
+  loadFonts,
+} from "../og-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-static";
@@ -15,53 +20,10 @@ const size = {
   height: 630,
 };
 
-const BACKGROUND_COUNT = 5;
-
-function getFallbackPosts() {
-  return getAllPosts()
-    .filter((post) => post.published && !post.coverImage)
-    .sort((a, b) => {
-      const dateDifference =
-        new Date(a.date).getTime() - new Date(b.date).getTime();
-
-      return dateDifference || a.slug.localeCompare(b.slug);
-    });
-}
-
 export function generateStaticParams() {
   return getFallbackPosts().map((post) => ({
     slug: `${post.slug}.jpg`,
   }));
-}
-
-function getBackgroundNumber(slug: string) {
-  const postIndex = getFallbackPosts().findIndex((post) => post.slug === slug);
-
-  return (Math.max(postIndex, 0) % BACKGROUND_COUNT) + 1;
-}
-
-function CencoriMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="24"
-      height="24"
-      viewBox="0 0 100 100"
-      fill="none"
-    >
-      <g clipPath="url(#blog-cencori-mark-clip)">
-        <circle cx="35.3" cy="0" r="35.3" fill="#fff" />
-        <circle cx="0" cy="64.7" r="35.3" fill="#fff" />
-        <circle cx="100" cy="35.3" r="35.3" fill="#fff" />
-        <circle cx="64.7" cy="100" r="35.3" fill="#fff" />
-      </g>
-      <defs>
-        <clipPath id="blog-cencori-mark-clip">
-          <rect width="100" height="100" rx="3" fill="#fff" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
 }
 
 export async function GET(
@@ -103,39 +65,12 @@ export async function GET(
     year: "numeric",
     timeZone: "UTC",
   });
-  const backgroundNumber = String(getBackgroundNumber(postSlug)).padStart(
-    2,
-    "0",
-  );
+  const backgroundNumber = getBackgroundNumber(postSlug);
 
-  const [backgroundFile, manropeFile, geistFile] = await Promise.all([
-    readFile(
-      path.join(
-        process.cwd(),
-        "public",
-        "newsroom",
-        "og",
-        "backgrounds",
-        `${backgroundNumber}.jpg`,
-      ),
-    ),
-    readFile(
-      path.join(process.cwd(), "public", "fonts", "manrope-medium.ttf"),
-    ),
-    readFile(path.join(process.cwd(), "app", "Geist-Black.ttf")),
+  const [backgroundImage, { manropeFont, geistFont }] = await Promise.all([
+    loadBackground(backgroundNumber),
+    loadFonts(),
   ]);
-  const backgroundImage = backgroundFile.buffer.slice(
-    backgroundFile.byteOffset,
-    backgroundFile.byteOffset + backgroundFile.byteLength,
-  );
-  const manropeFont = manropeFile.buffer.slice(
-    manropeFile.byteOffset,
-    manropeFile.byteOffset + manropeFile.byteLength,
-  );
-  const geistFont = geistFile.buffer.slice(
-    geistFile.byteOffset,
-    geistFile.byteOffset + geistFile.byteLength,
-  );
 
   const pngResponse = new ImageResponse(
     (

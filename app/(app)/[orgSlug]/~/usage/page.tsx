@@ -380,74 +380,7 @@ export default function UsagePage({ params }: PageProps) {
 
     const isLoading = orgLoading || statsLoading;
 
-    if (isLoading) {
-        return (
-            <main className="mx-auto w-full max-w-[980px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-                <div className="flex items-end justify-between gap-6">
-                    <div className="space-y-3">
-                        <Skeleton className="h-3 w-20" />
-                        <Skeleton className="h-8 w-28" />
-                        <Skeleton className="h-3 w-80 max-w-full" />
-                    </div>
-                    <Skeleton className="hidden h-8 w-48 sm:block" />
-                </div>
-
-                <div className="mt-10 overflow-hidden rounded-lg bg-muted/35 dark:bg-[#111111]">
-                    <div className="grid lg:grid-cols-[1.55fr_1fr]">
-                        <div className="p-6 sm:p-8 lg:p-10">
-                            <Skeleton className="h-3 w-28" />
-                            <Skeleton className="mt-8 h-12 w-64" />
-                            <Skeleton className="mt-8 h-9 w-full" />
-                            <div className="mt-8 grid grid-cols-3 gap-5 border-t border-border/25 pt-5">
-                                {[1, 2, 3].map((item) => <Skeleton key={item} className="h-8 w-24 max-w-full" />)}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-px bg-border/25 lg:border-l lg:border-border/25">
-                            {[1, 2, 3, 4].map((item) => (
-                                <div key={item} className="bg-muted/35 p-6 dark:bg-[#111111]">
-                                    <Skeleton className="h-3 w-16" />
-                                    <Skeleton className="mt-4 h-7 w-24" />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-12 border-y border-border/25 py-7">
-                    <div className="flex items-end justify-between">
-                        <Skeleton className="h-5 w-28" />
-                        <Skeleton className="h-8 w-24" />
-                    </div>
-                    <Skeleton className="mt-8 h-64 w-full" />
-                </div>
-
-                <div className="mt-12 grid overflow-hidden rounded-lg bg-muted/30 dark:bg-[#0d0d0d] lg:grid-cols-2 lg:divide-x lg:divide-border/25">
-                    {[1, 2].map((section) => (
-                        <div key={section} className="space-y-px">
-                            <div className="p-6"><Skeleton className="h-5 w-32" /></div>
-                            {[1, 2, 3, 4].map((row) => (
-                                <div key={row} className="px-6"><Skeleton className="h-10 w-full" /></div>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </main>
-        );
-    }
-
-    if (!org) {
-        return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <div className="text-center py-16 flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                    </div>
-                    <p className="text-sm font-medium">Organization not found</p>
-                </div>
-            </div>
-        );
-    }
-
-    const monthlyRequestsUsed = Number.isFinite(org.monthly_requests_used) && org.monthly_requests_used >= 0
+    const monthlyRequestsUsed = org && Number.isFinite(org.monthly_requests_used) && org.monthly_requests_used >= 0
         ? org.monthly_requests_used
         : 0;
 
@@ -474,7 +407,9 @@ export default function UsagePage({ params }: PageProps) {
     nextReset.setMonth(nextReset.getMonth() + 1, 1);
     nextReset.setHours(0, 0, 0, 0);
     const periodLabel = timeRange === '24h' ? 'Last 24 hours' : timeRange === '30d' ? 'Last 30 days' : 'Last 7 days';
-    const planLabel = `${org.subscription_tier.charAt(0).toUpperCase()}${org.subscription_tier.slice(1)}`;
+    const planLabel = org?.subscription_tier
+        ? `${org.subscription_tier.charAt(0).toUpperCase()}${org.subscription_tier.slice(1)}`
+        : "Free";
     const peakTokenInterval = Math.max(...activity.map((point) => point.input_tokens + point.output_tokens), 0);
     const averageTokenInterval = activity.length > 0 ? totalTokens / activity.length : 0;
     const hoveredActivityPoint = hoveredActivityIndex === null ? null : activity[hoveredActivityIndex] || null;
@@ -486,7 +421,7 @@ export default function UsagePage({ params }: PageProps) {
                     <p className="text-[10px] font-medium tracking-[0.18em] text-muted-foreground">ORGANIZATION TELEMETRY</p>
                     <h1 className="mt-3 text-[2rem] font-medium leading-none tracking-[-0.055em]">Usage</h1>
                     <p className="mt-3 max-w-[60ch] text-xs leading-5 text-muted-foreground">
-                        Model traffic, token consumption, and capacity across {org.name}.
+                        Model traffic, token consumption, and capacity across {org?.name ?? "your organization"}.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -504,7 +439,7 @@ export default function UsagePage({ params }: PageProps) {
                     </DropdownMenu>
                     <div className="flex h-8 items-center rounded-md border border-border/30 p-0.5" aria-label="Usage period">
                         {['24h', '7d', '30d'].map((range) => {
-                            const isGated = range === '30d' && org.subscription_tier === 'free';
+                            const isGated = range === '30d' && org?.subscription_tier === 'free';
 
                             if (isGated) {
                                 return (
@@ -566,6 +501,58 @@ export default function UsagePage({ params }: PageProps) {
                 </div>
             </header>
 
+            {isLoading ? (
+                <>
+                    <div className="mt-10 overflow-hidden rounded-lg bg-muted/35 dark:bg-[#111111]">
+                        <div className="grid lg:grid-cols-[1.55fr_1fr]">
+                            <div className="p-6 sm:p-8 lg:p-10">
+                                <Skeleton className="h-3 w-28" />
+                                <Skeleton className="mt-8 h-12 w-64" />
+                                <Skeleton className="mt-8 h-9 w-full" />
+                                <div className="mt-8 grid grid-cols-3 gap-5 border-t border-border/25 pt-5">
+                                    {[1, 2, 3].map((item) => <Skeleton key={item} className="h-8 w-24 max-w-full" />)}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-px bg-border/25 lg:border-l lg:border-border/25">
+                                {[1, 2, 3, 4].map((item) => (
+                                    <div key={item} className="bg-muted/35 p-6 dark:bg-[#111111]">
+                                        <Skeleton className="h-3 w-16" />
+                                        <Skeleton className="mt-4 h-7 w-24" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-12 border-y border-border/25 py-7">
+                        <div className="flex items-end justify-between">
+                            <Skeleton className="h-5 w-28" />
+                            <Skeleton className="h-8 w-24" />
+                        </div>
+                        <Skeleton className="mt-8 h-64 w-full" />
+                    </div>
+
+                    <div className="mt-12 grid overflow-hidden rounded-lg bg-muted/30 dark:bg-[#0d0d0d] lg:grid-cols-2 lg:divide-x lg:divide-border/25">
+                        {[1, 2].map((section) => (
+                            <div key={section} className="space-y-px">
+                                <div className="p-6"><Skeleton className="h-5 w-32" /></div>
+                                {[1, 2, 3, 4].map((row) => (
+                                    <div key={row} className="px-6"><Skeleton className="h-10 w-full" /></div>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            ) : !org ? (
+                <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                    <div className="text-center py-16 flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        </div>
+                        <p className="text-sm font-medium">Organization not found</p>
+                    </div>
+                </div>
+            ) : (
+            <>
             <section className="relative mt-10 overflow-hidden rounded-lg bg-[#f3f3f1] dark:bg-[#111111]" aria-labelledby="capacity-heading">
                 <div className="grid lg:grid-cols-[1.55fr_1fr]">
                     <div className="relative px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
@@ -747,9 +734,11 @@ export default function UsagePage({ params }: PageProps) {
             </section>
 
             <footer className="mt-12 flex flex-col gap-2 border-t border-border/25 pt-5 text-[10px] leading-4 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                <p>Usage aggregates every project and environment in {org.name}.</p>
+                <p>Usage aggregates every project and environment in {org?.name ?? "your organization"}.</p>
                 <p className="font-mono">WINDOW / {timeRange.toUpperCase()}</p>
             </footer>
+            </>
+            )}
         </main>
     );
 }

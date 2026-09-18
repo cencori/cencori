@@ -1034,21 +1034,65 @@ export default function UsageBillingPage({ params }: PageProps) {
 
   const rpIsSaving = rpCreateMutation.isPending || rpUpdateMutation.isPending;
 
-  // ─── Loading skeleton ───
+  // ─── Tab labels ───
 
-  if (projectLoading || configLoading) {
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "configuration", label: "Overview" },
+    { key: "end_users", label: "Customers" },
+    { key: "rate_plans", label: "Pricing" },
+    { key: "revenue", label: "Revenue" },
+  ];
+
+  // Identity (project + billing config) resolves from cache on warm sessions.
+  // The static shell below renders on the first paint regardless — only the
+  // data regions wait.
+  const identityLoading = projectLoading || configLoading;
+
+  if (identityLoading) {
     return (
       <main className="mx-auto w-full max-w-[980px] px-4 py-8 pb-24 sm:px-6 sm:py-10 lg:px-8">
-        <header className="mb-8">
-          <Skeleton className="h-2.5 w-28" />
-          <Skeleton className="mt-3 h-8 w-56" />
-          <Skeleton className="mt-3 h-3 w-80 max-w-full" />
+        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[9px] font-medium tracking-[0.18em] text-muted-foreground">PRODUCT REVENUE</p>
+            <h1 className="mt-3 text-[2rem] font-medium leading-none tracking-[-0.055em]">AI monetization</h1>
+            <p className="mt-3 max-w-[60ch] text-xs leading-5 text-muted-foreground">
+              Meter AI usage, set pricing, and bill your customers.
+            </p>
+          </div>
+          <div className="flex min-h-8 items-center gap-2">
+            {tab === "configuration" && (
+              <span className={cn(
+                "rounded-md border px-2 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.08em]",
+                enabled
+                  ? "border-emerald-500/20 bg-emerald-500/[0.07] text-emerald-500"
+                  : "border-border/40 bg-secondary/60 text-muted-foreground"
+              )}>
+                {enabled ? "Active" : "Not enabled"}
+              </span>
+            )}
+          </div>
         </header>
-        <div className="mb-7 flex h-10 items-end gap-6 border-b border-border/30">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="mb-3 h-3 w-16" />
+
+        {/* Tabs */}
+        <nav className="mb-7 flex items-center gap-6 overflow-x-auto border-b border-border/30" aria-label="Monetization sections">
+          {tabs.map((t) => (
+            <button
+              type="button"
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              aria-current={tab === t.key ? "page" : undefined}
+              className={cn(
+                "relative h-10 shrink-0 text-[11px] font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-px after:transition-colors",
+                tab === t.key
+                  ? "text-foreground after:bg-foreground"
+                  : "text-muted-foreground after:bg-transparent hover:text-foreground"
+              )}
+            >
+              {t.label}
+            </button>
           ))}
-        </div>
+        </nav>
+
         <div className="space-y-8">
           <Skeleton className="h-[276px] rounded-xl" />
           <section aria-label="Loading payment providers">
@@ -1064,15 +1108,6 @@ export default function UsageBillingPage({ params }: PageProps) {
       </main>
     );
   }
-
-  // ─── Tab labels ───
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "configuration", label: "Overview" },
-    { key: "end_users", label: "Customers" },
-    { key: "rate_plans", label: "Pricing" },
-    { key: "revenue", label: "Revenue" },
-  ];
 
   return (
     <main className="mx-auto w-full max-w-[980px] px-4 py-8 pb-24 sm:px-6 sm:py-10 lg:px-8">

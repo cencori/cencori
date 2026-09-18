@@ -24,11 +24,16 @@ export function BlogListView({ posts }: { posts: BlogCardPost[] }) {
 
   return (
     <div className="flex flex-col divide-y divide-border/40">
-      {posts.map((post) => (
+      {posts.map((post) => {
+        const external = Boolean(post.externalUrl);
+        return (
         <Link
           className="group flex gap-5 py-6 first:pt-0 last:pb-0"
-          href={getBlogPostUrl(post)}
+          href={post.externalUrl || getBlogPostUrl(post)}
           key={post.slug}
+          {...(external
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : {})}
         >
           <span className="relative hidden h-24 w-40 shrink-0 overflow-hidden rounded-lg bg-muted sm:block">
             <Image
@@ -36,7 +41,7 @@ export function BlogListView({ posts }: { posts: BlogCardPost[] }) {
               className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               fill
               sizes="160px"
-              src={post.coverImage || `/newsroom/og/v1/${post.slug}.jpg`}
+              src={post.coverImage || `/newsroom/og/v1/square/${post.slug}.jpg`}
               unoptimized
             />
           </span>
@@ -57,7 +62,8 @@ export function BlogListView({ posts }: { posts: BlogCardPost[] }) {
             </span>
           </span>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }

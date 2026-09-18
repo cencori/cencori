@@ -9,7 +9,7 @@ interface BlogCardProps {
 }
 
 export function BlogCard({ post }: BlogCardProps) {
-    const coverImage = post.coverImage || `/newsroom/og/v1/${post.slug}.jpg`;
+    const coverImage = post.coverImage || `/newsroom/og/v1/square/${post.slug}.jpg`;
 
     return (
         <Link href={post.category === "changelog" ? `/changelog/${post.slug}` : `/newsroom/${post.slug}`} className="block h-full group">

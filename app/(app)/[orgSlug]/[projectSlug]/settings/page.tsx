@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2 } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2, ArrowUpRight } from "lucide-react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { RagMetricsLogo } from "@/components/icons/BrandIcons";
 import { toast } from "@/components/ui/toast";
@@ -46,6 +46,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
+import { WebhooksManager } from "@/components/dashboard/WebhooksManager";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { SUPPORTED_PROVIDERS, getModelsForProvider } from "@/lib/providers/config";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,7 @@ const PROJECT_SETTINGS_TABS = [
   'networking',
   'integrations',
   'api',
+  'webhooks',
 ] as const;
 
 type ProjectSettingsTab = (typeof PROJECT_SETTINGS_TABS)[number];
@@ -656,18 +658,23 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     "[&>section:first-of-type]:border-t-0"
   );
 
-  if (projectLoading) {
-    return (
-      <div className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-10">
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-[200px]" />
-        </div>
-      </div>
-    );
-  }
+  // Identity (project details) resolves from cache instantly on warm
+  // sessions and refetches in the background. The static shell below
+  // renders on the first paint regardless — only the data regions wait.
+  const identityLoading = projectLoading;
 
-  if (error || !project) {
+  const SETTINGS_TAB_META: Record<ProjectSettingsTab, { title: string; description: string }> = {
+    general: { title: "General", description: "Manage this project's name and stable identifier." },
+    budget: { title: "Budget", description: "Set spending limits and monitor project costs." },
+    providers: { title: "Providers", description: "Configure model access, routing defaults, and failover behavior." },
+    infrastructure: { title: "Infrastructure", description: "Inspect the proxy runtime, service health, and request limits." },
+    networking: { title: "Networking", description: "Control how traffic reaches this project and where its data plane runs." },
+    integrations: { title: "Integrations", description: "Connect external services to this project's workflows." },
+    api: { title: "API", description: "Create and manage credentials used to access this project." },
+    webhooks: { title: "Webhooks", description: "Send real-time notifications to your endpoints when events occur." },
+  };
+
+  if (!identityLoading && (error || !project)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <p className="text-sm text-red-500">{error?.message || "Project not found."}</p>
@@ -678,6 +685,20 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   return (
     <main className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-12">
       <Tabs value={activeSettingsTab} className="space-y-0">
+        {identityLoading || !project ? (
+          <TabsContent value={activeSettingsTab} className={settingsTabClass}>
+            <SettingsPageLabel
+              title={SETTINGS_TAB_META[activeSettingsTab].title}
+              description={SETTINGS_TAB_META[activeSettingsTab].description}
+            />
+            <div className="space-y-3 pt-7">
+              <Skeleton className="h-[120px]" />
+              <Skeleton className="h-[120px]" />
+              <Skeleton className="h-[200px]" />
+            </div>
+          </TabsContent>
+        ) : (
+          <>
         {/* GENERAL TAB */}
         <TabsContent value="general" className={settingsTabClass}>
           <SettingsPageLabel
@@ -743,9 +764,31 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-sm md:text-xs font-medium">Observability</p>
                   <p className="text-xs md:text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs" asChild>
+                <Button size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs" asChild>
                   <Link href={`/${orgSlug}/${projectSlug}/observability`}>
                     View
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          {/* Organization */}
+          <section>
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Organization</h2>
+              <p className="text-xs md:text-[10px] text-muted-foreground">Manage organization name, members, and billing.</p>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+                <div className="space-y-0.5">
+                  <p className="text-sm md:text-xs font-medium">{organizations.find((item) => item.slug === orgSlug)?.name ?? "Organization"}</p>
+                  <p className="text-xs md:text-[10px] text-muted-foreground">Organization-level settings live outside this project.</p>
+                </div>
+                <Button size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs gap-1.5" asChild>
+                  <Link href={`/${orgSlug}/~/settings`}>
+                    Open settings
+                    <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
               </div>
@@ -2226,6 +2269,24 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
           </section>
         </TabsContent>
+        <TabsContent value="webhooks" className={settingsTabClass}>
+          <SettingsPageLabel
+            title="Webhooks"
+            description="Send real-time notifications to your endpoints when events occur."
+          />
+
+          <section>
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-medium">Event deliveries</h2>
+              <p className="text-xs text-muted-foreground md:text-[10px]">Endpoints subscribed to this project&apos;s events.</p>
+            </div>
+            <div className="min-w-0">
+              <WebhooksManager orgSlug={orgSlug} projectSlug={projectSlug} />
+            </div>
+          </section>
+        </TabsContent>
+          </>
+        )}
       </Tabs>
 
       {/* Revoke Key Confirmation */}
@@ -2252,13 +2313,15 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       </AlertDialog>
 
       {/* Generate Key Dialog */}
-      <GenerateKeyDialog
-        open={showCreateKeyDialog}
-        onOpenChange={setShowCreateKeyDialog}
-        projectId={project.id}
-        defaultKeyType={createKeyType}
-        onKeyGenerated={() => refetchApiKeys()}
-      />
+      {!identityLoading && project && (
+        <GenerateKeyDialog
+          open={showCreateKeyDialog}
+          onOpenChange={setShowCreateKeyDialog}
+          projectId={project.id}
+          defaultKeyType={createKeyType}
+          onKeyGenerated={() => refetchApiKeys()}
+        />
+      )}
 
       {/* Suggest Integration Dialog */}
       <Dialog open={showSuggestModal} onOpenChange={setShowSuggestModal}>

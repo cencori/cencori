@@ -2,7 +2,7 @@
 
 import { use, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Github } from "@lobehub/icons";
@@ -28,6 +28,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { getConsoleRoute } from "@/lib/console/routing";
 
 interface OrganizationData {
   id: string;
@@ -83,35 +85,14 @@ export default function OrgProjectsPage({
 }) {
   const { orgSlug } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
+  const { selectProject } = useOrganizationProject();
+  const consoleMode = getConsoleRoute(pathname) !== null;
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data, isLoading, error, refetch } = useOrgAndProjects(orgSlug);
   const organization = data?.organization;
   const projects = data?.projects || [];
-
-  if (isLoading) return <ProjectsPageSkeleton />;
-
-  if (error) {
-    return (
-      <main className="mx-auto w-full max-w-[1120px] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="border-t border-border/30 py-16">
-          <p className="text-sm font-medium">Projects are unavailable</p>
-          <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">{error.message}</p>
-          <Button size="sm" className="mt-4 h-8 rounded-md px-3 text-xs" onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      </main>
-    );
-  }
-
-  if (!organization) {
-    return (
-      <main className="mx-auto w-full max-w-[1120px] px-4 py-10 sm:px-6 lg:px-8">
-        <p className="text-sm font-medium">Organization not found</p>
-      </main>
-    );
-  }
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredProjects = projects.filter((project) =>
@@ -149,11 +130,23 @@ export default function OrgProjectsPage({
             />
           </div>
 
-          <CreateProjectMenu orgSlug={orgSlug} />
+          <CreateProjectMenu orgSlug={orgSlug} consoleMode={consoleMode} />
         </div>
 
-        {projects.length === 0 ? (
-          <NoProjects orgSlug={orgSlug} organizationName={organization.name} />
+        {isLoading ? (
+          <ProjectsPageSkeleton />
+        ) : error ? (
+          <div className="border-t border-border/30 py-16">
+            <p className="text-sm font-medium">Projects are unavailable</p>
+            <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">{error.message}</p>
+            <Button size="sm" className="mt-4 h-8 rounded-md px-3 text-xs" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : !organization ? (
+          <p className="text-sm font-medium">Organization not found</p>
+        ) : projects.length === 0 ? (
+          <NoProjects orgSlug={orgSlug} organizationName={organization.name} consoleMode={consoleMode} />
         ) : filteredProjects.length === 0 ? (
           <NoSearchResults searchTerm={searchTerm} onClear={() => setSearchTerm("")} />
         ) : (
@@ -175,7 +168,13 @@ export default function OrgProjectsPage({
                 <ProjectRow
                   key={project.id}
                   project={project}
-                  onOpen={() => router.push(`/${orgSlug}/${project.slug}`)}
+                  onOpen={async () => {
+                    if (consoleMode && await selectProject(project.id)) {
+                      router.push("/home");
+                      return;
+                    }
+                    router.push(`/${orgSlug}/${project.slug}`);
+                  }}
                 />
               ))}
             </div>
@@ -186,7 +185,7 @@ export default function OrgProjectsPage({
   );
 }
 
-function CreateProjectMenu({ orgSlug }: { orgSlug: string }) {
+function CreateProjectMenu({ orgSlug, consoleMode }: { orgSlug: string; consoleMode: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -198,20 +197,20 @@ function CreateProjectMenu({ orgSlug }: { orgSlug: string }) {
       <DropdownMenuContent align="end" className="w-56">
         {process.env.NODE_ENV !== "production" && (
           <DropdownMenuItem asChild className="cursor-pointer text-xs">
-            <Link href={`/${orgSlug}/~/projects/new-agent`}>
+            <Link href={consoleMode ? "/projects/new-agent" : `/${orgSlug}/~/projects/new-agent`}>
               <Bot size={14} className="mr-2" aria-hidden="true" />
               Deploy an agent
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild className="cursor-pointer text-xs">
-          <Link href={`/${orgSlug}/~/projects/new`}>
+          <Link href={consoleMode ? "/projects/new" : `/${orgSlug}/~/projects/new`}>
             <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.7} className="mr-2" aria-hidden="true" />
             Empty project (gateway only)
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer text-xs">
-          <Link href={`/${orgSlug}/~/projects/import/github`}>
+          <Link href={consoleMode ? "/projects/import/github" : `/${orgSlug}/~/projects/import/github`}>
             <Github size={14} className="mr-2" aria-hidden="true" />
             Import from GitHub
           </Link>
@@ -307,7 +306,15 @@ function ProjectField({ label, children }: { label: string; children: React.Reac
   );
 }
 
-function NoProjects({ orgSlug, organizationName }: { orgSlug: string; organizationName: string }) {
+function NoProjects({
+  orgSlug,
+  organizationName,
+  consoleMode,
+}: {
+  orgSlug: string;
+  organizationName: string;
+  consoleMode: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/20">
       <div className="grid gap-8 px-6 py-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:px-8 md:py-12">
@@ -322,10 +329,10 @@ function NoProjects({ orgSlug, organizationName }: { orgSlug: string; organizati
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="h-8 rounded-md px-3 text-xs">
-            <Link href={`/${orgSlug}/~/projects/new`}>Create project</Link>
+            <Link href={consoleMode ? "/projects/new" : `/${orgSlug}/~/projects/new`}>Create project</Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="h-8 rounded-md px-3 text-xs">
-            <Link href={`/${orgSlug}/~/projects/import/github`}>Import from GitHub</Link>
+            <Link href={consoleMode ? "/projects/import/github" : `/${orgSlug}/~/projects/import/github`}>Import from GitHub</Link>
           </Button>
         </div>
       </div>
@@ -347,35 +354,23 @@ function NoSearchResults({ searchTerm, onClear }: { searchTerm: string; onClear:
 
 function ProjectsPageSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <header>
-        <Skeleton className="h-8 w-40" />
-      </header>
-
-      <section className="pt-6">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <Skeleton className="h-8 w-full max-w-[320px]" />
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/20">
-          <div className="border-b border-border/30 bg-muted/45 px-6 py-3">
-            <Skeleton className="h-3 w-28" />
-          </div>
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="border-b border-border/30 px-6 py-5 last:border-b-0">
-              <div className="flex items-center">
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3.5 w-32" />
-                  <Skeleton className="h-2.5 w-56 max-w-full" />
-                </div>
-                <Skeleton className="hidden h-3 w-20 sm:block" />
-                <Skeleton className="hidden h-3 w-20 sm:block" />
-              </div>
+    <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/20">
+      <div className="border-b border-border/30 bg-muted/45 px-6 py-3">
+        <Skeleton className="h-3 w-28" />
+      </div>
+      {[1, 2, 3].map((item) => (
+        <div key={item} className="border-b border-border/30 px-6 py-5 last:border-b-0">
+          <div className="flex items-center">
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-2.5 w-56 max-w-full" />
             </div>
-          ))}
+            <Skeleton className="hidden h-3 w-20 sm:block" />
+            <Skeleton className="hidden h-3 w-20 sm:block" />
+          </div>
         </div>
-      </section>
-    </main>
+      ))}
+    </div>
   );
 }
 

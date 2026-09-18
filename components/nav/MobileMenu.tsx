@@ -53,7 +53,9 @@ export function MobileMenu({
   const subData = menus.find((menu) => menu.id === sub);
   const pathname = usePathname();
   const isDevelopers =
-    pathname === "/developers" || pathname?.startsWith("/developers/");
+    pathname === "/developers" ||
+    pathname?.startsWith("/developers/") ||
+    pathname === "/ai-gateway";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {

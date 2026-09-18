@@ -4,6 +4,16 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RESERVED_ORG_SLUGS } from "@/lib/reserved-slugs";
+import {
+  ACTIVE_ORG_COOKIE,
+  ACTIVE_PROJECT_COOKIE,
+  CONSOLE_INTERNAL_PREFIX,
+  buildScopedConsolePath,
+  getCanonicalConsoleRedirect,
+  getConsoleRoute,
+  getConsoleSurface,
+  isConsoleHostname,
+} from "@/lib/console/routing";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
 const LAST_ORG_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -407,6 +417,7 @@ async function canAccessProject(
 export async function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") ?? "";
   const domain = hostname.split(":")[0].toLowerCase();
+  const isConsoleSubdomain = isConsoleHostname(hostname);
   const isScanSubdomain =
     domain === "scan.cencori.com" ||
     domain === "scan.localhost" ||
@@ -420,6 +431,15 @@ export async function proxy(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
+
+  // Internal console routes are implementation details. Canonical console
+  // URLs are rewritten to them below, but they should never be bookmarkable or
+  // exposed directly on any host.
+  if (pathname === CONSOLE_INTERNAL_PREFIX || pathname.startsWith(`${CONSOLE_INTERNAL_PREFIX}/`)) {
+    const notFoundUrl = request.nextUrl.clone();
+    notFoundUrl.pathname = "/404";
+    return applySecurityHeaders(NextResponse.rewrite(notFoundUrl, { status: 404 }));
+  }
 
   if (
     !isLocalHostname(domain) &&
@@ -445,6 +465,58 @@ export async function proxy(request: NextRequest) {
   // Skip rewriting for static files (images, etc)
   // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
   const isFile = pathname.includes(".") && !pathname.startsWith("/.well-known");
+
+  if (isConsoleSubdomain && !isFile && (pathname === "/" || pathname === "")) {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = "/home";
+    return applySecurityHeaders(NextResponse.redirect(homeUrl, 308));
+  }
+
+  if (isConsoleSubdomain && !isFile) {
+    const canonical = getCanonicalConsoleRedirect(pathname);
+    if (canonical) {
+      const canonicalUrl = request.nextUrl.clone();
+      canonicalUrl.pathname = canonical.canonicalPath;
+      if (canonical.settingsTab) {
+        canonicalUrl.searchParams.set("tab", canonical.settingsTab);
+      }
+
+      const redirectResponse = NextResponse.redirect(canonicalUrl, 308);
+      const cookieOptions = {
+        httpOnly: true,
+        maxAge: LAST_ORG_MAX_AGE,
+        path: "/",
+        sameSite: "lax" as const,
+        secure: domain.endsWith("cencori.com"),
+      };
+
+      redirectResponse.cookies.set(
+        ACTIVE_ORG_COOKIE,
+        canonical.organizationSlug,
+        cookieOptions,
+      );
+      redirectResponse.cookies.set(
+        LAST_ORG_COOKIE,
+        canonical.organizationSlug,
+        cookieOptions,
+      );
+
+      if (canonical.projectSlug) {
+        redirectResponse.cookies.set(
+          ACTIVE_PROJECT_COOKIE,
+          canonical.projectSlug,
+          cookieOptions,
+        );
+      } else {
+        redirectResponse.cookies.set(ACTIVE_PROJECT_COOKIE, "", {
+          ...cookieOptions,
+          maxAge: 0,
+        });
+      }
+
+      return applySecurityHeaders(redirectResponse);
+    }
+  }
 
   // Canonicalize scan subdomain paths:
   // - /scan      -> /
@@ -528,8 +600,35 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!isFile) {
+    const consoleRoute = isConsoleSubdomain ? getConsoleRoute(pathname) : null;
+
+    // The console keeps tenant IDs out of visible URLs. Internally, the mature
+    // org/project route tree remains the single implementation. Existing
+    // slug-based URLs continue to work as compatibility aliases.
+    if (consoleRoute) {
+      const url = request.nextUrl.clone();
+      const organizationSlug = request.cookies.get(ACTIVE_ORG_COOKIE)?.value ?? null;
+      const projectSlug = request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
+      const scopedPath = organizationSlug
+        ? buildScopedConsolePath(consoleRoute, organizationSlug, projectSlug)
+        : null;
+
+      if (scopedPath) {
+        url.pathname = scopedPath;
+      } else if (consoleRoute.canonicalPath === "/home") {
+        // /home can resolve a first workspace server-side and seeds the active
+        // context on the client for all later flat routes.
+        url.pathname = `${CONSOLE_INTERNAL_PREFIX}/home`;
+      } else {
+        // A direct deep link before the workspace cookie exists gets one
+        // lightweight bootstrap render, then refreshes at the same public URL.
+        url.pathname = `${CONSOLE_INTERNAL_PREFIX}/bootstrap`;
+      }
+      rewriteUrl = url;
+      response = NextResponse.rewrite(url);
+    }
     // Handle pitch subdomain
-    if (domain === "pitch.cencori.com" || domain === "pitch.localhost") {
+    else if (domain === "pitch.cencori.com" || domain === "pitch.localhost") {
       const url = request.nextUrl.clone();
       url.pathname = `/pitch${url.pathname}`;
       rewriteUrl = url;
@@ -627,7 +726,13 @@ export async function proxy(request: NextRequest) {
   // would redirect anonymous visitors off any marketing page missing from
   // RESERVED_ORG_SLUGS. They're guarded in app/(app)/[orgSlug]/layout.tsx,
   // where the segment is unambiguous.
-  if (!isFile && !isScanSubdomain && !userId && isProtectedPagePath(pathname)) {
+  const isCanonicalConsolePage = isConsoleSubdomain && getConsoleSurface(pathname) !== null;
+  if (
+    !isFile &&
+    !isScanSubdomain &&
+    !userId &&
+    (isProtectedPagePath(pathname) || isCanonicalConsolePage)
+  ) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -642,11 +747,14 @@ export async function proxy(request: NextRequest) {
   // of the login page. Expired sessions have userId === null, so they still
   // see the form as expected.
   if (!isFile && !isScanSubdomain && userId && isAuthPagePath(pathname)) {
-    const destination = resolveSignedInDestination(
+    let destination = resolveSignedInDestination(
       request.nextUrl.searchParams.get("redirect"),
       request.nextUrl.origin,
       request.nextUrl.hostname,
     );
+    if (isConsoleSubdomain && destination === "/dashboard") {
+      destination = "/home";
+    }
     const redirectUrl =
       /^https?:\/\//i.test(destination)
         ? new URL(destination)

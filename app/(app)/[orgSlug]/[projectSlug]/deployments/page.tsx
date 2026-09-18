@@ -722,11 +722,20 @@ export default function DeploymentsPage({ params }: PageProps) {
         setBranchFilter("all");
     };
 
-    if (projectLoading || agentsLoading) {
+    // Identity resolves from cache on warm sessions. The static shell below
+    // renders on the first paint regardless — only the data regions wait.
+    const identityLoading = projectLoading || agentsLoading;
+
+    if (identityLoading) {
         return (
             <div className="w-full max-w-4xl mx-auto px-6 py-8">
-                <Skeleton className="h-5 w-32 mb-2" />
-                <Skeleton className="h-3 w-72 mb-6" />
+                <div className="mb-6">
+                    <h1 className="text-lg font-semibold">Deployments</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-[60ch]">
+                        Deploy this project&apos;s agent from a repo. Cencori builds and hosts it — endpoint, channels, and
+                        schedules included. One agent per project; its versions live here.
+                    </p>
+                </div>
                 <Skeleton className="h-40 w-full" />
             </div>
         );

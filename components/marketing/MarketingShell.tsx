@@ -8,11 +8,13 @@ import { MarketingNav } from "@/components/nav/MarketingNav";
 export function MarketingShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isDevelopers =
-    pathname === "/developers" || pathname?.startsWith("/developers/");
+    pathname === "/developers" ||
+    pathname?.startsWith("/developers/") ||
+    pathname === "/ai-gateway";
 
   return (
     <div
-      className={`${
+      className={`editorial-dark ${
         isDevelopers
           ? "developers-theme [--border:#4a4a4a]"
           : "marketing-theme [--border:#b8b8b8] dark:[--border:#4a4a4a]"

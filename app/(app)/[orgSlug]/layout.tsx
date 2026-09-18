@@ -1,6 +1,8 @@
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createServerClient } from "@/lib/supabaseServer";
+import { isConsoleHostname } from "@/lib/console/routing";
 import OrganizationLayoutClient from "./OrganizationLayoutClient";
 
 type LayoutParams = Promise<{ orgSlug: string }>;
@@ -53,8 +55,10 @@ export default async function OrganizationLayout({
     redirect(`/login?redirect=${encodeURIComponent(`/${orgSlug}`)}`);
   }
 
+  const host = (await headers()).get("host") ?? "";
+
   return (
-    <OrganizationLayoutClient>
+    <OrganizationLayoutClient consoleMode={isConsoleHostname(host)}>
       {children}
     </OrganizationLayoutClient>
   );

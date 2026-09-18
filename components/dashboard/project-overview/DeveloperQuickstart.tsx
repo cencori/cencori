@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BundledLanguage } from "shiki";
@@ -33,6 +34,7 @@ import {
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { formatCurrency } from "@/lib/currency";
 import { queryKeys, useProjectIdBySlug } from "@/lib/hooks/useQueries";
+import { getConsoleRoute } from "@/lib/console/routing";
 
 type LanguageId = "typescript" | "python" | "go" | "rust" | "php";
 type ModalityId = "chat" | "image" | "voice";
@@ -433,6 +435,10 @@ export function DeveloperQuickstart({
   orgSlug,
   projectSlug,
 }: DeveloperQuickstartProps) {
+  const pathname = usePathname();
+  const monetizationHref = getConsoleRoute(pathname)
+    ? "/monetization"
+    : `/${orgSlug}/${projectSlug}/monetization`;
   const queryClient = useQueryClient();
   const { environment } = useEnvironment();
   const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(
@@ -784,7 +790,7 @@ Instructions:
             Monetization
           </h2>
           <Link
-            href={`/${orgSlug}/${projectSlug}/monetization`}
+            href={monetizationHref}
             className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             Open monetization <span aria-hidden="true">↗</span>
@@ -836,7 +842,7 @@ Instructions:
                 asChild
                 className="mt-5 h-7 rounded-md bg-foreground px-3 text-[11px] font-medium text-background hover:bg-foreground/90"
               >
-                <Link href={`/${orgSlug}/${projectSlug}/monetization`}>
+                <Link href={monetizationHref}>
                   Configure monetization
                 </Link>
               </Button>

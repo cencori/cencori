@@ -186,44 +186,6 @@ export default function BillingPage({ params }: PageProps) {
         }
     }, [checkoutConfirmed, checkoutId]);
 
-    if (isLoading) {
-        return (
-            <div className="mx-auto w-full max-w-[1120px] animate-pulse space-y-6 px-4 py-8 text-current/[0.1] sm:px-6 lg:px-8">
-                <div className="space-y-3">
-                    <Skeleton className="h-3 w-20 rounded-full bg-current/5" />
-                    <Skeleton className="h-8 w-36 rounded bg-current/10" />
-                    <Skeleton className="h-4 w-80 max-w-full rounded bg-current/5" />
-                </div>
-                <Skeleton className="h-72 rounded-[18px] bg-current/5" />
-                <Skeleton className="h-72 rounded-[18px] bg-current/5" />
-                <Skeleton className="h-56 rounded-[18px] bg-current/5" />
-                <Skeleton className="h-64 rounded-[18px] bg-current/5" />
-                <Skeleton className="h-80 rounded-[18px] bg-current/5" />
-            </div>
-        );
-    }
-
-    if (error || !org) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-                <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/[0.03] text-destructive/60">
-                    <CreditCard className="h-8 w-8" />
-                </div>
-                <h2 className="text-lg font-medium tracking-tight">Billing unavailable</h2>
-                <p className="max-w-[280px] text-center text-xs leading-5 text-muted-foreground">
-                    Cencori could not load this organization&apos;s billing data. Check your connection and try again.
-                </p>
-                <Button
-                    variant="outline"
-                    className="h-7 rounded-md px-3 text-[11px] font-medium shadow-none"
-                    onClick={() => window.location.reload()}
-                >
-                    Try again
-                </Button>
-            </div>
-        );
-    }
-
     // Mapping for project budget format
     const formattedProjects = projects.map(p => ({
         id: p.id,
@@ -250,7 +212,7 @@ export default function BillingPage({ params }: PageProps) {
                 <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Finance</div>
                 <h1 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Billing</h1>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                    Plans, prepaid capacity, and spend controls for {org.name}.
+                    Plans, prepaid capacity, and spend controls for {org?.name ?? "your organization"}.
                 </p>
             </header>
             <AnimatePresence>
@@ -280,6 +242,32 @@ export default function BillingPage({ params }: PageProps) {
                 )}
             </AnimatePresence>
 
+            {isLoading ? (
+                <div className="space-y-6 text-current/[0.1]">
+                    <Skeleton className="h-72 rounded-[18px] bg-current/5" />
+                    <Skeleton className="h-72 rounded-[18px] bg-current/5" />
+                    <Skeleton className="h-56 rounded-[18px] bg-current/5" />
+                    <Skeleton className="h-64 rounded-[18px] bg-current/5" />
+                    <Skeleton className="h-80 rounded-[18px] bg-current/5" />
+                </div>
+            ) : error || !org ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                    <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/[0.03] text-destructive/60">
+                        <CreditCard className="h-8 w-8" />
+                    </div>
+                    <h2 className="text-lg font-medium tracking-tight">Billing unavailable</h2>
+                    <p className="max-w-[280px] text-center text-xs leading-5 text-muted-foreground">
+                        Cencori could not load this organization&apos;s billing data. Check your connection and try again.
+                    </p>
+                    <Button
+                        variant="outline"
+                        className="h-7 rounded-md px-3 text-[11px] font-medium shadow-none"
+                        onClick={() => window.location.reload()}
+                    >
+                        Try again
+                    </Button>
+                </div>
+            ) : (
             <div>
                 <PlanDetails
                     tier={org.subscription_tier}
@@ -359,6 +347,7 @@ export default function BillingPage({ params }: PageProps) {
                     </Button>
                 </div>
             </div>
+            )}
         </main>
     );
 }

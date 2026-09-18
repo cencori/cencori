@@ -72,40 +72,25 @@ export default function OrgSettingsPage({ params }: PageProps) {
         staleTime: 30 * 1000,
     });
 
-    if (isLoading) {
-        return (
-            <div className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12 space-y-8">
-                <div className="space-y-3">
-                    <Skeleton className="h-3 w-28" />
-                    <Skeleton className="h-7 w-56" />
-                    <Skeleton className="h-3 w-96 max-w-full" />
-                </div>
-                <div className="space-y-8 pt-6">
-                    {[1, 2, 3].map((i) => (
-                        <div key={i} className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
-                            <Skeleton className="h-12 w-40" />
-                            <Skeleton className="h-44 w-full rounded-lg" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    if (!org) {
-        return (
-            <div className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12">
-                <p className="text-sm font-medium">Organization not found</p>
-            </div>
-        );
-    }
+    // Identity resolves from cache on warm sessions and refetches in the
+    // background. The static shell below renders on the first paint
+    // regardless — only the data regions wait.
+    const identityLoading = isLoading;
 
     const previewTierValue = searchParams.get('preview_plan');
     const previewTier = process.env.NODE_ENV === 'development'
         && (previewTierValue === 'pro' || previewTierValue === 'team' || previewTierValue === 'enterprise')
         ? previewTierValue
         : null;
-    const effectiveTier = (previewTier || org.subscription_tier || 'free') as SubscriptionTier;
+    const effectiveTier = (previewTier || org?.subscription_tier || 'free') as SubscriptionTier;
+
+    if (!identityLoading && !org) {
+        return (
+            <div className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12">
+                <p className="text-sm font-medium">Organization not found</p>
+            </div>
+        );
+    }
 
     return (
         <main className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12">
@@ -116,8 +101,8 @@ export default function OrgSettingsPage({ params }: PageProps) {
                     </h1>
                     <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                         {activeSection === 'advanced'
-                            ? `Low-level organization controls for ${org.name}. Changes here can affect every project and workload.`
-                            : `Identity settings for every project and workload operated by ${org.name}.`}
+                            ? `Low-level organization controls for ${org?.name ?? "this organization"}. Changes here can affect every project and workload.`
+                            : `Identity settings for every project and workload operated by ${org?.name ?? "this organization"}.`}
                     </p>
                 </div>
             </header>
@@ -137,7 +122,16 @@ export default function OrgSettingsPage({ params }: PageProps) {
                 </Link>
             </nav>
 
-            {activeSection === 'general' ? (
+            {identityLoading || !org ? (
+                <div className="space-y-8 border-t border-border/35 pt-6">
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+                            <Skeleton className="h-12 w-40" />
+                            <Skeleton className="h-44 w-full rounded-lg" />
+                        </div>
+                    ))}
+                </div>
+            ) : activeSection === 'general' ? (
                 <div className="border-t border-border/35">
                     <SettingsSection
                         title="Organization identity"
