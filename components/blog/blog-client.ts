@@ -10,6 +10,7 @@ export type BlogCardPost = {
   coverImage?: string;
   category?: string;
   tags?: string[];
+  externalUrl?: string;
 };
 
 export function getBlogPostUrl(post: Pick<BlogCardPost, "slug" | "category">): string {

@@ -252,35 +252,12 @@ export default function TeamsPage({ params }: PageProps) {
         });
     };
 
-    if (isLoading) {
-        return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <Skeleton className="h-6 w-20 mb-6" />
-                <Skeleton className="h-10 w-48 mb-4" />
-                <Skeleton className="h-64" />
-            </div>
-        );
-    }
-
-    if (!org) {
-        return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
-                <div className="text-center py-16 flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium">Organization not found</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="w-full max-w-5xl mx-auto px-6 py-8">
             {/* Header */}
             <h1 className="text-lg font-medium mb-6">Team</h1>
 
-            {canManageMembers && !teamsEnabled && (
+            {org && canManageMembers && !teamsEnabled && (
                 <FeatureUpgradeWall
                     orgSlug={orgSlug}
                     orgId={org.id}
@@ -320,7 +297,7 @@ export default function TeamsPage({ params }: PageProps) {
                                 <DialogHeader>
                                     <DialogTitle className="text-base">Invite Team Member</DialogTitle>
                                     <DialogDescription className="text-xs">
-                                        Send an invitation to join {org.name}
+                                        Send an invitation to join {org?.name ?? "your organization"}
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
@@ -377,6 +354,19 @@ export default function TeamsPage({ params }: PageProps) {
             </div>
 
             {/* Members Table */}
+            {isLoading ? (
+                <div className="space-y-3">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-64 w-full" />
+                </div>
+            ) : !org ? (
+                <div className="text-center py-16 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
+                        <Users className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">Organization not found</p>
+                </div>
+            ) : (
             <div className="rounded-md border border-border/40 bg-card overflow-hidden">
                 {/* Table Header */}
                 <div className="grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 border-b border-border/40 bg-muted/30">
@@ -490,6 +480,7 @@ export default function TeamsPage({ params }: PageProps) {
                     </p>
                 </div>
             </div>
+            )}
 
             {/* Leave Team Dialog */}
             <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
@@ -497,7 +488,7 @@ export default function TeamsPage({ params }: PageProps) {
                     <DialogHeader>
                         <DialogTitle className="text-base">Leave Team</DialogTitle>
                         <DialogDescription className="text-xs">
-                            Are you sure you want to leave {org.name}? You will lose access to all projects.
+                            Are you sure you want to leave {org?.name ?? "your organization"}? You will lose access to all projects.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

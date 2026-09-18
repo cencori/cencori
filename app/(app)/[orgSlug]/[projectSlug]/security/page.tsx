@@ -65,22 +65,12 @@ export default function SecurityPage({ params }: PageProps) {
         filters.reviewed !== 'all' ||
         filters.time_range !== '7d';
 
-    if (isLoading || isOrganizationLoading) {
-        return (
-            <main className="mx-auto w-full max-w-[1180px] px-4 py-8 pb-24 sm:px-6 sm:py-10 lg:px-8">
-                <div className="mb-8">
-                    <div>
-                        <Skeleton className="h-8 w-32" />
-                        <Skeleton className="mt-3 h-3 w-80 max-w-full" />
-                    </div>
-                </div>
-                <Skeleton className="mb-7 h-10 w-full" />
-                <Skeleton className="h-[560px] w-full rounded-xl" />
-            </main>
-        );
-    }
+    // Identity (org + project id) resolves from cache instantly on warm
+    // sessions and refetches in the background. The static shell below
+    // renders on the first paint regardless — only the data regions wait.
+    const identityLoading = isLoading || isOrganizationLoading;
 
-    if (!projectId) {
+    if (!identityLoading && !projectId) {
         return (
             <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                 <div className="text-center py-16 flex flex-col items-center">
@@ -94,7 +84,7 @@ export default function SecurityPage({ params }: PageProps) {
         );
     }
 
-    if (organization && !securityEnabled) {
+    if (!identityLoading && organization && !securityEnabled) {
         return (
             <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                 <div className="mb-6">
@@ -127,7 +117,12 @@ export default function SecurityPage({ params }: PageProps) {
                 </div>
             </header>
 
-            {/* Tabs */}
+            {identityLoading ? (
+                <>
+                    <Skeleton className="mb-7 h-10 w-full" />
+                    <Skeleton className="h-[560px] w-full rounded-xl" />
+                </>
+            ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-7">
                 <TabsList className="w-full justify-start gap-6 overflow-x-auto border-border/30">
                     <TabsTrigger value="dashboard" disabled={!projectId} className="shrink-0 px-0 py-3 text-xs">Overview</TabsTrigger>
@@ -263,6 +258,7 @@ export default function SecurityPage({ params }: PageProps) {
                     {projectId && <AIDetectTest projectId={projectId} />}
                 </TabsContent>
             </Tabs>
+            )}
         </main>
     );
 }

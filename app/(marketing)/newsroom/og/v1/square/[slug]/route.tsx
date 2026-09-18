@@ -8,7 +8,7 @@ import {
   getFallbackPosts,
   loadBackground,
   loadFonts,
-} from "../og-shared";
+} from "../../og-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-static";
@@ -16,8 +16,8 @@ export const dynamicParams = false;
 export const revalidate = false;
 
 const size = {
-  width: 1200,
-  height: 630,
+  width: 1080,
+  height: 1080,
 };
 
 export function generateStaticParams() {
@@ -49,11 +49,11 @@ export async function GET(
 
   const title = post.title.slice(0, 120);
   const titleFontSize =
-    title.length > 82
+    title.length > 90
       ? 44
-      : title.length > 60
+      : title.length > 70
         ? 50
-        : title.length > 38
+        : title.length > 50
           ? 56
           : 64;
   const category = post.category
@@ -90,8 +90,8 @@ export async function GET(
         <img
           alt=""
           src={backgroundImage as unknown as string}
-          width="1200"
-          height="630"
+          width="1080"
+          height="1080"
           style={{
             position: "absolute",
             inset: 0,
@@ -122,8 +122,8 @@ export async function GET(
         <div
           style={{
             position: "absolute",
-            top: 58,
-            left: 64,
+            top: 72,
+            left: 84,
             display: "flex",
             alignItems: "center",
             gap: 18,
@@ -155,21 +155,21 @@ export async function GET(
         <div
           style={{
             position: "absolute",
-            left: 64,
+            left: 84,
             top: 0,
             bottom: 0,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            width: 1030,
+            width: 912,
           }}
         >
           <div
             style={{
               display: "flex",
-              marginBottom: 20,
+              marginBottom: 22,
               fontFamily: "Manrope, sans-serif",
-              fontSize: 17,
+              fontSize: 19,
               fontWeight: 500,
               lineHeight: 1,
               letterSpacing: "2.4px",
@@ -186,8 +186,8 @@ export async function GET(
               fontFamily: "Geist, sans-serif",
               fontSize: titleFontSize,
               fontWeight: 900,
-              lineHeight: 1.02,
-              letterSpacing: "-3.2px",
+              lineHeight: 1.04,
+              letterSpacing: "-2.8px",
             }}
           >
             {title}

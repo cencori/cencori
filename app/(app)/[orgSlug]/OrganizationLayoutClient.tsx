@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
     Sidebar,
     SidebarContent,
+    SidebarHeader,
     SidebarProvider,
     SidebarMenu,
     SidebarMenuItem,
@@ -24,16 +25,14 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, Check, ChevronsUpDown, ChevronLeft, ChevronRight, Plus, Search, Command } from "lucide-react";
 import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
 import Analytics01Icon from "@hugeicons/core-free-icons/Analytics01Icon";
 import Activity03Icon from "@hugeicons/core-free-icons/Activity03Icon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import AiLockIcon from "@hugeicons/core-free-icons/AiLockIcon";
 import AiBrain02Icon from "@hugeicons/core-free-icons/AiBrain02Icon";
-import PuzzleIcon from "@hugeicons/core-free-icons/PuzzleIcon";
 import CreditCardAcceptIcon from "@hugeicons/core-free-icons/CreditCardAcceptIcon";
-import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Configuration02Icon from "@hugeicons/core-free-icons/Configuration02Icon";
 import AiChat01Icon from "@hugeicons/core-free-icons/AiChat01Icon";
@@ -45,7 +44,7 @@ import Blockchain03Icon from "@hugeicons/core-free-icons/Blockchain03Icon";
 import AiChemistry01Icon from "@hugeicons/core-free-icons/AiChemistry01Icon";
 import DollarCircleIcon from "@hugeicons/core-free-icons/DollarCircleIcon";
 import Chart01Icon from "@hugeicons/core-free-icons/Chart01Icon";
-import Plug01Icon from "@hugeicons/core-free-icons/Plug01Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
 import DocumentValidationIcon from "@hugeicons/core-free-icons/DocumentValidationIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
@@ -54,7 +53,11 @@ import { isAuthExpiredError } from "@/lib/auth/auth-errors";
 import { WorkspaceUnavailable } from "@/components/dashboard/WorkspaceUnavailable";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { UserMenu } from "@/components/dashboard/UserMenu";
+import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
+import { useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { FeedbackMenu } from "@/components/dashboard/FeedbackMenu";
+import { getConsoleRoute } from "@/lib/console/routing";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 
 interface OrganizationData {
     id: string;
@@ -120,16 +123,31 @@ function useOrganization(orgSlug: string) {
 
 export default function OrganizationLayoutClient({
     children,
+    workspace,
+    consoleMode: consoleModeOverride = false,
 }: {
     children: React.ReactNode;
+    consoleMode?: boolean;
+    workspace?: {
+        orgSlug: string;
+        projectSlug: string;
+        consoleMode?: boolean;
+    };
 }) {
-    const params = useParams<{ orgSlug: string }>();
-    const { orgSlug } = params;
+    const params = useParams<{ orgSlug?: string; projectSlug?: string }>();
+    const orgSlug = workspace?.orgSlug ?? params.orgSlug ?? "";
+    const routeProjectSlug = workspace?.projectSlug ?? params.projectSlug ?? null;
+    const consoleMode = workspace?.consoleMode === true || consoleModeOverride;
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { isOpen, setIsOpen } = useMobileSheet();
     const { reportSessionExpired } = useSession();
-
+    const {
+        projects: workspaceProjects,
+        activeProject,
+        selectProject,
+        loading: workspaceLoading,
+    } = useOrganizationProject();
     const { data: organization, error } = useOrganization(orgSlug);
 
     const { data: projects } = useQuery({
@@ -154,31 +172,88 @@ export default function OrganizationLayoutClient({
     const router = useRouter();
     const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
     const orgSubSegment = segments[1];
-    const isInsideProject = !!orgSubSegment && orgSubSegment !== "~";
-    const projectSlug = isInsideProject ? orgSubSegment : (projects?.[0]?.slug || null);
+    const consoleRoute = useMemo(
+        () => consoleMode ? getConsoleRoute(pathname) : null,
+        [consoleMode, pathname],
+    );
+    // On the console host, the visible flat URL is the source of truth for
+    // scope. In particular, /organization/settings must not be inferred as a
+    // project route merely because "settings" is the second path segment.
+    const isInsideProject = consoleRoute
+        ? consoleRoute.scope === "project"
+        : Boolean(routeProjectSlug) || (!!orgSubSegment && orgSubSegment !== "~");
+    const projectSlug = routeProjectSlug ?? (isInsideProject ? orgSubSegment : (projects?.[0]?.slug || null));
+    const availableProjects = workspaceProjects.filter((project) =>
+        project.orgSlug === orgSlug || project.organization_id === organization?.id
+    );
+    const selectedProject = (
+        activeProject && availableProjects.some((project) => project.id === activeProject.id)
+            ? activeProject
+            : availableProjects.find((project) => project.slug === projectSlug)
+    ) ?? availableProjects[0] ?? null;
+    // While the workspace is still resolving (cold load, console context fetch)
+    // the header shows an explicit loading state instead of blank space.
+    const headerResolving = !selectedProject && workspaceLoading;
+    const headerProjectLabel = selectedProject?.name || projectSlug || "Select project";
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
     const scopedArea = segments[2];
-    const isProjectSettingsView = isInsideProject && scopedArea === "settings";
-    const isOrganizationSettingsView = !isInsideProject && scopedArea === "settings";
+    const isProjectSettingsView = isInsideProject && (
+        consoleMode ? pathname === "/settings" : scopedArea === "settings"
+    );
+    const isOrganizationSettingsView = !isInsideProject && (
+        consoleMode ? pathname === "/organization/settings" : scopedArea === "settings"
+    );
     const [activeView, setActiveView] = useState<"main" | "observability" | "ai-gateway" | "project-settings" | "settings">(() => {
-        if (isInsideProject && pathname.includes("/observability")) return "observability";
+        if (pathname.includes("/observability")) return "observability";
         if (pathname.includes("/ai-gateway")) return "ai-gateway";
         if (isProjectSettingsView) return "project-settings";
         if (isOrganizationSettingsView) return "settings";
         return "main";
     });
+    const [createProjectOpen, setCreateProjectOpen] = useState(false);
+    const { setOpen: setCommandPaletteOpen } = useCommandPalette();
 
     const orgBase = `/${orgSlug}`;
     const basePath = projectSlug ? `${orgBase}/${projectSlug}` : null;
-    const observabilityHref = isInsideProject ? `${basePath}/observability` : `${orgBase}/~/observability`;
+    // Sticky project scope: once a project is known (URL on slug hosts,
+    // console context on console hosts, last-visited on reloads), project
+    // items keep pointing at it even from org-level pages — so Billing →
+    // Monetization returns to the project view instead of a picker. Items
+    // whose org destination is a real page (Projects list, Deployments fleet,
+    // org Settings) are unaffected.
+    useEffect(() => {
+        if (routeProjectSlug && orgSlug) {
+            try {
+                localStorage.setItem(`cencori:last-project:${orgSlug}`, routeProjectSlug);
+            } catch { /* storage unavailable, ignore */ }
+        }
+    }, [routeProjectSlug, orgSlug]);
+    const stickyProjectSlug = useMemo(() => {
+        if (consoleMode) return activeProject?.slug ?? null;
+        if (routeProjectSlug) return routeProjectSlug;
+        if (!orgSlug || typeof window === "undefined") return null;
+        try {
+            return localStorage.getItem(`cencori:last-project:${orgSlug}`);
+        } catch {
+            return null;
+        }
+    }, [consoleMode, activeProject, routeProjectSlug, orgSlug]);
+    const scopeProjectSlug = isInsideProject ? projectSlug : stickyProjectSlug;
+    const scopedProjectHref = (subpath: string) =>
+        consoleMode ? `/${subpath}` : `${orgBase}/${scopeProjectSlug}${subpath}`;
+    const orgProductHref = (subpath: string) =>
+        consoleMode ? `/organization/${subpath}` : `${orgBase}/~/${subpath}`;
+    const observabilityHref = scopeProjectSlug
+        ? scopedProjectHref("observability")
+        : orgProductHref("observability");
     const rawObservabilitySection = searchParams.get("section");
     const observabilitySection = rawObservabilitySection === "http" || rawObservabilitySection === "api" || rawObservabilitySection === "web"
         ? "overview"
         : rawObservabilitySection || "overview";
     const organizationSettingsSection = searchParams.get("section") === "advanced" ? "advanced" : "general";
     const requestedProjectSettingsTab = searchParams.get("tab");
-    const projectSettingsTab = ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api"].includes(requestedProjectSettingsTab || "")
+    const projectSettingsTab = ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api", "webhooks"].includes(requestedProjectSettingsTab || "")
         ? requestedProjectSettingsTab
         : "general";
 
@@ -186,6 +261,9 @@ export default function OrganizationLayoutClient({
         const exactMatchOnly =
             path === basePath ||
             path === orgBase ||
+            path === "/home" ||
+            path === "/ai-gateway" ||
+            path === "/organization/ai-gateway" ||
             path === `${basePath}/ai-gateway` ||
             path === `${orgBase}/~/ai-gateway`;
         if (exactMatchOnly) return pathname === path;
@@ -204,7 +282,7 @@ export default function OrganizationLayoutClient({
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        if (isInsideProject && pathname.includes("/observability")) {
+        if (pathname.includes("/observability")) {
             setActiveView("observability");
         } else if (pathname.includes("/ai-gateway")) {
             setActiveView("ai-gateway");
@@ -240,12 +318,14 @@ export default function OrganizationLayoutClient({
     //   2. Observability toggle           — expands to observabilitySubItems
     //   3. projectItems                  — Logs
     //   4. AI Gateway toggle             — expands to projectSubItems
-    //   5. projectSecondaryItems         — Security, Memory, Edge, Deployments, Monetization
-    //   6. orgItems                      — Billing, Usage, Integrations, Teams, Audit Log
-    //   7. bottomItems                   — Webhooks, Settings
+    //   5. projectSecondaryItems         — Security, Memory, Deployments, Monetization
+    //   6. orgItems                      — Billing, Usage, Teams, Audit Log
+    //   7. bottomItems                   — Settings (fixed final position in every scope)
 
     const overviewItem = {
-        href: isInsideProject ? `${basePath}` : `${orgBase}/~/projects`,
+        href: consoleMode
+            ? (isInsideProject ? "/home" : "/projects")
+            : (isInsideProject ? `${basePath}` : `${orgBase}/~/projects`),
         icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />,
         label: isInsideProject ? "Overview" : "Projects",
     };
@@ -258,7 +338,7 @@ export default function OrganizationLayoutClient({
 
     const projectItems = [
         {
-            href: isInsideProject ? `${basePath}/logs` : `${orgBase}/~/logs`,
+            href: scopeProjectSlug ? scopedProjectHref("logs") : orgProductHref("logs"),
             icon: <HugeiconsIcon icon={Activity03Icon} className="!h-5 !w-5" />,
             label: "Logs",
         },
@@ -272,60 +352,94 @@ export default function OrganizationLayoutClient({
         { section: "intelligence", href: `${observabilityHref}?section=intelligence`, icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Intelligence" },
     ];
 
+    const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
+
     const projectSubItems = [
-        { href: isInsideProject ? `${basePath}/ai-gateway` : `${orgBase}/~/ai-gateway`, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/prompts` : `${orgBase}/~/ai-gateway/prompts`, icon: <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />, label: "Prompts" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/providers` : `${orgBase}/~/ai-gateway/providers`, icon: <HugeiconsIcon icon={AiCloudIcon} className="!h-5 !w-5" />, label: "BYOK" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/models` : `${orgBase}/~/ai-gateway/models`, icon: <HugeiconsIcon icon={AiChipIcon} className="!h-5 !w-5" />, label: "Models" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/custom-providers` : `${orgBase}/~/ai-gateway/custom-providers`, icon: <HugeiconsIcon icon={AiSettingIcon} className="!h-5 !w-5" />, label: "Custom Providers" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/cache` : `${orgBase}/~/ai-gateway/cache`, icon: <HugeiconsIcon icon={Blockchain03Icon} className="!h-5 !w-5" />, label: "Cache" },
-        { href: isInsideProject ? `${basePath}/ai-gateway/playground` : `${orgBase}/~/ai-gateway/playground`, icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Playground" },
+        { href: aiGatewayHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/prompts") : orgProductHref("ai-gateway/prompts"), icon: <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />, label: "Prompts" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/providers") : orgProductHref("ai-gateway/providers"), icon: <HugeiconsIcon icon={AiCloudIcon} className="!h-5 !w-5" />, label: "BYOK" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/models") : orgProductHref("ai-gateway/models"), icon: <HugeiconsIcon icon={AiChipIcon} className="!h-5 !w-5" />, label: "Models" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/custom-providers") : orgProductHref("ai-gateway/custom-providers"), icon: <HugeiconsIcon icon={AiSettingIcon} className="!h-5 !w-5" />, label: "Custom Providers" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/cache") : orgProductHref("ai-gateway/cache"), icon: <HugeiconsIcon icon={Blockchain03Icon} className="!h-5 !w-5" />, label: "Cache" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/playground") : orgProductHref("ai-gateway/playground"), icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Playground" },
     ];
 
     const projectSecondaryItems = [
-        { href: isInsideProject ? `${basePath}/security` : `${orgBase}/~/security`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
+        { href: scopeProjectSlug ? scopedProjectHref("security") : orgProductHref("security"), icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
         // Memory is per-project (a memory belongs to one project's end-users),
         // so there is no org-scope view to fall back to — hide it outside a project.
         ...(isInsideProject && process.env.NODE_ENV !== "production"
-            ? [{ href: `${basePath}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
+            ? [{ href: consoleMode ? "/memory" : `${basePath}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
-        { href: isInsideProject ? `${basePath}/edge` : `${orgBase}/~/edge`, icon: <HugeiconsIcon icon={PuzzleIcon} className="!h-5 !w-5" />, label: "Edge" },
         // Compute — agent hosting. Project scope = that agent's version history;
         // org scope = the agent fleet (one row per agent-project). See ~/deployments.
         ...(process.env.NODE_ENV !== "production"
-            ? [{ href: isInsideProject ? `${basePath}/deployments` : `${orgBase}/~/deployments`, icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
+            ? [{ href: consoleMode ? (isInsideProject ? "/deployments" : "/organization/deployments") : (isInsideProject ? `${basePath}/deployments` : `${orgBase}/~/deployments`), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
-        { href: isInsideProject ? `${basePath}/monetization` : `${orgBase}/~/monetization`, icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
+        { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
     ];
 
     const orgItems = [
-        { href: `${orgBase}/~/billing`, icon: <HugeiconsIcon icon={DollarCircleIcon} className="!h-5 !w-5" />, label: "Billing" },
-        { href: `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
-        { href: `${orgBase}/~/integrations`, icon: <HugeiconsIcon icon={Plug01Icon} className="!h-5 !w-5" />, label: "Integrations" },
-        { href: `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
-        { href: `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
-        { href: `${orgBase}/~/governance`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Governance" },
+        { href: consoleMode ? "/billing" : `${orgBase}/~/billing`, icon: <HugeiconsIcon icon={DollarCircleIcon} className="!h-5 !w-5" />, label: "Billing" },
+        { href: consoleMode ? "/usage" : `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
+        { href: consoleMode ? "/teams" : `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
+        { href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
+        { href: consoleMode ? "/governance" : `${orgBase}/~/governance`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Governance" },
     ];
 
     const bottomItems = [
-        { href: isInsideProject ? `${basePath}/webhooks` : `${orgBase}/~/webhooks`, icon: <HugeiconsIcon icon={AirdropIcon} className="!h-5 !w-5" />, label: "Webhooks" },
-        { href: isInsideProject ? `${basePath}/settings` : `${orgBase}/~/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
+        { href: consoleMode ? (isInsideProject ? "/settings" : "/organization/settings") : (isInsideProject ? `${basePath}/settings` : `${orgBase}/~/settings`), icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
     ];
 
     const organizationSettingsItems = [
-        { section: "general", href: `${orgBase}/~/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "General" },
-        { section: "advanced", href: `${orgBase}/~/settings?section=advanced`, icon: <HugeiconsIcon icon={Configuration02Icon} className="!h-5 !w-5" />, label: "Advanced" },
+        { section: "general", href: consoleMode ? "/organization/settings" : `${orgBase}/~/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "General" },
+        { section: "advanced", href: consoleMode ? "/organization/settings?section=advanced" : `${orgBase}/~/settings?section=advanced`, icon: <HugeiconsIcon icon={Configuration02Icon} className="!h-5 !w-5" />, label: "Advanced" },
     ];
 
     const projectSettingsItems = [
-        { tab: "general", href: `${basePath}/settings`, label: "General" },
-        { tab: "budget", href: `${basePath}/settings?tab=budget`, label: "Budget" },
-        { tab: "providers", href: `${basePath}/settings?tab=providers`, label: "Providers" },
-        { tab: "infrastructure", href: `${basePath}/settings?tab=infrastructure`, label: "Infrastructure" },
-        { tab: "networking", href: `${basePath}/settings?tab=networking`, label: "Networking" },
-        { tab: "integrations", href: `${basePath}/settings?tab=integrations`, label: "Integrations" },
-        { tab: "api", href: `${basePath}/settings?tab=api`, label: "API" },
+        { tab: "general", href: consoleMode ? "/settings" : `${basePath}/settings`, label: "General" },
+        { tab: "budget", href: consoleMode ? "/settings?tab=budget" : `${basePath}/settings?tab=budget`, label: "Budget" },
+        { tab: "providers", href: consoleMode ? "/settings?tab=providers" : `${basePath}/settings?tab=providers`, label: "Providers" },
+        { tab: "infrastructure", href: consoleMode ? "/settings?tab=infrastructure" : `${basePath}/settings?tab=infrastructure`, label: "Infrastructure" },
+        { tab: "networking", href: consoleMode ? "/settings?tab=networking" : `${basePath}/settings?tab=networking`, label: "Networking" },
+        { tab: "integrations", href: consoleMode ? "/settings?tab=integrations" : `${basePath}/settings?tab=integrations`, label: "Integrations" },
+        { tab: "api", href: consoleMode ? "/settings?tab=api" : `${basePath}/settings?tab=api`, label: "API" },
+        { tab: "webhooks", href: consoleMode ? "/settings?tab=webhooks" : `${basePath}/settings?tab=webhooks`, label: "Webhooks" },
     ];
+
+    const renderBottomItems = () => bottomItems.map((item) => {
+        const isProjectSettingsItem = isInsideProject && item.label === "Settings";
+        const isOrganizationSettingsItem = !isInsideProject && item.label === "Settings";
+        const isSettingsItem = isProjectSettingsItem || isOrganizationSettingsItem;
+
+        return (
+            <SidebarMenuItem key={item.href}>
+                {isSettingsItem ? (
+                    <SidebarMenuButton
+                        onClick={() => {
+                            setActiveView(isProjectSettingsItem ? "project-settings" : "settings");
+                            router.push(item.href);
+                        }}
+                        onMouseEnter={() => prefetchRoute(item.href)}
+                        isActive={isProjectSettingsItem ? isProjectSettingsView : isOrganizationSettingsView}
+                        size="sm"
+                        className="gap-1"
+                    >
+                        {item.icon}
+                        <span className="text-sm">{item.label}</span>
+                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                    </SidebarMenuButton>
+                ) : (
+                    <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
+                        <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                            {item.icon}
+                            <span className="text-sm">{item.label}</span>
+                        </Link>
+                    </SidebarMenuButton>
+                )}
+            </SidebarMenuItem>
+        );
+    });
 
     return (
         <SidebarProvider
@@ -333,10 +447,93 @@ export default function OrganizationLayoutClient({
             className={isPlayground ? "h-full min-h-0 overflow-hidden" : undefined}
         >
             {!isProjectCreation && (
-                <Sidebar className="top-12 hidden h-[calc(100vh-3rem)] border-r border-sidebar-border/70 bg-sidebar lg:block">
+                <Sidebar className="top-0 hidden h-svh border-r border-sidebar-border/70 bg-sidebar lg:block">
+                    <SidebarHeader className="h-12 shrink-0 justify-center p-1.5">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-foreground hover:bg-sidebar-accent"
+                                    aria-label="Select project"
+                                >
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {headerResolving ? "Loading..." : headerProjectLabel}
+                                    </span>
+                                    {headerResolving ? (
+                                        <HugeiconsIcon icon={Loading03Icon} className="size-3.5 shrink-0 animate-spin text-muted-foreground/60" />
+                                    ) : (
+                                        <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground/60" />
+                                    )}
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                side="bottom"
+                                align="start"
+                                sideOffset={5}
+                                className="z-[70] w-64 rounded-xl !border-0 !bg-[#f3f3f1] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)] data-[state=closed]:!animate-none data-[state=open]:!animate-none dark:!bg-[#181818]"
+                            >
+                                <p className="px-3 pb-1 pt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                                    Projects
+                                </p>
+                                <div className="max-h-52 overflow-y-auto">
+                                    {availableProjects.map((project) => (
+                                        <DropdownMenuItem
+                                            key={project.id}
+                                            className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px] font-medium"
+                                            onClick={async () => {
+                                                if (consoleMode && await selectProject(project.id)) {
+                                                    if (!isInsideProject) router.push("/home");
+                                                    router.refresh();
+                                                    return;
+                                                }
+                                                router.push(`/${orgSlug}/${project.slug}`);
+                                            }}
+                                        >
+                                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                                            {project.id === selectedProject?.id && (
+                                                <Check className="ml-auto size-4 shrink-0" />
+                                            )}
+                                        </DropdownMenuItem>
+                                    ))}
+                                    {availableProjects.length === 0 && (
+                                        <p className="px-3 py-3 text-xs text-muted-foreground">No projects yet.</p>
+                                    )}
+                                </div>
+                                <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
+                                <DropdownMenuItem
+                                    className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                                    onSelect={() => setCreateProjectOpen(true)}
+                                >
+                                    <span className="min-w-0 flex-1 truncate">Create project</span>
+                                    <Plus className="ml-auto size-4 shrink-0" />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                                    onClick={() => router.push(consoleMode ? "/projects" : `/${orgSlug}/~/projects`)}
+                                >
+                                    <span className="min-w-0 flex-1 truncate">Manage projects</span>
+                                    <HugeiconsIcon icon={Settings02Icon} className="ml-auto !size-4 shrink-0" />
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </SidebarHeader>
                     <SidebarContent>
                         <SidebarGroup className="pt-3">
                             <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        size="sm"
+                                        tooltip="Search"
+                                        onClick={() => setCommandPaletteOpen(true)}
+                                        className="bg-[#f3f3f1] text-muted-foreground dark:bg-[#181818]"
+                                    >
+                                        <Search className="!h-4 !w-4" />
+                                        <span className="text-sm">Search</span>
+                                        <span className="ml-auto flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+                                            <Command className="h-2.5 w-2.5" />K
+                                        </span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
                                 {activeView === "observability" ? (
                                     <>
                                         <SidebarMenuItem>
@@ -456,26 +653,20 @@ export default function OrganizationLayoutClient({
                                         </SidebarMenuItem>
                                         {/* 2. Observability */}
                                         <SidebarMenuItem>
-                                            {isInsideProject ? (
-                                                <SidebarMenuButton
-                                                    onClick={() => setActiveView("observability")}
-                                                    onMouseEnter={() => prefetchRoute(observabilityHref)}
-                                                    isActive={pathname === observabilityHref}
-                                                    size="sm"
-                                                    className="gap-1"
-                                                >
-                                                    {observabilityItem.icon}
-                                                    <span className="text-sm">{observabilityItem.label}</span>
-                                                    <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                </SidebarMenuButton>
-                                            ) : (
-                                                <SidebarMenuButton asChild tooltip={observabilityItem.label} isActive={isActive(observabilityItem.href)} size="sm">
-                                                    <Link href={observabilityItem.href} prefetch={true} onMouseEnter={() => prefetchRoute(observabilityItem.href)}>
-                                                        {observabilityItem.icon}
-                                                        <span className="text-sm">{observabilityItem.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            )}
+                                            <SidebarMenuButton
+                                                onClick={() => {
+                                                    setActiveView("observability");
+                                                    router.push(observabilityHref);
+                                                }}
+                                                onMouseEnter={() => prefetchRoute(observabilityHref)}
+                                                isActive={isActive(observabilityHref)}
+                                                size="sm"
+                                                className="gap-1"
+                                            >
+                                                {observabilityItem.icon}
+                                                <span className="text-sm">{observabilityItem.label}</span>
+                                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                            </SidebarMenuButton>
                                         </SidebarMenuItem>
                                         {/* 3. Logs */}
                                         {projectItems.map((item) => (
@@ -491,7 +682,12 @@ export default function OrganizationLayoutClient({
                                         {/* 4. AI Gateway toggle */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
-                                                onClick={() => setActiveView("ai-gateway")}
+                                                onClick={() => {
+                                                    setActiveView("ai-gateway");
+                                                    router.push(aiGatewayHref);
+                                                }}
+                                                onMouseEnter={() => prefetchRoute(aiGatewayHref)}
+                                                isActive={isActive(aiGatewayHref)}
                                                 size="sm"
                                                 className="gap-1"
                                             >
@@ -500,7 +696,7 @@ export default function OrganizationLayoutClient({
                                                 <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {/* 5. Security, Edge, Monetization */}
+                                        {/* 5. Security, Deployments, Monetization */}
                                         {projectSecondaryItems.map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
@@ -512,7 +708,7 @@ export default function OrganizationLayoutClient({
                                             </SidebarMenuItem>
                                         ))}
                                         <SidebarSeparator className="my-2 mx-0 w-full" />
-                                        {/* 6. Billing, Usage, Integrations, Teams, Audit Log */}
+                                        {/* 6. Billing, Usage, Teams, Audit Log */}
                                         {orgItems.map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
@@ -524,37 +720,7 @@ export default function OrganizationLayoutClient({
                                             </SidebarMenuItem>
                                         ))}
                                         <SidebarSeparator className="my-2 mx-0 w-full" />
-                                        {/* 7. Webhooks, Settings */}
-                                        {bottomItems.map((item) => {
-                                            const isProjectSettingsItem = isInsideProject && item.label === "Settings";
-                                            const isOrganizationSettingsItem = !isInsideProject && item.label === "Settings";
-                                            const isSettingsItem = isProjectSettingsItem || isOrganizationSettingsItem;
-
-                                            return (
-                                                <SidebarMenuItem key={item.href}>
-                                                    {isSettingsItem ? (
-                                                        <SidebarMenuButton
-                                                            onClick={() => setActiveView(isProjectSettingsItem ? "project-settings" : "settings")}
-                                                            onMouseEnter={() => prefetchRoute(item.href)}
-                                                            isActive={isProjectSettingsItem ? isProjectSettingsView : isOrganizationSettingsView}
-                                                            size="sm"
-                                                            className="gap-1"
-                                                        >
-                                                            {item.icon}
-                                                            <span className="text-sm">{item.label}</span>
-                                                            <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                        </SidebarMenuButton>
-                                                    ) : (
-                                                        <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
-                                                            <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                                {item.icon}
-                                                                <span className="text-sm">{item.label}</span>
-                                                            </Link>
-                                                        </SidebarMenuButton>
-                                                    )}
-                                                </SidebarMenuItem>
-                                            );
-                                        })}
+                                        {renderBottomItems()}
                                     </>
                                 )}
                             </SidebarMenu>
@@ -580,7 +746,7 @@ export default function OrganizationLayoutClient({
                                     <span className="flex-1">Help & Resources</span>
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 p-1 font-mono dark:bg-black dark:border-white/10 max-h-none overflow-visible">
+                            <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
                                 <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
                                     <Link href="/docs/troubleshooting" className="flex justify-between w-full items-center">
                                         Troubleshooting
@@ -646,7 +812,14 @@ export default function OrganizationLayoutClient({
                     <div className="py-3">
                         <SidebarGroup>
                             <SidebarMenu>
-                                {[overviewItem, observabilityItem, ...projectItems, ...projectSecondaryItems, ...orgItems, ...bottomItems].map((item) => (
+                                {[
+                                    overviewItem,
+                                    observabilityItem,
+                                    ...projectItems,
+                                    ...projectSecondaryItems,
+                                    ...orgItems,
+                                    ...bottomItems,
+                                ].map((item) => (
                                     <SidebarMenuItem key={item.href}>
                                         <SidebarMenuButton asChild size="sm" onClick={() => setIsOpen(false)}>
                                             <Link href={item.href} prefetch={true}>
@@ -674,6 +847,16 @@ export default function OrganizationLayoutClient({
                     {children}
                 </div>
             </main>
+
+            <CreateProjectDialog
+                open={createProjectOpen}
+                onOpenChange={setCreateProjectOpen}
+                orgId={organization?.id}
+                orgSlug={orgSlug}
+                orgName={organization?.name}
+                subscriptionTier={organization?.subscription_tier}
+                consoleMode={consoleMode}
+            />
         </SidebarProvider>
     );
 }

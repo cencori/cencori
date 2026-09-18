@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ORG_PROJECT_CACHE_KEY } from "@/lib/auth/session-caches";
+import { getConsoleSurface, isConsoleHostname } from "@/lib/console/routing";
 
 export interface Organization {
     id: string;
@@ -24,7 +25,10 @@ export interface Project {
 interface OrganizationProjectContextType {
     organizations: Organization[];
     projects: Project[];
+    activeOrganization: Organization | null;
+    activeProject: Project | null;
     loading: boolean;
+    selectProject: (projectId: string) => Promise<boolean>;
     updateOrganization: (id: string, updates: Partial<Organization>) => void;
     updateProject: (id: string, updates: Partial<Project>) => void;
     refetchData: () => Promise<void>;
@@ -68,6 +72,8 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
     const cached = useMemo(() => loadCache(), []);
     const [organizations, setOrganizations] = useState<Organization[]>(cached?.organizations ?? []);
     const [projects, setProjects] = useState<Project[]>(cached?.projects ?? []);
+    const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [loading, setLoading] = useState(!cached);
 
     const fetchData = useCallback(async () => {
@@ -127,6 +133,36 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
                 }
             }
 
+            // Canonical console URLs intentionally omit tenant slugs. Resolve
+            // the user's selected workspace separately so the shell can keep
+            // rendering the correct organization and project switchers.
+            const isCanonicalConsoleRoute = (
+                typeof window !== "undefined" &&
+                isConsoleHostname(window.location.hostname) &&
+                getConsoleSurface(window.location.pathname) !== null
+            );
+            if (isCanonicalConsoleRoute) {
+                try {
+                    const contextResponse = await fetch("/api/console/context", {
+                        cache: "no-store",
+                        credentials: "same-origin",
+                    });
+                    if (contextResponse.ok) {
+                        const payload = await contextResponse.json() as {
+                            workspace?: {
+                                organization?: { id?: string };
+                                project?: { id?: string };
+                            } | null;
+                        };
+                        setActiveOrganizationId(payload.workspace?.organization?.id ?? null);
+                        setActiveProjectId(payload.workspace?.project?.id ?? null);
+                    }
+                } catch {
+                    // The slug-based routes remain fully usable if context
+                    // resolution is temporarily unavailable.
+                }
+            }
+
             saveCache(orgsData || [], projectsWithOrgSlug, session.user.id);
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -149,6 +185,36 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
         setProjects((prev) => prev.map((proj) => (proj.id === id ? { ...proj, ...updates } : proj)));
     };
 
+    const selectProject = useCallback(async (projectId: string) => {
+        const response = await fetch("/api/console/context", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ projectId }),
+        });
+
+        if (!response.ok) return false;
+
+        const payload = await response.json() as {
+            workspace?: {
+                organization?: { id?: string };
+                project?: { id?: string };
+            };
+        };
+        setActiveOrganizationId(payload.workspace?.organization?.id ?? null);
+        setActiveProjectId(payload.workspace?.project?.id ?? null);
+        return true;
+    }, []);
+
+    const activeOrganization = useMemo(
+        () => organizations.find((organization) => organization.id === activeOrganizationId) ?? null,
+        [activeOrganizationId, organizations],
+    );
+    const activeProject = useMemo(
+        () => projects.find((project) => project.id === activeProjectId) ?? null,
+        [activeProjectId, projects],
+    );
+
     const refetchData = async () => {
         await fetchData();
     };
@@ -158,7 +224,10 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
             value={{
                 organizations,
                 projects,
+                activeOrganization,
+                activeProject,
                 loading,
+                selectProject,
                 updateOrganization,
                 updateProject,
                 refetchData,

@@ -47,7 +47,7 @@ export function FeedbackMenu() {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-md p-2 text-left text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
+                    className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
                 >
                     <HugeiconsIcon icon={ChatFeedbackIcon} className="size-3.5 shrink-0" />
                     <span className="flex-1">Feedback</span>

@@ -7,32 +7,23 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Logo } from "@/components/logo";
-import { CreditCard, Command, Menu, ChevronsUpDown, PlusCircle, Search, Check } from "lucide-react";
+import { CreditCard, Menu, Search } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { OrganizationProjectProvider, useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetContext";
+import { CommandPaletteProvider, useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
 import { useQuery } from "@tanstack/react-query";
-import { useTheme } from "next-themes";
 import posthog from "posthog-js";
 import { cn } from "@/lib/utils";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
@@ -42,6 +33,7 @@ import {
   writeDashboardUserCache,
   type DashboardUser,
 } from "@/lib/auth/dashboard-user-cache";
+import { getConsoleRoute, getConsoleSurface } from "@/lib/console/routing";
 
 const CommandPalette = dynamic(
   () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
@@ -153,6 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <ReactQueryProvider>
       <SessionProvider>
         {authState.loading ? null : (
+          <CommandPaletteProvider>
           <MobileSheetProvider>
             <OrganizationProjectProvider>
               <EnvironmentProvider>
@@ -165,6 +158,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </EnvironmentProvider>
             </OrganizationProjectProvider>
           </MobileSheetProvider>
+          </CommandPaletteProvider>
         )}
       </SessionProvider>
     </ReactQueryProvider>
@@ -186,14 +180,18 @@ interface LayoutContentProps {
 function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
 
   // Use context instead of local state
-  const { organizations, projects } = useOrganizationProject();
+  const {
+    organizations,
+    projects,
+    activeOrganization,
+    activeProject,
+  } = useOrganizationProject();
   const { toggle } = useMobileSheet();
-  const { setEnvironment, isTestMode } = useEnvironment();
+  const { isTestMode } = useEnvironment();
 
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
   const [agentOpen, setAgentOpen] = useState(false);
 
   // Fetch user profile to get custom avatar
@@ -223,7 +221,10 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const getOrgSlug = useMemo(() => {
+  const routeOrgSlug = useMemo(() => {
+    if (getConsoleSurface(pathname)) {
+      return null;
+    }
     if (pathname === "/" || pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
       return null;
     }
@@ -234,8 +235,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     return match ? match[1] : null;
   }, [pathname]);
 
-  const getProjectSlug = useMemo(() => {
-    const slug = getOrgSlug;
+  const routeProjectSlug = useMemo(() => {
+    const slug = routeOrgSlug;
     if (!slug) return null;
     const match = pathname.match(new RegExp(`^/${slug}/([^/]+)`));
     if (!match) return null;
@@ -243,15 +244,24 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     const reserved = ['~'];
     if (reserved.includes(second)) return null;
     return second;
-  }, [pathname, getOrgSlug]);
+  }, [pathname, routeOrgSlug]);
 
-  const orgSlug = getOrgSlug;
-  const projectSlug = getProjectSlug;
+  const consoleRoute = getConsoleRoute(pathname);
+  const isCanonicalConsoleRoute = consoleRoute !== null;
+  const orgSlug = routeOrgSlug ?? (isCanonicalConsoleRoute ? activeOrganization?.slug ?? null : null);
+  const projectSlug = routeProjectSlug ?? (
+    consoleRoute?.scope === "project" ? activeProject?.slug ?? null : null
+  );
   const isPlayground = pathname.includes("/playground");
   const isOnboardingFlow = pathname.includes("/onboarding");
+  const hasDesktopSidebar = Boolean(orgSlug) && !pathname.includes("/projects/new") && !pathname.includes("/projects/import");
 
-  const currentOrg = organizations.find((org) => org.slug === orgSlug);
-  const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug);
+  const currentOrg = organizations.find((org) => org.slug === orgSlug) ?? (
+    isCanonicalConsoleRoute ? activeOrganization ?? undefined : undefined
+  );
+  const currentProject = projects.find((proj) => proj.slug === projectSlug && proj.orgSlug === orgSlug) ?? (
+    isCanonicalConsoleRoute ? activeProject ?? undefined : undefined
+  );
   const currentOrgId = currentOrg?.id ?? null;
 
   const {
@@ -308,126 +318,16 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
       )}
     >
       {!isOnboardingFlow && (
-      <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono">
+      <header className={cn(
+        "fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
+        hasDesktopSidebar && "lg:left-64",
+      )}>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="flex items-center">
-            <Logo variant="mark" className="h-4" />
-          </Link>
           {/* Breadcrumbs - hidden on mobile */}
-          <span className="text-muted-foreground/50 ml-1 mr-1 select-none text-sm hidden lg:block" aria-hidden>
-            /
-          </span>
           <Breadcrumb className="hidden lg:flex">
             <BreadcrumbList>
-              {orgSlug && (
-                <React.Fragment>
-                  <BreadcrumbItem>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex h-7 cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors">
-                          {currentOrg?.name || "Organizations"}
-                          {currentOrg?.subscription_tier && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20">
-                              {currentOrg.subscription_tier}
-                            </span>
-                          )}
-                          <ChevronsUpDown size={12} className="text-muted-foreground/60" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-66 p-1 font-mono dark:bg-black dark:border-white/10" side="bottom" align="start" forceMount>
-                        <div className="px-1.5 py-1">
-                          <div className="relative">
-                            <Search className="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input
-                              type="search"
-                              placeholder="Search organizations..."
-                              className="h-9 w-full rounded bg-background pl-8 text-xs border-border/40"
-                            />
-                          </div>
-                        </div>
-                        <div className="h-auto w-full rounded-md overflow-y-auto max-h-40">
-                          {organizations.map((org) => (
-                            <DropdownMenuItem key={org.id} className="text-xs py-1.5 cursor-pointer flex justify-between rounded-sm" onClick={() => router.push(`/${org.slug}/~/projects`)}>
-                              {org.name}
-                              {org.slug === currentOrg?.slug && <Check className="h-3 w-3" />}
-                            </DropdownMenuItem>
-                          ))}
-                        </div>
-                        <div className="my-2 border-t border-border/40" />
-                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">More</p>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer rounded-sm" onClick={() => router.push("/dashboard")}>
-                          All Organizations
-                        </DropdownMenuItem>
-                        <div className="my-1 border-t border-border/40" />
-                        <div className="px-2 py-1.5">
-                          <button
-                            onClick={() => router.push("/onboarding")}
-                            className="flex w-full items-center justify-center gap-1.5 h-8 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 transition-opacity cursor-pointer dark:bg-white dark:text-black dark:hover:bg-zinc-100"
-                          >
-                            <PlusCircle className="h-3 w-3" />
-                            New Organization
-                          </button>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </BreadcrumbItem>
-                </React.Fragment>
-              )}
-
-              {orgSlug && projectSlug && (
-                <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
-                  <BreadcrumbItem>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex h-7 cursor-pointer items-center gap-1 px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/50 rounded-md transition-colors">
-                          {currentProject?.name || "Projects"}
-                          <ChevronsUpDown size={12} className="text-muted-foreground/60" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-66 p-1 font-mono dark:bg-black dark:border-white/10" side="bottom" align="start" forceMount>
-                        <div className="px-1.5 py-1">
-                          <div className="relative">
-                            <Search className="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input
-                              type="search"
-                              placeholder="Search projects..."
-                              className="h-9 w-full rounded bg-background pl-8 text-xs border-border/40"
-                            />
-                          </div>
-                        </div>
-                        <div className="h-auto w-full rounded-md overflow-y-auto max-h-40">
-                          {projects.filter(p => p.orgSlug === orgSlug).map((proj) => (
-                            <DropdownMenuItem key={proj.id} className="text-xs py-1.5 cursor-pointer flex justify-between rounded-sm" onClick={() => router.push(`/${orgSlug}/${proj.slug}`)}>
-                              {proj.name}
-                              {proj.slug === currentProject?.slug && <Check className="h-3 w-3" />}
-                            </DropdownMenuItem>
-                          ))}
-                        </div>
-                        <div className="my-2 border-t border-border/40" />
-                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">More</p>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer rounded-sm" onClick={() => router.push(`/${orgSlug}/~/projects`)}>
-                          All Projects
-                        </DropdownMenuItem>
-                        <div className="my-1 border-t border-border/40" />
-                        <div className="px-2 py-1.5">
-                          <button
-                            onClick={() => router.push(`/${orgSlug}/~/projects/new`)}
-                            className="flex w-full items-center justify-center gap-1.5 h-8 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 transition-opacity cursor-pointer dark:bg-white dark:text-black dark:hover:bg-zinc-100"
-                          >
-                            <PlusCircle className="h-3 w-3" />
-                            New Project
-                          </button>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </BreadcrumbItem>
-                </React.Fragment>
-              )}
-
               {pathname.includes("/organizations/new") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
                     <BreadcrumbPage className="text-xs font-medium">New organization</BreadcrumbPage>
                   </BreadcrumbItem>
@@ -436,7 +336,6 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
               {orgSlug && pathname.includes("/projects/new") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
                     <BreadcrumbPage className="text-xs font-medium">New project</BreadcrumbPage>
                   </BreadcrumbItem>
@@ -445,7 +344,6 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
               {orgSlug && projectSlug && pathname.includes("/edit") && (
                 <React.Fragment>
-                  <BreadcrumbSeparator className="text-muted-foreground/50 text-xs">/</BreadcrumbSeparator>
                   <BreadcrumbItem>
                     <BreadcrumbPage className="text-xs font-medium">Edit project</BreadcrumbPage>
                   </BreadcrumbItem>
@@ -454,33 +352,11 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             </BreadcrumbList>
           </Breadcrumb>
 
-          {projectSlug && (
-            <div className="hidden md:flex items-center bg-muted/30 rounded-full p-0.5 border border-border/40 ml-2">
-              <button
-                onClick={() => setEnvironment("production")}
-                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${!isTestMode
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                Production
-              </button>
-              <button
-                onClick={() => setEnvironment("test")}
-                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${isTestMode
-                  ? "bg-orange-500/10 text-orange-500 border border-orange-500/20"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                Development
-              </button>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {orgSlug && (
             <Link
-              href={`/${orgSlug}/~/billing`}
+              href={isCanonicalConsoleRoute ? "/billing" : `/${orgSlug}/~/billing`}
               className={creditsPillClassName}
               aria-label="View organization credit balance"
               title="Organization credits"
@@ -500,17 +376,14 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
             <span className="hidden lg:inline">Ask agent</span>
           </button>
 
-          {/* Search Button (icon only on mobile) */}
+          {/* Search Button — mobile only (desktop lives in the sidebar footer) */}
           <button
             type="button"
-            className="w-8 h-8 lg:w-auto lg:h-6 lg:px-2.5 flex items-center justify-center lg:justify-start gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
+            className="w-8 h-8 flex lg:hidden items-center justify-center gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
             onClick={() => setCommandPaletteOpen(true)}
+            aria-label="Search"
           >
-            <Search className="h-4 w-4 lg:h-3 lg:w-3" />
-            <span className="hidden lg:inline">Search...</span>
-            <span className="hidden lg:flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
-              <Command className="h-2.5 w-2.5" />K
-            </span>
+            <Search className="h-4 w-4" />
           </button>
 
           {/* Hamburger Menu - visible on mobile only */}
@@ -548,6 +421,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         onOpenChange={setCommandPaletteOpen}
         orgSlug={orgSlug}
         projectSlug={projectSlug}
+        consoleMode={isCanonicalConsoleRoute}
       />
       <CencoriAgentSidebar
         open={agentOpen}

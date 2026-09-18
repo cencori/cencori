@@ -327,7 +327,9 @@ export function SiteNav({
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const pathname = usePathname();
   const isDevelopers =
-    pathname === "/developers" || pathname?.startsWith("/developers/");
+    pathname === "/developers" ||
+    pathname?.startsWith("/developers/") ||
+    pathname === "/ai-gateway";
   const menus = isDevelopers ? developerNavigationMenus : navigationMenus;
   const activeMenuData = menus.find((menu) => menu.id === activeMenu);
   const [isAuthenticated, setIsAuthenticated] = useState(false);

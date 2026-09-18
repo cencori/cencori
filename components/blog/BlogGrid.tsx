@@ -24,11 +24,16 @@ export function BlogGrid({ posts }: { posts: BlogCardPost[] }) {
 
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-12 md:grid-cols-3">
-      {posts.map((post) => (
+      {posts.map((post) => {
+        const external = Boolean(post.externalUrl);
+        return (
         <Link
           className="group block"
-          href={getBlogPostUrl(post)}
+          href={post.externalUrl || getBlogPostUrl(post)}
           key={post.slug}
+          {...(external
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : {})}
         >
           <span className="relative block aspect-square w-full overflow-hidden rounded-xl bg-muted">
             <Image
@@ -36,7 +41,7 @@ export function BlogGrid({ posts }: { posts: BlogCardPost[] }) {
               className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               fill
               sizes="(max-width: 768px) 100vw, 33vw"
-              src={post.coverImage || `/newsroom/og/v1/${post.slug}.jpg`}
+              src={post.coverImage || `/newsroom/og/v1/square/${post.slug}.jpg`}
               unoptimized
             />
           </span>
@@ -48,7 +53,8 @@ export function BlogGrid({ posts }: { posts: BlogCardPost[] }) {
             <span>{formatDate(post.date)}</span>
           </span>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }

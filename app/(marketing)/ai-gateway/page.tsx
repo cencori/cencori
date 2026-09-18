@@ -2,6 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { BorderBeam } from "border-beam";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ArrowRightIcon,
   ShieldCheckIcon,
@@ -129,52 +132,110 @@ export default function AIGatewayPage() {
 
   return (
       <main>
-        <section className="bg-background border-b border-border/30 pt-28 sm:pt-36 pb-0 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-foreground/5 via-background to-background pointer-events-none" />
-
-          <div className="mx-auto max-w-6xl border-t border-x border-border/30 relative px-6 py-20 sm:px-12 sm:py-28 z-10 flex flex-col items-center text-center">
-            <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-            <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-            <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-            <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-            <Link
-              href="/"
-              className="group mb-8 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground animate-appear"
+        <section className="relative flex min-h-svh items-center justify-center overflow-hidden px-4 pt-24 pb-20">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 hidden h-[620px] sm:block"
+            style={{
+              background:
+                "radial-gradient(ellipse 55% 65% at 50% -8%, rgba(216, 205, 255, 0.95) 0%, rgba(150, 124, 255, 0.5) 32%, rgba(88, 62, 190, 0.18) 55%, transparent 75%)",
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[520px] sm:hidden"
+            style={{
+              background:
+                "radial-gradient(ellipse 95% 60% at 50% -8%, rgba(216, 205, 255, 0.95) 0%, rgba(150, 124, 255, 0.5) 35%, rgba(88, 62, 190, 0.18) 60%, transparent 78%)",
+            }}
+          />
+          <div className="relative z-10 mx-auto max-w-6xl text-center">
+            <BorderBeam
+              borderRadius={999}
+              className="mb-8 inline-block"
+              colorVariant="colorful"
+              size="md"
+              strength={0.59}
             >
-              <span>Try AI Gateway</span>
-              <ArrowRightIcon className="size-3 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
-            </Link>
+              <Link
+                className="group inline-flex items-center gap-2 rounded-full bg-white/5 py-2 pr-3 pl-4 text-[13px] text-white/80 backdrop-blur transition-colors hover:text-white"
+                href="/ai/models"
+              >
+                One endpoint for 150+ models
+                <HugeiconsIcon
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  color="currentColor"
+                  icon={ArrowRight01Icon}
+                  size={14}
+                  strokeWidth={1.9}
+                />
+              </Link>
+            </BorderBeam>
 
-            <h1 className="mb-8 max-w-3xl text-[2.5rem] font-heading font-black leading-[0.95] tracking-[-0.02em] animate-appear sm:text-[3.5rem] lg:text-[4.5rem] text-foreground">
-            Every AI request, under your
-              <span className="font-serif italic font-normal text-muted-foreground"> control.</span>
+            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+              <span className="block">Every AI request, under your</span>
+              <span className="block">control.</span>
             </h1>
 
-            <p className="mb-10 max-w-[38rem] text-base leading-[1.7] text-muted-foreground animate-appear [animation-delay:200ms]">
-            One endpoint for 150+ models. AI control, security, observability, and monetization. <br/>OpenAI-compatible API. Fast setup. No rewrite.
+            <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
+              One endpoint for 150+ models. AI control, security, observability,
+              and monetization. OpenAI-compatible API. Fast setup. No rewrite.
             </p>
 
-            <div className="mb-10 flex flex-wrap items-center justify-center gap-3 animate-appear [animation-delay:300ms]">
-              <Link href={siteConfig.links.getStartedUrl}>
-                <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
+            <div className="mt-8 flex flex-row items-center justify-center gap-3">
+              <Button
+                asChild
+                className="group h-10 rounded-full pr-2 pl-5 text-sm font-semibold"
+              >
+                <Link href={siteConfig.links.getStartedUrl}>
                   Get Started Free
-                </Button>
-              </Link>
-              <Link href="/docs">
-                <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
-                  Documentation
-                </Button>
-              </Link>
+                  <HugeiconsIcon
+                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                    color="currentColor"
+                    icon={ArrowRight01Icon}
+                    size={14}
+                    strokeWidth={1.9}
+                  />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                className="h-10 rounded-full px-5 text-sm font-semibold"
+                variant="outline"
+              >
+                <Link href="/docs">Documentation</Link>
+              </Button>
             </div>
 
-            <div className="mt-12 animate-appear [animation-delay:400ms]">
-              <p className="text-[10px] text-muted-foreground mb-3 uppercase tracking-wider">Supported Providers</p>
-              <div className="flex flex-wrap justify-center gap-4">
-                {providers.map((provider) => (
-                  <div key={provider.name} className="opacity-50 hover:opacity-100 transition-opacity">
-                    <provider.icon className="w-6 h-6" aria-hidden="true" />
-                  </div>
-                ))}
+            <div className="mt-12 w-full">
+              <p className="text-[10px] text-muted-foreground mb-5 uppercase tracking-wider">
+                Supported Providers
+              </p>
+              <div className="relative mx-auto max-w-3xl">
+                <div className="absolute left-0 top-0 bottom-0 w-16 md:w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-16 md:w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+                <div className="relative flex overflow-hidden select-none">
+                  {[0, 1].map((track) => (
+                    <div
+                      key={track}
+                      aria-hidden={track === 1}
+                      className="flex shrink-0 items-center animate-marquee"
+                    >
+                      {providers.map((provider) => (
+                        <div
+                          key={provider.name}
+                          title={provider.name}
+                          className="flex items-center gap-2.5 px-6 text-muted-foreground/70 hover:text-foreground transition-colors"
+                        >
+                          <provider.icon className="w-5 h-5" aria-hidden="true" />
+                          <span className="text-sm font-medium whitespace-nowrap">
+                            {provider.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
               <Link
                 href="/ai/models"

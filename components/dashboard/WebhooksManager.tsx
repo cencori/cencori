@@ -1,0 +1,329 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/components/ui/toast";
+import { Plus, Loader2, Globe, Trash2, MoreHorizontal, Zap } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { normalizeWebhookResponse } from "@/lib/webhook-response";
+import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
+
+interface Webhook {
+    id: string;
+    name: string;
+    url: string;
+    events: string[];
+    is_active: boolean;
+    created_at: string;
+    last_triggered_at: string | null;
+    failure_count: number;
+    secret?: string;
+}
+
+const WEBHOOK_EVENTS = [
+    { id: "request.completed", label: "Request Completed", description: "When an AI request completes successfully" },
+    { id: "request.failed", label: "Request Failed", description: "When an AI request fails" },
+    { id: "security.incident", label: "Security Incident", description: "When a security incident is detected" },
+    { id: "quota.warning", label: "Quota Warning", description: "When usage reaches 80% of quota" },
+    { id: "quota.exceeded", label: "Quota Exceeded", description: "When usage exceeds the monthly quota" },
+];
+
+export function WebhooksManager({ orgSlug, projectSlug }: { orgSlug: string; projectSlug: string }) {
+    const queryClient = useQueryClient();
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [newWebhook, setNewWebhook] = useState({
+        name: "",
+        url: "",
+        events: ["request.completed"] as string[],
+    });
+    const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
+
+    const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(orgSlug, projectSlug);
+
+    const { data: webhooksData, isLoading: webhooksLoading } = useQuery<unknown, Error, Webhook[]>({
+        queryKey: ["webhooks", projectId],
+        queryFn: async () => {
+            const res = await fetch(`/api/projects/${projectId}/webhooks`);
+            if (!res.ok) throw new Error("Failed to fetch webhooks");
+            return res.json();
+        },
+        select: normalizeWebhookResponse<Webhook>,
+        enabled: !!projectId,
+    });
+
+    const webhooks = webhooksData ?? [];
+
+    const createMutation = useMutation({
+        mutationFn: async (data: { name: string; url: string; events: string[] }) => {
+            const res = await fetch(`/api/projects/${projectId}/webhooks`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to create webhook");
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["webhooks", projectId] });
+            setCreateDialogOpen(false);
+            setNewWebhook({ name: "", url: "", events: ["request.completed"] });
+            toast.success("Webhook created");
+        },
+        onError: (error: Error) => {
+            toast.error(error.message);
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: async (webhookId: string) => {
+            const res = await fetch(`/api/projects/${projectId}/webhooks/${webhookId}`, {
+                method: "DELETE",
+            });
+            if (!res.ok) throw new Error("Failed to delete webhook");
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["webhooks", projectId] });
+            toast.success("Webhook deleted");
+        },
+        onError: () => {
+            toast.error("Failed to delete webhook");
+        },
+    });
+
+    const handleTestWebhook = async (webhookId: string) => {
+        setTestingWebhook(webhookId);
+        try {
+            const res = await fetch(`/api/projects/${projectId}/webhooks/${webhookId}/test`, {
+                method: "POST",
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Test webhook delivered successfully!");
+            } else {
+                toast.error(data.message || "Test webhook failed");
+            }
+        } catch {
+            toast.error("Failed to send test webhook");
+        } finally {
+            setTestingWebhook(null);
+        }
+    };
+
+    const handleEventToggle = (eventId: string) => {
+        setNewWebhook(prev => ({
+            ...prev,
+            events: prev.events.includes(eventId)
+                ? prev.events.filter(e => e !== eventId)
+                : [...prev.events, eventId],
+        }));
+    };
+
+    // Identity (project id) resolves from cache instantly on warm sessions —
+    // only data regions wait.
+    const identityLoading = projectLoading;
+    const contentLoading = projectLoading || webhooksLoading;
+
+    if (!identityLoading && !projectId) {
+        return (
+            <div className="text-center py-16">
+                <p className="text-sm font-medium">Project not found</p>
+                <p className="text-xs text-muted-foreground mt-1">Unable to load webhooks</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-w-0 space-y-3">
+            <div className="flex justify-end">
+                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button size="sm" className="h-7 gap-1.5 text-xs">
+                            <Plus className="h-3.5 w-3.5" />
+                            Add webhook
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-base">Create Webhook</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Configure a new webhook endpoint to receive event notifications
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="webhook-name" className="text-xs">Name</Label>
+                                <Input
+                                    id="webhook-name"
+                                    placeholder="My Webhook"
+                                    className="h-8 text-xs"
+                                    value={newWebhook.name}
+                                    onChange={e => setNewWebhook(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="webhook-url" className="text-xs">Endpoint URL</Label>
+                                <Input
+                                    id="webhook-url"
+                                    placeholder="https://your-server.com/webhook"
+                                    className="h-8 text-xs"
+                                    value={newWebhook.url}
+                                    onChange={e => setNewWebhook(prev => ({ ...prev, url: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs">Events</Label>
+                                <div className="space-y-2 border border-border/40 rounded-md p-3">
+                                    {WEBHOOK_EVENTS.map(event => (
+                                        <div key={event.id} className="flex items-start gap-2">
+                                            <Checkbox
+                                                id={`webhook-event-${event.id}`}
+                                                checked={newWebhook.events.includes(event.id)}
+                                                onCheckedChange={() => handleEventToggle(event.id)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="flex-1">
+                                                <label htmlFor={`webhook-event-${event.id}`} className="text-xs font-medium cursor-pointer">
+                                                    {event.label}
+                                                </label>
+                                                <p className="text-[10px] text-muted-foreground">{event.description}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => setCreateDialogOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => createMutation.mutate(newWebhook)}
+                                disabled={createMutation.isPending || !newWebhook.name || !newWebhook.url}
+                            >
+                                {createMutation.isPending ? (
+                                    <>
+                                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    "Create webhook"
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            {/* Webhooks List */}
+            {contentLoading ? (
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
+                </div>
+            ) : webhooks.length === 0 ? (
+                <div className="text-center py-16 border border-border/40 rounded-lg bg-card">
+                    <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center mx-auto mb-4">
+                        <Globe className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium mb-1">No webhooks configured</p>
+                    <p className="text-xs text-muted-foreground max-w-[280px] mx-auto">
+                        Create a webhook to start receiving real-time notifications for your project events
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {webhooks.map(webhook => (
+                        <div
+                            key={webhook.id}
+                            className="border border-border/40 rounded-lg bg-card p-4"
+                        >
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                    <div className={`w-2 h-2 rounded-full mt-1.5 ${webhook.is_active ? "bg-emerald-500" : "bg-muted-foreground"}`} />
+                                    <div>
+                                        <p className="text-sm font-medium">{webhook.name}</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                                            {webhook.url}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {webhook.events.map(event => (
+                                                <span
+                                                    key={event}
+                                                    className="px-1.5 py-0.5 text-[10px] bg-secondary rounded"
+                                                >
+                                                    {event}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                            className="text-xs cursor-pointer"
+                                            onClick={() => handleTestWebhook(webhook.id)}
+                                            disabled={testingWebhook === webhook.id}
+                                        >
+                                            {testingWebhook === webhook.id ? (
+                                                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                            ) : (
+                                                <Zap className="h-3 w-3 mr-2" />
+                                            )}
+                                            Send Test
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-xs cursor-pointer text-red-500"
+                                            onClick={() => deleteMutation.mutate(webhook.id)}
+                                        >
+                                            <Trash2 className="h-3 w-3 mr-2" />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                            {webhook.failure_count > 0 && (
+                                <p className="text-[10px] text-amber-500 mt-2">
+                                    {webhook.failure_count} failed deliveries
+                                </p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
