@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { resolveAuthRedirectTargets, getConsoleOrigin, getPostLoginDefault } from "@/lib/auth-redirect";
 
 describe("resolveAuthRedirectTargets", () => {
     test("resolves relative redirects against current origin", () => {
@@ -37,6 +37,35 @@ describe("resolveAuthRedirectTargets", () => {
 
         expect(result.oauthRedirectTo).toBe("https://cencori.com/dashboard");
         expect(result.navigationTarget).toBe("/dashboard");
+    });
+});
+
+describe("getConsoleOrigin", () => {
+    test("maps main hosts to their console origin", () => {
+        expect(getConsoleOrigin("https://cencori.com")).toBe("https://console.cencori.com");
+        expect(getConsoleOrigin("https://www.cencori.com/login")).toBe("https://console.cencori.com");
+        expect(getConsoleOrigin("http://localhost:3000/login")).toBe("http://console.localhost:3000");
+        expect(getConsoleOrigin("http://127.0.0.1:3000")).toBe("http://console.localhost:3000");
+    });
+
+    test("returns null for console and product hosts", () => {
+        expect(getConsoleOrigin("https://console.cencori.com/home")).toBeNull();
+        expect(getConsoleOrigin("http://console.localhost:3000/home")).toBeNull();
+        expect(getConsoleOrigin("https://scan.cencori.com")).toBeNull();
+        expect(getConsoleOrigin("not-a-url")).toBeNull();
+    });
+});
+
+describe("getPostLoginDefault", () => {
+    test("lands on console home", () => {
+        expect(getPostLoginDefault("https://console.cencori.com/login")).toBe("/home");
+        expect(getPostLoginDefault("http://console.localhost:3000/login")).toBe("/home");
+        expect(getPostLoginDefault("https://cencori.com/login")).toBe("https://console.cencori.com/home");
+        expect(getPostLoginDefault("http://localhost:3000/login")).toBe("http://console.localhost:3000/home");
+    });
+
+    test("falls back to dashboard elsewhere", () => {
+        expect(getPostLoginDefault("https://scan.cencori.com/login")).toBe("/dashboard");
     });
 });
 

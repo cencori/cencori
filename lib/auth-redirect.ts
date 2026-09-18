@@ -28,6 +28,69 @@ function isLocalhostHost(hostname: string): boolean {
     );
 }
 
+/**
+ * Main-app hosts whose bare `/login` should start on the console host
+ * instead, so the whole auth flow (form, callback, cookies) lives where the
+ * session will be used. Product subdomains (scan, pitch, …) are untouched.
+ */
+function isMainAppHostname(hostname: string): boolean {
+    const normalized = hostname.toLowerCase();
+    return (
+        normalized === "localhost" ||
+        normalized === "127.0.0.1" ||
+        normalized === "::1" ||
+        normalized === "cencori.com" ||
+        normalized === "www.cencori.com"
+    );
+}
+
+function isConsoleHostname(hostname: string): boolean {
+    const normalized = hostname.toLowerCase();
+    return (
+        normalized === "console.cencori.com" ||
+        normalized === "console.localhost"
+    );
+}
+
+/**
+ * Absolute console origin for a main-app origin, or null when the current
+ * host has no console counterpart (product subdomains, unknown hosts).
+ * Port is preserved so local dev maps :3000 → console.localhost:3000.
+ */
+export function getConsoleOrigin(currentOrigin: string): string | null {
+    let url: URL;
+    try {
+        url = new URL(currentOrigin);
+    } catch {
+        return null;
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "cencori.com" || hostname === "www.cencori.com") {
+        return "https://console.cencori.com";
+    }
+    if (isMainAppHostname(hostname)) {
+        return `http://console.localhost${url.port ? `:${url.port}` : ""}`;
+    }
+    return null;
+}
+
+/**
+ * Default post-login destination: `/home` when already on the console host,
+ * the absolute console home when on a main-app host (session cookies are
+ * shared via `.cencori.com` in prod; in dev the login itself must happen on
+ * the console host, which the login page enforces), `/dashboard` elsewhere.
+ */
+export function getPostLoginDefault(currentOrigin: string): string {
+    let hostname: string | null = null;
+    try {
+        hostname = new URL(currentOrigin).hostname;
+    } catch {
+        return "/dashboard";
+    }
+    if (isConsoleHostname(hostname)) return "/home";
+    return getConsoleOrigin(currentOrigin)?.concat("/home") ?? "/dashboard";
+}
+
 function isAllowedAuthRedirectHost(hostname: string, currentHostname: string): boolean {
     const target = hostname.toLowerCase();
     const current = currentHostname.toLowerCase();
@@ -102,14 +165,15 @@ export function resolveAuthRedirectTargets(
 /**
  * Destination for an already-signed-in visitor landing on /login or /signup.
  * Server-component safe (no window access). Honors a relative `?redirect=`
- * target, otherwise falls back to /dashboard. Auth pages themselves are never
+ * target, otherwise falls back to `fallback` (console home by default via
+ * getPostLoginDefault at call sites). Auth pages themselves are never
  * valid targets — they would loop. Sub-paths like /signup/verify are left
  * untouched by callers (only exact /login and /signup should bounce).
  */
 export function getSafeSignedInDestination(
     redirectParam: string | null | undefined,
+    fallback = "/dashboard",
 ): string {
-    const fallback = "/dashboard";
     if (!redirectParam) return fallback;
     const raw = redirectParam.trim();
     if (!raw) return fallback;
