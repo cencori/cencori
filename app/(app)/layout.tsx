@@ -256,7 +256,9 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
   );
   const isPlayground = pathname.includes("/playground");
   const isOnboardingFlow = pathname.includes("/onboarding");
-  const hasDesktopSidebar = Boolean(orgSlug) && !pathname.includes("/projects/new") && !pathname.includes("/projects/import");
+  const hasDesktopSidebar = (Boolean(orgSlug) || isCanonicalConsoleRoute)
+    && !pathname.includes("/projects/new")
+    && !pathname.includes("/projects/import");
 
   const currentOrg = organizations.find((org) => org.slug === orgSlug) ?? (
     isCanonicalConsoleRoute ? activeOrganization ?? undefined : undefined

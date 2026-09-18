@@ -193,7 +193,9 @@ export default function OrganizationLayoutClient({
     ) ?? availableProjects[0] ?? null;
     // While the workspace is still resolving (cold load, console context fetch)
     // the header shows an explicit loading state instead of blank space.
-    const headerResolving = !selectedProject && workspaceLoading;
+    const headerResolving = consoleMode
+        ? workspaceLoading && !activeProject
+        : !selectedProject && workspaceLoading;
     const headerProjectLabel = selectedProject?.name || projectSlug || "Select project";
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
@@ -217,11 +219,10 @@ export default function OrganizationLayoutClient({
     const orgBase = `/${orgSlug}`;
     const basePath = projectSlug ? `${orgBase}/${projectSlug}` : null;
     // Sticky project scope: once a project is known (URL on slug hosts,
-    // console context on console hosts, last-visited on reloads), project
-    // items keep pointing at it even from org-level pages — so Billing →
-    // Monetization returns to the project view instead of a picker. Items
-    // whose org destination is a real page (Projects list, Deployments fleet,
-    // org Settings) are unaffected.
+    // console context on console hosts, last-visited on reloads), the project
+    // section keeps pointing at it even from organization pages. Moving from
+    // Overview to Billing must not turn that section into an organization
+    // directory or discard the selected project.
     useEffect(() => {
         if (routeProjectSlug && orgSlug) {
             try {
@@ -314,7 +315,7 @@ export default function OrganizationLayoutClient({
     }
 
     // Layout groups (top → bottom):
-    //   1. overviewItem                  — Projects (org level) or Overview (project level)
+    //   1. overviewItem                  — selected project's Overview
     //   2. Observability toggle           — expands to observabilitySubItems
     //   3. projectItems                  — Logs
     //   4. AI Gateway toggle             — expands to projectSubItems
@@ -324,10 +325,10 @@ export default function OrganizationLayoutClient({
 
     const overviewItem = {
         href: consoleMode
-            ? (isInsideProject ? "/home" : "/projects")
-            : (isInsideProject ? `${basePath}` : `${orgBase}/~/projects`),
+            ? "/home"
+            : (scopeProjectSlug ? `${orgBase}/${scopeProjectSlug}` : `${orgBase}/~/projects`),
         icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />,
-        label: isInsideProject ? "Overview" : "Projects",
+        label: "Overview",
     };
 
     const observabilityItem = {
@@ -366,15 +367,15 @@ export default function OrganizationLayoutClient({
 
     const projectSecondaryItems = [
         { href: scopeProjectSlug ? scopedProjectHref("security") : orgProductHref("security"), icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
-        // Memory is per-project (a memory belongs to one project's end-users),
-        // so there is no org-scope view to fall back to — hide it outside a project.
-        ...(isInsideProject && process.env.NODE_ENV !== "production"
-            ? [{ href: consoleMode ? "/memory" : `${basePath}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
+        // Memory belongs to the selected project, so keep it available while an
+        // organization-level page is open instead of reshaping the sidebar.
+        ...(scopeProjectSlug && process.env.NODE_ENV !== "production"
+            ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
-        // Compute — agent hosting. Project scope = that agent's version history;
-        // org scope = the agent fleet (one row per agent-project). See ~/deployments.
+        // Deployments stays attached to the selected project for the same stable
+        // project → organization → project navigation model.
         ...(process.env.NODE_ENV !== "production"
-            ? [{ href: consoleMode ? (isInsideProject ? "/deployments" : "/organization/deployments") : (isInsideProject ? `${basePath}/deployments` : `${orgBase}/~/deployments`), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
+            ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
         { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
     ];
@@ -455,12 +456,14 @@ export default function OrganizationLayoutClient({
                                     type="button"
                                     className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-foreground hover:bg-sidebar-accent"
                                     aria-label="Select project"
+                                    aria-busy={headerResolving}
+                                    disabled={headerResolving}
                                 >
                                     <span className="min-w-0 flex-1 truncate">
-                                        {headerResolving ? "Loading..." : headerProjectLabel}
+                                        {headerResolving ? "Loading project" : headerProjectLabel}
                                     </span>
                                     {headerResolving ? (
-                                        <HugeiconsIcon icon={Loading03Icon} className="size-3.5 shrink-0 animate-spin text-muted-foreground/60" />
+                                        <HugeiconsIcon icon={Loading03Icon} className="size-4 shrink-0 animate-spin text-foreground/80" />
                                     ) : (
                                         <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground/60" />
                                     )}
@@ -642,7 +645,7 @@ export default function OrganizationLayoutClient({
                                     </>
                                 ) : (
                                     <>
-                                        {/* 1. Projects / Overview */}
+                                        {/* 1. Project Overview */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton asChild tooltip={overviewItem.label} isActive={isActive(overviewItem.href)} size="sm">
                                                 <Link href={overviewItem.href} prefetch={true} onMouseEnter={() => prefetchRoute(overviewItem.href)}>
