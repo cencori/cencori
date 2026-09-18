@@ -1,0 +1,37 @@
+name: Supply-Chain Guard
+
+# postcss.config.mjs has been hit by an obfuscated loader multiple times
+# (appended payload that eval/spawns second stages at build time). This fails
+# fast if loader patterns reappear in build config files.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  config-integrity:
+    name: Config Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail on loader patterns in build configs
+        run: |
+          set -e
+          suspicious=0
+          for f in postcss.config.* next.config.* tailwind.config.* vite.config.*; do
+            [ -f "$f" ] || continue
+            if grep -qE "_0x[0-9a-f]{4,}|createRequire|child_process|spawn\(|eval\(" "$f"; then
+              echo "::error file=$f::suspicious loader pattern detected"
+              suspicious=1
+            fi
+          done
+          if [ -f postcss.config.mjs ] && [ "$(wc -l < postcss.config.mjs)" -gt 12 ]; then
+            echo "::error file=postcss.config.mjs::unexpected size, possible appended payload"
+            suspicious=1
+          fi
+          exit $suspicious
