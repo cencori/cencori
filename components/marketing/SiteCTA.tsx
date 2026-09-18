@@ -2,6 +2,7 @@ import { ArrowUpRight03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import Link from "next/link";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 
 export function SiteCTA() {
   return (
@@ -21,7 +22,7 @@ export function SiteCTA() {
 
         <div className="relative z-10 flex min-h-[15rem] items-end justify-end p-6 sm:min-h-[32rem] sm:p-8">
           <Link
-            href="/login"
+            href={getConsoleUrl("/signup")}
             className="inline-flex min-h-[2.2rem] items-center gap-[0.35rem] rounded-full bg-[#f3f3ef] px-4 text-[0.92rem] tracking-[-0.005em] text-[#050505] transition-colors hover:bg-[#e4e4de]"
           >
             Get Started Free

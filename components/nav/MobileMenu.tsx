@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 import {
   developerNavigationMenus,
   navigationMenus,
@@ -200,7 +201,7 @@ export function MobileMenu({
         </ul>
         <Link
           className={styles.mobileMenuCta}
-          href={isDevelopers ? (isAuthenticated ? "/dashboard" : "/signup") : "/contact"}
+          href={isDevelopers ? getConsoleUrl(isAuthenticated ? "/home" : "/signup") : "/contact"}
           onClick={onNavigate}
         >
           {isDevelopers ? (isAuthenticated ? "Dashboard" : "Sign up") : "Talk to us"}
@@ -208,7 +209,7 @@ export function MobileMenu({
         {isDevelopers && !isAuthenticated ? (
           <Link
             className={styles.mobileMenuLogin}
-            href="/login"
+            href={getConsoleUrl("/login")}
             onClick={onNavigate}
           >
             Log in
@@ -217,7 +218,7 @@ export function MobileMenu({
         {!isDevelopers ? (
           <Link
             className={styles.mobileMenuConsole}
-            href={isAuthenticated ? "/dashboard" : "/signup"}
+            href={getConsoleUrl(isAuthenticated ? "/home" : "/signup")}
             onClick={onNavigate}
           >
             Console

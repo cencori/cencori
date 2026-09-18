@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 
 export function DevelopersCTA() {
   return (
@@ -17,7 +18,7 @@ export function DevelopersCTA() {
                 asChild
                 className="group h-10 rounded-full pr-2 pl-5 text-sm font-semibold"
               >
-                <Link href="/signup">
+                <Link href={getConsoleUrl("/signup")}>
                   Start building
                   <HugeiconsIcon
                     className="transition-transform duration-200 group-hover:translate-x-0.5"
