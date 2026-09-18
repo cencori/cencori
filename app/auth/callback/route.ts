@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     // Re-validate the post-login destination server-side (open-redirect defense).
     const { navigationTarget } = resolveAuthRedirectTargets(searchParams.get("next"), {
         currentOrigin: origin,
-        defaultPath: "/dashboard",
+        defaultPath: getPostLoginDefault(origin),
     });
 
     const loginWithError = (message: string) =>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
 
 /**
  * Password sign-in, server-side.
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // the OAuth callback does.
     const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
         currentOrigin: origin,
-        defaultPath: "/dashboard",
+        defaultPath: getPostLoginDefault(origin),
     });
 
     const isProduction = hostname.endsWith("cencori.com");

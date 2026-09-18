@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { isAuthFormTarget, resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { isAuthFormTarget, resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -107,10 +107,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         if (!cancelled && data.session?.user) {
           const { navigationTarget } = resolveAuthRedirectTargets(
             redirectParam,
-            { defaultPath: "/dashboard" },
+            { defaultPath: getPostLoginDefault(window.location.origin) },
           );
           const destination = isAuthFormTarget(navigationTarget)
-            ? "/dashboard"
+            ? getPostLoginDefault(window.location.origin)
             : navigationTarget;
           window.location.assign(destination);
         }
@@ -125,10 +125,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       if (!cancelled && event === "SIGNED_IN" && session?.user) {
         const { navigationTarget } = resolveAuthRedirectTargets(
           redirectParam,
-          { defaultPath: "/dashboard" },
+          { defaultPath: getPostLoginDefault(window.location.origin) },
         );
         const destination = isAuthFormTarget(navigationTarget)
-          ? "/dashboard"
+          ? getPostLoginDefault(window.location.origin)
           : navigationTarget;
         window.location.assign(destination);
       }
@@ -191,7 +191,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     setLoading(true);
     try {
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: "/dashboard",
+        defaultPath: getPostLoginDefault(window.location.origin),
       });
       // Route OAuth through the server callback so the session is exchanged and
       // cookie-set before the destination renders (prevents the login bounce).

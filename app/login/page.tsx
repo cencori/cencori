@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AuthGradient } from "@/components/auth/auth-gradient";
 import { LoginForm } from "@/components/login-form"
 import Link from "next/link"
 import { createServerClient } from "@/lib/supabaseServer";
-import { getSafeSignedInDestination } from "@/lib/auth-redirect";
+import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination } from "@/lib/auth-redirect";
 
 function LoginPageContent() {
   return (
@@ -39,8 +40,21 @@ export default async function LoginPage({
   const params = await searchParams;
   const supabase = await createServerClient();
   const { data } = await supabase.auth.getUser();
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "localhost:3000";
+  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+  const origin = `${proto}://${host}`;
   if (data.user) {
-    redirect(getSafeSignedInDestination(params?.redirect));
+    redirect(getSafeSignedInDestination(params?.redirect, getPostLoginDefault(origin)));
+  }
+  // Bare login on a main-app host starts on the console host instead, so the
+  // whole flow (form, callback, cookies) lives where the session is used.
+  // Explicit ?redirect= targets are honored as-is.
+  if (!params?.redirect) {
+    const consoleOrigin = getConsoleOrigin(origin);
+    if (consoleOrigin) {
+      redirect(`${consoleOrigin}/login`);
+    }
   }
   return (
     <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
