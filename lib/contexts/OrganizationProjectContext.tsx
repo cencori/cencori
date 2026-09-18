@@ -74,7 +74,11 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
     const [projects, setProjects] = useState<Project[]>(cached?.projects ?? []);
     const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(!cached);
+    // Cached organizations/projects can paint the shell immediately, but the
+    // active console workspace still has to be resolved on every page load.
+    // Keep this true through that first refresh so consumers never mistake a
+    // warm cache for a fully resolved active project.
+    const [loading, setLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
