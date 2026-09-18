@@ -205,7 +205,7 @@ export function CreateProjectDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="gap-0 overflow-y-auto !border-0 bg-muted/30 p-0 dark:bg-[#111111] sm:max-w-2xl">
+                <DialogContent className="gap-0 overflow-y-auto !border-0 bg-background p-0 text-foreground shadow-2xl shadow-black/20 dark:bg-[#111111] sm:max-w-2xl">
                     <DialogHeader className="px-6 pt-6 text-left">
                         <DialogTitle className="text-base font-medium">Create a new project</DialogTitle>
                         <DialogDescription className="text-xs">
