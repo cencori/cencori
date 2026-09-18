@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 import { MobileMenu } from "./MobileMenu";
 import {
   developerNavigationMenus,
@@ -443,15 +444,15 @@ export function SiteNav({
         <div className={styles.navActions}>
           {isDevelopers ? (
             isAuthenticated ? (
-              <Link className={styles.navCta} href="/dashboard">
+              <Link className={styles.navCta} href={getConsoleUrl("/home")}>
                 Dashboard
               </Link>
             ) : (
               <>
-                <Link className={styles.navLogin} href="/login">
+                <Link className={styles.navLogin} href={getConsoleUrl("/login")}>
                   Log in
                 </Link>
-                <Link className={styles.navCta} href="/signup">
+                <Link className={styles.navCta} href={getConsoleUrl("/signup")}>
                   Sign up
                 </Link>
               </>
@@ -460,7 +461,7 @@ export function SiteNav({
             <>
               <Link
                 className={styles.navConsole}
-                href={isAuthenticated ? "/dashboard" : "/signup"}
+                href={getConsoleUrl(isAuthenticated ? "/home" : "/signup")}
               >
                 Console
               </Link>

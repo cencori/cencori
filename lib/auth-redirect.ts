@@ -18,6 +18,22 @@ function normalizeOrigin(value: string | undefined): string | null {
     }
 }
 
+/**
+ * Public console destination for links whose intent is to enter the product.
+ * Marketing pages use an absolute URL so auth and dashboard navigation begin
+ * on the console host instead of briefly entering the main application host.
+ */
+export function getConsoleUrl(path = "/home", consoleOrigin?: string): string {
+    const origin =
+        normalizeOrigin(consoleOrigin) ??
+        normalizeOrigin(process.env.NEXT_PUBLIC_CONSOLE_URL) ??
+        (process.env.NODE_ENV === "development"
+            ? "http://console.localhost:3000"
+            : "https://console.cencori.com");
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return new URL(normalizedPath, `${origin}/`).toString();
+}
+
 function isLocalhostHost(hostname: string): boolean {
     const normalized = hostname.toLowerCase();
     return (
@@ -212,4 +228,3 @@ export function isAuthFormTarget(target: string): boolean {
         return false;
     }
 }
-

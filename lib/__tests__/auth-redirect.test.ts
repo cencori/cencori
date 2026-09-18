@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { resolveAuthRedirectTargets, getConsoleOrigin, getPostLoginDefault } from "@/lib/auth-redirect";
+import { resolveAuthRedirectTargets, getConsoleOrigin, getConsoleUrl, getPostLoginDefault } from "@/lib/auth-redirect";
+
+describe("getConsoleUrl", () => {
+    test("builds absolute dashboard-intent links on the console host", () => {
+        expect(getConsoleUrl("/home", "https://console.cencori.com")).toBe("https://console.cencori.com/home");
+        expect(getConsoleUrl("signup", "http://console.localhost:3000")).toBe("http://console.localhost:3000/signup");
+    });
+});
 
 describe("resolveAuthRedirectTargets", () => {
     test("resolves relative redirects against current origin", () => {
@@ -68,4 +75,3 @@ describe("getPostLoginDefault", () => {
         expect(getPostLoginDefault("https://scan.cencori.com/login")).toBe("/dashboard");
     });
 });
-
