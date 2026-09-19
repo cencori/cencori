@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,6 +9,7 @@ import { ApiGatewayRequestDetailModal } from './ApiGatewayRequestDetailModal';
 import { WebRequestDetailModal } from './WebRequestDetailModal';
 import { FileText } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
+import { onNavigationIntent } from '@/lib/navigation-intent';
 
 type HttpLogKind = 'api' | 'web';
 
@@ -34,6 +36,13 @@ interface HttpRequestLogsTableProps {
         time_range?: string;
         search?: string;
         api_key_id?: string;
+    };
+}
+
+interface HttpRequestLogsResponse {
+    requests: HttpRequestLog[];
+    pagination?: {
+        total_pages?: number;
     };
 }
 
@@ -66,20 +75,23 @@ function formatDate(dateString: string) {
 }
 
 export function HttpRequestLogsTable({ projectId, environment, filters }: HttpRequestLogsTableProps) {
-    const [requests, setRequests] = useState<HttpRequestLog[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [selectedRequest, setSelectedRequest] = useState<{ id: string; kind: HttpLogKind } | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const queryKey = useMemo(() => [
+        'http-request-logs',
+        projectId,
+        environment,
+        page,
+        filters,
+    ] as const, [environment, filters, page, projectId]);
 
-    const fetchLogs = useCallback(async () => {
-        if (!projectId) {
-            setLoading(true);
-            return;
-        }
-        setLoading(true);
-        try {
+    const { data, isLoading, isFetching, error } = useQuery<HttpRequestLogsResponse>({
+        queryKey,
+        queryFn: async ({ signal }) => {
+            if (!projectId) return { requests: [], pagination: { total_pages: 1 } };
+
             const params = new URLSearchParams({
                 page: page.toString(),
                 per_page: '50',
@@ -92,34 +104,40 @@ export function HttpRequestLogsTable({ projectId, environment, filters }: HttpRe
                 ...(filters.api_key_id && { api_key_id: filters.api_key_id }),
             });
 
-            const response = await fetch(`/api/projects/${projectId}/logs/http?${params}`);
+            const response = await fetch(`/api/projects/${projectId}/logs/http?${params}`, { signal });
             if (!response.ok) throw new Error('Failed to fetch HTTP traffic logs');
 
-            const data = await response.json();
-            setRequests((data.requests || []) as HttpRequestLog[]);
-            setTotalPages(data.pagination?.total_pages || 1);
-        } catch (error) {
-            console.error('Error fetching HTTP traffic logs:', error);
-            toast.error('Failed to load HTTP traffic logs');
-        } finally {
-            setLoading(false);
-        }
-    }, [projectId, environment, page, filters]);
+            return response.json() as Promise<HttpRequestLogsResponse>;
+        },
+        enabled: Boolean(projectId),
+        staleTime: 60 * 1000,
+        refetchOnMount: true,
+        placeholderData: (previousData) => previousData,
+    });
+
+    const requests = data?.requests || [];
+    const totalPages = data?.pagination?.total_pages || 1;
 
     useEffect(() => {
         setPage(1);
     }, [filters]);
 
+    useEffect(() => onNavigationIntent(() => {
+        void queryClient.cancelQueries({ queryKey, exact: true });
+    }), [queryClient, queryKey]);
+
     useEffect(() => {
-        if (projectId) void fetchLogs();
-    }, [fetchLogs, projectId]);
+        if (!error) return;
+        console.error('Error fetching HTTP traffic logs:', error);
+        toast.error('Failed to load HTTP traffic logs');
+    }, [error]);
 
     const handleRowClick = (requestId: string, kind: HttpLogKind) => {
         setSelectedRequest({ id: requestId, kind });
         setIsModalOpen(true);
     };
 
-    if (loading && requests.length === 0) {
+    if (isLoading && requests.length === 0) {
         return (
             <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                 <div className="hidden md:block">
@@ -297,7 +315,7 @@ export function HttpRequestLogsTable({ projectId, environment, filters }: HttpRe
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-                        disabled={page === 1 || loading}
+                        disabled={page === 1 || isFetching}
                     >
                         Previous
                     </Button>
@@ -306,7 +324,7 @@ export function HttpRequestLogsTable({ projectId, environment, filters }: HttpRe
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
-                        disabled={page === totalPages || loading}
+                        disabled={page === totalPages || isFetching}
                     >
                         Next
                     </Button>

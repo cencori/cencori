@@ -58,6 +58,7 @@ import { useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { FeedbackMenu } from "@/components/dashboard/FeedbackMenu";
 import { getConsoleRoute } from "@/lib/console/routing";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { announceNavigationIntent } from "@/lib/navigation-intent";
 
 interface OrganizationData {
     id: string;
@@ -140,6 +141,7 @@ export default function OrganizationLayoutClient({
     const consoleMode = workspace?.consoleMode === true || consoleModeOverride;
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const searchParamsKey = searchParams.toString();
     const { isOpen, setIsOpen } = useMobileSheet();
     const { reportSessionExpired } = useSession();
     const {
@@ -213,6 +215,7 @@ export default function OrganizationLayoutClient({
         if (isOrganizationSettingsView) return "settings";
         return "main";
     });
+    const [pendingSubnavEntry, setPendingSubnavEntry] = useState<Exclude<typeof activeView, "main"> | null>(null);
     const [createProjectOpen, setCreateProjectOpen] = useState(false);
     const { setOpen: setCommandPaletteOpen } = useCommandPalette();
 
@@ -248,13 +251,25 @@ export default function OrganizationLayoutClient({
     const observabilityHref = scopeProjectSlug
         ? scopedProjectHref("observability")
         : orgProductHref("observability");
-    const rawObservabilitySection = searchParams.get("section");
-    const observabilitySection = rawObservabilitySection === "http" || rawObservabilitySection === "api" || rawObservabilitySection === "web"
+    const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
+    const settingsHref = consoleMode
+        ? (isInsideProject ? "/settings" : "/organization/settings")
+        : (isInsideProject ? `${basePath}/settings` : `${orgBase}/~/settings`);
+    const rawObservabilitySection = pathname.includes("/observability")
+        ? searchParams.get("section")
+        : null;
+    const observabilitySection = pendingSubnavEntry === "observability"
+        ? "overview"
+        : rawObservabilitySection === "http" || rawObservabilitySection === "api" || rawObservabilitySection === "web"
         ? "overview"
         : rawObservabilitySection || "overview";
-    const organizationSettingsSection = searchParams.get("section") === "advanced" ? "advanced" : "general";
+    const organizationSettingsSection = pendingSubnavEntry === "settings"
+        ? "general"
+        : searchParams.get("section") === "advanced" ? "advanced" : "general";
     const requestedProjectSettingsTab = searchParams.get("tab");
-    const projectSettingsTab = ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api", "webhooks"].includes(requestedProjectSettingsTab || "")
+    const projectSettingsTab = pendingSubnavEntry === "project-settings"
+        ? "general"
+        : ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api", "webhooks"].includes(requestedProjectSettingsTab || "")
         ? requestedProjectSettingsTab
         : "general";
 
@@ -277,12 +292,38 @@ export default function OrganizationLayoutClient({
         router.prefetch(href);
     };
 
+    const handleSidebarNavigationCapture = (event: React.MouseEvent<HTMLElement>) => {
+        if (
+            event.button !== 0
+            || event.metaKey
+            || event.ctrlKey
+            || event.shiftKey
+            || event.altKey
+        ) return;
+
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const link = target.closest<HTMLAnchorElement>("a[href]");
+        if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+
+        const destination = new URL(link.href, window.location.href);
+        if (destination.origin !== window.location.origin) return;
+
+        const currentLocation = `${window.location.pathname}${window.location.search}`;
+        const nextLocation = `${destination.pathname}${destination.search}`;
+        if (currentLocation === nextLocation) return;
+
+        announceNavigationIntent(nextLocation);
+    };
+
     const queryClient = useQueryClient();
     useEffect(() => {
         queryClient.prefetchQuery({ queryKey: ["orgLayout", orgSlug] });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        setPendingSubnavEntry(null);
         if (pathname.includes("/observability")) {
             setActiveView("observability");
         } else if (pathname.includes("/ai-gateway")) {
@@ -294,7 +335,16 @@ export default function OrganizationLayoutClient({
         } else {
             setActiveView("main");
         }
-    }, [isInsideProject, isOrganizationSettingsView, isProjectSettingsView, pathname]);
+    }, [isInsideProject, isOrganizationSettingsView, isProjectSettingsView, pathname, searchParamsKey]);
+
+    // These entries also switch the sidebar into a nested navigation mode.
+    // Warm their default pages while the shell is idle so one click can reveal
+    // the submenu and its Overview/General page as a single, immediate action.
+    useEffect(() => {
+        router.prefetch(observabilityHref);
+        router.prefetch(aiGatewayHref);
+        router.prefetch(settingsHref);
+    }, [aiGatewayHref, observabilityHref, router, settingsHref]);
 
     // Transient/network errors keep the last-good dashboard on screen; the
     // global ConnectivityWatcher tells the user to reconnect, and React Query
@@ -353,8 +403,6 @@ export default function OrganizationLayoutClient({
         { section: "intelligence", href: `${observabilityHref}?section=intelligence`, icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Intelligence" },
     ];
 
-    const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
-
     const projectSubItems = [
         { href: aiGatewayHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
         { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/prompts") : orgProductHref("ai-gateway/prompts"), icon: <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />, label: "Prompts" },
@@ -389,7 +437,7 @@ export default function OrganizationLayoutClient({
     ];
 
     const bottomItems = [
-        { href: consoleMode ? (isInsideProject ? "/settings" : "/organization/settings") : (isInsideProject ? `${basePath}/settings` : `${orgBase}/~/settings`), icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
+        { href: settingsHref, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
     ];
 
     const organizationSettingsItems = [
@@ -417,18 +465,25 @@ export default function OrganizationLayoutClient({
             <SidebarMenuItem key={item.href}>
                 {isSettingsItem ? (
                     <SidebarMenuButton
-                        onClick={() => {
-                            setActiveView(isProjectSettingsItem ? "project-settings" : "settings");
-                            router.push(item.href);
-                        }}
-                        onMouseEnter={() => prefetchRoute(item.href)}
+                        asChild
                         isActive={isProjectSettingsItem ? isProjectSettingsView : isOrganizationSettingsView}
                         size="sm"
                         className="gap-1"
                     >
-                        {item.icon}
-                        <span className="text-sm">{item.label}</span>
-                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                        <Link
+                            href={item.href}
+                            prefetch={true}
+                            onClick={() => {
+                                const nextView = isProjectSettingsItem ? "project-settings" : "settings";
+                                setPendingSubnavEntry(nextView);
+                                setActiveView(nextView);
+                            }}
+                            onMouseEnter={() => prefetchRoute(item.href)}
+                        >
+                            {item.icon}
+                            <span className="text-sm">{item.label}</span>
+                            <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                        </Link>
                     </SidebarMenuButton>
                 ) : (
                     <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
@@ -448,7 +503,10 @@ export default function OrganizationLayoutClient({
             className={isPlayground ? "h-full min-h-0 overflow-hidden" : undefined}
         >
             {!isProjectCreation && (
-                <Sidebar className="top-0 hidden h-svh border-r border-sidebar-border/70 bg-sidebar lg:block">
+                <Sidebar
+                    className="top-0 hidden h-svh border-r border-sidebar-border/70 bg-sidebar lg:block"
+                    onClickCapture={handleSidebarNavigationCapture}
+                >
                     <SidebarHeader className="h-12 shrink-0 justify-center p-1.5">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -579,7 +637,15 @@ export default function OrganizationLayoutClient({
                                         </SidebarMenuItem>
                                         {projectSubItems.map((item) => (
                                             <SidebarMenuItem key={item.href}>
-                                                <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
+                                                <SidebarMenuButton
+                                                    asChild
+                                                    tooltip={item.label}
+                                                    isActive={isActive(item.href) || (
+                                                        pendingSubnavEntry === "ai-gateway"
+                                                        && item.href === aiGatewayHref
+                                                    )}
+                                                    size="sm"
+                                                >
                                                     <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
                                                         {item.icon}
                                                         <span className="text-sm">{item.label}</span>
@@ -657,18 +723,24 @@ export default function OrganizationLayoutClient({
                                         {/* 2. Observability */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
-                                                onClick={() => {
-                                                    setActiveView("observability");
-                                                    router.push(observabilityHref);
-                                                }}
-                                                onMouseEnter={() => prefetchRoute(observabilityHref)}
+                                                asChild
                                                 isActive={isActive(observabilityHref)}
                                                 size="sm"
                                                 className="gap-1"
                                             >
-                                                {observabilityItem.icon}
-                                                <span className="text-sm">{observabilityItem.label}</span>
-                                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                <Link
+                                                    href={observabilityHref}
+                                                    prefetch={true}
+                                                    onClick={() => {
+                                                        setPendingSubnavEntry("observability");
+                                                        setActiveView("observability");
+                                                    }}
+                                                    onMouseEnter={() => prefetchRoute(observabilityHref)}
+                                                >
+                                                    {observabilityItem.icon}
+                                                    <span className="text-sm">{observabilityItem.label}</span>
+                                                    <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
                                         {/* 3. Logs */}
@@ -685,18 +757,24 @@ export default function OrganizationLayoutClient({
                                         {/* 4. AI Gateway toggle */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
-                                                onClick={() => {
-                                                    setActiveView("ai-gateway");
-                                                    router.push(aiGatewayHref);
-                                                }}
-                                                onMouseEnter={() => prefetchRoute(aiGatewayHref)}
+                                                asChild
                                                 isActive={isActive(aiGatewayHref)}
                                                 size="sm"
                                                 className="gap-1"
                                             >
-                                                <HugeiconsIcon icon={DiscoverSquareIcon} className="!h-5 !w-5" />
-                                                <span className="text-sm">AI Gateway</span>
-                                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                <Link
+                                                    href={aiGatewayHref}
+                                                    prefetch={true}
+                                                    onClick={() => {
+                                                        setPendingSubnavEntry("ai-gateway");
+                                                        setActiveView("ai-gateway");
+                                                    }}
+                                                    onMouseEnter={() => prefetchRoute(aiGatewayHref)}
+                                                >
+                                                    <HugeiconsIcon icon={DiscoverSquareIcon} className="!h-5 !w-5" />
+                                                    <span className="text-sm">AI Gateway</span>
+                                                    <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
                                         {/* 5. Security, Deployments, Monetization */}
@@ -811,7 +889,11 @@ export default function OrganizationLayoutClient({
             )}
 
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetContent side="bottom" className="h-[70vh]">
+                <SheetContent
+                    side="bottom"
+                    className="h-[70vh]"
+                    onClickCapture={handleSidebarNavigationCapture}
+                >
                     <div className="py-3">
                         <SidebarGroup>
                             <SidebarMenu>
