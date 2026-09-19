@@ -247,6 +247,13 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                                             ))}
                                         </div>
                                         <div className="my-1 border-t border-border/40" />
+                                        <DropdownMenuItem
+                                            className="cursor-pointer py-1.5 text-xs"
+                                            onClick={() => router.push(consoleRoute ? "/organization/settings" : `/${currentOrg.slug}/~/settings`)}
+                                        >
+                                            <Settings className="h-3.5 w-3.5" />
+                                            Organization settings
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem className="cursor-pointer py-1.5 text-xs" onClick={() => router.push("/onboarding")}>
                                             <PlusCircle className="h-3.5 w-3.5" />
                                             New organization
