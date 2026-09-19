@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from './StatusBadge';
 import { RequestDetailModal } from './RequestDetailModal';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, ChevronRight, FileText } from 'lucide-react';
+import { Loader2, FileText } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
+import { onNavigationIntent } from '@/lib/navigation-intent';
 
 interface RequestLog {
     id: string;
@@ -39,21 +41,31 @@ interface RequestLogsTableProps {
     };
 }
 
+interface RequestLogsResponse {
+    requests: RequestLog[];
+    pagination: {
+        total_pages: number;
+    };
+}
+
 export function RequestLogsTable({ projectId, environment, filters }: RequestLogsTableProps) {
-    const [requests, setRequests] = useState<RequestLog[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const queryKey = useMemo(() => [
+        'request-logs',
+        projectId,
+        environment,
+        page,
+        filters,
+    ] as const, [environment, filters, page, projectId]);
 
-    const fetchLogs = useCallback(async () => {
-        if (!projectId) {
-            setLoading(true);
-            return;
-        }
-        setLoading(true);
-        try {
+    const { data, isLoading, isFetching, error } = useQuery<RequestLogsResponse>({
+        queryKey,
+        queryFn: async ({ signal }) => {
+            if (!projectId) return { requests: [], pagination: { total_pages: 1 } };
+
             const params = new URLSearchParams({
                 page: page.toString(),
                 per_page: '50',
@@ -65,31 +77,38 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                 ...(filters.api_key_id && { api_key_id: filters.api_key_id }),
             });
 
-            const response = await fetch(`/api/projects/${projectId}/logs?${params}`);
+            const response = await fetch(`/api/projects/${projectId}/logs?${params}`, { signal });
             if (!response.ok) throw new Error('Failed to fetch logs');
 
-            const data = await response.json();
-            setRequests(data.requests);
-            setTotalPages(data.pagination.total_pages);
-        } catch (error) {
-            console.error('Error fetching logs:', error);
-            toast.error('Failed to load request logs');
-        } finally {
-            setLoading(false);
-        }
-    }, [projectId, environment, page, filters]);
+            return response.json() as Promise<RequestLogsResponse>;
+        },
+        enabled: Boolean(projectId),
+        staleTime: 60 * 1000,
+        refetchOnMount: true,
+        placeholderData: (previousData) => previousData,
+    });
+
+    const requests = data?.requests || [];
+    const totalPages = data?.pagination.total_pages || 1;
 
     useEffect(() => {
         setPage(1);
     }, [filters]);
 
+    useEffect(() => onNavigationIntent(() => {
+        void queryClient.cancelQueries({ queryKey, exact: true });
+    }), [queryClient, queryKey]);
+
     useEffect(() => {
-        if (projectId) fetchLogs();
-    }, [fetchLogs, projectId]);
+        if (!error) return;
+        console.error('Error fetching logs:', error);
+        toast.error('Failed to load request logs');
+    }, [error]);
 
     useEffect(() => {
         if (!projectId) return;
         const eventSource = new EventSource(`/api/projects/${projectId}/logs/stream`);
+        const closeStreamForNavigation = onNavigationIntent(() => eventSource.close());
 
         eventSource.addEventListener('message', (event) => {
             try {
@@ -97,7 +116,17 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
 
                 if (data.type === 'new_request') {
                     if (page === 1) {
-                        setRequests(prev => [data.request, ...prev].slice(0, 50));
+                        queryClient.setQueryData<RequestLogsResponse>(queryKey, (previousData) => {
+                            if (!previousData) return previousData;
+
+                            return {
+                                ...previousData,
+                                requests: [
+                                    data.request,
+                                    ...previousData.requests.filter((request) => request.id !== data.request.id),
+                                ].slice(0, 50),
+                            };
+                        });
                     }
                 }
             } catch (error) {
@@ -110,9 +139,10 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         });
 
         return () => {
+            closeStreamForNavigation();
             eventSource.close();
         };
-    }, [projectId, page]);
+    }, [page, projectId, queryClient, queryKey]);
 
     // Supabase-style timestamp: "02 Jan 26 17:41:47"
     const formatDate = (dateString: string) => {
@@ -136,7 +166,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
         setIsModalOpen(true);
     };
 
-    if (loading && requests.length === 0) {
+    if (isLoading && requests.length === 0) {
         return (
             <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                 {/* Desktop skeleton */}
@@ -304,7 +334,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1 || loading}
+                        disabled={page === 1 || isFetching}
                     >
                         Previous
                     </Button>
@@ -313,7 +343,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages || loading}
+                        disabled={page === totalPages || isFetching}
                     >
                         Next
                     </Button>

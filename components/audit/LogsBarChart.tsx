@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
+import { onNavigationIntent } from '@/lib/navigation-intent';
 
 interface LogsBarChartProps {
     projectId?: string;
@@ -31,46 +33,54 @@ export function LogsBarChart({
     environment,
     source = 'ai',
 }: LogsBarChartProps) {
-    const [data, setData] = useState<LogBucket[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const queryKey = useMemo(() => [
+        'logs-chart',
+        projectId,
+        timeRange,
+        environment,
+        source,
+    ] as const, [environment, projectId, source, timeRange]);
+
+    const { data = [], isLoading, error } = useQuery<LogBucket[]>({
+        queryKey,
+        queryFn: async ({ signal }) => {
+            if (!projectId) return [];
+
+            const params = new URLSearchParams({ time_range: timeRange });
+            if ((source === 'ai' || source === 'http' || source === 'api') && environment) {
+                params.set('environment', environment);
+            }
+
+            const endpoint =
+                source === 'ai'
+                    ? `/api/projects/${projectId}/analytics/trends`
+                    : source === 'http'
+                        ? `/api/projects/${projectId}/logs/http/timeline`
+                    : source === 'api'
+                        ? `/api/projects/${projectId}/logs/gateway/timeline`
+                        : `/api/projects/${projectId}/logs/web/timeline`;
+
+            const res = await fetch(`${endpoint}?${params.toString()}`, { signal });
+            if (!res.ok) throw new Error('Failed to fetch chart data');
+
+            const json = await res.json();
+            return (json.trends || []) as LogBucket[];
+        },
+        enabled: Boolean(projectId),
+        staleTime: 60 * 1000,
+        refetchOnMount: true,
+    });
+
+    useEffect(() => onNavigationIntent(() => {
+        void queryClient.cancelQueries({ queryKey, exact: true });
+    }), [queryClient, queryKey]);
 
     useEffect(() => {
-        if (!projectId) {
-            setLoading(true);
-            setData([]);
-            return;
-        }
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const params = new URLSearchParams({ time_range: timeRange });
-                if ((source === 'ai' || source === 'http' || source === 'api') && environment) {
-                    params.set('environment', environment);
-                }
+        if (error) console.error('Failed to fetch chart data:', error);
+    }, [error]);
 
-                const endpoint =
-                    source === 'ai'
-                        ? `/api/projects/${projectId}/analytics/trends`
-                        : source === 'http'
-                            ? `/api/projects/${projectId}/logs/http/timeline`
-                        : source === 'api'
-                            ? `/api/projects/${projectId}/logs/gateway/timeline`
-                            : `/api/projects/${projectId}/logs/web/timeline`;
-
-                const res = await fetch(`${endpoint}?${params.toString()}`);
-                if (!res.ok) return;
-                const json = await res.json();
-                setData(json.trends || []);
-            } catch (error) {
-                console.error('Failed to fetch chart data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [projectId, timeRange, environment, source]);
-
-    if (loading || data.length === 0) {
+    if (isLoading || data.length === 0) {
         return null;
     }
 
