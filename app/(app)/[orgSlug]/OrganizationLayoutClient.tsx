@@ -252,9 +252,13 @@ export default function OrganizationLayoutClient({
         ? scopedProjectHref("observability")
         : orgProductHref("observability");
     const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
+    // The sidebar Settings entry has one stable meaning: settings for the
+    // selected project. Organization settings are entered deliberately from
+    // the user menu instead of changing this destination based on the page the
+    // user happens to be viewing.
     const settingsHref = consoleMode
-        ? (isInsideProject ? "/settings" : "/organization/settings")
-        : (isInsideProject ? `${basePath}/settings` : `${orgBase}/~/settings`);
+        ? "/settings"
+        : (scopeProjectSlug ? `${orgBase}/${scopeProjectSlug}/settings` : `${orgBase}/~/projects`);
     const rawObservabilitySection = pathname.includes("/observability")
         ? searchParams.get("section")
         : null;
@@ -446,27 +450,25 @@ export default function OrganizationLayoutClient({
     ];
 
     const projectSettingsItems = [
-        { tab: "general", href: consoleMode ? "/settings" : `${basePath}/settings`, label: "General" },
-        { tab: "budget", href: consoleMode ? "/settings?tab=budget" : `${basePath}/settings?tab=budget`, label: "Budget" },
-        { tab: "providers", href: consoleMode ? "/settings?tab=providers" : `${basePath}/settings?tab=providers`, label: "Providers" },
-        { tab: "infrastructure", href: consoleMode ? "/settings?tab=infrastructure" : `${basePath}/settings?tab=infrastructure`, label: "Infrastructure" },
-        { tab: "networking", href: consoleMode ? "/settings?tab=networking" : `${basePath}/settings?tab=networking`, label: "Networking" },
-        { tab: "integrations", href: consoleMode ? "/settings?tab=integrations" : `${basePath}/settings?tab=integrations`, label: "Integrations" },
-        { tab: "api", href: consoleMode ? "/settings?tab=api" : `${basePath}/settings?tab=api`, label: "API" },
-        { tab: "webhooks", href: consoleMode ? "/settings?tab=webhooks" : `${basePath}/settings?tab=webhooks`, label: "Webhooks" },
+        { tab: "general", href: settingsHref, label: "General" },
+        { tab: "budget", href: `${settingsHref}?tab=budget`, label: "Budget" },
+        { tab: "providers", href: `${settingsHref}?tab=providers`, label: "Providers" },
+        { tab: "infrastructure", href: `${settingsHref}?tab=infrastructure`, label: "Infrastructure" },
+        { tab: "networking", href: `${settingsHref}?tab=networking`, label: "Networking" },
+        { tab: "integrations", href: `${settingsHref}?tab=integrations`, label: "Integrations" },
+        { tab: "api", href: `${settingsHref}?tab=api`, label: "API" },
+        { tab: "webhooks", href: `${settingsHref}?tab=webhooks`, label: "Webhooks" },
     ];
 
     const renderBottomItems = () => bottomItems.map((item) => {
-        const isProjectSettingsItem = isInsideProject && item.label === "Settings";
-        const isOrganizationSettingsItem = !isInsideProject && item.label === "Settings";
-        const isSettingsItem = isProjectSettingsItem || isOrganizationSettingsItem;
+        const isSettingsItem = item.label === "Settings";
 
         return (
             <SidebarMenuItem key={item.href}>
                 {isSettingsItem ? (
                     <SidebarMenuButton
                         asChild
-                        isActive={isProjectSettingsItem ? isProjectSettingsView : isOrganizationSettingsView}
+                        isActive={isProjectSettingsView}
                         size="sm"
                         className="gap-1"
                     >
@@ -474,9 +476,8 @@ export default function OrganizationLayoutClient({
                             href={item.href}
                             prefetch={true}
                             onClick={() => {
-                                const nextView = isProjectSettingsItem ? "project-settings" : "settings";
-                                setPendingSubnavEntry(nextView);
-                                setActiveView(nextView);
+                                setPendingSubnavEntry("project-settings");
+                                setActiveView("project-settings");
                             }}
                             onMouseEnter={() => prefetchRoute(item.href)}
                         >

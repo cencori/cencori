@@ -102,6 +102,11 @@ export function UserMenu({ organization }: UserMenuProps) {
         ? organizations
         : currentOrganization ? [currentOrganization] : [];
     const isCanonicalConsoleRoute = getConsoleRoute(pathname) !== null;
+    const organizationSettingsHref = currentOrganization
+        ? (isCanonicalConsoleRoute
+            ? "/organization/settings"
+            : `/${currentOrganization.slug}/~/settings`)
+        : null;
     const currentTier = organization?.subscriptionTier === "pro" || organization?.subscriptionTier === "team"
         ? organization.subscriptionTier
         : "free";
@@ -189,6 +194,18 @@ export function UserMenu({ organization }: UserMenuProps) {
                                         ))}
                                     </div>
                                     <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
+                                    {organizationSettingsHref && (
+                                        <DropdownMenuItem
+                                            className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                                            onClick={() => {
+                                                setMenuOpen(false);
+                                                router.push(organizationSettingsHref);
+                                            }}
+                                        >
+                                            <span className="min-w-0 flex-1 truncate">Organization settings</span>
+                                            <Settings className="ml-auto size-4 shrink-0" />
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                         className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
                                         onClick={() => {

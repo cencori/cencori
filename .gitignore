@@ -85,6 +85,10 @@ eve
 
 # internal codebase audit — never ship
 AUDIT.md
+
+# private monetization product working document — never ship
+/monetization-product.md
+
 # Claude Code local config and worktrees (never commit)
 .claude/
 branch_structure.json
