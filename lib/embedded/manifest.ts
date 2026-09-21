@@ -162,15 +162,20 @@ export async function validateManifest(
         }
     }
 
-    // Subagents: referenced versions must exist, be published, and not self-cycle.
+    // Subagents: referenced versions must exist in-project, be published, and not self-cycle.
     // Indirect cycles are detected against the pinned edge graph.
     for (const sub of m.subagents) {
         if (sub.max_calls !== undefined && (sub.max_calls < 1 || sub.max_calls > 25)) {
             errors.push(`subagent max_calls must be 1–25`);
         }
-        const { data: child } = await supabase.from('agent_versions').select('id, agent_id, status').eq('id', dePrefix(sub.agent_version_id)).maybeSingle();
+        const { data: child } = await supabase
+            .from('agent_versions')
+            .select('id, agent_id, status, agents!inner(id, project_id)')
+            .eq('id', dePrefix(sub.agent_version_id))
+            .eq('agents.project_id', opts.projectId)
+            .maybeSingle();
         if (!child) {
-            errors.push(`subagent version '${sub.agent_version_id}' not found`);
+            errors.push(`subagent version '${sub.agent_version_id}' not found in this project`);
             continue;
         }
         if ((child.status as string) !== 'published') {
@@ -184,7 +189,7 @@ export async function validateManifest(
         const { delegationReachesAgent } = await import('./agents');
         for (const sub of m.subagents) {
             try {
-                const reaches = await delegationReachesAgent(supabase, dePrefix(sub.agent_version_id), opts.agentId);
+                const reaches = await delegationReachesAgent(supabase, dePrefix(sub.agent_version_id), opts.agentId, 8, opts.projectId);
                 if (reaches) {
                     errors.push(`subagent reference '${sub.agent_version_id}' creates an indirect delegation cycle`);
                     break;

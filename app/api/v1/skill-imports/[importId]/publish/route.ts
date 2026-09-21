@@ -56,6 +56,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ importId: 
     if (body.skill_id) {
         const { data: skill } = await supabase.from('skills').select('id, tenant_id').eq('project_id', validation.context.projectId).eq('id', body.skill_id.replace(/^(skl_)/, '')).maybeSingle();
         if (!skill) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Skill not found', { requestId }), { requestId });
+        // Imported content must not cross tenant scope: the staged import and
+        // the target skill must agree on tenant ownership.
+        const skillTenant = (skill as { tenant_id: string | null }).tenant_id ?? null;
+        if (skillTenant !== importRow.tenant_id) {
+            return addGatewayHeaders(embeddedError(403, 'tenant_scope_mismatch', 'Import scope does not match the target skill tenant scope', { requestId }), { requestId });
+        }
         skillId = (skill as { id: string }).id;
     } else {
         if (!body.name?.trim()) return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'name is required to create the skill', { requestId }), { requestId });

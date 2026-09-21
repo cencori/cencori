@@ -122,12 +122,28 @@ async function executeRun(runId: string): Promise<void> {
 
         const responseFormat = (run.input_ref as { response_format?: { type?: string; json_schema?: { name?: string; schema?: Record<string, unknown> } } }).response_format;
         const wantsJson = responseFormat?.type === 'json_schema';
+
+        // Pinned skill procedures for the installed version (tenant-filtered).
+        let runSkillsBlock: string | null = null;
+        let runSkillIds: string[] = [];
+        if (run.installation_id) {
+            try {
+                const { retrieveTurnSkills } = await import('@/lib/embedded/turn-knowledge');
+                const skills = await retrieveTurnSkills(supabase as never, { installationId: run.installation_id, tenantId: run.tenant_id });
+                runSkillsBlock = skills.block;
+                runSkillIds = skills.skill_version_ids;
+            } catch {
+                runSkillsBlock = null;
+            }
+        }
+
         const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
         const systemParts = [
             instructions ? `Instructions: ${instructions}` : null,
             contextSnippets.length > 0
                 ? `Company knowledge (cite source IDs [src] in your answer):\n${contextSnippets.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`
                 : null,
+            runSkillsBlock ? runSkillsBlock : null,
             wantsJson ? `Respond with JSON only, matching this schema: ${JSON.stringify(responseFormat?.json_schema?.schema ?? {})}` : null,
         ].filter(Boolean) as string[];
 
@@ -175,6 +191,8 @@ async function executeRun(runId: string): Promise<void> {
             agent_version_id: runtime.versionId,
             agent_version: runtime.version,
             knowledge_citations: citations,
+            skills_used: runSkillIds,
+            manifest_tools: ((runtime.config ?? {}) as { tools?: unknown }).tools ?? [],
             usage: response.usage,
         };
 

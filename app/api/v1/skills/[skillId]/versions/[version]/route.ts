@@ -26,7 +26,7 @@ function serializeVersion(row: Record<string, unknown>, includeContent: boolean)
     };
 }
 
-export async function loadSkillVersion(supabase: ReturnType<typeof createAdminClient>, projectId: string, skillId: string, version: string) {
+async function loadSkillVersion(supabase: ReturnType<typeof createAdminClient>, projectId: string, skillId: string, version: string) {
     const { data: skill } = await supabase.from('skills').select('id').eq('project_id', projectId).eq('id', deSkill(dePrefixId(skillId))).maybeSingle();
     const skillRow = skill ?? (await supabase.from('skills').select('id').eq('project_id', projectId).eq('slug', skillId).maybeSingle()).data;
     if (!skillRow) return null;

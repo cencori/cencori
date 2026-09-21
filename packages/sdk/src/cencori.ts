@@ -55,6 +55,8 @@ import {
     SkillImportsNamespace,
     WebhooksNamespace,
     UsageNamespace,
+    EndUsersNamespace,
+    RatePlansNamespace,
 } from './embedded';
 import { fetchWithRetry } from './utils';
 import {
@@ -256,6 +258,8 @@ export class Cencori {
     readonly skillImports: SkillImportsNamespace;
     readonly webhooks: WebhooksNamespace;
     readonly usage: UsageNamespace;
+    readonly endUsers: EndUsersNamespace;
+    readonly ratePlans: RatePlansNamespace;
 
     /**
      * Create a new Cencori client
@@ -315,6 +319,8 @@ export class Cencori {
         this.skillImports = new SkillImportsNamespace(this.config);
         this.webhooks = new WebhooksNamespace(this.config);
         this.usage = new UsageNamespace(this.config);
+        this.endUsers = new EndUsersNamespace(this.config);
+        this.ratePlans = new RatePlansNamespace(this.config);
     }
 
     /**

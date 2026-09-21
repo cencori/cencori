@@ -67,7 +67,9 @@ export async function retrieveTurnSkills(
         const usable = ((versions ?? []) as unknown as Array<{ id: string; content: string; skills: { tenant_id: string | null; status: string } | Array<{ tenant_id: string | null; status: string }> }>)
             .map((v) => ({ ...v, skills: Array.isArray(v.skills) ? v.skills[0] : v.skills }))
             .filter((v) => v.skills && (v.skills.status ?? 'active') !== 'archived')
-            .filter((v) => !v.skills.tenant_id || !opts.tenantId || v.skills.tenant_id === opts.tenantId);
+            // Fail closed: a tenant-private skill loads only on exact tenant
+            // match. Missing session tenant context loads nothing private.
+            .filter((v) => !v.skills.tenant_id || (opts.tenantId !== null && v.skills.tenant_id === opts.tenantId));
         if (usable.length === 0) return empty;
         let chars = 0;
         const parts: string[] = [];

@@ -169,6 +169,8 @@ export {
     SkillImportsNamespace,
     WebhooksNamespace,
     UsageNamespace,
+    EndUsersNamespace,
+    RatePlansNamespace,
 } from './embedded';
 export { TelemetryClient, type WebTelemetryPayload } from './telemetry';
 export {

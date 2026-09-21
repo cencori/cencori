@@ -76,6 +76,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             },
             requestId: `test_${requestId.slice(0, 8)}`,
         });
+        // Record test evidence: publication requires a passing test.
+        await supabase.from('agent_versions').update({ last_tested_at: new Date().toISOString(), last_test_passed: true }).eq('id', (target.id as string));
         return addGatewayHeaders(
             NextResponse.json({
                 valid: true,
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             { requestId },
         );
     } catch (e) {
+        await supabase.from('agent_versions').update({ last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('id', (target.id as string));
         return addGatewayHeaders(embeddedError(502, 'invalid_request_error', e instanceof Error ? e.message : 'Test execution failed', { requestId }), { requestId });
     }
 }

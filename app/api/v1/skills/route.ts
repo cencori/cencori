@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
     if (visibility !== 'tenant' && tenantId) {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'tenant_id requires tenant visibility', { requestId }), { requestId });
     }
+    if (visibility === 'tenant' && !tenantId) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'tenant visibility requires tenant_id', { requestId }), { requestId });
+    }
 
     // Plan caps on library size.
     {
