@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
 
     const title = url.searchParams.get("title") || "Cencori";
     const subtitle = url.searchParams.get("subtitle") || "";
+    const align = url.searchParams.get("align") === "center" ? "center" : "left";
+    const showLogo = url.searchParams.get("logo") !== "0";
+    const centered = align === "center";
 
     // Load Geist Black font (bundled at app/Geist-Black.ttf)
     const fontData = await fetch(
@@ -34,6 +37,7 @@ export async function GET(request: NextRequest) {
                 }}
             >
                 {/* Logo Top-Left */}
+                {showLogo ? (
                 <div
                     style={{
                         display: "flex",
@@ -51,15 +55,18 @@ export async function GET(request: NextRequest) {
                         height={42}
                     />
                 </div>
+                ) : null}
 
-                {/* Title + Subtitle Bottom-Left */}
+                {/* Title + Subtitle */}
                 <div
                     style={{
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "flex-end",
+                        justifyContent: "center",
+                        alignItems: centered ? "center" : "flex-start",
+                        textAlign: centered ? "center" : "left",
                         flex: 1,
-                        paddingTop: "160px",
+                        paddingTop: centered ? "0" : "160px",
                     }}
                 >
                     <h1

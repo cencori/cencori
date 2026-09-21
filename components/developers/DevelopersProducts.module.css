@@ -52,6 +52,20 @@
   animation: dev-thinking-shimmer 2.6s linear infinite;
 }
 
+.thinkingDark {
+  background: linear-gradient(
+    100deg,
+    rgba(0, 0, 0, 0.3) 30%,
+    #000 50%,
+    rgba(0, 0, 0, 0.3) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: dev-thinking-shimmer 2.6s linear infinite;
+}
+
 @keyframes dev-thinking-shimmer {
   from {
     background-position: 200% 0;
@@ -63,7 +77,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .msgEnter,
-  .thinking {
+  .thinking,
+  .thinkingDark {
     animation: none;
   }
 }
