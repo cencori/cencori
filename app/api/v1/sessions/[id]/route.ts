@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
+import { extractGatewayCallerIdentity } from "@/lib/api-gateway-logs";
 import {
-    validateGatewayRequest,
     addGatewayHeaders,
     handleCorsPreFlight,
     type GatewayContext,
 } from "@/lib/gateway-middleware";
-import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { authSessionRequest, denyOnScopeMismatch, hasClientPermission } from "@/lib/embedded/session-auth";
 import { expireStaleSessions } from "@/lib/gateway/session-engine";
 
 export async function OPTIONS() {
@@ -16,50 +15,18 @@ export async function OPTIONS() {
 
 type HandlerContext = {
     gatewayCtx: GatewayContext;
+    embeddedScope: { tenantId: string; externalUserId: string; installationIds?: string[]; permissions?: string[] } | null;
     respond: (response: NextResponse, errorCode?: string, errorMessage?: string) => NextResponse;
     respondError: (status: number, message: string, code?: string) => NextResponse;
 };
 
 async function authOrError(req: NextRequest, endpoint: string, startedAt: number, callerIdentity: ReturnType<typeof extractGatewayCallerIdentity>): Promise<NextResponse | HandlerContext> {
-    const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
-    if (!providedApiKey) {
-        return NextResponse.json({ error: { message: "Missing CENCORI_API_KEY", type: 'invalid_request_error', code: 'missing_api_key' }, status: 'failed' }, { status: 401 });
-    }
-
-    const validation = await validateGatewayRequest(req);
-    if (!validation.success) return validation.response;
-    const gatewayCtx = validation.context;
-
-    const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
-        void logApiGatewayRequest({
-            projectId: gatewayCtx.projectId,
-            apiKeyId: gatewayCtx.apiKeyId,
-            requestId: gatewayCtx.requestId,
-            endpoint,
-            method: req.method,
-            statusCode: response.status,
-            startedAt,
-            environment: gatewayCtx.environment,
-            ipAddress: gatewayCtx.clientIp,
-            countryCode: gatewayCtx.countryCode,
-            userAgent: req.headers.get('user-agent'),
-            callerOrigin: callerIdentity.callerOrigin,
-            clientApp: callerIdentity.clientApp,
-            errorCode: errorCode || null,
-            errorMessage: errorMessage || null,
-        });
-        return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
-    };
-
-    const respondError = (status: number, message: string, code = 'invalid_request_error') => {
-        return respond(
-            NextResponse.json({ error: { message, type: 'invalid_request_error', code }, status: 'failed' }, { status }),
-            code,
-            message,
-        );
-    };
-
-    return { gatewayCtx, respond, respondError };
+    const { logApiGatewayRequest } = await import("@/lib/api-gateway-logs");
+    const result = await authSessionRequest(req, endpoint, startedAt, callerIdentity, (args) => {
+        void logApiGatewayRequest({ ...args, apiKeyId: args.apiKeyId ?? '' });
+    }, addGatewayHeaders);
+    if ('status' in result) return result;
+    return { gatewayCtx: result.gatewayCtx, embeddedScope: result.embeddedScope ?? null, respond: result.respond, respondError: result.respondError };
 }
 
 export async function GET(
@@ -73,7 +40,10 @@ export async function GET(
 
     const ctx = await authOrError(req, endpoint, startedAt, callerIdentity);
     if ('status' in ctx) return ctx;
-    const { gatewayCtx, respondError, respond } = ctx;
+    const { gatewayCtx, embeddedScope, respondError, respond } = ctx;
+    if (embeddedScope && !hasClientPermission(embeddedScope, 'sessions:turn')) {
+        return respondError(403, 'Client token lacks sessions:turn permission', 'insufficient_scope');
+    }
 
     try {
         const adminClient = createAdminClient();
@@ -82,7 +52,7 @@ export async function GET(
         });
         const { data: session, error } = await adminClient
             .from('sessions')
-            .select('id, project_id, status, last_turn_number, created_at, updated_at, agent_id, metadata, total_cost_usd')
+            .select('id, project_id, status, last_turn_number, created_at, updated_at, agent_id, metadata, total_cost_usd, tenant_id, external_user_id, installation_id')
             .eq('id', id)
             .single();
 
@@ -90,7 +60,7 @@ export async function GET(
             return respondError(404, "Session not found", "session_not_found");
         }
 
-        if (session.project_id !== gatewayCtx.projectId) {
+        if (denyOnScopeMismatch(session as { project_id: string; tenant_id?: string | null; external_user_id?: string | null; installation_id?: string | null }, gatewayCtx.projectId, embeddedScope)) {
             return respondError(404, "Session not found", "session_not_found");
         }
 
@@ -102,6 +72,9 @@ export async function GET(
             updated_at: session.updated_at,
             agent_id: session.agent_id,
             metadata: session.metadata,
+            tenant_id: (session as { tenant_id?: string }).tenant_id ?? null,
+            external_user_id: (session as { external_user_id?: string }).external_user_id ?? null,
+            installation_id: (session as { installation_id?: string }).installation_id ?? null,
             total_cost: session.total_cost_usd ?? 0,
         }));
     } catch (error: unknown) {
@@ -121,14 +94,17 @@ export async function DELETE(
 
     const ctx = await authOrError(req, endpoint, startedAt, callerIdentity);
     if ('status' in ctx) return ctx;
-    const { gatewayCtx, respondError, respond } = ctx;
+    const { gatewayCtx, embeddedScope, respondError, respond } = ctx;
+    if (embeddedScope && !hasClientPermission(embeddedScope, 'sessions:turn')) {
+        return respondError(403, 'Client token lacks sessions:turn permission', 'insufficient_scope');
+    }
 
     try {
         const adminClient = createAdminClient();
 
         const { data: session, error: fetchError } = await adminClient
             .from('sessions')
-            .select('id, project_id, status')
+            .select('id, project_id, status, tenant_id')
             .eq('id', id)
             .single();
 
@@ -136,7 +112,7 @@ export async function DELETE(
             return respondError(404, "Session not found", "session_not_found");
         }
 
-        if (session.project_id !== gatewayCtx.projectId) {
+        if (denyOnScopeMismatch(session as { project_id: string; tenant_id?: string | null; external_user_id?: string | null; installation_id?: string | null }, gatewayCtx.projectId, embeddedScope)) {
             return respondError(404, "Session not found", "session_not_found");
         }
 

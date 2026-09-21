@@ -32,6 +32,7 @@ export interface TierFeatures {
   webhooks: boolean;
   sso: boolean;
   teams: boolean;
+  embeddedAgents: boolean;
 }
 
 const ALL_FEATURES_ENABLED: TierFeatures = {
@@ -66,6 +67,7 @@ const ALL_FEATURES_ENABLED: TierFeatures = {
   webhooks: true,
   sso: true,
   teams: true,
+  embeddedAgents: true,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -196,6 +198,30 @@ export function getMemoryQuota(tier: SubscriptionTier): number {
   return MEMORY_QUOTA[tier] ?? MEMORY_QUOTA.free;
 }
 
+// ── Embedded Agents limits (M4) ──
+// The capability is available on every tier (developer preview); the caps are
+// the gate. Metered per project/tenant/installation; runs additionally carry a
+// per-minute rate + concurrency cap for fair scheduling across tenants.
+export interface EmbeddedLimits {
+  maxTenants: number;
+  maxInstallationsPerTenant: number;
+  maxProviderConnections: number;
+  maxKnowledgeBases: number;
+  runsPerMinute: number;
+  maxConcurrentRuns: number;
+}
+
+export const EMBEDDED_LIMITS: Record<SubscriptionTier, EmbeddedLimits> = {
+  free: { maxTenants: 10, maxInstallationsPerTenant: 5, maxProviderConnections: 2, maxKnowledgeBases: 10, runsPerMinute: 10, maxConcurrentRuns: 2 },
+  pro: { maxTenants: 100, maxInstallationsPerTenant: 20, maxProviderConnections: 10, maxKnowledgeBases: 100, runsPerMinute: 60, maxConcurrentRuns: 10 },
+  team: { maxTenants: 1000, maxInstallationsPerTenant: 50, maxProviderConnections: 25, maxKnowledgeBases: 500, runsPerMinute: 300, maxConcurrentRuns: 25 },
+  enterprise: { maxTenants: Number.POSITIVE_INFINITY, maxInstallationsPerTenant: Number.POSITIVE_INFINITY, maxProviderConnections: Number.POSITIVE_INFINITY, maxKnowledgeBases: Number.POSITIVE_INFINITY, runsPerMinute: Number.POSITIVE_INFINITY, maxConcurrentRuns: Number.POSITIVE_INFINITY },
+};
+
+export function getEmbeddedLimits(tier: SubscriptionTier): EmbeddedLimits {
+  return EMBEDDED_LIMITS[tier] ?? EMBEDDED_LIMITS.free;
+}
+
 export function requireFeature(
   tier: SubscriptionTier,
   feature: keyof TierFeatures,
@@ -234,6 +260,7 @@ export function requireFeature(
       webhooks: 'Webhooks',
       sso: 'SSO',
       teams: 'Team collaboration',
+      embeddedAgents: 'Embedded Agents',
     };
     throw new Error(
       JSON.stringify({

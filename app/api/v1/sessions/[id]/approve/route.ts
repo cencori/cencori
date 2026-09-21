@@ -58,6 +58,9 @@ export async function POST(
 
         const validation = await validateGatewayRequest(req);
         if (!validation.success) return validation.response;
+        if (validation.context.keyType !== 'secret') {
+            return respondError(403, "This operation requires a secret project key", "secret_key_required");
+        }
         gatewayCtx = validation.context;
 
         let body: { action_id?: unknown; tool_results?: unknown };
@@ -97,7 +100,7 @@ export async function POST(
 
         const { data: session, error: sessionError } = await adminClient
             .from('sessions')
-            .select('id, project_id, status, last_turn_number')
+            .select('id, project_id, status, last_turn_number, agent_id, tenant_id, installation_id')
             .eq('id', sessionId)
             .single();
 
@@ -107,6 +110,12 @@ export async function POST(
 
         if (session.project_id !== gatewayCtx.projectId) {
             return respondError(404, "Session not found", "session_not_found");
+        }
+
+        // M3: attribute the resumed turn to tenant/agent/installation/session.
+        {
+            const s = session as { tenant_id?: string | null; agent_id?: string | null; installation_id?: string | null };
+            gatewayCtx.embedded = { tenantId: s.tenant_id ?? null, agentId: s.agent_id ?? null, installationId: s.installation_id ?? null, sessionId };
         }
 
         if (session.status !== 'paused') {
@@ -237,6 +246,29 @@ export async function POST(
             apiKeyId: gatewayCtx.apiKeyId,
             actorIp: gatewayCtx.clientIp,
         });
+
+        // M2 convergence: mirror into unified actions index (best-effort, never blocks resume).
+        void (async () => {
+            try {
+                const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
+                await adminClient.from('actions').upsert({
+                    project_id: gatewayCtx.projectId,
+                    tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
+                    session_id: sessionId,
+                    turn_number: session.last_turn_number,
+                    tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
+                    risk_level: 'write',
+                    status: 'approved',
+                    sanitized_arguments: { action_id },
+                    approval_policy: {},
+                    approved_by: gatewayCtx.apiKeyId,
+                    resolved_at: new Date().toISOString(),
+                    execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
+                }, { onConflict: 'execution_key' });
+            } catch {
+                // best-effort only
+            }
+        })();
 
         // Resume the turn and return its SSE stream.
         const execResult = await resumeSessionTurn({

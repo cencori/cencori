@@ -113,6 +113,29 @@ export const WEBHOOK_EVENTS = {
     QUOTA_EXCEEDED: 'quota.exceeded',
     ANOMALY_DETECTED: 'anomaly.detected',
     COST_THRESHOLD: 'cost.threshold',
+    // M1 Embedded Agents slice.
+    RUN_QUEUED: 'run.queued',
+    RUN_STARTED: 'run.started',
+    RUN_COMPLETED: 'run.completed',
+    RUN_FAILED: 'run.failed',
+    RUN_CANCELLED: 'run.cancelled',
+    KNOWLEDGE_SOURCE_QUEUED: 'knowledge_source.queued',
+    KNOWLEDGE_SOURCE_READY: 'knowledge_source.ready',
+    KNOWLEDGE_SOURCE_FAILED: 'knowledge_source.failed',
+    // M2 Embedded Agents slice.
+    ACTION_REQUIRED: 'action.required',
+    ACTION_APPROVED: 'action.approved',
+    ACTION_REJECTED: 'action.rejected',
+    ACTION_EXPIRED: 'action.expired',
+    ACTION_EXECUTED: 'action.executed',
+    ACTION_FAILED: 'action.failed',
+    CONNECTION_PENDING: 'connection.pending',
+    CONNECTION_ACTIVE: 'connection.active',
+    CONNECTION_EXPIRED: 'connection.expired',
+    CONNECTION_REVOKED: 'connection.revoked',
+    CONNECTION_ERROR: 'connection.error',
+    // M4 lifecycle.
+    TENANT_DELETED: 'tenant.deleted',
 } as const;
 
 export type WebhookEventType = typeof WEBHOOK_EVENTS[keyof typeof WEBHOOK_EVENTS];

@@ -21,6 +21,9 @@ export interface SessionRecord {
     organization_id: string;
     status: SessionStatus;
     agent_id: string | null;
+    tenant_id?: string | null;
+    external_user_id?: string | null;
+    installation_id?: string | null;
     last_turn_number: number;
     metadata: Record<string, unknown>;
     created_at: string;
@@ -91,6 +94,10 @@ export interface SessionResponse {
 export interface CreateSessionRequest {
     agent_id?: string;
     metadata?: Record<string, unknown>;
+    /** M0 embedded scope (secret-key path only; ect_ tokens derive this from claims). */
+    tenant_id?: string;
+    installation_id?: string;
+    external_user_id?: string;
 }
 
 export interface SSESessionEvent<T extends SessionEventType = SessionEventType> {

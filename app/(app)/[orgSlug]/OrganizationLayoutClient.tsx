@@ -430,6 +430,7 @@ export default function OrganizationLayoutClient({
             ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
         { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
+        { href: scopeProjectSlug ? scopedProjectHref("embedded-agents") : orgProductHref("embedded-agents"), icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Embedded Agents" },
     ];
 
     const orgItems = [

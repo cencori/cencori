@@ -62,6 +62,9 @@ export async function GET(
 
         const validation = await validateGatewayRequest(req);
         if (!validation.success) return validation.response;
+        if (validation.context.keyType !== 'secret') {
+            return respondError(403, "This operation requires a secret project key", "secret_key_required");
+        }
         gatewayCtx = validation.context;
 
         const adminClient = createAdminClient();

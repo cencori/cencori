@@ -34,6 +34,7 @@ const FEATURE_NAMES: Record<keyof TierFeatures, string> = {
   webhooks: 'Webhooks',
   sso: 'SSO',
   teams: 'Team collaboration',
+  embeddedAgents: 'Embedded Agents',
 };
 
 const LOCAL_SECURITY_PREVIEW_FEATURES = new Set<keyof TierFeatures>([

@@ -51,6 +51,9 @@ export async function POST(
 
         const validation = await validateGatewayRequest(req);
         if (!validation.success) return validation.response;
+        if (validation.context.keyType !== 'secret') {
+            return respondError(403, "This operation requires a secret project key", "secret_key_required");
+        }
         gatewayCtx = validation.context;
 
         let actionIdValue: unknown;
@@ -135,6 +138,29 @@ export async function POST(
             apiKeyId: gatewayCtx.apiKeyId,
             actorIp: gatewayCtx.clientIp,
         });
+
+        // M2 convergence: mirror into unified actions index (best-effort).
+        void (async () => {
+            try {
+                const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
+                await adminClient.from('actions').upsert({
+                    project_id: gatewayCtx.projectId,
+                    tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
+                    session_id: sessionId,
+                    turn_number: session.last_turn_number,
+                    tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
+                    risk_level: 'write',
+                    status: 'rejected',
+                    sanitized_arguments: { action_id },
+                    approval_policy: {},
+                    approved_by: gatewayCtx.apiKeyId,
+                    resolved_at: new Date().toISOString(),
+                    execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
+                }, { onConflict: 'execution_key' });
+            } catch {
+                // best-effort only
+            }
+        })();
 
         return respond(NextResponse.json({
             id: sessionId,
