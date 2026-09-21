@@ -43,13 +43,13 @@ async function dispatchExecution(
             ? await supabase.from('mcp_servers').select('*').eq('project_id', action.project_id).eq('id', sid).maybeSingle()
             : { data: null };
         if (!server) throw new Error('MCP server not found in this project');
-        const s = server as { url: string; auth_connection_id?: string | null };
+        const s = server as { url: string; transport?: string; auth_connection_id?: string | null };
         const mcpTool = (policy.mcp_tool as string) || action.tool_name.replace(/^mcp\./, '');
         // Same authenticated client as discovery: project-scoped credential,
-        // initialize handshake, session ID, SSRF-safe transport.
+        // modern stateless transport with legacy session fallback.
         const { mcpAuthHeaders, callMcpTool } = await import('@/lib/embedded/mcp');
         const headers = await mcpAuthHeaders(supabase as never, action.project_id, organizationId, s.auth_connection_id ?? null);
-        const output = await callMcpTool({ url: s.url, headers, tool: mcpTool, args: action.sanitized_arguments });
+        const output = await callMcpTool({ url: s.url, headers, transport: s.transport === 'sse' ? 'sse' : 'streamable-http', tool: mcpTool, args: action.sanitized_arguments });
         return { result: { tool: action.tool_name, output: output ?? null } };
     }
 

@@ -33,9 +33,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ serverId: 
     const headers = await mcpAuthHeaders(supabase as never, validation.context.projectId, validation.context.organizationId, r.auth_connection_id as string | null);
     const previous = (((r.tool_snapshot ?? {}) as { tools?: Array<{ name: string }> }).tools ?? []);
     try {
-        const discovered = await discoverMcpTools({ url: safeUrl.toString(), headers });
+        const discovered = await discoverMcpTools({ url: safeUrl.toString(), headers, transport: r.transport === 'sse' ? 'sse' : 'streamable-http' });
         const diff = diffToolSnapshot(previous, discovered.tools);
-        const snapshot = { tools: discovered.tools, discovered_at: new Date().toISOString() };
+        const snapshot = { tools: discovered.tools, discovered_at: new Date().toISOString(), transport_negotiated: discovered.transport };
         await supabase.from('mcp_servers').update({ tool_snapshot: snapshot, last_discovered_at: snapshot.discovered_at, status: 'active', last_error: null }).eq('id', r.id as string);
         return addGatewayHeaders(NextResponse.json({ tools: discovered.tools, diff }), { requestId });
     } catch (e) {
