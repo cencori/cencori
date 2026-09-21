@@ -83,11 +83,36 @@ export async function POST(req: NextRequest) {
         if (!tenantId) return addGatewayHeaders(embeddedError(404, 'tenant_not_found', 'Tenant not found', { requestId }), { requestId });
     }
 
+    // Referenced runs/sessions must belong to this project — otherwise an
+    // action could borrow another project's scope (and network allowlist).
+    let runId: string | null = null;
+    if (body.run_id) {
+        const { data: run } = await supabase.from('embedded_runs').select('id, tenant_id').eq('project_id', validation.context.projectId).eq('id', dePrefixId(body.run_id)).maybeSingle();
+        if (!run) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Run not found in this project', { requestId }), { requestId });
+        runId = (run as { id: string }).id;
+        const runTenant = (run as { tenant_id: string | null }).tenant_id;
+        if (tenantId && runTenant && runTenant !== tenantId) {
+            return addGatewayHeaders(embeddedError(403, 'tenant_scope_mismatch', 'Run does not belong to this tenant', { requestId }), { requestId });
+        }
+        if (!tenantId) tenantId = runTenant;
+    }
+    let sessionId: string | null = null;
+    if (body.session_id) {
+        const { data: sess } = await supabase.from('sessions').select('id, tenant_id').eq('project_id', validation.context.projectId).eq('id', dePrefixId(body.session_id)).maybeSingle();
+        if (!sess) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Session not found in this project', { requestId }), { requestId });
+        sessionId = (sess as { id: string }).id;
+        const sessTenant = (sess as { tenant_id: string | null }).tenant_id;
+        if (tenantId && sessTenant && sessTenant !== tenantId) {
+            return addGatewayHeaders(embeddedError(403, 'tenant_scope_mismatch', 'Session does not belong to this tenant', { requestId }), { requestId });
+        }
+        if (!tenantId) tenantId = sessTenant;
+    }
+
     const { data, error } = await supabase.from('actions').insert({
         project_id: validation.context.projectId,
         tenant_id: tenantId,
-        run_id: body.run_id ? dePrefixId(body.run_id) : null,
-        session_id: body.session_id ? dePrefixId(body.session_id) : null,
+        run_id: runId,
+        session_id: sessionId,
         turn_number: body.turn_number ?? null,
         tool_name: toolName,
         risk_level: body.risk_level ?? classified.risk,

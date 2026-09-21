@@ -11,6 +11,8 @@ export interface DelegationInput {
     parentRunId: string;
     childVersionId: string;
     input: unknown;
+    /** Optional explicit installation for the child (validated below). */
+    installationId?: string | null;
     idempotencyKey?: string | null;
 }
 
@@ -114,14 +116,43 @@ export async function delegateSubagent(
         throw Object.assign(new Error('Subagent call budget exhausted for this run'), { status: 429 });
     }
 
-    // Child version must be published; ancestry walk blocks indirect cycles.
-    const { data: childVersion } = await supabase.from('agent_versions').select('id, agent_id, status, config_json').eq('id', childVersionId).maybeSingle();
+    // Child version must exist in-project and be published; ancestry walk blocks indirect cycles.
+    const { data: childVersion } = await supabase
+        .from('agent_versions')
+        .select('id, agent_id, status, config_json, agents!inner(id, project_id)')
+        .eq('id', childVersionId)
+        .eq('agents.project_id', opts.projectId)
+        .maybeSingle();
     if (!childVersion || (childVersion.status as string) !== 'published') {
-        throw Object.assign(new Error('Child agent version is not published'), { status: 409 });
+        throw Object.assign(new Error('Child agent version is not published in this project'), { status: 409 });
     }
+    const childAgentId = (childVersion.agent_id as string);
     const ancestors = await ancestorVersionIds(supabase, parent.id);
     if (ancestors.has(childVersionId)) {
         throw Object.assign(new Error('Delegation would create a cycle'), { status: 409 });
+    }
+
+    // Isolated child context: the child NEVER inherits the parent's
+    // installation or session. An installation may be bound explicitly, and
+    // only when it belongs to this project and tenant and serves the CHILD
+    // agent. Sessions are never inherited — the child run stands alone.
+    let childInstallationId: string | null = null;
+    if (opts.installationId) {
+        const { data: childIns } = await supabase
+            .from('agent_installations')
+            .select('id, tenant_id, agent_id, status')
+            .eq('project_id', opts.projectId)
+            .eq('id', dePrefixId(opts.installationId))
+            .maybeSingle();
+        if (!childIns) throw Object.assign(new Error('Installation not found in this project'), { status: 404 });
+        if ((childIns.status as string) !== 'active') throw Object.assign(new Error('Installation is not active'), { status: 409 });
+        if (parent.tenant_id && (childIns.tenant_id as string) !== parent.tenant_id) {
+            throw Object.assign(new Error('Installation does not belong to this tenant'), { status: 403 });
+        }
+        if ((childIns.agent_id as string) !== childAgentId) {
+            throw Object.assign(new Error('Installation does not serve the child agent'), { status: 403 });
+        }
+        childInstallationId = (childIns.id as string);
     }
 
     // Idempotent child creation.
@@ -139,10 +170,10 @@ export async function delegateSubagent(
             project_id: opts.projectId,
             tenant_id: parent.tenant_id,
             external_user_id: parent.external_user_id,
-            agent_id: (childVersion.agent_id as string),
+            agent_id: childAgentId,
             agent_version_id: childVersionId,
-            installation_id: parent.installation_id,
-            session_id: parent.session_id,
+            installation_id: childInstallationId,
+            session_id: null,
             parent_run_id: parent.id,
             delegation_depth: depth + 1,
             status: 'queued',
@@ -169,12 +200,14 @@ export async function delegateSubagent(
         if (!config.model?.trim()) throw new Error('Child agent has no model configured');
 
         let contextBlock: string | null = null;
-        if (parent.installation_id) {
+        // Only explicitly bound child bindings load knowledge — never the
+        // parent's installation context.
+        if (childInstallationId) {
             const { retrieveTurnKnowledge } = await import('./turn-knowledge');
             const kb = await retrieveTurnKnowledge(supabase, {
                 projectId: opts.projectId,
                 organizationId: opts.organizationId,
-                installationId: parent.installation_id,
+                installationId: childInstallationId,
                 queryText: JSON.stringify(opts.input ?? {}).slice(0, 2000),
             });
             contextBlock = kb.block;

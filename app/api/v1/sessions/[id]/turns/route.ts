@@ -209,6 +209,39 @@ export async function POST(
         // ── Parse Request Body ──
         const body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
 
+        // Installed versions override legacy agent_configs: the normalized
+        // manifest (model, instructions, temperature) is the runtime source of
+        // truth whenever the session carries an installation.
+        let manifestPolicy: { browser?: { enabled?: boolean } } | null = null;
+        {
+            const installationId = (session as { installation_id?: string | null }).installation_id;
+            if (installationId) {
+                const { data: ins } = await adminClient
+                    .from('agent_installations')
+                    .select('agent_version_id, status')
+                    .eq('project_id', (gatewayCtx as GatewayContext).projectId)
+                    .eq('id', installationId)
+                    .maybeSingle();
+                const versionId = (ins as { agent_version_id?: string | null } | null)?.agent_version_id;
+                if (versionId) {
+                    const { data: version } = await adminClient.from('agent_versions').select('config_json').eq('id', versionId).maybeSingle();
+                    const config = ((version as { config_json?: Record<string, unknown> } | null)?.config_json ?? {}) as Record<string, unknown>;
+                    if (typeof config.model === 'string' && config.model.trim()) {
+                        agentConfig = {
+                            model: config.model,
+                            system_prompt: ((config.instructions ?? config.system_prompt) as string | undefined) ?? agentConfig?.system_prompt ?? null,
+                            tools: agentConfig?.tools ?? null,
+                        };
+                        agentId = agentId ?? session.agent_id;
+                        if (typeof config.temperature === 'number') {
+                            (body as { temperature?: number }).temperature ??= config.temperature;
+                        }
+                    }
+                    manifestPolicy = (config.policy ?? null) as typeof manifestPolicy;
+                }
+            }
+        }
+
         if (!body.model && !agentConfig?.model && !gatewayCtx?.defaultModel) {
             return respondError(400, "Missing model. Provide model in request body or set a default model in project settings.", 'missing_model');
         }
@@ -447,6 +480,18 @@ export async function POST(
                 if (!existingTypes.has(toolType)) {
                     tools.push({ type: toolType } as never);
                 }
+            }
+        }
+
+        // Browser default-deny: without an explicit browser grant in the
+        // installed manifest, open-web tools are stripped before execution.
+        const browserGranted = (manifestPolicy as { browser?: { enabled?: boolean } } | null)?.browser?.enabled === true;
+        if (manifestPolicy && !browserGranted) {
+            const before = tools.length;
+            const kept = tools.filter((t) => (t as { type?: string }).type !== 'web_search_preview');
+            if (kept.length !== before) {
+                tools.length = 0;
+                tools.push(...kept);
             }
         }
 

@@ -186,12 +186,12 @@ export async function POST(req: NextRequest) {
 
         // Look up rate plan markup for each unique end-user
         const uniqueUserIds = [...new Set(validated.map(e => e.end_user_id))];
-        const userMarkups: Record<string, { 
-            markupPercentage: number; 
+        const userMarkups: Record<string, {
+            markupPercentage: number;
             flatRatePerRequest: number | null;
             currency: string;
             pricingModel: 'flat' | 'tiered' | 'volume';
-            pricingTiers: any[];
+            pricingTiers: Array<{ up_to: number | null; unit_amount: number }>;
             platformCommissionPercentage: number;
         }> = {};
 
@@ -215,7 +215,14 @@ export async function POST(req: NextRequest) {
 
             if (endUsers) {
                 for (const eu of endUsers) {
-                    const plan = eu.rate_plans as any;
+                    const plan = eu.rate_plans as {
+                        markup_percentage?: number;
+                        flat_rate_per_request?: number | null;
+                        currency?: string;
+                        pricing_model?: 'flat' | 'tiered' | 'volume';
+                        pricing_tiers?: Array<{ up_to: number | null; unit_amount: number }>;
+                        platform_commission_percentage?: number;
+                    } | null;
                     userMarkups[eu.external_id] = {
                         markupPercentage: plan?.markup_percentage ?? customerMarkupPercentage,
                         flatRatePerRequest: plan?.flat_rate_per_request ?? null,

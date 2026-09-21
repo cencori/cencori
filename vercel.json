@@ -157,6 +157,22 @@
             "destination": "/api/v1/rate-plans/:path*"
         },
         {
+            "source": "/v1/skills",
+            "destination": "/api/v1/skills"
+        },
+        {
+            "source": "/v1/skills/:path*",
+            "destination": "/api/v1/skills/:path*"
+        },
+        {
+            "source": "/v1/skill-imports",
+            "destination": "/api/v1/skill-imports"
+        },
+        {
+            "source": "/v1/skill-imports/:path*",
+            "destination": "/api/v1/skill-imports/:path*"
+        },
+        {
             "source": "/v1/billing/:path*",
             "destination": "/api/v1/billing/:path*"
         },

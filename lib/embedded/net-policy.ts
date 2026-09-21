@@ -84,18 +84,21 @@ export async function checkEgress(rawUrl: string, policy: NetworkPolicy): Promis
 /** Resolve the effective network policy for an action via run → installation → version. */
 export async function resolveActionNetworkPolicy(
     supabase: Admin,
-    action: { run_id?: string | null; approval_policy?: Record<string, unknown> },
+    action: { project_id: string; run_id?: string | null; approval_policy?: Record<string, unknown> },
 ): Promise<NetworkPolicy> {
     try {
         const runId = (action.run_id as string | null) ?? (action.approval_policy?.run_id as string | null) ?? null;
         if (!runId) return DEFAULT_NETWORK;
-        const { data: run } = await supabase.from('embedded_runs').select('installation_id').eq('id', runId).maybeSingle();
+        // Every hop is project-scoped: an action must never borrow another
+        // project's allowlist through a foreign run_id.
+        const { data: run } = await supabase.from('embedded_runs').select('installation_id').eq('project_id', action.project_id).eq('id', runId).maybeSingle();
         const installationId = (run as { installation_id?: string | null } | null)?.installation_id;
         if (!installationId) return DEFAULT_NETWORK;
-        const { data: ins } = await supabase.from('agent_installations').select('agent_version_id, overlay_config').eq('id', installationId).maybeSingle();
+        const { data: ins } = await supabase.from('agent_installations').select('agent_version_id, overlay_config').eq('project_id', action.project_id).eq('id', installationId).maybeSingle();
         const versionId = (ins as { agent_version_id?: string | null } | null)?.agent_version_id;
         if (!versionId) return DEFAULT_NETWORK;
-        const { data: version } = await supabase.from('agent_versions').select('config_json').eq('id', versionId).maybeSingle();
+        const { data: version } = await supabase.from('agent_versions').select('config_json, project_id').eq('id', versionId).maybeSingle();
+        if (!version || (version as { project_id?: string }).project_id !== action.project_id) return DEFAULT_NETWORK;
         const manifest = ((version as { config_json?: Record<string, unknown> } | null)?.config_json ?? {}) as { policy?: { network?: unknown } };
         const overlay = ((ins as { overlay_config?: Record<string, unknown> } | null)?.overlay_config ?? {}) as { network?: unknown };
         return intersectNetworkPolicy(manifest.policy, overlay);

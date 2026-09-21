@@ -258,11 +258,23 @@ export class KnowledgeNamespace {
     addInlineSource(kbId: string, text: string, metadata?: Record<string, unknown>): Promise<unknown> {
         return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/sources`, { text, metadata });
     }
-    syncSource(kbId: string, sourceId: string, text?: string): Promise<unknown> {
-        return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/sources/${sourceId}/sync`, text ? { text } : {});
+    listSources(kbId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}/sources`);
+    }
+    getSource(kbId: string, sourceId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}/sources/${sourceId}`);
     }
     removeSource(kbId: string, sourceId: string): Promise<{ deleted: boolean }> {
         return request(this.config, 'DELETE', `/v1/knowledge-bases/${kbId}/sources/${sourceId}`);
+    }
+    syncSource(kbId: string, sourceId: string, text?: string): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/sources/${sourceId}/sync`, text ? { text } : {});
+    }
+    listGrants(kbId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}/grants`);
+    }
+    revokeGrant(kbId: string, grantId: string): Promise<{ deleted: boolean }> {
+        return request(this.config, 'DELETE', `/v1/knowledge-bases/${kbId}/grants/${grantId}`);
     }
     grant(kbId: string, params: { subject_type: string; subject_id: string; permissions?: string[] }): Promise<unknown> {
         return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/grants`, params);
@@ -285,14 +297,23 @@ export class SkillsNamespace {
     get(skillId: string): Promise<unknown> {
         return request(this.config, 'GET', `/v1/skills/${skillId}`);
     }
+    update(skillId: string, params: { name?: string; description?: string; visibility?: string; status?: string }): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/skills/${skillId}`, params);
+    }
     createVersion(skillId: string, params: { version: string; content?: string; files?: Array<{ path?: string; content?: string }> }): Promise<unknown> {
         return request(this.config, 'POST', `/v1/skills/${skillId}/versions`, params);
     }
     listVersions(skillId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/skills/${skillId}/versions`);
     }
+    getVersion(skillId: string, version: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/skills/${skillId}/versions/${version}`);
+    }
     publishVersion(skillId: string, version: string, params?: { reviewed_by?: string }): Promise<unknown> {
         return request(this.config, 'POST', `/v1/skills/${skillId}/versions/${version}/publish`, params ?? {});
+    }
+    deprecateVersion(skillId: string, version: string): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/skills/${skillId}/versions/${version}/deprecate`, {});
     }
 }
 
@@ -370,12 +391,15 @@ export class McpServersNamespace {
     }
 }
 
-// ── Webhooks + usage ─────────────────────────────────────
+// ── Webhooks + usage + billing admin ───────────────────────
 
 export class WebhooksNamespace {
     constructor(private config: Required<CencoriConfig>) {}
     create(params: { name: string; url: string; events?: string[] }): Promise<unknown> {
         return request(this.config, 'POST', '/v1/webhooks', params);
+    }
+    update(webhookId: string, params: { name?: string; url?: string; events?: string[]; is_active?: boolean }): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/webhooks/${webhookId}`, params);
     }
     list(): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', '/v1/webhooks');
@@ -409,5 +433,25 @@ export class UsageNamespace {
             throw new Error(`Cencori API error: ${response.statusText}`);
         }
         return response.text();
+    }
+}
+
+export class EndUsersNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    list(limit?: number): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/end-users${qs({ limit })}`);
+    }
+    upsert(params: { external_id: string; display_name?: string; email?: string; rate_plan_id?: string | null; is_blocked?: boolean; metadata?: Record<string, unknown> }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/end-users', params);
+    }
+}
+
+export class RatePlansNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    list(): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', '/v1/rate-plans');
+    }
+    create(params: { name: string; slug?: string; markup_percentage?: number; flat_rate?: number; currency?: string }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/rate-plans', params);
     }
 }

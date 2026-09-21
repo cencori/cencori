@@ -48,7 +48,7 @@ async function dispatchExecution(
         // Default-deny egress: the effective version ∩ installation network
         // policy must allowlist the server host (plus outbound safety).
         const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
-        const netPolicy = await resolveActionNetworkPolicy(supabase as never, { run_id: (action as { run_id?: string | null }).run_id ?? null, approval_policy: action.approval_policy });
+        const netPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: action.project_id, run_id: (action as { run_id?: string | null }).run_id ?? null, approval_policy: action.approval_policy });
         const egress = await checkEgress(s.url, netPolicy);
         if (!egress.allowed) {
             throw new Error(`Network policy denied MCP egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`);

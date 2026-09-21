@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ runId: str
     if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
     const { runId } = await ctx.params;
 
-    let body: { agent_version_id?: string; input?: unknown };
+    let body: { agent_version_id?: string; input?: unknown; installation_id?: string };
     try {
         body = await req.json();
     } catch {
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ runId: str
             parentRunId: dePrefixId(runId),
             childVersionId: body.agent_version_id,
             input: body.input ?? {},
+            installationId: body.installation_id ?? null,
             idempotencyKey: getIdempotencyKey(req.headers),
         });
         return addGatewayHeaders(

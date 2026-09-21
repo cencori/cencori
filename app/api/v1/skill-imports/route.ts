@@ -80,7 +80,8 @@ async function extractZip(buffer: Buffer): Promise<SkillFile[]> {
 function githubCodeloadUrl(repoUrl: string): string | null {
     const m = repoUrl.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?(?:\/|$)/i);
     if (!m) return null;
-    return `https://codeload.github.com/${m[1]}/tar.gz/HEAD`;
+    // Zipball: the importer extracts ZIP only (tar.gz is unsupported).
+    return `https://codeload.github.com/${m[1]}/zip/HEAD`;
 }
 
 // POST /v1/skill-imports — exactly one source; staged, never auto-published.

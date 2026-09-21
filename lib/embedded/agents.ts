@@ -38,35 +38,53 @@ export async function syncAgentVersionSkills(
 }
 
 /**
- * Pin an agent version's allowed subagent edges. Child versions must already
- * be validated as published; RESTRICT guards them against deletion.
+ * Pin an agent version's allowed subagent edges. Every child is re-verified
+ * in-project and published here so edges can never smuggle a foreign version
+ * even if validation was bypassed.
  */
 export async function syncAgentVersionSubagents(
     supabase: Admin,
     agentVersionId: string,
     subagents: Array<{ agent_version_id: string; max_calls?: number }>,
+    projectId?: string,
 ): Promise<void> {
-    await supabase.from('agent_version_subagents').delete().eq('parent_agent_version_id', agentVersionId);
+    const clean: Array<{ id: string; max_calls: number }> = [];
     const seen = new Set<string>();
     for (const sub of subagents) {
         const childId = sub.agent_version_id.replace(/^(agv_)/, '');
         if (seen.has(childId)) continue;
         seen.add(childId);
+        if (projectId) {
+            const { data: child } = await supabase
+                .from('agent_versions')
+                .select('id, status, agents!inner(id, project_id)')
+                .eq('id', childId)
+                .eq('agents.project_id', projectId)
+                .maybeSingle();
+            if (!child || (child.status as string) !== 'published') {
+                throw new Error(`Subagent version '${sub.agent_version_id}' is not published in this project`);
+            }
+        }
+        clean.push({ id: childId, max_calls: Math.min(25, Math.max(1, sub.max_calls ?? 1)) });
+    }
+    await supabase.from('agent_version_subagents').delete().eq('parent_agent_version_id', agentVersionId);
+    for (const { id, max_calls } of clean) {
         const { error } = await supabase.from('agent_version_subagents').insert({
             parent_agent_version_id: agentVersionId,
-            child_agent_version_id: childId,
-            max_calls: Math.min(25, Math.max(1, sub.max_calls ?? 1)),
+            child_agent_version_id: id,
+            max_calls,
         });
         if (error) throw new Error(`Failed to pin subagent edge: ${error.message}`);
     }
 }
 
-/** BFS over delegation edges for indirect cycles (bounded, read-only). */
+/** BFS over delegation edges for indirect cycles (bounded, project-scoped, read-only). */
 export async function delegationReachesAgent(
     supabase: Admin,
     fromVersionId: string,
     targetAgentId: string,
     maxDepth = 8,
+    projectId?: string,
 ): Promise<boolean> {
     let frontier = [fromVersionId];
     const visited = new Set<string>([fromVersionId]);
@@ -77,7 +95,9 @@ export async function delegationReachesAgent(
             .in('parent_agent_version_id', frontier);
         const children = ((edges ?? []) as Array<{ child_agent_version_id: string }>).map((e) => e.child_agent_version_id).filter((id) => !visited.has(id));
         if (children.length === 0) return false;
-        const { data: versions } = await supabase.from('agent_versions').select('id, agent_id').in('id', children);
+        let query = supabase.from('agent_versions').select('id, agent_id').in('id', children);
+        if (projectId) query = query.eq('project_id', projectId) as typeof query;
+        const { data: versions } = await query;
         for (const v of (versions ?? []) as Array<{ id: string; agent_id: string }>) {
             visited.add(v.id);
             if (v.agent_id === targetAgentId) return true;
