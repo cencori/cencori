@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
     if (!body.name?.trim() || !body.url?.trim()) {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'name and url are required', { requestId }), { requestId });
     }
+    // The legacy HTTP+SSE transport is deprecated by the spec and not
+    // implemented: Streamable HTTP (modern stateless with legacy handshake
+    // fallback) is the only supported transport for new servers. Rows created
+    // before this change keep working through the legacy POST path.
+    if (body.transport === 'sse') {
+        return addGatewayHeaders(embeddedError(400, 'unsupported_transport', 'The sse transport is not supported; register the server URL with transport streamable-http', { requestId }), { requestId });
+    }
     let safeUrl: URL;
     try {
         safeUrl = await assertSafeOutboundUrl(body.url.trim());

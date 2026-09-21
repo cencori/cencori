@@ -12,11 +12,14 @@ export interface DiscoveredTool {
 }
 
 export type McpTransport = 'streamable-http' | 'sse';
+// NOTE: 'sse' survives only for rows stored before the HTTP+SSE transport was
+// retired from registration. Those rows use the legacy POST fallback path;
+// new servers must register as streamable-http (dual modern/legacy).
 
 /** Spec 2026-07-28: stateless core, header-routed requests, no handshake. */
 export const MCP_MODERN_PROTOCOL_VERSION = '2026-07-28';
-/** Legacy stateful Streamable HTTP: initialize handshake + session ID. */
-export const MCP_LEGACY_PROTOCOL_VERSION = '2024-11-05';
+/** Latest handshake-era revision (legacy era spans 2024-10-07 … 2025-11-25). */
+export const MCP_LEGACY_PROTOCOL_VERSION = '2025-11-25';
 const CLIENT_IDENTITY = { name: 'cencori-embedded', version: '1.0' };
 
 interface RpcResult {
@@ -74,9 +77,11 @@ function modernHeaders(base: Record<string, string>, method: string, name?: stri
 function isModernNotSupported(error: unknown): boolean {
     const status = (error as { httpStatus?: number })?.httpStatus;
     if (status === 400 || status === 404 || status === 405 || status === 501) return true;
+    // 401/403 are auth walls and 5xx is server failure — neither is era evidence.
     const code = (error as { code?: number })?.code;
-    // JSON-RPC method-not-found / invalid-request: server predates header routing.
-    if (code === -32601 || code === -32600) return true;
+    // method-not-found / invalid-request: server predates header routing.
+    // -32022 UnsupportedProtocolVersion: explicit modern-to-legacy downgrade signal.
+    if (code === -32601 || code === -32600 || code === -32022) return true;
     return false;
 }
 
@@ -84,7 +89,9 @@ function isModernNotSupported(error: unknown): boolean {
  * Legacy handshake: initialize → session ID → initialized notification.
  * The session ID is captured from the Mcp-Session-Id RESPONSE HEADER first
  * (stateful Streamable HTTP servers), falling back to a sessionId in the
- * initialize result for older implementations.
+ * initialize result for older implementations. The server-negotiated
+ * protocol version is propagated on all subsequent legacy requests via
+ * MCP-Protocol-Version — only the session ID is not enough.
  */
 export async function initializeMcpSession(url: string, headers: Record<string, string>): Promise<Record<string, string>> {
     const normalized = url.replace(/\/$/, '');
@@ -94,9 +101,11 @@ export async function initializeMcpSession(url: string, headers: Record<string, 
         clientInfo: CLIENT_IDENTITY,
     });
     const headerSession = responseHeaders.get('mcp-session-id');
-    const bodySession = result && typeof result === 'object' ? (result as { sessionId?: unknown }).sessionId : undefined;
-    const sessionId = headerSession || (typeof bodySession === 'string' ? bodySession : null);
-    const sessionHeaders = sessionId ? { ...headers, 'mcp-session-id': sessionId } : headers;
+    const body = (result ?? {}) as { sessionId?: unknown; protocolVersion?: unknown };
+    const sessionId = headerSession || (typeof body.sessionId === 'string' ? body.sessionId : null);
+    const negotiatedVersion = typeof body.protocolVersion === 'string' ? body.protocolVersion : MCP_LEGACY_PROTOCOL_VERSION;
+    const sessionHeaders: Record<string, string> = { ...headers, 'MCP-Protocol-Version': negotiatedVersion };
+    if (sessionId) sessionHeaders['mcp-session-id'] = sessionId;
     try {
         await rpc(normalized, sessionHeaders, 'notifications/initialized', {});
     } catch {
