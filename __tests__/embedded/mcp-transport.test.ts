@@ -139,6 +139,35 @@ describe('legacy session fallback', () => {
         expect(mockedFetch).toHaveBeenCalledTimes(1);
     });
 
+    it('treats -32022 UnsupportedProtocolVersion as a downgrade signal', async () => {
+        mockedFetch
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 1, error: { code: -32022, message: 'UnsupportedProtocolVersion' } }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 2, result: { protocolVersion: '2025-11-25' } }, { 'mcp-session-id': 'sess-9' }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 3, result: {} }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 4, result: { tools: [{ name: 'downgraded' }] } }));
+        const { tools, transport } = await discoverMcpTools({ url: 'https://legacy.example.com/mcp' });
+        expect(transport).toBe('legacy');
+        expect(tools).toEqual([{ name: 'downgraded' }]);
+    });
+
+    it('propagates the negotiated version on post-handshake requests', async () => {
+        mockedFetch
+            .mockResolvedValueOnce(new Response('bad version', { status: 400 }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 1, result: { protocolVersion: '2025-11-25' } }, { 'mcp-session-id': 'sess-v' }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 2, result: {} }))
+            .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 3, result: { tools: [] } }));
+        await discoverMcpTools({ url: 'https://legacy.example.com/mcp' });
+        const listHeaders = (mockedFetch.mock.calls[3][1] as { headers: Record<string, string> }).headers;
+        expect(listHeaders['MCP-Protocol-Version']).toBe('2025-11-25');
+        expect(listHeaders['mcp-session-id']).toBe('sess-v');
+    });
+
+    it('never sends auth-wall or server-failure statuses into fallback', async () => {
+        mockedFetch.mockResolvedValueOnce(new Response('unauthorized', { status: 401 }));
+        await expect(discoverMcpTools({ url: 'https://mcp.example.com/mcp' })).rejects.toThrow(/401/);
+        expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('sse-declared servers skip the modern attempt', async () => {
         mockedFetch
             .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 1, result: {} }, { 'mcp-session-id': 's' }))
