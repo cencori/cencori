@@ -29,6 +29,7 @@ const PROJECT_ROOTS = new Set([
   "memory",
   "deployments",
   "monetization",
+  "embedded-agents",
   "webhooks",
   "settings",
 ]);

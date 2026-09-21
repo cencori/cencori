@@ -1,0 +1,55 @@
+---
+title: "Embedded Agents Overview"
+description: "The multi-tenant agent backend for SaaS products."
+section: "Embedded Agents"
+order: 1
+---
+
+## What it is
+
+Cencori Embedded Agents is the backend for SaaS products that embed agents: one API for models, providers, tenants, versions, installations, knowledge, tools, runs, approvals, webhooks, and metering.
+
+Your app owns the product experience. Cencori owns the hard infrastructure: isolation, execution, memory, approvals, observability, and economics.
+
+## The vertical slice
+
+1. `GET /v1/models` — unified registry (Cencori + BYOK + synced). Filter with `?available=true` for invokable-only.
+2. `POST /v1/provider-connections` — add BYOK; preview/apply a model sync without touching agent assignments.
+3. `POST /v1/tenants` — upsert a downstream company (idempotent by `external_id`).
+4. `POST /v1/agents/:id/versions` → submit → review → publish — immutable versions with `private|tenant|unlisted|public` visibility.
+5. `POST /v1/agent-installations` — bind version + knowledge + connections to a tenant. Missing requirements are returned, not guessed.
+6. `POST /v1/knowledge-bases/:id/sources` — ingest txt/md/pdf/docx; grant to the installation; search returns chunk citations.
+7. `POST /v1/client-tokens` — mint 15-minute `ect_` tokens; browsers never see your project secret.
+8. `POST /v1/sessions` + turns — chat scoped to tenant/user/installation; cross-tenant reads fail closed.
+9. `POST /v1/agents/:id/runs` — background work with idempotent creation, event log, and cancel.
+10. `POST /v1/actions/:id/approve` — consequential tools (Gmail send, MCP calls) execute exactly once under an execution key.
+11. Webhooks (`run.*`, `action.*`, `knowledge_source.*`, `connection.*`) — HMAC-signed, retried, replayable.
+12. `GET /v1/usage/export?format=csv` — invoice rows grouped by tenant and agent.
+
+## Tenancy model
+
+One Cencori project per application environment — not one project per downstream company. `tenant_id` is a typed column enforced in storage, retrieval, execution, billing, and logs. Metadata is never an authorization boundary.
+
+## TypeScript SDK
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+// Tenants → install → scoped session
+const tenant = await cencori.tenants.create({ external_id: 'company_123', name: 'Acme Ltd' });
+await cencori.installations.create({ tenant_id: tenant.id, agent_id: 'agt_...', version: '1.0.0' });
+const { token } = await cencori.clientTokens.mint({ tenant_id: tenant.id, external_user_id: 'u_1' });
+
+// Background run with idempotency
+const run = await cencori.runs.create('agt_...', { installation_id: 'ins_...', mode: 'background', input: { type: 'business_plan' } }, 'plan-company-123');
+
+// Approve a Gmail send exactly once
+await cencori.actions.approve('act_...');
+
+// Invoice export
+const summary = await cencori.usage.summary({ days: 30 });
+```
+
+See the full contract in `openapi/embedded-agents.json`.

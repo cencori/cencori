@@ -53,6 +53,14 @@ export interface GatewayContext {
     endUserBillingEnabled: boolean;
     /** Agent identity is loaded with the API-key cache to avoid a second key lookup. */
     agentId?: string | null;
+    /** M3 embedded attribution dims (set by scoped call sites: sessions, runs, ECT). */
+    embedded?: {
+        tenantId?: string | null;
+        agentId?: string | null;
+        installationId?: string | null;
+        sessionId?: string | null;
+        runId?: string | null;
+    };
     rateLimit?: {
         status: 'ok' | 'skipped' | 'failed_open' | 'failed_closed';
         limit: number;
@@ -84,6 +92,14 @@ export interface LogRequestParams {
     endUserId?: string;
     fallbackProvider?: string;
     fallbackModel?: string;
+    /** M3 embedded attribution dims (tenant/agent/installation/session/run). */
+    embedded?: {
+        tenantId?: string | null;
+        agentId?: string | null;
+        installationId?: string | null;
+        sessionId?: string | null;
+        runId?: string | null;
+    };
 }
 
 // ──────────────────────────────────────────────
@@ -916,6 +932,7 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
     waitUntil(recordGatewayGovernanceDecision(context, params));
 
     try {
+        const embeddedDims = params.embedded ?? context.embedded ?? {};
         const { data, error } = await context.supabase.from('ai_requests').insert({
             project_id: context.projectId,
             api_key_id: context.apiKeyId,
@@ -935,6 +952,12 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
             ip_address: context.clientIp,
             country_code: context.countryCode,
             end_user_id: params.endUserId,
+            // M3 embedded attribution (nullable; pre-M3 rows stay null).
+            tenant_id: embeddedDims.tenantId ?? null,
+            agent_id: embeddedDims.agentId ?? context.agentId ?? null,
+            installation_id: embeddedDims.installationId ?? null,
+            session_id: embeddedDims.sessionId ?? null,
+            run_id: embeddedDims.runId ?? null,
             error_message: params.errorMessage,
             metadata: params.metadata || {},
             // request_payload is NOT NULL in the live schema — omitting it makes

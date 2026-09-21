@@ -1,27 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
-import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
-import { publicProviderLabel } from '@/lib/providers/branding';
 import { addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-gateway-logs';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
-import { getManagedProviderNames } from '@/lib/gateway/providers-setup';
-import { hasStaticPricing } from '@/lib/providers/pricing';
-import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
+import { buildUnifiedModelRegistry } from '@/lib/embedded/model-registry';
+import type { ModelSource } from '@/lib/embedded/types';
 
 /**
- * GET /api/v1/models
- * 
- * Lists all available models through the Cencori gateway.
- * Dynamically derived from lib/providers/config.ts — always up to date.
- * 
- * Headers:
- *   Authorization: Bearer <api_key>
- * 
- * Returns:
- *   200: { object: "list", data: [...models] }
- *   401: { error: "..." }
+ * GET /api/v1/models — single unified model registry (M0 ADR-002).
+ *
+ * Returns Cencori-managed + project BYOK/synced/custom models with per-project
+ * availability metadata. Filters narrow the registry; no second catalog endpoint.
+ *
+ * Query: ?provider= ?type= ?available=true ?source=cencori|byok|custom ?connection_id=prc_123
+ * Callers needing legacy callable-only behavior use ?available=true.
  */
 
 /**
@@ -31,31 +24,8 @@ import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
  * each serverless instance and the value drifts on every deploy. The pricing
  * row's created_at is the closest real answer — when the model became
  * available on Cencori — and it is stable across instances and deploys.
+ * (Registry assembly now lives in lib/embedded/model-registry.ts.)
  */
-const UNKNOWN_CREATED = 0;
-
-// Build models list once at module load from the provider config (single source of truth)
-const MODELS = SUPPORTED_PROVIDERS.flatMap(provider =>
-    provider.models.map(model => ({
-        id: model.id,
-        object: 'model' as const,
-        // Free-tier models run on Cencori's own upstream accounts, so Cencori is
-        // the provider the customer actually deals with. Paid models keep their
-        // real vendor id. See lib/providers/branding.ts.
-        owned_by: publicProviderLabel(provider.id, model.id),
-        name: model.name,
-        type: model.type,
-        context_window: model.contextWindow,
-        description: model.description,
-    }))
-);
-
-type CatalogModel = (typeof MODELS)[number] & { created: number };
-
-function toEpochSeconds(value: unknown): number {
-    const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
-    return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : UNKNOWN_CREATED;
-}
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -173,181 +143,58 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const availableProviderIds = getManagedProviderNames();
-
-    // Include project BYOK and custom providers/models for API-key scoped requests.
-    let customModels: CatalogModel[] = [];
-    if (apiLogContext?.projectId) {
-        const supabase = createAdminClient();
-        const { data: providerKeys } = await supabase
-            .from('provider_keys')
-            .select('provider')
-            .eq('project_id', apiLogContext.projectId)
-            .eq('is_active', true);
-        for (const providerKey of providerKeys ?? []) {
-            if (providerKey.provider) availableProviderIds.add(providerKey.provider);
-        }
-
-        const { data: projectCustomProviders, error: customProviderError } = await supabase
-            .from('custom_providers')
-            .select(`
-                id,
-                name,
-                created_at,
-                custom_models(model_name, display_name, is_active, created_at)
-            `)
-            .eq('project_id', apiLogContext.projectId)
-            .eq('is_active', true);
-
-        if (!customProviderError && Array.isArray(projectCustomProviders)) {
-            const customRows = projectCustomProviders.flatMap((provider) => {
-                const providerTag = `custom:${provider.id}`;
-                const models = (provider.custom_models || [])
-                    .filter((model) => model.model_name && model.is_active !== false)
-                    .map((model) => ({
-                        id: model.model_name as string,
-                        object: 'model' as const,
-                        created: toEpochSeconds(model.created_at),
-                        owned_by: providerTag,
-                        name: (model.display_name as string | null) || (model.model_name as string),
-                        type: 'chat' as const,
-                        context_window: 0,
-                        description: `Custom provider model (${provider.name})`,
-                    }));
-
-                const hasAliasModel = models.some((model) => model.id === provider.name);
-                const aliasModel = hasAliasModel
-                    ? []
-                    : [{
-                        id: provider.name,
-                        object: 'model' as const,
-                        // The alias stands for the provider, not one model.
-                        created: toEpochSeconds(provider.created_at),
-                        owned_by: providerTag,
-                        name: provider.name,
-                        type: 'chat' as const,
-                        context_window: 0,
-                        description: `Custom provider alias (${provider.name})`,
-                    }];
-
-                return [...models, ...aliasModel];
-            });
-
-            const seen = new Set<string>();
-            customModels = customRows.filter((row) => {
-                if (!row.id || seen.has(row.id)) {
-                    return false;
-                }
-                seen.add(row.id);
-                return true;
-            });
-        }
-    }
-
-    // Only advertise models that have exact pricing. Provider-wide guessed
-    // defaults are unsafe for billing and are intentionally not used.
-    const pricingClient = createAdminClient();
-    const { data: pricingRows, error: pricingError } = await pricingClient
-        .from('model_pricing')
-        // select('*') rather than naming next_*: PostgREST errors on an unknown
-        // column, which would 503 the whole catalog if this ships before the
-        // migration that adds them.
-        .select('*')
-        .eq('is_active', true);
-    if (pricingError) {
-        return respond(
-            NextResponse.json({
-                error: {
-                    message: 'Model pricing catalog is temporarily unavailable',
-                    type: 'server_error',
-                    code: 'pricing_catalog_unavailable',
-                },
-            }, { status: 503 }),
-            'pricing_catalog_unavailable',
-            pricingError.message,
-        );
-    }
-    // A row whose promotional rate has lapsed still counts as priced when it
-    // carries the follow-on rate it switches to — that is a scheduled
-    // changeover, not a gap. Without one it drops out, same as before.
-    const activePricingRows = (pricingRows ?? [])
-        .filter(row => !row.pricing_expires_at
-            || Date.parse(row.pricing_expires_at) > Date.now()
-            || (row.next_input_price_per_1k_tokens != null
-                && row.next_output_price_per_1k_tokens != null));
-    const pricedModels = new Set(
-        activePricingRows.map(row => `${row.provider}:${row.model_name}`)
-    );
-    // When the model became available on Cencori. Stable across instances and
-    // deploys, unlike a boot-time timestamp.
-    const createdByModel = new Map<string, number>(
-        activePricingRows.map(row => [
-            `${row.provider}:${row.model_name}`,
-            toEpochSeconds(row.created_at),
-        ])
-    );
-
-    // Optional filtering by provider or type (Restored Feature)
     const url = new URL(req.url);
     const filterProvider = url.searchParams.get('provider');
     const filterType = url.searchParams.get('type');
+    const availableParam = url.searchParams.get('available');
+    const sourceParam = url.searchParams.get('source') as ModelSource | null;
+    const connectionParam = url.searchParams.get('connection_id');
 
-    const visibleCustomModels = customModels.filter((model) =>
-        resolveApiKeyModelAccess({
-            ...apiKeyModelAccess,
-            provider: model.owned_by,
-            model: model.id,
-        }).allowed
-    );
-
-    let filteredModels: CatalogModel[] = [
-        ...MODELS.filter((model) =>
-            availableProviderIds.has(model.owned_by)
-            && resolveApiKeyModelAccess({
-                ...apiKeyModelAccess,
-                provider: model.owned_by,
-                model: model.id,
-            }).allowed
-            && (
-                pricedModels.has(`${model.owned_by}:${model.id}`)
-                || hasStaticPricing(model.owned_by, model.id)
-            ))
-            // Statically-priced models have no pricing row to date them.
-            .map((model) => ({
-                ...model,
-                created: createdByModel.get(`${model.owned_by}:${model.id}`) ?? UNKNOWN_CREATED,
-            })),
-        ...visibleCustomModels,
-    ];
-    if (filterProvider) {
-        filteredModels = filteredModels.filter(m => m.owned_by === filterProvider);
-    }
-    if (filterType) {
-        filteredModels = filteredModels.filter(m => {
-            const types = Array.isArray(m.type) ? m.type : [m.type];
-            return types.includes(filterType);
-        });
-    }
+    const registry = await buildUnifiedModelRegistry(createAdminClient() as never, {
+        projectId: apiLogContext?.projectId ?? null,
+        keyAccess: apiKeyModelAccess,
+        query: {
+            provider: filterProvider,
+            type: filterType,
+            available: availableParam === 'true' ? true : availableParam === 'false' ? false : null,
+            source: sourceParam === 'cencori' || sourceParam === 'byok' || sourceParam === 'custom' ? sourceParam : null,
+            connectionId: connectionParam,
+        },
+    });
 
     return respond(
         NextResponse.json({
             object: 'list',
-            data: filteredModels,
-            providers: [
-                ...SUPPORTED_PROVIDERS
-                    .filter((provider) => availableProviderIds.has(provider.id))
-                    .map(provider => ({
-                        id: provider.id,
-                        name: provider.name,
-                        model_count: filteredModels.filter(model => model.owned_by === provider.id).length,
-                    }))
-                    .filter(provider => provider.model_count > 0),
-                ...Array.from(new Set(visibleCustomModels.map(model => model.owned_by))).map((providerId) => ({
-                    id: providerId,
-                    name: providerId,
-                    model_count: visibleCustomModels.filter(model => model.owned_by === providerId).length,
-                })),
-            ],
+            data: registry.models.map((m) => ({
+                id: m.id,
+                object: 'model',
+                created: m.created,
+                owned_by: m.owned_by,
+                name: m.name,
+                // Backward compat: legacy `type` (first capability) + canonical `types`.
+                type: m.types[0] ?? 'chat',
+                types: m.types,
+                context_window: m.context_window,
+                description: m.description,
+                // Unified registry extensions (additive).
+                provider: m.provider,
+                source: m.source,
+                connection_id: m.connection_id,
+                status: m.status,
+                available: m.available,
+                unavailable_reason: m.unavailable_reason,
+                byok_supported: m.byok_supported,
+                managed_access: m.managed_access,
+                pricing_status: m.pricing_status,
+                pricing: m.pricing ?? undefined,
+            })),
+            providers: registry.providers.map((p) => ({
+                id: p.id,
+                name: p.name,
+                supports_byok: p.supports_byok,
+                connection_status: p.connection_status,
+                model_count: p.model_count,
+            })),
         })
     );
 }

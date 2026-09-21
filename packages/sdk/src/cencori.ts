@@ -39,6 +39,20 @@ import { MemoryClient } from './memory';
 import { ChatNamespace } from './chat';
 import { TelemetryClient } from './telemetry';
 import { WebNamespace } from './web';
+import {
+    TenantsNamespace,
+    ClientTokensNamespace,
+    ModelsNamespace,
+    ProviderConnectionsNamespace,
+    AgentVersionsNamespace,
+    InstallationsNamespace,
+    RunsNamespace,
+    ActionsNamespace,
+    KnowledgeNamespace,
+    ConnectionsNamespace,
+    WebhooksNamespace,
+    UsageNamespace,
+} from './embedded';
 import { fetchWithRetry } from './utils';
 import {
     CencoriError,
@@ -223,6 +237,20 @@ export class Cencori {
      */
     readonly web: WebNamespace;
 
+    /** Embedded Agents - multi-tenant agent backend (tenants, versions, runs, knowledge). */
+    readonly tenants: TenantsNamespace;
+    readonly clientTokens: ClientTokensNamespace;
+    readonly models: ModelsNamespace;
+    readonly providerConnections: ProviderConnectionsNamespace;
+    readonly agentVersions: AgentVersionsNamespace;
+    readonly installations: InstallationsNamespace;
+    readonly runs: RunsNamespace;
+    readonly actions: ActionsNamespace;
+    readonly knowledge: KnowledgeNamespace;
+    readonly connections: ConnectionsNamespace;
+    readonly webhooks: WebhooksNamespace;
+    readonly usage: UsageNamespace;
+
     /**
      * Create a new Cencori client
      * 
@@ -266,6 +294,18 @@ export class Cencori {
         this.sessions = new SessionsNamespace(this.config);
         this.telemetry = new TelemetryClient(this.config);
         this.web = new WebNamespace(this.config);
+        this.tenants = new TenantsNamespace(this.config);
+        this.clientTokens = new ClientTokensNamespace(this.config);
+        this.models = new ModelsNamespace(this.config);
+        this.providerConnections = new ProviderConnectionsNamespace(this.config);
+        this.agentVersions = new AgentVersionsNamespace(this.config);
+        this.installations = new InstallationsNamespace(this.config);
+        this.runs = new RunsNamespace(this.config);
+        this.actions = new ActionsNamespace(this.config);
+        this.knowledge = new KnowledgeNamespace(this.config);
+        this.connections = new ConnectionsNamespace(this.config);
+        this.webhooks = new WebhooksNamespace(this.config);
+        this.usage = new UsageNamespace(this.config);
     }
 
     /**

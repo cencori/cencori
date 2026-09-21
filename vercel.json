@@ -49,6 +49,114 @@
             "destination": "/api/v1/agent/actions/poll"
         },
         {
+            "source": "/v1/tenants",
+            "destination": "/api/v1/tenants"
+        },
+        {
+            "source": "/v1/tenants/:path*",
+            "destination": "/api/v1/tenants/:path*"
+        },
+        {
+            "source": "/v1/client-tokens",
+            "destination": "/api/v1/client-tokens"
+        },
+        {
+            "source": "/v1/provider-connections",
+            "destination": "/api/v1/provider-connections"
+        },
+        {
+            "source": "/v1/provider-connections/:path*",
+            "destination": "/api/v1/provider-connections/:path*"
+        },
+        {
+            "source": "/v1/agent-catalog",
+            "destination": "/api/v1/agent-catalog"
+        },
+        {
+            "source": "/v1/agent-installations",
+            "destination": "/api/v1/agent-installations"
+        },
+        {
+            "source": "/v1/agent-installations/:path*",
+            "destination": "/api/v1/agent-installations/:path*"
+        },
+        {
+            "source": "/v1/runs/:path*",
+            "destination": "/api/v1/runs/:path*"
+        },
+        {
+            "source": "/v1/actions",
+            "destination": "/api/v1/actions"
+        },
+        {
+            "source": "/v1/actions/:path*",
+            "destination": "/api/v1/actions/:path*"
+        },
+        {
+            "source": "/v1/knowledge-bases",
+            "destination": "/api/v1/knowledge-bases"
+        },
+        {
+            "source": "/v1/knowledge-bases/:path*",
+            "destination": "/api/v1/knowledge-bases/:path*"
+        },
+        {
+            "source": "/v1/connectors/:path*",
+            "destination": "/api/v1/connectors/:path*"
+        },
+        {
+            "source": "/v1/connectors",
+            "destination": "/api/v1/connectors"
+        },
+        {
+            "source": "/v1/connections",
+            "destination": "/api/v1/connections"
+        },
+        {
+            "source": "/v1/connections/:path*",
+            "destination": "/api/v1/connections/:path*"
+        },
+        {
+            "source": "/v1/mcp/:path*",
+            "destination": "/api/v1/mcp/:path*"
+        },
+        {
+            "source": "/v1/webhooks",
+            "destination": "/api/v1/webhooks"
+        },
+        {
+            "source": "/v1/webhooks/:path*",
+            "destination": "/api/v1/webhooks/:path*"
+        },
+        {
+            "source": "/v1/webhook-deliveries/:path*",
+            "destination": "/api/v1/webhook-deliveries/:path*"
+        },
+        {
+            "source": "/v1/usage",
+            "destination": "/api/v1/usage"
+        },
+        {
+            "source": "/v1/usage/:path*",
+            "destination": "/api/v1/usage/:path*"
+        },
+        {
+            "source": "/v1/end-users",
+            "destination": "/api/v1/end-users"
+        },
+        {
+            "source": "/v1/end-users/:path*",
+            "destination": "/api/v1/end-users/:path*"
+        },
+        {
+            "source": "/v1/rate-plans",
+            "destination": "/api/v1/rate-plans"
+        },
+        {
+            "source": "/v1/rate-plans/:path*",
+            "destination": "/api/v1/rate-plans/:path*"
+        },
+        {
             "source": "/v1/billing/:path*",
             "destination": "/api/v1/billing/:path*"
         },

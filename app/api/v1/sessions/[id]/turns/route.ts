@@ -9,7 +9,11 @@ import {
     incrementUsage,
     type GatewayContext,
 } from "@/lib/gateway-middleware";
-import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { extractBearerToken, extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { verifyClientToken } from "@/lib/embedded/client-tokens";
+import { CLIENT_TOKEN_PREFIX } from "@/lib/embedded/types";
+import { dePrefixId } from "@/lib/embedded/http";
+import { denyOnScopeMismatch, hasClientPermission } from "@/lib/embedded/session-auth";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import type { ResponseInputItem } from "@/lib/gateway/v1-responses-execute";
@@ -96,13 +100,52 @@ export async function POST(
 
     try {
         const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
+        let embeddedScope: { tenantId: string; externalUserId: string; installationIds?: string[]; permissions?: string[] } | null = null;
         if (!providedApiKey) {
-            return respondError(401, "Missing CENCORI_API_KEY", "missing_api_key");
+            const bearer = extractBearerToken(req.headers.get('Authorization'));
+            if (bearer?.startsWith(CLIENT_TOKEN_PREFIX)) {
+                const verified = verifyClientToken(bearer);
+                if (!verified.ok) return respondError(401, verified.message, verified.code);
+                const admin = createAdminClient();
+                const { data: project } = await admin.from('projects').select('id, organization_id').eq('id', verified.claims.project_id).maybeSingle();
+                if (!project) return respondError(401, 'Invalid client token project', 'client_token_revoked');
+                const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
+                if (!tenant || (tenant.status as string) !== 'active') return respondError(403, 'Tenant is not active', 'tenant_suspended');
+                gatewayCtx = {
+                    supabase: admin as never,
+                    projectId: verified.claims.project_id,
+                    organizationId: (project.organization_id as string) ?? '',
+                    apiKeyId: null,
+                    allowedModels: null,
+                    sponsoredModels: null,
+                    fullySponsoredKey: false,
+                    environment: verified.claims.env,
+                    keyType: 'client_token',
+                    tier: 'embedded',
+                    requestId: (await import('crypto')).randomUUID(),
+                    startTime: Date.now(),
+                    clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '',
+                    countryCode: null,
+                    projectName: '',
+                    defaultModel: null,
+                    defaultProvider: null,
+                    endUserBillingEnabled: false,
+                } as unknown as GatewayContext;
+                embeddedScope = { tenantId: tenant.id as string, externalUserId: verified.claims.external_user_id, installationIds: verified.claims.installation_ids?.map(dePrefixId), permissions: verified.claims.permissions };
+                if (!hasClientPermission(embeddedScope, 'sessions:turn')) {
+                    return respondError(403, 'Client token lacks sessions:turn permission', 'insufficient_scope');
+                }
+            } else {
+                return respondError(401, "Missing CENCORI_API_KEY", "missing_api_key");
+            }
+        } else {
+            const validation = await validateGatewayRequest(req);
+            if (!validation.success) return validation.response;
+            if (validation.context.keyType !== 'secret') {
+                return respondError(403, "This operation requires a secret project key", "secret_key_required");
+            }
+            gatewayCtx = validation.context;
         }
-
-        const validation = await validateGatewayRequest(req);
-        if (!validation.success) return validation.response;
-        gatewayCtx = validation.context;
 
         // ── Agent resolution ──
         const adminClient = createAdminClient();
@@ -113,7 +156,7 @@ export async function POST(
         // Fetch session first
         const { data: session, error: sessionError } = await adminClient
             .from('sessions')
-            .select('id, project_id, organization_id, status, last_turn_number, agent_id, metadata')
+            .select('id, project_id, organization_id, status, last_turn_number, agent_id, metadata, tenant_id, external_user_id, installation_id')
             .eq('id', sessionId)
             .single();
 
@@ -121,7 +164,7 @@ export async function POST(
             return respondError(404, "Session not found", "session_not_found");
         }
 
-        if (session.project_id !== gatewayCtx.projectId) {
+        if (denyOnScopeMismatch(session as { project_id: string; tenant_id?: string | null; external_user_id?: string | null; installation_id?: string | null }, (gatewayCtx as GatewayContext).projectId, embeddedScope)) {
             return respondError(404, "Session not found", "session_not_found");
         }
 
@@ -150,6 +193,17 @@ export async function POST(
             // No agent — allowed
         } else if (agentResult.response) {
             return respond(agentResult.response, agentResult.errorCode, agentResult.errorMessage);
+        }
+
+        // M3: attribute usage to tenant/agent/installation/session.
+        {
+            const s = session as { tenant_id?: string | null; installation_id?: string | null };
+            (gatewayCtx as GatewayContext).embedded = {
+                tenantId: s.tenant_id ?? embeddedScope?.tenantId ?? null,
+                agentId: agentId,
+                installationId: s.installation_id ?? embeddedScope?.installationIds?.[0] ?? null,
+                sessionId: sessionId,
+            };
         }
 
         // ── Parse Request Body ──
@@ -392,6 +446,33 @@ export async function POST(
             for (const toolType of agentConfig.tools) {
                 if (!existingTypes.has(toolType)) {
                     tools.push({ type: toolType } as never);
+                }
+            }
+        }
+
+        // M2: enforce installation tool allowlists (discovered ∩ allowed).
+        // Empty allowlist = allow all (M2 default; strict-deny lands with M3 governance).
+        {
+            const installationId = (session as { installation_id?: string | null }).installation_id;
+            if (installationId) {
+                const { data: conns } = await adminClient.from('installation_connections').select('allowed_tools').eq('installation_id', installationId);
+                const union = new Set<string>();
+                let hasAllowlist = false;
+                for (const c of (conns ?? []) as Array<{ allowed_tools?: string[] }>) {
+                    const list = Array.isArray(c.allowed_tools) ? c.allowed_tools : [];
+                    if (list.length > 0) {
+                        hasAllowlist = true;
+                        for (const t of list) union.add(t);
+                    }
+                }
+                if (hasAllowlist) {
+                    const filtered = tools.filter((t) => {
+                        const tool = t as { type?: string; function?: { name?: string } };
+                        if (tool.type !== 'function') return true;
+                        return union.has(tool.function?.name ?? '');
+                    });
+                    tools.length = 0;
+                    tools.push(...filtered);
                 }
             }
         }

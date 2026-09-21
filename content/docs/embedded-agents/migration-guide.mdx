@@ -1,0 +1,29 @@
+---
+title: "Migration Guide"
+description: "Adopt Embedded Agents from dashboard-only flows and metadata tenancy."
+section: "Embedded Agents"
+order: 2
+---
+
+## From callable-only models to the unified registry
+
+`GET /v1/models` now returns the complete registry with `available` + `unavailable_reason` per row. If your picker assumed every row was invokable, add `?available=true` — the old behavior — then adopt availability reasons (`provider_connection_required`, `pricing_required`, `model_not_allowed`) in your UI.
+
+SDK selectors default to `available=true`.
+
+## From dashboard provider keys to the Provider Control Plane
+
+Dashboard provider screens now sit over the same services as `POST /v1/provider-connections`. Migrate setup flows to secret-key endpoints: create → `POST .../test` → preview sync → apply. Official provider base URLs are never caller-editable; custom providers require explicit public HTTPS URLs.
+
+## From metadata tenancy to hard sub-tenancy
+
+If you passed `tenant_id` inside `metadata`, stop: metadata is analytics-only. Create `platform_tenants` rows, pass `tenant_id` as a typed field (sessions, runs, installations), and serve browsers with `ect_` client tokens. Scope is immutable once execution begins.
+
+## From single-agent config to versions
+
+`agent_configs` still works as the legacy fallback. New work should create immutable versions (`draft → validating → ready_for_review → published`), point `stable` at the blessed row, and let installations pin or follow `stable`. Rollback repoints to the previous version id.
+
+## Limits and deletion are now enforced
+
+- Plan caps (`EMBEDDED_LIMITS`) return `402` with stable codes (`tenant_limit_exceeded`, `installation_limit_exceeded`, `run_rate_exceeded` with `Retry-After`, `run_concurrency_exceeded`).
+- `DELETE /v1/tenants/:id` now cascades (hard delete). `DELETE .../users/:id?hard=true` forgets the user including user-scoped memories.
