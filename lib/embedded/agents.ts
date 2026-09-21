@@ -20,6 +20,73 @@ export function checksumConfig(config: AgentVersionConfig): string {
     return crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
 }
 
+/**
+ * Pin an agent version's skill references as durable join rows (used for
+ * turn-time loading and audit). Refs must already be validated as published.
+ */
+export async function syncAgentVersionSkills(
+    supabase: Admin,
+    agentVersionId: string,
+    skillVersionIds: string[],
+): Promise<void> {
+    await supabase.from('agent_version_skills').delete().eq('agent_version_id', agentVersionId);
+    const clean = [...new Set(skillVersionIds.map((id) => id.replace(/^(skv_)/, '')))];
+    for (const skillVersionId of clean) {
+        const { error } = await supabase.from('agent_version_skills').insert({ agent_version_id: agentVersionId, skill_version_id: skillVersionId });
+        if (error) throw new Error(`Failed to pin skill reference: ${error.message}`);
+    }
+}
+
+/**
+ * Pin an agent version's allowed subagent edges. Child versions must already
+ * be validated as published; RESTRICT guards them against deletion.
+ */
+export async function syncAgentVersionSubagents(
+    supabase: Admin,
+    agentVersionId: string,
+    subagents: Array<{ agent_version_id: string; max_calls?: number }>,
+): Promise<void> {
+    await supabase.from('agent_version_subagents').delete().eq('parent_agent_version_id', agentVersionId);
+    const seen = new Set<string>();
+    for (const sub of subagents) {
+        const childId = sub.agent_version_id.replace(/^(agv_)/, '');
+        if (seen.has(childId)) continue;
+        seen.add(childId);
+        const { error } = await supabase.from('agent_version_subagents').insert({
+            parent_agent_version_id: agentVersionId,
+            child_agent_version_id: childId,
+            max_calls: Math.min(25, Math.max(1, sub.max_calls ?? 1)),
+        });
+        if (error) throw new Error(`Failed to pin subagent edge: ${error.message}`);
+    }
+}
+
+/** BFS over delegation edges for indirect cycles (bounded, read-only). */
+export async function delegationReachesAgent(
+    supabase: Admin,
+    fromVersionId: string,
+    targetAgentId: string,
+    maxDepth = 8,
+): Promise<boolean> {
+    let frontier = [fromVersionId];
+    const visited = new Set<string>([fromVersionId]);
+    for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+        const { data: edges } = await supabase
+            .from('agent_version_subagents')
+            .select('child_agent_version_id')
+            .in('parent_agent_version_id', frontier);
+        const children = ((edges ?? []) as Array<{ child_agent_version_id: string }>).map((e) => e.child_agent_version_id).filter((id) => !visited.has(id));
+        if (children.length === 0) return false;
+        const { data: versions } = await supabase.from('agent_versions').select('id, agent_id').in('id', children);
+        for (const v of (versions ?? []) as Array<{ id: string; agent_id: string }>) {
+            visited.add(v.id);
+            if (v.agent_id === targetAgentId) return true;
+        }
+        frontier = children;
+    }
+    return false;
+}
+
 export function validateVersionConfig(config: AgentVersionConfig): { ok: true } | { ok: false; message: string } {
     if (config.model !== undefined && (typeof config.model !== 'string' || !config.model.trim())) {
         return { ok: false, message: 'config.model must be a non-empty string' };

@@ -450,8 +450,10 @@ export async function POST(
             }
         }
 
-        // M2: enforce installation tool allowlists (discovered ∩ allowed).
-        // Empty allowlist = allow all (M2 default; strict-deny lands with M3 governance).
+        // Installation tool allowlists (discovered ∩ allowed). Default: an empty
+        // allowlist allows all function tools. Installations that set
+        // overlay_config.strict_tools=true deny every function tool unless an
+        // allowlist entry permits it.
         {
             const installationId = (session as { installation_id?: string | null }).installation_id;
             if (installationId) {
@@ -465,7 +467,12 @@ export async function POST(
                         for (const t of list) union.add(t);
                     }
                 }
-                if (hasAllowlist) {
+                let strict = false;
+                if (!hasAllowlist) {
+                    const { data: ins } = await adminClient.from('agent_installations').select('overlay_config').eq('id', installationId).maybeSingle();
+                    strict = ((ins as { overlay_config?: { strict_tools?: boolean } } | null)?.overlay_config?.strict_tools) === true;
+                }
+                if (hasAllowlist || strict) {
                     const filtered = tools.filter((t) => {
                         const tool = t as { type?: string; function?: { name?: string } };
                         if (tool.type !== 'function') return true;
@@ -497,6 +504,29 @@ export async function POST(
 
         const newTurnNumber = locked.last_turn_number;
 
+        // ── Installation knowledge + skills: best-effort retrieval for citations ──
+        let knowledgeContext: { block: string | null; citations: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> } | undefined;
+        let skillsBlock: string | null = null;
+        {
+            const installationId = (session as { installation_id?: string | null }).installation_id;
+            const tenantId = (session as { tenant_id?: string | null }).tenant_id ?? null;
+            if (installationId) {
+                try {
+                    const { retrieveTurnKnowledge, retrieveTurnSkills } = await import('@/lib/embedded/turn-knowledge');
+                    knowledgeContext = await retrieveTurnKnowledge(adminClient as never, {
+                        projectId: (gatewayCtx as GatewayContext).projectId,
+                        organizationId: (gatewayCtx as GatewayContext).organizationId,
+                        installationId,
+                        queryText: inputPipeline.inputText,
+                    });
+                    skillsBlock = (await retrieveTurnSkills(adminClient as never, { installationId, tenantId })).block;
+                } catch {
+                    knowledgeContext = undefined;
+                    skillsBlock = null;
+                }
+            }
+        }
+
         // ── Execute turn ──
         const execResult = await executeSessionTurn({
             supabase: adminClient,
@@ -516,6 +546,8 @@ export async function POST(
             tokenMap: inputPipeline.tokenMap,
             onCompletion: scheduleMemoryWriteback,
             pauseOnToolCalls: body.pause_on_tool_calls ?? false,
+            knowledgeContext,
+            skillsBlock: skillsBlock ?? undefined,
             endUserId,
             tier: (gatewayCtx.tier || "free") as SubscriptionTier,
             logSuccess: (meta) => {

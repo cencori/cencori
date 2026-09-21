@@ -22,6 +22,26 @@ async function resolveTenant(supabase: ReturnType<typeof createAdminClient>, pro
     return (byExt?.id as string) ?? null;
 }
 
+// GET /v1/mcp/servers — registered remote servers (snapshots included, secrets never).
+export async function GET(req: NextRequest) {
+    const requestId = crypto.randomUUID();
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) return validation.response;
+    if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
+    const supabase = createAdminClient();
+    const url = new URL(req.url);
+    const tenantFilter = url.searchParams.get('tenant_id');
+    let query = supabase.from('mcp_servers').select('*').eq('project_id', validation.context.projectId).order('created_at', { ascending: false }).limit(100);
+    if (tenantFilter) {
+        const tenantId = await resolveTenant(supabase, validation.context.projectId, tenantFilter);
+        if (!tenantId) return addGatewayHeaders(embeddedError(404, 'tenant_not_found', 'Tenant not found', { requestId }), { requestId });
+        query = query.eq('tenant_id', tenantId);
+    }
+    const { data, error } = await query;
+    if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
+    return addGatewayHeaders(NextResponse.json({ data: ((data ?? []) as Record<string, unknown>[]).map(serialize), next_cursor: null }), { requestId });
+}
+
 async function snapshotFor(supabase: ReturnType<typeof createAdminClient>, projectId: string, url: string, authConnectionId: string | null, organizationId: string, transport?: string) {
     const { mcpAuthHeaders, discoverMcpTools } = await import('@/lib/embedded/mcp');
     const headers = await mcpAuthHeaders(supabase as never, projectId, organizationId, authConnectionId);

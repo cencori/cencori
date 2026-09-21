@@ -164,6 +164,9 @@ export {
     ActionsNamespace,
     KnowledgeNamespace,
     ConnectionsNamespace,
+    McpServersNamespace,
+    SkillsNamespace,
+    SkillImportsNamespace,
     WebhooksNamespace,
     UsageNamespace,
 } from './embedded';

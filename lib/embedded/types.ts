@@ -42,6 +42,8 @@ export interface UnifiedModelRow {
     context_window: number;
     status: ModelLifecycleStatus;
     available: boolean;
+    /** True when the model advertises reasoning capabilities (reasoning_effort may be set). */
+    reasoning_supported: boolean;
     unavailable_reason: ModelUnavailableReason | null;
     byok_supported: boolean;
     managed_access: boolean;

@@ -1,0 +1,37 @@
+---
+title: "Skills and Imports"
+description: "Passive organization knowledge with staged scan, review, and publication."
+section: "Embedded Agents"
+order: 3
+---
+
+## Skills are passive, never executable
+
+A skill is reusable Markdown/text knowledge or procedure an agent loads when relevant. Skills are not connections, MCP servers, or tools. Alpha imports normalize to Markdown/text only — archives containing scripts, binaries, or hooks are rejected at scan time with actionable findings.
+
+## Lifecycle
+
+```
+author/paste → draft version → validate → staged import → review → publish (immutable)
+```
+
+- `POST /v1/skills` creates the stable identity (name, slug, visibility).
+- `POST /v1/skills/:id/versions` drafts content; every draft carries scan findings and a `blocked` flag.
+- `POST .../publish` requires zero blocking findings. Published versions are immutable; tenants keep working when you deprecate and replace.
+- Agent versions pin skill versions in their manifest (`skills: [{ skill_version_id }]`). Publishing an agent validates that each referenced skill version is published.
+
+## Staged imports
+
+`POST /v1/skill-imports` accepts exactly one source — `repository` (public GitHub, fetched as an archive), `url` (raw file or zip), `text`/`files` (paste), or multipart `file` (zip/md/txt). The import is normalized (Markdown/text kept, traversal and executables rejected), scanned, and staged as `ready_for_review`. Nothing becomes a production capability automatically.
+
+The scanner flags secrets (AWS keys, private keys, tokens), prompt-injection patterns, binaries, archive bombs, and oversized packages as blockers; external links are warnings. `POST .../publish` with `name` creates the skill and emits an immutable published version pinned to the scanned checksum.
+
+## Turn-time loading
+
+Sessions installed from a version with skill pins load published skill contents into context (capped, tenant-private skills only for their tenant). Skills never carry credentials.
+
+```typescript
+const skill = await cencori.skills.create({ name: 'Refund policy' });
+await cencori.skills.createVersion(skill.id, { version: '1.0.0', content: '# Refunds\n\n30 days.' });
+await cencori.skills.publishVersion(skill.id, '1.0.0', { reviewed_by: 'bola' });
+```

@@ -136,6 +136,10 @@ export const WEBHOOK_EVENTS = {
     CONNECTION_ERROR: 'connection.error',
     // M4 lifecycle.
     TENANT_DELETED: 'tenant.deleted',
+    // v1.1 subagent delegation.
+    SUBAGENT_CALLED: 'subagent.called',
+    SUBAGENT_COMPLETED: 'subagent.completed',
+    SUBAGENT_FAILED: 'subagent.failed',
 } as const;
 
 export type WebhookEventType = typeof WEBHOOK_EVENTS[keyof typeof WEBHOOK_EVENTS];

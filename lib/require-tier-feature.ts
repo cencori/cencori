@@ -35,6 +35,11 @@ const FEATURE_NAMES: Record<keyof TierFeatures, string> = {
   sso: 'SSO',
   teams: 'Team collaboration',
   embeddedAgents: 'Embedded Agents',
+  embeddedSkillLibrary: 'Embedded skill library',
+  embeddedSkillImport: 'Embedded skill imports',
+  embeddedRemoteMcp: 'Embedded remote MCP',
+  embeddedBrowserPolicy: 'Embedded browser/network policy',
+  embeddedSubagents: 'Embedded subagents',
 };
 
 const LOCAL_SECURITY_PREVIEW_FEATURES = new Set<keyof TierFeatures>([

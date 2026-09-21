@@ -31,5 +31,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ runId: str
     await supabase.from('embedded_runs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', run.id);
     await appendRunEvent(supabase as never, run.id, 'run.cancelled', { run_id: run.id });
     await emitEmbeddedEvent(run.project_id, 'run.cancelled', { run_id: run.id });
+    // Delegation propagates cancellation to active descendants.
+    try {
+        const { cancelChildRuns } = await import('@/lib/embedded/subagents');
+        await cancelChildRuns(supabase as never, run.id, run.project_id);
+    } catch {
+        // best-effort; parent cancellation already recorded
+    }
     return addGatewayHeaders(NextResponse.json({ id: withPrefix('run', run.id), status: 'cancelled' }), { requestId });
 }

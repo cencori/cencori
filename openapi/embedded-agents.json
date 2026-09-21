@@ -422,6 +422,17 @@
         }
       }
     },
+    "/v1/agents/{agentId}/versions/{version}/test": {
+      "post": {
+        "summary": "Sandboxed draft test (no persistence, capped tokens)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
     "/v1/agents/{agentId}/versions/{version}/validate": {
       "post": {
         "summary": "Validate draft (no side effects)",
@@ -720,9 +731,49 @@
         }
       }
     },
+    "/v1/mcp/servers/{serverId}": {
+      "get": {
+        "summary": "Get MCP server",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      },
+      "patch": {
+        "summary": "Update MCP server (URL re-validated)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      },
+      "delete": {
+        "summary": "Disable MCP server",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
     "/v1/mcp/servers/{serverId}/refresh-tools": {
       "post": {
         "summary": "Re-discover MCP tools (diff)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/mcp/servers/{serverId}/test": {
+      "post": {
+        "summary": "Live handshake probe (not persisted)",
         "responses": {
           "200": {
             "description": "OK"
@@ -927,6 +978,17 @@
         }
       }
     },
+    "/v1/runs/{runId}/delegate": {
+      "post": {
+        "summary": "Delegate a bounded task to an allowed subagent",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
     "/v1/runs/{runId}/events": {
       "get": {
         "summary": "Run event log",
@@ -1011,6 +1073,132 @@
             "description": "SSE stream"
           }
         }
+      }
+    },
+    "/v1/skill-imports": {
+      "post": {
+        "summary": "Stage an import (one source, never auto-publishes)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skill-imports/{importId}": {
+      "get": {
+        "summary": "Get staged import with findings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skill-imports/{importId}/publish": {
+      "post": {
+        "summary": "Review-gate publish of a staged import",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills": {
+      "get": {
+        "summary": "List skills",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      },
+      "post": {
+        "summary": "Create skill identity",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills/{skillId}": {
+      "get": {
+        "summary": "Get skill",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      },
+      "patch": {
+        "summary": "Update skill metadata",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills/{skillId}/versions": {
+      "get": {
+        "summary": "List skill versions",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      },
+      "post": {
+        "summary": "Draft skill version (scanned)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills/{skillId}/versions/{version}": {
+      "get": {
+        "summary": "Get skill version with content",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills/{skillId}/versions/{version}/deprecate": {
+      "post": {
+        "summary": "Deprecate skill version",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
+    "/v1/skills/{skillId}/versions/{version}/publish": {
+      "post": {
+        "summary": "Publish skill version (blockers reject)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
       }
     },
     "/v1/tenants": {

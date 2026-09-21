@@ -50,6 +50,9 @@ import {
     ActionsNamespace,
     KnowledgeNamespace,
     ConnectionsNamespace,
+    McpServersNamespace,
+    SkillsNamespace,
+    SkillImportsNamespace,
     WebhooksNamespace,
     UsageNamespace,
 } from './embedded';
@@ -248,6 +251,9 @@ export class Cencori {
     readonly actions: ActionsNamespace;
     readonly knowledge: KnowledgeNamespace;
     readonly connections: ConnectionsNamespace;
+    readonly mcpServers: McpServersNamespace;
+    readonly skills: SkillsNamespace;
+    readonly skillImports: SkillImportsNamespace;
     readonly webhooks: WebhooksNamespace;
     readonly usage: UsageNamespace;
 
@@ -304,6 +310,9 @@ export class Cencori {
         this.actions = new ActionsNamespace(this.config);
         this.knowledge = new KnowledgeNamespace(this.config);
         this.connections = new ConnectionsNamespace(this.config);
+        this.mcpServers = new McpServersNamespace(this.config);
+        this.skills = new SkillsNamespace(this.config);
+        this.skillImports = new SkillImportsNamespace(this.config);
         this.webhooks = new WebhooksNamespace(this.config);
         this.usage = new UsageNamespace(this.config);
     }

@@ -53,7 +53,7 @@ export interface SessionEventPayloadMap {
     'tool_call.completed': { tool?: string; output?: unknown; action_id?: string; call_id?: string; output_bytes?: number };
     'turn.paused': { reason: string; action_id: string; tool: string; arguments: Record<string, unknown>; actions?: Array<{ action_id: string; tool: string; arguments: string }> };
     'turn.resumed': { action_id: string; resolution: 'approved' | 'rejected' };
-    'turn.completed': { turn_number: number; output?: unknown; usage?: { input_tokens: number; output_tokens: number; total_tokens: number } };
+    'turn.completed': { turn_number: number; output?: unknown; usage?: { input_tokens: number; output_tokens: number; total_tokens: number }; knowledge_citations?: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
     'turn.failed': { turn_number: number; output: { error: string }; usage: { input_tokens: number; output_tokens: number; total_tokens: number } };
     'turn.checkpoint': { turn_number: number; messages: Array<{ role: string; content: string | null }> };
 }

@@ -48,10 +48,23 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
 
     const checked = validateVersionConfig(((target.config_json ?? {}) as Record<string, unknown>) as never);
     if (!checked.ok) return addGatewayHeaders(embeddedError(422, 'invalid_request_error', checked.message, { requestId }), { requestId });
+    const { normalizeManifest, validateManifest } = await import('@/lib/embedded/manifest');
+    const manifest = normalizeManifest(((target.config_json ?? {}) as Record<string, unknown>) as Record<string, unknown>);
+    const manifestCheck = await validateManifest(supabase as never, { projectId: validation.context.projectId, agentId, manifest });
+    if (!manifestCheck.valid) {
+        return addGatewayHeaders(embeddedError(422, 'invalid_request_error', `Manifest invalid: ${manifestCheck.errors.slice(0, 3).join('; ')}`, { requestId }), { requestId });
+    }
     const patch: Record<string, unknown> = { status: 'published', published_at: new Date().toISOString(), reviewed_by: body.reviewed_by ?? null };
     if (body.visibility && ['private', 'tenant', 'unlisted', 'public'].includes(body.visibility)) patch.visibility = body.visibility;
     const { data, error } = await supabase.from('agent_versions').update(patch).eq('id', target.id as string).select('id, version, status, visibility, published_at').single();
     if (error || !data) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Review failed', { requestId }), { requestId });
+    try {
+        const { syncAgentVersionSkills, syncAgentVersionSubagents } = await import('@/lib/embedded/agents');
+        await syncAgentVersionSkills(supabase as never, (target.id as string), manifest.skills.map((s) => s.skill_version_id));
+        await syncAgentVersionSubagents(supabase as never, (target.id as string), manifest.subagents);
+    } catch (e) {
+        return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Capability pinning failed', { requestId }), { requestId });
+    }
     await supabase.from('agents').update({ stable_version_id: (target.id as string) }).eq('id', agentId);
     return addGatewayHeaders(NextResponse.json(data), { requestId });
 }

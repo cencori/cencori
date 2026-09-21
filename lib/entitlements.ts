@@ -33,6 +33,11 @@ export interface TierFeatures {
   sso: boolean;
   teams: boolean;
   embeddedAgents: boolean;
+  embeddedSkillLibrary: boolean;
+  embeddedSkillImport: boolean;
+  embeddedRemoteMcp: boolean;
+  embeddedBrowserPolicy: boolean;
+  embeddedSubagents: boolean;
 }
 
 const ALL_FEATURES_ENABLED: TierFeatures = {
@@ -68,6 +73,11 @@ const ALL_FEATURES_ENABLED: TierFeatures = {
   sso: true,
   teams: true,
   embeddedAgents: true,
+  embeddedSkillLibrary: true,
+  embeddedSkillImport: true,
+  embeddedRemoteMcp: true,
+  embeddedBrowserPolicy: true,
+  embeddedSubagents: true,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -207,15 +217,17 @@ export interface EmbeddedLimits {
   maxInstallationsPerTenant: number;
   maxProviderConnections: number;
   maxKnowledgeBases: number;
+  maxSkills: number;
+  maxDelegationDepth: number;
   runsPerMinute: number;
   maxConcurrentRuns: number;
 }
 
 export const EMBEDDED_LIMITS: Record<SubscriptionTier, EmbeddedLimits> = {
-  free: { maxTenants: 10, maxInstallationsPerTenant: 5, maxProviderConnections: 2, maxKnowledgeBases: 10, runsPerMinute: 10, maxConcurrentRuns: 2 },
-  pro: { maxTenants: 100, maxInstallationsPerTenant: 20, maxProviderConnections: 10, maxKnowledgeBases: 100, runsPerMinute: 60, maxConcurrentRuns: 10 },
-  team: { maxTenants: 1000, maxInstallationsPerTenant: 50, maxProviderConnections: 25, maxKnowledgeBases: 500, runsPerMinute: 300, maxConcurrentRuns: 25 },
-  enterprise: { maxTenants: Number.POSITIVE_INFINITY, maxInstallationsPerTenant: Number.POSITIVE_INFINITY, maxProviderConnections: Number.POSITIVE_INFINITY, maxKnowledgeBases: Number.POSITIVE_INFINITY, runsPerMinute: Number.POSITIVE_INFINITY, maxConcurrentRuns: Number.POSITIVE_INFINITY },
+  free: { maxTenants: 10, maxInstallationsPerTenant: 5, maxProviderConnections: 2, maxKnowledgeBases: 10, maxSkills: 20, maxDelegationDepth: 1, runsPerMinute: 10, maxConcurrentRuns: 2 },
+  pro: { maxTenants: 100, maxInstallationsPerTenant: 20, maxProviderConnections: 10, maxKnowledgeBases: 100, maxSkills: 200, maxDelegationDepth: 3, runsPerMinute: 60, maxConcurrentRuns: 10 },
+  team: { maxTenants: 1000, maxInstallationsPerTenant: 50, maxProviderConnections: 25, maxKnowledgeBases: 500, maxSkills: 1000, maxDelegationDepth: 5, runsPerMinute: 300, maxConcurrentRuns: 25 },
+  enterprise: { maxTenants: Number.POSITIVE_INFINITY, maxInstallationsPerTenant: Number.POSITIVE_INFINITY, maxProviderConnections: Number.POSITIVE_INFINITY, maxKnowledgeBases: Number.POSITIVE_INFINITY, maxSkills: Number.POSITIVE_INFINITY, maxDelegationDepth: Number.POSITIVE_INFINITY, runsPerMinute: Number.POSITIVE_INFINITY, maxConcurrentRuns: Number.POSITIVE_INFINITY },
 };
 
 export function getEmbeddedLimits(tier: SubscriptionTier): EmbeddedLimits {
@@ -261,6 +273,11 @@ export function requireFeature(
       sso: 'SSO',
       teams: 'Team collaboration',
       embeddedAgents: 'Embedded Agents',
+      embeddedSkillLibrary: 'Embedded skill library',
+      embeddedSkillImport: 'Embedded skill imports',
+      embeddedRemoteMcp: 'Embedded remote MCP',
+      embeddedBrowserPolicy: 'Embedded browser/network policy',
+      embeddedSubagents: 'Embedded subagents',
     };
     throw new Error(
       JSON.stringify({

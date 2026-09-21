@@ -1,0 +1,28 @@
+---
+title: "Manifests, Browser Policy, and Subagents"
+description: "Compose governed agents: capability manifests, default-deny egress, bounded delegation."
+section: "Embedded Agents"
+order: 4
+---
+
+## One manifest, many screens
+
+Every agent version carries a normalized capability manifest: model (+ `reasoning_effort` only when `/v1/models` advertises reasoning), instructions, skill pins, tool declarations, connection requirements, MCP tool grants, subagent allowlist, and execution policy (browser, network, approval, delegation depth). Your builder may render separate screens, but `POST /v1/agents/:id/versions` accepts one contract and `POST .../validate` rejects unsupported combinations with errors instead of degrading silently.
+
+Authoring flow: `draft → validate → test → ready_for_review → publish`. `POST .../test` runs a sandboxed single model call — no run row, no webhooks, no installation bindings, no credentials, capped tokens. Publishing validates the manifest, pins skill/subagent edges as auditable rows, and mints an immutable checksum. Runs record the exact versions used.
+
+## Default-deny browser and network
+
+Browser access and generic egress are denied unless the manifest allowlists them, and the effective policy is the restrictive intersection of version and installation overlay. Only `none` and `allowlist` modes exist; there is no open egress. Connector calls to canonical provider origins (Gmail) are scoped invocations, not arbitrary network. Denied MCP egress fails the action with a policy error and an audit event.
+
+```json
+{ "policy": { "browser": { "enabled": false }, "network": { "mode": "allowlist", "allowed_hosts": ["api.example.com"] } } }
+```
+
+## Bounded subagent delegation
+
+A subagent is an explicitly allowlisted agent version invoked as a task. `POST /v1/runs/:id/delegate` with `{ agent_version_id, input }` creates an isolated child run: same project/tenant/user/installation (narrowed, never escalated), the child's own version config and knowledge, no parent conversation beyond the task. Manifest allowlists, per-edge call budgets, delegation depth (manifest + plan caps), and ancestry cycle checks gate every call; `subagent.called/completed/failed` events correlate parent and child with full cost attribution. Cancelling a parent cascades to active descendants, as does tenant suspension.
+
+```typescript
+const child = await cencori.runs.delegate(parentRunId, { agent_version_id: 'agv_analyst_v2', input: { task: 'Size the market' } });
+```

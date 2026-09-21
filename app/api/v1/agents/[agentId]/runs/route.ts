@@ -282,6 +282,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     const { data: insForVersion } = installationId
         ? await supabase.from('agent_installations').select('agent_version_id, update_channel').eq('id', installationId).maybeSingle()
         : { data: null };
+
+    // Suspended tenants accept no new work (deletion/suspension propagation).
+    if (tenantId) {
+        const { data: tenantRow } = await supabase.from('platform_tenants').select('status').eq('id', tenantId).maybeSingle();
+        if (!tenantRow || (tenantRow.status as string) !== 'active') {
+            return addGatewayHeaders(embeddedError(403, 'tenant_suspended', 'Tenant is not active', { requestId }), { requestId });
+        }
+    }
     const runtime = await resolveAgentRuntimeConfig(supabase as never, {
         agentId,
         installationVersionId: ((insForVersion as { agent_version_id?: string | null } | null)?.agent_version_id as string | null) ?? null,
@@ -307,6 +315,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         const concurrency = await checkRunConcurrency(supabase as never, installationId, tenantId, tier);
         if (!concurrency.ok) {
             return addGatewayHeaders(embeddedError(429, concurrency.code, concurrency.message, { requestId }), { requestId });
+        }
+        const { checkSpendBudgets } = await import('@/lib/embedded/budgets');
+        const budget = await checkSpendBudgets(supabase as never, { projectId: validation.context.projectId, tenantId, installationId, agentId });
+        if (!budget.ok) {
+            return addGatewayHeaders(embeddedError(402, 'budget_exceeded', `${budget.scope} spend budget exceeded (spent $${(budget.spent ?? 0).toFixed(2)} of $${(budget.budget ?? 0).toFixed(2)})`, { requestId }), { requestId });
         }
     }
 

@@ -12,7 +12,7 @@ export async function OPTIONS() {
 
 async function dispatchExecution(
     supabase: ReturnType<typeof createAdminClient>,
-    action: { id: string; tool_name: string; status?: string; sanitized_arguments: Record<string, unknown>; approval_policy: Record<string, unknown>; execution_key: string; project_id: string },
+    action: { id: string; tool_name: string; status?: string; run_id?: string | null; sanitized_arguments: Record<string, unknown>; approval_policy: Record<string, unknown>; execution_key: string; project_id: string },
     organizationId: string,
 ): Promise<{ result: Record<string, unknown> }> {
     const policy = action.approval_policy ?? {};
@@ -45,12 +45,20 @@ async function dispatchExecution(
         if (!server) throw new Error('MCP server not found in this project');
         const s = server as { url: string; transport?: string; auth_connection_id?: string | null };
         const mcpTool = (policy.mcp_tool as string) || action.tool_name.replace(/^mcp\./, '');
+        // Default-deny egress: the effective version ∩ installation network
+        // policy must allowlist the server host (plus outbound safety).
+        const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
+        const netPolicy = await resolveActionNetworkPolicy(supabase as never, { run_id: (action as { run_id?: string | null }).run_id ?? null, approval_policy: action.approval_policy });
+        const egress = await checkEgress(s.url, netPolicy);
+        if (!egress.allowed) {
+            throw new Error(`Network policy denied MCP egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`);
+        }
         // Same authenticated client as discovery: project-scoped credential,
         // modern stateless transport with legacy session fallback.
         const { mcpAuthHeaders, callMcpTool } = await import('@/lib/embedded/mcp');
         const headers = await mcpAuthHeaders(supabase as never, action.project_id, organizationId, s.auth_connection_id ?? null);
         const output = await callMcpTool({ url: s.url, headers, transport: s.transport === 'sse' ? 'sse' : 'streamable-http', tool: mcpTool, args: action.sanitized_arguments });
-        return { result: { tool: action.tool_name, output: output ?? null } };
+        return { result: { tool: action.tool_name, output: output ?? null, egress: { host: egress.host, allowed: true } } };
     }
 
     // Session-backed or manual actions: approval recorded; execution happens via the session resume path.

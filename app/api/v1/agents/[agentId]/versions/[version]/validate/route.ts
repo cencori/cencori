@@ -31,7 +31,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     }
     const checked = validateVersionConfig(((row.config_json ?? {}) as Record<string, unknown>) as never);
     if (!checked.ok) return addGatewayHeaders(embeddedError(422, 'invalid_request_error', checked.message, { requestId }), { requestId });
+
+    // Full capability manifest validation (deterministic, no side effects).
+    const { normalizeManifest, validateManifest } = await import('@/lib/embedded/manifest');
+    const manifest = normalizeManifest((row.config_json ?? {}) as Record<string, unknown>);
+    const result = await validateManifest(supabase as never, { projectId: validation.context.projectId, agentId, manifest });
+    if (!result.valid) {
+        return addGatewayHeaders(
+            NextResponse.json({ id: row.id, version: row.version, status: row.status, valid: false, errors: result.errors, warnings: result.warnings }, { status: 422 }),
+            { requestId },
+        );
+    }
     const { data, error } = await supabase.from('agent_versions').update({ status: 'validating' }).eq('id', row.id as string).select('id, version, status').single();
     if (error || !data) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Validation failed', { requestId }), { requestId });
-    return addGatewayHeaders(NextResponse.json(data), { requestId });
+    return addGatewayHeaders(NextResponse.json({ ...data, valid: true, warnings: result.warnings }), { requestId });
 }
