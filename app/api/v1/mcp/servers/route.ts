@@ -22,10 +22,10 @@ async function resolveTenant(supabase: ReturnType<typeof createAdminClient>, pro
     return (byExt?.id as string) ?? null;
 }
 
-async function snapshotFor(supabase: ReturnType<typeof createAdminClient>, projectId: string, url: string, authConnectionId: string | null, organizationId: string) {
+async function snapshotFor(supabase: ReturnType<typeof createAdminClient>, projectId: string, url: string, authConnectionId: string | null, organizationId: string, transport?: string) {
     const { mcpAuthHeaders, discoverMcpTools } = await import('@/lib/embedded/mcp');
     const headers = await mcpAuthHeaders(supabase as never, projectId, organizationId, authConnectionId);
-    return discoverMcpTools({ url, headers });
+    return discoverMcpTools({ url, headers, transport: transport === 'sse' ? 'sse' : 'streamable-http' });
 }
 
 // POST /v1/mcp/servers — register + discover.
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
     let status = 'active';
     let lastError: string | null = null;
     try {
-        const discovered = await snapshotFor(supabase, validation.context.projectId, safeUrl.toString(), body.auth_connection_id ? dePrefixId(body.auth_connection_id) : null, validation.context.organizationId);
-        snapshot = { tools: discovered.tools, discovered_at: new Date().toISOString() };
+        const discovered = await snapshotFor(supabase, validation.context.projectId, safeUrl.toString(), body.auth_connection_id ? dePrefixId(body.auth_connection_id) : null, validation.context.organizationId, body.transport);
+        snapshot = { tools: discovered.tools, discovered_at: new Date().toISOString(), transport_negotiated: discovered.transport };
     } catch (e) {
         status = 'unhealthy';
         lastError = e instanceof Error ? e.message.slice(0, 500) : 'Discovery failed';
