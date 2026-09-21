@@ -50,6 +50,10 @@ export type TurnExecuteParams = {
     pauseOnToolCalls?: boolean;
     endUserId: string | null;
     tier: SubscriptionTier;
+    /** Installation-bound knowledge: injected as context, cited on completion. */
+    knowledgeContext?: { block: string | null; citations: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
+    /** Published skill procedures pinned to the installed agent version. */
+    skillsBlock?: string | null;
     logSuccess: (meta: {
         provider: string; model: string; status: 'success' | 'success_fallback' | 'error';
         promptTokens: number; completionTokens: number; totalTokens: number;
@@ -157,6 +161,7 @@ function makeStream(params: {
     instructions?: string;
     inputText?: string;
     inputSecurity?: SecurityCheckResult;
+    knowledgeContext?: { block: string | null; citations: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
     tokenMap?: Map<string, string>;
     endUserId?: string | null;
     tier: SubscriptionTier;
@@ -170,7 +175,7 @@ function makeStream(params: {
         messages, functionTools, forceSchemaResult, schemaToolName, tool_choice,
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
-        tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion,
+        tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext,
     } = params;
 
     const stream = new ReadableStream({
@@ -401,7 +406,14 @@ function makeStream(params: {
                         const output = buildOutput(fullText, callValues, collectedBuiltinToolOutputs);
                         await terminal(
                             'turn.completed',
-                            { turn_number: turnNumber, output, usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt } },
+                            {
+                                turn_number: turnNumber,
+                                output,
+                                usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
+                                ...(knowledgeContext && knowledgeContext.citations.length > 0
+                                    ? { knowledge_citations: knowledgeContext.citations }
+                                    : {}),
+                            },
                             'active',
                             cc,
                         );
@@ -494,6 +506,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         instructions, tools, tool_choice, temperature, max_output_tokens,
         response_format, inputMessages, inputText, inputSecurity, tokenMap,
         pauseOnToolCalls, tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion,
+        knowledgeContext, skillsBlock,
     } = params;
 
     try {
@@ -547,6 +560,12 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
                 : '';
             messages.unshift({ role: 'system', content: `You have access to the following real-time information. Use it to answer the user's question naturally.${ci}\n\n${pre.systemContext}` });
         }
+        if (knowledgeContext?.block) {
+            messages.unshift({ role: 'system', content: knowledgeContext.block });
+        }
+        if (skillsBlock) {
+            messages.unshift({ role: 'system', content: skillsBlock });
+        }
         if (instructions) messages.unshift({ role: 'system', content: instructions });
 
         let forceSchema = false;
@@ -582,6 +601,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             collectedBuiltinToolOutputs: [...pre.toolOutputs],
             instructions, inputText, inputSecurity, tokenMap, endUserId: params.endUserId,
             tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion,
+            knowledgeContext,
         });
 
         return { ok: true, response };

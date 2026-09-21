@@ -8,6 +8,7 @@ Every operation is secured, logged, and tracked.
 """
 
 from .client import Cencori
+from .embedded import EmbeddedModule
 from .vision import VisionModule
 from .voice import VoiceModule
 from .documents import DocumentsModule
@@ -84,6 +85,7 @@ from .types import (
 __version__ = "1.4.0"
 __all__ = [
     "Cencori",
+    "EmbeddedModule",
     "VisionModule",
     "VoiceModule",
     "DocumentsModule",

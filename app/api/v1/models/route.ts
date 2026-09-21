@@ -183,6 +183,7 @@ export async function GET(req: NextRequest) {
                 status: m.status,
                 available: m.available,
                 unavailable_reason: m.unavailable_reason,
+                reasoning_supported: m.reasoning_supported,
                 byok_supported: m.byok_supported,
                 managed_access: m.managed_access,
                 pricing_status: m.pricing_status,

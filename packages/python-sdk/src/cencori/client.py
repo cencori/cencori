@@ -23,6 +23,7 @@ from .telemetry import TelemetryModule
 from .vision import VisionModule
 from .voice import VoiceModule
 from .documents import DocumentsModule
+from .embedded import EmbeddedModule
 
 
 class ComputeModule:
@@ -126,6 +127,7 @@ class Cencori:
         self.projects = ProjectsModule(self)
         self.api_keys = APIKeysModule(self)
         self.metrics = MetricsModule(self)
+        self.embedded = EmbeddedModule(self)
 
         self.compute = ComputeModule()
         self.workflow = WorkflowModule()

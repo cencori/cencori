@@ -166,6 +166,9 @@ export class AgentVersionsNamespace {
     publish(agentId: string, version: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/publish`, {});
     }
+    test(agentId: string, version: string, params?: { input?: string }): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/test`, params ?? {});
+    }
     deprecate(agentId: string, version: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/deprecate`, {});
     }
@@ -218,6 +221,9 @@ export class RunsNamespace {
     cancel(runId: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/runs/${runId}/cancel`, {});
     }
+    delegate(runId: string, params: { agent_version_id: string; input?: unknown }, idempotencyKey?: string): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/runs/${runId}/delegate`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
+    }
 }
 
 export class ActionsNamespace {
@@ -266,6 +272,43 @@ export class KnowledgeNamespace {
     }
 }
 
+// ── Skills ───────────────────────────────────────────────
+
+export class SkillsNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    create(params: { name: string; slug?: string; description?: string; visibility?: string; tenant_id?: string }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/skills', params);
+    }
+    list(params?: { visibility?: string; tenant_id?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/skills${qs({ visibility: params?.visibility, tenant_id: params?.tenant_id })}`);
+    }
+    get(skillId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/skills/${skillId}`);
+    }
+    createVersion(skillId: string, params: { version: string; content?: string; files?: Array<{ path?: string; content?: string }> }): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/skills/${skillId}/versions`, params);
+    }
+    listVersions(skillId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/skills/${skillId}/versions`);
+    }
+    publishVersion(skillId: string, version: string, params?: { reviewed_by?: string }): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/skills/${skillId}/versions/${version}/publish`, params ?? {});
+    }
+}
+
+export class SkillImportsNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    stage(params: { url?: string; repository?: string; text?: string; files?: Array<{ path?: string; content?: string }>; tenant_id?: string }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/skill-imports', params);
+    }
+    get(importId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/skill-imports/${importId}`);
+    }
+    publish(importId: string, params: { name?: string; skill_id?: string; visibility?: string; version?: string; reviewed_by?: string }): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/skill-imports/${importId}/publish`, params);
+    }
+}
+
 // ── Connections + MCP ────────────────────────────────────
 
 export class ConnectionsNamespace {
@@ -295,6 +338,34 @@ export class ConnectionsNamespace {
         return request(this.config, 'GET', `/v1/mcp/servers/${serverId}/tools`);
     }
     refreshMcpTools(serverId: string): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/mcp/servers/${serverId}/refresh-tools`, {});
+    }
+}
+
+export class McpServersNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    list(tenantId?: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/mcp/servers${qs({ tenant_id: tenantId })}`);
+    }
+    get(serverId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/mcp/servers/${serverId}`);
+    }
+    register(params: { name: string; url: string; transport?: string; tenant_id?: string; auth_connection_id?: string }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/mcp/servers', params);
+    }
+    update(serverId: string, params: { name?: string; url?: string; status?: string; auth_connection_id?: string | null }): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/mcp/servers/${serverId}`, params);
+    }
+    remove(serverId: string): Promise<{ id: string; status: string }> {
+        return request(this.config, 'DELETE', `/v1/mcp/servers/${serverId}`);
+    }
+    test(serverId: string): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/mcp/servers/${serverId}/test`, {});
+    }
+    tools(serverId: string): Promise<{ tools: unknown[] }> {
+        return request(this.config, 'GET', `/v1/mcp/servers/${serverId}/tools`);
+    }
+    refreshTools(serverId: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/mcp/servers/${serverId}/refresh-tools`, {});
     }
 }

@@ -25,11 +25,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     const target = row ?? (await supabase.from('agent_versions').select('*').eq('id', version).eq('agent_id', agentId).maybeSingle()).data;
     if (!target) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Agent version not found', { requestId }), { requestId });
     const current = (target.status as string) ?? 'draft';
-    if (!['draft', 'validating', 'ready_for_review'].includes(current)) {
-        return addGatewayHeaders(embeddedError(409, 'invalid_request_error', `Cannot publish from status ${current}; create a new version`, { requestId }), { requestId });
+    // The authoring lifecycle requires validation (and optionally an isolated
+    // test) before publication: draft → validate → test → ready_for_review → publish.
+    if (!['validating', 'ready_for_review'].includes(current)) {
+        return addGatewayHeaders(embeddedError(409, 'invalid_request_error', `Validate the version before publishing (current: ${current}); POST .../validate then .../test`, { requestId }), { requestId });
     }
     const checked = validateVersionConfig(((target.config_json ?? {}) as Record<string, unknown>) as never);
     if (!checked.ok) return addGatewayHeaders(embeddedError(422, 'invalid_request_error', checked.message, { requestId }), { requestId });
+
+    const { normalizeManifest, validateManifest } = await import('@/lib/embedded/manifest');
+    const manifest = normalizeManifest(((target.config_json ?? {}) as Record<string, unknown>) as Record<string, unknown>);
+    const check = await validateManifest(supabase as never, { projectId: validation.context.projectId, agentId, manifest });
+    if (!check.valid) {
+        return addGatewayHeaders(embeddedError(422, 'invalid_request_error', `Manifest invalid: ${check.errors.slice(0, 3).join('; ')}`, { requestId }), { requestId });
+    }
 
     const { data: updated, error } = await supabase
         .from('agent_versions')
@@ -39,6 +48,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         .single();
     if (error || !updated) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Publish failed', { requestId }), { requestId });
+    }
+    // Pin validated skill references and subagent edges as durable rows.
+    try {
+        const { syncAgentVersionSkills, syncAgentVersionSubagents } = await import('@/lib/embedded/agents');
+        await syncAgentVersionSkills(supabase as never, (target.id as string), manifest.skills.map((s) => s.skill_version_id));
+        await syncAgentVersionSubagents(supabase as never, (target.id as string), manifest.subagents);
+    } catch (e) {
+        return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Capability pinning failed', { requestId }), { requestId });
     }
     await supabase.from('agents').update({ stable_version_id: (target.id as string) }).eq('id', agentId);
     return addGatewayHeaders(NextResponse.json(updated), { requestId });

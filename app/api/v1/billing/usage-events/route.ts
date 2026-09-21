@@ -228,6 +228,35 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Month-to-date tokens per user so tiered/volume pricing graduates
+        // correctly instead of always computing from zero.
+        const monthlyTokens: Record<string, number> = {};
+        try {
+            const { data: userRows } = await supabase
+                .from('end_users')
+                .select('id, external_id')
+                .eq('project_id', projectId)
+                .in('external_id', uniqueUserIds);
+            const idByExternal = new Map(((userRows ?? []) as Array<{ id: string; external_id: string }>).map((u) => [u.external_id, u.id]));
+            const monthStart = new Date();
+            monthStart.setUTCDate(1);
+            monthStart.setUTCHours(0, 0, 0, 0);
+            const ids = [...idByExternal.values()];
+            if (ids.length > 0) {
+                const { data: usageRows } = await supabase
+                    .from('end_user_usage')
+                    .select('end_user_id, total_tokens')
+                    .in('end_user_id', ids)
+                    .gte('period_start', monthStart.toISOString().slice(0, 10));
+                for (const row of (usageRows ?? []) as Array<{ end_user_id: string; total_tokens: number }>) {
+                    const ext = [...idByExternal.entries()].find(([, id]) => id === row.end_user_id)?.[0];
+                    if (ext) monthlyTokens[ext] = (monthlyTokens[ext] ?? 0) + Number(row.total_tokens ?? 0);
+                }
+            }
+        } catch {
+            // Fall back to zero on lookup failure (previous behavior).
+        }
+
         // Process events
         const results: { end_user_id: string; status: 'recorded' | 'error'; error?: string }[] = [];
         const aiRequestRows: Record<string, unknown>[] = [];
@@ -240,6 +269,7 @@ export async function POST(req: NextRequest) {
 
             const providerCostUsd = event.cost_usd ?? 0;
             const cencoriChargeUsd = providerCostUsd; // Cencori's cut is the provider cost (no gateway markup since they're not using the gateway)
+            const monthBase = monthlyTokens[event.end_user_id] ?? 0;
             const customerChargeUsd = calculateCustomerCharge(
                 cencoriChargeUsd,
                 markup.markupPercentage,
@@ -247,8 +277,9 @@ export async function POST(req: NextRequest) {
                 markup.pricingModel,
                 markup.pricingTiers,
                 event.total_tokens,
-                0 // In-batch monthly usage tracking not implemented for this endpoint yet
+                monthBase
             );
+            monthlyTokens[event.end_user_id] = monthBase + event.total_tokens;
 
             try {
                 // Record in end-user usage aggregates (daily + monthly)
@@ -270,7 +301,7 @@ export async function POST(req: NextRequest) {
                     currency: markup.currency,
                     pricingModel: markup.pricingModel,
                     pricingTiers: markup.pricingTiers,
-                    monthlyTokensUsed: 0,
+                    monthlyTokensUsed: monthBase,
                     platformCommissionPercentage: markup.platformCommissionPercentage,
                 });
 

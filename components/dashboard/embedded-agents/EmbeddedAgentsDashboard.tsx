@@ -38,6 +38,11 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
     const webhooks = useGet<unknown[]>(projectId, "webhooks", "embedded-webhooks");
     const billingStats = useGet<{ totalRevenue?: number; activeUsers?: number }>(projectId, "end-user-billing/stats?period=30d", "embedded-billing-stats");
     const aiStats = useGet<{ totalRequests?: number; totalCost?: number }>(projectId, "ai/stats?period=30d", "embedded-ai-stats");
+    const embedded = useGet<{
+        tenants?: number; installations?: number; knowledge_bases?: number;
+        runs_7d?: number; run_success_rate_7d?: number | null;
+        pending_actions?: number; unhealthy_connections?: number; failing_webhooks?: number;
+    }>(projectId, "embedded-agents/summary", "embedded-summary");
 
     if (projectLoading) {
         return (
@@ -54,6 +59,7 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
 
     const agentCount = Array.isArray(agents.data) ? agents.data.length : (agents.data as { agents?: unknown[] } | null)?.agents?.length ?? 0;
     const webhookCount = Array.isArray(webhooks.data) ? webhooks.data.length : 0;
+    const summary = embedded.data ?? {};
 
     const checklist: ChecklistItem[] = [
         {
@@ -64,18 +70,35 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
         },
         {
             label: "Connect a provider",
-            description: "Add a BYOK or OpenAI-compatible provider via POST /v1/provider-connections.",
+            description: `Add a BYOK or OpenAI-compatible provider via POST /v1/provider-connections.${(summary.unhealthy_connections ?? 0) > 0 ? ` ${summary.unhealthy_connections} connection(s) need attention.` : ""}`,
             done: null,
         },
-        { label: "Create tenants", description: "Upsert downstream companies via POST /v1/tenants.", done: null },
+        {
+            label: "Create tenants",
+            description: `Upsert downstream companies via POST /v1/tenants.${(summary.tenants ?? 0) > 0 ? ` ${summary.tenants} tenant(s) live.` : ""}`,
+            done: (summary.tenants ?? 0) > 0,
+        },
         {
             label: "Publish an agent version",
-            description: "Draft → validate → submit → review → publish. Agents dashboard shows gateway agents.",
+            description: "Draft → validate → test → review → publish. Agents dashboard shows gateway agents.",
             done: agentCount > 0,
             href: `/${orgSlug}/${projectSlug}/deployments`,
         },
-        { label: "Install for a tenant", description: "POST /v1/agent-installations binds version + knowledge + connections.", done: null },
-        { label: "Attach knowledge", description: "POST /v1/knowledge-bases + sources, grant to the installation.", done: null },
+        {
+            label: "Install for a tenant",
+            description: `POST /v1/agent-installations binds version + knowledge + connections.${(summary.installations ?? 0) > 0 ? ` ${summary.installations} active installation(s).` : ""}`,
+            done: (summary.installations ?? 0) > 0,
+        },
+        {
+            label: "Attach knowledge",
+            description: `POST /v1/knowledge-bases + sources, grant to the installation.${(summary.knowledge_bases ?? 0) > 0 ? ` ${summary.knowledge_bases} knowledge base(s).` : ""}`,
+            done: (summary.knowledge_bases ?? 0) > 0,
+        },
+        {
+            label: "Run and approve safely",
+            description: `Background runs with approvals.${(summary.runs_7d ?? 0) > 0 ? ` ${summary.runs_7d} run(s) in 7d${summary.run_success_rate_7d != null ? `, ${(summary.run_success_rate_7d * 100).toFixed(0)}% success` : ""}.` : ""}${(summary.pending_actions ?? 0) > 0 ? ` ${summary.pending_actions} action(s) awaiting approval.` : ""}`,
+            done: (summary.runs_7d ?? 0) > 0,
+        },
         {
             label: "Subscribe to webhooks",
             description: "run.*, action.*, knowledge_source.* events keep your product in sync.",
