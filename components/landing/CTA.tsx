@@ -17,9 +17,9 @@ export const CTA = ({ isAuthenticated: providedIsAuthenticated }: CTAProps) => {
             <div className="mx-auto max-w-6xl border-x border-border/30 relative z-10 px-6 py-16 sm:px-12 sm:py-24">
                 {/* Corner Intersection Markers */}
                 <div className="absolute -top-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                <div className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -top-1.5 right-0 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none sm:-right-1.5">+</div>
                 <div className="absolute -bottom-1.5 -left-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
-                <div className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none">+</div>
+                <div className="absolute -bottom-1.5 right-0 flex h-3 w-3 items-center justify-center text-muted-foreground/40 font-mono text-[10px] select-none pointer-events-none sm:-right-1.5">+</div>
 
                 <div className="px-6 py-12 md:px-10 text-center">
                     <div className="flex flex-col items-center max-w-2xl mx-auto">

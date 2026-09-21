@@ -246,8 +246,8 @@ export function renderTemplate(
 //   });
 
 export interface LaunchTemplateOptions {
-  /** Full-width banner image URL. Sits at the top of the message. */
-  bannerUrl: string;
+  /** Optional full-width banner image URL. Sits at the top of the message. */
+  bannerUrl?: string;
   /** Alt text for the banner. */
   bannerAlt?: string;
   /** Optional preheader (inbox preview text). */
@@ -335,6 +335,10 @@ export function launchTemplate(options: LaunchTemplateOptions): string {
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>`
     : '';
 
+  const bannerBlock = bannerUrl
+    ? `<img src="${bannerUrl}" alt="${bannerAlt}" style="display:block;width:100%;height:auto;margin-bottom:32px;">`
+    : '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -344,7 +348,7 @@ export function launchTemplate(options: LaunchTemplateOptions): string {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;color:#111;">
 ${preheaderBlock}
 <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
-<img src="${bannerUrl}" alt="${bannerAlt}" style="display:block;width:100%;height:auto;margin-bottom:32px;">
+${bannerBlock}
 ${greetingBlock}
 ${paragraphsBlock}
 ${linksBlock}
