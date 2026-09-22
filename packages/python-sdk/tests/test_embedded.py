@@ -94,6 +94,24 @@ class TestEmbeddedSkills:
             args, _ = mock.call_args
             assert args[1] == "/v1/skill-imports/imp_1/publish"
 
+    def test_skill_reads(self, api_key: str) -> None:
+        """Test skill getters."""
+        client = Cencori(api_key=api_key)
+
+        with patch.object(client, "_request", return_value={}) as mock:
+            client.embedded.skills.get("skl_1")
+            client.embedded.skills.list_versions("skl_1")
+            client.embedded.skills.get_version("skl_1", "1.0.0")
+            client.embedded.skills.get_import("imp_1")
+
+            paths = [call.args[1] for call in mock.call_args_list]
+            assert paths == [
+                "/v1/skills/skl_1",
+                "/v1/skills/skl_1/versions",
+                "/v1/skills/skl_1/versions/1.0.0",
+                "/v1/skill-imports/imp_1",
+            ]
+
 
 class TestEmbeddedUsage:
     """Test usage reporting."""

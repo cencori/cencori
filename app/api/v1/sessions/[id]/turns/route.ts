@@ -210,9 +210,12 @@ export async function POST(
         const body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
 
         // Installed versions override legacy agent_configs: the normalized
-        // manifest (model, instructions, temperature) is the runtime source of
-        // truth whenever the session carries an installation.
+        // manifest is the runtime source of truth whenever the session
+        // carries an installation — model, instructions, temperature, the
+        // tool allowlist, and the (default-deny) browser policy.
         let manifestPolicy: { browser?: { enabled?: boolean } } | null = null;
+        let manifestBuiltinTools: string[] | null = null;
+        let manifestFunctionNames: Set<string> | null = null;
         {
             const installationId = (session as { installation_id?: string | null }).installation_id;
             if (installationId) {
@@ -226,18 +229,23 @@ export async function POST(
                 if (versionId) {
                     const { data: version } = await adminClient.from('agent_versions').select('config_json').eq('id', versionId).maybeSingle();
                     const config = ((version as { config_json?: Record<string, unknown> } | null)?.config_json ?? {}) as Record<string, unknown>;
-                    if (typeof config.model === 'string' && config.model.trim()) {
+                    const { normalizeManifest } = await import('@/lib/embedded/manifest');
+                    const manifest = normalizeManifest(config);
+                    if (manifest.model?.trim()) {
                         agentConfig = {
-                            model: config.model,
-                            system_prompt: ((config.instructions ?? config.system_prompt) as string | undefined) ?? agentConfig?.system_prompt ?? null,
+                            model: manifest.model,
+                            system_prompt: manifest.instructions ?? agentConfig?.system_prompt ?? null,
                             tools: agentConfig?.tools ?? null,
                         };
                         agentId = agentId ?? session.agent_id;
-                        if (typeof config.temperature === 'number') {
-                            (body as { temperature?: number }).temperature ??= config.temperature;
+                        const manifestTemp = (config.temperature as number | undefined) ?? undefined;
+                        if (typeof manifestTemp === 'number') {
+                            (body as { temperature?: number }).temperature ??= manifestTemp;
                         }
                     }
-                    manifestPolicy = (config.policy ?? null) as typeof manifestPolicy;
+                    manifestPolicy = manifest.policy;
+                    manifestBuiltinTools = manifest.tools.filter((t) => t.type === 'builtin').map((t) => t.name);
+                    manifestFunctionNames = new Set(manifest.tools.filter((t) => t.type !== 'builtin').map((t) => t.name));
                 }
             }
         }
@@ -472,9 +480,21 @@ export async function POST(
             }
         };
 
-        // Inject agent-configured built-in tools into the request
+        // Tool authority: the installed manifest decides. Request-supplied and
+        // legacy tools are intersected with the manifest declarations — a
+        // caller (including a browser token) cannot escalate beyond them.
+        // Without an installation, legacy agent-config merging applies.
         const tools = [...(body.tools || [])];
-        if (agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
+        if (manifestBuiltinTools) {
+            const builtinSet = new Set(manifestBuiltinTools);
+            const allowed = tools.filter((t) => {
+                const tool = t as { type?: string; function?: { name?: string } };
+                if (tool.type === 'function') return manifestFunctionNames?.has(tool.function?.name ?? '') ?? false;
+                return builtinSet.has(tool.type ?? '');
+            });
+            tools.length = 0;
+            tools.push(...allowed);
+        } else if (agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));
             for (const toolType of agentConfig.tools) {
                 if (!existingTypes.has(toolType)) {
@@ -483,8 +503,8 @@ export async function POST(
             }
         }
 
-        // Browser default-deny: without an explicit browser grant in the
-        // installed manifest, open-web tools are stripped before execution.
+        // Browser default-deny: installed sessions strip open-web tools
+        // unless the manifest explicitly grants browser access.
         const browserGranted = (manifestPolicy as { browser?: { enabled?: boolean } } | null)?.browser?.enabled === true;
         if (manifestPolicy && !browserGranted) {
             const before = tools.length;

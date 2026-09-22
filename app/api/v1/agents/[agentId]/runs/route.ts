@@ -193,6 +193,7 @@ async function executeRun(runId: string): Promise<void> {
             knowledge_citations: citations,
             skills_used: runSkillIds,
             manifest_tools: ((runtime.config ?? {}) as { tools?: unknown }).tools ?? [],
+            manifest_policy: ((runtime.config ?? {}) as { policy?: unknown }).policy ?? { browser: { enabled: false }, network: { mode: 'none', allowed_hosts: [] } },
             usage: response.usage,
         };
 

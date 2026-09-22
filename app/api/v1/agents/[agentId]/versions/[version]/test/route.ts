@@ -55,6 +55,32 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         return addGatewayHeaders(embeddedError(422, 'invalid_request_error', 'Version has no model configured', { requestId }), { requestId });
     }
 
+    // Capability exercise (no credentials used): resolve every declared
+    // skill, connection requirement, and MCP tool against live project state
+    // so the test proves the manifest — not just model+instructions.
+    const capabilities: { skills: unknown[]; connections: unknown[]; mcp_tools: unknown[] } = { skills: [], connections: [], mcp_tools: [] };
+    for (const s of manifest.skills) {
+        const { data: sv } = await supabase.from('skill_versions').select('id, status').eq('id', s.skill_version_id.replace(/^(skv_)/, '')).maybeSingle();
+        capabilities.skills.push({ skill_version_id: s.skill_version_id, status: (sv as { status?: string } | null)?.status ?? 'missing' });
+    }
+    for (const req of manifest.connection_requirements) {
+        const { data: connector } = await supabase.from('connectors').select('slug').eq('slug', req.connector.toLowerCase()).maybeSingle();
+        const { count } = connector
+            ? await supabase.from('tool_connections').select('id', { count: 'exact', head: true }).eq('project_id', validation.context.projectId).eq('connector_slug', (connector as { slug: string }).slug).eq('status', 'active')
+            : { count: 0 };
+        capabilities.connections.push({ connector: req.connector, known: Boolean(connector), active_connections: count ?? 0 });
+    }
+    for (const ref of manifest.mcp_tools) {
+        const { data: server } = await supabase.from('mcp_servers').select('id, status, tool_snapshot').eq('project_id', validation.context.projectId).eq('id', ref.server_id.replace(/^(mcp_)/, '')).maybeSingle();
+        const snapshot = ((server as { tool_snapshot?: { tools?: Array<{ name: string }> } } | null)?.tool_snapshot?.tools ?? []);
+        capabilities.mcp_tools.push({
+            server_id: ref.server_id,
+            tool: ref.tool,
+            server_status: (server as { status?: string } | null)?.status ?? 'missing',
+            in_snapshot: snapshot.some((t) => t.name === ref.tool),
+        });
+    }
+
     const { data: project } = await supabase.from('projects').select('organization_id, organizations!inner(subscription_tier)').eq('id', validation.context.projectId).maybeSingle();
     const organizationId = ((project as { organization_id?: string } | null)?.organization_id as string) ?? '';
     const tier = (((project as { organizations?: { subscription_tier?: string } } | null)?.organizations?.subscription_tier as string) ?? 'free') as import('@/lib/entitlements').SubscriptionTier;
@@ -82,6 +108,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             NextResponse.json({
                 valid: true,
                 warnings: check.warnings,
+                capabilities,
                 output: response.content,
                 model: response.model,
                 provider: response.provider,
