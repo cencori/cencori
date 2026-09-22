@@ -100,20 +100,43 @@ export async function delegateSubagent(
     }
     const { data: edge } = await supabase
         .from('agent_version_subagents')
-        .select('max_calls')
+        .select('max_calls, timeout_ms, budget_limit')
         .eq('parent_agent_version_id', parent.agent_version_id)
         .eq('child_agent_version_id', childVersionId)
         .maybeSingle();
     if (!edge) {
         throw Object.assign(new Error('Subagent version is not in the parent manifest allowlist'), { status: 403 });
     }
-    const { count: priorCalls } = await supabase
-        .from('embedded_runs')
-        .select('id', { count: 'exact', head: true })
-        .eq('parent_run_id', parent.id)
-        .eq('agent_version_id', childVersionId);
-    if ((priorCalls ?? 0) >= ((edge as { max_calls: number }).max_calls ?? 1)) {
-        throw Object.assign(new Error('Subagent call budget exhausted for this run'), { status: 429 });
+    const edgeLimits = edge as { max_calls: number; timeout_ms?: number | null; budget_limit?: number | null };
+
+    // Edge spend budget: completed child spend under this parent+edge.
+    if (edgeLimits.budget_limit != null) {
+        const { data: siblings } = await supabase.from('embedded_runs').select('id').eq('parent_run_id', parent.id).eq('agent_version_id', childVersionId);
+        const siblingIds = ((siblings ?? []) as Array<{ id: string }>).map((r) => r.id);
+        if (siblingIds.length > 0) {
+            let edgeSpend = 0;
+            for (let i = 0; i < siblingIds.length; i += 50) {
+                const { data: rows } = await supabase.from('ai_requests').select('cencori_charge_usd').in('run_id', siblingIds.slice(i, i + 50));
+                edgeSpend += ((rows ?? []) as Array<{ cencori_charge_usd: number | null }>).reduce((n, r) => n + Number(r.cencori_charge_usd ?? 0), 0);
+            }
+            if (edgeSpend >= edgeLimits.budget_limit) {
+                throw Object.assign(new Error('Subagent spend budget exhausted for this run'), { status: 402 });
+            }
+        }
+    }
+
+    // Delegations go through the same spend gate as ordinary runs.
+    {
+        const { checkSpendBudgets } = await import('./budgets');
+        const budget = await checkSpendBudgets(supabase, {
+            projectId: opts.projectId,
+            tenantId: parent.tenant_id,
+            installationId: parent.installation_id,
+            agentId: parent.agent_id,
+        });
+        if (!budget.ok) {
+            throw Object.assign(new Error(`${budget.scope} spend budget exceeded`), { status: 402 });
+        }
     }
 
     // Child version must exist in-project and be published; ancestry walk blocks indirect cycles.
@@ -155,11 +178,21 @@ export async function delegateSubagent(
         childInstallationId = (childIns.id as string);
     }
 
-    // Idempotent child creation.
+    // Idempotent child creation — but only for the identical delegation.
+    // A reused key must match parent, tenant, child version, and input;
+    // anything else is a conflict, never another run's output.
     if (opts.idempotencyKey) {
         const { data: existing } = await supabase.from('embedded_runs').select('*').eq('project_id', opts.projectId).eq('idempotency_key', opts.idempotencyKey).maybeSingle();
         if (existing) {
-            const e = existing as { id: string; status: string; output_ref: unknown };
+            const e = existing as { id: string; status: string; output_ref: unknown; parent_run_id: string | null; tenant_id: string | null; agent_version_id: string | null; input_ref: unknown };
+            const sameContext =
+                e.parent_run_id === parent.id &&
+                (e.tenant_id ?? null) === (parent.tenant_id ?? null) &&
+                e.agent_version_id === childVersionId &&
+                JSON.stringify(e.input_ref ?? {}) === JSON.stringify(opts.input ?? {});
+            if (!sameContext) {
+                throw Object.assign(new Error('Idempotency key already used for a different delegation'), { status: 409, code: 'idempotency_conflict' });
+            }
             return { childRunId: e.id, status: e.status, output: e.output_ref ?? null };
         }
     }
@@ -184,6 +217,22 @@ export async function delegateSubagent(
         .single();
     if (childError || !child) throw Object.assign(new Error(childError?.message ?? 'Failed to create child run'), { status: 500 });
     const childId = (child as { id: string }).id;
+
+    // Atomic max_calls: the insert above is the claim; verify the sibling
+    // count after it and roll our own row back when over budget. Concurrent
+    // delegations serialize on the row lock below only in outcome, never in
+    // overrun: overshoot resolves to 429s, never to silent excess.
+    {
+        const { count: siblings } = await supabase
+            .from('embedded_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('parent_run_id', parent.id)
+            .eq('agent_version_id', childVersionId);
+        if ((siblings ?? 0) > (edgeLimits.max_calls ?? 1)) {
+            await supabase.from('embedded_runs').delete().eq('id', childId);
+            throw Object.assign(new Error('Subagent call budget exhausted for this run'), { status: 429 });
+        }
+    }
 
     await appendRunEvent(supabase, parent.id, 'subagent.called', { parent_run_id: parent.id, child_run_id: childId, child_version_id: childVersionId });
     await appendRunEvent(supabase, childId, 'run.queued', { run_id: childId, parent_run_id: parent.id });
@@ -214,23 +263,28 @@ export async function delegateSubagent(
         }
 
         const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
-        const response = await executeGatewayChat({
-            supabase,
-            projectId: opts.projectId,
-            organizationId: opts.organizationId,
-            tier: opts.tier,
-            request: {
-                messages: [
-                    ...(config.instructions || config.system_prompt ? [{ role: 'system' as const, content: (config.instructions ?? config.system_prompt) as string }] : []),
-                    ...(contextBlock ? [{ role: 'system' as const, content: contextBlock }] : []),
-                    { role: 'user' as const, content: JSON.stringify({ delegated_task: opts.input ?? {} }).slice(0, 4000) },
-                ],
-                model: config.model,
-                temperature: config.temperature ?? undefined,
-                maxTokens: config.max_output_tokens ?? undefined,
-            },
-            requestId: `sub_${childId.slice(0, 8)}`,
-        });
+        // Edge timeout bounds the child model call (default 2 minutes).
+        const timeoutMs = edgeLimits.timeout_ms && edgeLimits.timeout_ms > 0 ? Math.min(edgeLimits.timeout_ms, 600000) : 120000;
+        const response = await Promise.race([
+            executeGatewayChat({
+                supabase,
+                projectId: opts.projectId,
+                organizationId: opts.organizationId,
+                tier: opts.tier,
+                request: {
+                    messages: [
+                        ...(config.instructions || config.system_prompt ? [{ role: 'system' as const, content: (config.instructions ?? config.system_prompt) as string }] : []),
+                        ...(contextBlock ? [{ role: 'system' as const, content: contextBlock }] : []),
+                        { role: 'user' as const, content: JSON.stringify({ delegated_task: opts.input ?? {} }).slice(0, 4000) },
+                    ],
+                    model: config.model,
+                    temperature: config.temperature ?? undefined,
+                    maxTokens: config.max_output_tokens ?? undefined,
+                },
+                requestId: `sub_${childId.slice(0, 8)}`,
+            }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Subagent execution timed out after ${timeoutMs}ms`)), timeoutMs)),
+        ]);
 
         const output = { output: response.content, model: response.model, child_version_id: childVersionId, usage: response.usage };
         const { data: done } = await supabase.from('embedded_runs').update({ status: 'completed', output_ref: output, completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running').select('id').maybeSingle();
@@ -245,7 +299,7 @@ export async function delegateSubagent(
                     prompt_tokens: response.usage.promptTokens, completion_tokens: response.usage.completionTokens, total_tokens: response.usage.totalTokens,
                     cost_usd: response.cost.cencoriChargeUsd, provider_cost_usd: response.cost.providerCostUsd, cencori_charge_usd: response.cost.cencoriChargeUsd,
                     markup_percentage: response.cost.markupPercentage,
-                    tenant_id: parent.tenant_id, agent_id: (childVersion.agent_id as string), installation_id: parent.installation_id,
+                    tenant_id: parent.tenant_id, agent_id: (childVersion.agent_id as string), installation_id: childInstallationId,
                     run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
                 });
             } catch { /* logging never fails delegation */ }

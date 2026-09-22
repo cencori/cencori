@@ -149,6 +149,22 @@ class SkillsModule:
             path += f"?visibility={visibility}"
         return self._client._request("GET", path)
 
+    def get(self, skill_id: str) -> Dict[str, Any]:
+        """Get a skill."""
+        return self._client._request("GET", f"/v1/skills/{skill_id}")
+
+    def update(self, skill_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Update skill metadata."""
+        return self._client._request("PATCH", f"/v1/skills/{skill_id}", json=kwargs)
+
+    def list_versions(self, skill_id: str) -> Dict[str, Any]:
+        """List skill versions."""
+        return self._client._request("GET", f"/v1/skills/{skill_id}/versions")
+
+    def get_version(self, skill_id: str, version: str) -> Dict[str, Any]:
+        """Get a skill version with content."""
+        return self._client._request("GET", f"/v1/skills/{skill_id}/versions/{version}")
+
     def create_version(self, skill_id: str, version: str, content: Optional[str] = None, files: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Draft a version with scan findings attached."""
         payload: Dict[str, Any] = {"version": version}
@@ -170,6 +186,10 @@ class SkillsModule:
         """Stage an import (exactly one source)."""
         payload = {k: v for k, v in {"url": url, "repository": repository, "text": text}.items() if v is not None}
         return self._client._request("POST", "/v1/skill-imports", json=payload)
+
+    def get_import(self, import_id: str) -> Dict[str, Any]:
+        """Get a staged import with findings."""
+        return self._client._request("GET", f"/v1/skill-imports/{import_id}")
 
     def publish_import(self, import_id: str, name: Optional[str] = None, skill_id: Optional[str] = None, version: str = "1.0.0") -> Dict[str, Any]:
         """Review-gate publish of a staged import."""

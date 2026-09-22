@@ -28,7 +28,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ runId: str
     if (!['queued', 'running', 'requires_action'].includes(run.status)) {
         return addGatewayHeaders(embeddedError(409, 'invalid_request_error', `Cannot cancel run in status ${run.status}`, { requestId }), { requestId });
     }
-    await supabase.from('embedded_runs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', run.id);
+    // Conditional claim: a concurrent completion wins the race instead of
+    // being overwritten by a stale cancel.
+    const { data: cancelled } = await supabase.from('embedded_runs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', run.id).in('status', ['queued', 'running', 'requires_action']).select('id, status').maybeSingle();
+    if (!cancelled) {
+        const { data: current } = await supabase.from('embedded_runs').select('status').eq('id', run.id).maybeSingle();
+        const currentStatus = (current as { status?: string } | null)?.status ?? run.status;
+        if ((RUN_TERMINAL as readonly string[]).includes(currentStatus)) {
+            return addGatewayHeaders(NextResponse.json({ id: withPrefix('run', run.id), status: currentStatus, deduped: true }), { requestId });
+        }
+        return addGatewayHeaders(embeddedError(409, 'concurrent_modification', 'Run state changed during cancel', { requestId }), { requestId });
+    }
     await appendRunEvent(supabase as never, run.id, 'run.cancelled', { run_id: run.id });
     await emitEmbeddedEvent(run.project_id, 'run.cancelled', { run_id: run.id });
     // Delegation propagates cancellation to active descendants.
