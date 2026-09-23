@@ -1,6 +1,6 @@
 """Sessions module for durable execution sessions."""
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import httpx
 

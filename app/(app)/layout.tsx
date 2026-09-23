@@ -255,7 +255,7 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     consoleRoute?.scope === "project" ? activeProject?.slug ?? null : null
   );
   const isPlayground = pathname.includes("/playground");
-  const isEmbeddedAgents = pathname === "/embedded-agents" || pathname.endsWith("/embedded-agents");
+  const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
   const isFixedWorkspace = isPlayground || isEmbeddedAgents;
   const isOnboardingFlow = pathname.includes("/onboarding");
   const hasDesktopSidebar = (Boolean(orgSlug) || isCanonicalConsoleRoute)

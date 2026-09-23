@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://cencori.com/api"
+      "url": "https://cencori.com"
     }
   ],
   "security": [

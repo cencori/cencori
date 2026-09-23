@@ -21,7 +21,7 @@ Browser access and generic egress are denied unless the manifest allowlists them
 
 ## Bounded subagent delegation
 
-A subagent is an explicitly allowlisted agent version invoked as a task. `POST /v1/runs/:id/delegate` with `{ agent_version_id, input }` creates an isolated child run: same project/tenant/user/installation (narrowed, never escalated), the child's own version config and knowledge, no parent conversation beyond the task. Manifest allowlists, per-edge call budgets, delegation depth (manifest + plan caps), and ancestry cycle checks gate every call; `subagent.called/completed/failed` events correlate parent and child with full cost attribution. Cancelling a parent cascades to active descendants, as does tenant suspension.
+A subagent is an explicitly allowlisted agent version invoked as a task. `POST /v1/runs/:id/delegate` with `{ agent_version_id, input, installation_id? }` creates an isolated child run: same project/tenant/user, the child's own version config and knowledge, no parent conversation beyond the task, and no inherited installation or session. An explicitly supplied child installation is accepted only after project, tenant, and child-agent validation. Manifest allowlists, per-edge call budgets, delegation depth (manifest + plan caps), and ancestry cycle checks gate every call; `subagent.called/completed/failed` events correlate parent and child with full cost attribution. Cancelling a parent cascades to active descendants, as does tenant suspension.
 
 ```typescript
 const child = await cencori.runs.delegate(parentRunId, { agent_version_id: 'agv_analyst_v2', input: { task: 'Size the market' } });

@@ -1,17 +1,17 @@
 ---
 title: MCP Server
-description: Give MCP clients first-party web search, Cencori docs, platform reads, inference, memory, sessions, and governance with explicit action tiers.
+description: Give MCP clients first-party web search, Cencori docs, Embedded Agents inspection, platform reads, inference, memory, sessions, and governance with explicit action tiers.
 section: MCP
 order: 1
 ---
 
 # MCP server
 
-`@cencori/mcp` is Cencori's official [Model Context Protocol](https://modelcontextprotocol.io) server. It gives Cursor, Claude Desktop, Codex, and any MCP client direct access to Cencori Web, documentation, gateway metrics, memory, agents, sessions, governance, and multimodal inference.
+`@cencori/mcp` is Cencori's official [Model Context Protocol](https://modelcontextprotocol.io) server. It gives Cursor, Claude Desktop, Codex, and any MCP client direct access to Cencori Web, documentation, Embedded Agents inspection, gateway metrics, memory, agents, sessions, governance, and multimodal inference.
 
 It is a thin stdio adapter over Cencori's public HTTP APIs. The platform enforces authentication, project isolation, quota, policy, and audit logging; the MCP server adds capability flags and tool annotations for reads, writes, destructive changes, and open-web access.
 
-Version `0.7.1` includes first-party Web tools.
+Version `0.8.0` includes first-party Web tools and read-only Embedded Agents inspection.
 
 ## Quick start
 
@@ -92,7 +92,7 @@ The server is safe by default: reads require a key, while operations that incur 
 | Tier | Gate | Examples |
 |---|---|---|
 | Public | none | `search_docs`, `get_doc`, `list_docs`, `get_integration_guide`, `how_to_*` guidance |
-| Read | `CENCORI_API_KEY` | Web search/fetch/extract, metrics, health, quota, and agents/memory/sessions/governance reads |
+| Read | `CENCORI_API_KEY` | Web search/fetch/extract, metrics, health, quota, Embedded Agents, and agents/memory/sessions/governance reads |
 | Write | `CENCORI_MCP_WRITE=1` | Web browse/crawl/takedown request, inference, memory writes, agent/session writes, governance drafts |
 | Destructive | `CENCORI_MCP_DESTRUCTIVE=1` | Delete memory/agent/session and approve/reject sessions; implies write |
 
@@ -112,7 +112,7 @@ Credential, billing, access, and governance-activation decisions are never execu
 | `CENCORI_API_KEY` | — | Secret project key (`csk_...`) for platform and Web tools. |
 | `CENCORI_MCP_WRITE` | `false` | Enable additive writes, inference, and Web actions. |
 | `CENCORI_MCP_DESTRUCTIVE` | `false` | Enable destructive actions and imply write. |
-| `CENCORI_MCP_FEATURES` | all | Comma list: `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, `multimodal`. |
+| `CENCORI_MCP_FEATURES` | all | Comma list: `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, `multimodal`, `embedded`. |
 | `CENCORI_BASE_URL` | `https://cencori.com` | Platform API host. |
 | `CENCORI_DOCS_BASE_URL` | `https://cencori.com` | Documentation API host. |
 
@@ -133,6 +133,9 @@ Restart the MCP server after changing environment variables.
 - Memory: list, semantic search, get, entities, graph, and forget suggestions
 - Sessions: list, get, and events
 - Governance: policies, roles, change requests, ledger, evidence, and templates
+- Embedded Agents: tenants, versions, installations, runs, actions, knowledge, skills, provider connections, usage, webhooks, and remote MCP snapshots
+
+To expose only Embedded Agents inspection, set `CENCORI_MCP_FEATURES=embedded`. The feature is deliberately read-only; publishing, approvals, credentials, and other writes remain dashboard- or API-guided.
 
 ### Write
 
@@ -160,6 +163,8 @@ Keep `CENCORI_API_KEY` in the MCP server environment, not in prompts or checked-
 **`web_browse` or `web_crawl` is missing:** set `CENCORI_MCP_WRITE=1`.
 
 **No Web tools appear with `CENCORI_MCP_FEATURES`:** include `web` in the comma-separated list.
+
+**No Embedded Agents tools appear with `CENCORI_MCP_FEATURES`:** include `embedded` and provide a secret project key.
 
 **A browser job is still queued:** call `get_web_browser_job` with the id returned by `web_browse`. Browser work is intentionally asynchronous.
 

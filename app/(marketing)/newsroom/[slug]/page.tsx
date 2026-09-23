@@ -25,7 +25,10 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     // metadataBase (cencori.com). Building an absolute URL here from
     // NEXT_PUBLIC_APP_URL leaked cencori.vercel.app into the card tags in
     // production, and X's crawler gets a 404 on that domain — no preview card.
-    const ogImage = post.coverImage ?? `/newsroom/og/v1/${post.slug}.jpg`;
+    // Newsroom cover art is a bare square used by cards and listing views.
+    // Social previews use the generated landscape composition so the title,
+    // category, and date remain legible when the article is shared.
+    const ogImage = `/newsroom/og/v1/${post.slug}.jpg`;
 
     return {
         title: post.title,

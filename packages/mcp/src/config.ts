@@ -71,6 +71,7 @@ function allFeaturesEnabled(): Record<McpFeature, boolean> {
         multimodal: true,
         governance: true,
         guidance: true,
+        embedded: true,
     };
 }
 
@@ -104,6 +105,7 @@ function parseFeatures(value: string | undefined): Record<McpFeature, boolean> {
         multimodal: enabled.has('multimodal'),
         governance: enabled.has('governance'),
         guidance: enabled.has('guidance'),
+        embedded: enabled.has('embedded'),
     };
 }
 

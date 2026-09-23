@@ -29,7 +29,7 @@ const PROJECT_ROOTS = new Set([
   "memory",
   "deployments",
   "monetization",
-  "embedded-agents",
+  "agents",
   "webhooks",
   "settings",
 ]);
@@ -76,6 +76,11 @@ export function isConsoleHostname(hostname: string): boolean {
  */
 export function getConsoleRoute(pathname: string): ConsoleRoute | null {
   const canonicalPath = normalizePathname(pathname);
+
+  if (canonicalPath === "/embedded-agents") {
+    return { canonicalPath: "/agents", scope: "project", scopedPath: "/agents" };
+  }
+
   const segments = canonicalPath.split("/").filter(Boolean);
 
   if (segments.length === 1 && segments[0] === "home") {
@@ -172,6 +177,14 @@ export function getCanonicalConsoleRedirect(pathname: string): ScopedConsoleRedi
       organizationSlug,
       projectSlug,
       settingsTab: "api",
+    };
+  }
+
+  if (rest.length === 1 && rest[0] === "embedded-agents") {
+    return {
+      canonicalPath: "/agents",
+      organizationSlug,
+      projectSlug,
     };
   }
 

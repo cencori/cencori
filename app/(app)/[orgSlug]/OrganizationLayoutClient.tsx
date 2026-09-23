@@ -203,7 +203,7 @@ export default function OrganizationLayoutClient({
     const headerProjectLabel = selectedProject?.name || projectSlug || "Select project";
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
-    const isEmbeddedAgents = pathname === "/embedded-agents" || pathname.endsWith("/embedded-agents");
+    const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
     const isFixedWorkspace = isPlayground || isEmbeddedAgents;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
@@ -435,7 +435,7 @@ export default function OrganizationLayoutClient({
             ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
         { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
-        { href: scopeProjectSlug ? scopedProjectHref("embedded-agents") : orgProductHref("embedded-agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
+        { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
     ];
 
     const orgItems = [

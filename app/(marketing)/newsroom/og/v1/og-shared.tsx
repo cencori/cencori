@@ -44,6 +44,23 @@ export async function loadBackground(number: number): Promise<ArrayBuffer> {
   return sliceBuffer(file);
 }
 
+export async function loadPublicImage(
+  publicPath: string | undefined,
+): Promise<ArrayBuffer | null> {
+  if (!publicPath?.startsWith("/")) return null;
+
+  const publicRoot = path.resolve(process.cwd(), "public");
+  const filePath = path.resolve(publicRoot, publicPath.slice(1));
+
+  if (!filePath.startsWith(`${publicRoot}${path.sep}`)) return null;
+
+  try {
+    return sliceBuffer(await readFile(filePath));
+  } catch {
+    return null;
+  }
+}
+
 export interface OgFonts {
   manropeFont: ArrayBuffer;
   geistFont: ArrayBuffer;

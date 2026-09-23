@@ -84,7 +84,7 @@ class RunsModule:
 
 
 class ActionsModule:
-    """Approval-gated actions with exactly-once claims."""
+    """Approval-gated actions with single-claim, at-most-once dispatch."""
 
     def __init__(self, client: "Cencori") -> None:
         self._client = client
@@ -100,7 +100,7 @@ class ActionsModule:
         return self._client._request("GET", f"/v1/actions/{action_id}")
 
     def approve(self, action_id: str, approved_by: Optional[str] = None) -> Dict[str, Any]:
-        """Approve (idempotent, executes once)."""
+        """Approve with a single claim and at-most-once external dispatch."""
         return self._client._request("POST", f"/v1/actions/{action_id}/approve", json={"approved_by": approved_by} if approved_by else {})
 
     def reject(self, action_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
@@ -241,14 +241,25 @@ class UsageModule:
             path += f"&cursor={cursor}"
         return self._client._request("GET", path)
 
-    def export_csv(self, days: int = 30) -> str:
+    def export_csv(
+        self,
+        days: int = 30,
+        tenant_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> str:
         """Invoice CSV export (raw text)."""
         import httpx
 
-        url = f"{self._client._base_url}/v1/usage/export?format=csv&days={days}"
+        params: Dict[str, Any] = {"format": "csv", "days": days}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+        if agent_id:
+            params["agent_id"] = agent_id
+
+        url = f"{self._client._base_url}/v1/usage/export"
         headers = {"CENCORI_API_KEY": self._client._api_key}
         with httpx.Client(timeout=self._client._timeout) as client:
-            response = client.request("GET", url, headers=headers)
+            response = client.request("GET", url, params=params, headers=headers)
             response.raise_for_status()
             return response.text
 

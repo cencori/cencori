@@ -58,7 +58,7 @@ await cencori.mcpServers.register({ name: 'CRM', url: 'https://mcp.example.com/m
 const csv = await cencori.usage.exportCsv({ days: 30, tenant_id: tenant.id });
 ```
 
-Namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. Full reference in `openapi/embedded-agents.json`.
+Namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. Full reference: https://cencori.com/openapi/embedded-agents.json.
 
 ## AI Gateway
 

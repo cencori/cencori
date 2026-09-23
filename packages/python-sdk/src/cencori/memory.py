@@ -1,6 +1,6 @@
 """Memory module for vector storage and semantic search."""
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from .types import (
     CreateNamespaceOptions,

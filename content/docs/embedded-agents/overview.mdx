@@ -32,6 +32,8 @@ One Cencori project per application environment — not one project per downstre
 
 ## TypeScript SDK
 
+Requires `cencori@1.7.0` or later. The Python Embedded Agents SDK is prepared but not yet published; use the HTTP API and OpenAPI contract until its release is announced.
+
 ```typescript
 import { Cencori } from 'cencori';
 
@@ -52,4 +54,4 @@ await cencori.actions.approve('act_...');
 const summary = await cencori.usage.summary({ days: 30 });
 ```
 
-See the full contract in `openapi/embedded-agents.json`.
+See the full contract in the [Embedded Agents OpenAPI specification](https://cencori.com/openapi/embedded-agents.json).

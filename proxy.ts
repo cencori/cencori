@@ -481,6 +481,16 @@ export async function proxy(request: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(homeUrl, 308));
   }
 
+  if (
+    isConsoleSubdomain &&
+    !isFile &&
+    (pathname === "/embedded-agents" || pathname === "/embedded-agents/")
+  ) {
+    const agentsUrl = request.nextUrl.clone();
+    agentsUrl.pathname = "/agents";
+    return applySecurityHeaders(NextResponse.redirect(agentsUrl, 308));
+  }
+
   if (isConsoleSubdomain && !isFile) {
     const canonical = getCanonicalConsoleRedirect(pathname);
     if (canonical) {
