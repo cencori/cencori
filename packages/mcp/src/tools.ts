@@ -1,4 +1,5 @@
 export { registerDocsTools } from './tools/docs.js';
+export { registerEmbeddedTools } from './tools/embedded.js';
 export { registerGatewayTools } from './tools/gateway.js';
 export { registerAgentsTools } from './tools/agents.js';
 export { registerMemoryTools } from './tools/memory.js';

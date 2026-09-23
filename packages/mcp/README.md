@@ -105,7 +105,7 @@ Destructive:
 | `CENCORI_API_KEY` | — | Secret project key for authenticated tools. |
 | `CENCORI_MCP_WRITE` | `false` | Enable additive writes, inference, and Web actions. |
 | `CENCORI_MCP_DESTRUCTIVE` | `false` | Enable destructive tools; implies write. |
-| `CENCORI_MCP_FEATURES` | all | `docs,guidance,gateway,agents,memory,sessions,web,governance,multimodal` |
+| `CENCORI_MCP_FEATURES` | all | `docs,guidance,gateway,agents,memory,sessions,web,governance,multimodal,embedded` |
 | `CENCORI_BASE_URL` | `https://cencori.com` | Platform API host. |
 | `CENCORI_DOCS_BASE_URL` | `https://cencori.com` | Documentation API host. |
 

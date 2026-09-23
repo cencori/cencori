@@ -45,7 +45,7 @@ const { token } = await cencori.clientTokens.mint({ tenant_id: tenant.id, extern
 // Background run with idempotency
 const run = await cencori.runs.create('agt_...', { installation_id: 'ins_...', mode: 'background', input: { type: 'business_plan' } }, 'plan-company-123');
 
-// Approve a Gmail send exactly once
+// Approve a Gmail send (single-claim, at-most-once — see Actions guide)
 await cencori.actions.approve('act_...');
 
 // Invoice export
