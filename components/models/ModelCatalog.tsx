@@ -827,7 +827,7 @@ export function ModelCatalog() {
             </div>
 
             {/* ── Table ── */}
-            <div className="hidden md:block border border-border/30 rounded-2xl overflow-hidden bg-[#f3f3f1] dark:bg-[#181818]">
+            <div className="hidden md:block border border-border/30 rounded-2xl overflow-hidden bg-black">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm table-fixed">
                         <thead>
