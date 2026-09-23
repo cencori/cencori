@@ -843,7 +843,7 @@ export function PlaygroundChat({
                                                         "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-all cursor-pointer",
                                                         isActiveSlot
                                                             ? "bg-primary/15 text-foreground ring-1 ring-primary/30"
-                                                            : "bg-card/60 hover:bg-card/85 text-foreground"
+                                                            : "bg-[#f3f3f1] dark:bg-[#181818] hover:bg-[#e9e9e5] dark:hover:bg-[#212121] text-foreground"
                                                     )}
                                                 >
                                                     <ProviderIcon providerId={mObj?.providerId ?? "openai"} size={13} />
