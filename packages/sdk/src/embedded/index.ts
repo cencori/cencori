@@ -65,6 +65,12 @@ export class TenantsNamespace {
     upsertUser(tenantId: string, externalUserId: string, params?: { display_name?: string; roles?: string[]; groups?: string[]; metadata?: Record<string, unknown> }): Promise<unknown> {
         return request(this.config, 'PUT', `/v1/tenants/${tenantId}/users/${externalUserId}`, params ?? {});
     }
+    getUser(tenantId: string, externalUserId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/tenants/${tenantId}/users/${externalUserId}`);
+    }
+    patchUser(tenantId: string, externalUserId: string, params: Record<string, unknown>): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/tenants/${tenantId}/users/${externalUserId}`, params);
+    }
     listUsers(tenantId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/tenants/${tenantId}/users`);
     }
@@ -135,6 +141,9 @@ export class ProviderConnectionsNamespace {
     }
     previewSync(connectionId: string): Promise<{ id: string; status: string; counts: Record<string, number> }> {
         return request(this.config, 'POST', `/v1/provider-connections/${connectionId}/model-syncs`, {});
+    }
+    getSync(connectionId: string, syncId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/provider-connections/${connectionId}/model-syncs/${syncId}`);
     }
     applySync(connectionId: string, syncId: string, idempotencyKey?: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/provider-connections/${connectionId}/model-syncs/${syncId}/apply`, {}, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
@@ -252,6 +261,12 @@ export class KnowledgeNamespace {
     listBases(tenantId?: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/knowledge-bases${qs({ tenant_id: tenantId })}`);
     }
+    getBase(kbId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}`);
+    }
+    updateBase(kbId: string, params: { name?: string; status?: string; retention_policy?: Record<string, unknown> }): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/knowledge-bases/${kbId}`, params);
+    }
     removeBase(kbId: string): Promise<{ deleted: boolean }> {
         return request(this.config, 'DELETE', `/v1/knowledge-bases/${kbId}`);
     }
@@ -337,11 +352,23 @@ export class ConnectionsNamespace {
     listConnectors(): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', '/v1/connectors');
     }
+    getConnector(connectorId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/connectors/${connectorId}`);
+    }
     create(params: { connector?: string; owner_type?: string; tenant_id?: string; external_user_id?: string; api_key?: string; scopes?: string[] }): Promise<unknown> {
         return request(this.config, 'POST', '/v1/connections', params);
     }
     list(tenantId?: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/connections${qs({ tenant_id: tenantId })}`);
+    }
+    get(connectionId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/connections/${connectionId}`);
+    }
+    update(connectionId: string, params: { scopes?: string[]; metadata?: Record<string, unknown> }): Promise<unknown> {
+        return request(this.config, 'PATCH', `/v1/connections/${connectionId}`, params);
+    }
+    remove(connectionId: string): Promise<unknown> {
+        return request(this.config, 'DELETE', `/v1/connections/${connectionId}`);
     }
     authorize(connectionId: string, params: { redirect_uri?: string; scopes?: string[] }): Promise<{ authorize_url: string; state: string }> {
         return request(this.config, 'POST', `/v1/connections/${connectionId}/authorize`, params);
@@ -419,6 +446,9 @@ export class UsageNamespace {
     constructor(private config: Required<CencoriConfig>) {}
     summary(params?: { days?: number; tenant_id?: string; agent_id?: string }): Promise<{ totals: unknown; groups: unknown[] }> {
         return request(this.config, 'GET', `/v1/usage${qs({ days: params?.days, tenant_id: params?.tenant_id, agent_id: params?.agent_id })}`);
+    }
+    events(params?: { days?: number; tenant_id?: string; agent_id?: string; limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/usage/events${qs({ days: params?.days, tenant_id: params?.tenant_id, agent_id: params?.agent_id, limit: params?.limit, cursor: params?.cursor })}`);
     }
     async exportCsv(params?: { days?: number; tenant_id?: string; agent_id?: string }): Promise<string> {
         // CSV is text, not JSON — fetch directly instead of the JSON helper.

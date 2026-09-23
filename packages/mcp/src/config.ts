@@ -9,7 +9,8 @@ export type McpFeature =
     | 'web'
     | 'multimodal'
     | 'governance'
-    | 'guidance';
+    | 'guidance'
+    | 'embedded';
 
 const KNOWN_FEATURES: readonly McpFeature[] = [
     'docs',
@@ -21,6 +22,7 @@ const KNOWN_FEATURES: readonly McpFeature[] = [
     'multimodal',
     'governance',
     'guidance',
+    'embedded',
 ];
 
 /**

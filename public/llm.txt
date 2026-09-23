@@ -1073,6 +1073,42 @@ Feature selection: `CENCORI_MCP_FEATURES` accepts `docs`, `guidance`, `gateway`,
 
 Safety: Web tools carry `openWorldHint: true`, and retrieved content is untrusted. Anything that costs money, enqueues work, or changes state is opt-in via env. Security-sensitive actions (API keys, billing, access, governance activation) are **never** executed by the MCP—the `how_to_*` tools return steps and a dashboard link.
 
+The `embedded` feature adds read-only inspection for Embedded Agents: `list_tenants`, `get_tenant`, `list_agent_versions`, `list_installations`, `get_run`, `get_run_events`, `get_action`, `list_knowledge_bases`, `search_knowledge_base`, `list_skills`, `list_provider_connections`, `get_usage`, `list_webhooks`, `list_webhook_deliveries`, `list_mcp_servers`, `list_mcp_server_tools`. Add `embedded` to `CENCORI_MCP_FEATURES` to enable them. Writes, publishing, credential management, and approvals stay dashboard-guided.
+
+Note the two MCP directions: `@cencori/mcp` exposes Cencori to MCP clients; `/v1/mcp/servers` registers *remote* MCP servers for agents to call.
+
+## Embedded Agents (multi-tenant agent backend)
+
+One project per application environment (never one project per downstream company). `tenant_id` is a typed column enforced in storage, retrieval, execution, billing, and logs. Metadata is never an authorization boundary.
+
+Auth:
+- `csk_*` (secret project key, server only): all control-plane operations. Anything else returns `403 secret_key_required`.
+- `ect_*` (15-minute browser token from `POST /v1/client-tokens`): `sessions:create` and `sessions:turn` within one tenant and user only.
+- `cpk_*` (publishable): cannot call embedded management APIs.
+- Never ship `csk_*` to a browser or mobile client.
+
+Canonical endpoints (`https://cencori.com/v1/*`, full reference in `openapi/embedded-agents.json`):
+- Models: `GET /v1/models` (only discovery surface; `?available=true` for invokable-only).
+- Providers: `POST/GET /v1/provider-connections`, `/validate`, `/:id/test`, `/model-syncs` preview then `/apply`.
+- Tenants: `POST/GET /v1/tenants` (upsert by `external_id`), `GET/PATCH/DELETE /v1/tenants/:id`, `/export`, `/users` CRUD.
+- Versions: `POST /v1/agents/:id/versions` then `validate` → `test` → `submit`/`review` → `publish` (immutable, needs a passing test); `deprecate`, `retire`; `GET /v1/agent-catalog`.
+- Installations: `POST/GET /v1/agent-installations`, `/:id` get/patch/disable, `/upgrade`, `/rollback`.
+- Sessions: `POST/GET /v1/sessions`, `/:id` get/delete, `/:id/turns` (SSE stream), `/:id/events`, `/:id/approve|reject`.
+- Runs: `POST /v1/agents/:id/runs` (202 background, `Idempotency-Key` project-scoped, 409 on reuse with a different body), `GET /v1/runs/:id`, `GET .../events?after=` (cursor-poll JSON, not SSE), `POST .../cancel` (cascades), `POST .../delegate`.
+- Actions: `POST /v1/actions`, `GET`, `POST .../approve|reject` (idempotent, `deduped:true`; 409 terminal, 410 expired). Single-claim, at-most-once dispatch — NOT exactly-once; reconcile ambiguous actions against the upstream outbox with a new key.
+- Knowledge: `POST/GET /v1/knowledge-bases`, sources (inline/file), `/sync`, grants, `/search` with chunk citations.
+- Skills: `POST/GET /v1/skills`, versions draft/publish (scan blockers reject), `POST /v1/skill-imports` (one source; never auto-publishes) → `/publish`. Skills are passive Markdown/text, never executable.
+- Connections: `GET /v1/connectors`, `POST/GET /v1/connections`, `/:id` get/patch/revoke, `/authorize`, `/test`, `/refresh`. Secrets are write-only and never returned.
+- MCP: `POST/GET /v1/mcp/servers`, `/:id` get/patch/disable, `/tools`, `/refresh-tools`, `/test`. Transport is `streamable-http` (2026-07-28 stateless first, legacy handshake fallback); `sse` is rejected for new servers.
+- Webhooks: `POST/GET /v1/webhooks`, `/:id` patch/delete, `GET /v1/webhook-deliveries`, `POST .../replay`. Verify `X-Webhook-Signature` (HMAC-SHA256 over raw body) before parsing; handlers must be idempotent (at-least-once delivery).
+- Usage: `GET /v1/usage`, `/usage/events`, `/usage/export?format=csv` (90-day window, 5k cap). Spend budgets gate runs with `402 budget_exceeded`; rate/concurrency overruns return `429` with `Retry-After`.
+
+Agent versions carry a capability manifest (model + reasoning effort only when the model advertises it, skills, tools, connections, MCP grants, subagent allowlist, browser/network policy). Installed manifests are the runtime tool authority; browser and egress default to deny (`none`/`allowlist` only, no open mode).
+
+TypeScript SDK namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. Python SDK mirrors them under `cencori.embedded.*`.
+
+Docs: https://cencori.com/docs/embedded-agents (overview, authentication, manifests, skills, actions, webhooks, usage, runs).
+
 ## Decision Rules For Code Agents
 
 When integrating Cencori into a project:

@@ -325,6 +325,66 @@
         "description": "Requires a secret project key (`secret_key_required` otherwise)."
       }
     },
+    "/v1/agents": {
+      "get": {
+        "summary": "List gateway agents",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Secret project key or dashboard session (project members)."
+      },
+      "post": {
+        "summary": "Create gateway agent",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Secret project key or dashboard session (project members)."
+      }
+    },
+    "/v1/agents/{agentId}": {
+      "get": {
+        "summary": "Get agent",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Secret project key or dashboard session (project members)."
+      },
+      "patch": {
+        "summary": "Update agent",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Secret project key or dashboard session (project members)."
+      },
+      "delete": {
+        "summary": "Delete agent",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Secret project key or dashboard session (project members)."
+      }
+    },
+    "/v1/agents/{agentId}/keys": {
+      "post": {
+        "summary": "Mint an agent-scoped key (dashboard owners only)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+      }
+    },
     "/v1/agents/{agentId}/runs": {
       "post": {
         "summary": "Create background run (idempotent)",
@@ -431,8 +491,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "input": { "type": "string", "maxLength": 2000 },
-                  "test_connection_ids": { "type": "array", "items": { "type": "string" }, "description": "Active project-scoped test_only connections used to verify declared connector scopes; credentials are not exercised." }
+                  "input": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "test_connection_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Active project-scoped test_only connections used to verify declared connector scopes; credentials are not exercised."
+                  }
                 }
               }
             }
@@ -490,7 +559,7 @@
     },
     "/v1/connections/oauth/callback": {
       "get": {
-        "summary": "OAuth redirect (state-signed, public)",
+        "summary": "OAuth redirect (state-signed, public, no key)",
         "responses": {
           "200": {
             "description": "Connected"
@@ -745,6 +814,15 @@
             "description": "Server"
           }
         }
+      },
+      "get": {
+        "summary": "List registered MCP servers",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise)."
       }
     },
     "/v1/mcp/servers/{serverId}": {
@@ -1003,11 +1081,18 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["agent_version_id"],
+                "required": [
+                  "agent_version_id"
+                ],
                 "properties": {
-                  "agent_version_id": { "type": "string" },
+                  "agent_version_id": {
+                    "type": "string"
+                  },
                   "input": {},
-                  "installation_id": { "type": "string", "description": "Optional active installation owned by the same project and tenant and serving the child agent." }
+                  "installation_id": {
+                    "type": "string",
+                    "description": "Optional active installation owned by the same project and tenant and serving the child agent."
+                  }
                 }
               }
             }

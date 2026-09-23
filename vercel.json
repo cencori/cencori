@@ -129,6 +129,10 @@
             "destination": "/api/v1/webhooks/:path*"
         },
         {
+            "source": "/v1/webhook-deliveries",
+            "destination": "/api/v1/webhook-deliveries"
+        },
+        {
             "source": "/v1/webhook-deliveries/:path*",
             "destination": "/api/v1/webhook-deliveries/:path*"
         },

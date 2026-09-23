@@ -39,6 +39,14 @@ class TenantsModule:
         """Upsert a user within a tenant."""
         return self._client._request("PUT", f"/v1/tenants/{tenant_id}/users/{external_user_id}", json=kwargs or None)
 
+    def get_user(self, tenant_id: str, external_user_id: str) -> Dict[str, Any]:
+        """Get a user."""
+        return self._client._request("GET", f"/v1/tenants/{tenant_id}/users/{external_user_id}")
+
+    def patch_user(self, tenant_id: str, external_user_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Update a user."""
+        return self._client._request("PATCH", f"/v1/tenants/{tenant_id}/users/{external_user_id}", json=kwargs)
+
 
 class RunsModule:
     """Background and synchronous agent runs."""
@@ -109,6 +117,14 @@ class KnowledgeModule:
     def create_base(self, name: str, **kwargs: Any) -> Dict[str, Any]:
         """Create a knowledge base."""
         return self._client._request("POST", "/v1/knowledge-bases", json={"name": name, **kwargs})
+
+    def get_base(self, kb_id: str) -> Dict[str, Any]:
+        """Get a knowledge base."""
+        return self._client._request("GET", f"/v1/knowledge-bases/{kb_id}")
+
+    def update_base(self, kb_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Update a knowledge base."""
+        return self._client._request("PATCH", f"/v1/knowledge-bases/{kb_id}", json=kwargs)
 
     def add_inline_source(self, kb_id: str, text: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Ingest inline text."""
@@ -218,6 +234,13 @@ class UsageModule:
             path += f"&agent_id={agent_id}"
         return self._client._request("GET", path)
 
+    def events(self, days: int = 30, limit: int = 20, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Paginated attributed request rows."""
+        path = f"/v1/usage/events?days={days}&limit={limit}"
+        if cursor:
+            path += f"&cursor={cursor}"
+        return self._client._request("GET", path)
+
     def export_csv(self, days: int = 30) -> str:
         """Invoice CSV export (raw text)."""
         import httpx
@@ -310,6 +333,10 @@ class ProviderConnectionsModule:
     def preview_sync(self, connection_id: str) -> Dict[str, Any]:
         """Preview an upstream model sync."""
         return self._client._request("POST", f"/v1/provider-connections/{connection_id}/model-syncs", json={})
+
+    def get_sync(self, connection_id: str, sync_id: str) -> Dict[str, Any]:
+        """Get a sync preview."""
+        return self._client._request("GET", f"/v1/provider-connections/{connection_id}/model-syncs/{sync_id}")
 
     def apply_sync(self, connection_id: str, sync_id: str, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
         """Apply an exact sync preview."""
@@ -415,6 +442,14 @@ class ToolConnectionsModule:
     def __init__(self, client: "Cencori") -> None:
         self._client = client
 
+    def list_connectors(self) -> Dict[str, Any]:
+        """List connector types."""
+        return self._client._request("GET", "/v1/connectors")
+
+    def get_connector(self, connector_id: str) -> Dict[str, Any]:
+        """Get a connector type."""
+        return self._client._request("GET", f"/v1/connectors/{connector_id}")
+
     def create(self, connector: str = "gmail", **kwargs: Any) -> Dict[str, Any]:
         """Create a connection (secret-key only)."""
         return self._client._request("POST", "/v1/connections", json={"connector": connector, **kwargs})
@@ -425,6 +460,18 @@ class ToolConnectionsModule:
         if tenant_id:
             path += f"?tenant_id={tenant_id}"
         return self._client._request("GET", path)
+
+    def get(self, connection_id: str) -> Dict[str, Any]:
+        """Get a connection (no secrets)."""
+        return self._client._request("GET", f"/v1/connections/{connection_id}")
+
+    def update(self, connection_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Update a connection (secret-key only)."""
+        return self._client._request("PATCH", f"/v1/connections/{connection_id}", json=kwargs)
+
+    def remove(self, connection_id: str) -> Dict[str, Any]:
+        """Revoke a connection."""
+        return self._client._request("DELETE", f"/v1/connections/{connection_id}")
 
     def authorize(self, connection_id: str, **kwargs: Any) -> Dict[str, Any]:
         """Start OAuth consent (returns authorize_url)."""

@@ -6,6 +6,7 @@ import {
     registerAgentsTools,
     registerAudioTools,
     registerDocsTools,
+    registerEmbeddedTools,
     registerGatewayTools,
     registerGovernanceTools,
     registerGuidanceTools,
@@ -52,6 +53,7 @@ export function createServer(config: McpConfig): McpServer {
         if (features.agents) registerAgentsTools(server, client, capabilities);
         if (features.memory) registerMemoryTools(server, client, capabilities);
         if (features.sessions) registerSessionsTools(server, client, capabilities);
+        if (features.embedded) registerEmbeddedTools(server, client);
         if (features.web) registerWebTools(server, client, capabilities);
         if (features.governance) registerGovernanceTools(server, client, capabilities);
 
