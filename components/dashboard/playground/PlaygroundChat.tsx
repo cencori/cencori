@@ -866,7 +866,7 @@ export function PlaygroundChat({
 
                                                 {/* Model Selector Popover */}
                                                 {isActiveSlot && (
-                                                    <div className="absolute z-50 bottom-full mb-2.5 left-0 w-80 rounded-2xl border border-border/40 bg-popover shadow-2xl p-2.5 flex flex-col max-h-[350px] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                     <div className="absolute z-50 bottom-full mb-2.5 left-0 w-80 rounded-2xl border border-border/40 bg-[#f3f3f1] dark:bg-[#181818] shadow-2xl p-2.5 flex flex-col max-h-[350px] animate-in fade-in slide-in-from-bottom-2 duration-150">
                                                         {/* Search */}
                                                         <div className="relative mb-2 shrink-0">
                                                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
