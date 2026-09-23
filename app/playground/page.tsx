@@ -1,6 +1,6 @@
 "use client";
 
-import { SiteNav } from "@/components/nav/SiteNav";
+import { ThesisScrollNav } from "@/components/nav/MarketingNav";
 import { PlaygroundChat } from "@/components/dashboard/playground/PlaygroundChat";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +10,8 @@ const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID;
 export default function PublicPlaygroundPage() {
     if (!DEMO_PROJECT_ID) {
         return (
-            <div className="min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
-                <SiteNav solid />
+            <div className="editorial-dark min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background">
+                <ThesisScrollNav developers />
                 <main className="flex min-h-0 flex-1 flex-col items-center justify-center pt-20 px-4">
                     <div className="max-w-md text-center space-y-3">
                         <h1 className="text-sm font-semibold">Playground not configured</h1>
@@ -29,11 +29,11 @@ export default function PublicPlaygroundPage() {
     return (
         <div
             className={cn(
-                "flex h-svh flex-col overflow-hidden bg-background text-foreground",
+                "editorial-dark flex h-svh flex-col overflow-hidden bg-background text-foreground",
                 "selection:bg-foreground selection:text-background"
             )}
         >
-            <SiteNav solid />
+            <ThesisScrollNav developers />
             <main className="flex min-h-0 flex-1 flex-col pt-12">
                 <PlaygroundChat
                     environment="production"

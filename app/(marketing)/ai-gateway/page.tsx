@@ -1502,18 +1502,19 @@ export default function AIGatewayPage() {
             }}
           />
           <div className="relative z-10 mx-auto w-full max-w-6xl text-center">
+            <div className="mb-8 flex flex-row items-center justify-center gap-3">
             <BorderBeam
               borderRadius={999}
-              className="mb-8 inline-block"
+              className="inline-block"
               colorVariant="colorful"
               size="md"
               strength={0.59}
             >
               <Link
                 className="group inline-flex items-center gap-2 rounded-full bg-white/5 py-2 pr-3 pl-4 text-[13px] text-white/80 backdrop-blur transition-colors hover:text-white"
-                href="/ai/models"
+                href="/ai-gateway/models"
               >
-                One endpoint for 150+ models
+                Models
                 <HugeiconsIcon
                   className="transition-transform duration-200 group-hover:translate-x-0.5"
                   color="currentColor"
@@ -1523,6 +1524,28 @@ export default function AIGatewayPage() {
                 />
               </Link>
             </BorderBeam>
+            <BorderBeam
+              borderRadius={999}
+              className="inline-block"
+              colorVariant="colorful"
+              size="md"
+              strength={0.59}
+            >
+              <Link
+                className="group inline-flex items-center gap-2 rounded-full bg-white/5 py-2 pr-3 pl-4 text-[13px] text-white/80 backdrop-blur transition-colors hover:text-white"
+                href="/playground"
+              >
+                Playground
+                <HugeiconsIcon
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  color="currentColor"
+                  icon={ArrowRight01Icon}
+                  size={14}
+                  strokeWidth={1.9}
+                />
+              </Link>
+            </BorderBeam>
+            </div>
 
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
               <span className="block">One API for every model.</span>
@@ -1589,7 +1612,7 @@ export default function AIGatewayPage() {
                 </div>
               </div>
               <Link
-                href="/ai/models"
+                href="/ai-gateway/models"
                 className="group mt-5 inline-flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
               >
                 Browse all 150+ models

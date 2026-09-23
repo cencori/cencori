@@ -35,7 +35,7 @@ export const navigationMenus = [
             preview: [
               { label: "APIs", href: "/developers/apis" },
               { label: "AI Gateway", href: "/ai-gateway" },
-              { label: "Models", href: "/models" },
+              { label: "Models", href: "/ai-gateway/models" },
               { label: "Inference", href: "/developers/inference" },
               { label: "Memory", href: "/memory" },
               { label: "Agent Deployment", href: "/developers/agent-deployment" },
@@ -105,7 +105,7 @@ export const navigationMenus = [
             description: "Infrastructure for people building AI.",
             preview: [
               { label: "Gateway", href: "/ai-gateway" },
-              { label: "Models", href: "/models" },
+              { label: "Models", href: "/ai-gateway/models" },
               { label: "Memory", href: "/memory" },
               { label: "Agents", href: "/agents" },
               { label: "APIs", href: "/developers/apis" },
@@ -824,7 +824,7 @@ export const developerNavigationMenus = [
               "100+ frontier models, one API.",
           },
           {
-            href: "/models",
+            href: "/ai-gateway/models",
             label: "Models",
             tagline: "Train · fine-tune · deploy",
             description:

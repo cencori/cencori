@@ -71,7 +71,7 @@ export default async function ModelCapabilityPage({
       eyebrow="Model Infrastructure"
       title={page.title}
       blurb={page.blurb}
-      backHref="/models"
+      backHref="/ai-gateway/models"
       backLabel="Back to Models"
     />
   );

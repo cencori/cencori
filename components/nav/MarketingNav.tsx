@@ -38,7 +38,8 @@ const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway"
 export function MarketingNav() {
   const pathname = usePathname();
   const developersNav =
-    pathname === "/models" || pathname?.startsWith("/models/");
+    pathname === "/models" || pathname?.startsWith("/models/") ||
+    pathname === "/ai-gateway/models";
   if (
     SCROLL_SOLID_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
