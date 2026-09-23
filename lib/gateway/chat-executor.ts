@@ -47,10 +47,13 @@ export type GatewayStreamChunk = StreamChunk & GatewayChatExecutionMeta;
 
 const PROVIDER_TIMEOUT_MS = 60_000;
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string, onTimeout?: () => void): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timed = new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+        timer = setTimeout(() => {
+            onTimeout?.();
+            reject(new Error(`${label} timed out after ${ms}ms`));
+        }, ms);
     });
     try {
         return await Promise.race([promise, timed]);
@@ -155,6 +158,8 @@ export async function executeGatewayChat(params: {
      * fallback): a failure should fail open, not route through an unfunded key.
      */
     googleOnly?: boolean;
+    /** Charge-sensitive callers may forbid retries and fallback providers. */
+    singleProviderAttempt?: boolean;
     performance?: GatewayPerformanceTracker;
 }): Promise<UnifiedChatResponse & GatewayChatExecutionMeta> {
     let resolved =
@@ -205,14 +210,20 @@ export async function executeGatewayChat(params: {
     if (failoverAllowed && (await isCircuitOpen(primaryCircuit, cbConfig))) {
         lastError = new Error(`Provider ${providerName} circuit is open for ${model}`);
     } else {
-        const maxRetries = failoverAllowed ? settings.maxRetries : 1;
+        const maxRetries = params.singleProviderAttempt ? 1 : failoverAllowed ? settings.maxRetries : 1;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
+            if (params.request.signal?.aborted) throw new Error('Chat request aborted');
+            const attemptController = new AbortController();
+            const attemptSignal = params.request.signal
+                ? AbortSignal.any([params.request.signal, attemptController.signal])
+                : attemptController.signal;
             try {
                 params.performance?.markProviderStart();
                 const providerResponse = await withTimeout(
-                    provider.chat(chatRequest),
+                    provider.chat({ ...chatRequest, signal: attemptSignal }),
                     PROVIDER_TIMEOUT_MS,
-                    `${providerName} primary`
+                    `${providerName} primary`,
+                    () => attemptController.abort(),
                 );
                 await recordSuccess(primaryCircuit);
                 const response = applyResponseBillingMode(providerResponse, resolved.billingMode);
@@ -226,6 +237,7 @@ export async function executeGatewayChat(params: {
                     billingMode: resolved.billingMode,
                 };
             } catch (error) {
+                if (params.request.signal?.aborted) throw new Error('Chat request aborted');
                 lastError = error instanceof Error ? error : new Error(String(error));
                 console.warn(
                     `[Gateway/Failover] Attempt ${attempt + 1}/${maxRetries} failed for ${providerName}:`,
@@ -240,13 +252,14 @@ export async function executeGatewayChat(params: {
         await recordFailure(primaryCircuit, cbConfig);
     }
 
-    if (params.googleOnly || !failoverAllowed || !settings.enableFallback || !lastError) {
+    if (params.googleOnly || params.singleProviderAttempt || !failoverAllowed || !settings.enableFallback || !lastError) {
         // googleOnly: memory is managed + Google-only — never fall back to OpenAI.
         throw lastError || new Error('Chat request failed');
     }
 
     const fallbackChain = getFallbackChain(providerName, settings.configuredFallback);
     for (const fallbackProviderName of fallbackChain) {
+        if (params.request.signal?.aborted) throw new Error('Chat request aborted');
         // Resolved before the circuit check so the circuit is keyed on what will actually run.
         // A fallback serves a different model than the primary, and recording its outcome under
         // the primary's model would blame a model this provider was never asked for.
@@ -276,6 +289,10 @@ export async function executeGatewayChat(params: {
 
         try {
             const fallbackProvider = router.getProvider(fallbackProviderName);
+            const attemptController = new AbortController();
+            const attemptSignal = params.request.signal
+                ? AbortSignal.any([params.request.signal, attemptController.signal])
+                : attemptController.signal;
             const fallbackBillingMode = assertApiKeyModelAccess({
                 allowedModels: params.allowedModels,
                 sponsoredModels: params.sponsoredModels,
@@ -284,9 +301,10 @@ export async function executeGatewayChat(params: {
             });
             await fallbackProvider.getPricing(fallbackModel);
             const providerResponse = await withTimeout(
-                fallbackProvider.chat({ ...chatRequest, model: fallbackModel }),
+                fallbackProvider.chat({ ...chatRequest, model: fallbackModel, signal: attemptSignal }),
                 PROVIDER_TIMEOUT_MS,
-                `${fallbackProviderName} fallback`
+                `${fallbackProviderName} fallback`,
+                () => attemptController.abort(),
             );
             const response = applyResponseBillingMode(providerResponse, fallbackBillingMode);
             await recordSuccess(fallbackCircuit);
@@ -310,6 +328,7 @@ export async function executeGatewayChat(params: {
                 billingMode: fallbackBillingMode,
             };
         } catch (fallbackError) {
+            if (params.request.signal?.aborted) throw new Error('Chat request aborted');
             const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
             fallbackErrors.push(`${fallbackProviderName}: ${msg}`);
             console.warn(`[Gateway/Failover] Fallback ${fallbackProviderName} failed:`, fallbackError);

@@ -424,13 +424,29 @@
     },
     "/v1/agents/{agentId}/versions/{version}/test": {
       "post": {
-        "summary": "Sandboxed draft test (no persistence, capped tokens)",
+        "summary": "Sandboxed model test and capability readiness check (capped tokens)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": { "type": "string", "maxLength": 2000 },
+                  "test_connection_ids": { "type": "array", "items": { "type": "string" }, "description": "Active project-scoped test_only connections used to verify declared connector scopes; credentials are not exercised." }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "422": {
+            "description": "Manifest or declared capability prerequisites are unavailable"
           }
         },
-        "description": "Requires a secret project key (`secret_key_required` otherwise)."
+        "description": "Requires a secret project key (`secret_key_required` otherwise). Stores pass/fail evidence on the draft version. Only the model is executed; skills, connectors, and MCP references are checked for readiness without invoking external tools."
       }
     },
     "/v1/agents/{agentId}/versions/{version}/validate": {
@@ -981,9 +997,25 @@
     "/v1/runs/{runId}/delegate": {
       "post": {
         "summary": "Delegate a bounded task to an allowed subagent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agent_version_id"],
+                "properties": {
+                  "agent_version_id": { "type": "string" },
+                  "input": {},
+                  "installation_id": { "type": "string", "description": "Optional active installation owned by the same project and tenant and serving the child agent." }
+                }
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "OK"
+          "201": {
+            "description": "Child run claimed or idempotent prior result"
           }
         },
         "description": "Requires a secret project key (`secret_key_required` otherwise)."

@@ -34,6 +34,13 @@ Dispatch is single-claim/at-most-once, not exactly-once: one approver wins the c
 ### Usage doesn't reconcile
 `GET /v1/usage/export` reads `ai_requests` (≤90d, 5k cap, `truncated` flag). Pre-M3 rows have null dims. `cencori_charge_usd` on `usage-events` rows means customer charge (external path skips gateway markup) — see exploration notes before accusing drift.
 
+### Subagent budget blocked by unresolved charge
+An aborted/timed-out provider request can still be billed upstream. Delegation records `billing_reconciliation_required` on the child run and, when possible, an `ai_requests` error row; tenant/installation/edge budget admission fails closed until reconciled. Compare the child `run_id` and `request_id` against provider billing logs. Record the verified charge in `ai_requests`, then clear its reconciliation metadata and the run error marker in one audited operation. Do not clear either marker merely because the HTTP request was aborted; abort does not prove the provider did not bill it.
+
+### Delegation race proof
+`20260922_000009_embedded_delegation_claim.sql` adds a parent-row-locking claim RPC. After applying it, run a controlled concurrent delegation test against a disposable project/tenant and verify exactly `max_calls` children; do not run fixture-seeding integration tests against a live customer project.
+The new publish RPC pins `timeout_ms` and `budget_limit` for new publications. Inspect already-published edges with null limits before rollout; create and publish a new immutable version for any agent that intended non-default limits rather than silently rewriting its published version.
+
 ## Escalation
 
 Security/isolation suspicion → freeze the tenant (`PATCH ... suspended`? use installation disable + revoke connections), preserve `request_id`s, escalate with event timelines. Zero tenant-isolation incidents is the GA bar.

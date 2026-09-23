@@ -14,6 +14,7 @@ import {
   getConsoleSurface,
   isConsoleHostname,
 } from "@/lib/console/routing";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
 const LAST_ORG_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -431,6 +432,14 @@ export async function proxy(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
+
+  // The console host is dashboard-only. Public documentation always lives on
+  // the main site, including in local development.
+  if (isConsoleSubdomain && (pathname === "/docs" || pathname.startsWith("/docs/"))) {
+    const docsUrl = new URL(getMainSiteUrl(pathname, request.nextUrl.origin));
+    docsUrl.search = request.nextUrl.search;
+    return applySecurityHeaders(NextResponse.redirect(docsUrl, 308));
+  }
 
   // Internal console routes are implementation details. Canonical console
   // URLs are rewritten to them below, but they should never be bookmarkable or

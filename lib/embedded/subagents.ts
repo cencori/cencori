@@ -39,8 +39,12 @@ async function ancestorVersionIds(supabase: Admin, runId: string): Promise<Set<s
 async function cancelDescendant(supabase: Admin, runId: string, projectId: string): Promise<void> {
     const { data } = await supabase.from('embedded_runs').select('id').eq('parent_run_id', runId).not('status', 'in', '(completed,failed,cancelled,expired)');
     for (const child of (data ?? []) as Array<{ id: string }>) {
-        await supabase.from('embedded_runs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', child.id).eq('project_id', projectId);
-        await appendRunEvent(supabase, child.id, 'run.cancelled', { run_id: child.id, cascade_from: runId });
+        const { data: claimed, error } = await supabase.from('embedded_runs')
+            .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+            .eq('id', child.id).eq('project_id', projectId)
+            .in('status', ['queued', 'running', 'requires_action']).select('id').maybeSingle();
+        if (error) throw new Error(`Failed to cancel child run: ${error.message}`);
+        if (claimed) await appendRunEvent(supabase, child.id, 'run.cancelled', { run_id: child.id, cascade_from: runId });
         await cancelDescendant(supabase, child.id, projectId);
     }
 }
@@ -52,8 +56,8 @@ export async function cancelChildRuns(supabase: Admin, parentRunId: string, proj
 
 /**
  * Delegate one bounded task to an explicitly referenced subagent version.
- * The child runs isolated: same project/tenant/user/installation (narrowed,
- * never escalated), its own version config, no parent conversation beyond the
+ * The child runs isolated: same project/tenant/user, an explicitly bound
+ * child installation (or none), its own version config, no parent conversation beyond the
  * explicit task input. Credentials resolve per the child's own bindings.
  */
 export async function delegateSubagent(
@@ -107,37 +111,8 @@ export async function delegateSubagent(
     if (!edge) {
         throw Object.assign(new Error('Subagent version is not in the parent manifest allowlist'), { status: 403 });
     }
-    const edgeLimits = edge as { max_calls: number; timeout_ms?: number | null; budget_limit?: number | null };
-
-    // Edge spend budget: completed child spend under this parent+edge.
-    if (edgeLimits.budget_limit != null) {
-        const { data: siblings } = await supabase.from('embedded_runs').select('id').eq('parent_run_id', parent.id).eq('agent_version_id', childVersionId);
-        const siblingIds = ((siblings ?? []) as Array<{ id: string }>).map((r) => r.id);
-        if (siblingIds.length > 0) {
-            let edgeSpend = 0;
-            for (let i = 0; i < siblingIds.length; i += 50) {
-                const { data: rows } = await supabase.from('ai_requests').select('cencori_charge_usd').in('run_id', siblingIds.slice(i, i + 50));
-                edgeSpend += ((rows ?? []) as Array<{ cencori_charge_usd: number | null }>).reduce((n, r) => n + Number(r.cencori_charge_usd ?? 0), 0);
-            }
-            if (edgeSpend >= edgeLimits.budget_limit) {
-                throw Object.assign(new Error('Subagent spend budget exhausted for this run'), { status: 402 });
-            }
-        }
-    }
-
-    // Delegations go through the same spend gate as ordinary runs.
-    {
-        const { checkSpendBudgets } = await import('./budgets');
-        const budget = await checkSpendBudgets(supabase, {
-            projectId: opts.projectId,
-            tenantId: parent.tenant_id,
-            installationId: parent.installation_id,
-            agentId: parent.agent_id,
-        });
-        if (!budget.ok) {
-            throw Object.assign(new Error(`${budget.scope} spend budget exceeded`), { status: 402 });
-        }
-    }
+    // Note: max_calls/timeout/budget enforcement lives in the atomic claim
+    // RPC below; this read is a fast-fail only and never a limit decision.
 
     // Child version must exist in-project and be published; ancestry walk blocks indirect cycles.
     const { data: childVersion } = await supabase
@@ -169,7 +144,7 @@ export async function delegateSubagent(
             .maybeSingle();
         if (!childIns) throw Object.assign(new Error('Installation not found in this project'), { status: 404 });
         if ((childIns.status as string) !== 'active') throw Object.assign(new Error('Installation is not active'), { status: 409 });
-        if (parent.tenant_id && (childIns.tenant_id as string) !== parent.tenant_id) {
+        if ((childIns.tenant_id as string) !== parent.tenant_id) {
             throw Object.assign(new Error('Installation does not belong to this tenant'), { status: 403 });
         }
         if ((childIns.agent_id as string) !== childAgentId) {
@@ -178,61 +153,44 @@ export async function delegateSubagent(
         childInstallationId = (childIns.id as string);
     }
 
-    // Idempotent child creation — but only for the identical delegation.
-    // A reused key must match parent, tenant, child version, and input;
-    // anything else is a conflict, never another run's output.
-    if (opts.idempotencyKey) {
-        const { data: existing } = await supabase.from('embedded_runs').select('*').eq('project_id', opts.projectId).eq('idempotency_key', opts.idempotencyKey).maybeSingle();
-        if (existing) {
-            const e = existing as { id: string; status: string; output_ref: unknown; parent_run_id: string | null; tenant_id: string | null; agent_version_id: string | null; input_ref: unknown };
-            const sameContext =
-                e.parent_run_id === parent.id &&
-                (e.tenant_id ?? null) === (parent.tenant_id ?? null) &&
-                e.agent_version_id === childVersionId &&
-                JSON.stringify(e.input_ref ?? {}) === JSON.stringify(opts.input ?? {});
-            if (!sameContext) {
-                throw Object.assign(new Error('Idempotency key already used for a different delegation'), { status: 409, code: 'idempotency_conflict' });
-            }
-            return { childRunId: e.id, status: e.status, output: e.output_ref ?? null };
-        }
-    }
+    // Charge admission to the child's installation and tenant, not the
+    // parent's installation: ai_requests is attributed to this same scope.
+    const { checkSpendBudgets } = await import('./budgets');
+    const budget = await checkSpendBudgets(supabase, {
+        projectId: opts.projectId,
+        tenantId: parent.tenant_id,
+        installationId: childInstallationId,
+        agentId: childAgentId,
+    });
+    if (!budget.ok) throw Object.assign(new Error(`${budget.scope} spend budget exceeded`), { status: 402 });
 
-    const { data: child, error: childError } = await supabase
-        .from('embedded_runs')
-        .insert({
-            project_id: opts.projectId,
-            tenant_id: parent.tenant_id,
-            external_user_id: parent.external_user_id,
-            agent_id: childAgentId,
-            agent_version_id: childVersionId,
-            installation_id: childInstallationId,
-            session_id: null,
-            parent_run_id: parent.id,
-            delegation_depth: depth + 1,
-            status: 'queued',
-            input_ref: (opts.input ?? {}) as Record<string, unknown>,
-            idempotency_key: opts.idempotencyKey ?? null,
-        })
-        .select('*')
-        .single();
-    if (childError || !child) throw Object.assign(new Error(childError?.message ?? 'Failed to create child run'), { status: 500 });
-    const childId = (child as { id: string }).id;
-
-    // Atomic max_calls: the insert above is the claim; verify the sibling
-    // count after it and roll our own row back when over budget. Concurrent
-    // delegations serialize on the row lock below only in outcome, never in
-    // overrun: overshoot resolves to 429s, never to silent excess.
-    {
-        const { count: siblings } = await supabase
-            .from('embedded_runs')
-            .select('id', { count: 'exact', head: true })
-            .eq('parent_run_id', parent.id)
-            .eq('agent_version_id', childVersionId);
-        if ((siblings ?? 0) > (edgeLimits.max_calls ?? 1)) {
-            await supabase.from('embedded_runs').delete().eq('id', childId);
-            throw Object.assign(new Error('Subagent call budget exhausted for this run'), { status: 429 });
-        }
+    // The database locks the parent and atomically enforces max_calls,
+    // installation/tenant ownership, and retry identity before inserting.
+    const { data: claim, error: claimError } = await supabase.rpc('claim_embedded_subagent_run', {
+        p_project_id: opts.projectId,
+        p_parent_run_id: parent.id,
+        p_child_version_id: childVersionId,
+        p_child_installation_id: childInstallationId,
+        p_input: (opts.input ?? {}) as Record<string, unknown>,
+        p_idempotency_key: opts.idempotencyKey ?? null,
+    });
+    if (claimError || !claim) {
+        const message = claimError?.message ?? 'Failed to claim subagent run';
+        const status = message.includes('subagent_call_budget_exhausted') || message.includes('subagent_budget_busy') ? 429
+            : message.includes('subagent_billing_reconciliation_required') ? 409
+            : message.includes('subagent_spend_budget_exhausted') ? 402
+            : message.includes('idempotency_conflict') ? 409
+                : message.includes('parent_run_not_found') ? 404
+                    : message.includes('tenant_suspended') || message.includes('child_installation_scope_mismatch') ? 403
+                        : message.includes('parent_run_inactive') || message.includes('child_version_unavailable') ? 409 : 500;
+        throw Object.assign(new Error(message), { status, code: status === 409 && message.includes('idempotency_conflict') ? 'idempotency_conflict' : 'invalid_request_error' });
     }
+    const claimedRun = claim as { id: string; status: string; output: unknown; created: boolean; timeout_ms?: number | null };
+    if (!claimedRun.created) return { childRunId: claimedRun.id, status: claimedRun.status, output: claimedRun.output ?? null };
+    const childId = claimedRun.id;
+    // The deadline comes from the atomic claim, not the stale pre-read: the
+    // edge may have been republished between the fast-fail check and now.
+    const claimTimeoutMs = typeof claimedRun.timeout_ms === 'number' && claimedRun.timeout_ms > 0 ? claimedRun.timeout_ms : null;
 
     await appendRunEvent(supabase, parent.id, 'subagent.called', { parent_run_id: parent.id, child_run_id: childId, child_version_id: childVersionId });
     await appendRunEvent(supabase, childId, 'run.queued', { run_id: childId, parent_run_id: parent.id });
@@ -243,10 +201,16 @@ export async function delegateSubagent(
     if (!claimed.data) return { childRunId: childId, status: 'queued', output: null };
     await appendRunEvent(supabase, childId, 'run.started', { run_id: childId });
 
+    let attemptedModel: string | null = null;
+    let timedOut = false;
+    let usageRecorded = false;
+    let reconciliationReason: string | null = null;
+    let appliedTimeoutMs = 120000;
     try {
         const runtime = await resolveAgentRuntimeConfig(supabase, { agentId: (childVersion.agent_id as string), installationVersionId: childVersionId });
         const config = (runtime.config ?? {}) as { model?: string; instructions?: string; system_prompt?: string; temperature?: number; max_output_tokens?: number };
         if (!config.model?.trim()) throw new Error('Child agent has no model configured');
+        attemptedModel = config.model;
 
         let contextBlock: string | null = null;
         // Only explicitly bound child bindings load knowledge — never the
@@ -263,10 +227,16 @@ export async function delegateSubagent(
         }
 
         const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
-        // Edge timeout bounds the child model call (default 2 minutes).
-        const timeoutMs = edgeLimits.timeout_ms && edgeLimits.timeout_ms > 0 ? Math.min(edgeLimits.timeout_ms, 600000) : 120000;
-        const response = await Promise.race([
-            executeGatewayChat({
+        // Abort the provider request at the edge deadline; providers still may
+        // bill a request already received, so timeout failures are marked for
+        // billing reconciliation rather than assumed to cost zero.
+        const timeoutMs = claimTimeoutMs ? Math.min(claimTimeoutMs, 600000) : 120000;
+        appliedTimeoutMs = timeoutMs;
+        const controller = new AbortController();
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+        let response: Awaited<ReturnType<typeof executeGatewayChat>>;
+        try {
+            response = await executeGatewayChat({
                 supabase,
                 projectId: opts.projectId,
                 organizationId: opts.organizationId,
@@ -278,40 +248,72 @@ export async function delegateSubagent(
                         { role: 'user' as const, content: JSON.stringify({ delegated_task: opts.input ?? {} }).slice(0, 4000) },
                     ],
                     model: config.model,
+                    signal: controller.signal,
                     temperature: config.temperature ?? undefined,
                     maxTokens: config.max_output_tokens ?? undefined,
                 },
                 requestId: `sub_${childId.slice(0, 8)}`,
-            }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Subagent execution timed out after ${timeoutMs}ms`)), timeoutMs)),
-        ]);
+                singleProviderAttempt: true,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
 
         const output = { output: response.content, model: response.model, child_version_id: childVersionId, usage: response.usage };
+        // Meter the provider call even if cancellation wins the completion
+        // race. A completed provider request is never free merely because the
+        // child output was discarded.
+        const { error: usageError } = await supabase.from('ai_requests').insert({
+            project_id: opts.projectId, api_key_id: null, environment: 'production', endpoint: 'runs.delegate',
+            model: response.model, provider: response.provider, status: 'success',
+            prompt_tokens: response.usage.promptTokens, completion_tokens: response.usage.completionTokens, total_tokens: response.usage.totalTokens,
+            cost_usd: response.cost.cencoriChargeUsd, provider_cost_usd: response.cost.providerCostUsd, cencori_charge_usd: response.cost.cencoriChargeUsd,
+            markup_percentage: response.cost.markupPercentage,
+            tenant_id: parent.tenant_id, agent_id: childAgentId, installation_id: childInstallationId,
+            run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
+        });
+        if (usageError) {
+            reconciliationReason = 'metering_failure';
+            throw new Error(`Failed to record subagent usage: ${usageError.message}`);
+        }
+        usageRecorded = true;
+        if (timedOut) throw new Error('Subagent model completed after its deadline');
         const { data: done } = await supabase.from('embedded_runs').update({ status: 'completed', output_ref: output, completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running').select('id').maybeSingle();
         if (done) {
             await appendRunEvent(supabase, childId, 'run.completed', { run_id: childId });
             await appendRunEvent(supabase, parent.id, 'subagent.completed', { parent_run_id: parent.id, child_run_id: childId });
             await emitEmbeddedEvent(opts.projectId, 'subagent.completed', { parent_run_id: parent.id, child_run_id: childId });
-            try {
-                await supabase.from('ai_requests').insert({
-                    project_id: opts.projectId, api_key_id: null, environment: 'production', endpoint: 'runs.delegate',
-                    model: response.model, provider: response.provider, status: 'success',
-                    prompt_tokens: response.usage.promptTokens, completion_tokens: response.usage.completionTokens, total_tokens: response.usage.totalTokens,
-                    cost_usd: response.cost.cencoriChargeUsd, provider_cost_usd: response.cost.providerCostUsd, cencori_charge_usd: response.cost.cencoriChargeUsd,
-                    markup_percentage: response.cost.markupPercentage,
-                    tenant_id: parent.tenant_id, agent_id: (childVersion.agent_id as string), installation_id: childInstallationId,
-                    run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
-                });
-            } catch { /* logging never fails delegation */ }
             return { childRunId: childId, status: 'completed', output };
         }
         return { childRunId: childId, status: 'cancelled', output: null };
     } catch (e) {
-        const message = e instanceof Error ? e.message : 'Subagent failed';
-        await supabase.from('embedded_runs').update({ status: 'failed', error: message.slice(0, 1000), completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running');
-        await appendRunEvent(supabase, childId, 'run.failed', { run_id: childId });
-        await appendRunEvent(supabase, parent.id, 'subagent.failed', { parent_run_id: parent.id, child_run_id: childId, error: message.slice(0, 300) });
-        await emitEmbeddedEvent(opts.projectId, 'subagent.failed', { parent_run_id: parent.id, child_run_id: childId });
+        const message = timedOut ? `Subagent execution timed out after ${appliedTimeoutMs}ms` : e instanceof Error ? e.message : 'Subagent failed';
+        if (!usageRecorded && /\btimed out after \d+ms\b/.test(message)) reconciliationReason = 'provider_timeout';
+        if (timedOut && !usageRecorded) reconciliationReason = 'provider_timeout';
+        if (reconciliationReason && attemptedModel) {
+            const { error: reconciliationError } = await supabase.from('ai_requests').insert({
+                project_id: opts.projectId, api_key_id: null, environment: 'production', endpoint: 'runs.delegate',
+                model: attemptedModel, provider: 'unknown', status: 'error',
+                prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+                cost_usd: 0, provider_cost_usd: 0, cencori_charge_usd: 0, markup_percentage: 0,
+                tenant_id: parent.tenant_id, agent_id: childAgentId, installation_id: childInstallationId,
+                run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
+                metadata: { billing_reconciliation_required: true, reason: reconciliationReason },
+            });
+            if (reconciliationError) console.error('[Embedded subagents] Reconciliation row insert failed:', reconciliationError.message);
+        }
+        const errorText = reconciliationReason ? `billing_reconciliation_required:${reconciliationReason}; ${message}` : message;
+        const { data: failed } = await supabase.from('embedded_runs').update({ status: 'failed', error: errorText.slice(0, 1000), completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running').select('id').maybeSingle();
+        if (!failed && reconciliationReason) {
+            // Cancellation must keep its terminal status but still retain the
+            // uncertain-charge marker when provider billing is unresolved.
+            await supabase.from('embedded_runs').update({ error: errorText.slice(0, 1000) }).eq('id', childId).eq('status', 'cancelled');
+        }
+        if (failed) {
+            await appendRunEvent(supabase, childId, 'run.failed', { run_id: childId, billing_reconciliation_required: Boolean(reconciliationReason) });
+            await appendRunEvent(supabase, parent.id, 'subagent.failed', { parent_run_id: parent.id, child_run_id: childId, error: message.slice(0, 300) });
+            await emitEmbeddedEvent(opts.projectId, 'subagent.failed', { parent_run_id: parent.id, child_run_id: childId });
+        }
         throw Object.assign(new Error(message), { status: 502 });
     }
 }

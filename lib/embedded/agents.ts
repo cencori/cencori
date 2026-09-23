@@ -7,7 +7,7 @@ export interface AgentVersionConfig {
     model?: string;
     instructions?: string;
     system_prompt?: string;
-    tools?: string[];
+    tools?: Array<string | { type: string; name: string; description?: string; parameters?: Record<string, unknown> }>;
     temperature?: number;
     max_output_tokens?: number;
     approval_defaults?: Record<string, unknown>;
@@ -115,8 +115,9 @@ export function validateVersionConfig(config: AgentVersionConfig): { ok: true } 
     if (instructions !== undefined && typeof instructions !== 'string') {
         return { ok: false, message: 'config.instructions must be a string' };
     }
-    if (config.tools !== undefined && (!Array.isArray(config.tools) || !config.tools.every((t) => typeof t === 'string'))) {
-        return { ok: false, message: 'config.tools must be a string array' };
+    if (config.tools !== undefined && (!Array.isArray(config.tools) || !config.tools.every((t) =>
+        typeof t === 'string' || (t !== null && typeof t === 'object' && typeof t.type === 'string' && typeof t.name === 'string' && t.name.trim().length > 0)))) {
+        return { ok: false, message: 'config.tools must contain tool names or typed tool declarations' };
     }
     if (config.temperature !== undefined && (typeof config.temperature !== 'number' || config.temperature < 0 || config.temperature > 2)) {
         return { ok: false, message: 'config.temperature must be 0–2' };

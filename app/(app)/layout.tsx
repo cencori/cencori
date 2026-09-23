@@ -255,6 +255,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     consoleRoute?.scope === "project" ? activeProject?.slug ?? null : null
   );
   const isPlayground = pathname.includes("/playground");
+  const isEmbeddedAgents = pathname === "/embedded-agents" || pathname.endsWith("/embedded-agents");
+  const isFixedWorkspace = isPlayground || isEmbeddedAgents;
   const isOnboardingFlow = pathname.includes("/onboarding");
   const hasDesktopSidebar = (Boolean(orgSlug) || isCanonicalConsoleRoute)
     && !pathname.includes("/projects/new")
@@ -318,13 +320,13 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     <div
       className={cn(
         "dashboard-theme bg-background transition-colors font-inter",
-        isPlayground ? "flex h-svh flex-col overflow-hidden" : "min-h-screen"
+        isFixedWorkspace ? "flex h-svh flex-col overflow-hidden" : "min-h-screen"
       )}
     >
       {!isOnboardingFlow && (
       <header className={cn(
         "fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
-        hasDesktopSidebar && "lg:left-64",
+        hasDesktopSidebar && (isEmbeddedAgents ? "lg:left-[calc(16rem+250px)]" : "lg:left-64"),
       )}>
         <div className="flex items-center gap-2">
           {/* Breadcrumbs - hidden on mobile */}
@@ -413,6 +415,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
         className={cn(
           isPlayground
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
+            : isEmbeddedAgents
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-12 pb-0 lg:pt-0"
             : isOnboardingFlow
               ? "p-4 md:p-6"
               : "p-4 md:p-6 pt-20 lg:pt-14"

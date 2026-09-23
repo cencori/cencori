@@ -39,6 +39,9 @@ import {
     type RetrievedMemory,
 } from "@/lib/memory";
 import { isLocalMemoryBuild } from "@/lib/memory/availability";
+import { installedTurnTools } from '@/lib/embedded/turn-tools';
+import { intersectBrowserEnabled, intersectNetworkPolicy, type NetworkPolicy } from '@/lib/embedded/net-policy';
+import type { CapabilityManifest } from '@/lib/embedded/manifest';
 
 const normalizeGatewayModelId = (modelId: string): string => {
     const strippedModel = modelId.startsWith("cencori/")
@@ -213,21 +216,25 @@ export async function POST(
         // manifest is the runtime source of truth whenever the session
         // carries an installation — model, instructions, temperature, the
         // tool allowlist, and the (default-deny) browser policy.
-        let manifestPolicy: { browser?: { enabled?: boolean } } | null = null;
-        let manifestBuiltinTools: string[] | null = null;
-        let manifestFunctionNames: Set<string> | null = null;
+        let installedManifest: CapabilityManifest | null = null;
+        let effectiveNetworkPolicy: NetworkPolicy | undefined;
+        let effectiveBrowserEnabled = false;
         {
             const installationId = (session as { installation_id?: string | null }).installation_id;
             if (installationId) {
                 const { data: ins } = await adminClient
                     .from('agent_installations')
-                    .select('agent_version_id, status')
+                    .select('agent_version_id, status, overlay_config')
                     .eq('project_id', (gatewayCtx as GatewayContext).projectId)
                     .eq('id', installationId)
                     .maybeSingle();
                 const versionId = (ins as { agent_version_id?: string | null } | null)?.agent_version_id;
+                if (!ins || ins.status !== 'active' || !versionId) {
+                    return respondError(403, 'Agent installation is not active', 'installation_inactive');
+                }
                 if (versionId) {
-                    const { data: version } = await adminClient.from('agent_versions').select('config_json').eq('id', versionId).maybeSingle();
+                    const { data: version } = await adminClient.from('agent_versions').select('config_json, status').eq('project_id', (gatewayCtx as GatewayContext).projectId).eq('id', versionId).maybeSingle();
+                    if (!version || version.status !== 'published') return respondError(409, 'Installed agent version is unavailable', 'version_unavailable');
                     const config = ((version as { config_json?: Record<string, unknown> } | null)?.config_json ?? {}) as Record<string, unknown>;
                     const { normalizeManifest } = await import('@/lib/embedded/manifest');
                     const manifest = normalizeManifest(config);
@@ -235,17 +242,17 @@ export async function POST(
                         agentConfig = {
                             model: manifest.model,
                             system_prompt: manifest.instructions ?? agentConfig?.system_prompt ?? null,
-                            tools: agentConfig?.tools ?? null,
+                            tools: null,
                         };
                         agentId = agentId ?? session.agent_id;
                         const manifestTemp = (config.temperature as number | undefined) ?? undefined;
                         if (typeof manifestTemp === 'number') {
-                            (body as { temperature?: number }).temperature ??= manifestTemp;
+                            (body as { temperature?: number }).temperature = manifestTemp;
                         }
-                    }
-                    manifestPolicy = manifest.policy;
-                    manifestBuiltinTools = manifest.tools.filter((t) => t.type === 'builtin').map((t) => t.name);
-                    manifestFunctionNames = new Set(manifest.tools.filter((t) => t.type !== 'builtin').map((t) => t.name));
+                    } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
+                    installedManifest = manifest;
+                    effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
+                    effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                 }
             }
         }
@@ -257,7 +264,7 @@ export async function POST(
         const model = normalizeGatewayModelId(configuredModel.trim());
 
         const input = body.input;
-        const instructions = agentConfig?.system_prompt || body.instructions;
+        const instructions = installedManifest ? (installedManifest.instructions ?? '') : (agentConfig?.system_prompt || body.instructions);
 
         if (!input || (Array.isArray(input) && input.length === 0)) {
             return respondError(400, "Missing input. Provide a string or array of input items.", 'missing_input');
@@ -480,21 +487,14 @@ export async function POST(
             }
         };
 
-        // Tool authority: the installed manifest decides. Request-supplied and
-        // legacy tools are intersected with the manifest declarations — a
-        // caller (including a browser token) cannot escalate beyond them.
+        // Tool authority: the installed manifest constructs the available
+        // tools. Request-supplied and legacy definitions are ignored for an
+        // installation, so a caller cannot introduce a new tool or schema.
         // Without an installation, legacy agent-config merging applies.
-        const tools = [...(body.tools || [])];
-        if (manifestBuiltinTools) {
-            const builtinSet = new Set(manifestBuiltinTools);
-            const allowed = tools.filter((t) => {
-                const tool = t as { type?: string; function?: { name?: string } };
-                if (tool.type === 'function') return manifestFunctionNames?.has(tool.function?.name ?? '') ?? false;
-                return builtinSet.has(tool.type ?? '');
-            });
-            tools.length = 0;
-            tools.push(...allowed);
-        } else if (agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
+        const tools: ResponsesRequest['tools'] = installedManifest
+            ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled)
+            : [...(body.tools || [])];
+        if (!installedManifest && agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));
             for (const toolType of agentConfig.tools) {
                 if (!existingTypes.has(toolType)) {
@@ -503,17 +503,9 @@ export async function POST(
             }
         }
 
-        // Browser default-deny: installed sessions strip open-web tools
-        // unless the manifest explicitly grants browser access.
-        const browserGranted = (manifestPolicy as { browser?: { enabled?: boolean } } | null)?.browser?.enabled === true;
-        if (manifestPolicy && !browserGranted) {
-            const before = tools.length;
-            const kept = tools.filter((t) => (t as { type?: string }).type !== 'web_search_preview');
-            if (kept.length !== before) {
-                tools.length = 0;
-                tools.push(...kept);
-            }
-        }
+        const forcedToolName = typeof body.tool_choice === 'object' && body.tool_choice?.type === 'function' ? body.tool_choice.name : null;
+        // (Forced-tool membership is checked after allowlist filtering below,
+        // so a declared-but-revoked tool still fails closed.)
 
         // Installation tool allowlists (discovered ∩ allowed). Default: an empty
         // allowlist allows all function tools. Installations that set
@@ -534,7 +526,7 @@ export async function POST(
                 }
                 let strict = false;
                 if (!hasAllowlist) {
-                    const { data: ins } = await adminClient.from('agent_installations').select('overlay_config').eq('id', installationId).maybeSingle();
+                    const { data: ins } = await adminClient.from('agent_installations').select('overlay_config').eq('project_id', (gatewayCtx as GatewayContext).projectId).eq('id', installationId).maybeSingle();
                     strict = ((ins as { overlay_config?: { strict_tools?: boolean } } | null)?.overlay_config?.strict_tools) === true;
                 }
                 if (hasAllowlist || strict) {
@@ -547,6 +539,10 @@ export async function POST(
                     tools.push(...filtered);
                 }
             }
+        }
+
+        if (installedManifest && forcedToolName && !tools.some((t) => t.type === 'function' && t.function.name === forcedToolName)) {
+            return respondError(403, 'Requested tool is not available on this installation', 'tool_not_allowed');
         }
 
         // Reserve a turn only after authentication, validation, quota, memory,
@@ -601,6 +597,7 @@ export async function POST(
             model,
             instructions: instructions || undefined,
             tools: tools as ResponsesRequest['tools'],
+            networkPolicy: effectiveNetworkPolicy,
             tool_choice: body.tool_choice,
             temperature: body.temperature,
             max_output_tokens: body.max_output_tokens,

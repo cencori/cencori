@@ -4,6 +4,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { checkEgress, type NetworkPolicy } from '@/lib/embedded/net-policy';
 
 // ── File Indexing (for file_search uploads) ──
 
@@ -87,10 +88,14 @@ export async function executeWebSearch(
     query: string,
     config: WebSearchToolConfig,
     projectId: string,
+    networkPolicy?: NetworkPolicy,
 ): Promise<ToolCallOutput> {
     const callId = `ws_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     try {
-        const results = await performWebSearch(query, config.search_context_size || 'medium', projectId);
+        if (networkPolicy && (networkPolicy.mode !== 'allowlist' || networkPolicy.allowed_hosts.length === 0)) {
+            throw new Error('Web search denied by the installed agent network policy');
+        }
+        const results = await performWebSearch(query, config.search_context_size || 'medium', projectId, networkPolicy);
         return {
             type: 'web_search_call',
             id: callId,
@@ -115,16 +120,22 @@ async function performWebSearch(
     query: string,
     contextSize: 'low' | 'medium' | 'high',
     projectId: string,
+    networkPolicy?: NetworkPolicy,
 ): Promise<Array<{ title: string; url: string; snippet: string }>> {
     const numResults = contextSize === 'low' ? 3 : contextSize === 'medium' ? 8 : 15;
     const { searchWebIndex } = await import('@/lib/web/index');
     const { createWebDataStore } = await import('@/lib/web/store');
     const results = await searchWebIndex(createWebDataStore(createAdminClient()), projectId, query, { limit: numResults });
-    return results.map(result => ({
-        title: result.title,
-        url: result.canonicalUrl,
-        snippet: result.snippet,
-    }));
+    const visible: Array<{ title: string; url: string; snippet: string }> = [];
+    for (const result of results) {
+        if (networkPolicy) {
+            if (!result.canonicalUrl.startsWith('https://')) continue;
+            const decision = await checkEgress(result.canonicalUrl, networkPolicy);
+            if (!decision.allowed) continue;
+        }
+        visible.push({ title: result.title, url: result.canonicalUrl, snippet: result.snippet });
+    }
+    return visible;
 }
 
 function formatSearchResultsForContext(
@@ -239,7 +250,8 @@ export type ToolPreProcessResult = {
 export async function preProcessBuiltInTools(
     input: string,
     tools: ResponsesBuiltInTool[],
-    projectId: string
+    projectId: string,
+    networkPolicy?: NetworkPolicy,
 ): Promise<ToolPreProcessResult> {
     const systemContexts: string[] = [];
     const toolOutputs: ToolCallOutput[] = [];
@@ -247,7 +259,7 @@ export async function preProcessBuiltInTools(
     for (const tool of tools) {
         switch (tool.type) {
             case 'web_search_preview': {
-                const result = await executeWebSearch(input, tool, projectId);
+                const result = await executeWebSearch(input, tool, projectId, networkPolicy);
                 toolOutputs.push(result);
                 if (result.status === 'completed' && result.output?.results) {
                     systemContexts.push(

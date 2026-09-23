@@ -19,6 +19,7 @@ import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabaseClient";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
 import { getConsoleRoute } from "@/lib/console/routing";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 
 interface MobileNavProps {
     onMenuClick: () => void;
@@ -164,7 +165,7 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                             <p className="text-[10px] text-muted-foreground">Start with our docs or community.</p>
                         </div>
                         <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                            <Link href="/docs" target="_blank">
+                            <Link href={getMainSiteUrl("/docs")} target="_blank">
                                 <ExternalLink className="h-3 w-3 mr-2" />
                                 Documentation
                             </Link>

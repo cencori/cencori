@@ -47,8 +47,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ skillId: 
         if (!['private', 'tenant', 'public'].includes(body.visibility)) {
             return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Invalid visibility', { requestId }), { requestId });
         }
-        if (body.visibility === 'tenant' && !(row.tenant_id as string | null)) {
-            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'tenant visibility requires a tenant-owned skill', { requestId }), { requestId });
+        if ((body.visibility === 'tenant') !== Boolean(row.tenant_id)) {
+            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Tenant visibility and tenant ownership must agree', { requestId }), { requestId });
         }
         patch.visibility = body.visibility;
     }

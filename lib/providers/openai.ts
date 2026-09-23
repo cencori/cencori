@@ -66,7 +66,7 @@ export class OpenAIProvider extends AIProvider {
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
                 prompt_cache_key: request.promptCacheKey,
-            });
+            }, { signal: request.signal });
 
             const usage = completion.usage!;
             const pricing = await this.getPricing(request.model);

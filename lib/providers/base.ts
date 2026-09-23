@@ -72,6 +72,8 @@ export interface ToolCall {
 export interface UnifiedChatRequest {
     messages: UnifiedMessage[];
     model: string;
+    /** Abort in-flight provider HTTP work when a caller's execution deadline expires. */
+    signal?: AbortSignal;
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;

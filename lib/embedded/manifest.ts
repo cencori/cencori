@@ -1,5 +1,6 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { buildUnifiedModelRegistry } from './model-registry';
+import { canonicalAllowedHost } from './net-policy';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -11,10 +12,10 @@ export interface CapabilityManifest {
     fallback_policy?: { model?: string; on?: string[] };
     instructions?: string;
     skills: Array<{ skill_version_id: string }>;
-    tools: Array<{ type: string; name: string }>;
+    tools: Array<{ type: string; name: string; description?: string; parameters?: Record<string, unknown> }>;
     connection_requirements: Array<{ connector: string; scopes: string[] }>;
     mcp_tools: Array<{ server_id: string; tool: string }>;
-    subagents: Array<{ agent_version_id: string; max_calls?: number }>;
+    subagents: Array<{ agent_version_id: string; max_calls?: number; timeout_ms?: number; budget_limit?: number }>;
     policy: {
         browser: { enabled: boolean };
         network: { mode: 'none' | 'allowlist'; allowed_hosts: string[] };
@@ -32,7 +33,11 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
         connection_requirements?: unknown; mcp_tools?: unknown; subagents?: unknown; policy?: unknown;
     };
     const tools = Array.isArray(c.tools)
-        ? (c.tools as unknown[]).map((t) => typeof t === 'string' ? { type: 'builtin', name: t } : (t as { type?: string; name?: string })).filter((t) => t.name).map((t) => ({ type: t.type ?? 'builtin', name: t.name as string }))
+        ? (c.tools as unknown[]).map((t) => typeof t === 'string' ? { type: 'builtin', name: t } : (t as CapabilityManifest['tools'][number])).filter((t) => t && typeof t.name === 'string' && t.name.trim()).map((t) => ({
+            type: t.type ?? 'builtin', name: t.name,
+            ...(t.description !== undefined ? { description: t.description } : {}),
+            ...(t.parameters !== undefined ? { parameters: t.parameters } : {}),
+        }))
         : [];
     const policy = (c.policy ?? {}) as Record<string, unknown>;
     const browser = (policy.browser ?? {}) as { enabled?: boolean };
@@ -51,7 +56,11 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
             ? (c.mcp_tools as Array<{ server_id?: string; tool?: string }>).filter((m) => m?.server_id && m?.tool).map((m) => ({ server_id: m.server_id as string, tool: m.tool as string }))
             : [],
         subagents: Array.isArray(c.subagents)
-            ? (c.subagents as Array<{ agent_version_id?: string; max_calls?: number }>).filter((s) => s?.agent_version_id).map((s) => ({ agent_version_id: s.agent_version_id as string, max_calls: s.max_calls ?? 1 }))
+            ? (c.subagents as Array<{ agent_version_id?: string; max_calls?: number; timeout_ms?: number; budget_limit?: number }>).filter((s) => s?.agent_version_id).map((s) => ({
+                agent_version_id: s.agent_version_id as string, max_calls: s.max_calls ?? 1,
+                ...(s.timeout_ms !== undefined ? { timeout_ms: s.timeout_ms } : {}),
+                ...(s.budget_limit !== undefined ? { budget_limit: s.budget_limit } : {}),
+            }))
             : [],
         policy: {
             browser: { enabled: browser.enabled ?? false },
@@ -86,6 +95,26 @@ export async function validateManifest(
     const errors: string[] = [];
     const warnings: string[] = [];
     const m = opts.manifest;
+
+    for (const tool of m.tools) {
+        if (tool.type === 'builtin') {
+            if (!['web_search', 'web_search_preview'].includes(tool.name)) {
+                errors.push(`built-in tool '${tool.name}' is not available for installed agent turns`);
+            }
+            if (['web_search', 'web_search_preview'].includes(tool.name) && !m.policy.browser.enabled) {
+                errors.push(`built-in tool '${tool.name}' requires browser policy to be enabled`);
+            }
+            if (['web_search', 'web_search_preview'].includes(tool.name) && m.policy.network.mode !== 'allowlist') {
+                errors.push(`built-in tool '${tool.name}' requires an outbound host allowlist`);
+            }
+        } else if (tool.type === 'function') {
+            if (!tool.parameters || typeof tool.parameters !== 'object' || Array.isArray(tool.parameters)) {
+                errors.push(`function tool '${tool.name}' requires a published parameters schema`);
+            }
+        } else {
+            errors.push(`unsupported tool type '${tool.type}'`);
+        }
+    }
 
     // Model: must resolve in the unified registry and be available.
     if (!m.model?.trim()) {
@@ -168,6 +197,12 @@ export async function validateManifest(
         if (sub.max_calls !== undefined && (sub.max_calls < 1 || sub.max_calls > 25)) {
             errors.push(`subagent max_calls must be 1–25`);
         }
+        if (sub.timeout_ms !== undefined && (!Number.isInteger(sub.timeout_ms) || sub.timeout_ms < 1000 || sub.timeout_ms > 600000)) {
+            errors.push('subagent timeout_ms must be an integer between 1000 and 600000');
+        }
+        if (sub.budget_limit !== undefined && (!Number.isFinite(sub.budget_limit) || sub.budget_limit <= 0)) {
+            errors.push('subagent budget_limit must be positive');
+        }
         const { data: child } = await supabase
             .from('agent_versions')
             .select('id, agent_id, status, agents!inner(id, project_id)')
@@ -210,15 +245,8 @@ export async function validateManifest(
             errors.push('network allowlist mode requires at least one allowed host');
         }
         for (const host of m.policy.network.allowed_hosts) {
-            try {
-                const url = new URL(host.includes('://') ? host : `https://${host}`);
-                if (url.username || url.password) {
-                    errors.push(`allowed host '${host}' must not embed credentials`);
-                } else if (!['https:', 'http:'].includes(url.protocol)) {
-                    errors.push(`allowed host '${host}' must be http(s)`);
-                }
-            } catch {
-                errors.push(`allowed host '${host}' is not a valid hostname or URL`);
+            if (typeof host !== 'string' || !canonicalAllowedHost(host)) {
+                errors.push(`allowed host '${String(host)}' must be an HTTPS hostname (optional explicit port; no path or credentials)`);
             }
         }
     }

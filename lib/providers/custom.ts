@@ -47,6 +47,7 @@ export class CustomProvider extends AIProvider {
                     ...(this.config.apiKey ? { 'Authorization': `Bearer ${this.config.apiKey}` } : {}),
                 },
                 body: JSON.stringify(body),
+                signal: request.signal,
             }, { maxRedirects: 0 });
 
             if (!response.ok) {

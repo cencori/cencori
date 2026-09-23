@@ -162,7 +162,7 @@ export class AnthropicProvider extends AIProvider {
                 messages: messages as Anthropic.MessageParam[],
                 ...(tools ? { tools } : {}),
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
-            });
+            }, { signal: request.signal });
 
             const pricing = await this.getPricing(request.model);
             // Anthropic reports cache reads and writes as fields of their own,
