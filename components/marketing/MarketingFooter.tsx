@@ -7,7 +7,9 @@ import { DevelopersFooterGlow } from "@/components/developers/DevelopersFooterGl
 export function MarketingFooter() {
   const pathname = usePathname();
   const isDevelopers =
-    pathname?.startsWith("/developers") || pathname === "/ai-gateway";
+    pathname?.startsWith("/developers") ||
+    pathname === "/ai-gateway" ||
+    pathname === "/ai-gateway/models";
 
   return <SiteFooter bottomGlow={isDevelopers ? <DevelopersFooterGlow /> : undefined} />;
 }
