@@ -1,0 +1,234 @@
+---
+title: "Introducing Cencori Embedded Agents"
+slug: "introducing-cencori-embedded-agents"
+date: "2026-09-23"
+excerpt: "Ship multi-tenant agents inside your SaaS without building the agent control plane: models, tenants, versioning, knowledge, tools, approvals, runs, webhooks, and metering through one API."
+coverImage: "/newsroom/images/covers/embedded-agents.webp"
+authors: []
+tags: ["Embedded Agents", "Agents", "Developers", "Product"]
+category: "product"
+published: true
+---
+
+An agent demo has one user, one prompt, and one API key.
+
+A SaaS product has companies, employees, permissions, private data, provider credentials, approval policies, background jobs, audit trails, and invoices.
+
+The distance between those two things is the agent backend.
+
+Today we are introducing **Cencori Embedded Agents**: the multi-tenant agent backend for SaaS products.
+
+Your customers stay inside your product. You own the interface, the workflow, and the relationship. Cencori runs the control plane underneath it: models, agent versions, tenant isolation, knowledge, memory, credentials, tools, approvals, durable execution, observability, and usage metering.
+
+```ts
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({
+  apiKey: process.env.CENCORI_API_KEY,
+});
+
+const tenant = await cencori.tenants.create({
+  external_id: 'company_123',
+  name: 'Acme Ltd',
+});
+
+await cencori.installations.create({
+  tenant_id: tenant.id,
+  agent_id: 'agt_support',
+  version: '1.0.0',
+});
+
+const { token } = await cencori.clientTokens.mint({
+  tenant_id: tenant.id,
+  external_user_id: 'user_42',
+  installation_ids: ['ins_...'],
+  permissions: ['sessions:create', 'sessions:turn'],
+});
+```
+
+The project secret remains on your server. Your frontend receives a short-lived client token scoped to one tenant, one user, an explicit set of installations, and the permissions it actually needs.
+
+That is the difference between adding a chatbot and shipping an AI product.
+
+## The missing layer between a model call and a product
+
+A model API can generate text. It does not decide which customer owns a document, whether an employee may use a connection, which version of an agent is live, whether a tool call needs approval, or whose invoice should include the tokens.
+
+Teams building agents into a SaaS product repeatedly end up assembling the same control plane:
+
+- a model registry and provider abstraction
+- tenant, user, and installation boundaries
+- agent definitions and immutable versions
+- knowledge retrieval and durable memory
+- OAuth, API, and MCP connections
+- action approval and idempotency
+- synchronous sessions and background runs
+- webhooks, logs, usage attribution, and billing exports
+
+Cencori Embedded Agents makes those responsibilities one platform contract instead of a collection of internal services.
+
+The API is the product. The dashboard is there for the moments a developer or operator needs to create, test, publish, inspect, or debug an agent. Your end users never need to leave your application.
+
+## One model registry, including your own providers
+
+Every agent starts with a model, but a growing AI product should not have to hard-code a stale provider list.
+
+`GET /v1/models` returns the complete Cencori model registry: native models, synchronized providers, and project-level BYOK models through the same schema. Availability is explicit. If a model cannot be routed because pricing or credentials are missing, the registry says why instead of pretending it is ready.
+
+```ts
+const models = await cencori.models.list({ available: true });
+```
+
+When Cencori adds a model, it appears in the registry automatically. When you connect an OpenAI-compatible provider, you can validate it, preview the catalog change, and deliberately apply the sync.
+
+Published agent versions remain pinned. A new model becoming available does not silently change a production agent's behavior or economics. You choose when to create, test, and publish the version that adopts it.
+
+Discovery can move quickly. Production stays controlled.
+
+## Agents are versions, not mutable prompts
+
+An agent is more than an instructions field. Its manifest can define:
+
+- model and response format
+- instructions and skills
+- tools and required connections
+- knowledge and memory behavior
+- MCP grants
+- browser and network policy
+- approval rules
+- subagent and delegation policy
+
+Changes move through a deliberate lifecycle:
+
+```text
+draft → validate → test → review → publish
+```
+
+Published versions are immutable. A customer installation can stay on `1.0.0` while you test `1.1.0`, and a run records the version it actually executed. Rollout becomes a product decision instead of an invisible prompt edit.
+
+The same versioning contract gives teams a clean place for evaluations, change review, release notes, and rollback.
+
+## Installations are the runtime boundary
+
+Creating an agent defines what it can do. Installing it defines what it may do for a particular customer.
+
+An installation binds a published agent version to tenant-owned resources: knowledge bases, connections, MCP servers, policies, and approval requirements. It is the runtime authorization boundary, not just a deployment record.
+
+That distinction matters. Two customers can use the same agent version while receiving completely different data, credentials, tools, and limits. A support agent installed for Acme cannot retrieve Globex documents because both happen to share an agent ID. Tenant, user, and installation scope follows the execution from authentication through storage, retrieval, model calls, logs, usage, and billing.
+
+Scope is established before execution begins and cannot be expanded by a prompt, a model response, or arbitrary metadata.
+
+## Capabilities without ambient authority
+
+Agents become useful when they can reach systems outside the model. They become dangerous when every capability inherits every credential.
+
+Cencori keeps capabilities explicit.
+
+Skills are versioned, reviewable instruction packages. Imported content is scanned before it can be published. Skills are passive text in the current release; they do not smuggle an executable runtime into an agent.
+
+Connections remain encrypted and bound to the installation that is allowed to use them. Credentials are injected at the tool boundary and never placed in the model prompt. MCP servers perform an authenticated initialization handshake before discovery or execution.
+
+Browser and network access are default-deny. An agent may reach only the destinations its published policy permits. Delegated subagents receive their own isolated context and cannot escalate beyond the parent's tenant, installation, connection, or network scope.
+
+Least privilege is not a dashboard preference. It is part of execution.
+
+## Approval is part of the runtime
+
+Consequential actions should not depend on a hopeful instruction that says “ask first.”
+
+Cencori turns a proposed side effect into an action record with its arguments, scope, expiration, and approval state. Your product can present that action in its own interface, collect the customer's decision, and approve or reject it through the API.
+
+Approval dispatch uses a single atomic claim. If two operators approve the same action at once, only one caller is allowed to perform the Gmail, MCP, or other external side effect. Execution keys are scoped to the project, and idempotent writes can be retried without producing duplicate work.
+
+The action is inspectable before execution and attributable afterward.
+
+```ts
+await cencori.actions.approve('act_...');
+```
+
+This model gives product teams a consistent approval surface across tools instead of rebuilding safety logic for every integration.
+
+## Sessions for interaction, runs for durable work
+
+Not every agent job has the same shape.
+
+Sessions hold the durable event stream behind an interactive experience. They can support chat, copilots, and multi-turn workflows while preserving the tenant and user binding established by the client token.
+
+Runs handle work that should outlive a browser request. A background run claims its job conditionally, resolves the published manifest, retrieves installation-bound knowledge, calls the selected model, records citations and usage, and completes only if it still owns the active state. If a cancellation wins the race, late model output is discarded instead of overwriting `cancelled`.
+
+```ts
+const run = await cencori.runs.create(
+  'agt_support',
+  {
+    installation_id: 'ins_...',
+    mode: 'background',
+    input: {
+      ticket_id: 'ticket_987',
+      question: 'Can I change my annual plan?',
+    },
+  },
+  'ticket-987-first-draft',
+);
+```
+
+Structured outputs are validated against the declared JSON Schema. Invalid or unparseable output fails loudly; it does not masquerade as a successful run with a hidden parse error.
+
+## Built for every customer, not just every request
+
+Multi-tenancy is easy to describe and difficult to retrofit.
+
+Cencori enforces it across tenant records, installations, sessions, runs, knowledge, memory, connections, actions, logs, webhooks, and usage. Client tokens are short-lived and signed for a specific tenant and external user. Project secret keys remain server-side and are required for control-plane operations.
+
+The result is a simple product integration:
+
+1. Map a company in your system to a Cencori tenant.
+2. Install a published agent version for that tenant.
+3. Bind the knowledge, connections, and policies that company owns.
+4. Mint a short-lived client token for the signed-in user.
+5. Render the experience inside your product.
+
+Your database remains the authority for companies, employees, roles, plans, and business workflow. Cencori does not become your CRM, ATS, payroll system, or product UI. Those systems appear as data and tools behind a scoped agent installation.
+
+## Observable from execution to invoice
+
+An AI feature is not production-ready if a team cannot explain what ran, why it ran, what it cost, or which customer used it.
+
+Cencori records usage across project, environment, tenant, user, agent, version, installation, session, run, model, provider, and tool dimensions. That makes it possible to debug one customer's failure, compare model economics, enforce plan limits, or export usage for invoicing without reconstructing attribution from provider receipts.
+
+Signed webhooks keep your product synchronized with runs, actions, knowledge processing, and other asynchronous events. Deliveries are retried and inspectable, and failed events can be replayed without inventing a second event system.
+
+The dashboard at [console.cencori.com/agents](https://console.cencori.com/agents) gives developers an operational view of the same resources exposed by the API. It does not replace the customer experience you are building.
+
+## Available now
+
+Cencori Embedded Agents is available today through the TypeScript SDK and public HTTP API.
+
+```bash
+npm install cencori@latest
+```
+
+The [OpenAPI specification](/openapi/embedded-agents.json) is the machine-readable contract for teams integrating from any language. Cencori MCP exposes the same platform to MCP-compatible clients:
+
+```bash
+npx -y @cencori/mcp@latest
+```
+
+Start with the [Embedded Agents overview](/docs/embedded-agents/overview), create a project key, and build the first tenant-scoped experience inside your product.
+
+The best agent platform should be nearly invisible to the people using it. They should see your product becoming more capable—not another dashboard they have to learn.
+
+That is what Cencori Embedded Agents is built for.
+
+## Go deeper
+
+- [Authentication and client tokens](/docs/embedded-agents/authentication)
+- [Agent manifests, browser policy, and subagents](/docs/embedded-agents/manifests-browser-subagents)
+- [Skills](/docs/embedded-agents/skills)
+- [Actions and approvals](/docs/embedded-agents/actions-approvals)
+- [Runs and delegation](/docs/embedded-agents/runs-delegation)
+- [Webhooks](/docs/embedded-agents/webhooks)
+- [Usage and billing](/docs/embedded-agents/usage-billing)
+- [Migration guide](/docs/embedded-agents/migration-guide)
+- [TypeScript SDK on npm](https://www.npmjs.com/package/cencori)
+- [Cencori MCP documentation](/docs/mcp)
+- [Complete integration context for LLMs](/llm.txt)

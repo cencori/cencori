@@ -165,6 +165,8 @@ print(f"Total Cost: ${metrics.cost.total_usd}")
 
 ## Embedded Agents
 
+Requires `cencori>=1.5.0`.
+
 ```python
 # Multi-tenant agent backend: tenants, versions, runs, approvals, metering
 tenant = cencori.embedded.tenants.create("company_123", "Acme Ltd", idempotency_key="tenant-acme-v1")
@@ -177,7 +179,7 @@ cencori.embedded.skills.stage_import(text="# Refund policy\n\n30 days.")
 print(cencori.embedded.usage.summary(days=30))
 ```
 
-Modules: `tenants`, `runs`, `actions`, `knowledge`, `skills`, `usage`, `client_tokens`, `models`, `provider_connections`, `agent_versions`, `installations`, `connections`, `mcp_servers`, `webhooks`, `end_users`, `rate_plans`. Full reference in `openapi/embedded-agents.json`.
+Modules: `tenants`, `runs`, `actions`, `knowledge`, `skills`, `usage`, `client_tokens`, `models`, `provider_connections`, `agent_versions`, `installations`, `connections`, `mcp_servers`, `webhooks`, `end_users`, `rate_plans`. Full reference: https://cencori.com/openapi/embedded-agents.json.
 
 ## Error Handling
 

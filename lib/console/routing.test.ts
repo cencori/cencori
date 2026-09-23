@@ -21,9 +21,14 @@ describe("console routing", () => {
       scopedPath: "/ai-gateway/providers",
     });
     expect(getConsoleRoute("/api-keys")).toBeNull();
-    expect(getConsoleRoute("/embedded-agents")).toMatchObject({
+    expect(getConsoleRoute("/agents")).toMatchObject({
       scope: "project",
-      scopedPath: "/embedded-agents",
+      scopedPath: "/agents",
+    });
+    expect(getConsoleRoute("/embedded-agents")).toMatchObject({
+      canonicalPath: "/agents",
+      scope: "project",
+      scopedPath: "/agents",
     });
   });
 
@@ -72,8 +77,13 @@ describe("console routing", () => {
       canonicalPath: "/settings",
       settingsTab: "api",
     });
+    expect(getCanonicalConsoleRedirect("/acme/api/agents")).toEqual({
+      canonicalPath: "/agents",
+      organizationSlug: "acme",
+      projectSlug: "api",
+    });
     expect(getCanonicalConsoleRedirect("/acme/api/embedded-agents")).toEqual({
-      canonicalPath: "/embedded-agents",
+      canonicalPath: "/agents",
       organizationSlug: "acme",
       projectSlug: "api",
     });

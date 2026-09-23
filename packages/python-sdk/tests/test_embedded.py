@@ -125,3 +125,22 @@ class TestEmbeddedUsage:
 
             args, _ = mock.call_args
             assert "days=7" in args[1] and "tenant_id=ten_1" in args[1]
+
+    def test_export_csv_forwards_filters(self, api_key: str) -> None:
+        """Test CSV export filter parity with the TypeScript SDK."""
+        client = Cencori(api_key=api_key)
+
+        with patch("httpx.Client") as http_client:
+            response = http_client.return_value.__enter__.return_value.request.return_value
+            response.text = "tenant_id,agent_id\nten_1,agt_1\n"
+
+            result = client.embedded.usage.export_csv(days=7, tenant_id="ten_1", agent_id="agt_1")
+
+            assert result == "tenant_id,agent_id\nten_1,agt_1\n"
+            http_client.return_value.__enter__.return_value.request.assert_called_once_with(
+                "GET",
+                "https://cencori.com/v1/usage/export",
+                params={"format": "csv", "days": 7, "tenant_id": "ten_1", "agent_id": "agt_1"},
+                headers={"CENCORI_API_KEY": api_key},
+            )
+            response.raise_for_status.assert_called_once_with()

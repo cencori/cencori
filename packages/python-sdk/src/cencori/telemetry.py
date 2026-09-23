@@ -1,6 +1,6 @@
 """Telemetry module for reporting web traffic."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from .types import WebTelemetryPayload
 

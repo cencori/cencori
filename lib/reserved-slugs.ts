@@ -26,6 +26,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "terms-of-service",
     // (marketing)/*
     "about",
+    "agents",
     "arcie",
     "blog",
     "brand",

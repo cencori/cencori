@@ -21,7 +21,16 @@ function skipWithoutApiKey(t) {
 function parseToolText(result) {
     const text = result.content?.find((item) => item.type === 'text')?.text;
     assert.ok(text, 'Expected text tool result');
-    return JSON.parse(text);
+
+    if (result.isError === true) {
+        assert.fail(`MCP tool failed: ${text}`);
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        assert.fail(`Expected JSON tool result, received: ${text.slice(0, 240)} (${error})`);
+    }
 }
 
 async function withMcpClient(env, fn) {
@@ -216,6 +225,38 @@ test('MCP server: web feature can be selected independently', async () => {
     });
     for (const t of ['web_search', 'web_fetch', 'web_extract', 'get_web_browser_job', 'web_browse', 'web_crawl', 'request_web_takedown']) {
         assert.ok(withWrite.includes(t), `expected standalone web tool ${t}`);
+    }
+});
+
+test('MCP server: embedded inspection is enabled by default and can be selected independently', async () => {
+    const expected = [
+        'get_action',
+        'get_run',
+        'get_run_events',
+        'get_tenant',
+        'get_usage',
+        'list_agent_versions',
+        'list_installations',
+        'list_knowledge_bases',
+        'list_mcp_server_tools',
+        'list_mcp_servers',
+        'list_provider_connections',
+        'list_skills',
+        'list_tenants',
+        'list_webhook_deliveries',
+        'list_webhooks',
+        'search_knowledge_base',
+    ].sort();
+
+    const selected = await toolNames({
+        CENCORI_API_KEY: 'csk_dummy_for_listing',
+        CENCORI_MCP_FEATURES: 'embedded',
+    });
+    assert.deepEqual(selected.sort(), expected);
+
+    const defaults = await toolNames({ CENCORI_API_KEY: 'csk_dummy_for_listing' });
+    for (const name of expected) {
+        assert.ok(defaults.includes(name), `expected default embedded read tool ${name}`);
     }
 });
 

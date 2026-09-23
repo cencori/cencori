@@ -46,9 +46,12 @@ Use one of these integration paths:
 - Package: `@cencori/mcp`
 - Best for: giving MCP clients Cencori docs, first-party web search, and authenticated platform tools
 
-Current minimum versions for Cencori Web:
-- TypeScript SDK: `cencori@1.6.1`
-- MCP server: `@cencori/mcp@0.7.1`
+Current minimum versions:
+- Cencori Web TypeScript SDK: `cencori@1.6.1`
+- Cencori Web MCP server: `@cencori/mcp@0.7.1`
+- Embedded Agents TypeScript SDK: `cencori@1.7.0`
+- Embedded Agents Python SDK: not yet published; use the HTTP API for Python integrations
+- Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
 
 ## Setup Decision
 
@@ -1045,7 +1048,7 @@ It requires Anthropic provider access; use `groq/compound-mini` for a free first
 
 ## MCP Server (for AI agents)
 
-Cencori ships an official Model Context Protocol server, `@cencori/mcp`. Version `0.7.1` includes first-party Web tools alongside docs and authenticated platform operations.
+Cencori ships an official Model Context Protocol server, `@cencori/mcp`. Version `0.8.0` includes first-party Web tools and read-only Embedded Agents inspection alongside docs and authenticated platform operations.
 
 Run it: `npx -y @cencori/mcp@latest`. Docs and manual-action guidance tools work with no key; set `CENCORI_API_KEY` for Web and platform reads; set `CENCORI_MCP_WRITE=1` to enable inference, Web actions, and additive writes.
 
@@ -1069,7 +1072,7 @@ Tool tiers:
 - Write (`CENCORI_MCP_WRITE=1`): Web (`web_browse`, `web_crawl`, `request_web_takedown`), inference (`generate_text`, `generate_rag`, `create_embeddings`, `moderate_content`, `generate_image`, vision, documents, `text_to_speech`, `transcribe_audio`) plus `remember_memory`, `write_memory`, `create_namespace`, `create_agent`, `update_agent`, `create_session`, `add_session_turn`, and governance drafts (`create_policy`, `install_template`). Policy activation stays manual.
 - Destructive (`CENCORI_MCP_DESTRUCTIVE=1`): `delete_memory`, `delete_agent`, `delete_session`, `approve_session`, `reject_session`.
 
-Feature selection: `CENCORI_MCP_FEATURES` accepts `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, and `multimodal`. Omit it to enable all features allowed by the key and action-tier flags.
+Feature selection: `CENCORI_MCP_FEATURES` accepts `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, `multimodal`, and `embedded`. Omit it to enable all features allowed by the key and action-tier flags.
 
 Safety: Web tools carry `openWorldHint: true`, and retrieved content is untrusted. Anything that costs money, enqueues work, or changes state is opt-in via env. Security-sensitive actions (API keys, billing, access, governance activation) are **never** executed by the MCP—the `how_to_*` tools return steps and a dashboard link.
 
@@ -1087,7 +1090,7 @@ Auth:
 - `cpk_*` (publishable): cannot call embedded management APIs.
 - Never ship `csk_*` to a browser or mobile client.
 
-Canonical endpoints (`https://cencori.com/v1/*`, full reference in `openapi/embedded-agents.json`):
+Canonical endpoints (`https://cencori.com/v1/*`; [full OpenAPI reference](https://cencori.com/openapi/embedded-agents.json)):
 - Models: `GET /v1/models` (only discovery surface; `?available=true` for invokable-only).
 - Providers: `POST/GET /v1/provider-connections`, `/validate`, `/:id/test`, `/model-syncs` preview then `/apply`.
 - Tenants: `POST/GET /v1/tenants` (upsert by `external_id`), `GET/PATCH/DELETE /v1/tenants/:id`, `/export`, `/users` CRUD.
@@ -1105,9 +1108,9 @@ Canonical endpoints (`https://cencori.com/v1/*`, full reference in `openapi/embe
 
 Agent versions carry a capability manifest (model + reasoning effort only when the model advertises it, skills, tools, connections, MCP grants, subagent allowlist, browser/network policy). Installed manifests are the runtime tool authority; browser and egress default to deny (`none`/`allowlist` only, no open mode).
 
-TypeScript SDK namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. Python SDK mirrors them under `cencori.embedded.*`.
+TypeScript SDK namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. The Python Embedded Agents SDK is not yet published; use these endpoints directly from Python until its release is announced.
 
-Docs: https://cencori.com/docs/embedded-agents (overview, authentication, manifests, skills, actions, webhooks, usage, runs).
+Docs: https://cencori.com/docs/embedded-agents/overview (overview, authentication, manifests, skills, actions, webhooks, usage, runs).
 
 ## Decision Rules For Code Agents
 

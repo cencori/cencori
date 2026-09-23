@@ -12,7 +12,7 @@ queued → running → completed | failed | cancelled | expired
                  ↘ requires_action (approval-gated tools)
 ```
 
-`POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, stream the durable log at `GET .../events?after=`, cancel with `POST .../cancel` — cancellation wins executor races via conditional claims, and cascades to active child runs.
+`POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, page through the durable JSON event log at `GET .../events?after=`, and cancel with `POST .../cancel` — cancellation wins executor races via conditional claims and cascades to active child runs.
 
 Structured output is strict: a requested `json_schema` must validate or the run fails loudly. Every run records the exact agent/skill/subagent versions, knowledge citations, and policy snapshot used.
 

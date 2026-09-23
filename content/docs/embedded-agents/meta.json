@@ -1,0 +1,14 @@
+{
+  "title": "Embedded Agents",
+  "pages": [
+    "overview",
+    "authentication",
+    "migration-guide",
+    "manifests-browser-subagents",
+    "skills",
+    "actions-approvals",
+    "webhooks",
+    "runs-delegation",
+    "usage-billing"
+  ]
+}

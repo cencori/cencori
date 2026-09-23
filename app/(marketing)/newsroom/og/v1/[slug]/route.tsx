@@ -1,13 +1,13 @@
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
 
-import { getPostBySlug } from "@/lib/blog";
+import { getAllPosts, getPostBySlug } from "@/lib/blog";
 import {
   CencoriMark,
   getBackgroundNumber,
-  getFallbackPosts,
   loadBackground,
   loadFonts,
+  loadPublicImage,
 } from "../og-shared";
 
 export const runtime = "nodejs";
@@ -21,9 +21,11 @@ const size = {
 };
 
 export function generateStaticParams() {
-  return getFallbackPosts().map((post) => ({
-    slug: `${post.slug}.jpg`,
-  }));
+  return getAllPosts()
+    .filter((post) => post.published && post.category !== "changelog")
+    .map((post) => ({
+      slug: `${post.slug}.jpg`,
+    }));
 }
 
 export async function GET(
@@ -39,11 +41,7 @@ export async function GET(
   const postSlug = imageSlug.slice(0, -".jpg".length);
   const post = getPostBySlug(postSlug);
 
-  if (
-    !post ||
-    !post.published ||
-    post.coverImage
-  ) {
+  if (!post || !post.published || post.category === "changelog") {
     return new Response(null, { status: 404 });
   }
 
@@ -67,10 +65,24 @@ export async function GET(
   });
   const backgroundNumber = getBackgroundNumber(postSlug);
 
-  const [backgroundImage, { manropeFont, geistFont }] = await Promise.all([
-    loadBackground(backgroundNumber),
-    loadFonts(),
-  ]);
+  const [sourceCoverImage, fallbackBackground, { manropeFont, geistFont }] =
+    await Promise.all([
+      loadPublicImage(post.coverImage),
+      loadBackground(backgroundNumber),
+      loadFonts(),
+    ]);
+  const encodedCoverImage = sourceCoverImage
+    ? await sharp(Buffer.from(sourceCoverImage))
+        .jpeg({ quality: 88, progressive: true, mozjpeg: true })
+        .toBuffer()
+    : null;
+  const coverImage = encodedCoverImage
+    ? (encodedCoverImage.buffer.slice(
+        encodedCoverImage.byteOffset,
+        encodedCoverImage.byteOffset + encodedCoverImage.byteLength,
+      ) as ArrayBuffer)
+    : null;
+  const backgroundImage = coverImage ?? fallbackBackground;
 
   const pngResponse = new ImageResponse(
     (

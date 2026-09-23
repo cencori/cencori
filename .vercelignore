@@ -1,0 +1,3 @@
+# Local-only artifacts that break remote builds (symlinks) or bloat uploads.
+.venv-pdf
+.venv

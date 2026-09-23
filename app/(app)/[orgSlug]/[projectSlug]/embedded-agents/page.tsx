@@ -1,7 +1,4 @@
-"use client";
-
-import { use } from "react";
-import { EmbeddedAgentsDashboard } from "@/components/dashboard/embedded-agents/EmbeddedAgentsDashboard";
+import { permanentRedirect } from "next/navigation";
 
 interface PageProps {
     params: Promise<{
@@ -10,12 +7,7 @@ interface PageProps {
     }>;
 }
 
-export default function EmbeddedAgentsPage({ params }: PageProps) {
-    const { orgSlug, projectSlug } = use(params);
-
-    return (
-        <div className="h-full min-h-0 w-full overflow-hidden">
-            <EmbeddedAgentsDashboard orgSlug={orgSlug} projectSlug={projectSlug} />
-        </div>
-    );
+export default async function LegacyEmbeddedAgentsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = await params;
+    permanentRedirect(`/${orgSlug}/${projectSlug}/agents`);
 }

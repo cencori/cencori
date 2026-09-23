@@ -1,6 +1,6 @@
 # @cencori/mcp
 
-Official MCP server for Cencori: first-party web search, documentation, gateway, memory, agents, sessions, governance, and multimodal inference.
+Official MCP server for Cencori: first-party web search, documentation, gateway, Embedded Agents, memory, sessions, governance, and multimodal inference.
 
 It is a thin stdio adapter over Cencori's public HTTP APIs. The platform enforces authentication, project isolation, quota, policy, and audit logging; the MCP server adds capability flags and tool annotations for reads, writes, destructive changes, and open-web access.
 
@@ -37,7 +37,7 @@ Enable operations that enqueue work, incur inference cost, or change state:
 
 ## Cencori Web tools
 
-Version 0.7.1 includes first-party Web access. Search uses Cencori's own crawler, corpus, embeddings, and ranking pipeline—not a third-party search API.
+Version 0.8.0 includes first-party Web access and read-only Embedded Agents inspection. Search uses Cencori's own crawler, corpus, embeddings, and ranking pipeline—not a third-party search API.
 
 | Tier | Tools |
 |---|---|
@@ -69,7 +69,7 @@ To expose only Web and docs:
 | Tier | Gate | Surface |
 |---|---|---|
 | Public | none | docs search/fetch/list, `llm.txt`, and manual `how_to_*` guidance |
-| Read | `CENCORI_API_KEY` | Web reads, metrics, health, quota, agents, memory, sessions, governance |
+| Read | `CENCORI_API_KEY` | Web reads, metrics, health, quota, Embedded Agents, agents, memory, sessions, governance |
 | Write | `CENCORI_MCP_WRITE=1` | Web actions, inference, memory/agent/session writes, governance drafts |
 | Destructive | `CENCORI_MCP_DESTRUCTIVE=1` | delete and approve/reject tools; implies write |
 
@@ -87,6 +87,7 @@ Authenticated reads:
 - Web: search, fetch, extract, and browser-job polling
 - Gateway: models, metrics, health, and quota
 - Agents, memory, sessions, and governance list/get/search tools
+- Embedded Agents: tenants, versions, installations, runs, actions, knowledge, skills, providers, usage, webhooks, and remote MCP snapshots
 
 Write:
 
@@ -110,6 +111,8 @@ Destructive:
 | `CENCORI_DOCS_BASE_URL` | `https://cencori.com` | Documentation API host. |
 
 Restart the client after changing environment variables.
+
+To expose only Embedded Agents inspection, use `CENCORI_MCP_FEATURES=embedded`. These tools are read-only: `list_tenants`, `get_tenant`, `list_agent_versions`, `list_installations`, `get_run`, `get_run_events`, `get_action`, `list_knowledge_bases`, `search_knowledge_base`, `list_skills`, `list_provider_connections`, `get_usage`, `list_webhooks`, `list_webhook_deliveries`, `list_mcp_servers`, and `list_mcp_server_tools`.
 
 ## Development
 
