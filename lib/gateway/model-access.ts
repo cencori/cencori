@@ -37,10 +37,10 @@ export function resolveApiKeyModelAccess(params: {
     const sponsored = canonicalSet(params.sponsoredModels);
     const hasExplicitAllowlist = Array.isArray(params.allowedModels);
     const grantsEveryModel = allowed.has(ALL_MODELS_GRANT);
-    // An allowlist scopes which *paid* models a key may reach. Cencori's free catalog is never
-    // charged to the customer, so it stays open to every key that is not fully closed — a scoped
-    // key can use free models without widening its billing exposure. An empty array still permits
-    // nothing, which is the only way to shut a key off entirely.
+    // An allowlist scopes which models a key may reach. The free catalog used to
+    // stay open to every key that was not fully closed; it was retired
+    // 2026-09-23, so an allowlist is now the only grant. An empty array still
+    // permits nothing, which is the only way to shut a key off entirely.
     const isAllowed = hasExplicitAllowlist
         ? allowed.size > 0 && (
             grantsEveryModel

@@ -1,8 +1,8 @@
 /**
  * OpenAI-Compatible Provider
- * 
+ *
  * Handles all providers that use the OpenAI API format with different base URLs.
- * Supports: Mistral, Groq, Together, Perplexity, OpenRouter, xAI, DeepSeek, Qwen
+ * Supports: Mistral, Groq, Together, Perplexity, xAI, DeepSeek, Qwen, Moonshot
  */
 
 import OpenAI from 'openai';
@@ -42,9 +42,12 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
         baseURL: 'https://api.perplexity.ai',
         name: 'Perplexity',
     },
-    openrouter: {
-        baseURL: 'https://openrouter.ai/api/v1',
-        name: 'OpenRouter',
+    // Moonshot AI (Kimi) — endpoint only, no catalog rows yet. Add models plus
+    // pricing rows to serve Kimi direct now that OpenRouter is gone (removed
+    // 2026-09-23); ids are `moonshotai/<model>` upstream.
+    moonshot: {
+        baseURL: 'https://api.moonshot.ai/v1',
+        name: 'Moonshot AI',
     },
     xai: {
         baseURL: 'https://api.x.ai/v1',
@@ -58,7 +61,7 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
         baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         name: 'Qwen',
     },
-    // Meta and HuggingFace typically go through other providers like Together or OpenRouter
+    // Meta and HuggingFace typically go through other providers like Together
     meta: {
         baseURL: 'https://api.together.xyz/v1', // Meta models via Together
         name: 'Meta AI',
@@ -102,12 +105,6 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
  */
 export function openAICompatibleHeaders(providerName: string): Record<string, string> {
     const headers: Record<string, string> = {};
-
-    // OpenRouter requires additional headers
-    if (providerName === 'openrouter') {
-        headers['HTTP-Referer'] = 'https://cencori.com';
-        headers['X-Title'] = 'Cencori';
-    }
 
     // Maximo's WAF blocks the OpenAI SDK's default User-Agent (`OpenAI/NodeJS …`),
     // returning `403 "Your request was blocked."`. Override it so requests pass.
@@ -191,7 +188,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 tool_choice: request.toolChoice as any,
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
-            });
+            }, { signal: request.signal });
 
             // Handle usage - some providers may not return it
             const usage = completion.usage || {

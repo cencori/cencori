@@ -56,19 +56,26 @@ describe('API-key model access and sponsorship', () => {
         expect(isFullySponsoredApiKey(access.allowedModels, access.sponsoredModels)).toBe(true);
     });
 
-    it('lets a scoped key reach the free catalog without widening its paid access', () => {
+    it('lets a scoped key reach only its allowlisted models', () => {
+        // The free catalog used to stay open to scoped keys; retired
+        // 2026-09-23, so the allowlist is now the only grant.
         const access = { allowedModels: [atlas], sponsoredModels: [atlas] };
 
         expect(resolveApiKeyModelAccess({
             ...access,
+            provider: 'maximo',
+            model: 'maximo-atlas-1.1',
+        })).toEqual({ allowed: true, billingMode: 'sponsored' });
+        expect(resolveApiKeyModelAccess({
+            ...access,
             provider: 'openrouter',
             model: 'poolside/laguna-s-2.1:free',
-        })).toEqual({ allowed: true, billingMode: 'standard' });
+        }).allowed).toBe(false);
         expect(resolveApiKeyModelAccess({
             ...access,
             provider: 'groq',
-            model: 'groq/compound',
-        }).allowed).toBe(true);
+            model: 'openai/gpt-oss-safeguard-20b',
+        }).allowed).toBe(false);
         expect(resolveApiKeyModelAccess({
             ...access,
             provider: 'anthropic',

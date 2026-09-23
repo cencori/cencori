@@ -86,12 +86,11 @@ export const STT_MODELS: Record<string, ModelInfo> = {
     'nova-3': { provider: 'deepgram', description: 'Deepgram Nova-3 (fast, diarization)', diarization: true },
     'assemblyai-universal': { provider: 'assemblyai', description: 'AssemblyAI Universal (long-form, diarization)', diarization: true },
     'spitch-stt': { provider: 'spitch', description: 'Spitch STT — Yoruba, Hausa, Igbo, English, Amharic', diarization: false },
-    // Groq's free developer plan bills nothing and rate-limits instead, so these
-    // are the only zero-cost transcription models in the catalog. Listed in
-    // free-models.ts, which getUsageUnitPricingFromDB checks before it looks for
-    // a per-minute rate.
-    'whisper-large-v3': { provider: 'groq', description: 'Whisper Large v3 on Groq — free, highest accuracy', diarization: false },
-    'whisper-large-v3-turbo': { provider: 'groq', description: 'Whisper Large v3 Turbo on Groq — free, fastest', diarization: false },
+    // Groq serves these on its free developer plan, which bills nothing — but
+    // the free tier was retired 2026-09-23, so they bill like any other model
+    // and need model_pricing rows (none exist yet) or transcription 503s.
+    'whisper-large-v3': { provider: 'groq', description: 'Whisper Large v3 on Groq — highest accuracy', diarization: false },
+    'whisper-large-v3-turbo': { provider: 'groq', description: 'Whisper Large v3 Turbo on Groq — fastest', diarization: false },
 };
 
 export function listTranscriptionModels() {

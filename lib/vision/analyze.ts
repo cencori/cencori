@@ -53,16 +53,6 @@ export const VISION_PROVIDER_LIMITS = {
         maxBytes: 20 * 1024 * 1024,
         notes: 'HEIC/HEIF supported. Max 20MB per image inline.',
     },
-    openrouter: {
-        // OpenRouter proxies to whichever upstream serves the model, so the
-        // binding limit is the upstream's, not OpenRouter's, and it varies per
-        // model. The cross-provider safe set is applied for the same reason as
-        // Maximo below: anything valid here stays valid if the request falls
-        // over to another provider.
-        formats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-        maxBytes: 5 * 1024 * 1024,
-        notes: 'Limits are the upstream model\'s and vary; the cross-provider safe set is applied.',
-    },
     maximo: {
         // Maximo publishes no image format or size limits, so the cross-provider
         // safe set applies: anything accepted here is accepted everywhere, which
@@ -113,7 +103,7 @@ export class VisionValidationError extends Error {
  * here plus its models in VISION_MODELS is all it takes; nothing about the
  * payload changes.
  */
-export const OPENAI_COMPATIBLE_VISION_PROVIDERS = ['maximo', 'openrouter', 'bai'] as const;
+export const OPENAI_COMPATIBLE_VISION_PROVIDERS = ['maximo', 'bai'] as const;
 
 export type OpenAICompatibleVisionProvider = typeof OPENAI_COMPATIBLE_VISION_PROVIDERS[number];
 
@@ -187,26 +177,11 @@ const VISION_MODELS: Record<string, ModelInfo> = {
     'gemini-2.5-flash-lite': { provider: 'google', apiModel: 'gemini-2.5-flash-lite', description: 'Fastest Gemini' },
     // Maximo (OpenAI wire format)
     'maximo-atlas-1.2': { provider: 'maximo', apiModel: 'maximo-atlas-1.2', description: 'Atlas 1.2 — agentic coding with visual understanding, 1M context' },
-    'maximo-atlas-1.1': { provider: 'maximo', apiModel: 'maximo-atlas-1.1', description: 'Atlas 1.1 — agentic coding, 1M context' },
-    // OpenRouter free tier (OpenAI wire format). Cost nothing to run, which
-    // makes them the only vision models that work while the OpenAI and
-    // Anthropic accounts are unfunded. Image understanding was verified against
-    // the live models on 2026-08-20 — both named the shapes, colours and
-    // left-to-right order in a generated test image — rather than inferred from
-    // the "vl"/"omni" in their ids.
-    // `nvidia/nemotron-nano-12b-v2-vl:free` was removed on 2026-09-10 — the id
-    // 404s upstream, so it had stopped being a vision option some weeks earlier.
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { provider: 'openrouter', apiModel: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', description: 'Free vision — 30B omni-modal reasoning, 256k context' },
-    // Added 2026-09-10, each verified the same way as the two above: a generated
-    // image of a red circle, blue square and green triangle, which all four
-    // named correctly in left-to-right order. Checked and rejected in the same
-    // pass: `google/gemma-4-*:free` (429 on every attempt, so unverifiable) and
-    // `nvidia/nemotron-3.5-content-safety:free` (accepts images but answers with
-    // a safety verdict rather than a description).
-    'inclusionai/ling-3.0-flash-vl:free': { provider: 'openrouter', apiModel: 'inclusionai/ling-3.0-flash-vl:free', description: 'Free vision — vision-language, 262k context' },
-    'nex-agi/nex-n2.5-pro:free': { provider: 'openrouter', apiModel: 'nex-agi/nex-n2.5-pro:free', description: 'Free vision — larger Nex model, 262k context' },
-    'nex-agi/nex-n2.5-mini:free': { provider: 'openrouter', apiModel: 'nex-agi/nex-n2.5-mini:free', description: 'Free vision — fast Nex model, 262k context' },
-    'dots-studio/dots-3-note-preview:free': { provider: 'openrouter', apiModel: 'dots-studio/dots-3-note-preview:free', description: 'Free vision — 512k context' },
+    // OpenRouter `:free` vision entries were removed 2026-09-23 with the
+    // free-tier retirement (nemotron-3-nano-omni, ling-3.0-flash-vl,
+    // nex-n2.5-pro/mini, dots-3-note-preview). They have no pricing rows, so
+    // they fail closed like any unpriced model. Restore one with a pricing row
+    // if a zero-cost vision path is ever offered again.
     // `deepseek-v4-flash-vision-exp` (B.AI) was removed 2026-09-10. This list is
     // served publicly by GET /api/ai/vision, and B.AI had stopped honouring the
     // zero-credit promo for it — every request returns "credit insufficient
@@ -793,11 +768,10 @@ const VISION_FALLBACK_CANDIDATES: Array<{ provider: VisionProvider; modelKey: st
     { provider: 'google', modelKey: 'gemini-2.5-flash' },
     { provider: 'openai', modelKey: 'gpt-4o-mini' },
     { provider: 'anthropic', modelKey: 'claude-3-5-haiku-latest' },
-    // Last resort, and the only one that cannot fail for billing reasons: the
-    // three above are a rate-limited free Gemini tier and two paid accounts, so
-    // an unfunded window takes out every vision request at once. Ordered last so
-    // it changes nothing while the others are healthy.
-    { provider: 'openrouter', modelKey: 'nvidia/nemotron-nano-12b-v2-vl:free' },
+    // No billing-proof last resort remains: the OpenRouter `:free` fallback
+    // was removed 2026-09-23 with the free-tier retirement (and its final id
+    // had 404'd upstream weeks earlier). An unfunded window now fails vision
+    // requests instead of rerouting them.
 ];
 
 /**

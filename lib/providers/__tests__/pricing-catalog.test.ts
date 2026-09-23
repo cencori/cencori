@@ -81,22 +81,17 @@ describe('reviewed managed pricing catalog', () => {
         expect(active.has('groq:groq/compound-mini')).toBe(false);
     });
 
-    it('keeps every model tagged free on zero-price static pricing', async () => {
+    it('tags no model as free (tier retired 2026-09-23)', async () => {
+        // Zero-price static pricing resolves nothing now; assert the empty set
+        // explicitly rather than looping vacuously, and prove a removed free id
+        // fails closed through the database path instead of billing zero.
         const freeModels = SUPPORTED_PROVIDERS.flatMap(provider =>
-            provider.models
-                .filter(model => model.free)
-                .map(model => [provider.id, model.id] as const)
+            provider.models.filter(model => model.free)
         );
 
-        expect(freeModels.length).toBeGreaterThan(0);
-        for (const [provider, model] of freeModels) {
-            expect(hasStaticPricing(provider, model)).toBe(true);
-            await expect(getPricingFromDB(provider, model)).resolves.toEqual({
-                inputPer1KTokens: 0,
-                outputPer1KTokens: 0,
-                cencoriMarkupPercentage: 0,
-            });
-        }
+        expect(freeModels).toEqual([]);
+        expect(hasStaticPricing('openrouter', 'openrouter/free')).toBe(false);
+        await expect(getPricingFromDB('openrouter', 'openrouter/free')).rejects.toThrow();
     });
 
     it('records provenance and an expiry for the Sonnet 5 promotion', () => {

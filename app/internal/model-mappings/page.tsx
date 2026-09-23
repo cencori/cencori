@@ -39,7 +39,6 @@ const PROVIDERS = [
     "cohere",
     "together",
     "perplexity",
-    "openrouter",
     "xai",
     "meta",
     "huggingface",

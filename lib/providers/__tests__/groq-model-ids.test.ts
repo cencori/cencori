@@ -11,13 +11,12 @@ import { ProviderRouter } from '../router';
  *
  * normalizeModelName used to strip any prefix that differed from the detected
  * provider, so every one of these reached Groq without its namespace and 404'd.
- * `groq/compound*` was the only Groq model that worked, because there the prefix
- * happens to equal the provider name. The failure was invisible from the routing
- * side — detectProvider returned `groq` correctly — and it applied to
- * gpt-oss-120b and gpt-oss-20b, which are sold, not just to the free tier.
+ * The failure was invisible from the routing side — detectProvider returned
+ * `groq` correctly — and it applied to gpt-oss-120b and gpt-oss-20b, which are
+ * sold, not just to the free tier.
  *
- * free-tier.test.ts covers the free half of this; the paid models had no
- * coverage at all, which is why it survived.
+ * free-tier.test.ts used to cover the free half of this; with the tier retired
+ * it guards the empty set instead, and the paid models carry this file.
  *
  * Groq's free Whisper models are deliberately absent here: transcription
  * resolves its provider from STT_MODELS in lib/audio/transcribe.ts and never
@@ -54,7 +53,6 @@ describe('Groq namespaced model ids', () => {
         // must not reach the separate Qwen provider.
         expect(router.detectProvider('openai/gpt-oss-safeguard-20b')).toBe('groq');
         expect(router.detectProvider('qwen/qwen3.8-27b')).toBe('groq');
-        expect(router.detectProvider('qwen/qwen3.6-27b')).toBe('groq');
         expect(router.detectProvider('moonshotai/kimi-k2-instruct')).toBe('groq');
     });
 
@@ -65,6 +63,6 @@ describe('Groq namespaced model ids', () => {
         // `gemini-2.5-flash`, not `vertex/gemini-2.5-flash`.
         expect(router.normalizeModelName('vertex/gemini-2.5-flash', 'google')).toBe('gemini-2.5-flash');
         // A prefix that matches its provider is a namespace, and is kept.
-        expect(router.normalizeModelName('groq/compound', 'groq')).toBe('groq/compound');
+        expect(router.normalizeModelName('openai/gpt-oss-120b', 'groq')).toBe('openai/gpt-oss-120b');
     });
 });

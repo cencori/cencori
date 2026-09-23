@@ -319,15 +319,21 @@ function MegaMenu({
 export function SiteNav({
   className = "",
   solid = false,
+  developers = false,
 }: {
   className?: string;
   solid?: boolean;
+  // Force the developers variant (developer menus, "Developers" wordmark,
+  // Log in / Sign up actions) on routes outside /developers* — e.g. the
+  // models pages. When absent, the variant is derived from the pathname.
+  developers?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const pathname = usePathname();
   const isDevelopers =
+    developers ||
     pathname === "/developers" ||
     pathname?.startsWith("/developers/") ||
     pathname === "/ai-gateway";
@@ -503,6 +509,7 @@ export function SiteNav({
       ) : null}
 
       <MobileMenu
+        developers={isDevelopers}
         menus={menus}
         onNavigate={closeMobile}
         onSelectSub={setMobileSub}

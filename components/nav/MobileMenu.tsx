@@ -37,12 +37,16 @@ function mobileLabel(label: string): string {
 }
 
 export function MobileMenu({
+  developers = false,
   menus,
   open,
   sub,
   onSelectSub,
   onNavigate,
 }: {
+  // Mirrors SiteNav's developers override so the mobile actions match the
+  // desktop variant when it is forced on a non-developers route.
+  developers?: boolean;
   menus:
     | typeof navigationMenus
     | typeof developerNavigationMenus;
@@ -54,6 +58,7 @@ export function MobileMenu({
   const subData = menus.find((menu) => menu.id === sub);
   const pathname = usePathname();
   const isDevelopers =
+    developers ||
     pathname === "/developers" ||
     pathname?.startsWith("/developers/") ||
     pathname === "/ai-gateway";

@@ -12,6 +12,34 @@ export interface AIModel {
     contextWindow: number;
     description?: string;
     free?: boolean;
+    capabilities?: ModelCapabilities;
+    /**
+     * Vendor release date (YYYY-MM-DD): the catalog's "newly added" ordering
+     * sorts on this, newest first. Day precision for 2026 launches, month
+     * precision older — relative order is what matters, not the exact day.
+     */
+    addedAt?: string;
+}
+
+/**
+ * Rich capability signals for the Features filter. Every flag is optional and
+ * only ever set to `true`: anything uncertain is omitted, and filters treat a
+ * missing flag as false — no fake precision. Family-level curation from
+ * published provider docs (2026-09-23); verify per model when touching a row.
+ */
+export interface ModelCapabilities {
+    /** Function calling / tool use. */
+    tools?: boolean;
+    /** Constrained JSON / structured outputs. */
+    structuredOutput?: boolean;
+    /** Document (PDF) input alongside text. */
+    fileInput?: boolean;
+    /** Video input. */
+    videoInput?: boolean;
+    /** Audio input. */
+    audioInput?: boolean;
+    /** Prompt caching (explicit; Google also caches implicitly). */
+    caching?: boolean;
 }
 
 export interface AIProviderConfig {
@@ -33,10 +61,13 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.z.ai/guides/llm/glm-5.2',
         keyPrefix: '',
         models: [
-            { id: 'glm-5.2', name: 'GLM-5.2', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Flagship model, 1M context, coding & agentic, reasoning effort (max/high)' },
-            // The one visible GLM-5.3 Flash row. Served through B.AI (see the bai
-            // provider block) but shown under Z.AI, which actually makes the model.
-            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning — free', free: true },
+            { id: 'glm-5.2', name: 'GLM-5.2', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Flagship model, 1M context, coding & agentic, reasoning effort (max/high)', capabilities: { tools: true }, addedAt: '2026-06-15' },
+            // Shown under Z.AI (the lab that makes it) but routed through B.AI
+            // (see router.ts). Paid since 2026-09-23: the B.AI zero-credit promo
+            // ended ("credit insufficient balance: balance=0") and the Z.AI key
+            // is unfunded, so there is no free path left. Bills from the active
+            // `bai:glm-5.3-flash` pricing row.
+            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning', capabilities: { tools: true }, addedAt: '2026-08-21' },
         ],
     },
     {
@@ -47,38 +78,44 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://platform.openai.com/docs',
         keyPrefix: 'sk-',
         models: [
-            // GPT-5.6 Series (July 2026)
-            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Flagship, SOTA coding/cyber/science, max/ultra reasoning, $5/$30 per 1M' },
-            { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Balanced, competitive with GPT-5.5 at 2x lower cost, $2.50/$15 per 1M' },
-            { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Fast/affordable, outperforms GPT-5.5 peak at 25x lower cost, $1/$6 per 1M' },
-            { id: 'gpt-5.5', name: 'GPT-5.5', type: ['chat'], contextWindow: 1050000, description: 'New class of intelligence for real work and agents' },
-            { id: 'gpt-5.4', name: 'GPT-5.4 Thinking', type: ['chat', 'reasoning'], contextWindow: 1050000, description: 'Latest GPT-5.4 reasoning model' },
-            { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', type: ['chat', 'reasoning', 'code'], contextWindow: 400000, description: 'High-volume coding and agent model' },
-            { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Lowest-cost GPT-5.4 model' },
-            { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Most capable GPT-5.4 variant' },
-            { id: 'gpt-5.3-chat-latest', name: 'GPT-5.3 Instant', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.3 instant release' },
-            { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: ['chat'], contextWindow: 400000, description: 'Most capable GPT-5.2 variant' },
-            { id: 'gpt-5.2', name: 'GPT-5.2', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.2 flagship' },
-            { id: 'gpt-5.1', name: 'GPT-5.1', type: ['chat'], contextWindow: 400000, description: 'Improved GPT-5 generation' },
-            { id: 'gpt-5-pro', name: 'GPT-5 Pro', type: ['chat'], contextWindow: 400000, description: 'High-quality GPT-5 variant' },
-            { id: 'gpt-5', name: 'GPT-5', type: ['chat'], contextWindow: 400000, description: 'Flagship model' },
-            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: ['chat'], contextWindow: 400000, description: 'Fast and efficient' },
-            { id: 'gpt-5-nano', name: 'GPT-5 Nano', type: ['chat'], contextWindow: 400000, description: 'Lowest-latency GPT-5 model' },
+            // GPT-6 Series (September 2026; servable but unlisted in /v1/models —
+            // ids resolve upstream, verified 2026-09-23 by error-code probe)
+            { id: 'gpt-6-astra', name: 'GPT-6 Astra', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'New generation flagship, computer use/coding/cyber/science, $10/$50 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
+            { id: 'gpt-6-sol', name: 'GPT-6 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'GPT-6 flagship tier, $2/$10 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
+            { id: 'gpt-6-luna', name: 'GPT-6 Luna', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Cheapest frontier tier, $0.10/$0.50 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
+            // GPT-5.6 Series (July 2026; repriced Aug 21 2026)
+            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Flagship, SOTA coding/cyber/science, max/ultra reasoning, $4/$20 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-09' },
+            { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Balanced, competitive with GPT-5.5 at lower cost, $2/$12 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-09' },
+            { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Fast/affordable, outperforms GPT-5.5 peak at low cost, $0.20/$1.20 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-09' },
+            { id: 'gpt-5.5', name: 'GPT-5.5', type: ['chat'], contextWindow: 1050000, description: 'New class of intelligence for real work and agents', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-04-23' },
+            { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', type: ['chat', 'reasoning'], contextWindow: 1050000, description: 'Highest-quality GPT-5.5, $30/$180 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-05' },
+            { id: 'gpt-5.4', name: 'GPT-5.4 Thinking', type: ['chat', 'reasoning'], contextWindow: 1050000, description: 'Latest GPT-5.4 reasoning model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-03-05' },
+            { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', type: ['chat', 'reasoning', 'code'], contextWindow: 400000, description: 'High-volume coding and agent model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-03-17' },
+            { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Lowest-cost GPT-5.4 model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-03-17' },
+            { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', type: ['chat', 'reasoning'], contextWindow: 400000, description: 'Most capable GPT-5.4 variant', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-03-05' },
+            { id: 'gpt-5.3-chat-latest', name: 'GPT-5.3 Instant', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.3 instant release', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-01-15' },
+            { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', type: ['chat'], contextWindow: 400000, description: 'Most capable GPT-5.2 variant', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-12-11' },
+            { id: 'gpt-5.2', name: 'GPT-5.2', type: ['chat'], contextWindow: 400000, description: 'Latest GPT-5.2 flagship', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-12-11' },
+            { id: 'gpt-5.1', name: 'GPT-5.1', type: ['chat'], contextWindow: 400000, description: 'Improved GPT-5 generation', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-11-13' },
+            { id: 'gpt-5-pro', name: 'GPT-5 Pro', type: ['chat'], contextWindow: 400000, description: 'High-quality GPT-5 variant', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-10-06' },
+            { id: 'gpt-5', name: 'GPT-5', type: ['chat'], contextWindow: 400000, description: 'Flagship model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-08-07' },
+            { id: 'gpt-5-mini', name: 'GPT-5 Mini', type: ['chat'], contextWindow: 400000, description: 'Fast and efficient', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-08-07' },
+            { id: 'gpt-5-nano', name: 'GPT-5 Nano', type: ['chat'], contextWindow: 400000, description: 'Lowest-latency GPT-5 model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-08-07' },
             // GPT-4.1 / GPT-4o Series
-            { id: 'gpt-4.1', name: 'GPT-4.1', type: ['chat', 'code'], contextWindow: 1047576, description: 'Long-context GPT-4.1' },
-            { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: ['chat'], contextWindow: 1047576, description: 'Balanced GPT-4.1 model' },
-            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: ['chat'], contextWindow: 1047576, description: 'Fast GPT-4.1 nano model' },
-            { id: 'gpt-4o', name: 'GPT-4o', type: ['chat'], contextWindow: 128000, description: 'Omni-modal model' },
-            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: ['chat'], contextWindow: 128000, description: 'Fast and cost-effective' },
+            { id: 'gpt-4.1', name: 'GPT-4.1', type: ['chat', 'code'], contextWindow: 1047576, description: 'Long-context GPT-4.1', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
+            { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: ['chat'], contextWindow: 1047576, description: 'Balanced GPT-4.1 model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
+            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: ['chat'], contextWindow: 1047576, description: 'Fast GPT-4.1 nano model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
+            { id: 'gpt-4o', name: 'GPT-4o', type: ['chat'], contextWindow: 128000, description: 'Omni-modal model', capabilities: { tools: true, structuredOutput: true, fileInput: true, audioInput: true, caching: true }, addedAt: '2024-05-13' },
+            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: ['chat'], contextWindow: 128000, description: 'Fast and cost-effective', capabilities: { tools: true, structuredOutput: true, fileInput: true, audioInput: true, caching: true }, addedAt: '2024-07-18' },
             // O-Series Reasoning (latest)
-            { id: 'o3', name: 'o3', type: ['reasoning', 'code'], contextWindow: 200000, description: 'Advanced reasoning model' },
-            { id: 'o3-mini', name: 'o3 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Fast reasoning model' },
-            { id: 'o4-mini', name: 'o4 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Successor to o1-mini' },
-            { id: 'o1', name: 'o1', type: ['reasoning'], contextWindow: 200000, description: 'Legacy reasoning model' },
+            { id: 'o3', name: 'o3', type: ['reasoning', 'code'], contextWindow: 200000, description: 'Advanced reasoning model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-16' },
+            { id: 'o3-mini', name: 'o3 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Fast reasoning model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-01-31' },
+            { id: 'o4-mini', name: 'o4 Mini', type: ['reasoning'], contextWindow: 200000, description: 'Successor to o1-mini', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-16' },
+            { id: 'o1', name: 'o1', type: ['reasoning'], contextWindow: 200000, description: 'Legacy reasoning model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2024-12-17' },
             // Image Generation
-            { id: 'gpt-image-2', name: 'GPT Image 2', type: ['image'], contextWindow: 0, description: 'State-of-the-art image generation model' },
-            { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: ['image'], contextWindow: 0, description: 'Best text rendering' },
-            { id: 'gpt-image-1', name: 'GPT Image 1', type: ['image'], contextWindow: 0, description: 'ChatGPT image generation model' },
+            { id: 'gpt-image-2', name: 'GPT Image 2', type: ['image'], contextWindow: 0, description: 'State-of-the-art image generation model', addedAt: '2026-04-21' },
+            { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: ['image'], contextWindow: 0, description: 'Best text rendering', addedAt: '2026-06-01' },
+            { id: 'gpt-image-1', name: 'GPT Image 1', type: ['image'], contextWindow: 0, description: 'ChatGPT image generation model', addedAt: '2025-04-23' },
         ],
     },
     {
@@ -92,20 +129,23 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         // Anthropic has retired fails upstream no matter what we price it at.
         models: [
             // Claude 5.1 Series (September 2026)
-            { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Most capable model, succeeds Fable 5 at the same rate with 75% cheaper cache reads' },
-            { id: 'claude-mythos-5-1', name: 'Claude Mythos 5.1', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fable 5.1 under trusted-access safeguards, for vetted cybersecurity & life-sciences work' },
+            { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Most capable model, succeeds Fable 5 at the same rate with 75% cheaper cache reads', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-01' },
+            { id: 'claude-mythos-5-1', name: 'Claude Mythos 5.1', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fable 5.1 under trusted-access safeguards, for vetted cybersecurity & life-sciences work', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-01' },
+            // Claude Opus 5.5 (September 2026) — Anthropic's recommended default
+            // for most workloads. $4/$20 per 1M, 1M context, adaptive thinking.
+            { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Default for most workloads, long-horizon agentic coding, $4/$20 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-20' },
             // Claude 5 Series (June-July 2026)
-            { id: 'claude-fable-5', name: 'Claude Fable 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Most capable model, for the most demanding reasoning & long-horizon agentic work' },
-            { id: 'claude-opus-5', name: 'Claude Opus 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'New flagship for complex agentic coding & enterprise work, succeeds Opus 4.8' },
-            { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Anthropic\'s most agentic Sonnet, close to Opus-tier capabilities' },
+            { id: 'claude-fable-5', name: 'Claude Fable 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Most capable model, for the most demanding reasoning & long-horizon agentic work', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-06-09' },
+            { id: 'claude-opus-5', name: 'Claude Opus 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'New flagship for complex agentic coding & enterprise work, succeeds Opus 4.8', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-24' },
+            { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Anthropic\'s most agentic Sonnet, close to Opus-tier capabilities', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-06-30' },
             // Claude 4 Series (2025/2026)
-            { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, dynamic workflows & effort control' },
-            { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding' },
-            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, enhanced reasoning & coding' },
-            { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, agentic coding record-breaker' },
-            { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', type: ['chat', 'reasoning', 'code'], contextWindow: 200000, description: 'Previous-generation Opus' },
-            { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', type: ['chat'], contextWindow: 200000, description: 'Enhanced coding & agents' },
-            { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', type: ['chat'], contextWindow: 200000, description: 'Fastest Claude model' },
+            { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, dynamic workflows & effort control', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-05-28' },
+            { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, improved reasoning & agentic coding', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-04-16' },
+            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, enhanced reasoning & coding', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-02-17' },
+            { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest flagship, agentic coding record-breaker', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-02-05' },
+            { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', type: ['chat', 'reasoning', 'code'], contextWindow: 200000, description: 'Previous-generation Opus', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-11-24' },
+            { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', type: ['chat'], contextWindow: 200000, description: 'Enhanced coding & agents', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-09-29' },
+            { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', type: ['chat'], contextWindow: 200000, description: 'Fastest Claude model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-10-15' },
         ],
     },
     {
@@ -117,30 +157,21 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'AIza',
         models: [
             // Gemini 3.1 Series (Feb 2026)
-            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Latest flagship preview, 1M context, enhanced reasoning' },
-            { id: 'gemini-3.1-pro-preview-customtools', name: 'Gemini 3.1 Pro (Custom Tools)', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Optimized for custom tools and bash' },
-            { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image (Nano Banana 2)', type: ['image'], contextWindow: 0, description: 'Reasoning-guided image synthesis, up to 4K' },
+            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Latest flagship preview, 1M context, enhanced reasoning', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2026-02-15' },
+            { id: 'gemini-3.1-pro-preview-customtools', name: 'Gemini 3.1 Pro (Custom Tools)', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Optimized for custom tools and bash', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2026-02-15' },
+            { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image (Nano Banana 2)', type: ['image'], contextWindow: 0, description: 'Reasoning-guided image synthesis, up to 4K', addedAt: '2025-11-25' },
             // Gemini 3 Series (Late 2025)
-            { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Frontier speed & intelligence preview' },
+            { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Frontier speed & intelligence preview', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2025-11-15' },
             // Gemini 2.5 Series (Mid 2025)
-            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Enhanced reasoning & coding' },
-            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Thinking capabilities' },
-            { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', type: ['chat'], contextWindow: 1000000, description: 'Speed optimized' },
-            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: ['image'], contextWindow: 0, description: 'Fast photorealism' },
-            { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest Flash model, speed + reasoning' },
-            // Gemma — open-weight, served on the same Gemini API key. Google
-            // publishes no paid rate for these, so they are free at every tier
-            // and cannot be withdrawn by a billing change. The endpoint 500s
-            // intermittently (measured 2026-09-10); worth a retry, not a
-            // delisting.
-            //
-            // Deliberately NOT tagged `vision`. Gemma 4 is a multimodal
-            // checkpoint and OpenRouter reports image+video input for it, but
-            // every image request to the Gemini API endpoint failed on
-            // 2026-09-10 (500 INTERNAL, then empty 404s) while text on the same
-            // model succeeded. Tag it once an image actually round-trips.
-            { id: 'gemma-4-31b-it', name: 'Gemma 4 31B', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Open-weight Google model, 262k context — free', free: true },
-            { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Open-weight Google MoE, 262k context — free', free: true },
+            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Enhanced reasoning & coding', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2025-06-15' },
+            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Thinking capabilities', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2025-06-15' },
+            { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', type: ['chat'], contextWindow: 1000000, description: 'Speed optimized', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2025-07-15' },
+            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', type: ['image'], contextWindow: 0, description: 'Fast photorealism', addedAt: '2026-01-15' },
+            { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Latest Flash model, speed + reasoning', capabilities: { tools: true, structuredOutput: true, fileInput: true, videoInput: true, audioInput: true, caching: true }, addedAt: '2026-05-19' },
+            // Gemma rows removed 2026-09-23 with the free-tier retirement: Google
+            // publishes no paid rate for them, so they cannot be priced and are
+            // gone from the catalog. Deliberately NOT re-added without pricing —
+            // an unpriced row only trades a missing model for a 503.
         ],
     },
     {
@@ -152,14 +183,14 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: '',
         models: [
             // Mistral Large 3 (Dec 2025 - MoE)
-            { id: 'mistral-large-latest', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: '675B params, best open-weight multimodal' },
-            { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: ['chat'], contextWindow: 128000, description: 'Frontier-class multimodal' },
-            { id: 'mistral-small-latest', name: 'Mistral Small 3', type: ['chat'], contextWindow: 32000, description: '24B params, fast' },
+            { id: 'mistral-large-latest', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: '675B params, best open-weight multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
+            { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: ['chat'], contextWindow: 128000, description: 'Frontier-class multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
+            { id: 'mistral-small-latest', name: 'Mistral Small 3', type: ['chat'], contextWindow: 32000, description: '24B params, fast', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
             // Ministral (Dec 2025)
-            { id: 'ministral-3b', name: 'Ministral 3B', type: ['chat'], contextWindow: 128000, description: 'Compact edge model' },
-            { id: 'ministral-8b', name: 'Ministral 8B', type: ['chat'], contextWindow: 128000, description: 'Small efficient model' },
-            { id: 'codestral-latest', name: 'Codestral 25.01', type: ['code', 'chat'], contextWindow: 256000, description: '2.5x faster code generation' },
-            { id: 'devstral-latest', name: 'Devstral 2', type: ['code', 'chat'], contextWindow: 256000, description: 'Frontier code agents' },
+            { id: 'ministral-3b', name: 'Ministral 3B', type: ['chat'], contextWindow: 128000, description: 'Compact edge model', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
+            { id: 'ministral-8b', name: 'Ministral 8B', type: ['chat'], contextWindow: 128000, description: 'Small efficient model', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
+            { id: 'codestral-latest', name: 'Codestral 25.01', type: ['code', 'chat'], contextWindow: 256000, description: '2.5x faster code generation', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
+            { id: 'devstral-latest', name: 'Devstral 2', type: ['code', 'chat'], contextWindow: 256000, description: 'Frontier code agents', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
             // Reasoning: `magistral-medium` removed 2026-09-10 — Mistral answers
             // "Invalid model: magistral-medium". The model still exists as
             // `magistral-medium-latest`; re-add it under that id together with a
@@ -174,17 +205,18 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://console.groq.com/docs',
         keyPrefix: 'gsk_',
         models: [
-            { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Groq production model' },
-            { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Groq production model' },
-            { id: 'groq/compound', name: 'Compound', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI system', free: true },
-            { id: 'groq/compound-mini', name: 'Compound Mini', type: ['chat'], contextWindow: 131072, description: 'Groq compound AI mini', free: true },
-            // Free on Groq's developer plan, which bills nothing and rate-limits
-            // instead. gpt-oss-120b/20b above stay paid on purpose — they carry
-            // active pricing rows (see free-models.ts).
-            { id: 'openai/gpt-oss-safeguard-20b', name: 'GPT OSS Safeguard 20B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Safety-classification variant of GPT OSS 20B — free', free: true },
-            { id: 'qwen/qwen3.8-27b', name: 'Qwen 3.8 27B', type: ['chat', 'reasoning', 'code'], contextWindow: 131072, description: 'Qwen 3.8 on Groq, fast reasoning — free', free: true },
-            { id: 'qwen/qwen3.6-27b', name: 'Qwen 3.6 27B', type: ['chat', 'reasoning', 'code'], contextWindow: 131072, description: 'Qwen 3.6 on Groq — free', free: true },
-            { id: 'allam-2-7b', name: 'Allam 2 7B', type: ['chat'], contextWindow: 131072, description: 'Arabic-capable small model on Groq' },
+            { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Groq production model', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-08-05' },
+            { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', type: ['chat', 'reasoning'], contextWindow: 131072, description: 'Groq production model', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-08-05' },
+            // Groq serves its open-weight models on the free developer plan, which
+            // bills nothing — but Cencori no longer offers a free tier, so only
+            // rows with active model_pricing are listed here. The plan's
+            // remaining servable ids (gpt-oss-safeguard-20b, qwen3.8-27b,
+            // allam-2-7b) were removed 2026-09-23: no flat token rate to price
+            // them from, and an unpriced row only trades a missing model for a
+            // 503. Re-add with pricing rows if they are ever sold.
+            //
+            // Verified 2026-09-23 against Groq's live /models: `groq/compound`,
+            // `groq/compound-mini` and `qwen/qwen3.6-27b` 404 and stay removed.
         ],
     },
     {
@@ -197,8 +229,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         models: [
             // Command A (March 2025 - New flagship)
             // Command R+ (Aug 2024 update)
-            { id: 'command-r-plus-08-2024', name: 'Command R+', type: ['chat'], contextWindow: 128000, description: 'Complex RAG and multi-step' },
-            { id: 'command-light', name: 'Command Light', type: ['chat'], contextWindow: 4096, description: 'Fast and efficient' },
+            { id: 'command-r-plus-08-2024', name: 'Command R+', type: ['chat'], contextWindow: 128000, description: 'Complex RAG and multi-step', capabilities: { tools: true }, addedAt: '2024-08-30' },
+            { id: 'command-light', name: 'Command Light', type: ['chat'], contextWindow: 4096, description: 'Fast and efficient', capabilities: { tools: true }, addedAt: '2024-04-04' },
         ],
     },
     {
@@ -229,106 +261,17 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'pplx-',
         models: [
             // Sonar Models (2025)
-            { id: 'sonar-pro', name: 'Sonar Pro', type: ['search'], contextWindow: 128000, description: 'Enhanced search, richer context' },
-            { id: 'sonar', name: 'Sonar', type: ['search'], contextWindow: 128000, description: 'Default web-connected' },
-            { id: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro', type: ['reasoning', 'search'], contextWindow: 128000, description: 'Deep inference & research' },
+            { id: 'sonar-pro', name: 'Sonar Pro', type: ['search'], contextWindow: 128000, description: 'Enhanced search, richer context', addedAt: '2025-02-01' },
+            { id: 'sonar', name: 'Sonar', type: ['search'], contextWindow: 128000, description: 'Default web-connected', addedAt: '2025-02-01' },
+            { id: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro', type: ['reasoning', 'search'], contextWindow: 128000, description: 'Deep inference & research', addedAt: '2025-02-01' },
             // Legacy
         ],
     },
-    {
-        id: 'openrouter',
-        name: 'OpenRouter',
-        icon: '/providers/openrouter.svg',
-        website: 'https://openrouter.ai',
-        docsUrl: 'https://openrouter.ai/docs',
-        keyPrefix: 'sk-or-',
-        // Model ids, context windows and pricing here are read from
-        // https://openrouter.ai/api/v1/models, which is the authoritative live
-        // catalog — an id absent from that response 404s at inference no matter
-        // what this file says. Verified 2026-08-17.
-        //
-        // OpenRouter is also how Cencori serves the open-weight Chinese models
-        // (DeepSeek, Kimi, Qwen) without provisioning a direct key with each
-        // lab. The trade is margin: OpenRouter's published rate already includes
-        // their cut, and Cencori's markup stacks on top, so the same model costs
-        // the end user more here than through a funded direct key.
-        models: [
-            { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', type: ['chat'], contextWindow: 256000, description: 'Access any model' },
-            { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5 (via OpenRouter)', type: ['chat'], contextWindow: 200000, description: 'Unified billing' },
-            // `google/gemini-3-pro` and `x-ai/grok-4` were listed here but do not
-            // exist on OpenRouter; they are replaced by the ids it actually serves.
-            { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (via OpenRouter)', type: ['chat', 'reasoning'], contextWindow: 1048576, description: 'Google flagship preview through OpenRouter' },
-            { id: 'x-ai/grok-4.3', name: 'Grok 4.3 (via OpenRouter)', type: ['reasoning'], contextWindow: 1000000, description: 'Long-context xAI reasoning model' },
-            { id: 'x-ai/grok-4.6', name: 'Grok 4.6 (via OpenRouter)', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Frontier xAI reasoning model' },
-            // ── Open-weight models (the "free and open source" tier) ──────────
-            { id: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro (via OpenRouter)', type: ['chat', 'reasoning', 'code'], contextWindow: 1048576, description: '1.6T total / 49B active params, flagship open-weight model' },
-            { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek V4 Flash (via OpenRouter)', type: ['chat', 'reasoning', 'code'], contextWindow: 1048576, description: 'Fast, very low cost open-weight model' },
-            { id: 'moonshotai/kimi-k3', name: 'Kimi K3 (via OpenRouter)', type: ['chat', 'reasoning', 'code'], contextWindow: 1048576, description: 'Moonshot flagship, 1M context' },
-            { id: 'moonshotai/kimi-k2.7-code', name: 'Kimi K2.7 Code (via OpenRouter)', type: ['code', 'chat', 'reasoning'], contextWindow: 262144, description: 'Coding-tuned Kimi, strong price/performance' },
-            { id: 'moonshotai/kimi-k2.6', name: 'Kimi K2.6 (via OpenRouter)', type: ['chat', 'reasoning', 'code'], contextWindow: 262144, description: 'General-purpose Kimi K2 generation' },
-            { id: 'qwen/qwen3.8-max', name: 'Qwen 3.8 Max (via OpenRouter)', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Alibaba flagship, 1M context' },
-            { id: 'qwen/qwen3-coder-plus', name: 'Qwen 3 Coder Plus (via OpenRouter)', type: ['code', 'chat'], contextWindow: 1000000, description: 'Code-specialised Qwen, 1M context' },
-
-            // ── Zero-cost tier (`:free`) ──────────────────────────────────────
-            // OpenRouter serves these at no charge, so they cost Cencori nothing
-            // and are billed to the customer at zero (see EXPLICITLY_FREE_MODELS
-            // in pricing.ts — the two lists must stay in sync or the catalog test
-            // fails). They replace the Groq Llama and Cerebras models that used to
-            // carry the free tier: Groq decommissioned the former and the Cerebras
-            // account is unfunded (402 on every model, re-confirmed 2026-09-10).
-            //
-            // Every id below returned a 200 on 2026-09-10, checked against
-            // https://openrouter.ai/api/v1/models. Five ids that used to sit here
-            // had already 404'd upstream by then and were removed; run
-            // `npm run sync:free-models` to catch the next round before users do.
-            //
-            // The real constraint is not the model count — it is the account cap.
-            // OpenRouter allows 50 `:free` requests/day across ALL of these
-            // combined until 10 credits are purchased, then 1,000/day. Adding
-            // models here does not add capacity.
-            //
-            // Most of these are reasoning models that spend the first tokens on a
-            // hidden reasoning trace, so a small max_tokens returns empty content.
-            // `poolside/laguna-s-2.1:free` answers cleanly at low budgets, which is
-            // why the first-test path uses it.
-
-            // OpenRouter's own pool router: one id fanned out across every
-            // zero-cost listing. It cannot go stale when a single model is
-            // withdrawn, so it is the default free model (DEFAULT_FREE_MODEL).
-            { id: 'openrouter/free', name: 'Auto (free pool)', type: ['chat', 'reasoning'], contextWindow: 200000, description: 'Automatically routes across the whole free pool. Survives any single free model being withdrawn — the most reliable free option', free: true },
-
-            { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S 2.1 (free)', type: ['chat'], contextWindow: 262144, description: 'Free tier. Clean short answers, no reasoning preamble', free: true },
-            { id: 'poolside/laguna-xs-2.1:free', name: 'Laguna XS 2.1 (free)', type: ['chat'], contextWindow: 262144, description: 'Free tier. Smallest Laguna', free: true },
-            { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni 30B (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 256000, description: 'Free tier. Omni-modal; reads images and audio', free: true },
-            { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super 120B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. 120B MoE, strongest free reasoning; overloads under load', free: true },
-            { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'Nemotron 3 Ultra 550B (free)', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Free tier. 550B MoE, 1M context; overloads under load', free: true },
-            { id: 'nvidia/nemotron-3.5-lightning:free', name: 'Nemotron 3.5 Lightning (free)', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Free tier. 1M context, low latency', free: true },
-            { id: 'nvidia/nemotron-3.5-content-safety:free', name: 'Nemotron 3.5 Content Safety (free)', type: ['chat'], contextWindow: 128000, description: 'Free tier. Content-safety classifier — returns a safety verdict, not prose', free: true },
-            { id: 'inclusionai/ling-3.0-flash-vl:free', name: 'Ling 3.0 Flash VL (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Vision-language; reads images', free: true },
-            { id: 'inclusionai/ling-3.0-flash-sante:free', name: 'Ling 3.0 Flash Santé (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Health/life-sciences tuned', free: true },
-            { id: 'inclusionai/ling-3.0-flash-fin:free', name: 'Ling 3.0 Flash Fin (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Finance tuned', free: true },
-            { id: 'nex-agi/nex-n2.5-pro:free', name: 'Nex N2.5 Pro (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Larger Nex model; reads images', free: true },
-            { id: 'nex-agi/nex-n2.5-mini:free', name: 'Nex N2.5 Mini (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 262144, description: 'Free tier. Fast Nex model; reads images', free: true },
-            // Also available direct from Google (google:gemma-4-*), which is not
-            // subject to OpenRouter's account cap and is the better route when
-            // these 429 — they do so often.
-            { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Open-weight 31B model; often rate-limited — the Gemma 4 31B listing is the more reliable route', free: true },
-            { id: 'google/gemma-4-26b-a4b-it:free', name: 'Gemma 4 26B A4B (free)', type: ['chat', 'reasoning'], contextWindow: 262144, description: 'Free tier. Open-weight 26B MoE; often rate-limited — the Gemma 4 26B A4B listing is the more reliable route', free: true },
-            { id: 'cohere/north-mini-code:free', name: 'North Mini Code (free)', type: ['code', 'chat'], contextWindow: 256000, description: 'Free tier. Code-specialised', free: true },
-            { id: 'dots-studio/dots-3-note-preview:free', name: 'Dots 3 Note Preview (free)', type: ['chat', 'reasoning', 'vision'], contextWindow: 512000, description: 'Free tier. 512k context; reads images', free: true },
-            { id: 'liquid/lfm-2.5-2.6b:free', name: 'LFM 2.5 2.6B (free)', type: ['chat'], contextWindow: 65536, description: 'Free tier. Tiny, cheapest to run', free: true },
-
-            // Removed 2026-09-10 after they began 404ing upstream:
-            // nvidia/nemotron-nano-12b-v2-vl:free, nvidia/nemotron-nano-9b-v2:free,
-            // nvidia/nemotron-3-nano-30b-a3b:free, openai/gpt-oss-20b:free, and
-            // stealth/ox-alpha — the anonymous preview ended, exactly as its note
-            // here predicted it would.
-            //
-            // Not listed: thinkingmachines/inkling:free and inkling-small:free.
-            // They are priced $0 but 403 with "only available on agentic
-            // harnesses", so they are not callable through a gateway.
-        ],
-    },
+    // OpenRouter was removed 2026-09-23: with the free tier retired it was
+    // purely a paid proxy, and its margin stacked on Cencori's markup. DeepSeek,
+    // Kimi and Qwen are served direct now (deepseek / moonshot / qwen providers);
+    // the frontier dupes (GPT-5, Opus 4.5, Gemini, Grok) were already direct.
+    // Pricing rows retired in 20260923_120000_retire_openrouter_provider.sql.
     {
         id: 'xai',
         name: 'xAI',
@@ -337,12 +280,15 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.x.ai',
         keyPrefix: 'xai-',
         models: [
+            // Grok 4.7 (September 2026) — frontier xAI reasoning model, succeeds
+            // 4.6 at the same $2/$6 rate. Text + image input, 500k context.
+            { id: 'grok-4.7', name: 'Grok 4.7', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Frontier xAI reasoning model with text and image input, $2/$6 per 1M', capabilities: { tools: true, structuredOutput: true, caching: true }, addedAt: '2026-09-21' },
             // Grok 4.6 (August 2026)
-            { id: 'grok-4.6', name: 'Grok 4.6', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Frontier xAI reasoning model with text and image input' },
+            { id: 'grok-4.6', name: 'Grok 4.6', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Frontier xAI reasoning model with text and image input', capabilities: { tools: true, caching: true }, addedAt: '2026-08-15' },
             // Grok 4.5 Series (July 2026)
-            { id: 'grok-4.5', name: 'Grok 4.5', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Previous xAI flagship, same price as Grok 4.6' },
+            { id: 'grok-4.5', name: 'Grok 4.5', type: ['reasoning', 'chat'], contextWindow: 500000, description: 'Previous xAI flagship, same price as Grok 4.6', capabilities: { tools: true }, addedAt: '2026-07-15' },
             // Grok 4.3 Series (April 2026)
-            { id: 'grok-4.3', name: 'Grok 4.3', type: ['reasoning', 'chat'], contextWindow: 1000000, description: 'Long-context xAI reasoning model with text and image input' },
+            { id: 'grok-4.3', name: 'Grok 4.3', type: ['reasoning', 'chat'], contextWindow: 1000000, description: 'Long-context xAI reasoning model with text and image input', capabilities: { tools: true }, addedAt: '2026-04-15' },
             // Grok Voice Series
             // Grok 4 Series (July-Nov 2025)
             // Grok 3 Series
@@ -396,7 +342,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // V4 Series (April 2026)
-            { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance' },
+            { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-04-24' },
             // DeepSeek V4 Flash (+ vision-exp) removed 2026-09-10 — the B.AI promo
             // that made them free has ended; see the bai provider block.
             // V3.2 Series (Dec 2025)
@@ -420,8 +366,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // up, and they bill from their model_pricing rows when it is.
             // `zai-glm-4.7` is gone entirely: Cerebras archived it (404
             // model_archived), so it is not orderable at any price.
-            { id: 'gpt-oss-120b', name: 'GPT OSS 120B (Cerebras)', type: ['chat'], contextWindow: 131072, description: '120B open model, 3000 tok/s inference' },
-            { id: 'gemma-4-31b', name: 'Gemma 4 31B (Cerebras)', type: ['chat', 'vision'], contextWindow: 131072, description: 'Multimodal production model on Cerebras' },
+            { id: 'gpt-oss-120b', name: 'GPT OSS 120B (Cerebras)', type: ['chat'], contextWindow: 131072, description: '120B open model, 3000 tok/s inference', addedAt: '2025-08-05' },
+            { id: 'gemma-4-31b', name: 'Gemma 4 31B (Cerebras)', type: ['chat', 'vision'], contextWindow: 131072, description: 'Multimodal production model on Cerebras', addedAt: '2026-08-01' },
         ],
     },
     {
@@ -432,8 +378,12 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://maximoai.co/platform',
         keyPrefix: '',
         models: [
-            { id: 'maximo-atlas-1.2', name: 'Maximo Atlas 1.2', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Agentic coding & debugging across large codebases, image input, 1M context / 128K max output, prompt caching, reasoning low→max. $0.11/$0.01 cached/$0.30 per 1M through 2026-08-31 UTC, then $0.55/$0.05/$1.50' },
-            { id: 'maximo-atlas-1.1', name: 'Maximo Atlas 1.1', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Agentic coding model, multiple specialized models behind one endpoint, image input, 1M context / 128K max output, $0.20/$1.00 per 1M tokens' },
+            { id: 'maximo-atlas-1.3', name: 'Maximo Atlas 1.3', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Full-stack frontier agent for terminal, code, and web work at max reasoning effort, $0.20/$0.02 cached/$0.50 per 1M', capabilities: { tools: true }, addedAt: '2026-09-23' },
+            { id: 'maximo-atlas-1.2', name: 'Maximo Atlas 1.2', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Agentic coding & debugging across large codebases, image input, 1M context / 128K max output, prompt caching, reasoning low→max. $0.11/$0.01 cached/$0.30 per 1M through 2026-08-31 UTC, then $0.55/$0.05/$1.50', capabilities: { tools: true }, addedAt: '2026-08-17' },
+            // maximo-atlas-1.1 retired 2026-09-23: gone from Maximo's live
+            // /models (1.2/1.3/1.4 served). Pricing row retired alongside.
+            // 1.3/1.4 deliberately NOT added: no published rates to price them
+            // from, and an unpriced row only trades a missing model for a 503.
         ],
     },
     {
@@ -444,7 +394,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://launchverse.app',
         keyPrefix: 'csk_cencori_',
         models: [
-            { id: 'helix-advisor', name: 'Helix Advisor', type: ['chat', 'reasoning', 'code'], contextWindow: 128000, description: 'Autonomous engineering agent (advisor mode) by Launchverse — architecture, debugging, and planning guidance. Read-only.' },
+            { id: 'helix-advisor', name: 'Helix Advisor', type: ['chat', 'reasoning', 'code'], contextWindow: 128000, description: 'Autonomous engineering agent (advisor mode) by Launchverse — architecture, debugging, and planning guidance. Read-only.', addedAt: '2026-07-22' },
         ],
     },
     {

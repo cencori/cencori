@@ -30,9 +30,11 @@ const OPENAI_COMPATIBLE_ENV_VARS: Record<string, string[]> = {
     groq: ['GROQ_API_KEY'],
     mistral: ['MISTRAL_API_KEY'],
     together: ['TOGETHER_API_KEY'],
-    openrouter: ['OPENROUTER_API_KEY'],
     perplexity: ['PERPLEXITY_API_KEY'],
     huggingface: ['HUGGINGFACE_API_KEY'],
+    // Moonshot AI (Kimi) direct key. Endpoint only for now — no catalog rows
+    // until Kimi is re-homed off OpenRouter (removed 2026-09-23).
+    moonshot: ['MOONSHOT_API_KEY'],
     zai: ['ZAI_API_KEY'],
     cerebras: ['CEREBRAS_API_KEY'],
     qwen: ['QWEN_API_KEY'],

@@ -31,7 +31,7 @@ const MODEL_ALIASES: Record<string, string> = {
  * Providers whose model ids are genuinely `vendor/model` upstream, so the part
  * before the slash must be preserved rather than read as a routing prefix.
  */
-const NAMESPACED_MODEL_ID_PROVIDERS = new Set(['huggingface', 'openrouter', 'groq']);
+const NAMESPACED_MODEL_ID_PROVIDERS = new Set(['huggingface', 'groq']);
 
 // Explicit model-to-provider mapping for models whose IDs would route to the wrong provider via prefix matching
 const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
@@ -47,11 +47,12 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'meta-llama/Llama-3.3-70B-Instruct': 'huggingface',
     'meta-llama/Llama-4-Maverick': 'huggingface',
     // Groq (conflict with openai/qwen/moonshot prefixes)
+    // Verified 2026-09-23: qwen3.6-27b 404s upstream and was removed from the
+    // catalog; only the ids below are served.
     'openai/gpt-oss-120b': 'groq',
     'openai/gpt-oss-20b': 'groq',
     'qwen/qwen3-32b': 'groq',
     'qwen/qwen3.8-27b': 'groq',
-    'qwen/qwen3.6-27b': 'groq',
     'openai/gpt-oss-safeguard-20b': 'groq',
     'moonshotai/kimi-k2-instruct': 'groq',
     'allam-2-7b': 'groq',
@@ -61,31 +62,13 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'gemma-4-31b-it': 'google',
     'gemma-4-26b-a4b-it': 'google',
     // Maximo AI (defaults to openai)
+    'maximo-atlas-1.3': 'maximo',
     'maximo-atlas-1.2': 'maximo',
     'maximo-atlas-1.1': 'maximo',
     // Helix (Launchverse) — autonomous engineering agent personas
     'helix-advisor': 'helix',
     // Centaur stealth preview (bare id, no provider prefix to infer from)
     'centaur': 'centaur',
-    // OpenRouter stealth preview (`stealth/` prefix → nonexistent stealth provider)
-    'stealth/ox-alpha': 'openrouter',
-    // OpenRouter paid catalog — every id is `vendor/model` and would otherwise
-    // be misrouted by the generic `provider/model` split below (e.g.
-    // `openai/gpt-5` → openai, `moonshotai/kimi-*` → moonshotai). Explicit
-    // overrides keep them on OpenRouter so BYOK `openrouter` keys are consulted
-    // and `normalizeModelName` preserves the full id upstream.
-    'openai/gpt-5': 'openrouter',
-    'anthropic/claude-opus-4.5': 'openrouter',
-    'google/gemini-3.1-pro-preview': 'openrouter',
-    'x-ai/grok-4.3': 'openrouter',
-    'x-ai/grok-4.6': 'openrouter',
-    'deepseek/deepseek-v4-pro': 'openrouter',
-    'deepseek/deepseek-v4-flash': 'openrouter',
-    'moonshotai/kimi-k3': 'openrouter',
-    'moonshotai/kimi-k2.7-code': 'openrouter',
-    'moonshotai/kimi-k2.6': 'openrouter',
-    'qwen/qwen3.8-max': 'openrouter',
-    'qwen/qwen3-coder-plus': 'openrouter',
     // B.AI — backend provider for DeepSeek and GLM models. These are shown
     // under their public-facing provider names (deepseek, zai) in the catalog
     // but route through b.ai for inference. See also: catalog entries in
@@ -117,6 +100,11 @@ export class ProviderRouter {
         // Check explicit model-to-provider overrides first (handles ambiguous prefixes)
         const override = MODEL_PROVIDER_OVERRIDES[modelName];
         if (override) return override;
+
+        // NOTE: there is deliberately no `:free` suffix rule. OpenRouter (the
+        // only provider serving suffixed ids) was removed 2026-09-23, so a
+        // `:free` id falls through to the generic `provider/model` split and
+        // fails as unconfigured — honest, since nothing serves it.
 
         // OpenAI models
         if (modelName.startsWith('gpt-') ||
@@ -178,19 +166,9 @@ export class ProviderRouter {
             return 'perplexity';
         }
 
-        // Qwen models
+        // Qwen models (bare ids for the DashScope-compatible endpoint)
         if (modelName.startsWith('qwen-') || modelName.includes('qwen')) {
             return 'qwen';
-        }
-
-        // OpenRouter's free tier. The `:free` suffix is an OpenRouter-only
-        // convention — the same id without it is a different, paid listing, and
-        // no other provider serves the suffixed form. Matched BEFORE the generic
-        // "provider/model" split below, which would otherwise route
-        // `nvidia/...:free` to a nonexistent `nvidia` provider and
-        // `openai/gpt-oss-20b:free` to the paid OpenAI account.
-        if (modelName.endsWith(':free')) {
-            return 'openrouter';
         }
 
         // Explicit provider prefix format: "provider/model"
@@ -266,9 +244,6 @@ export class ProviderRouter {
             // provider expects upstream, not a routing prefix to strip:
             //
             //  - huggingface: ids are always `author/model`.
-            //  - openrouter:  ids are always `vendor/model`. Stripping would send
-            //    `nvidia/nemotron-...` upstream as `nemotron-...`, which
-            //    OpenRouter does not serve.
             //  - groq:        Groq namespaces the open-weight models it hosts by
             //    their originating lab (`openai/gpt-oss-120b`, `qwen/qwen3.8-27b`,
             //    `moonshotai/kimi-k2-instruct`) and rejects the bare form with

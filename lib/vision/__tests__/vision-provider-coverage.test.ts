@@ -57,11 +57,10 @@ describe('vision capability coverage', () => {
         expect(unroutable).toEqual([]);
     });
 
-    it('registers both Atlas models against the Maximo provider', () => {
+    it('registers Atlas 1.2 against the Maximo provider', () => {
         const byId = new Map(listVisionModels().map((model) => [model.id, model.provider]));
 
         expect(byId.get('maximo-atlas-1.2')).toBe('maximo');
-        expect(byId.get('maximo-atlas-1.1')).toBe('maximo');
     });
 
     it('declares image limits for every OpenAI-compatible vision provider', () => {
@@ -77,8 +76,6 @@ describe('vision capability coverage', () => {
     it('does not "upgrade" Atlas to another provider on an image request', () => {
         // Before this was in VISION_CAPABLE_PATTERNS, Atlas fell through to the
         // unknown-provider branch. It survived by accident; now it's explicit.
-        for (const model of ['maximo-atlas-1.2', 'maximo-atlas-1.1']) {
-            expect(upgradeModelForVision(model)).toEqual({ model, upgraded: false });
-        }
+        expect(upgradeModelForVision('maximo-atlas-1.2')).toEqual({ model: 'maximo-atlas-1.2', upgraded: false });
     });
 });
