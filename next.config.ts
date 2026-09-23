@@ -74,6 +74,17 @@ const nextConfig: NextConfig = {
         destination: "/newsroom",
         permanent: true,
       },
+      // Model catalog lives on one surface now.
+      {
+        source: "/models",
+        destination: "/ai-gateway/models",
+        permanent: true,
+      },
+      {
+        source: "/ai/models",
+        destination: "/ai-gateway/models",
+        permanent: true,
+      },
     ];
   },
   // Configure images to allow all local paths (Next.js 16 requirement)
