@@ -6,11 +6,12 @@ import { ProviderRouter } from '../router';
 import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
 
 describe('Maximo Atlas catalog', () => {
-    it('advertises Atlas 1.2 and 1.1 and removes the preview model', () => {
+    it('advertises Atlas 1.3 and 1.2, not the retired 1.1 or the preview model', () => {
         const modelIds = getModelsForProvider('maximo').map((model) => model.id);
 
+        expect(modelIds).toContain('maximo-atlas-1.3');
         expect(modelIds).toContain('maximo-atlas-1.2');
-        expect(modelIds).toContain('maximo-atlas-1.1');
+        expect(modelIds).not.toContain('maximo-atlas-1.1');
         expect(modelIds).not.toContain('maximo-atlas-preview');
     });
 
@@ -23,9 +24,10 @@ describe('Maximo Atlas catalog', () => {
         }
     });
 
-    it('routes both Atlas versions to Maximo', () => {
+    it('routes all Atlas versions to Maximo', () => {
         const router = new ProviderRouter();
 
+        expect(router.detectProvider('maximo-atlas-1.3')).toBe('maximo');
         expect(router.detectProvider('maximo-atlas-1.2')).toBe('maximo');
         expect(router.detectProvider('maximo-atlas-1.1')).toBe('maximo');
         expect(() => router.detectProvider('maximo-atlas-preview')).toThrow(

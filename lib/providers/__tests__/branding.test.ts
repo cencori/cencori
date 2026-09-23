@@ -1,30 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { SUPPORTED_PROVIDERS } from '../config';
 import {
-    CENCORI_PROVIDER_DISPLAY_NAME,
-    CENCORI_PROVIDER_LABEL,
     publicFailureMessage,
     publicProviderDisplayName,
     publicProviderLabel,
 } from '../branding';
-import { RateLimitError, ServiceUnavailableError } from '../errors';
+import { ServiceUnavailableError } from '../errors';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 
-// A live free model. Kept current deliberately: the previous constant here
-// (`nvidia/nemotron-nano-12b-v2-vl:free`) went on passing this file long after
-// the id had 404'd upstream, which is how the dead free listings escaped notice.
-const FREE_MODEL = 'poolside/laguna-s-2.1:free';
-const FREE_PROVIDER = 'openrouter';
-
 describe('public provider identity', () => {
-    it('names Cencori as the provider of every free-tier model', () => {
-        const free = SUPPORTED_PROVIDERS.flatMap(p =>
-            p.models.filter(m => m.free).map(m => [p.id, m.id] as const)
+    it('brands every catalog model with its real vendor', () => {
+        // The free tier (retired 2026-09-23) used to relabel Cencori-served
+        // models; with nothing free, the public label must always equal the
+        // routing provider — a mismatch would strand the row in the wrong
+        // provider filter.
+        const relabelled = SUPPORTED_PROVIDERS.flatMap((provider) =>
+            provider.models
+                .filter((model) => publicProviderLabel(provider.id, model.id) !== provider.id)
+                .map((model) => `${provider.id}:${model.id}`)
         );
-        expect(free.length).toBeGreaterThan(0);
-        for (const [providerId, modelId] of free) {
-            expect(publicProviderLabel(providerId, modelId), modelId).toBe(CENCORI_PROVIDER_LABEL);
-        }
+
+        expect(relabelled).toEqual([]);
     });
 
     it('leaves paid models attributed to their real vendor', () => {
@@ -34,15 +30,6 @@ describe('public provider identity', () => {
         expect(publicProviderLabel('groq', 'openai/gpt-oss-20b')).toBe('groq');
     });
 
-    it('reports cencori on an error for a free model', () => {
-        const failure = mapProviderErrorToHttpResponse(
-            new RateLimitError(FREE_PROVIDER), undefined, FREE_MODEL
-        );
-        expect(failure.provider).toBe(CENCORI_PROVIDER_LABEL);
-        expect(failure.status).toBe(429);
-        expect(JSON.stringify(failure)).not.toContain(FREE_PROVIDER);
-    });
-
     it('still reports the real provider on an error for a paid model', () => {
         const failure = mapProviderErrorToHttpResponse(
             new ServiceUnavailableError('anthropic'), undefined, 'claude-opus-5'
@@ -50,53 +37,48 @@ describe('public provider identity', () => {
         expect(failure.provider).toBe('anthropic');
     });
 
-    it('scrubs the failover aggregate for a free model but keeps it for paid', () => {
+    it('leaves the failover aggregate intact for paid models', () => {
         const aggregate =
             'All providers exhausted. Primary (openrouter): [openrouter] 429. '
             + 'Fallback attempts: [anthropic: credit balance is too low]';
 
-        const scrubbed = publicFailureMessage(aggregate, FREE_PROVIDER, FREE_MODEL);
-        expect(scrubbed).not.toContain('openrouter');
-        expect(scrubbed).not.toContain('anthropic');
-        expect(scrubbed).not.toContain('credit balance');
-
         expect(publicFailureMessage(aggregate, 'openai', 'gpt-5')).toBe(aggregate);
     });
 
-    it('shows Cencori as the display name for every free model, and never a vendor', () => {
+    it('shows the vendor display name for every catalog model', () => {
         // The console catalog and playground both build their provider column
-        // from these two helpers. A vendor name surfacing here is the leak the
-        // /v1/models branding was meant to close.
+        // from these two helpers. With the free tier retired, the display name
+        // must always be the vendor's own — never a white-label.
         for (const provider of SUPPORTED_PROVIDERS) {
             for (const model of provider.models) {
-                if (!model.free) continue;
                 expect(
                     publicProviderDisplayName(provider.id, provider.name, model.id),
                     `${provider.id}/${model.id}`
-                ).toBe(CENCORI_PROVIDER_DISPLAY_NAME);
+                ).toBe(provider.name);
             }
         }
     });
 
-    it('keeps a provider visible for its paid models even when some are free', () => {
-        // Groq and OpenRouter each serve both tiers. Branding the free half must
-        // not evict them from the catalog's provider filter.
+    it('keeps a provider visible for its paid models', () => {
+        // Groq serves paid models and must stay in the catalog's provider
+        // filter. OpenRouter was removed 2026-09-23 and must be fully gone —
+        // a leftover row would strand in a filter with nothing behind it.
+        const listed = SUPPORTED_PROVIDERS.map(p => p.id);
+        expect(listed).toContain('groq');
+        expect(listed).not.toContain('openrouter');
         const stillListed = SUPPORTED_PROVIDERS.filter(p =>
             p.models.some(m => publicProviderLabel(p.id, m.id) === p.id)
         ).map(p => p.id);
-        expect(stillListed).toContain('openrouter');
         expect(stillListed).toContain('groq');
     });
 
-    it('does not advertise a free model under a name that leaks its origin', () => {
-        const vendors = ['openrouter', 'open router', 'via openrouter'];
+    it('advertises no catalog row as free', () => {
+        // The rows are gone; this catches leftover "free" copy promising what
+        // billing no longer honours.
         for (const provider of SUPPORTED_PROVIDERS) {
             for (const model of provider.models) {
-                if (!model.free) continue;
                 const text = `${model.name} ${model.description ?? ''}`.toLowerCase();
-                for (const vendor of vendors) {
-                    expect(text, `${model.id} name/description`).not.toContain(vendor);
-                }
+                expect(text, `${model.id} name/description`).not.toContain('free');
             }
         }
     });

@@ -28,15 +28,6 @@ import { getTestSupabaseClient } from '../utils/db-helpers';
  * tolerated. Every entry here is a model users cannot call.
  */
 const KNOWN_UNPRICED: Record<string, string> = {
-    // Groq bills these as agentic systems via the underlying models they invoke
-    // and publishes no flat token rate, so any figure would be invented.
-    'groq:groq/compound': 'no flat token rate published',
-    'groq:groq/compound-mini': 'no flat token rate published',
-    // Alive, not dead: re-checked on 2026-09-10 and Groq answered normally (in
-    // Arabic). The previous note here claimed it was no longer offered and
-    // should be deleted, which was wrong — it needs a pricing row, not removal.
-    'groq:allam-2-7b': 'served by Groq but no pricing row yet',
-
     // Image generation is billed per image, not per token. These need per-image
     // pricing support before they can be advertised as callable.
     'openai:gpt-image-2': 'per-image billing not modelled',

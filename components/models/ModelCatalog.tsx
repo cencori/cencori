@@ -10,16 +10,16 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
-    Perplexity, OpenRouter, Groq, XAI, Together,
+    Perplexity, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
     Ai21, Bedrock, Nova, Azure, Cerebras,
     Cloudflare, DeepInfra, Fireworks, Nvidia,
     SambaNova, Upstage, Minimax, Moonshot,
     Stepfun, Baseten, Alibaba, Baidu, ZAI,
 } from "@lobehub/icons";
-import { SUPPORTED_PROVIDERS, type AIModel } from "@/lib/providers/config";
+import { SUPPORTED_PROVIDERS, type AIModel, type ModelCapabilities } from "@/lib/providers/config";
 import { CENCORI_PROVIDER_LABEL, publicProviderDisplayName, publicProviderLabel } from "@/lib/providers/branding";
-import { Search, ChevronDown, ChevronUp, Copy, Check, Brain } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
     ChatIcon,
@@ -29,6 +29,8 @@ import {
     AiNetworkIcon,
     AiImageIcon,
     BotIcon,
+    CheckmarkCircle02Icon,
+    EyeIcon,
 } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -77,15 +79,19 @@ const HelixIcon = ({ size }: { size: number }) => (
 
 // Models Cencori serves on its own accounts carry Cencori's mark rather than the
 // upstream's — see lib/providers/branding.ts. Two files so the logo stays legible
-// on either background.
-const CencoriIcon = ({ size }: { size: number }) => (
-    <>
-        <img src="/logo%20black.svg" alt="Cencori" width={size} height={size}
-             className="dark:hidden" style={{ width: size, height: size }} />
-        <img src="/logo%20white.svg" alt="Cencori" width={size} height={size}
-             className="hidden dark:block" style={{ width: size, height: size }} />
-    </>
-);
+// on either background. Rendered at 75% of the slot: the wordmark asset reads
+// oversized next to vendor glyphs at full size.
+const CencoriIcon = ({ size }: { size: number }) => {
+    const s = Math.max(10, Math.round(size * 0.75));
+    return (
+        <>
+            <img src="/logo%20black.svg" alt="Cencori" width={s} height={s}
+                 className="dark:hidden" style={{ width: s, height: s }} />
+            <img src="/logo%20white.svg" alt="Cencori" width={s} height={s}
+                 className="hidden dark:block" style={{ width: s, height: s }} />
+        </>
+    );
+};
 
 // ─── Provider icon mapping ──────────────────────────────────────────────────
 
@@ -98,7 +104,6 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     perplexity: (s) => <Perplexity.Color size={s} />,
     groq: (s) => <Groq size={s} />,
     together: (s) => <Together.Color size={s} />,
-    openrouter: (s) => <OpenRouter size={s} />,
     xai: (s) => <XAI size={s} />,
     meta: (s) => <Meta.Avatar size={s} />,
     huggingface: (s) => <HuggingFace.Color size={s} />,
@@ -140,6 +145,7 @@ const TYPE_COLORS: Record<string, string> = {
     reasoning: "bg-purple-500/10 text-purple-400 border-purple-500/20",
     code: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     search: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    vision: "bg-teal-500/10 text-teal-400 border-teal-500/20",
     embedding: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     image: "bg-pink-500/10 text-pink-400 border-pink-500/20",
 };
@@ -151,6 +157,7 @@ const CAPABILITY_ICONS: Record<string, React.ComponentProps<typeof HugeiconsIcon
     search: AiSearchIcon,
     embedding: AiNetworkIcon,
     image: AiImageIcon,
+    vision: EyeIcon,
 };
 
 const CAPABILITY_LABELS: Record<string, string> = {
@@ -158,9 +165,44 @@ const CAPABILITY_LABELS: Record<string, string> = {
     reasoning: "Reasoning",
     code: "Code",
     search: "Search",
+    vision: "Vision",
     embedding: "Embedding",
     image: "Image Generation",
 };
+
+// ─── Feature filters (Vercel-style capabilities menu) ───────────────────────
+// Type-derived capabilities (reasoning, vision, code, search, image, free)
+// plus the curated `capabilities` flags on each catalog row (tool use,
+// structured output, file/video/audio input, caching). A listed feature always
+// has data behind it; capabilities with no row-level signal stay out until the
+// catalog expansion lands them.
+type FeatureId = "reasoning" | "vision" | "code" | "search" | "image"
+    | "tools" | "structuredOutput" | "fileInput" | "videoInput" | "audioInput" | "caching";
+
+interface FeatureFilter {
+    id: FeatureId;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    match: (model: { type: string | string[]; free?: boolean; capabilities?: ModelCapabilities }) => boolean;
+}
+
+function modelTypes(model: { type: string | string[] }): string[] {
+    return Array.isArray(model.type) ? model.type : [model.type];
+}
+
+const FEATURE_FILTERS: FeatureFilter[] = [
+    { id: "reasoning", label: "Reasoning", icon: Brain, match: (m) => modelTypes(m).includes("reasoning") },
+    { id: "vision", label: "Vision (Image)", icon: Eye, match: (m) => modelTypes(m).includes("vision") },
+    { id: "code", label: "Code", icon: Code, match: (m) => modelTypes(m).includes("code") },
+    { id: "search", label: "Web Search", icon: Globe, match: (m) => modelTypes(m).includes("search") },
+    { id: "image", label: "Image Generation", icon: Image, match: (m) => modelTypes(m).includes("image") },
+    { id: "tools", label: "Tool Use", icon: Wrench, match: (m) => m.capabilities?.tools === true },
+    { id: "structuredOutput", label: "Structured Output", icon: FileJson, match: (m) => m.capabilities?.structuredOutput === true },
+    { id: "fileInput", label: "File Input", icon: FileInput, match: (m) => m.capabilities?.fileInput === true },
+    { id: "videoInput", label: "Video Input", icon: Video, match: (m) => m.capabilities?.videoInput === true },
+    { id: "audioInput", label: "Audio Input", icon: Mic, match: (m) => m.capabilities?.audioInput === true },
+    { id: "caching", label: "Prompt Caching", icon: Zap, match: (m) => m.capabilities?.caching === true },
+];
 
 // ─── Pricing Helper ──────────────────────────────────────────────────────────
 
@@ -169,11 +211,7 @@ interface ModelPrice {
     output: string;
 }
 
-function getModelPrice(modelId: string, type: string | string[], free?: boolean): ModelPrice {
-    if (free) {
-        return { input: "$0.00", output: "$0.00" };
-    }
-    
+function getModelPrice(modelId: string, type: string | string[]): ModelPrice {
     const id = modelId.toLowerCase();
     const primaryType = Array.isArray(type) ? type[0] : type;
     
@@ -185,6 +223,17 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
         return { input: "$0.020", output: "per img" };
     }
     
+    // GPT-5.6 family (repriced Aug 21 2026 — Sol $4/$20, Terra $2/$12,
+    // Luna $0.20/$1.20). Luna is the cheapest frontier path; don't collapse
+    // it into the generic GPT-5 branch below.
+    if (id.startsWith("gpt-5.6-sol")) return { input: "$4.00", output: "$20.00" };
+    if (id.startsWith("gpt-5.6-terra")) return { input: "$2.00", output: "$12.00" };
+    if (id.startsWith("gpt-5.6-luna")) return { input: "$0.20", output: "$1.20" };
+    // GPT-6 family (September 2026)
+    if (id.startsWith("gpt-6-astra")) return { input: "$10.00", output: "$50.00" };
+    if (id.startsWith("gpt-6-sol")) return { input: "$2.00", output: "$10.00" };
+    if (id.startsWith("gpt-6-luna")) return { input: "$0.20", output: "$0.50" };
+    if (id.startsWith("gpt-5.5-pro")) return { input: "$30.00", output: "$180.00" };
     // GPT-5 flagship
     if (id.startsWith("gpt-5.5") || id.startsWith("gpt-5.4") || id.startsWith("gpt-5.3") || id.startsWith("gpt-5.2") || id.startsWith("gpt-5-pro") || id.startsWith("gpt-5")) {
         if (id.includes("mini")) return { input: "$0.15", output: "$0.60" };
@@ -205,21 +254,18 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
     }
     
     // Claude
-    if (id === "axiveri/africlaude-7b") {
-        return { input: "$0.50", output: "$1.00" };
-    }
-
     if (id === "claude-sonnet-5") {
-        const isIntroActive = new Date().getTime() < new Date("2026-09-01").getTime();
-        return isIntroActive 
-            ? { input: "$2.00", output: "$10.00" } 
-            : { input: "$3.00", output: "$15.00" };
+        // Introductory $2/$10 made permanent Aug 10 2026 — no expiry.
+        return { input: "$2.00", output: "$10.00" };
     }
     if (id === "claude-opus-4.8") {
         return { input: "$5.00", output: "$25.00" };
     }
     if (id === "claude-opus-5") {
         return { input: "$5.00", output: "$25.00" };
+    }
+    if (id === "claude-opus-5-5") {
+        return { input: "$4.00", output: "$20.00" };
     }
     // Priced above the Opus tier. Without this the Fable/Mythos ids match none
     // of the Claude branches below and fall through to the generic catch-all,
@@ -277,7 +323,21 @@ function getModelPrice(modelId: string, type: string | string[], free?: boolean)
         if (id.includes("3b")) return { input: "$0.06", output: "$0.18" };
         return { input: "$0.50", output: "$1.50" };
     }
+
+    // xAI Grok ($2/$6 flagship tier, $1.25/$2.50 for 4.3)
+    if (id.startsWith("grok-")) {
+        if (id.startsWith("grok-4.3")) return { input: "$1.25", output: "$2.50" };
+        return { input: "$2.00", output: "$6.00" };
+    }
     
+    // Maximo Atlas (1.3 launch rate, then 1.2 standard)
+    if (id === "maximo-atlas-1.3") {
+        return { input: "$0.20", output: "$0.50" };
+    }
+    if (id === "maximo-atlas-1.2") {
+        return { input: "$0.55", output: "$1.50" };
+    }
+
     // Fallbacks based on context window size / capabilities
     if (id.includes("pro") || id.includes("large")) return { input: "$1.50", output: "$4.50" };
     if (id.includes("mini") || id.includes("lite") || id.includes("small")) return { input: "$0.15", output: "$0.60" };
@@ -323,21 +383,12 @@ function flattenModels(): FlatModel[] {
         }
     }
 
-    // Models pinned to the top (newly added, remove from this list after a while)
-    const pinnedIds = new Set(['claude-fable-5-1', 'claude-opus-5', 'claude-sonnet-5', 'glm-5.2', 'axiveri/africlaude-7b', 'claude-opus-4.8', 'gemini-3.5-flash']);
-    const pinned: FlatModel[] = [];
-    const rest: FlatModel[] = [];
-
-    for (const m of models) {
-        if (pinnedIds.has(m.id)) {
-            pinned.push(m);
-        } else {
-            rest.push(m);
-        }
-    }
-
-    // Keep provider-order for the rest (no shuffle)
-    const result = [...pinned, ...rest];
+    // Newly-added-first: the catalog's default order is vendor release date
+    // descending (see `addedAt` in config.ts). Rows without a date sort last;
+    // ties break by name for stability.
+    const result = [...models].sort((a, b) =>
+        (b.addedAt ?? "").localeCompare(a.addedAt ?? "") || a.name.localeCompare(b.name)
+    );
     return result.map((m, i) => ({ ...m, index: i }));
 }
 
@@ -348,24 +399,26 @@ export function ModelCatalog() {
 
     const [search, setSearch] = useState("");
     const [providerFilter, setProviderFilter] = useState<string>("all");
+    const [providerSearch, setProviderSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState<string>("all");
-    const [showFreeOnly, setShowFreeOnly] = useState(false);
+    const [selectedFeatures, setSelectedFeatures] = useState<FeatureId[]>([]);
     const [sortKey, setSortKey] = useState<SortKey>("none");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isProviderOpen, setIsProviderOpen] = useState(false);
-    const [isPricingOpen, setIsPricingOpen] = useState(false);
+    const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
     const providerRef = useRef<HTMLDivElement>(null);
-    const pricingRef = useRef<HTMLDivElement>(null);
+    const featuresRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns on outside click
     useEffect(() => {
         function handleClick(e: MouseEvent) {
             if (providerRef.current && !providerRef.current.contains(e.target as Node)) {
                 setIsProviderOpen(false);
+                setProviderSearch("");
             }
-            if (pricingRef.current && !pricingRef.current.contains(e.target as Node)) {
-                setIsPricingOpen(false);
+            if (featuresRef.current && !featuresRef.current.contains(e.target as Node)) {
+                setIsFeaturesOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClick);
@@ -432,9 +485,13 @@ export function ModelCatalog() {
             });
         }
         
-        // Free filter
-        if (showFreeOnly) {
-            result = result.filter((m) => m.free);
+        // Feature filters (a model must carry every selected capability)
+        if (selectedFeatures.length > 0) {
+            result = result.filter((m) =>
+                selectedFeatures.every((id) =>
+                    FEATURE_FILTERS.find((f) => f.id === id)?.match(m) ?? false
+                )
+            );
         }
 
         // Sort
@@ -461,7 +518,13 @@ export function ModelCatalog() {
         });
 
         return result;
-    }, [allModels, search, providerFilter, typeFilter, showFreeOnly, sortKey, sortDir]);
+    }, [allModels, search, providerFilter, typeFilter, selectedFeatures, sortKey, sortDir]);
+
+    function toggleFeature(id: FeatureId) {
+        setSelectedFeatures((prev) =>
+            prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
+        );
+    }
 
     function toggleSort(key: SortKey) {
         if (sortKey === key) {
@@ -481,32 +544,66 @@ export function ModelCatalog() {
 
     return (
         <div className="space-y-5">
+            {/* Sticky filter bar: pins below the fixed nav while the table scrolls */}
+            <div className="sticky top-20 z-30 -mx-4 border-b border-border/20 bg-background/85 px-4 py-3 backdrop-blur-xl">
             <div className="flex flex-col gap-3">
-                {/* Row 1: Search + dropdowns */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                    {/* Search */}
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                {/* Filters: search, type tags and dropdowns on one line */}
+                <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                    {/* Search — dashboard sidebar style */}
+                    <div className="relative flex-1 min-w-0 xl:max-w-xs xl:order-3 xl:ml-auto">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                             type="text"
-                            placeholder="Search models, providers, or types..."
+                            placeholder="Search models..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full h-10 pl-9 pr-4 rounded-xl border border-border/40 bg-card/50 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+                            className="h-9 w-full rounded-lg border-0 bg-[#f3f3f1] py-2 pl-9 pr-12 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30 dark:bg-[#181818]"
                         />
+                        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-0.5 text-[10px] text-muted-foreground/60">
+                            <Command className="h-2.5 w-2.5" />K
+                        </span>
+                    </div>
+
+                    {/* Type tags — segmented container */}
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar min-w-0 rounded-xl border border-border/40 p-0.5 xl:order-2">
+                        <button
+                            onClick={() => setTypeFilter("all")}
+                            className={cn(
+                                "shrink-0 h-7 px-3 rounded-lg text-xs font-medium border transition-all",
+                                typeFilter === "all"
+                                    ? "bg-foreground/10 text-foreground border-border/50"
+                                    : "bg-transparent text-muted-foreground/70 border-transparent hover:text-foreground/80 hover:bg-muted/20"
+                            )}
+                        >
+                            All
+                        </button>
+                        {types.map((t) => (
+                            <button
+                                key={t}
+                                onClick={() => setTypeFilter(t)}
+                                className={cn(
+                                    "shrink-0 h-7 px-3 rounded-lg text-xs font-medium border transition-all capitalize",
+                                    typeFilter === t
+                                        ? "bg-foreground/10 text-foreground border-border/50"
+                                        : "bg-transparent text-muted-foreground/70 border-transparent hover:text-foreground/80 hover:bg-muted/20"
+                                )}
+                            >
+                                {t}
+                            </button>
+                        ))}
                     </div>
 
                     {/* Filter dropdowns */}
-                    <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="flex gap-2 w-full xl:w-auto shrink-0 xl:order-1">
                         {/* Provider dropdown (custom) */}
                         <div ref={providerRef} className="relative flex-1 sm:flex-none">
                             <button
                                 onClick={() => setIsProviderOpen((v) => !v)}
                                 className={cn(
-                                    "flex items-center gap-2 h-10 px-3 rounded-xl border text-sm cursor-pointer w-full sm:w-auto transition-all",
+                                    "flex items-center gap-2 h-8 px-3 rounded-xl border text-sm cursor-pointer w-full sm:w-auto transition-all",
                                     isProviderOpen
-                                        ? "border-primary/40 bg-card/80 ring-2 ring-primary/20"
-                                        : "border-border/40 bg-card/50 hover:border-border/60"
+                                        ? "border-border/60 bg-[#f3f3f1] dark:bg-[#212121]"
+                                        : "border-transparent bg-[#f3f3f1] hover:bg-[#e9e9e5] dark:bg-[#181818] dark:hover:bg-[#212121]"
                                 )}
                             >
                                 {providerFilter !== "all" && (
@@ -526,25 +623,36 @@ export function ModelCatalog() {
                             </button>
 
                             {isProviderOpen && (
-                                <div className="absolute z-50 top-full mt-1.5 left-0 w-64 max-h-80 overflow-y-auto rounded-xl border border-border/40 bg-card shadow-xl shadow-black/30 py-1 backdrop-blur-xl">
-                                    <button
-                                        onClick={() => { setProviderFilter("all"); setIsProviderOpen(false); }}
-                                        className={cn(
-                                            "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors",
-                                            providerFilter === "all"
-                                                ? "bg-primary/10 text-foreground"
-                                                : "text-muted-foreground hover:bg-foreground/5"
-                                        )}
-                                    >
-                                        <span className="w-5 h-5 flex items-center justify-center rounded bg-muted/40">
-                                            <HugeiconsIcon icon={BotIcon} size={12} className="text-muted-foreground/60" />
-                                        </span>
-                                        All Providers
-                                    </button>
-                                    {providerOptions.map((p) => (
+                                <div className="absolute z-50 top-full mt-1.5 left-0 w-64 max-h-80 overflow-y-auto rounded-xl border border-border/40 bg-card shadow-xl shadow-black/30 pb-1 backdrop-blur-xl">
+                                    <div className="sticky top-0 z-10 rounded-t-xl bg-black px-2 py-2">
+                                        <div className="relative">
+                                            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                            <input
+                                                autoFocus
+                                                value={providerSearch}
+                                                onChange={(e) => setProviderSearch(e.target.value)}
+                                                placeholder="Search providers..."
+                                                className="h-8 w-full rounded-lg border-0 bg-[#f3f3f1] pl-8 pr-2 text-xs text-foreground outline-none placeholder:text-muted-foreground dark:bg-[#181818]"
+                                            />
+                                        </div>
+                                    </div>
+                                    {providerFilter !== "all" && (
+                                        <button
+                                            onClick={() => { setProviderFilter("all"); setProviderSearch(""); setIsProviderOpen(false); }}
+                                            className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors text-muted-foreground hover:bg-foreground/5"
+                                        >
+                                            <span className="w-5 h-5 flex items-center justify-center rounded bg-muted/40">
+                                                <HugeiconsIcon icon={BotIcon} size={12} className="text-muted-foreground/60" />
+                                            </span>
+                                            All Providers
+                                        </button>
+                                    )}
+                                    {providerOptions
+                                        .filter((p) => p.name.toLowerCase().includes(providerSearch.toLowerCase()))
+                                        .map((p) => (
                                         <button
                                             key={p.id}
-                                            onClick={() => { setProviderFilter(p.id); setIsProviderOpen(false); }}
+                                            onClick={() => { setProviderFilter(p.id); setProviderSearch(""); setIsProviderOpen(false); }}
                                             className={cn(
                                                 "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors",
                                                 providerFilter === p.id
@@ -558,104 +666,71 @@ export function ModelCatalog() {
                                             {p.name}
                                         </button>
                                     ))}
+                                    {providerOptions.filter((p) => p.name.toLowerCase().includes(providerSearch.toLowerCase())).length === 0 && (
+                                        <p className="px-3 py-4 text-center text-xs text-muted-foreground/60">
+                                            No providers found.
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Pricing filter dropdown (custom) */}
-                        <div ref={pricingRef} className="relative flex-1 sm:flex-none">
+                        {/* Properties filter dropdown (custom) */}
+                        <div ref={featuresRef} className="relative flex-1 sm:flex-none">
                             <button
-                                onClick={() => setIsPricingOpen((v) => !v)}
+                                onClick={() => setIsFeaturesOpen((v) => !v)}
                                 className={cn(
-                                    "flex items-center gap-2 h-10 px-3 rounded-xl border text-sm cursor-pointer w-full sm:w-40 transition-all",
-                                    isPricingOpen
-                                        ? "border-primary/40 bg-card/80 ring-2 ring-primary/20"
-                                        : "border-border/40 bg-card/50 hover:border-border/60",
-                                    showFreeOnly && "border-violet-500/30 bg-violet-500/10"
+                                    "flex items-center gap-2 h-8 px-3 rounded-xl border text-sm cursor-pointer w-full sm:w-40 transition-all",
+                                    isFeaturesOpen
+                                        ? "border-border/60 bg-[#f3f3f1] dark:bg-[#212121]"
+                                        : "border-transparent bg-[#f3f3f1] hover:bg-[#e9e9e5] dark:bg-[#181818] dark:hover:bg-[#212121]",
                                 )}
                             >
-                                {showFreeOnly && (
-                                    <span className="shrink-0 w-4 h-4 flex items-center justify-center">
-                                        <HugeiconsIcon icon={BotIcon} size={12} className="text-violet-400" />
-                                    </span>
-                                )}
-                                <span className={cn(
-                                    "truncate",
-                                    showFreeOnly ? "text-violet-400" : "text-foreground"
-                                )}>
-                                    {showFreeOnly ? "Free Models" : "All Models"}
+                                <span className="truncate text-foreground">
+                                    Properties
                                 </span>
                                 <ChevronDown className={cn(
-                                    "shrink-0 h-3.5 w-3.5 transition-transform ml-auto",
-                                    showFreeOnly ? "text-violet-400/60" : "text-muted-foreground/60",
-                                    isPricingOpen && "rotate-180"
+                                    "shrink-0 h-3.5 w-3.5 transition-transform ml-auto text-muted-foreground/60",
+                                    isFeaturesOpen && "rotate-180"
                                 )} />
                             </button>
 
-                            {isPricingOpen && (
-                                <div className="absolute z-50 top-full mt-1.5 left-0 w-40 rounded-xl border border-border/40 bg-card shadow-xl shadow-black/30 py-1 backdrop-blur-xl">
-                                    <button
-                                        onClick={() => { setShowFreeOnly(false); setIsPricingOpen(false); }}
-                                        className={cn(
-                                            "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors",
-                                            !showFreeOnly
-                                                ? "bg-primary/10 text-foreground"
-                                                : "text-muted-foreground hover:bg-foreground/5"
-                                        )}
-                                    >
-                                        <span className="w-5 h-5 flex items-center justify-center rounded bg-muted/40">
-                                            <HugeiconsIcon icon={BotIcon} size={12} className="text-muted-foreground/60" />
-                                        </span>
-                                        All Models
-                                    </button>
-                                    <button
-                                        onClick={() => { setShowFreeOnly(true); setIsPricingOpen(false); }}
-                                        className={cn(
-                                            "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors",
-                                            showFreeOnly
-                                                ? "bg-violet-500/10 text-violet-400"
-                                                : "text-muted-foreground hover:bg-foreground/5"
-                                        )}
-                                    >
-                                        <span className="w-5 h-5 flex items-center justify-center rounded bg-violet-500/20">
-                                            <HugeiconsIcon icon={BotIcon} size={12} className="text-violet-400" />
-                                        </span>
-                                        Free Models
-                                    </button>
+                            {isFeaturesOpen && (
+                                <div className="absolute z-50 top-full mt-1.5 right-0 w-56 rounded-xl border border-border/40 bg-card shadow-xl shadow-black/30 py-1 backdrop-blur-xl">
+                                    {FEATURE_FILTERS.map((f) => {
+                                        const active = selectedFeatures.includes(f.id);
+                                        const Icon = f.icon;
+                                        return (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => toggleFeature(f.id)}
+                                                className={cn(
+                                                    "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors",
+                                                    active
+                                                        ? "text-foreground hover:bg-foreground/5"
+                                                        : "text-muted-foreground hover:bg-foreground/5"
+                                                )}
+                                            >
+                                                <Icon className="shrink-0 h-4 w-4" />
+                                                <span className="flex-1">{f.label}</span>
+                                                {active && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={14} className="shrink-0" />}
+                                            </button>
+                                        );
+                                    })}
+                                    {selectedFeatures.length > 0 && (
+                                        <button
+                                            onClick={() => setSelectedFeatures([])}
+                                            className="flex items-center w-full px-3 py-2 text-xs text-muted-foreground/60 text-left transition-colors hover:text-foreground"
+                                        >
+                                            Clear all
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
-
-                {/* Row 2: Type tabs */}
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
-                    <button
-                        onClick={() => setTypeFilter("all")}
-                        className={cn(
-                            "shrink-0 h-8 px-3 rounded-lg text-xs font-medium border transition-all",
-                            typeFilter === "all"
-                                ? "bg-foreground/10 text-foreground border-border/50"
-                                : "bg-transparent text-muted-foreground/60 border-transparent hover:text-foreground/80 hover:bg-muted/20"
-                        )}
-                    >
-                        All
-                    </button>
-                    {types.map((t) => (
-                        <button
-                            key={t}
-                            onClick={() => setTypeFilter(t)}
-                            className={cn(
-                                "shrink-0 h-8 px-3 rounded-lg text-xs font-medium border transition-all capitalize",
-                                typeFilter === t
-                                    ? TYPE_COLORS[t] || "bg-muted text-foreground border-border/30"
-                                    : "bg-transparent text-muted-foreground/60 border-transparent hover:text-foreground/80 hover:bg-muted/20"
-                            )}
-                        >
-                            {t}
-                        </button>
-                    ))}
-                </div>
+            </div>
             </div>
 
 
@@ -667,7 +742,7 @@ export function ModelCatalog() {
                     </div>
                 ) : (
                     filtered.map((model) => {
-                        const price = getModelPrice(model.id, model.type, model.free);
+                        const price = getModelPrice(model.id, model.type);
                         return (
                             <div
                                 key={`${model.providerId}-${model.id}-mobile`}
@@ -681,11 +756,6 @@ export function ModelCatalog() {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <p className="font-semibold text-foreground truncate leading-tight">{model.name}</p>
-                                                {model.free && (
-                                                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-tight bg-violet-600 text-white px-1.5 py-0.5 rounded-sm">
-                                                        Free
-                                                    </span>
-                                                )}
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                                                 <p className="text-[11px] text-muted-foreground/60 font-mono truncate">{model.id}</p>
@@ -757,7 +827,7 @@ export function ModelCatalog() {
             </div>
 
             {/* ── Table ── */}
-            <div className="hidden md:block border border-border/30 rounded-2xl overflow-hidden bg-card/30">
+            <div className="hidden md:block border border-border/30 rounded-2xl overflow-hidden bg-[#f3f3f1] dark:bg-[#181818]">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm table-fixed">
                         <thead>
@@ -811,7 +881,7 @@ export function ModelCatalog() {
                                 </tr>
                             ) : (
                                 filtered.map((model) => {
-                                    const price = getModelPrice(model.id, model.type, model.free);
+                                    const price = getModelPrice(model.id, model.type);
                                     return (
                                         <tr
                                             key={`${model.providerId}-${model.id}`}
@@ -826,11 +896,6 @@ export function ModelCatalog() {
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <div className="font-semibold text-foreground truncate leading-tight">{model.name}</div>
-                                                            {model.free && (
-                                                                <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-widest bg-violet-600 text-white px-1.5 py-0.5 rounded-[2px]">
-                                                                    Free
-                                                                </span>
-                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                                                             <span className="text-[11px] text-muted-foreground/50 font-mono truncate">{model.id}</span>

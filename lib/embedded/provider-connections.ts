@@ -8,7 +8,7 @@ type Admin = ReturnType<typeof createAdminClient>;
 // Official providers must use Cencori-owned origins; base_url is never caller-editable.
 const OFFICIAL_PROVIDERS = new Set([
     'openai', 'anthropic', 'google', 'cohere', 'xai', 'deepseek', 'groq', 'mistral',
-    'together', 'openrouter', 'perplexity', 'huggingface', 'zai', 'cerebras', 'qwen',
+    'together', 'perplexity', 'huggingface', 'zai', 'cerebras', 'qwen',
     'meta', 'maximo', 'helix', 'centaur', 'bai',
 ]);
 

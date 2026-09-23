@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
-    Perplexity, OpenRouter, Groq, XAI, Together,
+    Perplexity, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
     Minimax, Baidu, ZAI, Cerebras,
 } from "@lobehub/icons";
@@ -118,7 +118,6 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     perplexity: (s) => <Perplexity.Color size={s} />,
     groq: (s) => <Groq size={s} />,
     together: (s) => <Together.Color size={s} />,
-    openrouter: (s) => <OpenRouter size={s} />,
     xai: (s) => <XAI size={s} />,
     meta: (s) => <Meta.Avatar size={s} />,
     huggingface: (s) => <HuggingFace.Color size={s} />,
@@ -155,7 +154,9 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const freeChatModels = chatCatalogModels.filter((m) => m.free);
-const firstFreeModelId = freeChatModels[0]?.id ?? "gpt-4o";
+// Retired with the free tier (2026-09-23): no catalog row is free, so this is
+// always empty. Public callers default to the first catalog model instead.
+const firstFreeModelId = freeChatModels[0]?.id ?? chatCatalogModels[0]?.id ?? "gpt-4o";
 
 export function PlaygroundChat({
     orgSlug,
@@ -179,7 +180,7 @@ export function PlaygroundChat({
     // Model Selector dropdown states
     const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
     const [modelSearchQuery, setModelSearchQuery] = useState("");
-    const [modelActiveTab, setModelActiveTab] = useState<"all" | "free" | "pro">("all");
+    const [modelActiveTab, setModelActiveTab] = useState<"all" | "pro">("all");
 
     // Upgrade Dialog state
     const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
@@ -625,7 +626,6 @@ export function PlaygroundChat({
 
         const matchesTab =
             modelActiveTab === "all" ||
-            (modelActiveTab === "free" && m.free) ||
             (modelActiveTab === "pro" && !m.free);
 
         return matchesSearch && matchesTab;
@@ -726,18 +726,6 @@ export function PlaygroundChat({
                                                     <span className="text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wide">
                                                         {mObj?.name ?? message.modelId}
                                                     </span>
-                                                    {mObj && (
-                                                        <Badge
-                                                            className={cn(
-                                                                "h-3.5 px-1 text-[7px] font-bold uppercase scale-90",
-                                                                mObj.free
-                                                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                                    : "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                                                            )}
-                                                        >
-                                                            {mObj.free ? "Free" : "Pro"}
-                                                        </Badge>
-                                                    )}
                                                 </div>
                                             );
                                         })()}
@@ -860,18 +848,6 @@ export function PlaygroundChat({
                                                 >
                                                     <ProviderIcon providerId={mObj?.providerId ?? "openai"} size={13} />
                                                     <span className="max-w-[100px] truncate">{mObj?.name ?? mId}</span>
-                                                    {mObj && (
-                                                        <Badge
-                                                            className={cn(
-                                                                "h-4 px-1 text-[8px] font-bold uppercase",
-                                                                mObj.free
-                                                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                                    : "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                                                            )}
-                                                        >
-                                                            {mObj.free ? "Free" : "Pro"}
-                                                        </Badge>
-                                                    )}
                                                 </button>
                                                 {/* Remove button (only if more than 1 model) */}
                                                 {selectedModels.length > 1 && (
@@ -905,7 +881,7 @@ export function PlaygroundChat({
 
                                                         {/* Tabs */}
                                                         <div className="flex gap-1 mb-2 bg-muted/40 p-0.5 rounded-lg shrink-0">
-                                                            {(["all", "free", "pro"] as const).map((tab) => (
+                                                            {(["all", "pro"] as const).map((tab) => (
                                                                 <button
                                                                     key={tab}
                                                                     type="button"
@@ -917,7 +893,7 @@ export function PlaygroundChat({
                                                                             : "text-muted-foreground hover:text-foreground/80"
                                                                     )}
                                                                 >
-                                                                    {tab === "all" ? "All" : tab === "free" ? "Free" : "Pro"}
+                                                                    {tab === "all" ? "All" : "Pro"}
                                                                 </button>
                                                             ))}
                                                         </div>
@@ -950,16 +926,6 @@ export function PlaygroundChat({
                                                                                         <span className="text-[11px] font-medium text-foreground truncate">
                                                                                             {m.name}
                                                                                         </span>
-                                                                                        <Badge
-                                                                                            className={cn(
-                                                                                                "h-3.5 px-1 text-[7px] font-bold uppercase shrink-0 scale-90",
-                                                                                                m.free
-                                                                                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                                                                    : "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                                                                                            )}
-                                                                                        >
-                                                                                            {m.free ? "Free" : "Pro"}
-                                                                                        </Badge>
                                                                                     </div>
                                                                                     <span className="text-[9px] text-muted-foreground/60 truncate block leading-normal">
                                                                                         {m.providerName} • {m.contextWindow.toLocaleString()} ctx

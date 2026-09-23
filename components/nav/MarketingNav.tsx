@@ -33,16 +33,18 @@ function TransparentAboutNav() {
   );
 }
 
-const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway", "/newsroom"];
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway", "/newsroom", "/models"];
 
 export function MarketingNav() {
   const pathname = usePathname();
+  const developersNav =
+    pathname === "/models" || pathname?.startsWith("/models/");
   if (
     SCROLL_SOLID_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     )
   ) {
-    return <ThesisScrollNav />;
+    return <ThesisScrollNav developers={developersNav} />;
   }
   const transparent = TRANSPARENT_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -51,8 +53,12 @@ export function MarketingNav() {
   return <TransparentAboutNav />;
 }
 
-// Thesis: transparent at the top, soft-fades to solid page background on scroll.
-function ThesisScrollNav() {
+// Thesis/developers style: transparent at the top, soft-fades to solid page
+// background on scroll. Exported so standalone pages (e.g. /ai/models) can
+// reuse the same nav behavior outside the marketing shell. `developers`
+// forces the developers variant (menus, wordmark, actions) on routes where
+// the pathname check would not trigger it.
+export function ThesisScrollNav({ developers = false }: { developers?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -68,7 +74,7 @@ function ThesisScrollNav() {
         scrolled ? "bg-background" : "bg-transparent"
       }`}
     >
-      <SiteNav />
+      <SiteNav developers={developers} />
     </div>
   );
 }
