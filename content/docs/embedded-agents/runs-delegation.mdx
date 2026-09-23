@@ -1,0 +1,27 @@
+---
+title: "Runs and Delegation"
+description: "Durable background work with bounded subagent calls."
+section: "Embedded Agents"
+order: 8
+---
+
+## Run lifecycle
+
+```
+queued → running → completed | failed | cancelled | expired
+                 ↘ requires_action (approval-gated tools)
+```
+
+`POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, stream the durable log at `GET .../events?after=`, cancel with `POST .../cancel` — cancellation wins executor races via conditional claims, and cascades to active child runs.
+
+Structured output is strict: a requested `json_schema` must validate or the run fails loudly. Every run records the exact agent/skill/subagent versions, knowledge citations, and policy snapshot used.
+
+## Delegation
+
+`POST /v1/runs/:id/delegate` with `{ agent_version_id, input, installation_id? }` runs one bounded task on an explicitly allowlisted subagent version. The child is isolated: same project/tenant/user, the child's own version config, no parent conversation beyond the task input, no inherited installation or session (bind one explicitly and it is triple-validated). Knowledge loads only from the child's own bindings.
+
+Gates, in order: parent active, tenant active, manifest depth, plan depth, edge allowlist, edge call/timeout/spend budgets, published child, cycle check. `subagent.called/completed/failed` events correlate parent and child with full cost attribution to the child installation.
+
+## Testing versions
+
+`POST /v1/agents/:id/versions/:version/test` runs a sandboxed single model call — no run row, no webhooks, no bindings, no credentials, capped tokens — and records passing evidence. Publishing requires it: both publish paths reject untested versions.

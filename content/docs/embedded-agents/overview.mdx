@@ -22,7 +22,7 @@ Your app owns the product experience. Cencori owns the hard infrastructure: isol
 7. `POST /v1/client-tokens` — mint 15-minute `ect_` tokens; browsers never see your project secret.
 8. `POST /v1/sessions` + turns — chat scoped to tenant/user/installation; cross-tenant reads fail closed.
 9. `POST /v1/agents/:id/runs` — background work with idempotent creation, event log, and cancel.
-10. `POST /v1/actions/:id/approve` — consequential tools (Gmail send, MCP calls) execute exactly once under an execution key.
+10. `POST /v1/actions/:id/approve` — consequential tools (Gmail send, MCP calls) dispatch under a single-claim, at-most-once guarantee (see Actions guide for reconciliation).
 11. Webhooks (`run.*`, `action.*`, `knowledge_source.*`, `connection.*`) — HMAC-signed, retried, replayable.
 12. `GET /v1/usage/export?format=csv` — invoice rows grouped by tenant and agent.
 

@@ -1,0 +1,29 @@
+---
+title: "Webhooks"
+description: "Signed, retried, replayable event delivery."
+section: "Embedded Agents"
+order: 6
+---
+
+## Event families
+
+`provider_connection.*`, `provider_model_sync.*`, `tenant.*`, `agent.*`, `installation.*`, `knowledge_source.*`, `connection.*`, `session.*`, `run.*` (+ `subagent.*`), `action.*`, `usage.*`. Subscribe with `POST /v1/webhooks` (secret-key only); filter by family. Inspect the delivery log at `GET /v1/webhook-deliveries` and replay any delivery with `POST .../:id/replay`.
+
+## Verification
+
+Every delivery carries `X-Webhook-Signature: sha256=<hex>`, `X-Webhook-Event`, and `X-Webhook-Timestamp`. The signature is HMAC-SHA256 over the exact JSON body with your endpoint secret:
+
+```typescript
+import crypto from 'crypto';
+
+function verifyWebhook(rawBody: string, signature: string, secret: string): boolean {
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+```
+
+Always verify on the **raw body bytes** before parsing — parsed-then-restringified JSON can differ in whitespace and fail the check.
+
+## Delivery guarantees
+
+At-least-once with exponential backoff (2s, 4s, 8s) and 24-hour retry budget. `4xx` (other than `429`) is non-retryable; `5xx`, `429`, and network errors retry. Design every handler idempotently: deliveries (and replays) can arrive more than once. Payloads carry their own `api_version` so additive changes never break your parser.

@@ -1,0 +1,37 @@
+---
+title: "Authentication and Client Tokens"
+description: "Secret keys, publishable keys, and short-lived browser tokens."
+section: "Embedded Agents"
+order: 2
+---
+
+## Two credentials, two audiences
+
+- **Secret project keys (`csk_*`)** — your backend. Required for every control-plane operation: tenants, publishing, credentials, syncs, webhooks, client-token minting, usage. Anything else returns `403 secret_key_required`.
+- **Client tokens (`ect_*`)** — browsers and mobile apps. Minted server-side via `POST /v1/client-tokens`, 15 minutes maximum. A token carries project, tenant, user, installation grants, permissions, and environment — signed by Cencori, never overridable from request bodies.
+
+Publishable keys (`cpk_*`) cannot call embedded management APIs. The project secret must never ship to a browser.
+
+## Minting
+
+```http
+POST /v1/client-tokens
+Authorization: Bearer csk_...
+
+{
+  "tenant_id": "ten_123",
+  "external_user_id": "employee_456",
+  "installation_ids": ["ins_789"],
+  "permissions": ["sessions:create", "sessions:turn"],
+  "expires_in": 900
+}
+```
+
+Installation IDs are validated against the tenant at mint time. Permissions are enforced per operation: `sessions:create` gates session creation, `sessions:turn` gates listing, reads, and turns.
+
+## Scope rules
+
+- A token sees only its tenant **and** user. Other users' sessions are invisible, and installations outside its grant list are rejected — including sessions created before scoping existed only where their user/installation fields are empty.
+- Scope is immutable once execution begins: a session or run never changes tenant, user, or installation.
+- Revoking a user, tenant, installation, or project key invalidates outstanding tokens through a short-lived revocation cache.
+- In production, token signing requires an explicit `EMBEDDED_CLIENT_TOKEN_SECRET` (or `ENCRYPTION_SECRET`); there is no fallback secret.
