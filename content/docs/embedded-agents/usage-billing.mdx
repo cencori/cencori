@@ -1,0 +1,26 @@
+---
+title: "Usage and Billing"
+description: "Tenant-attributed metering and invoice exports."
+section: "Embedded Agents"
+order: 7
+---
+
+## Attribution dimensions
+
+Every model call, embedding, search, and tool execution records project, environment, tenant, user, agent, installation, session, run, model, and provider. Pre-attribution rows (before your cutover) carry nulls rather than guesses.
+
+## Reading usage
+
+- `GET /v1/usage` — summary grouped by tenant, agent, installation, model, and day (90-day window max).
+- `GET /v1/usage/events` — paginated attributed rows for debugging and support.
+- `GET /v1/usage/export?format=csv` — invoice-quality export grouped by tenant and agent (5,000-row cap, `truncated` flag when hit). Narrow with `tenant_id` / `agent_id`.
+
+## Budgets and limits
+
+- **Rate/concurrency** (`EMBEDDED_LIMITS`, per tier): run creation returns `429` with `Retry-After` when per-scope rates or concurrent-run caps trip. Bursty tenants are isolated by fair scheduling — one tenant cannot starve the project queue.
+- **Spend budgets**: installations (`budget: { max_spend_usd, window_days }`) and tenants (`metadata.budget`) gate run creation and delegation with `402 budget_exceeded`. Session turns are metered, not gated, to protect p95 latency.
+- **Entitlements**: `embeddedAgents`, `embeddedSkillLibrary`, `embeddedSkillImport`, `embeddedRemoteMcp`, `embeddedBrowserPolicy`, `embeddedSubagents` are tier flags; count caps (`maxTenants`, `maxSkills`, …) are the enforcement mechanism.
+
+## Billing your own users
+
+Use rate plans (`/v1/rate-plans`) and end-user administration (`/v1/end-users`) plus the usage export to build your own billing UI. Cencori is not the merchant of record for your marketplace. Tiered/volume plans graduate on real month-to-date usage, including in-batch accumulation.

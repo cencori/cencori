@@ -163,6 +163,22 @@ print(f"Total Requests: {metrics.requests.total}")
 print(f"Total Cost: ${metrics.cost.total_usd}")
 ```
 
+## Embedded Agents
+
+```python
+# Multi-tenant agent backend: tenants, versions, runs, approvals, metering
+tenant = cencori.embedded.tenants.create("company_123", "Acme Ltd", idempotency_key="tenant-acme-v1")
+
+run = cencori.embedded.runs.create("agt_...", {"mode": "background", "input": {}}, idempotency_key="plan-123")
+child = cencori.embedded.runs.delegate(run["id"], "agv_analyst_v2", {"task": "Size the market"})
+
+cencori.embedded.actions.approve("act_123")
+cencori.embedded.skills.stage_import(text="# Refund policy\n\n30 days.")
+print(cencori.embedded.usage.summary(days=30))
+```
+
+Modules: `tenants`, `runs`, `actions`, `knowledge`, `skills`, `usage`, `client_tokens`, `models`, `provider_connections`, `agent_versions`, `installations`, `connections`, `mcp_servers`, `webhooks`, `end_users`, `rate_plans`. Full reference in `openapi/embedded-agents.json`.
+
 ## Error Handling
 
 ```python

@@ -1,0 +1,32 @@
+---
+title: "Actions and Approvals"
+description: "Permissioned execution with single-claim, at-most-once dispatch."
+section: "Embedded Agents"
+order: 5
+---
+
+## What an action is
+
+Any consequential tool call becomes an action: tool name, sanitized arguments (credential-looking keys are stripped before storage), risk level, tenant/run/session attribution, approval policy, and expiry. Read-only tools may execute automatically; write tools need installation permission; destructive, financial, identity, email-send, and provisioning actions require approval by default.
+
+## Lifecycle
+
+```
+pending → approved → executed | failed
+pending → rejected | expired
+```
+
+Create with `POST /v1/actions` (idempotent via `Idempotency-Key`, scoped to your project — the same key elsewhere is a different action). Decide with `POST /v1/actions/:id/approve` or `/reject`. Both decisions are idempotent: replays return the recorded outcome with `deduped: true`. Terminal states conflict with `409`; expired actions return `410` and can never be revived.
+
+## Delivery semantics: single-claim, at-most-once
+
+Exactly one approver wins the `pending → approved` claim; that winner dispatches once, and concurrent approvers get the recorded outcome instead of a second side effect. This is **not** exactly-once external delivery:
+
+- A crash between the external send and the result write leaves `approved` with no recorded outcome.
+- Gmail does not accept our execution key as upstream idempotency.
+
+On an ambiguous action, reconcile against the upstream outbox (Gmail sent folder, MCP server logs) before creating a **replacement action with a new key** — never reuse a key with a different body (that is `409 idempotency_conflict` by design).
+
+## Session approvals
+
+Session pauses (`turn.paused`) resolve through the session endpoints and mirror into the actions index, so one timeline covers both. Approval requires the full `tool_results` set; the resume replays tool outputs back into the model and continues the turn.

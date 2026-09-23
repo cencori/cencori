@@ -34,6 +34,31 @@ console.log(response.content);
 | **Web** | ✅ Available | First-party fetch, extraction, crawl, and evidence-bearing search |
 | **Billing** | ✅ Available | End-user usage monetization and Stripe integration |
 | **Integration** | ✅ Available | SDKs, Vercel AI, TanStack |
+| **Embedded Agents** | ✅ Available | Multi-tenant agent backend: tenants, versions, runs, approvals, metering |
+
+## Embedded Agents
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+// Tenants → install → scoped session
+const tenant = await cencori.tenants.create({ external_id: 'company_123', name: 'Acme Ltd' });
+await cencori.installations.create({ tenant_id: tenant.id, agent_id: 'agt_...', version: '1.0.0' });
+const { token } = await cencori.clientTokens.mint({ tenant_id: tenant.id, external_user_id: 'u_1' });
+
+// Background run with idempotency, then approve once
+const run = await cencori.runs.create('agt_...', { installation_id: 'ins_...', mode: 'background', input: {} }, 'plan-123');
+await cencori.actions.approve('act_...');
+
+// Skills, MCP, usage
+await cencori.skills.create({ name: 'Refund policy' });
+await cencori.mcpServers.register({ name: 'CRM', url: 'https://mcp.example.com/mcp' });
+const csv = await cencori.usage.exportCsv({ days: 30, tenant_id: tenant.id });
+```
+
+Namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. Full reference in `openapi/embedded-agents.json`.
 
 ## AI Gateway
 
