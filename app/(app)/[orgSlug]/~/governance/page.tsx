@@ -13,6 +13,7 @@ import CheckmarkBadge01Icon from "@hugeicons/core-free-icons/CheckmarkBadge01Ico
 import { FeatureUpgradeWall } from "@/components/billing/FeatureUpgradeWall";
 import { hasFeature, type SubscriptionTier, type TierFeatures } from "@/lib/entitlements";
 import { supabase } from "@/lib/supabaseClient";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 
 // ── types ────────────────────────────────────────────────────────────────────
 interface Predicate { field: string; equals?: unknown; gte?: number; gt?: number; lte?: number; lt?: number; present?: boolean; matches?: string; in?: unknown[] }
@@ -203,7 +204,7 @@ export default function GovernanceConsole({ params }: { params: Promise<{ orgSlu
                     Policy enforcement, human approvals, and the immutable, verifiable audit ledger for {org?.name ?? "your organization"}.
                 </p>
                 <a
-                    href="/docs/security/governance"
+                    href={getMainSiteUrl("/docs/security/governance")}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"

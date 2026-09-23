@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkEgress, intersectNetworkPolicy } from '@/lib/embedded/net-policy';
+import { canonicalAllowedHost, checkEgress, intersectNetworkPolicy } from '@/lib/embedded/net-policy';
 
 describe('network policy intersection', () => {
     it('denies when either side is none', () => {
@@ -23,6 +23,36 @@ describe('network policy intersection', () => {
         );
         expect(policy.allowed_hosts).toEqual(['*.example.com']);
     });
+
+    it('keeps the narrower host when wildcard and exact entries overlap', () => {
+        const policy = intersectNetworkPolicy(
+            { network: { mode: 'allowlist', allowed_hosts: ['*.example.com'] } },
+            { network: { mode: 'allowlist', allowed_hosts: ['api.example.com'] } },
+        );
+        expect(policy.allowed_hosts).toEqual(['api.example.com']);
+        expect(intersectNetworkPolicy(
+            { network: { mode: 'allowlist', allowed_hosts: ['api.example.com'] } },
+            { network: { mode: 'allowlist', allowed_hosts: ['*.example.com'] } },
+        ).allowed_hosts).toEqual(['api.example.com']);
+    });
+
+    it('keeps the narrower wildcard and excludes unrelated suffixes', () => {
+        const policy = intersectNetworkPolicy(
+            { network: { mode: 'allowlist', allowed_hosts: ['*.example.com'] } },
+            { network: { mode: 'allowlist', allowed_hosts: ['*.us.example.com', '*.other.com'] } },
+        );
+        expect(policy.allowed_hosts).toEqual(['*.us.example.com']);
+    });
+
+    it('does not widen an exact host to another port', () => {
+        expect(canonicalAllowedHost('https://api.example.com:8443')).toBe('api.example.com:8443');
+        expect(canonicalAllowedHost('http://api.example.com')).toBeNull();
+        expect(canonicalAllowedHost('api.example.com/path')).toBeNull();
+        expect(intersectNetworkPolicy(
+            { network: { mode: 'allowlist', allowed_hosts: ['api.example.com:8443'] } },
+            { network: { mode: 'allowlist', allowed_hosts: ['api.example.com'] } },
+        ).allowed_hosts).toEqual([]);
+    });
 });
 
 describe('egress decisions (default-deny)', () => {
@@ -44,5 +74,11 @@ describe('egress decisions (default-deny)', () => {
 
     it('denies everything in none mode', async () => {
         expect((await checkEgress('https://api.example.com/', { mode: 'none', allowed_hosts: [] })).allowed).toBe(false);
+    });
+
+    it('denies non-HTTPS requests and unlisted ports', async () => {
+        const policy = { mode: 'allowlist' as const, allowed_hosts: ['api.example.com'] };
+        expect((await checkEgress('http://api.example.com/', policy)).allowed).toBe(false);
+        expect((await checkEgress('https://api.example.com:8443/', policy)).allowed).toBe(false);
     });
 });

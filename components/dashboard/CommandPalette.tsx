@@ -7,6 +7,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import ReactMarkdown from "react-markdown";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
 import {
   Search,
@@ -488,7 +489,7 @@ export function CommandPalette({
           id: "docs-home",
           label: "Documentation",
           icon: <Book className="h-3.5 w-3.5" />,
-          action: () => navigate("/docs"),
+          action: () => openExternal(getMainSiteUrl("/docs")),
           keywords: ["help", "learn", "guide"],
         },
         {
@@ -502,28 +503,28 @@ export function CommandPalette({
           id: "quick-start",
           label: "Quick Start Guide",
           icon: <ArrowUpCircleIcon className="h-3.5 w-3.5" />,
-          action: () => navigate("/docs/quick-start"),
+          action: () => openExternal(getMainSiteUrl("/docs/quick-start")),
           keywords: ["getting started", "tutorial", "begin"],
         },
         {
           id: "api-reference",
           label: "API Reference",
           icon: <Code2 className="h-3.5 w-3.5" />,
-          action: () => navigate("/docs/api/metrics"),
+          action: () => openExternal(getMainSiteUrl("/docs/api/metrics")),
           keywords: ["endpoints", "methods", "rest", "sdk"],
         },
         {
           id: "installation",
           label: "Installation",
           icon: <FileText className="h-3.5 w-3.5" />,
-          action: () => navigate("/docs/installation"),
+          action: () => openExternal(getMainSiteUrl("/docs/installation")),
           keywords: ["setup", "npm", "install", "package"],
         },
         {
           id: "security-docs",
           label: "Security Guide",
           icon: <Lock className="h-3.5 w-3.5" />,
-          action: () => navigate("/docs/security"),
+          action: () => openExternal(getMainSiteUrl("/docs/security")),
           keywords: ["protection", "encryption", "compliance"],
         },
       ],

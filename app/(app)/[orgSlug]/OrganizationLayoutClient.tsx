@@ -32,6 +32,7 @@ import Activity03Icon from "@hugeicons/core-free-icons/Activity03Icon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import AiLockIcon from "@hugeicons/core-free-icons/AiLockIcon";
 import AiBrain02Icon from "@hugeicons/core-free-icons/AiBrain02Icon";
+import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import CreditCardAcceptIcon from "@hugeicons/core-free-icons/CreditCardAcceptIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Configuration02Icon from "@hugeicons/core-free-icons/Configuration02Icon";
@@ -57,6 +58,7 @@ import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog"
 import { useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { FeedbackMenu } from "@/components/dashboard/FeedbackMenu";
 import { getConsoleRoute } from "@/lib/console/routing";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { announceNavigationIntent } from "@/lib/navigation-intent";
 
@@ -201,6 +203,9 @@ export default function OrganizationLayoutClient({
     const headerProjectLabel = selectedProject?.name || projectSlug || "Select project";
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
+    const isEmbeddedAgents = pathname === "/embedded-agents" || pathname.endsWith("/embedded-agents");
+    const isFixedWorkspace = isPlayground || isEmbeddedAgents;
+    const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
         consoleMode ? pathname === "/settings" : scopedArea === "settings"
@@ -430,7 +435,7 @@ export default function OrganizationLayoutClient({
             ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
         { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
-        { href: scopeProjectSlug ? scopedProjectHref("embedded-agents") : orgProductHref("embedded-agents"), icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Embedded Agents" },
+        { href: scopeProjectSlug ? scopedProjectHref("embedded-agents") : orgProductHref("embedded-agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
     ];
 
     const orgItems = [
@@ -502,7 +507,7 @@ export default function OrganizationLayoutClient({
     return (
         <SidebarProvider
             defaultOpen
-            className={isPlayground ? "h-full min-h-0 overflow-hidden" : undefined}
+            className={isFixedWorkspace ? "h-full min-h-0 overflow-hidden" : undefined}
         >
             {!isProjectCreation && (
                 <Sidebar
@@ -811,7 +816,7 @@ export default function OrganizationLayoutClient({
                     </SidebarContent>
                     <SidebarFooter className="pt-1 space-y-0.5">
                         <Link
-                            href="/docs"
+                            href={docsUrl}
                             target="_blank"
                             className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
                         >
@@ -831,7 +836,7 @@ export default function OrganizationLayoutClient({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
                                 <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="/docs/troubleshooting" className="flex justify-between w-full items-center">
+                                    <Link href={getMainSiteUrl("/docs/troubleshooting")} className="flex justify-between w-full items-center">
                                         Troubleshooting
                                         <Wrench className="h-3.5 w-3.5 shrink-0" />
                                     </Link>
@@ -925,7 +930,7 @@ export default function OrganizationLayoutClient({
             <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
                 <div
                     key={pathname}
-                    className={isPlayground
+                    className={isFixedWorkspace
                         ? "flex min-h-0 flex-1 flex-col overflow-hidden animate-fade-in"
                         : "animate-fade-in"
                     }

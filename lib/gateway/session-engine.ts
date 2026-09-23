@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import type { NetworkPolicy } from '@/lib/embedded/net-policy';
 import { streamGatewayChat } from '@/lib/gateway/chat-executor';
 import {
     resolveGatewayProvider,
@@ -39,6 +40,8 @@ export type TurnExecuteParams = {
     model: string;
     instructions?: string;
     tools?: ResponsesTool[];
+    /** Effective published-version ∩ installation host policy for built-in Web results. */
+    networkPolicy?: NetworkPolicy;
     tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string };
     temperature?: number;
     max_output_tokens?: number;
@@ -529,7 +532,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         const messages: UnifiedMessage[] = [...history, ...inputMessages];
 
         const pre = builtInTools.length > 0
-            ? await preProcessBuiltInTools(inputText, builtInTools, gatewayCtx.projectId)
+            ? await preProcessBuiltInTools(inputText, builtInTools, gatewayCtx.projectId, params.networkPolicy)
             : { systemContext: '', toolOutputs: [] as ToolCallOutput[] };
 
         if (pre.systemContext) {

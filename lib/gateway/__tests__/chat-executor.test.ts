@@ -188,6 +188,26 @@ describe('executeGatewayChat failover', () => {
         expect(mockTriggerFallbackWebhook).toHaveBeenCalled();
     });
 
+    it('makes only one charge-sensitive provider attempt without fallback', async () => {
+        const primaryChat = vi.fn().mockRejectedValue(new Error('provider unavailable'));
+        const fallbackChat = vi.fn().mockResolvedValue(mockResponse('must not run'));
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 3 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            singleProviderAttempt: true,
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai', model: 'gpt-4o',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => true, getProvider: () => ({ chat: fallbackChat, getPricing: vi.fn() }) },
+            } as never,
+        })).rejects.toThrow('provider unavailable');
+        expect(primaryChat).toHaveBeenCalledTimes(1);
+        expect(fallbackChat).not.toHaveBeenCalled();
+    });
+
     it('skips primary when circuit is open and uses fallback', async () => {
         // Scoped key: opening 'openai' alone no longer gates anything, which is the containment
         // this test now pins — only the failing provider+model pair is short-circuited.

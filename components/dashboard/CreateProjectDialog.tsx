@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { slugify } from "@/lib/utils";
 import { isReservedProjectSlug } from "@/lib/reserved-slugs";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -316,7 +317,7 @@ export function CreateProjectDialog({
                                         </Select>
                                         <p className="text-[11px] text-muted-foreground">
                                             Select the edge region for your AI requests.{" "}
-                                            <Link href="/docs/concepts/regions" className="text-primary hover:underline">
+                                            <Link href={getMainSiteUrl("/docs/concepts/regions")} className="text-primary hover:underline">
                                                 Learn more
                                             </Link>
                                         </p>

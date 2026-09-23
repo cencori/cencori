@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         p_reviewed_by: body.reviewed_by ?? null,
         p_set_stable: true,
         p_skill_version_ids: manifest.skills.map((s) => s.skill_version_id.replace(/^(skv_)/, '')),
-        p_subagents: manifest.subagents.map((s) => ({ agent_version_id: s.agent_version_id.replace(/^(agv_)/, ''), max_calls: s.max_calls })),
+        p_subagents: manifest.subagents.map((s) => ({ agent_version_id: s.agent_version_id.replace(/^(agv_)/, ''), max_calls: s.max_calls, timeout_ms: s.timeout_ms, budget_limit: s.budget_limit })),
     });
     if (error) {
         return addGatewayHeaders(mapReviewError(error.message, requestId), { requestId });

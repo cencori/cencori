@@ -166,7 +166,7 @@ export class AgentVersionsNamespace {
     publish(agentId: string, version: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/publish`, {});
     }
-    test(agentId: string, version: string, params?: { input?: string }): Promise<unknown> {
+    test(agentId: string, version: string, params?: { input?: string; test_connection_ids?: string[] }): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/test`, params ?? {});
     }
     deprecate(agentId: string, version: string): Promise<unknown> {
@@ -221,7 +221,7 @@ export class RunsNamespace {
     cancel(runId: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/runs/${runId}/cancel`, {});
     }
-    delegate(runId: string, params: { agent_version_id: string; input?: unknown }, idempotencyKey?: string): Promise<unknown> {
+    delegate(runId: string, params: { agent_version_id: string; input?: unknown; installation_id?: string }, idempotencyKey?: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/runs/${runId}/delegate`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
     }
 }

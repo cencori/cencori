@@ -119,7 +119,7 @@ export class CohereProvider extends AIProvider {
                     temperature: request.temperature ?? 0.7,
                     max_tokens: request.maxTokens,
                 }),
-                signal: AbortSignal.timeout(55_000),
+                signal: request.signal ? AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]) : AbortSignal.timeout(55_000),
             });
 
             if (!response.ok) {

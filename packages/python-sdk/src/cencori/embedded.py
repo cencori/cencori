@@ -66,9 +66,11 @@ class RunsModule:
         """Cancel a run (cascades to child runs)."""
         return self._client._request("POST", f"/v1/runs/{run_id}/cancel", json={})
 
-    def delegate(self, run_id: str, agent_version_id: str, payload: Optional[Dict[str, Any]] = None, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+    def delegate(self, run_id: str, agent_version_id: str, payload: Optional[Dict[str, Any]] = None, idempotency_key: Optional[str] = None, installation_id: Optional[str] = None) -> Dict[str, Any]:
         """Delegate one bounded task to an allowed subagent version."""
         body: Dict[str, Any] = {"agent_version_id": agent_version_id, "input": payload or {}}
+        if installation_id:
+            body["installation_id"] = installation_id
         headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
         return self._client._request("POST", f"/v1/runs/{run_id}/delegate", json=body, headers=headers)
 
@@ -340,9 +342,14 @@ class AgentVersionsModule:
         """Validate manifest and capabilities."""
         return self._client._request("POST", f"/v1/agents/{agent_id}/versions/{version}/validate", json={})
 
-    def test(self, agent_id: str, version: str, input: Optional[str] = None) -> Dict[str, Any]:
-        """Sandboxed draft test (no persistence)."""
-        return self._client._request("POST", f"/v1/agents/{agent_id}/versions/{version}/test", json={"input": input} if input else {})
+    def test(self, agent_id: str, version: str, input: Optional[str] = None, test_connection_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Sandboxed model test with dependency readiness checks; stores test evidence."""
+        body: Dict[str, Any] = {}
+        if input:
+            body["input"] = input
+        if test_connection_ids is not None:
+            body["test_connection_ids"] = test_connection_ids
+        return self._client._request("POST", f"/v1/agents/{agent_id}/versions/{version}/test", json=body)
 
     def submit(self, agent_id: str, version: str) -> Dict[str, Any]:
         """Submit for review."""

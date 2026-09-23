@@ -65,9 +65,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ importId: 
         skillId = (skill as { id: string }).id;
     } else {
         if (!body.name?.trim()) return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'name is required to create the skill', { requestId }), { requestId });
-        const visibility = body.visibility ?? 'private';
+        const visibility = body.visibility ?? (importRow.tenant_id ? 'tenant' : 'private');
         if (!['private', 'tenant', 'public'].includes(visibility)) {
             return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Invalid visibility', { requestId }), { requestId });
+        }
+        if ((visibility === 'tenant') !== Boolean(importRow.tenant_id)) {
+            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Tenant visibility and tenant ownership must agree', { requestId }), { requestId });
         }
         const { data: skill, error: skillError } = await supabase
             .from('skills')

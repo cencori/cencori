@@ -51,7 +51,7 @@ export class GeminiProvider extends AIProvider {
             });
 
             // Send the message
-            const result = await chat.sendMessage(prompt);
+            const result = await chat.sendMessage(prompt, { signal: request.signal });
             const response = result.response;
             const text = response.text();
 
