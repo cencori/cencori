@@ -25,7 +25,7 @@ export class AuthenticationError extends CencoriError {
 }
 
 export class RateLimitError extends CencoriError {
-    constructor(message = 'Rate limit exceeded') {
+    constructor(message = 'Rate limit exceeded', public retryAfterSeconds?: number | null) {
         super(message, 429, 'RATE_LIMIT_EXCEEDED');
         this.name = 'RateLimitError';
         Object.setPrototypeOf(this, RateLimitError.prototype);

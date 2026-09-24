@@ -4,7 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
 import { resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
 import { appendRunEvent, canTransition, emitEmbeddedEvent } from '@/lib/embedded/runs';
-import { decodeRunRequest, encodeRunRequest, isRunResponseFormat } from '@/lib/embedded/run-request';
+import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody } from '@/lib/embedded/run-request';
 import { validateJsonSchema, validateRunSchemaDefinition } from '@/lib/embedded/json-schema';
 import { waitUntil } from '@vercel/functions';
 import crypto from 'crypto';
@@ -290,9 +290,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         const { data: existing } = await supabase.from('embedded_runs').select('*').eq('project_id', validation.context.projectId).eq('idempotency_key', idempotencyKey).maybeSingle();
         if (existing) {
             const stored = (existing as { input_ref: unknown }).input_ref;
-            const sameBody = JSON.stringify(stored) === JSON.stringify(persistedRequest)
-                || (JSON.stringify(stored) === JSON.stringify(input) && body.response_format === undefined && (body.mode ?? 'background') === 'background');
-            if (!sameBody) {
+            // Stable comparison: jsonb round-trips do not preserve key order,
+            // so plain JSON.stringify can falsely report identical bodies as
+            // different (see SDK 1.7.2 retest finding 1).
+            if (!sameRunRequestBody(stored, persistedRequest)) {
                 return addGatewayHeaders(embeddedError(409, 'idempotency_conflict', 'Idempotency key already used with a different body', { requestId }), { requestId });
             }
             return addGatewayHeaders(NextResponse.json(serializeRun(existing as Record<string, unknown>)), { requestId });
@@ -385,7 +386,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     if (error || !run) {
         if (error?.code === '23505' && idempotencyKey) {
             const { data: existing } = await supabase.from('embedded_runs').select('*').eq('project_id', validation.context.projectId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (existing) return addGatewayHeaders(NextResponse.json(serializeRun(existing as Record<string, unknown>)), { requestId });
+            if (existing) {
+                const stored = (existing as { input_ref: unknown }).input_ref;
+                if (!sameRunRequestBody(stored, persistedRequest)) {
+                    return addGatewayHeaders(embeddedError(409, 'idempotency_conflict', 'Idempotency key already used with a different body', { requestId }), { requestId });
+                }
+                return addGatewayHeaders(NextResponse.json(serializeRun(existing as Record<string, unknown>)), { requestId });
+            }
         }
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Failed to create run', { requestId }), { requestId });
     }

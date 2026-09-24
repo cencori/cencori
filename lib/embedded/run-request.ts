@@ -18,6 +18,62 @@ export function encodeRunRequest(input: unknown, responseFormat?: RunResponseFor
     return { [RUN_REQUEST_MARKER]: true, input, ...(responseFormat ? { response_format: responseFormat } : {}), mode };
 }
 
+/**
+ * Deterministic JSON serialization with recursively sorted object keys.
+ * Postgres `jsonb` does not preserve key insertion order (keys are stored
+ * sorted), so a plain `JSON.stringify` comparison between a freshly encoded
+ * request and a row read back from the database can report a false mismatch
+ * for semantically identical bodies. This helper mirrors `JSON.stringify`
+ * semantics (skipping `undefined`, preserving array order) while sorting
+ * object keys so identical payloads compare equal regardless of storage
+ * round-trip ordering.
+ */
+export function stableStringify(value: unknown): string {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+    // Respect toJSON (e.g. Date) exactly like JSON.stringify does.
+    const maybeJson = value as { toJSON?: unknown };
+    if (typeof maybeJson.toJSON === 'function') {
+        try {
+            return stableStringify((maybeJson.toJSON as () => unknown).call(value));
+        } catch {
+            return JSON.stringify(value) ?? 'null';
+        }
+    }
+    if (Array.isArray(value)) return `[${value.map((entry) => stableStringify(entry)).join(',')}]`;
+    const entries = Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol')
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(',')}}`;
+}
+
+/**
+ * Idempotency body comparison: true when a stored `input_ref` matches the
+ * freshly encoded request, tolerating key-order normalization from `jsonb`
+ * round-trips. Also accepts legacy rows that stored only the raw input.
+ */
+export function sameRunRequestBody(stored: unknown, persistedRequest: Record<string, unknown>): boolean {
+    try {
+        if (stableStringify(stored) === stableStringify(persistedRequest)) return true;
+    } catch {
+        return false;
+    }
+    // Legacy rows (pre-envelope) stored only the raw input.
+    const decoded = decodeRunRequest(stored);
+    const legacyShape = decoded.responseFormat === undefined && decoded.mode === undefined;
+    if (legacyShape) {
+        try {
+            const input = (persistedRequest as Record<string, unknown>).input;
+            const mode = (persistedRequest as Record<string, unknown>).mode;
+            const hasFormat = (persistedRequest as Record<string, unknown>).response_format !== undefined;
+            return !hasFormat && (mode === undefined || mode === 'background') && stableStringify(stored) === stableStringify(input);
+        } catch {
+            return false;
+        }
+    }
+    return false;
+}
+
 export function decodeRunRequest(stored: unknown): { input: unknown; responseFormat?: RunResponseFormat; mode?: string } {
     if (stored && typeof stored === 'object' && !Array.isArray(stored) && (stored as Record<string, unknown>)[RUN_REQUEST_MARKER] === true) {
         const record = stored as Record<string, unknown>;

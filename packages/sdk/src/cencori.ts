@@ -71,6 +71,9 @@ const DEFAULT_BASE_URL = 'https://cencori.com';
 interface ErrorResponse {
     error?: string;
     reasons?: string[];
+    retry_after_ms?: unknown;
+    retry_after_seconds?: unknown;
+    retry_after?: unknown;
 }
 
 export class Cencori {
@@ -383,7 +386,18 @@ export class Cencori {
                     throw new AuthenticationError(errorData.error || 'Invalid API key');
                 }
                 if (response.status === 429) {
-                    throw new RateLimitError(errorData.error || 'Rate limit exceeded');
+                    const rawRetryAfter = response.headers.get('Retry-After') ?? response.headers.get('retry-after');
+                    const parsed = rawRetryAfter ? Number.parseInt(rawRetryAfter.trim(), 10) : NaN;
+                    let retryAfterSeconds: number | null = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+                    if (retryAfterSeconds == null) {
+                        const secHint = errorData.retry_after_seconds ?? errorData.retry_after;
+                        if (typeof secHint === 'number' && Number.isFinite(secHint) && secHint >= 0) {
+                            retryAfterSeconds = Math.ceil(secHint);
+                        } else if (typeof errorData.retry_after_ms === 'number' && Number.isFinite(errorData.retry_after_ms) && (errorData.retry_after_ms as number) >= 0) {
+                            retryAfterSeconds = Math.ceil((errorData.retry_after_ms as number) / 1000);
+                        }
+                    }
+                    throw new RateLimitError(errorData.error || 'Rate limit exceeded', retryAfterSeconds);
                 }
                 if (response.status === 400 && errorData.reasons) {
                     throw new SafetyError(errorData.error, errorData.reasons);

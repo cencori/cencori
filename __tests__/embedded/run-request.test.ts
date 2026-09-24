@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeRunRequest, encodeRunRequest, isRunResponseFormat } from '@/lib/embedded/run-request';
+import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody, stableStringify } from '@/lib/embedded/run-request';
 import { dePrefixId, withPrefix } from '@/lib/embedded/http';
 import { TENANT_PREFIX, USER_PREFIX } from '@/lib/embedded/types';
 
@@ -38,5 +38,21 @@ describe('run request persistence', () => {
     it('rejects malformed schema requests', () => {
         expect(isRunResponseFormat({ type: 'json_schema', json_schema: {} })).toBe(false);
         expect(isRunResponseFormat(format)).toBe(true);
+    });
+
+    it('compares idempotency bodies independent of key order (jsonb round-trip)', () => {
+        const input = { b: 1, a: { y: 2, x: 1 }, prompt: 'hello' };
+        const encoded = encodeRunRequest(input, undefined, 'background');
+        // Simulate Postgres jsonb key reordering on read-back.
+        const reordered = { mode: 'background', input: { prompt: 'hello', a: { x: 1, y: 2 }, b: 1 }, __cencori_run_request_v1: true };
+        expect(JSON.stringify(encoded) === JSON.stringify(reordered)).toBe(false);
+        expect(stableStringify(encoded)).toBe(stableStringify(reordered));
+        expect(sameRunRequestBody(reordered, encoded)).toBe(true);
+    });
+
+    it('rejects genuinely different bodies', () => {
+        const a = encodeRunRequest({ prompt: 'one' }, undefined, 'background');
+        const b = encodeRunRequest({ prompt: 'two' }, undefined, 'background');
+        expect(sameRunRequestBody(b, a)).toBe(false);
     });
 });
