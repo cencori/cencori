@@ -92,7 +92,11 @@ async function executeRun(runId: string): Promise<void> {
         const inputText = JSON.stringify(input);
         if (run.installation_id) {
             const { data: bindings } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', run.installation_id);
-            try {
+            // Skip the embedding call entirely when nothing is bound — it is
+            // billed work with no retrieval to serve.
+            if (!bindings || (bindings as Array<{ knowledge_base_id: string }>).length === 0) {
+                // No knowledge bound; citations stay empty.
+            } else try {
                 const { embedForMemory } = await import('@/lib/memory/embeddings');
                 const embedded = await embedForMemory(supabase as never, run.project_id, organizationId, inputText.slice(-2000));
                 const vector = `[${embedded.embeddings[0].join(',')}]`;

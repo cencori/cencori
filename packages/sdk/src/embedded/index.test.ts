@@ -94,4 +94,15 @@ describe('embedded SDK request diagnostics', () => {
         const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
         expect(error.retryAfterSeconds).toBe(10);
     });
+
+    it('preserves gateway top-level code and retry hints', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: 'Rate limit exceeded', code: 'rate_limit_exceeded', retry_after_ms: 60000,
+        }), { status: 429, headers: { 'Retry-After': '60', 'X-Request-Id': 'req_gw_1' } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.status).toBe(429);
+        expect(error.code).toBe('rate_limit_exceeded');
+        expect(error.retryAfterSeconds).toBe(60);
+        expect(error.requestId).toBe('req_gw_1');
+    });
 });

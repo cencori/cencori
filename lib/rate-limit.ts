@@ -104,14 +104,22 @@ export async function checkCustomRateLimit(
         return { allowed: flags.rateLimitFailOpen, remaining: flags.rateLimitFailOpen ? limit : 0, reset: now + windowSeconds * 1000 };
     }
     try {
+        // Fixed window: the expiry is set once when the window opens and is
+        // never refreshed — not even by rejected requests. Refreshing on every
+        // hit (INCR + unconditional EXPIRE) turns the "1 minute" limit into an
+        // indefinite block under sustained low-rate traffic.
         const redisKey = `policy_rate_limit:${key}`;
         const pipeline = client.pipeline();
         pipeline.incr(redisKey);
-        pipeline.expire(redisKey, windowSeconds);
         pipeline.ttl(redisKey);
-        const results = await pipeline.exec<[number, number, number]>();
+        const results = await pipeline.exec<[number, number]>();
         const requests = results[0];
-        const ttl = results[2] > 0 ? results[2] : windowSeconds;
+        let ttl = results[1];
+        if (requests === 1 || ttl < 0) {
+            await client.expire(redisKey, windowSeconds);
+            ttl = windowSeconds;
+        }
+        if (!(ttl > 0)) ttl = windowSeconds;
         return { allowed: requests <= limit, remaining: Math.max(0, limit - requests), reset: now + ttl * 1000 };
     } catch {
         return { allowed: flags.rateLimitFailOpen, remaining: 0, reset: now + windowSeconds * 1000 };
@@ -157,15 +165,20 @@ export async function checkRateLimit(
     }
 
     try {
-        // Pipeline: batch all 3 Redis ops into a single HTTP round-trip
+        // Fixed window (see checkCustomRateLimit): expiry is set once when the
+        // window opens. Rejected requests must not extend the block.
         const pipeline = client.pipeline();
         pipeline.incr(key);
-        pipeline.expire(key, RATE_LIMIT_WINDOW);
         pipeline.ttl(key);
-        const results = await pipeline.exec<[number, number, number]>();
+        const results = await pipeline.exec<[number, number]>();
 
         const requests = results[0];
-        const ttl = results[2] > 0 ? results[2] : RATE_LIMIT_WINDOW;
+        let ttl = results[1];
+        if (requests === 1 || ttl < 0) {
+            await client.expire(key, RATE_LIMIT_WINDOW);
+            ttl = RATE_LIMIT_WINDOW;
+        }
+        if (!(ttl > 0)) ttl = RATE_LIMIT_WINDOW;
 
         const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - requests);
         const reset = now + (ttl * 1000);
