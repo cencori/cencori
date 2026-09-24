@@ -16,13 +16,23 @@ Every delivery carries `X-Webhook-Signature: sha256=<hex>`, `X-Webhook-Event`, a
 ```typescript
 import crypto from 'crypto';
 
-function verifyWebhook(rawBody: string, signature: string, secret: string): boolean {
+function verifyWebhook(
+  rawBody: string,
+  signature: string | null | undefined,
+  secret: string,
+): boolean {
+  if (!signature || !/^sha256=[0-9a-f]{64}$/i.test(signature)) return false;
+
   const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const receivedBuffer = Buffer.from(signature, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+
+  return receivedBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
 }
 ```
 
-Always verify on the **raw body bytes** before parsing — parsed-then-restringified JSON can differ in whitespace and fail the check.
+Always verify on the **raw body bytes** before parsing — parsed-then-restringified JSON can differ in whitespace and fail the check. Treat missing, malformed, or incorrectly sized signatures as an authentication failure; verification should return `false`, never throw.
 
 ## Delivery guarantees
 

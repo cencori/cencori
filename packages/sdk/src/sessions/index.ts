@@ -7,6 +7,9 @@ export interface Session {
     created_at: string;
     updated_at: string;
     agent_id: string | null;
+    tenant_id: string | null;
+    external_user_id: string | null;
+    installation_id: string | null;
     metadata: Record<string, unknown>;
     total_cost: number;
 }
@@ -23,6 +26,9 @@ export interface SessionEvent {
 
 export interface CreateSessionParams {
     agent_id?: string;
+    tenant_id?: string;
+    external_user_id?: string;
+    installation_id?: string;
     metadata?: Record<string, unknown>;
 }
 
@@ -60,6 +66,7 @@ export interface SessionListParams {
     limit?: number;
     status?: 'active' | 'paused' | 'completed' | 'failed';
     agent_id?: string;
+    tenant_id?: string;
 }
 
 export class SessionsNamespace {
@@ -99,6 +106,7 @@ export class SessionsNamespace {
         if (params?.limit) searchParams.set('limit', String(params.limit));
         if (params?.status) searchParams.set('status', params.status);
         if (params?.agent_id) searchParams.set('agent_id', params.agent_id);
+        if (params?.tenant_id) searchParams.set('tenant_id', params.tenant_id);
         const qs = searchParams.toString();
         return this.request<PaginatedResponse<Session>>('GET', `/v1/sessions${qs ? `?${qs}` : ''}`);
     }
