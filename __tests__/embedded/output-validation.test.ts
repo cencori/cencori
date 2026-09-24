@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateJsonSchema } from '@/lib/embedded/json-schema';
+import { validateJsonSchema, validateRunSchemaDefinition } from '@/lib/embedded/json-schema';
 import { verifyClientToken } from '@/lib/embedded/client-tokens';
 
 describe('json-schema output validation', () => {
@@ -29,6 +29,15 @@ describe('json-schema output validation', () => {
 
     it('rejects non-objects at the root', () => {
         expect(validateJsonSchema(schema, 'nope').length).toBeGreaterThan(0);
+    });
+
+    it('rejects additional properties when prohibited', () => {
+        expect(validateJsonSchema({ type: 'object', properties: { selected: { type: 'string' } }, required: ['selected'], additionalProperties: false }, { response: { selected: 'wrong envelope' } })).toEqual(expect.arrayContaining([expect.stringContaining('unexpected property')]));
+    });
+
+    it('rejects unsupported schema assertions instead of silently ignoring them', () => {
+        expect(validateRunSchemaDefinition({ type: 'object', properties: { selected: { type: 'string', minLength: 3 } } })).toEqual(expect.arrayContaining([expect.stringContaining('minLength')]));
+        expect(validateRunSchemaDefinition({ type: 'object', properties: { selected: { type: 'string' } }, additionalProperties: false })).toEqual([]);
     });
 });
 

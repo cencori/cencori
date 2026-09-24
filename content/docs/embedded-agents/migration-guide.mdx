@@ -25,5 +25,5 @@ If you passed `tenant_id` inside `metadata`, stop: metadata is analytics-only. C
 
 ## Limits and deletion are now enforced
 
-- Plan caps (`EMBEDDED_LIMITS`) return `402` with stable codes (`tenant_limit_exceeded`, `installation_limit_exceeded`, `run_rate_exceeded` with `Retry-After`, `run_concurrency_exceeded`).
+- Resource plan caps (`tenant_limit_exceeded`, `installation_limit_exceeded`) and spend budgets return `402`. Run rate and concurrency caps return `429` (`run_rate_exceeded`, `run_concurrency_exceeded`) with `Retry-After`.
 - `DELETE /v1/tenants/:id` now cascades (hard delete). `DELETE .../users/:id?hard=true` forgets the user including user-scoped memories.

@@ -20,6 +20,14 @@ import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError } from './errors';
 
+export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model' | 'maxTokens' | 'temperature'>) {
+    const reasoningModel = /^(?:gpt-5(?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
+    return {
+        temperature: reasoningModel ? undefined : (request.temperature ?? 0.7),
+        max_completion_tokens: request.maxTokens,
+    };
+}
+
 export class OpenAIProvider extends AIProvider {
     readonly providerName = 'openai';
     readonly supportsTools = true;
@@ -57,8 +65,7 @@ export class OpenAIProvider extends AIProvider {
             const completion = await this.client.chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
-                temperature: request.temperature ?? 0.7,
-                max_tokens: request.maxTokens,
+                ...openAICompletionLimits(request),
                 stream: false,
                 user: request.userId,
                 tools,
@@ -155,8 +162,7 @@ export class OpenAIProvider extends AIProvider {
             const stream = await this.client.chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
-                temperature: request.temperature ?? 0.7,
-                max_tokens: request.maxTokens,
+                ...openAICompletionLimits(request),
                 stream: true,
                 user: request.userId,
                 tools,

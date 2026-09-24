@@ -259,7 +259,17 @@ export async function delegateSubagent(
             clearTimeout(timer);
         }
 
-        const output = { output: response.content, model: response.model, child_version_id: childVersionId, usage: response.usage };
+        const output = {
+            type: 'result',
+            output: response.content,
+            model: response.model,
+            provider: response.provider,
+            child_version_id: childVersionId,
+            agent_version_id: childVersionId,
+            agent_version: runtime.version,
+            usage: response.usage,
+            cost: response.cost,
+        };
         // Meter the provider call even if cancellation wins the completion
         // race. A completed provider request is never free merely because the
         // child output was discarded.

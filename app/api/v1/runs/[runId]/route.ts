@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, withPrefix } from '@/lib/embedded/http';
+import { decodeRunRequest } from '@/lib/embedded/run-request';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -15,7 +16,7 @@ function serializeRun(row: Record<string, unknown>) {
         installation_id: row.installation_id ? withPrefix('ins', row.installation_id as string) : null,
         tenant_id: row.tenant_id ? withPrefix('ten', row.tenant_id as string) : null,
         external_user_id: row.external_user_id ?? null, session_id: row.session_id ?? null,
-        status: row.status, input: row.input_ref ?? {}, output: row.output_ref ?? null,
+        status: row.status, input: decodeRunRequest(row.input_ref).input, output: row.output_ref ?? null,
         error: row.error ?? null, started_at: row.started_at ?? null, completed_at: row.completed_at ?? null,
         created_at: row.created_at, updated_at: row.updated_at,
     };

@@ -49,7 +49,7 @@ Use one of these integration paths:
 Current minimum versions:
 - Cencori Web TypeScript SDK: `cencori@1.6.1`
 - Cencori Web MCP server: `@cencori/mcp@0.7.1`
-- Embedded Agents TypeScript SDK: `cencori@1.7.0`
+- Embedded Agents TypeScript SDK: `cencori@1.7.1`
 - Embedded Agents Python SDK: not yet published; use the HTTP API for Python integrations
 - Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
 

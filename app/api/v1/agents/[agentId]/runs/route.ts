@@ -4,6 +4,8 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
 import { resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
 import { appendRunEvent, canTransition, emitEmbeddedEvent } from '@/lib/embedded/runs';
+import { decodeRunRequest, encodeRunRequest, isRunResponseFormat } from '@/lib/embedded/run-request';
+import { validateJsonSchema, validateRunSchemaDefinition } from '@/lib/embedded/json-schema';
 import { waitUntil } from '@vercel/functions';
 import crypto from 'crypto';
 
@@ -21,7 +23,7 @@ function serializeRun(row: Record<string, unknown>) {
         external_user_id: row.external_user_id ?? null,
         session_id: row.session_id ?? null,
         status: row.status,
-        input: row.input_ref ?? {},
+        input: decodeRunRequest(row.input_ref).input,
         output: row.output_ref ?? null,
         error: row.error ?? null,
         started_at: row.started_at ?? null,
@@ -86,12 +88,13 @@ async function executeRun(runId: string): Promise<void> {
         // Knowledge context: embed the input and retrieve per bound KB (fallback: first chunks).
         const citations: Array<{ chunk_id: string; source_id: string; score: number }> = [];
         const contextSnippets: string[] = [];
-        const inputText = JSON.stringify(run.input_ref ?? {}).slice(0, 2000);
+        const { input, responseFormat } = decodeRunRequest(run.input_ref);
+        const inputText = JSON.stringify(input);
         if (run.installation_id) {
             const { data: bindings } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', run.installation_id);
             try {
                 const { embedForMemory } = await import('@/lib/memory/embeddings');
-                const embedded = await embedForMemory(supabase as never, run.project_id, organizationId, inputText);
+                const embedded = await embedForMemory(supabase as never, run.project_id, organizationId, inputText.slice(-2000));
                 const vector = `[${embedded.embeddings[0].join(',')}]`;
                 for (const b of (bindings ?? []) as Array<{ knowledge_base_id: string }>) {
                     const { data: hits } = await supabase.rpc('match_knowledge_chunks', {
@@ -120,8 +123,7 @@ async function executeRun(runId: string): Promise<void> {
             }
         }
 
-        const responseFormat = (run.input_ref as { response_format?: { type?: string; json_schema?: { name?: string; schema?: Record<string, unknown> } } }).response_format;
-        const wantsJson = responseFormat?.type === 'json_schema';
+        const wantsJson = Boolean(responseFormat);
 
         // Pinned skill procedures for the installed version (tenant-filtered).
         let runSkillsBlock: string | null = null;
@@ -176,7 +178,6 @@ async function executeRun(runId: string): Promise<void> {
             } catch {
                 throw new Error('Model output was not valid JSON for the requested json_schema');
             }
-            const { validateJsonSchema } = await import('@/lib/embedded/json-schema');
             const violations = validateJsonSchema(schema, parsed);
             if (violations.length > 0) {
                 throw new Error(`Model output failed response schema: ${violations.slice(0, 3).join('; ')}`);
@@ -184,7 +185,7 @@ async function executeRun(runId: string): Promise<void> {
             output = parsed;
         }
         const outputRef = {
-            type: (run.input_ref as { type?: string })?.type ?? 'result',
+            type: (input && typeof input === 'object' && !Array.isArray(input) ? (input as { type?: string }).type : undefined) ?? 'result',
             output,
             model: response.model,
             provider: response.provider,
@@ -195,6 +196,7 @@ async function executeRun(runId: string): Promise<void> {
             manifest_tools: ((runtime.config ?? {}) as { tools?: unknown }).tools ?? [],
             manifest_policy: ((runtime.config ?? {}) as { policy?: unknown }).policy ?? { browser: { enabled: false }, network: { mode: 'none', allowed_hosts: [] } },
             usage: response.usage,
+            cost: response.cost,
         };
 
         // Attribute the model call (best-effort; never fails the run).
@@ -264,12 +266,32 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     } catch {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Invalid JSON body', { requestId }), { requestId });
     }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Run request must be a JSON object', { requestId }), { requestId });
+    }
+
+    if (body.response_format !== undefined && !isRunResponseFormat(body.response_format)) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'response_format must contain a json_schema object', { requestId, param: 'response_format' }), { requestId });
+    }
+    if (isRunResponseFormat(body.response_format)) {
+        const schemaErrors = validateRunSchemaDefinition(body.response_format.json_schema.schema);
+        if (schemaErrors.length > 0) {
+            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', schemaErrors[0], { requestId, param: 'response_format.json_schema.schema' }), { requestId });
+        }
+    }
+    const input = body.input ?? {};
+    if (Buffer.byteLength(JSON.stringify(input), 'utf8') > 65_536) {
+        return addGatewayHeaders(embeddedError(413, 'input_too_large', 'Run input exceeds the 64 KiB limit', { requestId, param: 'input' }), { requestId });
+    }
+    const persistedRequest = encodeRunRequest(input, body.response_format as ReturnType<typeof decodeRunRequest>['responseFormat'], body.mode ?? 'background');
 
     const idempotencyKey = getIdempotencyKey(req.headers);
     if (idempotencyKey) {
         const { data: existing } = await supabase.from('embedded_runs').select('*').eq('project_id', validation.context.projectId).eq('idempotency_key', idempotencyKey).maybeSingle();
         if (existing) {
-            const sameBody = JSON.stringify((existing as { input_ref: unknown }).input_ref) === JSON.stringify(body.input ?? {});
+            const stored = (existing as { input_ref: unknown }).input_ref;
+            const sameBody = JSON.stringify(stored) === JSON.stringify(persistedRequest)
+                || (JSON.stringify(stored) === JSON.stringify(input) && body.response_format === undefined && (body.mode ?? 'background') === 'background');
             if (!sameBody) {
                 return addGatewayHeaders(embeddedError(409, 'idempotency_conflict', 'Idempotency key already used with a different body', { requestId }), { requestId });
             }
@@ -333,7 +355,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
         }
         const concurrency = await checkRunConcurrency(supabase as never, installationId, tenantId, tier);
         if (!concurrency.ok) {
-            return addGatewayHeaders(embeddedError(429, concurrency.code, concurrency.message, { requestId }), { requestId });
+            const res = embeddedError(429, concurrency.code, concurrency.message, { requestId });
+            res.headers.set('Retry-After', '1');
+            return addGatewayHeaders(res, { requestId });
         }
         const { checkSpendBudgets } = await import('@/lib/embedded/budgets');
         const budget = await checkSpendBudgets(supabase as never, { projectId: validation.context.projectId, tenantId, installationId, agentId });
@@ -353,7 +377,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             installation_id: installationId,
             session_id: body.session_id ?? null,
             status: 'queued',
-            input_ref: (body.input ?? {}) as Record<string, unknown>,
+            input_ref: persistedRequest,
             idempotency_key: idempotencyKey,
         })
         .select('*')

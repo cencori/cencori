@@ -34,6 +34,8 @@ function verifyWebhook(
 
 Always verify on the **raw body bytes** before parsing — parsed-then-restringified JSON can differ in whitespace and fail the check. Treat missing, malformed, or incorrectly sized signatures as an authentication failure; verification should return `false`, never throw.
 
+The HMAC covers the body, **not** `X-Webhook-Timestamp`. Do not treat the header alone as authenticated proof of freshness. After verifying the signature, parse the signed body's `timestamp`, reject events outside your allowed time window, and deduplicate by the signed `data.event_id` when present. Keep the deduplication ledger longer than your accepted time window. The header is only a convenience copy of the body timestamp.
+
 ## Delivery guarantees
 
 At-least-once with exponential backoff (2s, 4s, 8s) and 24-hour retry budget. `4xx` (other than `429`) is non-retryable; `5xx`, `429`, and network errors retry. Design every handler idempotently: deliveries (and replays) can arrive more than once. Payloads carry their own `api_version` so additive changes never break your parser.
