@@ -8,6 +8,25 @@ import {
 
 const RATE_LIMIT_WINDOW = 60; // 1 minute in seconds
 const MAX_REQUESTS_PER_WINDOW = 60; // 60 requests per minute
+/** Control-plane reads (status polls, event reads) get a roomier bucket. */
+export const MAX_READ_REQUESTS_PER_WINDOW = 300; // 300 reads per minute
+export const READ_BUCKET_SUFFIX = ':read';
+
+/** Which quota bucket a request consumes. */
+export type RateLimitTier = 'write' | 'read' | 'cancel_exempt';
+
+/**
+ * Route a request to its quota bucket. Cancellation is always exempt — the
+ * corrective action for overload must never itself be blocked by overload.
+ * Reads (polls) share a generous bucket so status checks cannot starve the
+ * write budget that run creation draws from. Everything else is a write.
+ */
+export function classifyRateLimitTier(method: string, pathname: string): RateLimitTier {
+    const normalized = pathname.toLowerCase();
+    if (method.toUpperCase() === 'POST' && normalized.endsWith('/cancel')) return 'cancel_exempt';
+    if (method.toUpperCase() === 'GET') return 'read';
+    return 'write';
+}
 
 let redis: Redis | null | undefined;
 
@@ -35,8 +54,15 @@ export interface RateLimitResult {
     remaining: number;
     reset: number; // Timestamp when the window resets
     status: 'ok' | 'skipped' | 'failed_open' | 'failed_closed';
-    reason: 'allowed' | 'limit_exceeded' | 'disabled' | 'backend_unavailable';
+    reason: 'allowed' | 'limit_exceeded' | 'disabled' | 'backend_unavailable' | 'exempt';
     errorMessage?: string;
+}
+
+export interface RateLimitBucketOptions {
+    /** Override the per-minute allowance (default: writes, 60). */
+    limit?: number;
+    /** Key suffix for a separate bucket (e.g. ':read'). */
+    keySuffix?: string;
 }
 
 export interface RateLimitTelemetryContext {
@@ -48,7 +74,8 @@ function fallbackResult(
     now: number,
     status: 'failed_open' | 'failed_closed',
     error: unknown,
-    context?: RateLimitTelemetryContext
+    context?: RateLimitTelemetryContext,
+    limit: number = MAX_REQUESTS_PER_WINDOW
 ): RateLimitResult {
     const flags = getGatewayFeatureFlags();
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -75,8 +102,8 @@ function fallbackResult(
     return {
         success: status === 'failed_open',
         allowed: status === 'failed_open',
-        limit: MAX_REQUESTS_PER_WINDOW,
-        remaining: status === 'failed_open' ? MAX_REQUESTS_PER_WINDOW : 0,
+        limit,
+        remaining: status === 'failed_open' ? limit : 0,
         reset: now + (RATE_LIMIT_WINDOW * 1000),
         status,
         reason: 'backend_unavailable',
@@ -128,9 +155,11 @@ export async function checkCustomRateLimit(
 
 export async function checkRateLimit(
     projectId: string,
-    context?: RateLimitTelemetryContext
+    context?: RateLimitTelemetryContext,
+    bucket?: RateLimitBucketOptions
 ): Promise<RateLimitResult> {
-    const key = `rate_limit:${projectId}`;
+    const limit = bucket?.limit ?? MAX_REQUESTS_PER_WINDOW;
+    const key = `rate_limit:${projectId}${bucket?.keySuffix ?? ''}`;
     const now = Date.now();
     const flags = getGatewayFeatureFlags();
 
@@ -146,8 +175,8 @@ export async function checkRateLimit(
         return {
             success: true,
             allowed: true,
-            limit: MAX_REQUESTS_PER_WINDOW,
-            remaining: MAX_REQUESTS_PER_WINDOW,
+            limit,
+            remaining: limit,
             reset: now + (RATE_LIMIT_WINDOW * 1000),
             status: 'skipped',
             reason: 'disabled',
@@ -160,7 +189,8 @@ export async function checkRateLimit(
             now,
             flags.rateLimitFailOpen ? 'failed_open' : 'failed_closed',
             new Error('Upstash Redis is not configured for rate limiting'),
-            context
+            context,
+            limit
         );
     }
 
@@ -180,17 +210,17 @@ export async function checkRateLimit(
         }
         if (!(ttl > 0)) ttl = RATE_LIMIT_WINDOW;
 
-        const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - requests);
+        const remaining = Math.max(0, limit - requests);
         const reset = now + (ttl * 1000);
 
         return {
-            success: requests <= MAX_REQUESTS_PER_WINDOW,
-            allowed: requests <= MAX_REQUESTS_PER_WINDOW,
-            limit: MAX_REQUESTS_PER_WINDOW,
+            success: requests <= limit,
+            allowed: requests <= limit,
+            limit,
             remaining,
             reset,
             status: 'ok',
-            reason: requests <= MAX_REQUESTS_PER_WINDOW ? 'allowed' : 'limit_exceeded',
+            reason: requests <= limit ? 'allowed' : 'limit_exceeded',
         };
     } catch (error) {
         return fallbackResult(

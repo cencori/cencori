@@ -29,6 +29,13 @@ vi.mock('@/lib/config-cache', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
     checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+    classifyRateLimitTier: (method: string, pathname: string) => {
+        if (method.toUpperCase() === 'POST' && pathname.toLowerCase().endsWith('/cancel')) return 'cancel_exempt';
+        if (method.toUpperCase() === 'GET') return 'read';
+        return 'write';
+    },
+    MAX_READ_REQUESTS_PER_WINDOW: 300,
+    READ_BUCKET_SUFFIX: ':read',
 }));
 
 vi.mock('@/lib/budgets', () => ({

@@ -68,6 +68,18 @@ async function loadModuleWithFake(fake: ReturnType<typeof createFakeRedis>) {
     return import('@/lib/rate-limit');
 }
 
+describe('rate limit tier classification', () => {
+    test('routes requests to write, read, or exempt buckets', async () => {
+        const mod = await import('@/lib/rate-limit');
+        expect(mod.classifyRateLimitTier('GET', '/v1/runs/run_123')).toBe('read');
+        expect(mod.classifyRateLimitTier('GET', '/V1/RUNS/RUN_123/EVENTS')).toBe('read');
+        expect(mod.classifyRateLimitTier('POST', '/v1/runs/run_123/cancel')).toBe('cancel_exempt');
+        expect(mod.classifyRateLimitTier('post', '/v1/agents/agt_1/runs')).toBe('write');
+        expect(mod.classifyRateLimitTier('POST', '/v1/agents/agt_1/runs')).toBe('write');
+        expect(mod.classifyRateLimitTier('DELETE', '/v1/sessions/ses_1')).toBe('write');
+    });
+});
+
 describe('rate limiter fixed window', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
@@ -91,6 +103,29 @@ describe('rate limiter fixed window', () => {
         } finally {
             nowSpy.mockRestore();
         }
+    });
+
+    test('read and write buckets are independent', async () => {
+        const fake = createFakeRedis();
+        const mod = await loadModuleWithFake(fake);
+        // Exhaust the 60/min write bucket...
+        for (let i = 0; i < 60; i++) {
+            const res = await mod.checkRateLimit('project-tiers', { route: '/v1/agents/a/runs' });
+            expect(res.allowed).toBe(true);
+            expect(res.limit).toBe(60);
+        }
+        const blocked = await mod.checkRateLimit('project-tiers', { route: '/v1/agents/a/runs' });
+        expect(blocked.allowed).toBe(false);
+        expect(blocked.limit).toBe(60);
+        // ...while reads on the same project still flow from their own bucket.
+        const read = await mod.checkRateLimit(
+            'project-tiers',
+            { route: '/v1/runs/r1' },
+            { limit: mod.MAX_READ_REQUESTS_PER_WINDOW, keySuffix: mod.READ_BUCKET_SUFFIX },
+        );
+        expect(read.allowed).toBe(true);
+        expect(read.limit).toBe(300);
+        expect(read.remaining).toBe(299);
     });
 
     test('rejected requests do not extend the window', async () => {
