@@ -60,10 +60,27 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as {
             error?: { message?: string; code?: string; request_id?: string; type?: string; param?: string; retry_after_ms?: unknown; retry_after?: unknown; retry_after_seconds?: unknown } | string;
+            code?: unknown; message?: unknown;
+            request_id?: unknown; requestId?: unknown;
+            type?: unknown; param?: unknown;
             retry_after_ms?: unknown; retry_after?: unknown; retry_after_seconds?: unknown;
         };
-        const message = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || response.statusText;
+        const message =
+            typeof errorData.error === 'string'
+                ? errorData.error
+                : errorData.error?.message
+                    ?? (typeof errorData.message === 'string' ? errorData.message : null)
+                    ?? response.statusText;
         const details = typeof errorData.error === 'object' ? errorData.error : null;
+        const topCode = typeof errorData.code === 'string' ? errorData.code : null;
+        const topRequestId =
+            typeof errorData.request_id === 'string'
+                ? errorData.request_id
+                : typeof errorData.requestId === 'string'
+                    ? errorData.requestId
+                    : null;
+        const topType = typeof errorData.type === 'string' ? errorData.type : null;
+        const topParam = typeof errorData.param === 'string' ? errorData.param : null;
         // Prefer the standards-compliant Retry-After response header; fall back
         // to versioned body hints (retry_after_ms / retry_after_seconds) so
         // callers can back off precisely without parsing raw responses.
@@ -85,7 +102,7 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
                 }
             }
         }
-        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? null, details?.request_id ?? response.headers.get('X-Request-Id'), details?.type ?? null, details?.param ?? null, retryAfterSeconds);
+        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? topCode, details?.request_id ?? topRequestId ?? response.headers.get('X-Request-Id'), details?.type ?? topType, details?.param ?? topParam, retryAfterSeconds);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
