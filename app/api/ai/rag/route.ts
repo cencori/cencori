@@ -112,8 +112,7 @@ async function searchMemories(
         ?? embeddingResponse.usage?.total_tokens
         ?? 0;
     const providerCostUsd = calculateProviderTokenCost(promptTokens, 0, pricing);
-    const cencoriChargeUsd = providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriChargeUsd = providerKey?.encrypted_key ? 0 : providerCostUsd;
 
     // Record the upstream embedding immediately. The provider has already
     // billed this call even if the subsequent vector lookup fails.
@@ -127,7 +126,7 @@ async function searchMemories(
         costUsd: cencoriChargeUsd,
         providerCostUsd,
         cencoriChargeUsd,
-        markupPercentage: pricing.cencoriMarkupPercentage,
+        markupPercentage: 0,
         requestPayload: promptPayload(query, { model: embeddingModel }),
         responsePayload: { embedding_dimensions: queryEmbedding.length },
     });

@@ -2,7 +2,7 @@ import type { ModelPricing, UnifiedChatResponse } from '@/lib/providers/base';
 import { ModelAccessDeniedError } from '@/lib/providers/errors';
 import { isExplicitlyFree } from '@/lib/providers/pricing';
 
-export type GatewayBillingMode = 'standard' | 'sponsored';
+export type GatewayBillingMode = 'standard' | 'sponsored' | 'byok';
 
 export const ALL_MODELS_GRANT = '*';
 
@@ -77,19 +77,26 @@ export function isFullySponsoredApiKey(
     return allowedModels.every((model) => sponsored.has(model.trim().toLowerCase()));
 }
 
+/** The upstream provider bills BYOK requests directly; Cencori bills only managed calls. */
+export function resolveProviderBillingMode(
+    accessMode: GatewayBillingMode,
+    usesByok: boolean,
+): GatewayBillingMode {
+    return accessMode === 'sponsored' ? 'sponsored' : usesByok ? 'byok' : 'standard';
+}
+
 export function calculateGatewayCharge(
     providerCostUsd: number,
-    pricing: ModelPricing,
+    _pricing: ModelPricing,
     billingMode: GatewayBillingMode,
 ): { cencoriChargeUsd: number; markupPercentage: number } {
-    if (billingMode === 'sponsored') {
+    if (billingMode !== 'standard') {
         return { cencoriChargeUsd: 0, markupPercentage: 0 };
     }
 
     return {
-        cencoriChargeUsd: providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-            + (pricing.fixedFeePerRequest ?? 0),
-        markupPercentage: pricing.cencoriMarkupPercentage,
+        cencoriChargeUsd: providerCostUsd,
+        markupPercentage: 0,
     };
 }
 
@@ -97,7 +104,7 @@ export function applyResponseBillingMode(
     response: UnifiedChatResponse,
     billingMode: GatewayBillingMode,
 ): UnifiedChatResponse {
-    if (billingMode !== 'sponsored') return response;
+    if (billingMode === 'standard') return response;
     return {
         ...response,
         cost: {

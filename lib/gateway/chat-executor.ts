@@ -23,6 +23,7 @@ import { GeminiProvider, OpenAICompatibleProvider } from '@/lib/providers';
 import {
     applyResponseBillingMode,
     assertApiKeyModelAccess,
+    resolveProviderBillingMode,
     type GatewayBillingMode,
 } from '@/lib/gateway/model-access';
 import type { GatewayPerformanceTracker } from '@/lib/gateway/performance';
@@ -276,16 +277,14 @@ export async function executeGatewayChat(params: {
         const fallbackCircuit = circuitKey(fallbackProviderName, fallbackModel);
         if (await isCircuitOpen(fallbackCircuit, cbConfig)) continue;
 
-        if (!router.hasProvider(fallbackProviderName)) {
-            const initialized = await initializeBYOKProviders(
-                router,
-                params.supabase,
-                params.projectId,
-                params.organizationId,
-                fallbackProviderName
-            );
-            if (!initialized.success) continue;
-        }
+        const initialized = await initializeBYOKProviders(
+            router,
+            params.supabase,
+            params.projectId,
+            params.organizationId,
+            fallbackProviderName
+        );
+        if (!initialized.success) continue;
 
         try {
             const fallbackProvider = router.getProvider(fallbackProviderName);
@@ -293,12 +292,13 @@ export async function executeGatewayChat(params: {
             const attemptSignal = params.request.signal
                 ? AbortSignal.any([params.request.signal, attemptController.signal])
                 : attemptController.signal;
-            const fallbackBillingMode = assertApiKeyModelAccess({
+            const fallbackAccessMode = assertApiKeyModelAccess({
                 allowedModels: params.allowedModels,
                 sponsoredModels: params.sponsoredModels,
                 provider: fallbackProviderName,
                 model: fallbackModel,
             });
+            const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
             await fallbackProvider.getPricing(fallbackModel);
             const providerResponse = await withTimeout(
                 fallbackProvider.chat({ ...chatRequest, model: fallbackModel, signal: attemptSignal }),
@@ -413,16 +413,14 @@ export async function* streamGatewayChat(params: {
                     const fallbackChain = getFallbackChain(providerName, settings.configuredFallback);
                     for (const candidate of fallbackChain) {
                         if (await isCircuitOpen(circuitKey(candidate, model), cbConfig)) continue;
-                        if (!router.hasProvider(candidate)) {
-                            const initialized = await initializeBYOKProviders(
-                                router,
-                                params.supabase,
-                                params.projectId,
-                                params.organizationId,
-                                candidate
-                            );
-                            if (!initialized.success) continue;
-                        }
+                        const initialized = await initializeBYOKProviders(
+                            router,
+                            params.supabase,
+                            params.projectId,
+                            params.organizationId,
+                            candidate
+                        );
+                        if (!initialized.success) continue;
 
                         const fallbackProvider = router.getProvider(candidate);
                         const fallbackModel = await getFallbackModel(
@@ -430,12 +428,13 @@ export async function* streamGatewayChat(params: {
                             candidate,
                             settings.configuredFallbackModel
                         );
-                        const billingMode = assertApiKeyModelAccess({
+                        const accessMode = assertApiKeyModelAccess({
                             allowedModels: params.allowedModels,
                             sponsoredModels: params.sponsoredModels,
                             provider: candidate,
                             model: fallbackModel,
                         });
+                        const billingMode = resolveProviderBillingMode(accessMode, initialized.usesByok);
                         await fallbackProvider.getPricing(fallbackModel);
                         hedgeFallbackProviderName = candidate;
                         hedgeFallbackModel = fallbackModel;
@@ -556,26 +555,25 @@ export async function* streamGatewayChat(params: {
         const fallbackCircuit = circuitKey(fallbackProviderName, fallbackModel);
         if (await isCircuitOpen(fallbackCircuit, cbConfig)) continue;
 
-        if (!router.hasProvider(fallbackProviderName)) {
-            const initialized = await initializeBYOKProviders(
-                router,
-                params.supabase,
-                params.projectId,
-                params.organizationId,
-                fallbackProviderName
-            );
-            if (!initialized.success) continue;
-        }
+        const initialized = await initializeBYOKProviders(
+            router,
+            params.supabase,
+            params.projectId,
+            params.organizationId,
+            fallbackProviderName
+        );
+        if (!initialized.success) continue;
 
         let fallbackEmitted = false;
         try {
             const fallbackProvider = router.getProvider(fallbackProviderName);
-            const fallbackBillingMode = assertApiKeyModelAccess({
+            const fallbackAccessMode = assertApiKeyModelAccess({
                 allowedModels: params.allowedModels,
                 sponsoredModels: params.sponsoredModels,
                 provider: fallbackProviderName,
                 model: fallbackModel,
             });
+            const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
             await fallbackProvider.getPricing(fallbackModel);
             params.performance?.markProviderStart();
             const stream = fallbackProvider.stream({ ...chatRequest, model: fallbackModel });

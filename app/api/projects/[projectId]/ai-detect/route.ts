@@ -5,8 +5,6 @@ import { decryptApiKey } from '@/lib/encryption';
 import {
     calculateTokenCharge,
     chargeProjectUsageCredits,
-    parseCreditsBalance,
-    shouldEnforceProjectCredits,
 } from '@/lib/project-credit-billing';
 import { requireTierFeatureForProject } from '@/lib/require-tier-feature';
 
@@ -101,25 +99,12 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         };
         const tier = organization?.subscription_tier || 'free';
         const billingFrozen = Boolean(organization?.billing_frozen);
-        const creditsBalance = parseCreditsBalance(organization?.credits_balance);
-        const shouldEnforceCredits = shouldEnforceProjectCredits(tier);
 
         if (billingFrozen) {
             return NextResponse.json(
                 {
                     error: 'Billing account frozen',
                     message: 'Billing is currently frozen for this organization. Contact support.',
-                },
-                { status: 403 }
-            );
-        }
-
-        if (shouldEnforceCredits && creditsBalance <= 0) {
-            return NextResponse.json(
-                {
-                    error: 'Credit balance exhausted',
-                    message: 'Your organization has run out of credits. Top up to continue.',
-                    balance: 0,
                 },
                 { status: 403 }
             );
@@ -185,7 +170,8 @@ ${detectionPrompt}`;
             provider,
             result.model,
             result.usage.promptTokens,
-            result.usage.completionTokens
+            result.usage.completionTokens,
+            true,
         );
 
         const charged = await chargeProjectUsageCredits(

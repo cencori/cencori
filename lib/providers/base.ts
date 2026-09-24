@@ -115,7 +115,7 @@ export interface TokenUsage {
 export interface CostBreakdown {
     providerCostUsd: number;     // Actual cost from provider
     cencoriChargeUsd: number;    // Amount we charge the customer
-    markupPercentage: number;    // Markup applied
+    markupPercentage: number;    // Legacy response field; always zero for Cencori charges
 }
 
 /**
@@ -158,6 +158,7 @@ export interface StreamChunk {
 export interface ModelPricing {
     inputPer1KTokens: number;
     outputPer1KTokens: number;
+    /** Legacy pricing field retained for compatibility; gateway charging ignores it. */
     cencoriMarkupPercentage: number;
     /** Discounted provider rate for cached prompt tokens, when reported. */
     cachedInputPer1KTokens?: number;
@@ -175,7 +176,7 @@ export interface ModelPricing {
     longContextCachedInputPer1KTokens?: number;
     /** Review deadline for temporary/promotional pricing. */
     pricingExpiresAt?: string;
-    /** Optional fixed platform fee charged once per provider request. */
+    /** Legacy platform-fee field retained for compatibility; gateway charging ignores it. */
     fixedFeePerRequest?: number;
 }
 
@@ -319,12 +320,5 @@ export abstract class AIProvider {
         cached?: CachedTokenUsage
     ): number {
         return calculateProviderTokenCost(promptTokens, completionTokens, pricing, cached);
-    }
-
-    /**
-     * Apply markup to provider cost
-     */
-    protected applyMarkup(providerCost: number, markupPercentage: number): number {
-        return providerCost * (1 + markupPercentage / 100);
     }
 }

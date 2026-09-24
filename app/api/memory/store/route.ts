@@ -221,9 +221,8 @@ export async function POST(req: NextRequest) {
             totalTokens = embeddingResponse.usage?.total_tokens ?? promptTokens;
 
             providerCost = calculateProviderTokenCost(totalTokens, 0, pricing);
-            cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-                + (pricing.fixedFeePerRequest ?? 0);
-            markupPercentage = pricing.cencoriMarkupPercentage;
+            cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
+            markupPercentage = 0;
         }
 
         const { data: memory, error: storeError } = await supabase

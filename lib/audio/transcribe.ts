@@ -57,6 +57,7 @@ export interface TranscriptionResult {
     words?: TranscriptWord[];
     provider: STTProvider;
     model: string;
+    usesByok?: boolean;
 }
 
 /** Thrown for caller-fixable problems so the route can map to a 4xx. */
@@ -132,7 +133,7 @@ const ENV_KEYS: Record<STTProvider, string | undefined> = {
     groq: process.env.GROQ_API_KEY,
 };
 
-async function getProviderKey(ctx: GatewayContext, provider: STTProvider): Promise<string | null> {
+async function getProviderKey(ctx: GatewayContext, provider: STTProvider): Promise<{ key: string; usesByok: boolean } | null> {
     const { data: providerKey } = await ctx.supabase
         .from('provider_keys')
         .select('encrypted_key, is_active')
@@ -142,9 +143,10 @@ async function getProviderKey(ctx: GatewayContext, provider: STTProvider): Promi
         .maybeSingle();
 
     if (providerKey?.encrypted_key) {
-        return decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
+        return { key: decryptApiKey(providerKey.encrypted_key, ctx.organizationId), usesByok: true };
     }
-    return ENV_KEYS[provider] ?? null;
+    const key = ENV_KEYS[provider];
+    return key ? { key, usesByok: false } : null;
 }
 
 // ── Public entry point ──────────────────────────────────────────
@@ -159,10 +161,11 @@ export async function transcribeAudio(ctx: GatewayContext, req: TranscribeReques
 
     const { provider, model } = resolveProviderModel(req);
 
-    const apiKey = await getProviderKey(ctx, provider);
-    if (!apiKey) {
+    const providerKey = await getProviderKey(ctx, provider);
+    if (!providerKey) {
         throw new TranscribeRequestError('provider_not_configured', `No ${provider} API key configured`, 400);
     }
+    const apiKey = providerKey.key;
 
     const diarize = req.diarize === true && STT_MODELS[model].diarization;
 
@@ -194,7 +197,7 @@ export async function transcribeAudio(ctx: GatewayContext, req: TranscribeReques
     if (!Number.isFinite(result.durationSeconds) || result.durationSeconds <= 0) {
         throw new TranscribeRequestError('provider_error', `${provider} did not return a billable audio duration`, 502);
     }
-    return result;
+    return { ...result, usesByok: providerKey.usesByok };
 }
 
 // ── Provider adapters ───────────────────────────────────────────

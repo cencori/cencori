@@ -128,7 +128,15 @@ export async function POST(request: NextRequest, context: RouteParams) {
             );
         }
 
-        if (shouldEnforceCredits && creditsBalance <= 0) {
+        const { data: providerKey } = await adminClient
+            .from('provider_keys')
+            .select('encrypted_key')
+            .eq('project_id', projectId)
+            .eq('provider', 'openai')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (shouldEnforceCredits && creditsBalance <= 0 && !providerKey?.encrypted_key) {
             return NextResponse.json(
                 {
                     error: "Credit balance exhausted",
@@ -195,13 +203,6 @@ export async function POST(request: NextRequest, context: RouteParams) {
 
         // Generate embeddings and atomically persist/bill each completed batch.
         const pricing = await getPricingFromDB('openai', 'text-embedding-3-small');
-        const { data: providerKey } = await adminClient
-            .from('provider_keys')
-            .select('encrypted_key')
-            .eq('project_id', projectId)
-            .eq('provider', 'openai')
-            .eq('is_active', true)
-            .maybeSingle();
         const openaiKey = providerKey?.encrypted_key
             ? decryptApiKey(providerKey.encrypted_key, project.organization_id)
             : process.env.OPENAI_API_KEY;
@@ -283,10 +284,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
             }
 
             const providerCostUsd = calculateProviderTokenCost(embeddingTokens, 0, pricing);
-            const cencoriChargeUsd = shouldEnforceCredits
-                ? providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-                    + (i === 0 ? pricing.fixedFeePerRequest ?? 0 : 0)
-                : 0;
+            const cencoriChargeUsd = shouldEnforceCredits && !providerKey?.encrypted_key ? providerCostUsd : 0;
             const batchNumber = Math.floor(i / 10);
             const { data: rpcData, error: rpcError } = await adminClient.rpc(
                 'store_memory_batch_and_charge',

@@ -152,15 +152,14 @@ async function embedWithGemini(inputs: string[]): Promise<MemoryEmbeddingResult>
     }
 
     const providerCostUsd = calculateProviderTokenCost(totalTokens, 0, pricing);
-    const cencoriChargeUsd = providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriChargeUsd = providerCostUsd;
 
     return {
         embeddings,
         totalTokens,
         providerCostUsd,
         cencoriChargeUsd,
-        markupPercentage: pricing.cencoriMarkupPercentage,
+        markupPercentage: 0,
         model: MEMORY_EMBEDDING_MODEL_MANAGED,
         provider: 'google',
     };
@@ -177,8 +176,7 @@ async function embedWithOpenAI(openaiKey: string, inputs: string[]): Promise<Mem
 
     const totalTokens = response.usage?.total_tokens ?? 0;
     const providerCostUsd = calculateProviderTokenCost(totalTokens, 0, pricing);
-    const cencoriChargeUsd = providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriChargeUsd = 0;
 
     // OpenAI returns embeddings with an index field; keep input order.
     const ordered = [...response.data].sort((a, b) => a.index - b.index);
@@ -188,7 +186,7 @@ async function embedWithOpenAI(openaiKey: string, inputs: string[]): Promise<Mem
         totalTokens,
         providerCostUsd,
         cencoriChargeUsd,
-        markupPercentage: pricing.cencoriMarkupPercentage,
+        markupPercentage: 0,
         model: MEMORY_EMBEDDING_MODEL,
         provider: 'openai',
     };

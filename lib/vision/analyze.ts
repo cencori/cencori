@@ -225,7 +225,7 @@ export function listVisionModels() {
 
 // ── Provider key resolution ─────────────────────────────────────
 
-async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Promise<string | null> {
+async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Promise<{ key: string; usesByok: boolean } | null> {
     const { data: providerKey } = await ctx.supabase
         .from('provider_keys')
         .select('encrypted_key, is_active')
@@ -235,14 +235,15 @@ async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Pr
         .maybeSingle();
 
     if (providerKey?.encrypted_key) {
-        return decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
+        return { key: decryptApiKey(providerKey.encrypted_key, ctx.organizationId), usesByok: true };
     }
-    if (provider === 'openai') return process.env.OPENAI_API_KEY ?? null;
-    if (provider === 'anthropic') return process.env.ANTHROPIC_API_KEY ?? null;
-    if (provider === 'google') return getGoogleApiKey();
+    const managedKey = provider === 'openai' ? process.env.OPENAI_API_KEY
+        : provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY
+        : provider === 'google' ? getGoogleApiKey()
+        : getManagedOpenAICompatibleKey(provider);
     // Managed keys for OpenAI-compatible providers are named in one place
     // (providers-setup), including historical aliases like MAXIMOAI_API_KEY.
-    return getManagedOpenAICompatibleKey(provider) ?? null;
+    return managedKey ? { key: managedKey, usesByok: false } : null;
 }
 
 // ── Image normalization ─────────────────────────────────────────
@@ -649,10 +650,11 @@ export async function* streamVision(
     let model = resolveModel(request.model);
     const originalModel = model;
     let usedFallback = false;
-    const apiKey = await getProviderKey(ctx, model.provider);
-    if (!apiKey) {
+    const initialKey = await getProviderKey(ctx, model.provider);
+    if (!initialKey) {
         throw new Error(`No ${model.provider} API key configured for this project. Add one in project settings.`);
     }
+    let usesByok = initialKey.usesByok;
 
     const imgs = await normalizeImages(resolveImageList(request));
     for (const img of imgs) validateImageForProvider(img, model.provider);
@@ -663,7 +665,7 @@ export async function* streamVision(
     // Failover window: only before the first chunk is emitted. Once bytes
     // have flowed to the client we can't switch providers mid-answer.
     let generator = makeVisionStreamGenerator(
-        model.provider, apiKey, model.apiModel, prompt, imgs, opts
+        model.provider, initialKey.key, model.apiModel, prompt, imgs, opts
     );
     let iterator = generator[Symbol.asyncIterator]();
     let first: IteratorResult<Awaited<ReturnType<typeof iterator.next>>['value']>;
@@ -691,12 +693,13 @@ export async function* streamVision(
                 const fallbackPricing = await getPricingFromDB(candidate.provider, fallbackModel.apiModel);
                 for (const img of imgs) validateImageForProvider(img, candidate.provider);
                 generator = makeVisionStreamGenerator(
-                    candidate.provider, fallbackKey, fallbackModel.apiModel, prompt, imgs, opts
+                    candidate.provider, fallbackKey.key, fallbackModel.apiModel, prompt, imgs, opts
                 );
                 iterator = generator[Symbol.asyncIterator]();
                 first = await iterator.next();
                 model = fallbackModel;
                 pricing = fallbackPricing;
+                usesByok = fallbackKey.usesByok;
                 usedFallback = true;
                 recovered = true;
                 break;
@@ -732,8 +735,7 @@ export async function* streamVision(
         completionTokens,
         pricing
     );
-    const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriCharge = usesByok ? 0 : providerCost;
 
     yield {
         done: true,
@@ -747,7 +749,7 @@ export async function* streamVision(
         cost: {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
         },
         usedFallback,
         ...(usedFallback
@@ -810,10 +812,11 @@ export async function analyzeVision(
     request: VisionAnalyzeRequest
 ): Promise<VisionAnalyzeResult> {
     let model = resolveModel(request.model);
-    const apiKey = await getProviderKey(ctx, model.provider);
-    if (!apiKey) {
+    const initialKey = await getProviderKey(ctx, model.provider);
+    if (!initialKey) {
         throw new Error(`No ${model.provider} API key configured for this project. Add one in project settings.`);
     }
+    let usesByok = initialKey.usesByok;
 
     const imgs = await normalizeImages(resolveImageList(request));
     for (const img of imgs) validateImageForProvider(img, model.provider);
@@ -830,7 +833,7 @@ export async function analyzeVision(
     const originalModel = model;
 
     try {
-        result = await callVisionProvider(model.provider, apiKey, model.apiModel, prompt, imgs, opts);
+        result = await callVisionProvider(model.provider, initialKey.key, model.apiModel, prompt, imgs, opts);
     } catch (primaryError) {
         if (!isFailoverWorthy(primaryError, model.provider)) {
             throw normalizeProviderError(model.provider, primaryError);
@@ -854,7 +857,7 @@ export async function analyzeVision(
                 for (const img of imgs) validateImageForProvider(img, candidate.provider);
                 const fallbackResult = await callVisionProvider(
                     candidate.provider,
-                    fallbackKey,
+                    fallbackKey.key,
                     fallbackModel.apiModel,
                     prompt,
                     imgs,
@@ -862,6 +865,7 @@ export async function analyzeVision(
                 );
                 recovered = { result: fallbackResult, candidate: fallbackModel };
                 pricing = fallbackPricing;
+                usesByok = fallbackKey.usesByok;
                 break;
             } catch (fallbackError) {
                 console.warn(
@@ -887,8 +891,7 @@ export async function analyzeVision(
         result.completionTokens,
         pricing
     );
-    const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriCharge = usesByok ? 0 : providerCost;
 
     return {
         analysis: result.analysis,
@@ -902,7 +905,7 @@ export async function analyzeVision(
         cost: {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
         },
         ...(usedFallback
             ? {

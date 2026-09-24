@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
         // ── Cost tracking (per 1,000 characters) ──
         const providerCost = (result.charCount / 1000) * pricing.unitPriceUsd;
-        const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
+        const cencoriCharge = result.usesByok ? 0 : providerCost;
 
         await logGatewayRequest(ctx, {
             endpoint: 'audio/speech',
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
             costUsd: cencoriCharge,
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             metadata: { streaming },
             requestPayload: promptPayload(guardedInput, {
                 model: resolved.model,

@@ -275,10 +275,10 @@ export async function POST(req: NextRequest) {
             };
 
             const providerCostUsd = event.cost_usd ?? 0;
-            const cencoriChargeUsd = providerCostUsd; // Cencori's cut is the provider cost (no gateway markup since they're not using the gateway)
+            const cencoriChargeUsd = 0; // External provider usage is paid outside Cencori.
             const monthBase = monthlyTokens[event.end_user_id] ?? 0;
             const customerChargeUsd = calculateCustomerCharge(
-                cencoriChargeUsd,
+                providerCostUsd,
                 markup.markupPercentage,
                 markup.flatRatePerRequest,
                 markup.pricingModel,
@@ -324,10 +324,10 @@ export async function POST(req: NextRequest) {
                     prompt_tokens: event.prompt_tokens,
                     completion_tokens: event.completion_tokens,
                     total_tokens: event.total_tokens,
-                    cost_usd: providerCostUsd,
+                    cost_usd: cencoriChargeUsd,
                     provider_cost_usd: providerCostUsd,
-                    cencori_charge_usd: customerChargeUsd,
-                    markup_percentage: markup.markupPercentage,
+                    cencori_charge_usd: 0,
+                    markup_percentage: 0,
                     latency_ms: event.latency_ms ?? 0,
                     end_user_id: event.end_user_id,
                     metadata: event.metadata ?? {},

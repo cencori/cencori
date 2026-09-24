@@ -178,8 +178,7 @@ export class AnthropicProvider extends AIProvider {
                 pricing,
                 cached
             );
-            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                + (pricing.fixedFeePerRequest ?? 0);
+            const cencoriCharge = providerCost;
 
             // A response can interleave several blocks — prose plus one
             // tool_use per requested call — so walk all of them rather than
@@ -215,7 +214,7 @@ export class AnthropicProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: toFinishReason(response.stop_reason),

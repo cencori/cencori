@@ -188,6 +188,29 @@ describe('executeGatewayChat failover', () => {
         expect(mockTriggerFallbackWebhook).toHaveBeenCalled();
     });
 
+    it('does not charge Cencori credits when fallback uses a BYOK key', async () => {
+        mockInitializeBYOKProviders.mockResolvedValue({ success: true, usesByok: true });
+        const primaryChat = vi.fn().mockRejectedValue(new Error('openai down'));
+        const fallbackChat = vi.fn().mockResolvedValue({
+            ...mockResponse('BYOK fallback'),
+            cost: { providerCostUsd: 0.25, cencoriChargeUsd: 0.25, markupPercentage: 0 },
+        });
+        const result = await executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai', model: 'gpt-4o', billingMode: 'standard',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => true, getProvider: () => ({ chat: fallbackChat, getPricing: vi.fn() }) },
+            } as never,
+        });
+        expect(result.billingMode).toBe('byok');
+        expect(result.cost).toEqual({ providerCostUsd: 0.25, cencoriChargeUsd: 0, markupPercentage: 0 });
+    });
+
     it('makes only one charge-sensitive provider attempt without fallback', async () => {
         const primaryChat = vi.fn().mockRejectedValue(new Error('provider unavailable'));
         const fallbackChat = vi.fn().mockResolvedValue(mockResponse('must not run'));

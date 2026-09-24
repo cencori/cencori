@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
         // deployed variant row instead of falling back to a guessed flat fee.
         const { data: imagePricing, error: imagePricingError } = await ctx.supabase
             .from('gateway_image_pricing')
-            .select('price_per_image, cencori_markup_percentage')
+            .select('price_per_image')
             .eq('provider', provider)
             .eq('model_name', model)
             .eq('size', size)
@@ -283,10 +283,8 @@ export async function POST(req: NextRequest) {
             .eq('is_active', true)
             .maybeSingle();
         const pricePerImage = Number(imagePricing?.price_per_image);
-        const markupPercentage = Number(imagePricing?.cencori_markup_percentage);
         if (imagePricingError || !imagePricing
-            || !Number.isFinite(pricePerImage) || pricePerImage < 0
-            || !Number.isFinite(markupPercentage) || markupPercentage < 0) {
+            || !Number.isFinite(pricePerImage) || pricePerImage < 0) {
             return addGatewayHeaders(
                 NextResponse.json({
                     error: 'pricing_unavailable',
@@ -361,7 +359,7 @@ export async function POST(req: NextRequest) {
 
         // Cost tracking (fixed per-image pricing)
         const providerCost = requestedImageCount * pricePerImage;
-        const cencoriCharge = providerCost * (1 + markupPercentage / 100);
+        const cencoriCharge = providerKey?.is_active && providerKey.encrypted_key ? 0 : providerCost;
 
         await logGatewayRequest(ctx, {
             endpoint: 'images/generate',
@@ -371,7 +369,7 @@ export async function POST(req: NextRequest) {
             costUsd: cencoriCharge,
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage,
+            markupPercentage: 0,
             metadata: { prompt_length: prompt.length, numImages: requestedImageCount, size, quality },
             errorMessage: outputCheck.ok ? undefined : outputCheck.message,
             requestPayload: promptPayload(body.prompt, { model, size, quality, n: requestedImageCount }),

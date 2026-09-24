@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         // ── Cost tracking (per minute) ──
         const durationMinutes = result.durationSeconds / 60;
         const providerCost = durationMinutes * pricing.unitPriceUsd;
-        const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100);
+        const cencoriCharge = result.usesByok ? 0 : providerCost;
 
         const tokenMap = inputPipeline.tokenMap ?? new Map();
         const finalTranscript = deTokenize(result.text, tokenMap);
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
             costUsd: cencoriCharge,
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             metadata: {
                 file_size: file.size,
                 file_type: file.type,

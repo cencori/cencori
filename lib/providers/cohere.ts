@@ -139,8 +139,7 @@ export class CohereProvider extends AIProvider {
 
             const pricing = await this.getPricing(request.model);
             const providerCost = this.calculateCost(inputTokens, outputTokens, pricing);
-            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                + (pricing.fixedFeePerRequest ?? 0);
+            const cencoriCharge = providerCost;
 
             return {
                 content: data.text,
@@ -154,7 +153,7 @@ export class CohereProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: data.finish_reason === 'COMPLETE' ? 'stop' : undefined,
