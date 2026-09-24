@@ -226,9 +226,8 @@ export class CustomProvider extends AIProvider {
             },
             cost: {
                 providerCostUsd: providerCost,
-                cencoriChargeUsd: this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                    + (pricing.fixedFeePerRequest ?? 0),
-                markupPercentage: pricing.cencoriMarkupPercentage,
+                cencoriChargeUsd: providerCost,
+                markupPercentage: 0,
             },
             latencyMs: Date.now() - startTime,
             finishReason,

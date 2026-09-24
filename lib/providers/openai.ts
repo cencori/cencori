@@ -89,8 +89,7 @@ export class OpenAIProvider extends AIProvider {
                 cached
             );
 
-            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                + (pricing.fixedFeePerRequest ?? 0);
+            const cencoriCharge = providerCost;
 
             // Parse finish reason
             const finishReason = completion.choices[0].finish_reason;
@@ -133,7 +132,7 @@ export class OpenAIProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: finishReason === 'tool_calls' ? 'tool_calls'

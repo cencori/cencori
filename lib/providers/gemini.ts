@@ -83,8 +83,7 @@ export class GeminiProvider extends AIProvider {
                 pricing,
                 { cacheReadTokens }
             );
-            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                + (pricing.fixedFeePerRequest ?? 0);
+            const cencoriCharge = providerCost;
 
             return {
                 content: text,
@@ -99,7 +98,7 @@ export class GeminiProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
                 latencyMs: Date.now() - startTime,
             };

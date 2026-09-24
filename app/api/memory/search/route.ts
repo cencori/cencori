@@ -175,8 +175,7 @@ export async function POST(req: NextRequest) {
             ?? embeddingResponse.usage?.prompt_tokens
             ?? Math.max(1, Math.ceil(guardedQuery.length / 4));
         const providerCost = calculateProviderTokenCost(totalTokens, 0, pricing);
-        const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-            + (pricing.fixedFeePerRequest ?? 0);
+        const cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
         await logGatewayRequest(ctx, {
             endpoint: 'memory/search',
             model,
@@ -188,7 +187,7 @@ export async function POST(req: NextRequest) {
             costUsd: cencoriCharge,
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             errorMessage: outputCheck.ok ? undefined : outputCheck.message,
             metadata: { namespace_id: namespaceData.id, results: results.length },
             requestPayload: promptPayload(guardedQuery, { model }),

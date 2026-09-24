@@ -166,8 +166,7 @@ export async function POST(req: NextRequest) {
             completionTokens,
             pricing
         );
-        const charge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-            + (pricing.fixedFeePerRequest ?? 0);
+        const charge = providerKey?.encrypted_key ? 0 : providerCost;
 
         const totalProviderCost = providerCost + (extracted.cost?.providerCostUsd ?? 0);
         const totalCharge = charge + (extracted.cost?.cencoriChargeUsd ?? 0);
@@ -194,7 +193,7 @@ export async function POST(req: NextRequest) {
             costUsd: totalCharge,
             providerCostUsd: totalProviderCost,
             cencoriChargeUsd: totalCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             metadata: { extract_method: extracted.method, kind: extracted.kind, pageCount: extracted.pageCount, question_length: question.length },
             requestPayload: promptPayload(`${documentForLog}\n\nQuestion: ${question}`, { model: QUERY_MODEL }),
             responsePayload: outputCheck.ok ? textResponsePayload(answer) : undefined,
@@ -225,7 +224,7 @@ export async function POST(req: NextRequest) {
                 cost: {
                     providerCostUsd: totalProviderCost,
                     cencoriChargeUsd: totalCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
             }),
             { requestId: ctx.requestId }

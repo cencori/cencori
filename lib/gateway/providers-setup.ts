@@ -15,6 +15,7 @@ import type { AIProvider } from '@/lib/providers/base';
 import { ModelAccessDeniedError } from '@/lib/providers/errors';
 import {
     assertApiKeyModelAccess,
+    resolveProviderBillingMode,
     type GatewayBillingMode,
 } from '@/lib/gateway/model-access';
 import {
@@ -135,7 +136,7 @@ export async function initializeBYOKProviders(
     projectId: string,
     organizationId: string,
     targetProvider: string
-): Promise<{ success: boolean; defaultModel?: string }> {
+): Promise<{ success: boolean; usesByok: boolean; defaultModel?: string }> {
     try {
         const cached = await getCachedProviderConfig(projectId, targetProvider);
         let providerKey = cached?.row;
@@ -158,37 +159,37 @@ export async function initializeBYOKProviders(
             const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
             if (targetProvider === 'google') {
                 router.registerProvider(targetProvider, new GeminiProvider(apiKey));
-                return { success: true, defaultModel: providerKey.default_model || undefined };
+                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
             if (targetProvider === 'openai') {
                 router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
-                return { success: true, defaultModel: providerKey.default_model || undefined };
+                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
             if (targetProvider === 'anthropic') {
                 router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
-                return { success: true, defaultModel: providerKey.default_model || undefined };
+                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
             if (isOpenAICompatible(targetProvider)) {
                 router.registerProvider(
                     targetProvider,
                     new OpenAICompatibleProvider(targetProvider, apiKey)
                 );
-                return { success: true, defaultModel: providerKey.default_model || undefined };
+                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
             if (targetProvider === 'cohere') {
                 router.registerProvider(targetProvider, new CohereProvider(apiKey));
-                return { success: true, defaultModel: providerKey.default_model || undefined };
+                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
         }
 
         if (router.hasProvider(targetProvider)) {
-            return { success: true };
+            return { success: true, usesByok: false };
         }
 
-        return { success: false };
+        return { success: false, usesByok: false };
     } catch (error) {
         console.error(`[Gateway] Failed to initialize BYOK provider ${targetProvider}:`, error);
-        return { success: router.hasProvider(targetProvider) };
+        return { success: router.hasProvider(targetProvider), usesByok: false };
     }
 }
 
@@ -276,6 +277,8 @@ export async function resolveGatewayProvider(params: {
 
     let providerName: string;
     let model: string;
+    let usesByok = Boolean(customProvider)
+        && (Boolean(customProvider?.apiKey) || customProvider?.apiFormat !== 'anthropic');
 
     if (customProvider) {
         providerName = customProvider.providerTag;
@@ -313,6 +316,7 @@ export async function resolveGatewayProvider(params: {
             params.organizationId,
             providerName
         );
+        usesByok = byokResult.usesByok;
 
         if (!byokResult.success) {
             registerDefaultProviders(router);
@@ -329,12 +333,13 @@ export async function resolveGatewayProvider(params: {
         ? router.getProvider(providerName)
         : router.getProviderForModel(requestedModel);
 
-    const billingMode = assertApiKeyModelAccess({
+    const accessMode = assertApiKeyModelAccess({
         allowedModels: params.allowedModels,
         sponsoredModels: params.sponsoredModels,
         provider: providerName,
         model,
     });
+    const billingMode = resolveProviderBillingMode(accessMode, usesByok);
 
     // Verify exact billing configuration before any upstream request is made.
     // This prevents a successful provider call from later becoming an

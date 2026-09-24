@@ -275,4 +275,4 @@ Errors use the shared flat envelope — see the [Error Reference](/docs/api/erro
 
 ## Pricing & billing
 
-TTS bills per 1,000 characters; STT bills per minute of audio (derived from the provider's reported duration — a failed request without a duration is never billed). Every request is logged to `ai_requests` with the provider, model, provider cost, and your Cencori charge (provider cost + markup) — visible in the dashboard alongside chat and vision usage. BYOK keys are used when configured; otherwise the platform key is used. Streaming responses bill the same as buffered ones (characters are known before the first byte).
+TTS provider cost is computed per 1,000 characters; STT provider cost is computed per minute of audio (derived from the provider's reported duration — a failed request without a duration is never billed). Every request is logged to `ai_requests` with provider, model, provider cost, and Cencori usage charge. Managed-key calls charge the configured provider cost without gateway markup; BYOK calls have a zero Cencori usage charge while the provider bills your account directly. Streaming responses use the same accounting as buffered ones.

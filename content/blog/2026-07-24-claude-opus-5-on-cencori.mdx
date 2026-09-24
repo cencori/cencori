@@ -35,7 +35,7 @@ Claude Opus 5 is priced identically to Opus 4.8 — no premium for the upgrade.
 
 Integrating new frontier models is trivial when your applications are built on Cencori's **intelligence infrastructure**:
 
-1. **Decoupled Billing & Credit Quotas**: Cencori manages credit allocations, end-user billing, and budget caps at the proxy level. Switching your workloads to `claude-opus-5` doesn't require touching your billing logic — Cencori tracks provider cost and markup automatically at the new model's rates.
+1. **Decoupled Billing & Credit Quotas**: Cencori manages credit allocations, end-user billing, and budget caps at the proxy level. Switching your workloads to `claude-opus-5` doesn't require touching your billing logic — Cencori tracks usage at the configured provider rate, without a gateway markup. Any markup you configure for your own end users is separate.
 2. **Enterprise Security Layer**: Cencori's input and output security pipeline — PII detection, jailbreak detection, and custom data rules — applies to Opus 5 traffic the same way it does to every other model on the gateway, with full audit logging.
 3. **Seamless Model Failovers**: Opus 5 is now the default Anthropic fallback target for our GPT-5.5 and o3 traffic on Cencori. If your Claude Opus 5 usage hits provider rate limits, traffic can automatically route to GPT-5.5 or Gemini 3.1 Pro Preview without breaking active client sessions.
 

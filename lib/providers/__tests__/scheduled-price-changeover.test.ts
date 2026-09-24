@@ -66,6 +66,7 @@ describe('scheduled price changeover', () => {
         expect(pricing.inputPer1KTokens).toBe(0.002);
         expect(pricing.outputPer1KTokens).toBe(0.010);
         expect(pricing.cachedInputPer1KTokens).toBe(0.0002);
+        expect(pricing.cencoriMarkupPercentage).toBe(0);
         expect(pricing.pricingExpiresAt).toBe(EXPIRY);
     });
 

@@ -78,7 +78,15 @@ export async function GET(request: NextRequest, context: RouteParams) {
             );
         }
 
-        if (shouldEnforceCredits && creditsBalance <= 0) {
+        const { data: providerKey } = await adminClient
+            .from('provider_keys')
+            .select('encrypted_key')
+            .eq('project_id', projectId)
+            .eq('provider', 'openai')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (shouldEnforceCredits && creditsBalance <= 0 && !providerKey?.encrypted_key) {
             return NextResponse.json(
                 {
                     error: "Credit balance exhausted",
@@ -128,14 +136,6 @@ export async function GET(request: NextRequest, context: RouteParams) {
         const guardedQuery = inputPipeline.messages[0]?.content ?? query;
 
         // Get project's encrypted OpenAI key for embeddings.
-        const { data: providerKey } = await adminClient
-            .from("provider_keys")
-            .select("encrypted_key")
-            .eq("project_id", projectId)
-            .eq("provider", "openai")
-            .eq('is_active', true)
-            .single();
-
         // Use project key or fallback to platform key
         const openaiKey = providerKey?.encrypted_key
             ? decryptApiKey(providerKey.encrypted_key, project.organization_id)
@@ -161,7 +161,8 @@ export async function GET(request: NextRequest, context: RouteParams) {
             "openai",
             "text-embedding-3-small",
             totalTokens,
-            0
+            0,
+            Boolean(providerKey?.encrypted_key),
         );
 
         const charged = await chargeProjectUsageCredits(

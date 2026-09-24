@@ -46,6 +46,7 @@ export interface SpeechResult {
     voice: string;
     /** Billable unit count (characters of guarded input). */
     charCount: number;
+    usesByok: boolean;
 }
 
 /** Thrown for caller-fixable problems so the route can map to a 4xx. */
@@ -180,7 +181,7 @@ const ENV_KEYS: Record<TTSProvider, string | undefined> = {
     elevenlabs: process.env.ELEVENLABS_API_KEY,
 };
 
-async function getProviderKey(ctx: GatewayContext, provider: TTSProvider): Promise<string | null> {
+async function getProviderKey(ctx: GatewayContext, provider: TTSProvider): Promise<{ key: string; usesByok: boolean } | null> {
     const { data: providerKey } = await ctx.supabase
         .from('provider_keys')
         .select('encrypted_key, is_active')
@@ -190,9 +191,10 @@ async function getProviderKey(ctx: GatewayContext, provider: TTSProvider): Promi
         .maybeSingle();
 
     if (providerKey?.encrypted_key) {
-        return decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
+        return { key: decryptApiKey(providerKey.encrypted_key, ctx.organizationId), usesByok: true };
     }
-    return ENV_KEYS[provider] ?? null;
+    const key = ENV_KEYS[provider];
+    return key ? { key, usesByok: false } : null;
 }
 
 // ── Public entry point ──────────────────────────────────────────
@@ -204,6 +206,7 @@ interface ResolvedSpeech {
     response_format: ResponseFormat;
     speed: number;
     apiKey: string;
+    usesByok: boolean;
     input: string;
     params: SynthParams;
 }
@@ -251,8 +254,8 @@ async function resolveSpeechRequest(ctx: GatewayContext, req: SpeechRequest): Pr
         throw new SpeechRequestError('bad_request', 'speed must be between 0.25 and 4');
     }
 
-    const apiKey = await getProviderKey(ctx, provider);
-    if (!apiKey) {
+    const providerKey = await getProviderKey(ctx, provider);
+    if (!providerKey) {
         throw new SpeechRequestError('provider_not_configured', `No ${provider} API key configured`, 400);
     }
 
@@ -262,14 +265,15 @@ async function resolveSpeechRequest(ctx: GatewayContext, req: SpeechRequest): Pr
         voice,
         response_format,
         speed,
-        apiKey,
+        apiKey: providerKey.key,
+        usesByok: providerKey.usesByok,
         input,
         params: { input, model, voice, response_format, speed, language: req.language },
     };
 }
 
 export async function generateSpeech(ctx: GatewayContext, req: SpeechRequest): Promise<SpeechResult> {
-    const { provider, model, voice, response_format, apiKey, input, params } = await resolveSpeechRequest(ctx, req);
+    const { provider, model, voice, response_format, apiKey, input, params, usesByok } = await resolveSpeechRequest(ctx, req);
 
     let audio: ArrayBuffer;
     switch (provider) {
@@ -299,6 +303,7 @@ export async function generateSpeech(ctx: GatewayContext, req: SpeechRequest): P
         model,
         voice,
         charCount: input.length,
+        usesByok,
     };
 }
 
@@ -310,6 +315,7 @@ export interface SpeechStreamResult {
     model: string;
     voice: string;
     charCount: number;
+    usesByok: boolean;
 }
 
 /**
@@ -320,7 +326,7 @@ export interface SpeechStreamResult {
  * JSON errors; errors after the first byte cannot change the status.
  */
 export async function generateSpeechStream(ctx: GatewayContext, req: SpeechRequest): Promise<SpeechStreamResult> {
-    const { provider, model, voice, response_format, apiKey, input, params } = await resolveSpeechRequest(ctx, req);
+    const { provider, model, voice, response_format, apiKey, input, params, usesByok } = await resolveSpeechRequest(ctx, req);
 
     const stream = await streamSynth(provider, apiKey, params);
     return {
@@ -330,6 +336,7 @@ export async function generateSpeechStream(ctx: GatewayContext, req: SpeechReque
         model,
         voice,
         charCount: input.length,
+        usesByok,
     };
 }
 

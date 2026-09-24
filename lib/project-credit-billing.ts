@@ -16,7 +16,8 @@ export async function calculateTokenCharge(
     provider: string,
     model: string,
     promptTokens: number,
-    completionTokens: number
+    completionTokens: number,
+    usesByok = false,
 ): Promise<{
     providerCostUsd: number;
     cencoriChargeUsd: number;
@@ -31,13 +32,12 @@ export async function calculateTokenCharge(
         safeCompletionTokens,
         pricing
     );
-    const cencoriChargeUsd = providerCostUsd * (1 + pricing.cencoriMarkupPercentage / 100)
-        + (pricing.fixedFeePerRequest ?? 0);
+    const cencoriChargeUsd = usesByok ? 0 : providerCostUsd;
 
     return {
         providerCostUsd,
         cencoriChargeUsd,
-        markupPercentage: pricing.cencoriMarkupPercentage,
+        markupPercentage: 0,
     };
 }
 

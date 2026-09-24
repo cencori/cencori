@@ -42,10 +42,10 @@ When a user recharges:
 
 ## Usage Charging
 
-For each successful request:
+For each successful managed-key request:
 
 1. Cencori computes provider cost from model pricing and token/image/audio usage.
-2. Cencori applies model/provider markup.
+2. The provider cost is logged as the Cencori usage charge; no gateway markup or per-request platform fee is added.
 3. Final charge is logged.
 4. Credits are deducted from org balance.
 5. A `usage` transaction is written with a reference to the request log.
@@ -53,7 +53,8 @@ For each successful request:
 Formula:
 
 ```text
-provider_cost + markup = total_charge
+managed: provider_cost = total_charge
+BYOK: total_charge = 0
 ```
 
 ## Example
@@ -69,7 +70,7 @@ If the final calculated charge is **0.0245 credits**, then:
 
 ## Enforcement Behavior
 
-Credits are enforced before request execution on credit-gated tiers.
+Credits are enforced before request execution on credit-gated tiers. This preflight currently also applies to BYOK requests, even though their Cencori usage charge is zero.
 
 - If balance is exhausted, API returns `403` with a credit exhaustion message.
 - Recharge and retry to continue.
@@ -84,7 +85,7 @@ Credits do **not** force BYOK. You can run either mode:
 | Mode | Who pays provider bill | How usage is charged in Cencori |
 | :--- | :--- | :--- |
 | Managed keys | Cencori | Org credits are deducted |
-| BYOK | Your org directly with provider | Cencori can still meter platform usage depending on your plan/config |
+| BYOK | Your org directly with provider | Provider cost is logged; no Cencori usage credits are deducted |
 
 See [Bring Your Own Key (BYOK)](/docs/platform/byok) for setup and tradeoffs.
 

@@ -7,6 +7,7 @@ import {
     applyResponseBillingMode,
     calculateGatewayCharge,
     isFullySponsoredApiKey,
+    resolveProviderBillingMode,
     resolveApiKeyModelAccess,
 } from '@/lib/gateway/model-access';
 
@@ -146,5 +147,32 @@ describe('API-key model access and sponsorship', () => {
             cencoriChargeUsd: 0,
             markupPercentage: 0,
         });
+    });
+
+    it('passes through provider cost even when legacy markup and fee fields are set', () => {
+        expect(calculateGatewayCharge(0.75, {
+            inputPer1KTokens: 0.0002,
+            outputPer1KTokens: 0.001,
+            cencoriMarkupPercentage: 50,
+            fixedFeePerRequest: 0.001,
+        }, 'standard')).toEqual({ cencoriChargeUsd: 0.75, markupPercentage: 0 });
+    });
+
+    it('charges BYOK requests zero while retaining provider-cost telemetry', () => {
+        expect(resolveProviderBillingMode('standard', true)).toBe('byok');
+        expect(resolveProviderBillingMode('standard', false)).toBe('standard');
+        expect(resolveProviderBillingMode('sponsored', true)).toBe('sponsored');
+
+        const pricing = { inputPer1KTokens: 0.01, outputPer1KTokens: 0.03, cencoriMarkupPercentage: 0 };
+        expect(calculateGatewayCharge(0.75, pricing, 'byok'))
+            .toEqual({ cencoriChargeUsd: 0, markupPercentage: 0 });
+        expect(applyResponseBillingMode({
+            content: 'ok',
+            model: 'gpt-5',
+            provider: 'openai',
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            cost: { providerCostUsd: 0.75, cencoriChargeUsd: 0.75, markupPercentage: 0 },
+            latencyMs: 10,
+        }, 'byok').cost).toEqual({ providerCostUsd: 0.75, cencoriChargeUsd: 0, markupPercentage: 0 });
     });
 });

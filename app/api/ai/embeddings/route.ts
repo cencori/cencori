@@ -290,8 +290,7 @@ export async function POST(req: NextRequest) {
 
         // Cost tracking
         const providerCost = calculateProviderTokenCost(result.usage.total_tokens, 0, pricing);
-        const cencoriCharge = providerCost * (1 + pricing.cencoriMarkupPercentage / 100)
-            + (pricing.fixedFeePerRequest ?? 0);
+        const cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
 
         await logGatewayRequest(ctx, {
             endpoint: 'embeddings',
@@ -303,7 +302,7 @@ export async function POST(req: NextRequest) {
             costUsd: cencoriCharge,
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             requestPayload: {
                 messages: toLoggedMessages(guardedInput.map((text) => ({ role: 'user', content: text }))),
                 model: result.model,

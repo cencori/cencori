@@ -456,20 +456,18 @@ const openai = new OpenAI({
 **Customers pay two things:**
 
 1. **Cencori Subscription**: Fixed monthly fee based on tier
-2. **AI Usage**: Pass-through cost from providers + 10-20% markup
+2. **AI Usage**: Configured provider cost, with no Cencori gateway markup
 
 **Example calculation (Pro tier, 30K requests/month):**
 - Cencori subscription: $49
 - Average request cost: $0.002 (GPT-4o mini average)
 - AI usage: 30,000 × $0.002 = $60
-- Cencori markup (15%): $9
-- **Total monthly cost: $49 + $60 + $9 = $118**
+- Cencori gateway markup: $0
+- **Total monthly cost: $49 + $60 = $109**
 
-**Why markup on AI usage?**
-- We handle all provider billing (consolidated invoice)
-- We provide security scanning on every request
-- We maintain the infrastructure and routing
-- You're paying for infrastructure, not just pass-through
+**What does the subscription cover?**
+- Consolidated provider billing, security controls, and gateway infrastructure
+- Routing, observability, and spend controls
 
 ## Discount Guidelines
 

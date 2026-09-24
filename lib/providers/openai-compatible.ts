@@ -209,8 +209,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 pricing,
                 cached
             );
-            const cencoriCharge = this.applyMarkup(providerCost, pricing.cencoriMarkupPercentage)
-                + (pricing.fixedFeePerRequest ?? 0);
+            const cencoriCharge = providerCost;
 
             const finishReason = completion.choices[0]?.finish_reason;
 
@@ -246,7 +245,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter' || finishReason === 'tool_calls'

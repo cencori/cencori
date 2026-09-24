@@ -12,7 +12,7 @@ order: 5
 | Feature | Managed Keys (Standard) | BYOK (Custom Keys) |
 | :--- | :--- | :--- |
 | **Provider Invoice** | Paid by Cencori | Paid by your provider account |
-| **Cencori Usage Charging** | Credit wallet is charged | Depends on your Cencori plan/policy |
+| **Cencori Usage Charging** | Credit wallet is charged | No usage deduction; provider cost is still logged |
 | **Rate Limits** | Shared Cencori limits | Your personal provider limits |
 | **Model Access** | Standard supported models | Access to betas/finetunes |
 | **Setup** | Instant (use Credits) | Requires configuration |
@@ -44,6 +44,8 @@ You can mix and match Managed Keys and BYOK:
 - Use **BYOK** where your team needs provider-specific controls.
 
 See [Credits System](/docs/platform/credits) and [Billing & Usage](/docs/platform/billing) for how usage charging is applied in your deployment.
+
+BYOK requests still pass the current credit-balance preflight on credit-gated plans. A zero balance can therefore block a request even though its Cencori usage charge would be zero.
 
 ## Security
 

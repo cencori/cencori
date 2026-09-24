@@ -21,7 +21,6 @@ type CustomProviderModelRow = {
     is_active: boolean | null;
     input_price_per_1k_tokens: number | string | null;
     output_price_per_1k_tokens: number | string | null;
-    platform_fee_per_request: number | string | null;
 };
 
 export type CustomProviderLookupRow = {
@@ -47,7 +46,6 @@ export type ResolvedCustomProvider = {
         inputPer1KTokens: number;
         outputPer1KTokens: number;
         cencoriMarkupPercentage: number;
-        fixedFeePerRequest: number;
     };
 };
 
@@ -165,8 +163,7 @@ export async function resolveCustomProviderForProject(params: {
                     model_name,
                     is_active,
                     input_price_per_1k_tokens,
-                    output_price_per_1k_tokens,
-                    platform_fee_per_request
+                    output_price_per_1k_tokens
                 )
             `)
             .eq('project_id', projectId)
@@ -233,7 +230,6 @@ export async function resolveCustomProviderForProject(params: {
                 inputPer1KTokens: parseNonNegative(modelRow?.input_price_per_1k_tokens),
                 outputPer1KTokens: parseNonNegative(modelRow?.output_price_per_1k_tokens),
                 cencoriMarkupPercentage: 0,
-                fixedFeePerRequest: parseNonNegative(modelRow?.platform_fee_per_request),
             };
         })(),
     };

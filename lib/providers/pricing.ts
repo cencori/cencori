@@ -41,7 +41,7 @@ export async function getUsageUnitPricingFromDB(
     const column = unit === 'characters' ? 'price_per_1k_chars' : 'price_per_minute';
     const { data, error } = await supabase
         .from('model_pricing')
-        .select(`${column}, cencori_markup_percentage, pricing_expires_at`)
+        .select(`${column}, pricing_expires_at`)
         .eq('provider', provider)
         .eq('model_name', model)
         .eq('is_active', true)
@@ -49,18 +49,17 @@ export async function getUsageUnitPricingFromDB(
 
     const row = data as Record<string, unknown> | null;
     const unitPriceUsd = Number(row?.[column]);
-    const cencoriMarkupPercentage = Number(row?.cencori_markup_percentage);
     const pricingExpiresAt = typeof row?.pricing_expires_at === 'string'
         ? Date.parse(row.pricing_expires_at)
         : null;
     if (error || !data
         || !Number.isFinite(unitPriceUsd) || unitPriceUsd < 0
-        || !Number.isFinite(cencoriMarkupPercentage) || cencoriMarkupPercentage < 0
         || (pricingExpiresAt !== null && (!Number.isFinite(pricingExpiresAt) || pricingExpiresAt <= Date.now()))) {
         throw new PricingUnavailableError(provider, model, `${column} is missing or invalid`);
     }
 
-    return { unitPriceUsd, cencoriMarkupPercentage };
+    // Ignore legacy stored markup even before the zeroing migration lands.
+    return { unitPriceUsd, cencoriMarkupPercentage: 0 };
 }
 
 /**
@@ -143,7 +142,6 @@ export async function getPricingFromDB(
         throw new PricingUnavailableError(provider, model, error?.message);
     }
 
-    const cencoriMarkupPercentage = Number(data.cencori_markup_percentage);
     const pricingExpiresAt = typeof data.pricing_expires_at === 'string'
         ? Date.parse(data.pricing_expires_at)
         : null;
@@ -162,10 +160,8 @@ export async function getPricingFromDB(
     if (
         !Number.isFinite(inputPer1KTokens)
         || !Number.isFinite(outputPer1KTokens)
-        || !Number.isFinite(cencoriMarkupPercentage)
         || inputPer1KTokens < 0
         || outputPer1KTokens < 0
-        || cencoriMarkupPercentage < 0
         || expiryIsUnresolved
     ) {
         throw new PricingUnavailableError(provider, model, 'stored pricing is invalid');
@@ -197,7 +193,7 @@ export async function getPricingFromDB(
     const pricing: ModelPricing = {
         inputPer1KTokens,
         outputPer1KTokens,
-        cencoriMarkupPercentage,
+        cencoriMarkupPercentage: 0,
         cachedInputPer1KTokens: scheduled
             ? scheduled.cachedInput
             : optionalRate(data.cached_input_price_per_1k_tokens),
@@ -239,7 +235,7 @@ export async function updatePricing(
             model_name: model,
             input_price_per_1k_tokens: pricing.inputPer1KTokens,
             output_price_per_1k_tokens: pricing.outputPer1KTokens,
-            cencori_markup_percentage: pricing.cencoriMarkupPercentage,
+            cencori_markup_percentage: 0,
             updated_at: new Date().toISOString(),
         }, {
             onConflict: 'provider,model_name'
@@ -278,7 +274,7 @@ export async function getProviderPricing(provider: string): Promise<Record<strin
         pricing[row.model_name] = {
             inputPer1KTokens: scheduled?.input ?? parseFloat(row.input_price_per_1k_tokens),
             outputPer1KTokens: scheduled?.output ?? parseFloat(row.output_price_per_1k_tokens),
-            cencoriMarkupPercentage: parseFloat(row.cencori_markup_percentage),
+            cencoriMarkupPercentage: 0,
             cachedInputPer1KTokens: scheduled
                 ? scheduled.cachedInput
                 : row.cached_input_price_per_1k_tokens == null

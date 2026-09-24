@@ -143,8 +143,7 @@ export async function POST(req: NextRequest) {
             summaryCompletionTokens,
             pricing
         );
-        const summaryCharge = summaryProviderCost * (1 + pricing.cencoriMarkupPercentage / 100)
-            + (pricing.fixedFeePerRequest ?? 0);
+        const summaryCharge = providerKey?.encrypted_key ? 0 : summaryProviderCost;
 
         // Combine costs (extract may have run through Vision)
         const totalProviderCost = summaryProviderCost + (extracted.cost?.providerCostUsd ?? 0);
@@ -172,7 +171,7 @@ export async function POST(req: NextRequest) {
             costUsd: totalCharge,
             providerCostUsd: totalProviderCost,
             cencoriChargeUsd: totalCharge,
-            markupPercentage: pricing.cencoriMarkupPercentage,
+            markupPercentage: 0,
             metadata: { extract_method: extracted.method, kind: extracted.kind, pageCount: extracted.pageCount },
             errorMessage: outputCheck.ok ? undefined : outputCheck.message,
             requestPayload: promptPayload(documentForLog, { model: SUMMARY_MODEL }),
@@ -205,7 +204,7 @@ export async function POST(req: NextRequest) {
                 cost: {
                     providerCostUsd: totalProviderCost,
                     cencoriChargeUsd: totalCharge,
-                    markupPercentage: pricing.cencoriMarkupPercentage,
+                    markupPercentage: 0,
                 },
             }),
             { requestId: ctx.requestId }

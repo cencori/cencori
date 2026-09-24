@@ -181,7 +181,7 @@ export async function recordEndUserUsageAsync(
   const supabase = createAdminClient();
   const environment = record.environment === "test" ? "test" : "production";
   const customerChargeUsd = calculateCustomerCharge(
-    record.cost.cencoriChargeUsd,
+    record.cost.providerUsd,
     record.customerMarkupPercentage,
     record.flatRatePerRequest,
     record.pricingModel,
@@ -191,7 +191,7 @@ export async function recordEndUserUsageAsync(
   );
 
   // Calculate Platform Commission (Cut of the profit)
-  const userProfitUsd = Math.max(0, customerChargeUsd - record.cost.cencoriChargeUsd);
+  const userProfitUsd = Math.max(0, customerChargeUsd - record.cost.providerUsd);
   const platformCommissionUsd = userProfitUsd * (record.platformCommissionPercentage / 100);
 
   const { error } = await supabase.rpc("increment_end_user_usage", {
@@ -199,7 +199,9 @@ export async function recordEndUserUsageAsync(
     p_external_user_id: record.externalUserId,
     p_prompt_tokens: record.tokens.prompt,
     p_completion_tokens: record.tokens.completion,
-    p_total_cost_usd: record.cost.cencoriChargeUsd,
+    // End-user cost caps track the upstream cost even when Cencori charges
+    // nothing for BYOK. Cencori's own usage charge stays in the request log.
+    p_total_cost_usd: record.cost.providerUsd,
     p_provider_cost_usd: record.cost.providerUsd,
     p_customer_charge_usd: customerChargeUsd,
     p_platform_commission_usd: platformCommissionUsd,
@@ -291,11 +293,11 @@ function calculateVolumeCharge(
 /**
  * Calculate what the customer should charge their end-user.
  *
- * Flat applies the customer's markup to Cencori's charge. Graduated and volume
+ * Flat applies the customer's markup to provider cost. Graduated and volume
  * rate plans price the request's units directly and replace the markup entirely.
  */
 export function calculateCustomerCharge(
-  cencoriChargeUsd: number,
+  providerCostUsd: number,
   markupPercentage: number,
   flatRatePerRequest: number | null,
   pricingModel: 'flat' | 'tiered' | 'volume' = 'flat',
@@ -312,5 +314,5 @@ export function calculateCustomerCharge(
     }
   }
 
-  return cencoriChargeUsd * (1 + markupPercentage / 100) + (flatRatePerRequest || 0);
+  return providerCostUsd * (1 + markupPercentage / 100) + (flatRatePerRequest || 0);
 }
