@@ -61,7 +61,7 @@ export function CreditBalance({ orgId, balance, transactions, currency = "USD" }
             <div>
                 <h2 className="text-sm font-medium">Prepaid credits</h2>
                 <p className="mt-1.5 max-w-[30ch] text-sm leading-6 text-muted-foreground">
-                    Add balance for on-demand model usage outside your monthly plan.
+                    Add balance for managed model usage. Your provider-key calls remain separate.
                 </p>
             </div>
 
@@ -107,6 +107,7 @@ export function CreditBalance({ orgId, balance, transactions, currency = "USD" }
                         value={selectedPack}
                         onValueChange={setSelectedPack}
                         disabled={isRecharging}
+                        paymentMethod={paymentMethod}
                     />
                     <Button
                         className="h-7 rounded-md px-3 text-[11px] font-medium shadow-none"

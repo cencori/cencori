@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { NextRequest } from 'next/server';
 import { decryptApiKey } from '@/lib/encryption';
+import { getCreditsBalance } from '@/lib/credits';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import {
     OPENAI_COMPATIBLE_ENDPOINTS,
@@ -241,6 +242,10 @@ async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Pr
         : provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY
         : provider === 'google' ? getGoogleApiKey()
         : getManagedOpenAICompatibleKey(provider);
+    if (managedKey && ctx.tier !== 'enterprise' && !ctx.fullySponsoredKey
+        && await getCreditsBalance(ctx.organizationId) <= 0) {
+        return null;
+    }
     // Managed keys for OpenAI-compatible providers are named in one place
     // (providers-setup), including historical aliases like MAXIMOAI_API_KEY.
     return managedKey ? { key: managedKey, usesByok: false } : null;

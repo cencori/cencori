@@ -4,7 +4,7 @@ import { calculateProviderTokenCost } from '@/lib/providers/base';
 
 export function shouldEnforceProjectCredits(tier: string | null | undefined): boolean {
     const normalizedTier = (tier || 'free').toLowerCase();
-    return normalizedTier !== 'free' && normalizedTier !== 'enterprise';
+    return normalizedTier !== 'enterprise';
 }
 
 export function parseCreditsBalance(value: string | number | null | undefined): number {

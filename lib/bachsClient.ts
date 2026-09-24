@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { CENCORI_PAID_PLANS } from '@/lib/billing/plans';
+import { CARD_TOPUP_FEE_PERCENT, netTopupCredits } from '@/lib/billing/credit-pricing';
 
 const BACHS_API_BASE =
   process.env.BACHS_API_BASE ||
@@ -312,12 +313,12 @@ export const TIER_LIMITS = {
 } as const;
 
 export const CREDIT_TOPUP_PACKS = [
-  { label: 'Starter', credits: 50_000, price: 1000, productId: BACHS_CONFIG.products.creditsStarter },
-  { label: 'Growth', credits: 250_000, price: 5000, productId: BACHS_CONFIG.products.creditsGrowth },
-  { label: 'Scale', credits: 1_000_000, price: 20000, productId: BACHS_CONFIG.products.creditsScale },
+  { label: 'Starter', credits: 10, price: 1000, productId: BACHS_CONFIG.products.creditsStarter },
+  { label: 'Growth', credits: 50, price: 5000, productId: BACHS_CONFIG.products.creditsGrowth },
+  { label: 'Scale', credits: 200, price: 20000, productId: BACHS_CONFIG.products.creditsScale },
 ] as const;
 
-export const PLATFORM_FEE_PERCENT = 5.5;
+export { CARD_TOPUP_FEE_PERCENT as PLATFORM_FEE_PERCENT } from '@/lib/billing/credit-pricing';
 
 /* ─── Product Billing Interval Lookup ─────────────────────────────────── */
 
@@ -428,7 +429,7 @@ export function getCreditTopupCreditsByProductId(
 }
 
 export function netCreditsAfterFee(grossCredits: number): number {
-  return Math.floor(grossCredits * (1 - PLATFORM_FEE_PERCENT / 100));
+  return netTopupCredits(grossCredits, CARD_TOPUP_FEE_PERCENT);
 }
 
 export function getBillingInterval(

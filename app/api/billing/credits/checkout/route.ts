@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const orgId = body.orgId;
   const productId = body.productId || PACK_TO_ID[body.pack];
-  if (!orgId || !productId) {
+  if (!orgId || !productId || !Object.values(PACK_TO_ID).includes(productId)) {
     return NextResponse.json(
-      { error: 'Missing orgId or productId' },
+      { error: 'Select a configured credit pack' },
       { status: 400 }
     );
   }

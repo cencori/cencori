@@ -11,8 +11,8 @@ Cencori uses an organization-level prepaid wallet for AI usage.
 
 - **1 credit = $1 USD**.
 - Credits are held at the **organization** level (not per project).
-- Every successful AI request deducts usage from your org balance.
-- If your org has no credits left, credit-gated tiers receive a blocked response until top-up.
+- Successful managed-key AI requests deduct usage from your org balance (except contracted Enterprise or explicitly sponsored usage).
+- Free, Pro, and Team organizations need prepaid credits for managed-key AI calls.
 
 ## Billing Model
 
@@ -38,7 +38,9 @@ When a user recharges:
 4. A `topup` transaction is written to the transaction history.
 
 > [!NOTE]
-> Top-up settlement is idempotent: duplicate payment events do not double-credit the same order.
+> Top-up settlement is atomic and idempotent by payment reference: duplicate payment events do not double-credit the same order. Existing balances are not revalued by this change.
+
+Wallet credits are dollar-denominated. The default credit packs cost $10, $50, and $200. Card top-ups add 94.5% of the pack price to the wallet after a 5.5% fee; crypto top-ups add 93.5% after a 6.5% fee. The exact wallet amount is shown before checkout. Checkout tax or provider fees may change the payment total without multiplying wallet credits.
 
 ## Usage Charging
 
@@ -70,13 +72,13 @@ If the final calculated charge is **0.0245 credits**, then:
 
 ## Enforcement Behavior
 
-Credits are enforced before request execution on credit-gated tiers. This preflight currently also applies to BYOK requests, even though their Cencori usage charge is zero.
+Free, Pro, and Team managed-key inference requires a positive credit balance before execution. A request with a provable active project BYOK key can proceed at zero balance; ambiguous or multi-provider requests may still require credits until their key source can be established. Control-plane reads and cancellation do not consume AI credits.
 
 - If balance is exhausted, API returns `403` with a credit exhaustion message.
 - Recharge and retry to continue.
 
 > [!IMPORTANT]
-> By default, Pro and Team tiers are credit-gated. Free and Enterprise can use separate policy paths based on deployment config.
+> Enterprise billing follows its contract rather than the prepaid wallet.
 
 ## Managed Keys vs BYOK
 
@@ -100,8 +102,8 @@ You can track credits in:
 
 If you operate your own Cencori deployment:
 
-1. Configure Polar credit products (`starter`, `growth`, `scale`).
-2. Set webhook endpoint and subscribe to `order.paid`.
+1. Configure Bachs credit products (`starter`, `growth`, `scale`) with the listed dollar face values, or enable CoinCircuit checkout.
+2. Set signed webhooks and subscribe to Bachs `collection.succeeded` or CoinCircuit `payment.completed`.
 3. Ensure provider keys are configured for managed mode.
 4. Keep model pricing data current for accurate charging.
 5. Set spend caps and monitor low-balance orgs.
@@ -110,7 +112,7 @@ If you operate your own Cencori deployment:
 
 ### Payment succeeded but credits not added
 - Verify webhook endpoint is reachable and signed correctly.
-- Confirm `order.paid` events are enabled.
+- Confirm the corresponding payment-success webhook is enabled and the atomic top-up migration is applied.
 - Check webhook logs for org resolution and metadata (`purchase_type=credits_topup`).
 
 ### Credits not deducted on requests

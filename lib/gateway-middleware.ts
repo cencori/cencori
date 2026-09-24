@@ -19,6 +19,7 @@ import { getCachedApiKeyConfig, setCachedApiKeyConfig } from '@/lib/config-cache
 import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
+import { isMeteredGatewayRequest, isProvenByokRequest } from '@/lib/gateway/credit-policy';
 import {
     isProjectIngressAllowed,
     loadProjectNetworkPolicy,
@@ -611,7 +612,8 @@ return {
             ? keyData.created_by
             : null;
 
-    const shouldEnforceCredits = tier !== 'free' && tier !== 'enterprise' && !fullySponsoredKey;
+    const shouldEnforceCredits = tier !== 'enterprise' && !fullySponsoredKey
+        && (tier !== 'free' || isMeteredGatewayRequest(req.method, req.nextUrl.pathname));
 
     if (billingFrozen && !fullySponsoredKey) {
         return {
@@ -649,10 +651,7 @@ return {
     // overlapping the I/O removes two network round trips from warm TTFT.
     const route = req.nextUrl.pathname;
     const creditsBalancePromise = shouldEnforceCredits
-        ? import('@/lib/config-cache').then(async ({ getCachedCreditsBalance }) => {
-            const cached = await getCachedCreditsBalance(organizationId);
-            return cached ?? Number(organization.credits_balance ?? 0);
-        })
+        ? import('@/lib/credits').then(({ getCreditsBalance }) => getCreditsBalance(organizationId))
         : Promise.resolve(Number(organization.credits_balance ?? 0));
     const basecodeAccessPromise = basecodeUserId
         ? supabase.rpc('basecode_gateway_access', { p_user_id: basecodeUserId })
@@ -756,7 +755,18 @@ return {
         }
     }
 
-    if (shouldEnforceCredits && creditsBalance <= 0) {
+    const zeroBalanceByok = shouldEnforceCredits && creditsBalance <= 0
+        ? await isProvenByokRequest({
+            req,
+            supabase,
+            projectId: project.id,
+            organizationId,
+            defaultModel: project.default_model,
+            agentId: keyData.agent_id,
+        })
+        : false;
+
+    if (shouldEnforceCredits && creditsBalance <= 0 && !zeroBalanceByok) {
         return {
             success: false,
             response: addGatewayHeaders(
@@ -1128,8 +1138,8 @@ export function describeBasecodeRefusal(reason: string | undefined): {
 }
 
 async function chargeCreditsForRequest(context: GatewayContext, costUsd?: number): Promise<void> {
-    // Free and enterprise tiers are not credit-gated by default.
-    if (context.tier === 'free' || context.tier === 'enterprise') {
+    // Enterprise is handled by contract; every other tier pays for managed usage.
+    if (context.tier === 'enterprise') {
         return;
     }
 

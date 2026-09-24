@@ -9,7 +9,7 @@ const mockGetCachedApiKeyConfig = vi.fn();
 const mockSetCachedApiKeyConfig = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockCheckSpendCap = vi.fn();
-const mockGetCachedCreditsBalance = vi.fn();
+const mockGetCreditsBalance = vi.fn();
 const mockSupabaseFrom = vi.fn();
 const mockProcessUsageQueue = vi.fn();
 const mockLoadProjectNetworkPolicy = vi.fn();
@@ -24,7 +24,6 @@ vi.mock('@/lib/config-cache', () => ({
     getCachedApiKeyConfig: (...args: unknown[]) => mockGetCachedApiKeyConfig(...args),
     setCachedApiKeyConfig: (...args: unknown[]) => mockSetCachedApiKeyConfig(...args),
     invalidateApiKeyCache: vi.fn(),
-    getCachedCreditsBalance: (...args: unknown[]) => mockGetCachedCreditsBalance(...args),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -44,6 +43,11 @@ vi.mock('@/lib/budgets', () => ({
 
 vi.mock('@/lib/credits', () => ({
     deductCredits: vi.fn(),
+    getCreditsBalance: (...args: unknown[]) => mockGetCreditsBalance(...args),
+}));
+
+vi.mock('@/lib/providers/custom-provider-routing', () => ({
+    resolveCustomProviderForProject: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/queue', () => ({
@@ -124,7 +128,7 @@ describe('validateGatewayRequest', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockGetCachedApiKeyConfig.mockResolvedValue(null);
-        mockGetCachedCreditsBalance.mockResolvedValue(null);
+        mockGetCreditsBalance.mockResolvedValue(100);
         mockProcessUsageQueue.mockResolvedValue(0);
         mockLoadProjectNetworkPolicy.mockResolvedValue({ accessMode: 'public', allowedCidrs: [] });
         mockCheckRateLimit.mockResolvedValue({
@@ -317,6 +321,7 @@ describe('validateGatewayRequest', () => {
     });
 
     it('returns 403 when pro org has no credits', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'api_keys') {
                 return {
@@ -340,6 +345,69 @@ describe('validateGatewayRequest', () => {
         if (!result.success) {
             expect(result.response.status).toBe(403);
         }
+    });
+
+    it('requires prepaid credits for free-tier managed inference but not control-plane writes', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
+        mockGetCachedApiKeyConfig.mockResolvedValue({
+            data: buildKeyData({ tier: 'free', creditsBalance: 0 }),
+            fromCache: true,
+        });
+
+        const inference = await validateGatewayRequest(authRequest('/api/ai/chat'));
+        expect(inference.success).toBe(false);
+        if (!inference.success) {
+            expect(inference.response.status).toBe(403);
+            expect((await inference.response.json()).code).toBe('credit_balance_exhausted');
+        }
+
+        const controlPlane = await validateGatewayRequest(authRequest('/api/v1/agents'));
+        expect(controlPlane.success).toBe(true);
+    });
+
+    it('does not trust an API-key cache entry with an old positive wallet balance', async () => {
+        mockGetCachedApiKeyConfig.mockResolvedValue({
+            data: buildKeyData({ tier: 'free', creditsBalance: 100 }),
+            fromCache: true,
+        });
+        mockGetCreditsBalance.mockResolvedValue(0);
+
+        const result = await validateGatewayRequest(authRequest('/api/ai/chat'));
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect((await result.response.json()).code).toBe('credit_balance_exhausted');
+        }
+        expect(mockGetCreditsBalance).toHaveBeenCalledWith('org-val-1');
+    });
+
+    it('allows a zero-balance free-tier request with the selected active BYOK key', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
+        mockGetCachedApiKeyConfig.mockResolvedValue({
+            data: buildKeyData({ tier: 'free', creditsBalance: 0 }),
+            fromCache: true,
+        });
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'provider_keys') {
+                return {
+                    select: () => ({
+                        eq: () => ({ eq: () => ({ eq: () => ({
+                            maybeSingle: async () => ({
+                                data: { encrypted_key: 'encrypted', is_active: true },
+                                error: null,
+                            }),
+                        }) }) }),
+                    }),
+                };
+            }
+            return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }) };
+        });
+
+        const request = new NextRequest('http://localhost/api/ai/chat', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TEST_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'gpt-4o', messages: [] }),
+        });
+        expect((await validateGatewayRequest(request)).success).toBe(true);
     });
 
     it('serves a free org far past the old monthly ceiling', async () => {

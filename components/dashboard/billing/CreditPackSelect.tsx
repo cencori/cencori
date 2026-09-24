@@ -4,27 +4,31 @@ import { Check, ChevronDown } from "lucide-react";
 import { Select as SelectPrimitive } from "radix-ui";
 
 import { cn } from "@/lib/utils";
+import { CARD_TOPUP_FEE_PERCENT, CRYPTO_TOPUP_FEE_PERCENT, netTopupCredits } from "@/lib/billing/credit-pricing";
 
 export type CreditPackId = "starter" | "growth" | "scale";
 
 const CREDIT_PACK_OPTIONS: Array<{
     id: CreditPackId;
     price: string;
-    credits: string;
+    grossUsd: number;
 }> = [
-    { id: "starter", price: "$10", credits: "50,000 credits" },
-    { id: "growth", price: "$50", credits: "250,000 credits" },
-    { id: "scale", price: "$200", credits: "1,000,000 credits" },
+    { id: "starter", price: "$10", grossUsd: 10 },
+    { id: "growth", price: "$50", grossUsd: 50 },
+    { id: "scale", price: "$200", grossUsd: 200 },
 ];
 
 interface CreditPackSelectProps {
     value: CreditPackId;
     onValueChange: (value: CreditPackId) => void;
     disabled?: boolean;
+    paymentMethod: "card" | "crypto";
 }
 
-export function CreditPackSelect({ value, onValueChange, disabled }: CreditPackSelectProps) {
+export function CreditPackSelect({ value, onValueChange, disabled, paymentMethod }: CreditPackSelectProps) {
     const selectedPack = CREDIT_PACK_OPTIONS.find((pack) => pack.id === value) ?? CREDIT_PACK_OPTIONS[0];
+    const feePercent = paymentMethod === "card" ? CARD_TOPUP_FEE_PERCENT : CRYPTO_TOPUP_FEE_PERCENT;
+    const creditLabel = (grossUsd: number) => `$${netTopupCredits(grossUsd, feePercent).toFixed(2)} credits after ${feePercent}% fee`;
 
     return (
         <SelectPrimitive.Root
@@ -42,7 +46,7 @@ export function CreditPackSelect({ value, onValueChange, disabled }: CreditPackS
                             {selectedPack.price}
                         </span>
                         <span className="truncate text-[11px] text-muted-foreground">
-                            {selectedPack.credits}
+                            {creditLabel(selectedPack.grossUsd)}
                         </span>
                     </span>
                 </SelectPrimitive.Value>
@@ -80,7 +84,7 @@ export function CreditPackSelect({ value, onValueChange, disabled }: CreditPackS
                                                 {pack.price}
                                             </span>
                                             <span className="truncate text-[11px] text-muted-foreground">
-                                                {pack.credits}
+                                                {creditLabel(pack.grossUsd)}
                                             </span>
                                         </span>
                                     </SelectPrimitive.ItemText>

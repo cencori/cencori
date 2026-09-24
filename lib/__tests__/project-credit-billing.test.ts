@@ -10,9 +10,15 @@ vi.mock('@/lib/providers/pricing', () => ({
 }));
 vi.mock('@/lib/credits', () => ({ deductCredits: vi.fn() }));
 
-import { calculateTokenCharge } from '@/lib/project-credit-billing';
+import { calculateTokenCharge, shouldEnforceProjectCredits } from '@/lib/project-credit-billing';
 
 describe('project usage credits', () => {
+    it('requires prepaid credits on free and paid tiers, except enterprise contracts', () => {
+        expect(shouldEnforceProjectCredits('free')).toBe(true);
+        expect(shouldEnforceProjectCredits('pro')).toBe(true);
+        expect(shouldEnforceProjectCredits('enterprise')).toBe(false);
+    });
+
     it('does not deduct Cencori usage for BYOK while retaining the provider estimate', async () => {
         expect(await calculateTokenCharge('openai', 'test-model', 1000, 500, true)).toEqual({
             providerCostUsd: 0.007,
