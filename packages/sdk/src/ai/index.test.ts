@@ -132,6 +132,20 @@ describe('AINamespace chat response parsing', () => {
 });
 
 describe('AINamespace generateObject', () => {
+    it('reports unknown usage as null and exposes cost and request ID', async () => {
+        const ns = createNamespace();
+        const controller = new AbortController();
+        const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            toolCalls: [{ id: 'call_1', type: 'function', function: { name: 'generate_object', arguments: '{"ok":true}' } }],
+            cost_usd: 0.002,
+        }), { status: 200, headers: { 'X-Request-Id': 'req_456' } }));
+        const result = await ns.generateObject({ model: 'gpt-4o', prompt: 'hello', schema: { type: 'object' }, signal: controller.signal });
+        expect(result.usage.totalTokens).toBeNull();
+        expect(result.costUsd).toBe(0.002);
+        expect(result.requestId).toBe('req_456');
+        expect(fetchMock).toHaveBeenCalledWith('https://cencori.com/api/ai/chat', expect.objectContaining({ signal: controller.signal }));
+    });
+
     it('reads structured output from top-level tool_calls', async () => {
         const ns = createNamespace();
 

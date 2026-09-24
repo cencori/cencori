@@ -128,6 +128,8 @@ export interface GenerateObjectRequest {
     schemaDescription?: string;
     temperature?: number;
     maxTokens?: number;
+    /** Abort the HTTP request (not a server-side hosted run). */
+    signal?: AbortSignal;
 }
 
 /**
@@ -136,10 +138,13 @@ export interface GenerateObjectRequest {
 export interface GenerateObjectResponse<T = unknown> {
     object: T;
     usage: {
-        promptTokens: number;
-        completionTokens: number;
-        totalTokens: number;
+        promptTokens: number | null;
+        completionTokens: number | null;
+        totalTokens: number | null;
     };
+    /** USD charged by Cencori, or null when the gateway did not report it. */
+    costUsd: number | null;
+    requestId: string | null;
 }
 
 export interface CompletionRequest {
@@ -361,4 +366,3 @@ export interface RequestOptions {
     body?: string;
     headers?: Record<string, string>;
 }
-

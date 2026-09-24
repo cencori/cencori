@@ -28,6 +28,7 @@ import type {
 interface OpenAIChatResponse {
     id?: string;
     model?: string;
+    cost_usd?: number;
     content?: string;
     finish_reason?: string;
     toolCalls?: Array<{
@@ -319,6 +320,7 @@ export class AINamespace {
         // Use function calling to enforce JSON schema
         const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
             method: 'POST',
+            signal: request.signal,
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
                 'Content-Type': 'application/json',
@@ -367,10 +369,12 @@ export class AINamespace {
         return {
             object: parsedObject,
             usage: {
-                promptTokens: data.usage?.prompt_tokens ?? 0,
-                completionTokens: data.usage?.completion_tokens ?? 0,
-                totalTokens: data.usage?.total_tokens ?? 0,
+                promptTokens: data.usage?.prompt_tokens ?? null,
+                completionTokens: data.usage?.completion_tokens ?? null,
+                totalTokens: data.usage?.total_tokens ?? null,
             },
+            costUsd: data.cost_usd ?? null,
+            requestId: response.headers.get('X-Request-Id'),
         };
     }
 
